@@ -19,6 +19,8 @@ import Maintenance from "./pages/Maintenance";
 import RoutePermits from "./pages/RoutePermits";
 import DriverTraining from "./pages/DriverTraining";
 import RealTimeTracking from "./pages/RealTimeTracking";
+import DriverAllocation from "./pages/DriverAllocation";
+import StaffAttendancePayroll from "./pages/StaffAttendancePayroll";
 
 const queryClient = new QueryClient();
 
@@ -133,9 +135,9 @@ const App = () => (
             <Route 
               path="/allocation" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
                   <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Driver Allocation module coming soon...</div>
+                    <DriverAllocation />
                   </AppLayout>
                 </ProtectedRoute>
               } 
@@ -143,9 +145,9 @@ const App = () => (
             <Route 
               path="/attendance" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
                   <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Staff Attendance module coming soon...</div>
+                    <StaffAttendancePayroll />
                   </AppLayout>
                 </ProtectedRoute>
               } 

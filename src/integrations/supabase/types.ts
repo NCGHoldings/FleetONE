@@ -268,6 +268,75 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_allocations: {
+        Row: {
+          allocation_date: string
+          bus_id: string | null
+          conductor_id: string | null
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          end_time: string | null
+          id: string
+          notes: string | null
+          route_id: string | null
+          start_time: string | null
+          status: string
+          trip_id: string
+          updated_at: string
+          whatsapp_sent: boolean | null
+        }
+        Insert: {
+          allocation_date?: string
+          bus_id?: string | null
+          conductor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          route_id?: string | null
+          start_time?: string | null
+          status?: string
+          trip_id: string
+          updated_at?: string
+          whatsapp_sent?: boolean | null
+        }
+        Update: {
+          allocation_date?: string
+          bus_id?: string | null
+          conductor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          route_id?: string | null
+          start_time?: string | null
+          status?: string
+          trip_id?: string
+          updated_at?: string
+          whatsapp_sent?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_allocations_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_allocations_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_training: {
         Row: {
           created_at: string
@@ -613,6 +682,101 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payroll_adjustments: {
+        Row: {
+          adjusted_by: string | null
+          adjustment_type: string
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          payroll_record_id: string | null
+        }
+        Insert: {
+          adjusted_by?: string | null
+          adjustment_type: string
+          amount: number
+          created_at?: string
+          description: string
+          id?: string
+          payroll_record_id?: string | null
+        }
+        Update: {
+          adjusted_by?: string | null
+          adjustment_type?: string
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          payroll_record_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_adjustments_payroll_record_id_fkey"
+            columns: ["payroll_record_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_records: {
+        Row: {
+          allowances: number | null
+          base_salary: number | null
+          created_at: string
+          deductions: number | null
+          gross_pay: number | null
+          id: string
+          net_pay: number | null
+          overtime_pay: number | null
+          pay_period_end: string
+          pay_period_start: string
+          processed_at: string | null
+          processed_by: string | null
+          staff_id: string
+          staff_name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          allowances?: number | null
+          base_salary?: number | null
+          created_at?: string
+          deductions?: number | null
+          gross_pay?: number | null
+          id?: string
+          net_pay?: number | null
+          overtime_pay?: number | null
+          pay_period_end: string
+          pay_period_start: string
+          processed_at?: string | null
+          processed_by?: string | null
+          staff_id: string
+          staff_name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          allowances?: number | null
+          base_salary?: number | null
+          created_at?: string
+          deductions?: number | null
+          gross_pay?: number | null
+          id?: string
+          net_pay?: number | null
+          overtime_pay?: number | null
+          pay_period_end?: string
+          pay_period_start?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          staff_id?: string
+          staff_name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -1005,6 +1169,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      staff_attendance: {
+        Row: {
+          attendance_date: string
+          auto_generated: boolean | null
+          bus_no: string | null
+          created_at: string
+          end_time: string | null
+          hours_worked: number | null
+          id: string
+          overtime_hours: number | null
+          route: string | null
+          staff_id: string
+          staff_name: string
+          start_time: string | null
+          status: string
+          trip_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          attendance_date?: string
+          auto_generated?: boolean | null
+          bus_no?: string | null
+          created_at?: string
+          end_time?: string | null
+          hours_worked?: number | null
+          id?: string
+          overtime_hours?: number | null
+          route?: string | null
+          staff_id: string
+          staff_name: string
+          start_time?: string | null
+          status?: string
+          trip_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attendance_date?: string
+          auto_generated?: boolean | null
+          bus_no?: string | null
+          created_at?: string
+          end_time?: string | null
+          hours_worked?: number | null
+          id?: string
+          overtime_hours?: number | null
+          route?: string | null
+          staff_id?: string
+          staff_name?: string
+          start_time?: string | null
+          status?: string
+          trip_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       system_settings: {
         Row: {
