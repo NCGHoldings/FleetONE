@@ -3,7 +3,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2 } from "lucide-react";
+import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2, FileText, Edit, Calculator } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
@@ -11,25 +11,44 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { AddTripForm } from "@/components/trips/AddTripForm";
+import { OtherExpensesModal } from "@/components/trips/OtherExpensesModal";
+import { ExportModal } from "@/components/trips/ExportModal";
+import { EditTripForm } from "@/components/trips/EditTripForm";
 
 interface Trip {
   id: string;
   trip_no: string;
+  bus_id: string;
+  route_id: string;
+  driver_id?: string;
+  conductor_id?: string;
   bus_no: string;
   route_no: string;
   route: string;
   driver_name?: string;
   conductor_name?: string;
+  whatsapp?: string;
   trip_date: string;
   start_time?: string;
   end_time?: string;
+  odometer_start?: number;
+  odometer_end?: number;
   distance_km: number;
   income: number;
   fuel_cost: number;
+  diesel_price_per_liter?: number;
+  fuel_liters?: number;
+  other_expenses: number;
+  other_expenses_details?: any[];
+  total_expenses: number;
   net_income: number;
   km_per_liter: number;
+  performance_score?: number;
+  audit_log?: any[];
   status: "scheduled" | "ongoing" | "completed" | "cancelled";
 }
 
@@ -45,7 +64,59 @@ const getStatusBadge = (status: Trip['status']) => {
   return <Badge className={`status-${config.variant.replace('destructive', 'error')}`}>{config.label}</Badge>;
 };
 
-const columns: ColumnDef<Trip>[] = [
+// Handler functions defined before columns
+const handleViewDetails = (tripId: string) => {
+  console.log("Viewing details for trip:", tripId);
+};
+
+const handleEditTrip = (trip: Trip, setEditingTrip: (trip: Trip | null) => void, setShowEditForm: (show: boolean) => void) => {
+  setEditingTrip(trip);
+  setShowEditForm(true);
+};
+
+const handleViewExpenses = (trip: Trip, setSelectedTrip: (trip: Trip | null) => void, setShowExpensesModal: (show: boolean) => void) => {
+  setSelectedTrip(trip);
+  setShowExpensesModal(true);
+};
+
+const handleCancelTrip = async (tripId: string, toast: any, fetchTrips: () => void) => {
+  try {
+    const { error } = await supabase
+      .from('daily_trips')
+      .update({ status: 'cancelled' })
+      .eq('id', tripId);
+
+    if (error) throw error;
+
+    toast({
+      title: "Success",
+      description: "Trip cancelled successfully",
+    });
+    
+    fetchTrips();
+  } catch (error) {
+    console.error('Error cancelling trip:', error);
+    toast({
+      title: "Error",
+      description: "Failed to cancel trip",
+      variant: "destructive",
+    });
+  }
+};
+
+const createColumns = (
+  handleViewDetailsLocal: (tripId: string) => void,
+  handleEditTripLocal: (trip: Trip) => void,
+  handleViewExpensesLocal: (trip: Trip) => void,
+  handleCancelTripLocal: (tripId: string) => void
+): ColumnDef<Trip>[] => [
+  {
+    accessorKey: "trip_no",
+    header: "Trip ID",
+    cell: ({ row }) => (
+      <span className="font-mono text-sm">{row.getValue("trip_no")}</span>
+    ),
+  },
   {
     accessorKey: "bus_no",
     header: "Bus No.",
@@ -67,6 +138,52 @@ const columns: ColumnDef<Trip>[] = [
     accessorKey: "conductor_name",
     header: "Conductor",
     cell: ({ row }) => row.getValue("conductor_name") || "-",
+  },
+  {
+    accessorKey: "whatsapp",
+    header: "WhatsApp",
+    cell: ({ row }) => {
+      const whatsapp = row.getValue("whatsapp") as string;
+      return whatsapp ? (
+        <span className="text-green-600">✓ Sent</span>
+      ) : (
+        <span className="text-muted-foreground">-</span>
+      );
+    },
+  },
+  {
+    accessorKey: "trip_date",
+    header: "Date",
+    cell: ({ row }) => {
+      const date = row.getValue("trip_date") as string;
+      return new Date(date).toLocaleDateString();
+    },
+  },
+  {
+    accessorKey: "start_time",
+    header: "Start Time",
+    cell: ({ row }) => row.getValue("start_time") || "-",
+  },
+  {
+    accessorKey: "end_time",
+    header: "End Time",
+    cell: ({ row }) => row.getValue("end_time") || "-",
+  },
+  {
+    accessorKey: "odometer_start",
+    header: "Odo Start",
+    cell: ({ row }) => {
+      const value = row.getValue("odometer_start") as number;
+      return value ? value.toLocaleString() : "-";
+    },
+  },
+  {
+    accessorKey: "odometer_end",
+    header: "Odo End",
+    cell: ({ row }) => {
+      const value = row.getValue("odometer_end") as number;
+      return value ? value.toLocaleString() : "-";
+    },
   },
   {
     accessorKey: "distance_km",
@@ -93,11 +210,58 @@ const columns: ColumnDef<Trip>[] = [
     },
   },
   {
+    accessorKey: "diesel_price_per_liter",
+    header: "Diesel Price (₨/L)",
+    cell: ({ row }) => {
+      const price = row.getValue("diesel_price_per_liter") as number;
+      return price > 0 ? `₨ ${price.toFixed(2)}` : "-";
+    },
+  },
+  {
+    accessorKey: "fuel_liters",
+    header: "Fuel Liters (L)",
+    cell: ({ row }) => {
+      const liters = row.getValue("fuel_liters") as number;
+      return liters > 0 ? liters.toFixed(2) : "-";
+    },
+  },
+  {
+    accessorKey: "other_expenses",
+    header: "Other Expenses",
+    cell: ({ row }) => {
+      const expenses = row.getValue("other_expenses") as number;
+      const details = row.original.other_expenses_details;
+      return (
+        <div className="text-center">
+          <span>{expenses > 0 ? `₨ ${expenses.toLocaleString()}` : "-"}</span>
+          {details && details.length > 0 && (
+            <div className="text-xs text-muted-foreground mt-1">
+              {details.length} item{details.length > 1 ? 's' : ''}
+            </div>
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "total_expenses",
+    header: "Total Expenses",
+    cell: ({ row }) => {
+      const total = row.getValue("total_expenses") as number;
+      return total > 0 ? `₨ ${total.toLocaleString()}` : "-";
+    },
+  },
+  {
     accessorKey: "net_income",
     header: "Net Income (₨)",
     cell: ({ row }) => {
       const netIncome = row.getValue("net_income") as number;
-      return netIncome > 0 ? `₨ ${netIncome.toLocaleString()}` : "-";
+      const className = netIncome >= 0 ? "text-green-600" : "text-red-600";
+      return (
+        <span className={className}>
+          {netIncome !== 0 ? `₨ ${netIncome.toLocaleString()}` : "-"}
+        </span>
+      );
     },
   },
   {
@@ -105,7 +269,17 @@ const columns: ColumnDef<Trip>[] = [
     header: "km/L",
     cell: ({ row }) => {
       const kmPerLiter = row.getValue("km_per_liter") as number;
-      return kmPerLiter > 0 ? kmPerLiter.toFixed(1) : "-";
+      const performance = row.original.performance_score;
+      return (
+        <div className="text-center">
+          <span>{kmPerLiter > 0 ? kmPerLiter.toFixed(1) : "-"}</span>
+          {performance && (
+            <div className={`text-xs mt-1 ${performance >= 100 ? 'text-green-600' : performance >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
+              {performance.toFixed(0)}% eff.
+            </div>
+          )}
+        </div>
+      );
     },
   },
   {
@@ -115,6 +289,7 @@ const columns: ColumnDef<Trip>[] = [
   },
   {
     id: "actions",
+    header: "Actions",
     cell: ({ row }) => {
       const trip = row.original;
       return (
@@ -125,10 +300,19 @@ const columns: ColumnDef<Trip>[] = [
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>View Details</DropdownMenuItem>
-            <DropdownMenuItem>Edit Trip</DropdownMenuItem>
-            <DropdownMenuItem>Print Receipt</DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem onClick={() => handleViewDetailsLocal(trip.id)}>
+              <FileText className="h-4 w-4 mr-2" />
+              View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleEditTripLocal(trip)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Trip
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleViewExpensesLocal(trip)}>
+              <Calculator className="h-4 w-4 mr-2" />
+              View Expenses
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => handleCancelTripLocal(trip.id)}>
               Cancel Trip
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -141,11 +325,75 @@ const columns: ColumnDef<Trip>[] = [
 export default function DailyTrips() {
   const [data, setData] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [showExpensesModal, setShowExpensesModal] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [dieselPrice, setDieselPrice] = useState<number>(150);
   const { toast } = useToast();
+
+  const handleViewDetailsLocal = (tripId: string) => {
+    console.log("Viewing details for trip:", tripId);
+  };
+
+  const handleEditTripLocal = (trip: Trip) => {
+    setEditingTrip(trip);
+    setShowEditForm(true);
+  };
+
+  const handleViewExpensesLocal = (trip: Trip) => {
+    setSelectedTrip(trip);
+    setShowExpensesModal(true);
+  };
+
+  const handleCancelTripLocal = async (tripId: string) => {
+    try {
+      const { error } = await supabase
+        .from('daily_trips')
+        .update({ status: 'cancelled' })
+        .eq('id', tripId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Trip cancelled successfully",
+      });
+      
+      fetchTrips();
+    } catch (error) {
+      console.error('Error cancelling trip:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel trip",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     fetchTrips();
+    fetchDieselPrice();
   }, []);
+
+  const fetchDieselPrice = async () => {
+    try {
+      const { data: settings, error } = await supabase
+        .from('system_settings')
+        .select('setting_value')
+        .eq('setting_key', 'diesel_price_per_liter')
+        .single();
+
+      if (error) throw error;
+      if (settings) {
+        setDieselPrice(parseFloat(settings.setting_value as string));
+      }
+    } catch (error) {
+      console.error('Error fetching diesel price:', error);
+    }
+  };
 
   const fetchTrips = async () => {
     try {
@@ -174,19 +422,33 @@ export default function DailyTrips() {
       const transformedTrips: Trip[] = trips?.map(trip => ({
         id: trip.id,
         trip_no: trip.trip_no || `T-${trip.id.slice(0, 8)}`,
+        bus_id: trip.bus_id,
+        route_id: trip.route_id,
+        driver_id: trip.driver_id,
+        conductor_id: trip.conductor_id,
         bus_no: trip.buses?.bus_no || 'Unknown',
         route_no: trip.routes?.route_no || 'Unknown',
         route: trip.routes?.route_name || 'Unknown Route',
         driver_name: trip.driver ? `${trip.driver.first_name} ${trip.driver.last_name}` : undefined,
         conductor_name: trip.conductor ? `${trip.conductor.first_name} ${trip.conductor.last_name}` : undefined,
+        whatsapp: trip.whatsapp,
         trip_date: trip.trip_date,
         start_time: trip.start_time,
         end_time: trip.end_time,
+        odometer_start: trip.odometer_start,
+        odometer_end: trip.odometer_end,
         distance_km: trip.distance_km || 0,
         income: trip.income || 0,
         fuel_cost: trip.fuel_cost || 0,
+        diesel_price_per_liter: trip.diesel_price_per_liter,
+        fuel_liters: trip.fuel_liters,
+        other_expenses: trip.other_expenses || 0,
+        other_expenses_details: Array.isArray(trip.other_expenses_details) ? trip.other_expenses_details : [],
+        total_expenses: trip.total_expenses || 0,
         net_income: trip.net_income || 0,
         km_per_liter: trip.km_per_liter || 0,
+        performance_score: trip.performance_score,
+        audit_log: Array.isArray(trip.audit_log) ? trip.audit_log : [],
         status: trip.status as Trip['status'],
       })) || [];
 
@@ -204,13 +466,22 @@ export default function DailyTrips() {
   };
 
   const handleExport = () => {
-    console.log("Exporting trips data...");
-    // Export logic will be implemented here
+    setShowExportModal(true);
   };
 
   const handleAddTrip = () => {
-    console.log("Adding new trip...");
-    // Add trip logic will be implemented here
+    setShowAddForm(true);
+  };
+
+  const handleTripAdded = () => {
+    setShowAddForm(false);
+    fetchTrips();
+  };
+
+  const handleTripUpdated = () => {
+    setShowEditForm(false);
+    setEditingTrip(null);
+    fetchTrips();
   };
 
   // Calculate KPIs
@@ -288,11 +559,54 @@ export default function DailyTrips() {
 
       {/* Data Table */}
       <DataTable
-        columns={columns}
+        columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal)}
         data={data}
         searchKey="bus_no"
-        title="Today's Trips"
+        title="Daily Trips"
         onExport={handleExport}
+      />
+
+      {/* Modals */}
+      <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Trip</DialogTitle>
+          </DialogHeader>
+          <AddTripForm 
+            onSuccess={handleTripAdded}
+            onCancel={() => setShowAddForm(false)}
+            dieselPrice={dieselPrice}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Trip</DialogTitle>
+          </DialogHeader>
+          {editingTrip && (
+            <EditTripForm 
+              trip={editingTrip}
+              onSuccess={handleTripUpdated}
+              onCancel={() => setShowEditForm(false)}
+              dieselPrice={dieselPrice}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <OtherExpensesModal
+        isOpen={showExpensesModal}
+        onClose={() => setShowExpensesModal(false)}
+        trip={selectedTrip}
+        onUpdate={fetchTrips}
+      />
+
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        data={data}
       />
     </div>
   );
