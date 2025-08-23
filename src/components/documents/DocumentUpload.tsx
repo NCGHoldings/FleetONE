@@ -101,12 +101,7 @@ export function DocumentUpload({ linkedTable, linkedRowId, title = "Documents" }
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
-
-      // Save metadata to database
+      // Save metadata to database (store storage path, we'll generate signed URLs on demand)
       const { error: dbError } = await supabase
         .from('documents')
         .insert({
@@ -115,7 +110,7 @@ export function DocumentUpload({ linkedTable, linkedRowId, title = "Documents" }
           file_name: selectedFile.name,
           file_type: selectedFile.type,
           file_size: selectedFile.size,
-          file_url: publicUrl,
+          file_url: filePath, // Store the storage path instead of public URL
           storage_path: filePath,
           tag: selectedTag,
           uploaded_by: user.id
@@ -161,9 +156,16 @@ export function DocumentUpload({ linkedTable, linkedRowId, title = "Documents" }
     }
   };
 
-  const handleDownload = async (fileUrl: string, fileName: string) => {
+  const handleDownload = async (storagePath: string, fileName: string) => {
     try {
-      const response = await fetch(fileUrl);
+      // Create signed URL for downloading
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(storagePath, 60); // 60 seconds expiry
+
+      if (error) throw error;
+
+      const response = await fetch(data.signedUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -174,6 +176,7 @@ export function DocumentUpload({ linkedTable, linkedRowId, title = "Documents" }
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
+      console.error('Download error:', error);
       toast.error('Failed to download document');
     }
   };
@@ -282,14 +285,26 @@ export function DocumentUpload({ linkedTable, linkedRowId, title = "Documents" }
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => window.open(doc.file_url, '_blank')}
+                    onClick={async () => {
+                      try {
+                        const { data, error } = await supabase.storage
+                          .from('documents')
+                          .createSignedUrl(doc.storage_path, 60);
+                        
+                        if (error) throw error;
+                        window.open(data.signedUrl, '_blank');
+                      } catch (error) {
+                        console.error('Preview error:', error);
+                        toast.error('Failed to preview document');
+                      }
+                    }}
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => handleDownload(doc.file_url, doc.file_name)}
+                    onClick={() => handleDownload(doc.storage_path, doc.file_name)}
                   >
                     <Download className="h-4 w-4" />
                   </Button>

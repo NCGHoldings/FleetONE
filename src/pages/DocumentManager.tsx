@@ -64,9 +64,16 @@ export default function DocumentManager() {
     fetchDocuments();
   }, [searchTerm, selectedTable, selectedTag]);
 
-  const handleDownload = async (fileUrl: string, fileName: string) => {
+  const handleDownload = async (storagePath: string, fileName: string) => {
     try {
-      const response = await fetch(fileUrl);
+      // Create signed URL for downloading
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(storagePath, 60); // 60 seconds expiry
+
+      if (error) throw error;
+
+      const response = await fetch(data.signedUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -78,6 +85,7 @@ export default function DocumentManager() {
       window.URL.revokeObjectURL(url);
       toast.success('Document downloaded');
     } catch (error) {
+      console.error('Download error:', error);
       toast.error('Failed to download document');
     }
   };
@@ -170,14 +178,26 @@ export default function DocumentManager() {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => window.open(row.original.file_url, '_blank')}
+            onClick={async () => {
+              try {
+                const { data, error } = await supabase.storage
+                  .from('documents')
+                  .createSignedUrl(row.original.storage_path, 60);
+                
+                if (error) throw error;
+                window.open(data.signedUrl, '_blank');
+              } catch (error) {
+                console.error('Preview error:', error);
+                toast.error('Failed to preview document');
+              }
+            }}
           >
             <Eye className="h-4 w-4" />
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => handleDownload(row.original.file_url, row.original.file_name)}
+            onClick={() => handleDownload(row.original.storage_path, row.original.file_name)}
           >
             <Download className="h-4 w-4" />
           </Button>
