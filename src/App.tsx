@@ -22,6 +22,7 @@ import DriverTraining from "./pages/DriverTraining";
 import RealTimeTracking from "./pages/RealTimeTracking";
 import DriverAllocation from "./pages/DriverAllocation";
 import StaffAttendancePayroll from "./pages/StaffAttendancePayroll";
+import DocumentManager from "./pages/DocumentManager";
 
 const queryClient = new QueryClient();
 
@@ -178,7 +179,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Document Manager module coming soon...</div>
+                    <DocumentManager />
                   </AppLayout>
                 </ProtectedRoute>
               } 

@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Shield, Plus, AlertTriangle, CheckCircle, Calendar } from "lucide-react";
+import { Shield, Plus, AlertTriangle, CheckCircle, Calendar, FileText, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { format, parseISO, differenceInDays } from "date-fns";
+import { DocumentUpload } from "@/components/documents/DocumentUpload";
 
 interface InsuranceRecord {
   id: string;
@@ -195,6 +196,30 @@ export default function Insurance() {
       },
     },
     {
+      accessorKey: "expiry_date",
+      header: "Days Remaining",
+      cell: ({ row }) => {
+        const expiryDate = row.original.expiry_date;
+        const daysRemaining = differenceInDays(parseISO(expiryDate), new Date());
+        const status = getExpiryStatus(expiryDate);
+        
+        return (
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            <span className={
+              status === 'expired' ? 'text-red-600 font-semibold' :
+              status === 'expiring-soon' ? 'text-yellow-600 font-semibold' :
+              'text-green-600'
+            }>
+              {daysRemaining < 0 ? `${Math.abs(daysRemaining)} days overdue` : 
+               daysRemaining === 0 ? 'Expires today' :
+               `${daysRemaining} days`}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
@@ -215,6 +240,29 @@ export default function Insurance() {
           </Badge>
         );
       },
+    },
+    {
+      id: "documents",
+      header: "Documents",
+      cell: ({ row }) => (
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="outline">
+              <FileText className="h-4 w-4 mr-2" />
+              Docs
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Insurance Documents - Policy #{row.original.policy_number}</DialogTitle>
+            </DialogHeader>
+            <DocumentUpload 
+              linkedTable="insurance_records" 
+              linkedRowId={row.original.id}
+            />
+          </DialogContent>
+        </Dialog>
+      ),
     },
   ];
 
