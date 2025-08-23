@@ -314,12 +314,12 @@ export default function DriverAllocation() {
 
                 <div>
                   <Label>Conductor</Label>
-                  <Select value={form.conductor_id} onValueChange={(v) => setForm({ ...form, conductor_id: v })}>
+                  <Select value={form.conductor_id || "none"} onValueChange={(v) => setForm({ ...form, conductor_id: v === "none" ? "" : v })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select conductor (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {people.map((p) => (
                         <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
                       ))}
