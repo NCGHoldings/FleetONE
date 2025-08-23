@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus } from "lucide-react";
+import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
@@ -11,84 +11,33 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Trip {
   id: string;
-  busNo: string;
-  routeNo: string;
+  trip_no: string;
+  bus_no: string;
+  route_no: string;
   route: string;
-  driver: string;
-  conductor: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  distance: number;
+  driver_name?: string;
+  conductor_name?: string;
+  trip_date: string;
+  start_time?: string;
+  end_time?: string;
+  distance_km: number;
   income: number;
-  fuelCost: number;
-  netIncome: number;
-  kmPerLiter: number;
-  status: "completed" | "ongoing" | "cancelled";
+  fuel_cost: number;
+  net_income: number;
+  km_per_liter: number;
+  status: "scheduled" | "ongoing" | "completed" | "cancelled";
 }
-
-// Mock data
-const tripsData: Trip[] = [
-  {
-    id: "T001",
-    busNo: "NK-2847",
-    routeNo: "R101",
-    route: "Colombo - Kandy",
-    driver: "Sunil Perera",
-    conductor: "Nimal Silva",
-    date: "2024-01-15",
-    startTime: "06:00",
-    endTime: "10:30",
-    distance: 115,
-    income: 12500,
-    fuelCost: 3200,
-    netIncome: 9300,
-    kmPerLiter: 12.8,
-    status: "completed"
-  },
-  {
-    id: "T002",
-    busNo: "NK-1234",
-    routeNo: "R102",
-    route: "Colombo - Galle",
-    driver: "Kamal Ranasinghe",
-    conductor: "Prasad Kumara",
-    date: "2024-01-15",
-    startTime: "07:15",
-    endTime: "11:45",
-    distance: 98,
-    income: 10800,
-    fuelCost: 2950,
-    netIncome: 7850,
-    kmPerLiter: 11.2,
-    status: "completed"
-  },
-  {
-    id: "T003",
-    busNo: "NK-5678",
-    routeNo: "R103",
-    route: "Kandy - Nuwara Eliya",
-    driver: "Ranjan Fernando",
-    conductor: "Chamara Dias",
-    date: "2024-01-15",
-    startTime: "08:00",
-    endTime: "",
-    distance: 0,
-    income: 0,
-    fuelCost: 0,
-    netIncome: 0,
-    kmPerLiter: 0,
-    status: "ongoing"
-  }
-];
 
 const getStatusBadge = (status: Trip['status']) => {
   const variants = {
-    completed: { variant: "success" as const, label: "Completed" },
+    scheduled: { variant: "secondary" as const, label: "Scheduled" },
     ongoing: { variant: "warning" as const, label: "Ongoing" },
+    completed: { variant: "success" as const, label: "Completed" },
     cancelled: { variant: "destructive" as const, label: "Cancelled" }
   };
   
@@ -98,11 +47,11 @@ const getStatusBadge = (status: Trip['status']) => {
 
 const columns: ColumnDef<Trip>[] = [
   {
-    accessorKey: "busNo",
+    accessorKey: "bus_no",
     header: "Bus No.",
   },
   {
-    accessorKey: "routeNo",
+    accessorKey: "route_no",
     header: "Route No.",
   },
   {
@@ -110,18 +59,20 @@ const columns: ColumnDef<Trip>[] = [
     header: "Route",
   },
   {
-    accessorKey: "driver",
+    accessorKey: "driver_name",
     header: "Driver",
+    cell: ({ row }) => row.getValue("driver_name") || "-",
   },
   {
-    accessorKey: "conductor",
+    accessorKey: "conductor_name",
     header: "Conductor",
+    cell: ({ row }) => row.getValue("conductor_name") || "-",
   },
   {
-    accessorKey: "distance",
+    accessorKey: "distance_km",
     header: "Distance (km)",
     cell: ({ row }) => {
-      const distance = row.getValue("distance") as number;
+      const distance = row.getValue("distance_km") as number;
       return distance > 0 ? distance.toFixed(1) : "-";
     },
   },
@@ -134,26 +85,26 @@ const columns: ColumnDef<Trip>[] = [
     },
   },
   {
-    accessorKey: "fuelCost",
+    accessorKey: "fuel_cost",
     header: "Fuel Cost (₨)",
     cell: ({ row }) => {
-      const fuelCost = row.getValue("fuelCost") as number;
+      const fuelCost = row.getValue("fuel_cost") as number;
       return fuelCost > 0 ? `₨ ${fuelCost.toLocaleString()}` : "-";
     },
   },
   {
-    accessorKey: "netIncome",
+    accessorKey: "net_income",
     header: "Net Income (₨)",
     cell: ({ row }) => {
-      const netIncome = row.getValue("netIncome") as number;
+      const netIncome = row.getValue("net_income") as number;
       return netIncome > 0 ? `₨ ${netIncome.toLocaleString()}` : "-";
     },
   },
   {
-    accessorKey: "kmPerLiter",
+    accessorKey: "km_per_liter",
     header: "km/L",
     cell: ({ row }) => {
-      const kmPerLiter = row.getValue("kmPerLiter") as number;
+      const kmPerLiter = row.getValue("km_per_liter") as number;
       return kmPerLiter > 0 ? kmPerLiter.toFixed(1) : "-";
     },
   },
@@ -188,7 +139,69 @@ const columns: ColumnDef<Trip>[] = [
 ];
 
 export default function DailyTrips() {
-  const [data] = useState<Trip[]>(tripsData);
+  const [data, setData] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchTrips();
+  }, []);
+
+  const fetchTrips = async () => {
+    try {
+      const { data: trips, error } = await supabase
+        .from('daily_trips')
+        .select(`
+          *,
+          buses!inner(bus_no),
+          routes!inner(route_no, route_name),
+          driver:profiles!daily_trips_driver_id_fkey(first_name, last_name),
+          conductor:profiles!daily_trips_conductor_id_fkey(first_name, last_name)
+        `)
+        .order('trip_date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching trips:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load trips data.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Transform the data to match our interface
+      const transformedTrips: Trip[] = trips?.map(trip => ({
+        id: trip.id,
+        trip_no: trip.trip_no || `T-${trip.id.slice(0, 8)}`,
+        bus_no: trip.buses?.bus_no || 'Unknown',
+        route_no: trip.routes?.route_no || 'Unknown',
+        route: trip.routes?.route_name || 'Unknown Route',
+        driver_name: trip.driver ? `${trip.driver.first_name} ${trip.driver.last_name}` : undefined,
+        conductor_name: trip.conductor ? `${trip.conductor.first_name} ${trip.conductor.last_name}` : undefined,
+        trip_date: trip.trip_date,
+        start_time: trip.start_time,
+        end_time: trip.end_time,
+        distance_km: trip.distance_km || 0,
+        income: trip.income || 0,
+        fuel_cost: trip.fuel_cost || 0,
+        net_income: trip.net_income || 0,
+        km_per_liter: trip.km_per_liter || 0,
+        status: trip.status as Trip['status'],
+      })) || [];
+
+      setData(transformedTrips);
+    } catch (error) {
+      console.error('Error in fetchTrips:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while loading trips.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleExport = () => {
     console.log("Exporting trips data...");
@@ -204,9 +217,32 @@ export default function DailyTrips() {
   const totalTrips = data.length;
   const completedTrips = data.filter(trip => trip.status === 'completed').length;
   const totalIncome = data.reduce((sum, trip) => sum + trip.income, 0);
-  const totalDistance = data.reduce((sum, trip) => sum + trip.distance, 0);
-  const avgKmPerLiter = data.filter(trip => trip.kmPerLiter > 0)
-    .reduce((sum, trip, _, arr) => sum + trip.kmPerLiter / arr.length, 0);
+  const totalDistance = data.reduce((sum, trip) => sum + trip.distance_km, 0);
+  const avgKmPerLiter = data.filter(trip => trip.km_per_liter > 0)
+    .reduce((sum, trip, _, arr) => sum + trip.km_per_liter / arr.length, 0);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Daily Trips</h1>
+            <p className="text-muted-foreground">Monitor and manage daily bus operations</p>
+          </div>
+          <Button disabled className="gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading...
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 bg-muted/20 animate-pulse rounded-lg" />
+          ))}
+        </div>
+        <div className="h-96 bg-muted/20 animate-pulse rounded-lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -254,7 +290,7 @@ export default function DailyTrips() {
       <DataTable
         columns={columns}
         data={data}
-        searchKey="busNo"
+        searchKey="bus_no"
         title="Today's Trips"
         onExport={handleExport}
       />

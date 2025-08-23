@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus } from "lucide-react";
+import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus, Loader2 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
@@ -11,96 +11,39 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Fleet {
   id: string;
-  busNo: string;
+  bus_no: string;
   type: string;
-  route: string;
+  route?: string;
   model: string;
   year: number;
   capacity: number;
-  status: "active" | "maintenance" | "idle";
-  lastService: string;
-  nextService: string;
-  mileage: number;
-  avgDailyRevenue: number;
+  status: "active" | "maintenance" | "idle" | "retired";
+  last_service_date?: string;
+  next_service_date?: string;
+  current_mileage: number;
+  avg_daily_revenue?: number;
 }
-
-// Mock data
-const fleetData: Fleet[] = [
-  {
-    id: "F001",
-    busNo: "NK-2847",
-    type: "Inter-City",
-    route: "Colombo - Kandy",
-    model: "Ashok Leyland Viking",
-    year: 2020,
-    capacity: 49,
-    status: "active",
-    lastService: "2024-01-10",
-    nextService: "2024-04-10",
-    mileage: 125000,
-    avgDailyRevenue: 15500
-  },
-  {
-    id: "F002",
-    busNo: "NK-1234",
-    type: "Highway",
-    route: "Colombo - Galle",
-    model: "Tata Starbus",
-    year: 2019,
-    capacity: 45,
-    status: "active",
-    lastService: "2024-01-05",
-    nextService: "2024-04-05",
-    mileage: 142000,
-    avgDailyRevenue: 13200
-  },
-  {
-    id: "F003",
-    busNo: "NK-5678",
-    type: "Hill Country",
-    route: "Kandy - Nuwara Eliya",
-    model: "Ashok Leyland Viking",
-    year: 2021,
-    capacity: 42,
-    status: "maintenance",
-    lastService: "2024-01-12",
-    nextService: "2024-04-12",
-    mileage: 98000,
-    avgDailyRevenue: 12800
-  },
-  {
-    id: "F004",
-    busNo: "NK-9012",
-    type: "City",
-    route: "Colombo Local",
-    model: "Tata Starbus",
-    year: 2018,
-    capacity: 38,
-    status: "idle",
-    lastService: "2023-12-28",
-    nextService: "2024-03-28",
-    mileage: 185000,
-    avgDailyRevenue: 8500
-  }
-];
 
 const getStatusBadge = (status: Fleet['status']) => {
   const variants = {
     active: { variant: "success" as const, label: "Active" },
     maintenance: { variant: "warning" as const, label: "Maintenance" },
-    idle: { variant: "secondary" as const, label: "Idle" }
+    idle: { variant: "secondary" as const, label: "Idle" },
+    retired: { variant: "destructive" as const, label: "Retired" }
   };
   
   const config = variants[status];
-  return <Badge className={`status-${config.variant.replace('secondary', 'neutral')}`}>{config.label}</Badge>;
+  return <Badge className={`status-${config.variant.replace('secondary', 'neutral').replace('destructive', 'error')}`}>{config.label}</Badge>;
 };
 
 const columns: ColumnDef<Fleet>[] = [
   {
-    accessorKey: "busNo",
+    accessorKey: "bus_no",
     header: "Bus No.",
   },
   {
@@ -110,6 +53,7 @@ const columns: ColumnDef<Fleet>[] = [
   {
     accessorKey: "route",
     header: "Route",
+    cell: ({ row }) => row.getValue("route") || "-",
   },
   {
     accessorKey: "model",
@@ -130,27 +74,27 @@ const columns: ColumnDef<Fleet>[] = [
     cell: ({ row }) => getStatusBadge(row.getValue("status")),
   },
   {
-    accessorKey: "mileage",
+    accessorKey: "current_mileage",
     header: "Mileage (km)",
     cell: ({ row }) => {
-      const mileage = row.getValue("mileage") as number;
+      const mileage = row.getValue("current_mileage") as number;
       return mileage.toLocaleString();
     },
   },
   {
-    accessorKey: "avgDailyRevenue",
+    accessorKey: "avg_daily_revenue",
     header: "Avg Daily Revenue (₨)",
     cell: ({ row }) => {
-      const revenue = row.getValue("avgDailyRevenue") as number;
-      return `₨ ${revenue.toLocaleString()}`;
+      const revenue = row.getValue("avg_daily_revenue") as number;
+      return revenue ? `₨ ${revenue.toLocaleString()}` : "-";
     },
   },
   {
-    accessorKey: "nextService",
+    accessorKey: "next_service_date",
     header: "Next Service",
     cell: ({ row }) => {
-      const date = new Date(row.getValue("nextService"));
-      return date.toLocaleDateString();
+      const date = row.getValue("next_service_date");
+      return date ? new Date(date as string).toLocaleDateString() : "-";
     },
   },
   {
@@ -180,7 +124,74 @@ const columns: ColumnDef<Fleet>[] = [
 ];
 
 export default function FleetManagement() {
-  const [data] = useState<Fleet[]>(fleetData);
+  const [data, setData] = useState<Fleet[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchFleet();
+  }, []);
+
+  const fetchFleet = async () => {
+    try {
+      // Fetch buses with calculated average daily revenue
+      const { data: buses, error } = await supabase
+        .from('buses')
+        .select('*')
+        .order('bus_no');
+
+      if (error) {
+        console.error('Error fetching fleet:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load fleet data.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // For each bus, calculate average daily revenue from trips
+      const busesWithRevenue = await Promise.all(
+        buses?.map(async (bus) => {
+          const { data: trips } = await supabase
+            .from('daily_trips')
+            .select('income, trip_date')
+            .eq('bus_id', bus.id)
+            .eq('status', 'completed');
+
+          const totalRevenue = trips?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
+          const tripCount = trips?.length || 0;
+          const avgDailyRevenue = tripCount > 0 ? totalRevenue / tripCount : 0;
+
+          return {
+            id: bus.id,
+            bus_no: bus.bus_no,
+            type: bus.type,
+            route: bus.route,
+            model: bus.model,
+            year: bus.year,
+            capacity: bus.capacity,
+            status: bus.status as Fleet['status'],
+            last_service_date: bus.last_service_date,
+            next_service_date: bus.next_service_date,
+            current_mileage: bus.current_mileage || 0,
+            avg_daily_revenue: Math.round(avgDailyRevenue),
+          } as Fleet;
+        }) || []
+      );
+
+      setData(busesWithRevenue);
+    } catch (error) {
+      console.error('Error in fetchFleet:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while loading fleet data.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleExport = () => {
     console.log("Exporting fleet data...");
@@ -196,8 +207,31 @@ export default function FleetManagement() {
   const totalBuses = data.length;
   const activeBuses = data.filter(bus => bus.status === 'active').length;
   const maintenanceBuses = data.filter(bus => bus.status === 'maintenance').length;
-  const totalRevenue = data.reduce((sum, bus) => sum + bus.avgDailyRevenue, 0);
-  const avgMileage = data.reduce((sum, bus, _, arr) => sum + bus.mileage / arr.length, 0);
+  const totalRevenue = data.reduce((sum, bus) => sum + (bus.avg_daily_revenue || 0), 0);
+  const avgMileage = data.reduce((sum, bus, _, arr) => sum + bus.current_mileage / arr.length, 0);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Fleet Management</h1>
+            <p className="text-muted-foreground">Monitor and manage your bus fleet</p>
+          </div>
+          <Button disabled className="gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading...
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 bg-muted/20 animate-pulse rounded-lg" />
+          ))}
+        </div>
+        <div className="h-96 bg-muted/20 animate-pulse rounded-lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -224,7 +258,7 @@ export default function FleetManagement() {
         <KPICard
           title="Active Buses"
           value={activeBuses.toString()}
-          change={`${((activeBuses / totalBuses) * 100).toFixed(0)}%`}
+          change={totalBuses > 0 ? `${((activeBuses / totalBuses) * 100).toFixed(0)}%` : "0%"}
           changeType="positive"
           icon={<Bus className="w-5 h-5" />}
           description="On road now"
@@ -247,7 +281,7 @@ export default function FleetManagement() {
       <DataTable
         columns={columns}
         data={data}
-        searchKey="busNo"
+        searchKey="bus_no"
         title="Fleet Overview"
         onExport={handleExport}
       />
