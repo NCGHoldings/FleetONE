@@ -195,26 +195,36 @@ export default function DriverAllocation() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
+      // Analyze data first
+      const missingBuses = new Set<string>();
+      const missingRoutes = new Set<string>();
+      const missingDrivers = new Set<string>();
+      const missingConductors = new Set<string>();
       const processedRows = [];
-      const errors = [];
+      const validRows = [];
 
       for (let i = 0; i < jsonData.length; i++) {
         const row = jsonData[i];
-        const bus = findBusByNo(row['Bus No']);
-        const route = findRouteByName(row['route name']);
-        const driver = findPersonByName(row['Driver']);
-        const conductor = row['Conductor'] ? findPersonByName(row['Conductor']) : null;
+        const busNo = row['Bus No']?.toString().trim();
+        const routeName = row['route name']?.toString().trim();
+        const driverName = row['Driver']?.toString().trim();
+        const conductorName = row['Conductor']?.toString().trim();
+        
+        const bus = findBusByNo(busNo);
+        const route = findRouteByName(routeName);
+        const driver = findPersonByName(driverName);
+        const conductor = conductorName ? findPersonByName(conductorName) : null;
         
         const date = parseDate(row['date']);
         const time = parseTime(row['Time']);
         
-        if (!bus) errors.push(`Row ${i + 1}: Bus "${row['Bus No']}" not found`);
-        if (!route) errors.push(`Row ${i + 1}: Route "${row['route name']}" not found`);
-        if (!driver) errors.push(`Row ${i + 1}: Driver "${row['Driver']}" not found`);
-        if (!date) errors.push(`Row ${i + 1}: Invalid date format "${row['date']}"`);
+        if (!bus && busNo) missingBuses.add(busNo);
+        if (!route && routeName) missingRoutes.add(routeName);
+        if (!driver && driverName) missingDrivers.add(driverName);
+        if (!conductor && conductorName) missingConductors.add(conductorName);
 
         if (bus && route && driver && date) {
-          processedRows.push({
+          const processedRow = {
             tripId: generateTripId(),
             busId: bus.id,
             routeId: route.id,
@@ -223,17 +233,45 @@ export default function DriverAllocation() {
             date: date,
             startTime: time || '06:00',
             endTime: time ? addHours(time, 8) : '18:00'
-          });
+          };
+          processedRows.push(processedRow);
+          validRows.push(i + 1);
         }
       }
 
-      if (errors.length > 0) {
-        toast.error(`Found ${errors.length} errors. Check console for details.`);
-        console.error('Excel parsing errors:', errors);
+      // Show detailed error report
+      if (missingBuses.size > 0 || missingRoutes.size > 0 || missingDrivers.size > 0) {
+        let errorMsg = 'Missing data found:\n';
+        if (missingBuses.size > 0) {
+          errorMsg += `\nBuses (${missingBuses.size}): ${Array.from(missingBuses).slice(0, 5).join(', ')}${missingBuses.size > 5 ? '...' : ''}`;
+        }
+        if (missingRoutes.size > 0) {
+          errorMsg += `\nRoutes (${missingRoutes.size}): ${Array.from(missingRoutes).slice(0, 3).join(', ')}${missingRoutes.size > 3 ? '...' : ''}`;
+        }
+        if (missingDrivers.size > 0) {
+          errorMsg += `\nDrivers (${missingDrivers.size}): ${Array.from(missingDrivers).slice(0, 5).join(', ')}${missingDrivers.size > 5 ? '...' : ''}`;
+        }
+        
+        errorMsg += `\n\nPlease add missing records to the system first.\nValid rows that can be imported: ${validRows.length}/${jsonData.length}`;
+        
+        // Show detailed missing data in console for reference
+        console.log('Missing Buses:', Array.from(missingBuses));
+        console.log('Missing Routes:', Array.from(missingRoutes));
+        console.log('Missing Drivers:', Array.from(missingDrivers));
+        if (missingConductors.size > 0) {
+          console.log('Missing Conductors:', Array.from(missingConductors));
+        }
+        
+        toast.error(errorMsg);
         return;
       }
 
-      // Create allocations
+      if (processedRows.length === 0) {
+        toast.error('No valid rows found to import');
+        return;
+      }
+
+      // Proceed with import
       const allocRows = processedRows.map(row => ({
         trip_id: row.tripId,
         bus_id: row.busId,
