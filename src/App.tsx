@@ -13,6 +13,9 @@ import Dashboard from "./pages/Dashboard";
 import DailyTrips from "./pages/DailyTrips";
 import FleetManagement from "./pages/FleetManagement";
 import NotFound from "./pages/NotFound";
+import StaffManagement from "./pages/StaffManagement";
+import Insurance from "./pages/Insurance";
+import Maintenance from "./pages/Maintenance";
 
 const queryClient = new QueryClient();
 
@@ -65,7 +68,7 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
                   <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Staff Management module coming soon...</div>
+                    <StaffManagement />
                   </AppLayout>
                 </ProtectedRoute>
               } 
@@ -77,7 +80,7 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
                   <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Maintenance module coming soon...</div>
+                    <Maintenance />
                   </AppLayout>
                 </ProtectedRoute>
               } 
@@ -89,7 +92,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Insurance module coming soon...</div>
+                    <Insurance />
                   </AppLayout>
                 </ProtectedRoute>
               } 

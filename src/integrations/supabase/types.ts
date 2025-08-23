@@ -22,6 +22,7 @@ export type Database = {
           created_at: string
           current_mileage: number | null
           engine_number: string | null
+          expected_km_per_liter: number | null
           id: string
           insurance_expiry: string | null
           last_service_date: string | null
@@ -29,9 +30,13 @@ export type Database = {
           model: string
           next_service_date: string | null
           next_service_mileage: number | null
+          owner_address: string | null
+          owner_name: string | null
+          owner_nic: string | null
           registration_number: string | null
           revenue_license_expiry: string | null
           route: string | null
+          service_interval_km: number | null
           status: Database["public"]["Enums"]["fleet_status"] | null
           type: string
           updated_at: string
@@ -44,6 +49,7 @@ export type Database = {
           created_at?: string
           current_mileage?: number | null
           engine_number?: string | null
+          expected_km_per_liter?: number | null
           id?: string
           insurance_expiry?: string | null
           last_service_date?: string | null
@@ -51,9 +57,13 @@ export type Database = {
           model: string
           next_service_date?: string | null
           next_service_mileage?: number | null
+          owner_address?: string | null
+          owner_name?: string | null
+          owner_nic?: string | null
           registration_number?: string | null
           revenue_license_expiry?: string | null
           route?: string | null
+          service_interval_km?: number | null
           status?: Database["public"]["Enums"]["fleet_status"] | null
           type: string
           updated_at?: string
@@ -66,6 +76,7 @@ export type Database = {
           created_at?: string
           current_mileage?: number | null
           engine_number?: string | null
+          expected_km_per_liter?: number | null
           id?: string
           insurance_expiry?: string | null
           last_service_date?: string | null
@@ -73,9 +84,13 @@ export type Database = {
           model?: string
           next_service_date?: string | null
           next_service_mileage?: number | null
+          owner_address?: string | null
+          owner_name?: string | null
+          owner_nic?: string | null
           registration_number?: string | null
           revenue_license_expiry?: string | null
           route?: string | null
+          service_interval_km?: number | null
           status?: Database["public"]["Enums"]["fleet_status"] | null
           type?: string
           updated_at?: string
@@ -85,6 +100,7 @@ export type Database = {
       }
       daily_trips: {
         Row: {
+          audit_log: Json | null
           bus_id: string
           conductor_id: string | null
           created_at: string
@@ -104,6 +120,7 @@ export type Database = {
           odometer_start: number | null
           other_expenses: number | null
           other_expenses_details: Json | null
+          performance_score: number | null
           route_id: string | null
           start_time: string | null
           status: Database["public"]["Enums"]["trip_status"] | null
@@ -111,8 +128,10 @@ export type Database = {
           trip_date: string
           trip_no: string | null
           updated_at: string
+          whatsapp: string | null
         }
         Insert: {
+          audit_log?: Json | null
           bus_id: string
           conductor_id?: string | null
           created_at?: string
@@ -132,6 +151,7 @@ export type Database = {
           odometer_start?: number | null
           other_expenses?: number | null
           other_expenses_details?: Json | null
+          performance_score?: number | null
           route_id?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["trip_status"] | null
@@ -139,8 +159,10 @@ export type Database = {
           trip_date?: string
           trip_no?: string | null
           updated_at?: string
+          whatsapp?: string | null
         }
         Update: {
+          audit_log?: Json | null
           bus_id?: string
           conductor_id?: string | null
           created_at?: string
@@ -160,6 +182,7 @@ export type Database = {
           odometer_start?: number | null
           other_expenses?: number | null
           other_expenses_details?: Json | null
+          performance_score?: number | null
           route_id?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["trip_status"] | null
@@ -167,6 +190,7 @@ export type Database = {
           trip_date?: string
           trip_no?: string | null
           updated_at?: string
+          whatsapp?: string | null
         }
         Relationships: [
           {
@@ -241,6 +265,188 @@ export type Database = {
           tag?: string | null
           uploaded_at?: string
           uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      feedback_complaints: {
+        Row: {
+          category: string
+          created_at: string
+          current_handler: string | null
+          description: string
+          escalation_level: number | null
+          feedback_date: string
+          feedback_id: string | null
+          id: string
+          priority: string | null
+          reported_by: string
+          resolution: string | null
+          resolved_at: string | null
+          staff_group: string | null
+          status: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          current_handler?: string | null
+          description: string
+          escalation_level?: number | null
+          feedback_date?: string
+          feedback_id?: string | null
+          id?: string
+          priority?: string | null
+          reported_by: string
+          resolution?: string | null
+          resolved_at?: string | null
+          staff_group?: string | null
+          status?: string | null
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          current_handler?: string | null
+          description?: string
+          escalation_level?: number | null
+          feedback_date?: string
+          feedback_id?: string | null
+          id?: string
+          priority?: string | null
+          reported_by?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          staff_group?: string | null
+          status?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_complaints_current_handler_fkey"
+            columns: ["current_handler"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_complaints_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insurance_records: {
+        Row: {
+          agent_email: string | null
+          agent_name: string | null
+          agent_phone: string | null
+          bus_id: string
+          coverage_amount: number | null
+          created_at: string
+          expiry_date: string
+          id: string
+          insurance_company: string
+          issue_date: string
+          notes: string | null
+          policy_number: string
+          policy_type: string
+          premium_amount: number | null
+          reminder_threshold_days: number | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_email?: string | null
+          agent_name?: string | null
+          agent_phone?: string | null
+          bus_id: string
+          coverage_amount?: number | null
+          created_at?: string
+          expiry_date: string
+          id?: string
+          insurance_company: string
+          issue_date: string
+          notes?: string | null
+          policy_number: string
+          policy_type: string
+          premium_amount?: number | null
+          reminder_threshold_days?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_email?: string | null
+          agent_name?: string | null
+          agent_phone?: string | null
+          bus_id?: string
+          coverage_amount?: number | null
+          created_at?: string
+          expiry_date?: string
+          id?: string
+          insurance_company?: string
+          issue_date?: string
+          notes?: string | null
+          policy_number?: string
+          policy_type?: string
+          premium_amount?: number | null
+          reminder_threshold_days?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_records_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_bays: {
+        Row: {
+          bay_name: string
+          bay_number: string
+          can_work_overtime: boolean | null
+          capacity: number | null
+          created_at: string
+          default_workers: number | null
+          hourly_rate: number | null
+          id: string
+          is_active: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          bay_name: string
+          bay_number: string
+          can_work_overtime?: boolean | null
+          capacity?: number | null
+          created_at?: string
+          default_workers?: number | null
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          bay_name?: string
+          bay_number?: string
+          can_work_overtime?: boolean | null
+          capacity?: number | null
+          created_at?: string
+          default_workers?: number | null
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -540,6 +746,103 @@ export type Database = {
           via_locations?: string[] | null
         }
         Relationships: []
+      }
+      special_hire_projects: {
+        Row: {
+          bus_id: string | null
+          conductor_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          distance_km: number | null
+          driver_id: string | null
+          drop_location: string
+          estimated_price: number | null
+          extra_charges: number | null
+          hire_type: string | null
+          id: string
+          net_income: number | null
+          notes: string | null
+          pickup_datetime: string | null
+          pickup_location: string
+          project_id: string | null
+          status: string | null
+          total_expenses: number | null
+          updated_at: string
+        }
+        Insert: {
+          bus_id?: string | null
+          conductor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          distance_km?: number | null
+          driver_id?: string | null
+          drop_location: string
+          estimated_price?: number | null
+          extra_charges?: number | null
+          hire_type?: string | null
+          id?: string
+          net_income?: number | null
+          notes?: string | null
+          pickup_datetime?: string | null
+          pickup_location: string
+          project_id?: string | null
+          status?: string | null
+          total_expenses?: number | null
+          updated_at?: string
+        }
+        Update: {
+          bus_id?: string | null
+          conductor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          distance_km?: number | null
+          driver_id?: string | null
+          drop_location?: string
+          estimated_price?: number | null
+          extra_charges?: number | null
+          hire_type?: string | null
+          id?: string
+          net_income?: number | null
+          notes?: string | null
+          pickup_datetime?: string | null
+          pickup_location?: string
+          project_id?: string | null
+          status?: string | null
+          total_expenses?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_hire_projects_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_projects_conductor_id_fkey"
+            columns: ["conductor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_projects_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       system_settings: {
         Row: {
