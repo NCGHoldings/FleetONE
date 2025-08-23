@@ -96,6 +96,10 @@ export default function DriverAllocation() {
   };
   const phoneOf = (userId?: string) => people.find(p => p.user_id === userId)?.phone;
 
+  const safeParseJSON = (str?: string) => {
+    try { return str ? JSON.parse(str) : null; } catch { return null; }
+  };
+
   const fetchAllocations = async () => {
     try {
       setLoading(true);
@@ -106,21 +110,24 @@ export default function DriverAllocation() {
         .limit(100);
       if (error) throw error;
 
-      const rows: AllocationRow[] = (data || []).map((r: any) => ({
-        id: r.id,
-        trip_id: r.trip_id,
-        date: r.allocation_date,
-        start_time: r.start_time,
-        end_time: r.end_time,
-        status: r.status,
-        bus_no: buses.find(b => b.id === r.bus_id)?.bus_no,
-        route_no: routes.find(rt => rt.id === r.route_id)?.route_no,
-        route_name: routes.find(rt => rt.id === r.route_id)?.route_name,
-        driver_name: nameOf(r.driver_id),
-        conductor_name: nameOf(r.conductor_id),
-        driver_phone: phoneOf(r.driver_id),
-        conductor_phone: phoneOf(r.conductor_id),
-      }));
+      const rows: AllocationRow[] = (data || []).map((r: any) => {
+        const meta = safeParseJSON(r.notes);
+        return {
+          id: r.id,
+          trip_id: r.trip_id,
+          date: r.allocation_date,
+          start_time: r.start_time,
+          end_time: r.end_time,
+          status: r.status,
+          bus_no: meta?.bus_no || buses.find(b => b.id === r.bus_id)?.bus_no,
+          route_no: meta?.route_no || routes.find(rt => rt.id === r.route_id)?.route_no,
+          route_name: meta?.route || routes.find(rt => rt.id === r.route_id)?.route_name,
+          driver_name: meta?.driver || nameOf(r.driver_id),
+          conductor_name: meta?.conductor || nameOf(r.conductor_id),
+          driver_phone: meta?.whatsapp || phoneOf(r.driver_id),
+          conductor_phone: phoneOf(r.conductor_id),
+        };
+      });
 
       setAllocations(rows);
     } catch (e) {
@@ -201,172 +208,45 @@ export default function DriverAllocation() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-      console.log('Processing Excel data:', jsonData);
-
-      // Step 1: Create missing buses
-      const newBuses = new Set<string>();
-      for (const row of jsonData) {
+      const seqByDate: Record<string, number> = {};
+      const allocRows = jsonData.map((row: any) => {
         const busNo = row['Bus No']?.toString().trim();
-        if (busNo && !findBusByNo(busNo)) {
-          newBuses.add(busNo);
-        }
-      }
-
-      if (newBuses.size > 0) {
-        console.log('Creating missing buses:', Array.from(newBuses));
-        const busRows = Array.from(newBuses).map(busNo => ({
-          bus_no: busNo,
-          type: 'Bus', // default type
-          model: 'Unknown',
-          year: new Date().getFullYear(),
-          capacity: 50 // default capacity
-        }));
-        
-        const { error: busErr } = await supabase.from('buses').insert(busRows);
-        if (busErr) {
-          console.error('Error creating buses:', busErr);
-          throw new Error(`Failed to create buses: ${busErr.message}`);
-        }
-      }
-
-      // Step 2: Create missing routes
-      const newRoutes = new Set<string>();
-      for (const row of jsonData) {
-        const routeName = row['route name']?.toString().trim();
-        if (routeName && !findRouteByName(routeName)) {
-          newRoutes.add(routeName);
-        }
-      }
-
-      if (newRoutes.size > 0) {
-        console.log('Creating missing routes:', Array.from(newRoutes));
-        const routeRows = Array.from(newRoutes).map((routeName, index) => ({
-          route_no: `R${Date.now()}${index}`, // generate route number
-          route_name: routeName,
-          start_location: (routeName.split(/\s+to\s+/i)[0] || 'Unknown').trim(),
-          end_location: (routeName.split(/\s+to\s+/i)[1] || 'Unknown').trim()
-        }));
-        
-        const { error: routeErr } = await supabase.from('routes').insert(routeRows);
-        if (routeErr) {
-          console.error('Error creating routes:', routeErr);
-          throw new Error(`Failed to create routes: ${routeErr.message}`);
-        }
-      }
-
-      // Step 3: Create missing staff profiles
-      const newStaff = new Set<string>();
-      for (const row of jsonData) {
-        const driverName = row['Driver']?.toString().trim();
-        const conductorName = row['Conductor']?.toString().trim();
-        
-        if (driverName && !findPersonByName(driverName)) {
-          newStaff.add(driverName);
-        }
-        if (conductorName && !findPersonByName(conductorName)) {
-          newStaff.add(conductorName);
-        }
-      }
-
-      if (newStaff.size > 0) {
-        console.log('Creating missing staff profiles:', Array.from(newStaff));
-        const staffRows = Array.from(newStaff).map((fullName) => {
-          const nameParts = fullName.trim().split(' ');
-          const phoneMatch = (jsonData as any[]).find(r => r['Driver']?.toString().trim() === fullName && r['Whatsapp']);
-          const phone = phoneMatch ? phoneMatch['Whatsapp'].toString().replace(/\D/g, '') : '';
-          return {
-            user_id: crypto.randomUUID(), // Generate UUID for user_id
-            first_name: nameParts[0] || fullName,
-            last_name: nameParts.slice(1).join(' ') || '',
-            employee_id: `EMP${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-            phone
-          };
-        });
-        
-        const { error: staffErr } = await supabase.from('profiles').insert(staffRows);
-        if (staffErr) {
-          console.error('Error creating staff profiles:', staffErr);
-          throw new Error(`Failed to create staff profiles: ${staffErr.message}`);
-        }
-      }
-
-      // Step 4: Refresh local data
-      await fetchLists();
-
-      // Step 5: Process Excel data for allocations
-      const processedRows = [];
-      for (let i = 0; i < jsonData.length; i++) {
-        const row = jsonData[i];
-        const busNo = row['Bus No']?.toString().trim();
+        const routeNo = row['Route']?.toString().trim();
         const routeName = row['route name']?.toString().trim();
         const driverName = row['Driver']?.toString().trim();
         const conductorName = row['Conductor']?.toString().trim();
-        
-        const bus = findBusByNo(busNo);
-        const route = findRouteByName(routeName);
-        const driver = findPersonByName(driverName);
-        const conductor = conductorName ? findPersonByName(conductorName) : null;
-        
+        const whatsapp = row['Whatsapp']?.toString().replace(/\D/g, '');
         const date = parseDate(row['date']);
         const time = parseTime(row['Time']);
+        const seq = date ? (seqByDate[date] = (seqByDate[date] || 0) + 1) : 1;
+        const tripId = date ? generateTripIdForExcel(date, seq) : generateTripId();
 
-        if (bus && route && driver && date) {
-          processedRows.push({
-            tripId: generateTripIdForExcel(date, i + 1),
-            busId: bus.id,
-            routeId: route.id,
-            driverId: driver.user_id,
-            conductorId: conductor?.user_id || null,
-            date: date,
-            startTime: time || '06:00',
-            endTime: time ? addHours(time, 8) : '18:00'
-          });
-        }
-      }
+        return {
+          trip_id: tripId,
+          allocation_date: date,
+          start_time: time || '06:00',
+          end_time: time ? addHours(time, 8) : '18:00',
+          status: 'confirmed',
+          notes: JSON.stringify({
+            bus_no: busNo,
+            route_no: routeNo,
+            route: routeName,
+            driver: driverName,
+            conductor: conductorName,
+            whatsapp,
+          })
+        } as any;
+      });
 
-      if (processedRows.length === 0) {
-        toast.error('No valid rows found to import after creating missing records');
-        return;
-      }
+      const { error } = await supabase.from('driver_allocations').insert(allocRows);
+      if (error) throw error;
 
-      // Step 6: Create allocations
-      const allocRows = processedRows.map(row => ({
-        trip_id: row.tripId,
-        bus_id: row.busId,
-        route_id: row.routeId,
-        driver_id: row.driverId,
-        conductor_id: row.conductorId,
-        allocation_date: row.date,
-        start_time: row.startTime,
-        end_time: row.endTime,
-        status: 'confirmed'
-      }));
-
-      const { error: allocErr } = await supabase.from('driver_allocations').insert(allocRows);
-      if (allocErr) throw allocErr;
-
-      // Step 7: Create daily trips
-      const tripRows = processedRows.map(row => ({
-        bus_id: row.busId,
-        route_id: row.routeId,
-        driver_id: row.driverId,
-        conductor_id: row.conductorId,
-        trip_date: row.date,
-        start_time: row.startTime,
-        end_time: row.endTime,
-        status: 'scheduled' as const,
-        trip_no: row.tripId
-      }));
-
-      const { error: tripErr } = await supabase.from('daily_trips').insert(tripRows);
-      if (tripErr) throw tripErr;
-
-      toast.success(`Successfully imported ${processedRows.length} allocations and created ${newBuses.size} buses, ${newRoutes.size} routes, ${newStaff.size} staff profiles`);
+      toast.success(`Imported ${allocRows.length} allocations`);
       setExcelOpen(false);
       fetchAllocations();
     } catch (error: any) {
       console.error('Excel upload error:', error);
-      toast.error('Failed to process Excel file: ' + error.message);
+      toast.error('Failed to process Excel file: ' + (error.message || 'Unknown error'));
     } finally {
       setUploading(false);
       if (event.target) event.target.value = '';
