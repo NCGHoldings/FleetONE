@@ -220,7 +220,7 @@ export default function StaffAttendancePayroll() {
   };
 
   const exportCSV = (rows: any[], filename: string) => {
-    const csv = [Object.keys(rows[0] || {}).join(','), ...rows.map(r => Object.values(r).map(v => (""+v).replaceAll(',', ' ')).join(','))].join('\n');
+    const csv = [Object.keys(rows[0] || {}).join(','), ...rows.map(r => Object.values(r).map(v => (""+v).replace(/,/g, ' ')).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

@@ -160,7 +160,7 @@ export default function DriverAllocation() {
       return;
     }
 
-    const tripId = form.trip_id || `ALC-${form.date.replaceAll('-', '')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+    const tripId = form.trip_id || `ALC-${form.date.replace(/-/g, '')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
 
     try {
       // Create one allocation per bus to support many-to-many mapping
