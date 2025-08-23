@@ -14,7 +14,9 @@ import {
   Lightbulb,
   Star,
   ChevronDown,
-  Truck
+  Truck,
+  TrendingUp,
+  AlertTriangle
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -38,6 +40,7 @@ const mainItems = [
   { title: "Maintenance", url: "/maintenance", icon: Wrench },
   { title: "Insurance", url: "/insurance", icon: Shield },
   { title: "Staff Management", url: "/staff", icon: Users },
+  { title: "Staff Performance", url: "/staff-performance", icon: TrendingUp },
 ];
 
 const operationsItems = [
@@ -46,6 +49,7 @@ const operationsItems = [
   { title: "Real-Time Tracking", url: "/tracking", icon: MapPin },
   { title: "Driver Allocation", url: "/allocation", icon: UserCheck },
   { title: "Staff Attendance", url: "/attendance", icon: Calendar },
+  { title: "Complaints", url: "/complaints", icon: AlertTriangle },
 ];
 
 const businessItems = [

@@ -23,6 +23,8 @@ import RealTimeTracking from "./pages/RealTimeTracking";
 import DriverAllocation from "./pages/DriverAllocation";
 import StaffAttendancePayroll from "./pages/StaffAttendancePayroll";
 import DocumentManager from "./pages/DocumentManager";
+import Complaints from "./pages/Complaints";
+import StaffPerformance from "./pages/StaffPerformance";
 
 const queryClient = new QueryClient();
 
@@ -180,6 +182,26 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <DocumentManager />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/complaints" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
+                  <AppLayout>
+                    <Complaints />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/staff-performance" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
+                  <AppLayout>
+                    <StaffPerformance />
                   </AppLayout>
                 </ProtectedRoute>
               } 
