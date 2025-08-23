@@ -1,4 +1,4 @@
-import { Bell, Search, User, Settings } from "lucide-react";
+import { Bell, Search, User, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,8 +10,30 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/hooks/useAuth";
 
 export function Header() {
+  const { user, userProfile, userRoles, signOut } = useAuth();
+
+  const getInitials = (firstName?: string, lastName?: string) => {
+    if (!firstName && !lastName) return "U";
+    return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+  };
+
+  const getRoleDisplay = (roles: string[]) => {
+    if (roles.includes("super_admin")) return "Super Admin";
+    if (roles.includes("admin")) return "Admin";
+    if (roles.includes("supervisor")) return "Supervisor";
+    if (roles.includes("driver")) return "Driver";
+    if (roles.includes("conductor")) return "Conductor";
+    if (roles.includes("mechanic")) return "Mechanic";
+    return "Staff";
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
     <header className="h-16 border-b border-border/50 bg-card/50 backdrop-blur-sm flex items-center justify-between px-6">
       <div className="flex items-center gap-4 flex-1">
@@ -36,14 +58,20 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 h-10">
               <Avatar className="w-8 h-8">
-                <AvatarImage src="/placeholder-avatar.jpg" alt="User" />
+                <AvatarImage src={userProfile?.avatar_url} alt="User" />
                 <AvatarFallback className="bg-primary text-primary-foreground">
-                  AM
+                  {getInitials(userProfile?.first_name, userProfile?.last_name)}
                 </AvatarFallback>
               </Avatar>
               <div className="text-left hidden md:block">
-                <p className="text-sm font-medium">Admin User</p>
-                <p className="text-xs text-muted-foreground">Super Admin</p>
+                <p className="text-sm font-medium">
+                  {userProfile?.first_name && userProfile?.last_name
+                    ? `${userProfile.first_name} ${userProfile.last_name}`
+                    : user?.email || "User"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {getRoleDisplay(userRoles)}
+                </p>
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -59,7 +87,11 @@ export function Header() {
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem 
+              className="text-destructive"
+              onClick={handleSignOut}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
