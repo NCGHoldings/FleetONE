@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface AuthContextType {
   user: User | null;
@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const { toast } = useToast();
+  
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -101,16 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Error signing out:', error);
-        toast({
-          title: "Error",
-          description: "There was a problem signing out. Please try again.",
-          variant: "destructive",
-        });
+        toast.error("There was a problem signing out. Please try again.");
       } else {
-        toast({
-          title: "Signed out",
-          description: "You have been successfully signed out.",
-        });
+        toast.success("You have been successfully signed out.");
       }
     } catch (error) {
       console.error('Unexpected error during sign out:', error);
