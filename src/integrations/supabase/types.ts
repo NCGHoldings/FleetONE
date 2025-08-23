@@ -552,10 +552,12 @@ export type Database = {
           can_work_overtime: boolean | null
           capacity: number | null
           created_at: string
+          current_maintenance_id: string | null
           default_workers: number | null
           hourly_rate: number | null
           id: string
           is_active: boolean | null
+          overtime_rate_multiplier: number | null
           updated_at: string
         }
         Insert: {
@@ -564,10 +566,12 @@ export type Database = {
           can_work_overtime?: boolean | null
           capacity?: number | null
           created_at?: string
+          current_maintenance_id?: string | null
           default_workers?: number | null
           hourly_rate?: number | null
           id?: string
           is_active?: boolean | null
+          overtime_rate_multiplier?: number | null
           updated_at?: string
         }
         Update: {
@@ -576,11 +580,46 @@ export type Database = {
           can_work_overtime?: boolean | null
           capacity?: number | null
           created_at?: string
+          current_maintenance_id?: string | null
           default_workers?: number | null
           hourly_rate?: number | null
           id?: string
           is_active?: boolean | null
+          overtime_rate_multiplier?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      maintenance_parts: {
+        Row: {
+          created_at: string
+          id: string
+          item_code: string | null
+          item_description: string
+          maintenance_record_id: string
+          quantity: number
+          total_cost: number | null
+          unit_cost: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_code?: string | null
+          item_description: string
+          maintenance_record_id: string
+          quantity?: number
+          total_cost?: number | null
+          unit_cost?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_code?: string | null
+          item_description?: string
+          maintenance_record_id?: string
+          quantity?: number
+          total_cost?: number | null
+          unit_cost?: number | null
         }
         Relationships: []
       }
@@ -593,22 +632,29 @@ export type Database = {
           completion_date: string | null
           created_at: string
           created_by: string | null
+          current_bay_id: string | null
           description: string | null
           estimated_cost: number | null
+          estimated_delivery_date: string | null
           estimated_hours: number | null
           id: string
           labor_hours: Json | null
+          labor_total_cost: number | null
           maintenance_no: string | null
           next_service_date: string | null
           next_service_km: number | null
           notes: string | null
+          parts_total_cost: number | null
           parts_used: Json | null
           priority: string | null
+          profit_margin_percent: number | null
           scheduled_date: string | null
           service_type: string
           start_date: string | null
           status: Database["public"]["Enums"]["maintenance_status"] | null
           supervisor_id: string | null
+          timer_started_at: string | null
+          timer_status: string | null
           updated_at: string
           workshop: string | null
         }
@@ -620,22 +666,29 @@ export type Database = {
           completion_date?: string | null
           created_at?: string
           created_by?: string | null
+          current_bay_id?: string | null
           description?: string | null
           estimated_cost?: number | null
+          estimated_delivery_date?: string | null
           estimated_hours?: number | null
           id?: string
           labor_hours?: Json | null
+          labor_total_cost?: number | null
           maintenance_no?: string | null
           next_service_date?: string | null
           next_service_km?: number | null
           notes?: string | null
+          parts_total_cost?: number | null
           parts_used?: Json | null
           priority?: string | null
+          profit_margin_percent?: number | null
           scheduled_date?: string | null
           service_type: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["maintenance_status"] | null
           supervisor_id?: string | null
+          timer_started_at?: string | null
+          timer_status?: string | null
           updated_at?: string
           workshop?: string | null
         }
@@ -647,22 +700,29 @@ export type Database = {
           completion_date?: string | null
           created_at?: string
           created_by?: string | null
+          current_bay_id?: string | null
           description?: string | null
           estimated_cost?: number | null
+          estimated_delivery_date?: string | null
           estimated_hours?: number | null
           id?: string
           labor_hours?: Json | null
+          labor_total_cost?: number | null
           maintenance_no?: string | null
           next_service_date?: string | null
           next_service_km?: number | null
           notes?: string | null
+          parts_total_cost?: number | null
           parts_used?: Json | null
           priority?: string | null
+          profit_margin_percent?: number | null
           scheduled_date?: string | null
           service_type?: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["maintenance_status"] | null
           supervisor_id?: string | null
+          timer_started_at?: string | null
+          timer_status?: string | null
           updated_at?: string
           workshop?: string | null
         }
@@ -682,6 +742,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      maintenance_timers: {
+        Row: {
+          bay_id: string | null
+          created_at: string
+          end_time: string | null
+          id: string
+          is_overtime: boolean | null
+          maintenance_record_id: string
+          overtime_approved_by: string | null
+          pause_time: string | null
+          resume_time: string | null
+          start_time: string
+          status: string | null
+          total_minutes: number | null
+          worker_count: number | null
+        }
+        Insert: {
+          bay_id?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_overtime?: boolean | null
+          maintenance_record_id: string
+          overtime_approved_by?: string | null
+          pause_time?: string | null
+          resume_time?: string | null
+          start_time: string
+          status?: string | null
+          total_minutes?: number | null
+          worker_count?: number | null
+        }
+        Update: {
+          bay_id?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_overtime?: boolean | null
+          maintenance_record_id?: string
+          overtime_approved_by?: string | null
+          pause_time?: string | null
+          resume_time?: string | null
+          start_time?: string
+          status?: string | null
+          total_minutes?: number | null
+          worker_count?: number | null
+        }
+        Relationships: []
       }
       payroll_adjustments: {
         Row: {
@@ -1073,6 +1181,48 @@ export type Database = {
         }
         Relationships: []
       }
+      service_master: {
+        Row: {
+          base_role: string | null
+          created_at: string
+          default_qty: number | null
+          estimated_hours: number | null
+          id: string
+          item_code: string | null
+          item_description: string | null
+          notes: string | null
+          role_rate_per_hour: number | null
+          service_type: string
+          updated_at: string
+        }
+        Insert: {
+          base_role?: string | null
+          created_at?: string
+          default_qty?: number | null
+          estimated_hours?: number | null
+          id?: string
+          item_code?: string | null
+          item_description?: string | null
+          notes?: string | null
+          role_rate_per_hour?: number | null
+          service_type: string
+          updated_at?: string
+        }
+        Update: {
+          base_role?: string | null
+          created_at?: string
+          default_qty?: number | null
+          estimated_hours?: number | null
+          id?: string
+          item_code?: string | null
+          item_description?: string | null
+          notes?: string | null
+          role_rate_per_hour?: number | null
+          service_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       special_hire_projects: {
         Row: {
           bus_id: string | null
@@ -1275,6 +1425,33 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      workshop_settings: {
+        Row: {
+          created_at: string
+          id: string
+          setting_key: string
+          setting_type: string
+          setting_value: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          setting_key: string
+          setting_type: string
+          setting_value: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          setting_key?: string
+          setting_type?: string
+          setting_value?: Json
+          updated_at?: string
         }
         Relationships: []
       }
