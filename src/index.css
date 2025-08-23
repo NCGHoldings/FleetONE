@@ -2,41 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* NCG Transport Management System - Enterprise Design System */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
+    /* Enterprise Color Palette */
+    --background: 215 28% 97%;
+    --foreground: 215 25% 15%; 
+    
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 215 25% 15%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
+    --popover-foreground: 215 25% 15%;
+    
+    /* Professional Blue Primary */
+    --primary: 215 88% 52%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 215 88% 47%;
+    --primary-glow: 215 88% 72%;
+    
+    /* Enterprise Secondary */
+    --secondary: 215 15% 95%;
+    --secondary-foreground: 215 25% 35%;
+    
+    /* Muted Backgrounds */
+    --muted: 215 15% 96%;
+    --muted-foreground: 215 10% 50%;
+    
+    /* Accent Colors */
+    --accent: 160 75% 45%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 160 75% 40%;
+    
+    /* Status Colors */
+    --success: 145 65% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Borders & Inputs */
+    --border: 215 15% 88%;
+    --input: 215 15% 92%;
+    --ring: 215 88% 52%;
+    
+    /* Professional Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--muted)));
+    --gradient-hero: linear-gradient(135deg, hsl(215 88% 52%), hsl(215 88% 42%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100% / 0.8), hsl(0 0% 100% / 0.4));
+    
+    /* Shadows */
+    --shadow-card: 0 4px 6px -1px hsl(215 25% 15% / 0.1), 0 2px 4px -1px hsl(215 25% 15% / 0.06);
+    --shadow-elevated: 0 10px 15px -3px hsl(215 25% 15% / 0.1), 0 4px 6px -2px hsl(215 25% 15% / 0.05);
+    --shadow-primary: 0 8px 25px -5px hsl(var(--primary) / 0.3);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -56,41 +83,111 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark Enterprise Colors */
+    --background: 215 25% 8%;
+    --foreground: 215 15% 92%;
+    
+    --card: 215 25% 10%;
+    --card-foreground: 215 15% 92%;
+    
+    --popover: 215 25% 10%;
+    --popover-foreground: 215 15% 92%;
+    
+    /* Dark Primary */
+    --primary: 215 88% 62%;
+    --primary-foreground: 215 25% 8%;
+    --primary-hover: 215 88% 57%;
+    --primary-glow: 215 88% 72%;
+    
+    /* Dark Secondary */
+    --secondary: 215 15% 15%;
+    --secondary-foreground: 215 15% 85%;
+    
+    /* Dark Muted */
+    --muted: 215 15% 12%;
+    --muted-foreground: 215 10% 65%;
+    
+    /* Dark Accent */
+    --accent: 160 75% 55%;
+    --accent-foreground: 215 25% 8%;
+    --accent-hover: 160 75% 50%;
+    
+    /* Dark Status Colors */
+    --success: 145 65% 52%;
+    --success-foreground: 215 25% 8%;
+    --warning: 38 92% 60%;
+    --warning-foreground: 215 25% 8%;
+    --destructive: 0 75% 65%;
+    --destructive-foreground: 215 25% 8%;
+    
+    /* Dark Borders */
+    --border: 215 15% 18%;
+    --input: 215 15% 15%;
+    --ring: 215 88% 62%;
+    
+    /* Dark Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--muted)));
+    --gradient-hero: linear-gradient(135deg, hsl(215 88% 62%), hsl(215 88% 52%));
+    --gradient-card: linear-gradient(145deg, hsl(215 25% 10% / 0.8), hsl(215 25% 10% / 0.4));
+    
+    /* Dark Shadows */
+    --shadow-card: 0 4px 6px -1px hsl(215 25% 5% / 0.3), 0 2px 4px -1px hsl(215 25% 5% / 0.2);
+    --shadow-elevated: 0 10px 15px -3px hsl(215 25% 5% / 0.4), 0 4px 6px -2px hsl(215 25% 5% / 0.2);
+    --shadow-primary: 0 8px 25px -5px hsl(var(--primary) / 0.4);
+    
+    /* Sidebar Dark */
+    --sidebar-background: 215 25% 6%;
+    --sidebar-foreground: 215 15% 88%;
+    --sidebar-primary: 215 88% 62%;
+    --sidebar-primary-foreground: 215 25% 8%;
+    --sidebar-accent: 215 15% 12%;
+    --sidebar-accent-foreground: 215 15% 88%;
+    --sidebar-border: 215 15% 15%;
+    --sidebar-ring: 215 88% 62%;
+  }
+}
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+/* Enterprise Utility Classes */
+@layer components {
+  .card-elevated {
+    @apply bg-card border border-border/50 shadow-[var(--shadow-elevated)] backdrop-blur-sm;
+  }
+  
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+  
+  .shadow-primary {
+    box-shadow: var(--shadow-primary);
+  }
+  
+  .table-row-hover {
+    @apply hover:bg-muted/50 transition-smooth cursor-pointer;
+  }
+  
+  .kpi-card {
+    @apply bg-card border border-border/50 rounded-lg p-6 shadow-[var(--shadow-card)] transition-smooth hover:shadow-[var(--shadow-elevated)];
+  }
+  
+  .status-success {
+    @apply bg-success text-success-foreground;
+  }
+  
+  .status-warning {
+    @apply bg-warning text-warning-foreground;
+  }
+  
+  .status-error {
+    @apply bg-destructive text-destructive-foreground;
   }
 }
 
@@ -100,6 +197,10 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-foreground;
   }
 }
