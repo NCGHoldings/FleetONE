@@ -11,7 +11,8 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Calendar, CheckCircle, MessageCircle, Plus, Send, ShieldAlert } from "lucide-react";
+import { Calendar, CheckCircle, MessageCircle, Plus, Send, ShieldAlert, Upload, Download, Edit, Trash2 } from "lucide-react";
+import * as XLSX from 'xlsx';
 
 interface AllocationRow {
   id: string;
@@ -36,6 +37,9 @@ export default function DriverAllocation() {
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [excelOpen, setExcelOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [editingAllocation, setEditingAllocation] = useState<AllocationRow | null>(null);
 
   const [buses, setBuses] = useState<any[]>([]);
   const [routes, setRoutes] = useState<any[]>([]);
@@ -140,11 +144,191 @@ export default function DriverAllocation() {
     return overlaps;
   };
 
+  const generateTripId = () => {
+    const timestamp = Date.now().toString().slice(-6);
+    return `T${timestamp}`;
+  };
+
+  const parseTime = (timeStr: string) => {
+    if (!timeStr) return null;
+    // Handle formats like "7.15PM", "8:45PM", etc.
+    const match = timeStr.match(/(\d+)[\.:]\s*(\d+)\s*(AM|PM)/i);
+    if (match) {
+      let hours = parseInt(match[1]);
+      const minutes = parseInt(match[2]);
+      const ampm = match[3].toUpperCase();
+      
+      if (ampm === 'PM' && hours !== 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+    return null;
+  };
+
+  const parseDate = (dateStr: string) => {
+    // Handle format like "2025.07.31"
+    if (dateStr && dateStr.includes('.')) {
+      const parts = dateStr.split('.');
+      if (parts.length === 3) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+    }
+    return dateStr;
+  };
+
+  const findBusByNo = (busNo: string) => buses.find(b => b.bus_no.toLowerCase() === busNo.toLowerCase());
+  const findRouteByName = (routeName: string) => routes.find(r => r.route_name.toLowerCase().includes(routeName.toLowerCase()));
+  const findPersonByName = (name: string) => people.find(p => 
+    `${p.first_name} ${p.last_name}`.toLowerCase().includes(name.toLowerCase()) ||
+    name.toLowerCase().includes(p.first_name.toLowerCase())
+  );
+
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      const processedRows = [];
+      const errors = [];
+
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        const bus = findBusByNo(row['Bus No']);
+        const route = findRouteByName(row['route name']);
+        const driver = findPersonByName(row['Driver']);
+        const conductor = row['Conductor'] ? findPersonByName(row['Conductor']) : null;
+        
+        const date = parseDate(row['date']);
+        const time = parseTime(row['Time']);
+        
+        if (!bus) errors.push(`Row ${i + 1}: Bus "${row['Bus No']}" not found`);
+        if (!route) errors.push(`Row ${i + 1}: Route "${row['route name']}" not found`);
+        if (!driver) errors.push(`Row ${i + 1}: Driver "${row['Driver']}" not found`);
+        if (!date) errors.push(`Row ${i + 1}: Invalid date format "${row['date']}"`);
+
+        if (bus && route && driver && date) {
+          processedRows.push({
+            tripId: generateTripId(),
+            busId: bus.id,
+            routeId: route.id,
+            driverId: driver.user_id,
+            conductorId: conductor?.user_id || null,
+            date: date,
+            startTime: time || '06:00',
+            endTime: time ? addHours(time, 8) : '18:00'
+          });
+        }
+      }
+
+      if (errors.length > 0) {
+        toast.error(`Found ${errors.length} errors. Check console for details.`);
+        console.error('Excel parsing errors:', errors);
+        return;
+      }
+
+      // Create allocations
+      const allocRows = processedRows.map(row => ({
+        trip_id: row.tripId,
+        bus_id: row.busId,
+        route_id: row.routeId,
+        driver_id: row.driverId,
+        conductor_id: row.conductorId,
+        allocation_date: row.date,
+        start_time: row.startTime,
+        end_time: row.endTime,
+        status: 'confirmed'
+      }));
+
+      const { error: allocErr } = await supabase.from('driver_allocations').insert(allocRows);
+      if (allocErr) throw allocErr;
+
+      // Create daily trips
+      const tripRows = processedRows.map(row => ({
+        bus_id: row.busId,
+        route_id: row.routeId,
+        driver_id: row.driverId,
+        conductor_id: row.conductorId,
+        trip_date: row.date,
+        start_time: row.startTime,
+        end_time: row.endTime,
+        status: 'scheduled' as const,
+        trip_no: row.tripId
+      }));
+
+      const { error: tripErr } = await supabase.from('daily_trips').insert(tripRows);
+      if (tripErr) throw tripErr;
+
+      toast.success(`Successfully imported ${processedRows.length} allocations`);
+      setExcelOpen(false);
+      fetchAllocations();
+    } catch (error: any) {
+      console.error('Excel upload error:', error);
+      toast.error('Failed to process Excel file: ' + error.message);
+    } finally {
+      setUploading(false);
+      if (event.target) event.target.value = '';
+    }
+  };
+
+  const addHours = (timeStr: string, hours: number) => {
+    const [h, m] = timeStr.split(':').map(Number);
+    const totalMinutes = h * 60 + m + (hours * 60);
+    const newHours = Math.floor(totalMinutes / 60) % 24;
+    const newMinutes = totalMinutes % 60;
+    return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}`;
+  };
+
   const createWhatsAppLink = (phone?: string, text?: string) => {
     if (!phone) return undefined;
     const digits = phone.replace(/\D/g, '');
     const msg = encodeURIComponent(text || 'Trip assigned.');
     return `https://wa.me/${digits}?text=${msg}`;
+  };
+
+  const handleDeleteAllocation = async (allocationId: string) => {
+    if (!isSupervisor) return toast.error('Access denied');
+    
+    try {
+      const { error } = await supabase
+        .from('driver_allocations')
+        .delete()
+        .eq('id', allocationId);
+      
+      if (error) throw error;
+      
+      toast.success('Allocation deleted');
+      fetchAllocations();
+    } catch (error: any) {
+      toast.error('Failed to delete allocation: ' + error.message);
+    }
+  };
+
+  const handleExportData = () => {
+    const exportData = allocations.map(row => ({
+      'Trip ID': row.trip_id,
+      'Bus No': row.bus_no,
+      'Route No': row.route_no,
+      'Route Name': row.route_name,
+      'Driver': row.driver_name,
+      'Conductor': row.conductor_name,
+      'Date': row.date,
+      'Start Time': row.start_time,
+      'End Time': row.end_time,
+      'Status': row.status
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Allocations');
+    XLSX.writeFile(wb, `driver_allocations_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Data exported successfully');
   };
 
   const handleCreate = async () => {
@@ -235,6 +419,16 @@ export default function DriverAllocation() {
           >
             <Send className="h-4 w-4" /> Conductor
           </a>
+          {isSupervisor && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDeleteAllocation(row.original.id)}
+              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       )
     }
@@ -252,104 +446,142 @@ export default function DriverAllocation() {
           <p className="text-muted-foreground">Assign buses, routes, drivers and confirm trips</p>
         </div>
         {isSupervisor && (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => setOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" /> New Allocation
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create Allocation</DialogTitle>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label>Trip ID</Label>
-                  <Input placeholder="Auto or custom" value={form.trip_id}
-                    onChange={(e) => setForm({ ...form, trip_id: e.target.value })} />
-                </div>
-
-                <div>
-                  <Label>Date</Label>
-                  <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+          <div className="flex gap-2">
+            <Button onClick={handleExportData} variant="outline">
+              <Download className="h-4 w-4 mr-2" /> Export
+            </Button>
+            
+            <Dialog open={excelOpen} onOpenChange={setExcelOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Upload className="h-4 w-4 mr-2" /> Import Excel
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Import Excel File</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
                   <div>
-                    <Label>Start</Label>
-                    <Input type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+                    <Label>Excel File</Label>
+                    <Input 
+                      type="file" 
+                      accept=".xlsx,.xls" 
+                      onChange={handleExcelUpload}
+                      disabled={uploading}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Expected format: Bus No | Route | route name | Driver | Conductor | Whatsapp | date | Time
+                    </p>
                   </div>
+                  {uploading && (
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">Processing Excel file...</p>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => setOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> New Allocation
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Create Allocation</DialogTitle>
+                </DialogHeader>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Label>Trip ID</Label>
+                    <Input placeholder="Auto or custom" value={form.trip_id}
+                      onChange={(e) => setForm({ ...form, trip_id: e.target.value })} />
+                  </div>
+
                   <div>
-                    <Label>End</Label>
-                    <Input type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
+                    <Label>Date</Label>
+                    <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label>Start</Label>
+                      <Input type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>End</Label>
+                      <Input type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Route</Label>
+                    <Select value={form.route_id} onValueChange={(v) => setForm({ ...form, route_id: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select route" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {routes.map((r) => (
+                          <SelectItem key={r.id} value={r.id}>{r.route_no} — {r.route_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Driver</Label>
+                    <Select value={form.driver_id} onValueChange={(v) => setForm({ ...form, driver_id: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select driver" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {people.map((p) => (
+                          <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Conductor</Label>
+                    <Select value={form.conductor_id || "none"} onValueChange={(v) => setForm({ ...form, conductor_id: v === "none" ? "" : v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select conductor (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {people.map((p) => (
+                          <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="col-span-2">
+                    <Label>Buses (max 3)</Label>
+                    <select multiple className="w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
+                      value={form.bus_ids} onChange={(e) => {
+                        const opts = Array.from(e.target.selectedOptions).map(o => o.value);
+                        setForm({ ...form, bus_ids: opts.slice(0,3) });
+                      }}>
+                      {buses.map((b) => (
+                        <option key={b.id} value={b.id}>{b.bus_no}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">Selected: {selectedBusNames || 'None'}</p>
+                  </div>
+
+                  <div className="col-span-2">
+                    <Button onClick={handleCreate} className="w-full"><CheckCircle className="h-4 w-4 mr-2" />Confirm & Create Trips</Button>
+                  </div>
+                  <div className="col-span-2">
+                    <Badge variant="secondary" className="w-full justify-start gap-2"><ShieldAlert className="h-4 w-4" /> Time-window conflict checks run before confirming.</Badge>
                   </div>
                 </div>
-
-                <div>
-                  <Label>Route</Label>
-                  <Select value={form.route_id} onValueChange={(v) => setForm({ ...form, route_id: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select route" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {routes.map((r) => (
-                        <SelectItem key={r.id} value={r.id}>{r.route_no} — {r.route_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Driver</Label>
-                  <Select value={form.driver_id} onValueChange={(v) => setForm({ ...form, driver_id: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select driver" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {people.map((p) => (
-                        <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Conductor</Label>
-                  <Select value={form.conductor_id || "none"} onValueChange={(v) => setForm({ ...form, conductor_id: v === "none" ? "" : v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select conductor (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {people.map((p) => (
-                        <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="col-span-2">
-                  <Label>Buses (max 3)</Label>
-                  <select multiple className="w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
-                    value={form.bus_ids} onChange={(e) => {
-                      const opts = Array.from(e.target.selectedOptions).map(o => o.value);
-                      setForm({ ...form, bus_ids: opts.slice(0,3) });
-                    }}>
-                    {buses.map((b) => (
-                      <option key={b.id} value={b.id}>{b.bus_no}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground mt-1">Selected: {selectedBusNames || 'None'}</p>
-                </div>
-
-                <div className="col-span-2">
-                  <Button onClick={handleCreate} className="w-full"><CheckCircle className="h-4 w-4 mr-2" />Confirm & Create Trips</Button>
-                </div>
-                <div className="col-span-2">
-                  <Badge variant="secondary" className="w-full justify-start gap-2"><ShieldAlert className="h-4 w-4" /> Time-window conflict checks run before confirming.</Badge>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 
