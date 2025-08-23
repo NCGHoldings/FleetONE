@@ -268,6 +268,71 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_training: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          documents: Json | null
+          driver_id: string
+          driver_name: string
+          duration: number | null
+          id: string
+          instructor_email: string | null
+          instructor_name: string | null
+          instructor_phone: string | null
+          notes: string | null
+          status: string
+          training_date: string
+          training_id: string
+          training_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          documents?: Json | null
+          driver_id: string
+          driver_name: string
+          duration?: number | null
+          id?: string
+          instructor_email?: string | null
+          instructor_name?: string | null
+          instructor_phone?: string | null
+          notes?: string | null
+          status?: string
+          training_date: string
+          training_id: string
+          training_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          documents?: Json | null
+          driver_id?: string
+          driver_name?: string
+          duration?: number | null
+          id?: string
+          instructor_email?: string | null
+          instructor_name?: string | null
+          instructor_phone?: string | null
+          notes?: string | null
+          status?: string
+          training_date?: string
+          training_id?: string
+          training_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_training_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       feedback_complaints: {
         Row: {
           category: string
@@ -611,6 +676,103 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      real_time_tracking: {
+        Row: {
+          alerts: Json | null
+          battery_voltage: number | null
+          bus_id: string
+          bus_no: string
+          created_at: string
+          current_location: string | null
+          driver_id: string | null
+          driver_name: string | null
+          engine_health: string | null
+          engine_temperature: number | null
+          fuel_level: number | null
+          gps_coordinates: Json | null
+          id: string
+          last_update: string
+          odometer_reading: number | null
+          oil_pressure: number | null
+          route_id: string | null
+          route_name: string | null
+          speed_kmh: number | null
+          status: string
+          tire_pressure: Json | null
+          updated_at: string
+        }
+        Insert: {
+          alerts?: Json | null
+          battery_voltage?: number | null
+          bus_id: string
+          bus_no: string
+          created_at?: string
+          current_location?: string | null
+          driver_id?: string | null
+          driver_name?: string | null
+          engine_health?: string | null
+          engine_temperature?: number | null
+          fuel_level?: number | null
+          gps_coordinates?: Json | null
+          id?: string
+          last_update?: string
+          odometer_reading?: number | null
+          oil_pressure?: number | null
+          route_id?: string | null
+          route_name?: string | null
+          speed_kmh?: number | null
+          status?: string
+          tire_pressure?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          alerts?: Json | null
+          battery_voltage?: number | null
+          bus_id?: string
+          bus_no?: string
+          created_at?: string
+          current_location?: string | null
+          driver_id?: string | null
+          driver_name?: string | null
+          engine_health?: string | null
+          engine_temperature?: number | null
+          fuel_level?: number | null
+          gps_coordinates?: Json | null
+          id?: string
+          last_update?: string
+          odometer_reading?: number | null
+          oil_pressure?: number | null
+          route_id?: string | null
+          route_name?: string | null
+          speed_kmh?: number | null
+          status?: string
+          tire_pressure?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "real_time_tracking_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "real_time_tracking_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "real_time_tracking_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       route_permits: {
         Row: {

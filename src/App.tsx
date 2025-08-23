@@ -17,6 +17,8 @@ import StaffManagement from "./pages/StaffManagement";
 import Insurance from "./pages/Insurance";
 import Maintenance from "./pages/Maintenance";
 import RoutePermits from "./pages/RoutePermits";
+import DriverTraining from "./pages/DriverTraining";
+import RealTimeTracking from "./pages/RealTimeTracking";
 
 const queryClient = new QueryClient();
 
@@ -113,7 +115,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Driver Training module coming soon...</div>
+                    <DriverTraining />
                   </AppLayout>
                 </ProtectedRoute>
               } 
@@ -123,7 +125,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Real-Time Tracking module coming soon...</div>
+                    <RealTimeTracking />
                   </AppLayout>
                 </ProtectedRoute>
               } 
