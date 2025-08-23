@@ -177,6 +177,12 @@ export default function DriverAllocation() {
     return dateStr;
   };
 
+  const generateTripIdForExcel = (dateStr: string, seq: number) => {
+    const d = parseDate(dateStr) || new Date().toISOString().slice(0,10);
+    const ymd = d.split('-').join('');
+    return `T${ymd}-${String(seq).padStart(4,'0')}`;
+  };
+
   const findBusByNo = (busNo: string) => buses.find(b => b.bus_no.toLowerCase() === busNo.toLowerCase());
   const findRouteByName = (routeName: string) => routes.find(r => r.route_name.toLowerCase().includes(routeName.toLowerCase()));
   const findPersonByName = (name: string) => people.find(p => 
@@ -237,8 +243,8 @@ export default function DriverAllocation() {
         const routeRows = Array.from(newRoutes).map((routeName, index) => ({
           route_no: `R${Date.now()}${index}`, // generate route number
           route_name: routeName,
-          start_location: routeName.split(' To ')[0] || 'Unknown',
-          end_location: routeName.split(' To ')[1] || 'Unknown'
+          start_location: (routeName.split(/\s+to\s+/i)[0] || 'Unknown').trim(),
+          end_location: (routeName.split(/\s+to\s+/i)[1] || 'Unknown').trim()
         }));
         
         const { error: routeErr } = await supabase.from('routes').insert(routeRows);
@@ -266,12 +272,14 @@ export default function DriverAllocation() {
         console.log('Creating missing staff profiles:', Array.from(newStaff));
         const staffRows = Array.from(newStaff).map((fullName) => {
           const nameParts = fullName.trim().split(' ');
+          const phoneMatch = (jsonData as any[]).find(r => r['Driver']?.toString().trim() === fullName && r['Whatsapp']);
+          const phone = phoneMatch ? phoneMatch['Whatsapp'].toString().replace(/\D/g, '') : '';
           return {
             user_id: crypto.randomUUID(), // Generate UUID for user_id
             first_name: nameParts[0] || fullName,
             last_name: nameParts.slice(1).join(' ') || '',
             employee_id: `EMP${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-            phone: '' // Will be updated from Excel if provided
+            phone
           };
         });
         
@@ -304,7 +312,7 @@ export default function DriverAllocation() {
 
         if (bus && route && driver && date) {
           processedRows.push({
-            tripId: generateTripId(),
+            tripId: generateTripIdForExcel(date, i + 1),
             busId: bus.id,
             routeId: route.id,
             driverId: driver.user_id,
