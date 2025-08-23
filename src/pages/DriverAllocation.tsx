@@ -195,14 +195,98 @@ export default function DriverAllocation() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-      // Analyze data first
-      const missingBuses = new Set<string>();
-      const missingRoutes = new Set<string>();
-      const missingDrivers = new Set<string>();
-      const missingConductors = new Set<string>();
-      const processedRows = [];
-      const validRows = [];
+      console.log('Processing Excel data:', jsonData);
 
+      // Step 1: Create missing buses
+      const newBuses = new Set<string>();
+      for (const row of jsonData) {
+        const busNo = row['Bus No']?.toString().trim();
+        if (busNo && !findBusByNo(busNo)) {
+          newBuses.add(busNo);
+        }
+      }
+
+      if (newBuses.size > 0) {
+        console.log('Creating missing buses:', Array.from(newBuses));
+        const busRows = Array.from(newBuses).map(busNo => ({
+          bus_no: busNo,
+          type: 'Bus', // default type
+          model: 'Unknown',
+          year: new Date().getFullYear(),
+          capacity: 50 // default capacity
+        }));
+        
+        const { error: busErr } = await supabase.from('buses').insert(busRows);
+        if (busErr) {
+          console.error('Error creating buses:', busErr);
+          throw new Error(`Failed to create buses: ${busErr.message}`);
+        }
+      }
+
+      // Step 2: Create missing routes
+      const newRoutes = new Set<string>();
+      for (const row of jsonData) {
+        const routeName = row['route name']?.toString().trim();
+        if (routeName && !findRouteByName(routeName)) {
+          newRoutes.add(routeName);
+        }
+      }
+
+      if (newRoutes.size > 0) {
+        console.log('Creating missing routes:', Array.from(newRoutes));
+        const routeRows = Array.from(newRoutes).map((routeName, index) => ({
+          route_no: `R${Date.now()}${index}`, // generate route number
+          route_name: routeName,
+          start_location: routeName.split(' To ')[0] || 'Unknown',
+          end_location: routeName.split(' To ')[1] || 'Unknown'
+        }));
+        
+        const { error: routeErr } = await supabase.from('routes').insert(routeRows);
+        if (routeErr) {
+          console.error('Error creating routes:', routeErr);
+          throw new Error(`Failed to create routes: ${routeErr.message}`);
+        }
+      }
+
+      // Step 3: Create missing staff profiles
+      const newStaff = new Set<string>();
+      for (const row of jsonData) {
+        const driverName = row['Driver']?.toString().trim();
+        const conductorName = row['Conductor']?.toString().trim();
+        
+        if (driverName && !findPersonByName(driverName)) {
+          newStaff.add(driverName);
+        }
+        if (conductorName && !findPersonByName(conductorName)) {
+          newStaff.add(conductorName);
+        }
+      }
+
+      if (newStaff.size > 0) {
+        console.log('Creating missing staff profiles:', Array.from(newStaff));
+        const staffRows = Array.from(newStaff).map((fullName) => {
+          const nameParts = fullName.trim().split(' ');
+          return {
+            user_id: crypto.randomUUID(), // Generate UUID for user_id
+            first_name: nameParts[0] || fullName,
+            last_name: nameParts.slice(1).join(' ') || '',
+            employee_id: `EMP${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+            phone: '' // Will be updated from Excel if provided
+          };
+        });
+        
+        const { error: staffErr } = await supabase.from('profiles').insert(staffRows);
+        if (staffErr) {
+          console.error('Error creating staff profiles:', staffErr);
+          throw new Error(`Failed to create staff profiles: ${staffErr.message}`);
+        }
+      }
+
+      // Step 4: Refresh local data
+      await fetchLists();
+
+      // Step 5: Process Excel data for allocations
+      const processedRows = [];
       for (let i = 0; i < jsonData.length; i++) {
         const row = jsonData[i];
         const busNo = row['Bus No']?.toString().trim();
@@ -217,14 +301,9 @@ export default function DriverAllocation() {
         
         const date = parseDate(row['date']);
         const time = parseTime(row['Time']);
-        
-        if (!bus && busNo) missingBuses.add(busNo);
-        if (!route && routeName) missingRoutes.add(routeName);
-        if (!driver && driverName) missingDrivers.add(driverName);
-        if (!conductor && conductorName) missingConductors.add(conductorName);
 
         if (bus && route && driver && date) {
-          const processedRow = {
+          processedRows.push({
             tripId: generateTripId(),
             busId: bus.id,
             routeId: route.id,
@@ -233,45 +312,16 @@ export default function DriverAllocation() {
             date: date,
             startTime: time || '06:00',
             endTime: time ? addHours(time, 8) : '18:00'
-          };
-          processedRows.push(processedRow);
-          validRows.push(i + 1);
+          });
         }
-      }
-
-      // Show detailed error report
-      if (missingBuses.size > 0 || missingRoutes.size > 0 || missingDrivers.size > 0) {
-        let errorMsg = 'Missing data found:\n';
-        if (missingBuses.size > 0) {
-          errorMsg += `\nBuses (${missingBuses.size}): ${Array.from(missingBuses).slice(0, 5).join(', ')}${missingBuses.size > 5 ? '...' : ''}`;
-        }
-        if (missingRoutes.size > 0) {
-          errorMsg += `\nRoutes (${missingRoutes.size}): ${Array.from(missingRoutes).slice(0, 3).join(', ')}${missingRoutes.size > 3 ? '...' : ''}`;
-        }
-        if (missingDrivers.size > 0) {
-          errorMsg += `\nDrivers (${missingDrivers.size}): ${Array.from(missingDrivers).slice(0, 5).join(', ')}${missingDrivers.size > 5 ? '...' : ''}`;
-        }
-        
-        errorMsg += `\n\nPlease add missing records to the system first.\nValid rows that can be imported: ${validRows.length}/${jsonData.length}`;
-        
-        // Show detailed missing data in console for reference
-        console.log('Missing Buses:', Array.from(missingBuses));
-        console.log('Missing Routes:', Array.from(missingRoutes));
-        console.log('Missing Drivers:', Array.from(missingDrivers));
-        if (missingConductors.size > 0) {
-          console.log('Missing Conductors:', Array.from(missingConductors));
-        }
-        
-        toast.error(errorMsg);
-        return;
       }
 
       if (processedRows.length === 0) {
-        toast.error('No valid rows found to import');
+        toast.error('No valid rows found to import after creating missing records');
         return;
       }
 
-      // Proceed with import
+      // Step 6: Create allocations
       const allocRows = processedRows.map(row => ({
         trip_id: row.tripId,
         bus_id: row.busId,
@@ -287,7 +337,7 @@ export default function DriverAllocation() {
       const { error: allocErr } = await supabase.from('driver_allocations').insert(allocRows);
       if (allocErr) throw allocErr;
 
-      // Create daily trips
+      // Step 7: Create daily trips
       const tripRows = processedRows.map(row => ({
         bus_id: row.busId,
         route_id: row.routeId,
@@ -303,7 +353,7 @@ export default function DriverAllocation() {
       const { error: tripErr } = await supabase.from('daily_trips').insert(tripRows);
       if (tripErr) throw tripErr;
 
-      toast.success(`Successfully imported ${processedRows.length} allocations`);
+      toast.success(`Successfully imported ${processedRows.length} allocations and created ${newBuses.size} buses, ${newRoutes.size} routes, ${newStaff.size} staff profiles`);
       setExcelOpen(false);
       fetchAllocations();
     } catch (error: any) {
