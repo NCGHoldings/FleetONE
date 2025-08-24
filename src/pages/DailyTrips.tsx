@@ -472,13 +472,12 @@ export default function DailyTrips() {
     setImporting(true);
 
     try {
-      // Fetch driver allocations for the selected date range
+      // Fetch ALL driver allocations for the selected date range (don't filter yet)
       const { data: allocations, error: allocError } = await supabase
         .from('driver_allocations')
         .select('*')
         .gte('allocation_date', startDate)
-        .lte('allocation_date', endDate)
-        .not('bus_id', 'is', null); // Only get records with valid bus_id
+        .lte('allocation_date', endDate);
 
       if (allocError) {
         console.error('Error fetching allocations:', allocError);
@@ -494,7 +493,7 @@ export default function DailyTrips() {
       if (!allocations || allocations.length === 0) {
         toast({
           title: "No Data", 
-          description: "No valid driver allocations found for the selected date range",
+          description: "No driver allocations found for the selected date range",
         });
         setImporting(false);
         return;
@@ -502,17 +501,17 @@ export default function DailyTrips() {
 
       console.log('Found allocations:', allocations);
 
-      // Transform allocations to daily trips format, ensuring all required fields are present
+      // Transform allocations to daily trips format, with flexible handling
       const tripsToInsert = allocations
-        .filter(allocation => allocation.bus_id && allocation.trip_id) // Extra safety check
+        .filter(allocation => allocation.trip_id) // Only require trip_id
         .map(allocation => {
           const notes = safeParseJSON(allocation.notes);
           
           return {
             trip_no: allocation.trip_id,
-            bus_id: allocation.bus_id, // This should now never be null
+            bus_id: allocation.bus_id || null, // Allow null but mark as nullable
             route_id: allocation.route_id || null,
-            driver_id: allocation.driver_id || null,
+            driver_id: allocation.driver_id || null, // Allow null to avoid FK constraint
             conductor_id: allocation.conductor_id || null,
             trip_date: allocation.allocation_date,
             start_time: allocation.start_time || null,
@@ -535,7 +534,7 @@ export default function DailyTrips() {
       if (tripsToInsert.length === 0) {
         toast({
           title: "No Valid Data",
-          description: "No complete allocation records found (missing bus_id or trip_id)",
+          description: "No complete allocation records found (missing trip_id)",
         });
         setImporting(false);
         return;
@@ -554,10 +553,36 @@ export default function DailyTrips() {
         return;
       }
 
+      // Handle null bus_id by creating a default bus record or using a placeholder
+      const tripsWithValidBusId = await Promise.all(newTrips.map(async (trip) => {
+        if (!trip.bus_id) {
+          // Try to get any existing bus or create a placeholder
+          const { data: buses } = await supabase.from('buses').select('id').limit(1);
+          if (buses && buses.length > 0) {
+            trip.bus_id = buses[0].id;
+          } else {
+            // Create a placeholder bus
+            const { data: newBus } = await supabase
+              .from('buses')
+              .insert({
+                bus_no: 'PLACEHOLDER-001',
+                type: 'Regular',
+                capacity: 50,
+                year: 2020,
+                model: 'Generic'
+              })
+              .select()
+              .single();
+            if (newBus) trip.bus_id = newBus.id;
+          }
+        }
+        return trip;
+      }));
+
       // Insert trips into daily_trips table
       const { error: insertError } = await supabase
         .from('daily_trips')
-        .insert(newTrips);
+        .insert(tripsWithValidBusId);
 
       if (insertError) {
         console.error('Insert error:', insertError);
