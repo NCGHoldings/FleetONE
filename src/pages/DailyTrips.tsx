@@ -477,46 +477,69 @@ export default function DailyTrips() {
         .from('driver_allocations')
         .select('*')
         .gte('allocation_date', startDate)
-        .lte('allocation_date', endDate);
+        .lte('allocation_date', endDate)
+        .not('bus_id', 'is', null); // Only get records with valid bus_id
 
       if (allocError) {
         console.error('Error fetching allocations:', allocError);
-      }
-
-      if (!allocations || allocations.length === 0) {
         toast({
-          title: "No Data",
-          description: "No driver allocations found for the selected date range",
+          title: "Error",
+          description: "Failed to fetch driver allocations",
+          variant: "destructive",
         });
         setImporting(false);
         return;
       }
 
-      // Transform allocations to daily trips format
-      const tripsToInsert = allocations.map(allocation => {
-        const notes = safeParseJSON(allocation.notes);
-        
-        return {
-          trip_no: allocation.trip_id,
-          bus_id: allocation.bus_id,
-          route_id: allocation.route_id,
-          driver_id: allocation.driver_id,
-          conductor_id: allocation.conductor_id,
-          trip_date: allocation.allocation_date,
-          start_time: allocation.start_time,
-          end_time: allocation.end_time,
-          whatsapp: allocation.whatsapp_sent ? 'sent' : null,
-          status: 'scheduled' as const,
-          income: 0,
-          fuel_cost: 0,
-          other_expenses: 0,
-          total_expenses: 0,
-          net_income: 0,
-          distance_km: 0,
-          km_per_liter: 0,
-          notes: allocation.notes || null,
-        };
-      });
+      if (!allocations || allocations.length === 0) {
+        toast({
+          title: "No Data", 
+          description: "No valid driver allocations found for the selected date range",
+        });
+        setImporting(false);
+        return;
+      }
+
+      console.log('Found allocations:', allocations);
+
+      // Transform allocations to daily trips format, ensuring all required fields are present
+      const tripsToInsert = allocations
+        .filter(allocation => allocation.bus_id && allocation.trip_id) // Extra safety check
+        .map(allocation => {
+          const notes = safeParseJSON(allocation.notes);
+          
+          return {
+            trip_no: allocation.trip_id,
+            bus_id: allocation.bus_id, // This should now never be null
+            route_id: allocation.route_id || null,
+            driver_id: allocation.driver_id || null,
+            conductor_id: allocation.conductor_id || null,
+            trip_date: allocation.allocation_date,
+            start_time: allocation.start_time || null,
+            end_time: allocation.end_time || null,
+            whatsapp: allocation.whatsapp_sent ? 'sent' : null,
+            status: 'scheduled' as const,
+            income: 0,
+            fuel_cost: 0,
+            other_expenses: 0,
+            total_expenses: 0,
+            net_income: 0,
+            distance_km: 0,
+            km_per_liter: 0,
+            notes: allocation.notes || null,
+          };
+        });
+
+      console.log('Trips to insert:', tripsToInsert);
+
+      if (tripsToInsert.length === 0) {
+        toast({
+          title: "No Valid Data",
+          description: "No complete allocation records found (missing bus_id or trip_id)",
+        });
+        setImporting(false);
+        return;
+      }
 
       // Check for existing trips to avoid duplicates
       const existingTripIds = data.map(trip => trip.trip_no);
@@ -538,11 +561,18 @@ export default function DailyTrips() {
 
       if (insertError) {
         console.error('Insert error:', insertError);
+        toast({
+          title: "Error",
+          description: `Failed to import trips: ${insertError.message}`,
+          variant: "destructive",
+        });
+        setImporting(false);
+        return;
       }
 
       toast({
         title: "Success",
-        description: `Imported ${newTrips.length} trips from driver allocations`,
+        description: `Successfully imported ${newTrips.length} trips from driver allocations`,
       });
 
       // Refresh the trips list
@@ -551,10 +581,10 @@ export default function DailyTrips() {
     } catch (error: any) {
       console.error('Import error:', error);
       toast({
-        title: "Import Completed",
-        description: "Trip import completed - some data may need manual review",
+        title: "Error",
+        description: `Import failed: ${error.message}`,
+        variant: "destructive",
       });
-      fetchTrips();
     } finally {
       setImporting(false);
     }
