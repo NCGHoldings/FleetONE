@@ -38,6 +38,7 @@ interface Trip {
   trip_date: string;
   start_time?: string;
   end_time?: string;
+  time?: string;
   odometer_start?: number;
   odometer_end?: number;
   distance_km: number;
@@ -67,46 +68,6 @@ const getStatusBadge = (status: Trip['status']) => {
   return <Badge className={`status-${config.variant.replace('destructive', 'error')}`}>{config.label}</Badge>;
 };
 
-// Handler functions defined before columns
-const handleViewDetails = (tripId: string) => {
-  console.log("Viewing details for trip:", tripId);
-};
-
-const handleEditTrip = (trip: Trip, setEditingTrip: (trip: Trip | null) => void, setShowEditForm: (show: boolean) => void) => {
-  setEditingTrip(trip);
-  setShowEditForm(true);
-};
-
-const handleViewExpenses = (trip: Trip, setSelectedTrip: (trip: Trip | null) => void, setShowExpensesModal: (show: boolean) => void) => {
-  setSelectedTrip(trip);
-  setShowExpensesModal(true);
-};
-
-const handleCancelTrip = async (tripId: string, toast: any, fetchTrips: () => void) => {
-  try {
-    const { error } = await supabase
-      .from('daily_trips')
-      .update({ status: 'cancelled' })
-      .eq('id', tripId);
-
-    if (error) throw error;
-
-    toast({
-      title: "Success",
-      description: "Trip cancelled successfully",
-    });
-    
-    fetchTrips();
-  } catch (error) {
-    console.error('Error cancelling trip:', error);
-    toast({
-      title: "Error",
-      description: "Failed to cancel trip",
-      variant: "destructive",
-    });
-  }
-};
-
 const createColumns = (
   handleViewDetailsLocal: (tripId: string) => void,
   handleEditTripLocal: (trip: Trip) => void,
@@ -119,6 +80,14 @@ const createColumns = (
     cell: ({ row }) => (
       <span className="font-mono text-sm">{row.getValue("trip_no")}</span>
     ),
+  },
+  {
+    accessorKey: "trip_date",
+    header: "Date",
+    cell: ({ row }) => {
+      const date = row.getValue("trip_date") as string;
+      return new Date(date).toLocaleDateString();
+    },
   },
   {
     accessorKey: "bus_no",
@@ -155,12 +124,9 @@ const createColumns = (
     },
   },
   {
-    accessorKey: "trip_date",
-    header: "Date",
-    cell: ({ row }) => {
-      const date = row.getValue("trip_date") as string;
-      return new Date(date).toLocaleDateString();
-    },
+    accessorKey: "time",
+    header: "Time",
+    cell: ({ row }) => row.getValue("time") || "-",
   },
   {
     accessorKey: "start_time",
@@ -210,22 +176,6 @@ const createColumns = (
     cell: ({ row }) => {
       const fuelCost = row.getValue("fuel_cost") as number;
       return fuelCost > 0 ? `₨ ${fuelCost.toLocaleString()}` : "-";
-    },
-  },
-  {
-    accessorKey: "diesel_price_per_liter",
-    header: "Diesel Price (₨/L)",
-    cell: ({ row }) => {
-      const price = row.getValue("diesel_price_per_liter") as number;
-      return price > 0 ? `₨ ${price.toFixed(2)}` : "-";
-    },
-  },
-  {
-    accessorKey: "fuel_liters",
-    header: "Fuel Liters (L)",
-    cell: ({ row }) => {
-      const liters = row.getValue("fuel_liters") as number;
-      return liters > 0 ? liters.toFixed(2) : "-";
     },
   },
   {
@@ -384,6 +334,16 @@ export default function DailyTrips() {
     fetchDieselPrice();
   }, []);
 
+  const safeParseJSON = (str?: string | any) => {
+    if (!str) return {};
+    if (typeof str === 'object') return str;
+    try {
+      return JSON.parse(str);
+    } catch {
+      return {};
+    }
+  };
+
   const fetchDieselPrice = async () => {
     try {
       const { data: settings, error } = await supabase
@@ -392,7 +352,6 @@ export default function DailyTrips() {
         .eq('setting_key', 'diesel_price_per_liter')
         .single();
 
-      if (error) throw error;
       if (settings) {
         setDieselPrice(parseFloat(settings.setting_value as string));
       }
@@ -404,7 +363,7 @@ export default function DailyTrips() {
   const fetchTrips = async () => {
     setLoading(true);
     try {
-      // Just get daily trips data directly without complex joins
+      // Fetch daily trips data
       const { data: trips, error } = await supabase
         .from('daily_trips')
         .select('*')
@@ -421,39 +380,51 @@ export default function DailyTrips() {
         return;
       }
 
-      // Transform the data to match our interface - use existing data or defaults
-      const transformedTrips: Trip[] = trips.map(trip => ({
-        id: trip.id,
-        trip_no: trip.trip_no || `T-${trip.id.slice(0, 8)}`,
-        bus_id: trip.bus_id || '',
-        route_id: trip.route_id || '',
-        driver_id: trip.driver_id,
-        conductor_id: trip.conductor_id,
-        bus_no: 'Bus-' + (trip.bus_id?.slice(0, 8) || 'Unknown'),
-        route_no: 'R-' + (trip.route_id?.slice(0, 8) || 'Unknown'),
-        route: 'Route-' + (trip.route_id?.slice(0, 8) || 'Unknown'),
-        driver_name: trip.driver_id ? 'Driver-' + trip.driver_id.slice(0, 8) : undefined,
-        conductor_name: trip.conductor_id ? 'Conductor-' + trip.conductor_id.slice(0, 8) : undefined,
-        whatsapp: trip.whatsapp,
-        trip_date: trip.trip_date,
-        start_time: trip.start_time,
-        end_time: trip.end_time,
-        odometer_start: trip.odometer_start,
-        odometer_end: trip.odometer_end,
-        distance_km: trip.distance_km || 0,
-        income: trip.income || 0,
-        fuel_cost: trip.fuel_cost || 0,
-        diesel_price_per_liter: trip.diesel_price_per_liter,
-        fuel_liters: trip.fuel_liters,
-        other_expenses: trip.other_expenses || 0,
-        other_expenses_details: Array.isArray(trip.other_expenses_details) ? trip.other_expenses_details : [],
-        total_expenses: trip.total_expenses || 0,
-        net_income: trip.net_income || 0,
-        km_per_liter: trip.km_per_liter || 0,
-        performance_score: trip.performance_score,
-        audit_log: Array.isArray(trip.audit_log) ? trip.audit_log : [],
-        status: trip.status as Trip['status'],
-      }));
+      // Also fetch additional data from driver allocations for better display
+      const { data: allocations } = await supabase
+        .from('driver_allocations')
+        .select('*');
+
+      // Transform the data to match our interface
+      const transformedTrips: Trip[] = trips.map(trip => {
+        // Find matching allocation data for better display
+        const allocation = allocations?.find(a => a.trip_id === trip.trip_no);
+        const notes = allocation ? safeParseJSON(allocation.notes) : {};
+
+        return {
+          id: trip.id,
+          trip_no: trip.trip_no || `T${trip.id.slice(0, 4)}`,
+          bus_id: trip.bus_id || '',
+          route_id: trip.route_id || '',
+          driver_id: trip.driver_id,
+          conductor_id: trip.conductor_id,
+          bus_no: notes.bus_no || `Bus-${trip.bus_id?.slice(0, 8) || 'Unknown'}`,
+          route_no: notes.route_no || `R-${trip.route_id?.slice(0, 8) || 'Unknown'}`,
+          route: notes.route || `Route-${trip.route_id?.slice(0, 8) || 'Unknown'}`,
+          driver_name: notes.driver || (trip.driver_id ? `Driver-${trip.driver_id.slice(0, 8)}` : undefined),
+          conductor_name: notes.conductor || (trip.conductor_id ? `Conductor-${trip.conductor_id.slice(0, 8)}` : undefined),
+          whatsapp: notes.whatsapp || trip.whatsapp,
+          trip_date: trip.trip_date,
+          start_time: trip.start_time,
+          end_time: trip.end_time,
+          time: notes.time,
+          odometer_start: trip.odometer_start,
+          odometer_end: trip.odometer_end,
+          distance_km: trip.distance_km || 0,
+          income: trip.income || 0,
+          fuel_cost: trip.fuel_cost || 0,
+          diesel_price_per_liter: trip.diesel_price_per_liter,
+          fuel_liters: trip.fuel_liters,
+          other_expenses: trip.other_expenses || 0,
+          other_expenses_details: Array.isArray(trip.other_expenses_details) ? trip.other_expenses_details : [],
+          total_expenses: trip.total_expenses || 0,
+          net_income: trip.net_income || 0,
+          km_per_liter: trip.km_per_liter || 0,
+          performance_score: trip.performance_score,
+          audit_log: Array.isArray(trip.audit_log) ? trip.audit_log : [],
+          status: trip.status as Trip['status'] || 'scheduled',
+        };
+      });
 
       setData(transformedTrips);
     } catch (error) {
@@ -501,16 +472,16 @@ export default function DailyTrips() {
     setImporting(true);
 
     try {
-      // Fetch driver allocations with basic bus and route info for the selected date range
-      const { data: allocations } = await supabase
+      // Fetch driver allocations for the selected date range
+      const { data: allocations, error: allocError } = await supabase
         .from('driver_allocations')
-        .select(`
-          *,
-          buses(bus_no),
-          routes(route_no, route_name)
-        `)
+        .select('*')
         .gte('allocation_date', startDate)
         .lte('allocation_date', endDate);
+
+      if (allocError) {
+        console.error('Error fetching allocations:', allocError);
+      }
 
       if (!allocations || allocations.length === 0) {
         toast({
@@ -521,43 +492,64 @@ export default function DailyTrips() {
         return;
       }
 
-      // Transform allocations to daily trips format with all matching columns
-      const tripsToInsert = allocations.map(allocation => ({
-        trip_no: allocation.trip_id,
-        bus_id: allocation.bus_id,
-        route_id: allocation.route_id,
-        driver_id: allocation.driver_id,
-        conductor_id: allocation.conductor_id,
-        trip_date: allocation.allocation_date,
-        start_time: allocation.start_time,
-        end_time: allocation.end_time,
-        whatsapp: allocation.whatsapp_sent ? 'sent' : null,
-        status: 'scheduled' as const,
-        income: 0,
-        fuel_cost: 0,
-        other_expenses: 0,
-        total_expenses: 0,
-        net_income: 0,
-        distance_km: 0,
-        km_per_liter: 0,
-        notes: allocation.notes || null,
-      }));
+      // Transform allocations to daily trips format
+      const tripsToInsert = allocations.map(allocation => {
+        const notes = safeParseJSON(allocation.notes);
+        
+        return {
+          trip_no: allocation.trip_id,
+          bus_id: allocation.bus_id,
+          route_id: allocation.route_id,
+          driver_id: allocation.driver_id,
+          conductor_id: allocation.conductor_id,
+          trip_date: allocation.allocation_date,
+          start_time: allocation.start_time,
+          end_time: allocation.end_time,
+          whatsapp: allocation.whatsapp_sent ? 'sent' : null,
+          status: 'scheduled' as const,
+          income: 0,
+          fuel_cost: 0,
+          other_expenses: 0,
+          total_expenses: 0,
+          net_income: 0,
+          distance_km: 0,
+          km_per_liter: 0,
+          notes: allocation.notes || null,
+        };
+      });
+
+      // Check for existing trips to avoid duplicates
+      const existingTripIds = data.map(trip => trip.trip_no);
+      const newTrips = tripsToInsert.filter(trip => !existingTripIds.includes(trip.trip_no));
+
+      if (newTrips.length === 0) {
+        toast({
+          title: "Info",
+          description: "All trips from the selected date range already exist",
+        });
+        setImporting(false);
+        return;
+      }
 
       // Insert trips into daily_trips table
-      await supabase
+      const { error: insertError } = await supabase
         .from('daily_trips')
-        .insert(tripsToInsert);
+        .insert(newTrips);
+
+      if (insertError) {
+        console.error('Insert error:', insertError);
+      }
 
       toast({
         title: "Success",
-        description: `Imported ${tripsToInsert.length} trips from driver allocations`,
+        description: `Imported ${newTrips.length} trips from driver allocations`,
       });
 
       // Refresh the trips list
-      fetchTrips();
+      await fetchTrips();
 
     } catch (error: any) {
-      // Ignore all errors as requested by user
+      console.error('Import error:', error);
       toast({
         title: "Import Completed",
         description: "Trip import completed - some data may need manual review",
