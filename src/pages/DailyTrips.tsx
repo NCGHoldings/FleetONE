@@ -504,10 +504,14 @@ export default function DailyTrips() {
     setImporting(true);
 
     try {
-      // Fetch all driver allocations for the selected date range - ignore any errors
+      // Fetch driver allocations with basic bus and route info for the selected date range
       const { data: allocations } = await supabase
         .from('driver_allocations')
-        .select('*')
+        .select(`
+          *,
+          buses(bus_no),
+          routes(route_no, route_name)
+        `)
         .gte('allocation_date', startDate)
         .lte('allocation_date', endDate);
 
@@ -520,7 +524,7 @@ export default function DailyTrips() {
         return;
       }
 
-      // Transform allocations to daily trips format - simple mapping
+      // Transform allocations to daily trips format with all matching columns
       const tripsToInsert = allocations.map(allocation => ({
         trip_no: allocation.trip_id,
         bus_id: allocation.bus_id,
@@ -530,6 +534,7 @@ export default function DailyTrips() {
         trip_date: allocation.allocation_date,
         start_time: allocation.start_time,
         end_time: allocation.end_time,
+        whatsapp: allocation.whatsapp_sent ? 'sent' : null,
         status: 'scheduled' as const,
         income: 0,
         fuel_cost: 0,
@@ -538,9 +543,10 @@ export default function DailyTrips() {
         net_income: 0,
         distance_km: 0,
         km_per_liter: 0,
+        notes: allocation.notes || null,
       }));
 
-      // Insert trips into daily_trips table - ignore any errors
+      // Insert trips into daily_trips table
       await supabase
         .from('daily_trips')
         .insert(tripsToInsert);
