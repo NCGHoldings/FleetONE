@@ -3,7 +3,10 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2, FileText, Edit, Calculator } from "lucide-react";
+import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2, FileText, Edit, Calculator, Download, CalendarIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
@@ -332,6 +335,9 @@ export default function DailyTrips() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [dieselPrice, setDieselPrice] = useState<number>(150);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [importing, setImporting] = useState(false);
   const { toast } = useToast();
 
   const handleViewDetailsLocal = (tripId: string) => {
@@ -484,6 +490,106 @@ export default function DailyTrips() {
     fetchTrips();
   };
 
+  // Import driver allocation data for selected date range
+  const importDriverAllocationData = async () => {
+    if (!startDate || !endDate) {
+      toast({
+        title: "Error",
+        description: "Please select both start and end dates",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+      toast({
+        title: "Error", 
+        description: "Start date must be before end date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImporting(true);
+
+    try {
+      // Fetch driver allocations for the selected date range
+      const { data: allocations, error: fetchError } = await supabase
+        .from('driver_allocations')
+        .select(`
+          *,
+          buses!inner(bus_no, id),
+          routes!inner(route_no, route_name, id),
+          driver:profiles!driver_allocations_driver_id_fkey(first_name, last_name, id),
+          conductor:profiles!driver_allocations_conductor_id_fkey(first_name, last_name, id)
+        `)
+        .gte('allocation_date', startDate)
+        .lte('allocation_date', endDate)
+        .eq('status', 'scheduled');
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (!allocations || allocations.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No driver allocations found for the selected date range",
+        });
+        return;
+      }
+
+      // Transform allocations to daily trips format
+      const tripsToInsert = allocations.map(allocation => ({
+        trip_no: allocation.trip_id,
+        bus_id: allocation.bus_id,
+        route_id: allocation.route_id,
+        driver_id: allocation.driver_id,
+        conductor_id: allocation.conductor_id,
+        trip_date: allocation.allocation_date,
+        start_time: allocation.start_time,
+        end_time: allocation.end_time,
+        whatsapp: allocation.whatsapp_sent ? 'sent' : null,
+        status: 'scheduled' as const,
+        income: 0,
+        fuel_cost: 0,
+        other_expenses: 0,
+        total_expenses: 0,
+        net_income: 0,
+        distance_km: 0,
+        km_per_liter: 0,
+        created_by: allocation.created_by,
+      }));
+
+      // Insert trips into daily_trips table
+      const { error: insertError } = await supabase
+        .from('daily_trips')
+        .insert(tripsToInsert);
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      toast({
+        title: "Success",
+        description: `Successfully imported ${tripsToInsert.length} trips from driver allocations`,
+      });
+
+      // Refresh the trips list
+      fetchTrips();
+
+    } catch (error: any) {
+      console.error('Error importing driver allocation data:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to import driver allocation data",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   // Calculate KPIs
   const totalTrips = data.length;
   const completedTrips = data.filter(trip => trip.status === 'completed').length;
@@ -523,11 +629,65 @@ export default function DailyTrips() {
           <h1 className="text-3xl font-bold text-foreground">Daily Trips</h1>
           <p className="text-muted-foreground">Monitor and manage daily bus operations</p>
         </div>
-        <Button onClick={handleAddTrip} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add New Trip
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleAddTrip} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Add New Trip
+          </Button>
+        </div>
       </div>
+
+      {/* Import Driver Allocations Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="w-5 h-5" />
+            Import from Driver Allocations
+          </CardTitle>
+          <CardDescription>
+            Select a date range to automatically import scheduled driver allocations as daily trips
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-4">
+            <div className="flex-1">
+              <Label htmlFor="start-date">Start Date</Label>
+              <Input
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <Label htmlFor="end-date">End Date</Label>
+              <Input
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+            <Button 
+              onClick={importDriverAllocationData}
+              disabled={importing || !startDate || !endDate}
+              className="gap-2"
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <CalendarIcon className="w-4 h-4" />
+                  Import Trips
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* KPI Strip */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
