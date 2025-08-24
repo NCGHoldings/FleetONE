@@ -28,6 +28,7 @@ interface AllocationRow {
   conductor_name?: string;
   driver_phone?: string;
   conductor_phone?: string;
+  time?: string;
 }
 
 export default function DriverAllocation() {
@@ -126,6 +127,7 @@ export default function DriverAllocation() {
           conductor_name: meta?.conductor || nameOf(r.conductor_id),
           driver_phone: meta?.whatsapp || phoneOf(r.driver_id),
           conductor_phone: phoneOf(r.conductor_id),
+          time: meta?.time,
         };
       });
 
@@ -151,9 +153,25 @@ export default function DriverAllocation() {
     return overlaps;
   };
 
-  const generateTripId = () => {
-    const timestamp = Date.now().toString().slice(-6);
-    return `T${timestamp}`;
+  const generateTripId = async () => {
+    // Get the highest trip ID number to continue sequence
+    const { data } = await supabase
+      .from('driver_allocations')
+      .select('trip_id')
+      .like('trip_id', 'T%')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    let nextNumber = 1;
+    if (data && data.length > 0) {
+      const lastTripId = data[0].trip_id;
+      const match = lastTripId.match(/T(\d+)/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      }
+    }
+    
+    return `T${nextNumber.toString().padStart(4, '0')}`;
   };
 
   const parseTime = (timeStr: string) => {
@@ -184,13 +202,6 @@ export default function DriverAllocation() {
     return dateStr;
   };
 
-  const generateTripIdForExcel = (dateStr: string, seq: number) => {
-    const d = parseDate(dateStr) || new Date().toISOString().slice(0,10);
-    const ymd = d.split('-').join('');
-    return `T${ymd}-${String(seq).padStart(4,'0')}`;
-  };
-
-  const findBusByNo = (busNo: string) => buses.find(b => b.bus_no.toLowerCase() === busNo.toLowerCase());
   const findRouteByName = (routeName: string) => routes.find(r => r.route_name.toLowerCase().includes(routeName.toLowerCase()));
   const findPersonByName = (name: string) => people.find(p => 
     `${p.first_name} ${p.last_name}`.toLowerCase().includes(name.toLowerCase()) ||
@@ -208,8 +219,25 @@ export default function DriverAllocation() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-      const seqByDate: Record<string, number> = {};
-      const allocRows = jsonData.map((row: any) => {
+      let currentTripNumber = 1;
+      
+      // First get the current highest trip ID to continue sequence
+      const { data: existingData } = await supabase
+        .from('driver_allocations')
+        .select('trip_id')
+        .like('trip_id', 'T%')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (existingData && existingData.length > 0) {
+        const lastTripId = existingData[0].trip_id;
+        const match = lastTripId.match(/T(\d+)/);
+        if (match) {
+          currentTripNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      const allocRows = jsonData.map((row: any, index: number) => {
         const busNo = row['Bus No']?.toString().trim();
         const routeNo = row['Route']?.toString().trim();
         const routeName = row['route name']?.toString().trim();
@@ -218,8 +246,7 @@ export default function DriverAllocation() {
         const whatsapp = row['Whatsapp']?.toString().replace(/\D/g, '');
         const date = parseDate(row['date']);
         const time = parseTime(row['Time']);
-        const seq = date ? (seqByDate[date] = (seqByDate[date] || 0) + 1) : 1;
-        const tripId = date ? generateTripIdForExcel(date, seq) : generateTripId();
+        const tripId = `T${(currentTripNumber + index).toString().padStart(4, '0')}`;
 
         return {
           trip_id: tripId,
@@ -234,6 +261,7 @@ export default function DriverAllocation() {
             driver: driverName,
             conductor: conductorName,
             whatsapp,
+            time: row['Time']?.toString()
           })
         } as any;
       });
@@ -259,13 +287,6 @@ export default function DriverAllocation() {
     const newHours = Math.floor(totalMinutes / 60) % 24;
     const newMinutes = totalMinutes % 60;
     return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}`;
-  };
-
-  const createWhatsAppLink = (phone?: string, text?: string) => {
-    if (!phone) return undefined;
-    const digits = phone.replace(/\D/g, '');
-    const msg = encodeURIComponent(text || 'Trip assigned.');
-    return `https://wa.me/${digits}?text=${msg}`;
   };
 
   const handleDeleteAllocation = async (allocationId: string) => {
@@ -320,7 +341,7 @@ export default function DriverAllocation() {
       return;
     }
 
-    const tripId = form.trip_id || `ALC-${form.date.replace(/-/g, '')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+    const tripId = form.trip_id || await generateTripId();
 
     try {
       // Create one allocation per bus to support many-to-many mapping
@@ -366,44 +387,45 @@ export default function DriverAllocation() {
 
   const columns: ColumnDef<AllocationRow>[] = [
     { accessorKey: 'trip_id', header: 'Trip ID' },
+    { accessorKey: 'date', header: 'Date' },
     { accessorKey: 'bus_no', header: 'Bus No.' },
     { accessorKey: 'route_no', header: 'Route No.' },
     { accessorKey: 'route_name', header: 'Route' },
     { accessorKey: 'driver_name', header: 'Driver' },
     { accessorKey: 'conductor_name', header: 'Conductor' },
-    {
-      accessorKey: 'driver_phone',
-      header: 'Whatsapp',
-      cell: ({ row }) => {
-        const url = createWhatsAppLink(row.original.driver_phone, `Trip ${row.original.trip_id} assigned to you on ${row.original.date}`);
-        return url ? (
-          <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary">
-            <MessageCircle className="h-4 w-4" /> Driver
-          </a>
-        ) : '-';
-      }
+    { 
+      accessorKey: 'driver_phone', 
+      header: 'WhatsApp',
+      cell: ({ row }) => row.original.driver_phone || '-'
     },
+    { accessorKey: 'time', header: 'Time' },
+    { accessorKey: 'start_time', header: 'Start Time' },
+    { accessorKey: 'end_time', header: 'End Time' },
+    { accessorKey: 'status', header: 'Status' },
     {
       id: 'actions',
-      header: 'Action',
+      header: 'Actions',
       cell: ({ row }) => (
-        <div className="flex gap-2">
-          <a
-            href={createWhatsAppLink(row.original.conductor_phone, `Trip ${row.original.trip_id} assigned on ${row.original.date}`)}
-            target="_blank" rel="noreferrer"
-            className="inline-flex items-center gap-1 text-muted-foreground"
-          >
-            <Send className="h-4 w-4" /> Conductor
-          </a>
+        <div className="flex gap-1">
           {isSupervisor && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDeleteAllocation(row.original.id)}
-              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditingAllocation(row.original)}
+                className="h-8 w-8 p-0"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteAllocation(row.original.id)}
+                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
           )}
         </div>
       )
