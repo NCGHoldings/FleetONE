@@ -234,47 +234,83 @@ export default function FleetManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Fleet Management</h1>
-          <p className="text-muted-foreground">Monitor and manage your bus fleet</p>
+    <div className="space-y-8 animate-fade-in">
+      {/* Enhanced Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent via-accent-hover to-primary p-8 text-accent-foreground">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm animate-logo-glow">
+              <Bus className="w-10 h-10 animate-bounce-subtle" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right">
+                Fleet Management
+              </h1>
+              <p className="text-accent-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
+                Monitor and optimize your entire bus fleet
+              </p>
+            </div>
+          </div>
+          <Button 
+            onClick={handleAddBus} 
+            className="gap-2 bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in" 
+            style={{ animationDelay: '0.2s' }}
+          >
+            <Plus className="w-4 h-4 animate-pulse-subtle" />
+            Add New Bus
+          </Button>
         </div>
-        <Button onClick={handleAddBus} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add New Bus
-        </Button>
+        
+        {/* Animated Background Elements */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse-subtle" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl animate-bounce-subtle" />
       </div>
 
-      {/* KPI Strip */}
+      {/* Enhanced KPI Cards with Animations */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Total Buses"
-          value={totalBuses.toString()}
-          icon={<Bus className="w-5 h-5" />}
-          description="Fleet size"
-        />
-        <KPICard
-          title="Active Buses"
-          value={activeBuses.toString()}
-          change={totalBuses > 0 ? `${((activeBuses / totalBuses) * 100).toFixed(0)}%` : "0%"}
-          changeType="positive"
-          icon={<Bus className="w-5 h-5" />}
-          description="On road now"
-        />
-        <KPICard
-          title="In Maintenance"
-          value={maintenanceBuses.toString()}
-          icon={<Wrench className="w-5 h-5" />}
-          description="Under service"
-        />
-        <KPICard
-          title="Daily Revenue"
-          value={`₨ ${totalRevenue.toLocaleString()}`}
-          icon={<DollarSign className="w-5 h-5" />}
-          description="Fleet total"
-        />
+        <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
+          <div className="professional-card hover:shadow-primary transition-all duration-500 group">
+            <KPICard
+              title="Total Buses"
+              value={totalBuses.toString()}
+              icon={<Bus className="w-5 h-5 group-hover:animate-wiggle" />}
+              description="Fleet size"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+          <div className="professional-card hover:shadow-primary transition-all duration-500 group">
+            <KPICard
+              title="Active Buses"
+              value={activeBuses.toString()}
+              change={totalBuses > 0 ? `${((activeBuses / totalBuses) * 100).toFixed(0)}%` : "0%"}
+              changeType="positive"
+              icon={<Bus className="w-5 h-5 group-hover:animate-bounce-subtle" />}
+              description="On road now"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.3s' }}>
+          <div className="professional-card hover:shadow-warning transition-all duration-500 group">
+            <KPICard
+              title="In Maintenance"
+              value={maintenanceBuses.toString()}
+              icon={<Wrench className="w-5 h-5 group-hover:animate-pulse-subtle" />}
+              description="Under service"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.4s' }}>
+          <div className="professional-card hover:shadow-success transition-all duration-500 group">
+            <KPICard
+              title="Daily Revenue"
+              value={`₨ ${totalRevenue.toLocaleString()}`}
+              icon={<DollarSign className="w-5 h-5 group-hover:animate-bounce-notification" />}
+              description="Fleet total"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Data Table */}

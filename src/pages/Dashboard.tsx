@@ -8,7 +8,8 @@ import {
   Calendar, 
   Wrench,
   AlertTriangle,
-  Activity
+  Activity,
+  BarChart3
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 
@@ -36,53 +37,92 @@ const recentAlerts = [
 
 export default function Dashboard() {
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back! Here's what's happening with your transport operations.</p>
+    <div className="space-y-8 animate-fade-in">
+      {/* Hero Header with Gradient Background */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary-hover to-accent p-8 text-primary-foreground">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm animate-pulse-subtle">
+                <BarChart3 className="w-8 h-8 animate-bounce-subtle" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right">
+                  Transport Dashboard
+                </h1>
+                <p className="text-primary-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
+                  Real-time insights into your fleet operations
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="text-right animate-scale-in" style={{ animationDelay: '0.2s' }}>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+              <p className="text-sm text-primary-foreground/70">System Status</p>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <p className="text-lg font-semibold">All Systems Online</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">Last updated</p>
-          <p className="text-lg font-semibold">Just now</p>
-        </div>
+        
+        {/* Animated Background Elements */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse-subtle" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-accent/20 rounded-full blur-2xl animate-bounce-subtle" />
       </div>
 
-      {/* KPI Cards */}
+      {/* Enhanced KPI Cards with Animations */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KPICard
-          title="Total Revenue"
-          value="₨ 2.4M"
-          change="+12.5%"
-          changeType="positive"
-          icon={<DollarSign className="w-6 h-6" />}
-          description="This month vs last month"
-        />
-        <KPICard
-          title="Active Buses"
-          value="45"
-          change="+2"
-          changeType="positive"
-          icon={<Bus className="w-6 h-6" />}
-          description="Currently on routes"
-        />
-        <KPICard
-          title="Daily Trips"
-          value="238"
-          change="-3.2%"
-          changeType="negative"
-          icon={<Calendar className="w-6 h-6" />}
-          description="Completed today"
-        />
-        <KPICard
-          title="Staff"
-          value="156"
-          change="+5"
-          changeType="positive"
-          icon={<Users className="w-6 h-6" />}
-          description="Total active staff"
-        />
+        <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
+          <div className="professional-card hover:shadow-primary transition-all duration-500 group">
+            <KPICard
+              title="Total Revenue"
+              value="₨ 2.4M"
+              change="+12.5%"
+              changeType="positive"
+              icon={<DollarSign className="w-6 h-6 group-hover:animate-bounce-notification" />}
+              description="This month vs last month"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+          <div className="professional-card hover:shadow-primary transition-all duration-500 group">
+            <KPICard
+              title="Active Buses"
+              value="45"
+              change="+2"
+              changeType="positive"
+              icon={<Bus className="w-6 h-6 group-hover:animate-wiggle" />}
+              description="Currently on routes"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.3s' }}>
+          <div className="professional-card hover:shadow-primary transition-all duration-500 group">
+            <KPICard
+              title="Daily Trips"
+              value="238"
+              change="-3.2%"
+              changeType="negative"
+              icon={<Calendar className="w-6 h-6 group-hover:animate-pulse-subtle" />}
+              description="Completed today"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.4s' }}>
+          <div className="professional-card hover:shadow-primary transition-all duration-500 group">
+            <KPICard
+              title="Staff"
+              value="156"
+              change="+5"
+              changeType="positive"
+              icon={<Users className="w-6 h-6 group-hover:animate-bounce-subtle" />}
+              description="Total active staff"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Charts Row */}

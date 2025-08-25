@@ -304,39 +304,59 @@ export default function RealTimeTracking() {
   const lowFuelVehicles = trackingData.filter(v => (v.fuel_level || 0) < 20).length;
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Real-Time Tracking</h1>
-          <p className="text-muted-foreground">Monitor fleet vehicles in real-time with GPS tracking</p>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={refreshData}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+    <div className="space-y-8 animate-fade-in p-6">
+      {/* Enhanced Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent via-primary to-primary-hover p-8 text-accent-foreground">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm animate-logo-glow">
+              <Navigation className="w-10 h-10 animate-bounce-subtle" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right">
+                Real-Time Tracking
+              </h1>
+              <p className="text-accent-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
+                Monitor fleet vehicles in real-time with GPS tracking
+              </p>
+            </div>
+          </div>
           
-          <Button 
-            variant="outline" 
-            onClick={() => setIsMapView(!isMapView)}
-          >
-            <MapPin className="h-4 w-4 mr-2" />
-            {isMapView ? 'Table View' : 'Map View'}
-          </Button>
-          
-          {isSupervisor && (
-            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Settings className="h-4 w-4 mr-2" />
-                  GPS Settings
-                </Button>
-              </DialogTrigger>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={refreshData}
+              disabled={isRefreshing}
+              className="bg-white/10 backdrop-blur-sm border border-white/30 hover:bg-white/20 transition-all duration-300 animate-scale-in"
+              style={{ animationDelay: '0.2s' }}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : 'animate-pulse-subtle'}`} />
+              Refresh
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => setIsMapView(!isMapView)}
+              className="bg-white/10 backdrop-blur-sm border border-white/30 hover:bg-white/20 transition-all duration-300 animate-scale-in"
+              style={{ animationDelay: '0.3s' }}
+            >
+              <MapPin className="h-4 w-4 mr-2 animate-wiggle" />
+              {isMapView ? 'Table View' : 'Map View'}
+            </Button>
+            
+            {isSupervisor && (
+              <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="outline"
+                    className="bg-white/10 backdrop-blur-sm border border-white/30 hover:bg-white/20 transition-all duration-300 animate-scale-in"
+                    style={{ animationDelay: '0.4s' }}
+                  >
+                    <Settings className="h-4 w-4 mr-2 animate-bounce-notification" />
+                    GPS Settings
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>GPS API Configuration</DialogTitle>
@@ -398,42 +418,62 @@ export default function RealTimeTracking() {
             </Dialog>
           )}
         </div>
+        
+        {/* Animated Background Elements */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse-subtle" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl animate-bounce-subtle" />
       </div>
 
-      {/* KPI Cards */}
+      {/* Enhanced KPI Cards with Animations */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          title="Active Vehicles"
-          value={`${activeVehicles}/${totalVehicles}`}
-          icon={<Truck className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="currently on road"
-        />
-        <KPICard
-          title="Average Speed"
-          value={`${averageSpeed} km/h`}
-          icon={<Gauge className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="fleet average"
-        />
-        <KPICard
-          title="Low Fuel Alerts"
-          value={lowFuelVehicles.toString()}
-          icon={<Fuel className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="require attention"
-        />
-        <KPICard
-          title="GPS Status"
-          value="Online"
-          icon={<Navigation className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="tracking active"
-        />
+        <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
+          <div className="professional-card hover:shadow-primary transition-all duration-500 group">
+            <KPICard
+              title="Active Vehicles"
+              value={`${activeVehicles}/${totalVehicles}`}
+              icon={<Truck className="h-4 w-4 group-hover:animate-wiggle" />}
+              change="0"
+              changeType="neutral"
+              description="currently on road"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+          <div className="professional-card hover:shadow-success transition-all duration-500 group">
+            <KPICard
+              title="Average Speed"
+              value={`${averageSpeed} km/h`}
+              icon={<Gauge className="h-4 w-4 group-hover:animate-pulse-subtle" />}
+              change="0"
+              changeType="neutral"
+              description="fleet average"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.3s' }}>
+          <div className="professional-card hover:shadow-warning transition-all duration-500 group">
+            <KPICard
+              title="Low Fuel Alerts"
+              value={lowFuelVehicles.toString()}
+              icon={<Fuel className="h-4 w-4 group-hover:animate-bounce-notification" />}
+              change="0"
+              changeType="neutral"
+              description="require attention"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.4s' }}>
+          <div className="professional-card hover:shadow-accent transition-all duration-500 group">
+            <KPICard
+              title="GPS Status"
+              value="Online"
+              icon={<Navigation className="h-4 w-4 group-hover:animate-bounce-subtle" />}
+              change="0"
+              changeType="neutral"
+              description="tracking active"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Map or Table View */}

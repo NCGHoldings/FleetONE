@@ -250,126 +250,163 @@ export default function StaffManagement() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
-          <p className="text-muted-foreground">Manage employees, roles, and access control</p>
+    <div className="space-y-8 animate-fade-in">
+      {/* Enhanced Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-success via-success to-primary p-8 text-success-foreground">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm animate-logo-glow">
+              <Users className="w-10 h-10 animate-bounce-subtle" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right">
+                Staff Management
+              </h1>
+              <p className="text-success-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
+                Manage employees, roles, and access control
+              </p>
+            </div>
+          </div>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                onClick={resetForm}
+                className="bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in"
+                style={{ animationDelay: '0.2s' }}
+              >
+                <UserPlus className="h-4 w-4 mr-2 animate-pulse-subtle" />
+                Add Staff Member
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add New Staff Member</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="John"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="john.doe@company.com"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+94 77 123 4567"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="role">Initial Role</Label>
+                  <Select value={role} onValueChange={setRole}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="driver">Driver</SelectItem>
+                      <SelectItem value="conductor">Conductor</SelectItem>
+                      <SelectItem value="mechanic">Mechanic</SelectItem>
+                      <SelectItem value="supervisor">Supervisor</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <Button onClick={handleCreateStaff} className="w-full">
+                  Create Staff Member
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add Staff Member
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add New Staff Member</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="John"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Doe"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="john.doe@company.com"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+94 77 123 4567"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="role">Initial Role</Label>
-                <Select value={role} onValueChange={setRole}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="driver">Driver</SelectItem>
-                    <SelectItem value="conductor">Conductor</SelectItem>
-                    <SelectItem value="mechanic">Mechanic</SelectItem>
-                    <SelectItem value="supervisor">Supervisor</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <Button onClick={handleCreateStaff} className="w-full">
-                Create Staff Member
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Animated Background Elements */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse-subtle" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl animate-bounce-subtle" />
       </div>
 
-      {/* KPI Cards */}
+      {/* Enhanced KPI Cards with Animations */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          title="Total Staff"
-          value={totalStaff.toString()}
-          icon={<Users className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="this month"
-        />
-        <KPICard
-          title="Active Staff"
-          value={activeStaff.toString()}
-          icon={<Users className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="this month"
-        />
-        <KPICard
-          title="Admins"
-          value={adminCount.toString()}
-          icon={<Shield className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="this month"
-        />
-        <KPICard
-          title="Drivers"
-          value={driverCount.toString()}
-          icon={<Users className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="this month"
-        />
+        <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
+          <div className="professional-card hover:shadow-success transition-all duration-500 group">
+            <KPICard
+              title="Total Staff"
+              value={totalStaff.toString()}
+              icon={<Users className="h-4 w-4 group-hover:animate-bounce-subtle" />}
+              change="0"
+              changeType="neutral"
+              description="this month"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+          <div className="professional-card hover:shadow-primary transition-all duration-500 group">
+            <KPICard
+              title="Active Staff"
+              value={activeStaff.toString()}
+              icon={<Users className="h-4 w-4 group-hover:animate-pulse-subtle" />}
+              change="0"
+              changeType="neutral"
+              description="this month"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.3s' }}>
+          <div className="professional-card hover:shadow-warning transition-all duration-500 group">
+            <KPICard
+              title="Admins"
+              value={adminCount.toString()}
+              icon={<Shield className="h-4 w-4 group-hover:animate-wiggle" />}
+              change="0"
+              changeType="neutral"
+              description="this month"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.4s' }}>
+          <div className="professional-card hover:shadow-accent transition-all duration-500 group">
+            <KPICard
+              title="Drivers"
+              value={driverCount.toString()}
+              icon={<Users className="h-4 w-4 group-hover:animate-bounce-notification" />}
+              change="0"
+              changeType="neutral"
+              description="this month"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Staff Table */}

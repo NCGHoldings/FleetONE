@@ -272,21 +272,37 @@ export default function Insurance() {
   const expired = insuranceRecords.filter(r => getExpiryStatus(r.expiry_date) === 'expired').length;
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Insurance Management</h1>
-          <p className="text-muted-foreground">Track and manage vehicle insurance policies</p>
-        </div>
-        
-        {isAdmin && (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Insurance Policy
-              </Button>
-            </DialogTrigger>
+    <div className="space-y-8 animate-fade-in">
+      {/* Enhanced Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-warning via-warning to-primary p-8 text-warning-foreground">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm animate-logo-glow">
+              <Shield className="w-10 h-10 animate-bounce-subtle" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right">
+                Insurance Management
+              </h1>
+              <p className="text-warning-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
+                Comprehensive insurance policy tracking and management
+              </p>
+            </div>
+          </div>
+          
+          {isAdmin && (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  onClick={resetForm}
+                  className="bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in"
+                  style={{ animationDelay: '0.2s' }}
+                >
+                  <Plus className="h-4 w-4 mr-2 animate-pulse-subtle" />
+                  Add Insurance Policy
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Add Insurance Policy</DialogTitle>
@@ -421,44 +437,65 @@ export default function Insurance() {
                 </div>
               </div>
             </DialogContent>
-          </Dialog>
-        )}
+            </Dialog>
+          )}
+        </div>
+        
+        {/* Animated Background Elements */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse-subtle" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl animate-bounce-subtle" />
       </div>
 
-      {/* KPI Cards */}
+      {/* Enhanced KPI Cards with Animations */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          title="Total Policies"
-          value={totalPolicies.toString()}
-          icon={<Shield className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="this month"
-        />
-        <KPICard
-          title="Active Policies"
-          value={activePolicies.toString()}
-          icon={<CheckCircle className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="this month"
-        />
-        <KPICard
-          title="Expiring Soon"
-          value={expiringSoon.toString()}
-          icon={<Calendar className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="next 30 days"
-        />
-        <KPICard
-          title="Expired"
-          value={expired.toString()}
-          icon={<AlertTriangle className="h-4 w-4" />}
-          change="0"
-          changeType="neutral"
-          description="needs renewal"
-        />
+        <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
+          <div className="professional-card hover:shadow-warning transition-all duration-500 group">
+            <KPICard
+              title="Total Policies"
+              value={totalPolicies.toString()}
+              icon={<Shield className="h-4 w-4 group-hover:animate-bounce-subtle" />}
+              change="0"
+              changeType="neutral"
+              description="this month"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+          <div className="professional-card hover:shadow-success transition-all duration-500 group">
+            <KPICard
+              title="Active Policies"
+              value={activePolicies.toString()}
+              icon={<CheckCircle className="h-4 w-4 group-hover:animate-pulse-subtle" />}
+              change="0"
+              changeType="neutral"
+              description="this month"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.3s' }}>
+          <div className="professional-card hover:shadow-warning transition-all duration-500 group">
+            <KPICard
+              title="Expiring Soon"
+              value={expiringSoon.toString()}
+              icon={<Calendar className="h-4 w-4 group-hover:animate-wiggle" />}
+              change="0"
+              changeType="neutral"
+              description="next 30 days"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.4s' }}>
+          <div className="professional-card hover:shadow-destructive transition-all duration-500 group">
+            <KPICard
+              title="Expired"
+              value={expired.toString()}
+              icon={<AlertTriangle className="h-4 w-4 group-hover:animate-bounce-notification" />}
+              change="0"
+              changeType="neutral"
+              description="needs renewal"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Insurance Table */}

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentUpload } from "@/components/documents/DocumentUpload";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, FileText, AlertTriangle, CheckCircle, XCircle, User, Phone, Bus, MapPin, Flag, Calendar } from "lucide-react";
+import { Clock, FileText, AlertTriangle, CheckCircle, XCircle, User, Phone, Bus, MapPin, Flag, Calendar, Plus } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 
 interface Complaint {
@@ -189,63 +189,91 @@ export default function Complaints() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Complaints Management</h1>
-          <p className="text-muted-foreground">
-            Track and resolve customer complaints efficiently
-          </p>
+    <div className="space-y-8 animate-fade-in">
+      {/* Enhanced Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-destructive via-destructive to-primary p-8 text-destructive-foreground">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm animate-logo-glow">
+              <AlertTriangle className="w-10 h-10 animate-wiggle" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right">
+                Complaints Management
+              </h1>
+              <p className="text-destructive-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
+                Track, resolve, and prevent customer complaints efficiently
+              </p>
+            </div>
+          </div>
+          <Button 
+            onClick={() => setShowAddDialog(true)}
+            className="bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in"
+            style={{ animationDelay: '0.2s' }}
+          >
+            <Plus className="w-4 h-4 mr-2 animate-pulse-subtle" />
+            Add New Complaint
+          </Button>
         </div>
-        <Button onClick={() => setShowAddDialog(true)}>
-          Add New Complaint
-        </Button>
+        
+        {/* Animated Background Elements */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse-subtle" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl animate-bounce-subtle" />
       </div>
 
-      {/* Stats Cards */}
+      {/* Enhanced Stats Cards with Animations */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Complaints</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{complaints.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {complaints.filter(c => c.status !== 'resolved').length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resolved</CardTitle>
-            <CheckCircle className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {complaints.filter(c => c.status === 'resolved').length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">High Priority</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {complaints.filter(c => c.priority === 'high').length}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
+          <Card className="professional-card hover:shadow-primary transition-all duration-500 group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Complaints</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground group-hover:animate-bounce-subtle" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{complaints.length}</div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+          <Card className="professional-card hover:shadow-warning transition-all duration-500 group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending</CardTitle>
+              <Clock className="h-4 w-4 text-warning group-hover:animate-pulse-subtle" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {complaints.filter(c => c.status !== 'resolved').length}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.3s' }}>
+          <Card className="professional-card hover:shadow-success transition-all duration-500 group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Resolved</CardTitle>
+              <CheckCircle className="h-4 w-4 text-success group-hover:animate-bounce-notification" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {complaints.filter(c => c.status === 'resolved').length}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.4s' }}>
+          <Card className="professional-card hover:shadow-destructive transition-all duration-500 group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">High Priority</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive group-hover:animate-wiggle" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {complaints.filter(c => c.priority === 'high').length}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <DataTable

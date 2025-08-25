@@ -450,27 +450,48 @@ export default function RoutePermits() {
   const expired = permits.filter(p => getExpiryStatus(p.expiry_date) === 'expired').length;
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Route Permits</h1>
-          <p className="text-muted-foreground">Manage transport route permits and compliance</p>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportToExcel}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
+    <div className="space-y-8 animate-fade-in p-6">
+      {/* Enhanced Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary-hover to-accent p-8 text-primary-foreground">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm animate-logo-glow">
+              <FileText className="w-10 h-10 animate-bounce-subtle" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right">
+                Route Permits
+              </h1>
+              <p className="text-primary-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
+                Manage transport route permits and compliance
+              </p>
+            </div>
+          </div>
           
-          {isAdmin && (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Permit
-                </Button>
-              </DialogTrigger>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={exportToExcel}
+              className="bg-white/10 backdrop-blur-sm border border-white/30 hover:bg-white/20 transition-all duration-300 animate-scale-in"
+              style={{ animationDelay: '0.2s' }}
+            >
+              <Download className="h-4 w-4 mr-2 animate-pulse-subtle" />
+              Export Report
+            </Button>
+            
+            {isAdmin && (
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    onClick={resetForm}
+                    className="bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in"
+                    style={{ animationDelay: '0.3s' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2 animate-pulse-subtle" />
+                    Add Permit
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>
@@ -676,6 +697,10 @@ export default function RoutePermits() {
             </Dialog>
           )}
         </div>
+        
+        {/* Animated Background Elements */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse-subtle" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl animate-bounce-subtle" />
       </div>
 
       {/* KPI Cards */}
