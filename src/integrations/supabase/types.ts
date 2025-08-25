@@ -1374,6 +1374,42 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_performance: {
+        Row: {
+          created_at: string | null
+          id: string
+          license_number: string | null
+          name: string
+          phone: string | null
+          role: string | null
+          staff_id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          license_number?: string | null
+          name: string
+          phone?: string | null
+          role?: string | null
+          staff_id: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          license_number?: string | null
+          name?: string
+          phone?: string | null
+          role?: string | null
+          staff_id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           category: string | null
