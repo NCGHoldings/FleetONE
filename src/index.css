@@ -189,6 +189,35 @@
   .status-error {
     @apply bg-destructive text-destructive-foreground;
   }
+  
+  /* Enhanced Interactive Elements */
+  .nav-item {
+    @apply relative overflow-hidden;
+  }
+  
+  .nav-item::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10 opacity-0 transition-opacity duration-300;
+  }
+  
+  .nav-item:hover::before {
+    @apply opacity-100;
+  }
+  
+  /* Smooth Page Transitions */
+  .page-transition {
+    @apply animate-fade-in;
+  }
+  
+  /* Enhanced Cards */
+  .professional-card {
+    @apply bg-gradient-to-br from-card via-card to-card/80 border border-border/50 rounded-xl shadow-[var(--shadow-card)] backdrop-blur-sm hover:shadow-[var(--shadow-elevated)] transition-all duration-300 hover:scale-[1.02];
+  }
+  
+  /* Loading States */
+  .skeleton-pulse {
+    @apply animate-pulse bg-gradient-to-r from-muted via-muted/70 to-muted;
+  }
 }
 
 @layer base {

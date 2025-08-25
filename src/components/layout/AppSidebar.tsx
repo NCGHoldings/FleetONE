@@ -67,36 +67,41 @@ export function AppSidebar() {
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? "bg-primary text-primary-foreground font-medium shadow-primary" : "hover:bg-muted/50 text-muted-foreground hover:text-foreground";
+    isActive 
+      ? "bg-gradient-to-r from-primary to-primary-hover text-primary-foreground font-medium shadow-primary animate-pulse-subtle" 
+      : "hover:bg-accent/10 text-sidebar-foreground hover:text-primary hover:bg-gradient-to-r hover:from-accent/5 hover:to-primary/5 transition-all duration-300 ease-out hover:shadow-sm hover:scale-[1.02]";
 
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"} collapsible="icon">
-      <SidebarHeader className="border-b border-border/50 p-4">
+      <SidebarHeader className="border-b border-border/50 p-4 bg-gradient-to-r from-sidebar-background to-sidebar-accent/30">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Truck className="w-5 h-5 text-primary-foreground" />
+          <div className="w-10 h-10 bg-gradient-to-br from-primary via-primary-hover to-accent rounded-xl flex items-center justify-center shadow-primary animate-logo-glow">
+            <Truck className="w-6 h-6 text-primary-foreground animate-bounce-subtle" />
           </div>
           {!collapsed && (
-            <div>
-              <h2 className="font-bold text-foreground">NCG Speed</h2>
-              <p className="text-xs text-muted-foreground">Transport Management</p>
+            <div className="animate-slide-in-right">
+              <h2 className="font-bold text-sidebar-foreground bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">NCG Speed</h2>
+              <p className="text-xs text-sidebar-foreground/70">Transport Management</p>
             </div>
           )}
         </div>
-        <SidebarTrigger className="ml-auto" />
+        <SidebarTrigger className="ml-auto hover:scale-110 transition-transform duration-200 hover:rotate-180" />
       </SidebarHeader>
 
       <SidebarContent className="py-4">
         <SidebarGroup>
-          <SidebarGroupLabel>Main</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-primary to-accent rounded-full animate-pulse"></div>
+            Main
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavCls}>
-                      <item.icon className="w-4 h-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <item.icon className="w-5 h-5 transition-all duration-300" />
+                      {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -106,15 +111,18 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Operations</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-accent to-warning rounded-full animate-pulse"></div>
+            Operations
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {operationsItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavCls}>
-                      <item.icon className="w-4 h-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <item.icon className="w-5 h-5 transition-all duration-300" />
+                      {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -124,15 +132,18 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Business</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-success to-primary rounded-full animate-pulse"></div>
+            Business
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {businessItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavCls}>
-                      <item.icon className="w-4 h-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <item.icon className="w-5 h-5 transition-all duration-300" />
+                      {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
