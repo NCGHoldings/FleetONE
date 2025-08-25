@@ -695,7 +695,8 @@ export default function RoutePermits() {
                 </div>
               </DialogContent>
             </Dialog>
-          )}
+            )}
+          </div>
         </div>
         
         {/* Animated Background Elements */}

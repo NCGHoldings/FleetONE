@@ -416,7 +416,8 @@ export default function RealTimeTracking() {
                 </div>
               </DialogContent>
             </Dialog>
-          )}
+            )}
+          </div>
         </div>
         
         {/* Animated Background Elements */}

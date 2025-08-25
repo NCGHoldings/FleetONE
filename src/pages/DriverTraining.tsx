@@ -476,7 +476,8 @@ export default function DriverTraining() {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
+        )}
+      </div>
         
         {/* Animated Background Elements */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse-subtle" />
