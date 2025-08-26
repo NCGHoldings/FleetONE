@@ -553,6 +553,8 @@ export type Database = {
           capacity: number | null
           created_at: string
           current_maintenance_id: string | null
+          default_hourly_rate: number | null
+          default_service_type: string | null
           default_workers: number | null
           hourly_rate: number | null
           id: string
@@ -567,6 +569,8 @@ export type Database = {
           capacity?: number | null
           created_at?: string
           current_maintenance_id?: string | null
+          default_hourly_rate?: number | null
+          default_service_type?: string | null
           default_workers?: number | null
           hourly_rate?: number | null
           id?: string
@@ -581,11 +585,67 @@ export type Database = {
           capacity?: number | null
           created_at?: string
           current_maintenance_id?: string | null
+          default_hourly_rate?: number | null
+          default_service_type?: string | null
           default_workers?: number | null
           hourly_rate?: number | null
           id?: string
           is_active?: boolean | null
           overtime_rate_multiplier?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      maintenance_financials: {
+        Row: {
+          bay_id: string | null
+          created_at: string
+          hourly_pay_rate: number | null
+          id: string
+          inventory_cost: number | null
+          labour_cost: number | null
+          maintenance_record_id: string
+          net_income: number | null
+          override_values: Json | null
+          profit_margin_percent: number | null
+          revenue: number | null
+          service_type: string
+          total_expenses: number | null
+          total_staff_hours: number | null
+          updated_at: string
+        }
+        Insert: {
+          bay_id?: string | null
+          created_at?: string
+          hourly_pay_rate?: number | null
+          id?: string
+          inventory_cost?: number | null
+          labour_cost?: number | null
+          maintenance_record_id: string
+          net_income?: number | null
+          override_values?: Json | null
+          profit_margin_percent?: number | null
+          revenue?: number | null
+          service_type: string
+          total_expenses?: number | null
+          total_staff_hours?: number | null
+          updated_at?: string
+        }
+        Update: {
+          bay_id?: string | null
+          created_at?: string
+          hourly_pay_rate?: number | null
+          id?: string
+          inventory_cost?: number | null
+          labour_cost?: number | null
+          maintenance_record_id?: string
+          net_income?: number | null
+          override_values?: Json | null
+          profit_margin_percent?: number | null
+          revenue?: number | null
+          service_type?: string
+          total_expenses?: number | null
+          total_staff_hours?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -630,9 +690,11 @@ export type Database = {
           bay_number: string | null
           bus_id: string
           completion_date: string | null
+          countdown_seconds: number | null
           created_at: string
           created_by: string | null
           current_bay_id: string | null
+          current_staff_count: number | null
           description: string | null
           estimated_cost: number | null
           estimated_delivery_date: string | null
@@ -655,6 +717,7 @@ export type Database = {
           supervisor_id: string | null
           timer_started_at: string | null
           timer_status: string | null
+          total_staff_hours: number | null
           updated_at: string
           workshop: string | null
         }
@@ -664,9 +727,11 @@ export type Database = {
           bay_number?: string | null
           bus_id: string
           completion_date?: string | null
+          countdown_seconds?: number | null
           created_at?: string
           created_by?: string | null
           current_bay_id?: string | null
+          current_staff_count?: number | null
           description?: string | null
           estimated_cost?: number | null
           estimated_delivery_date?: string | null
@@ -689,6 +754,7 @@ export type Database = {
           supervisor_id?: string | null
           timer_started_at?: string | null
           timer_status?: string | null
+          total_staff_hours?: number | null
           updated_at?: string
           workshop?: string | null
         }
@@ -698,9 +764,11 @@ export type Database = {
           bay_number?: string | null
           bus_id?: string
           completion_date?: string | null
+          countdown_seconds?: number | null
           created_at?: string
           created_by?: string | null
           current_bay_id?: string | null
+          current_staff_count?: number | null
           description?: string | null
           estimated_cost?: number | null
           estimated_delivery_date?: string | null
@@ -723,6 +791,7 @@ export type Database = {
           supervisor_id?: string | null
           timer_started_at?: string | null
           timer_status?: string | null
+          total_staff_hours?: number | null
           updated_at?: string
           workshop?: string | null
         }
@@ -1046,6 +1115,36 @@ export type Database = {
           },
         ]
       }
+      repair_staff_log: {
+        Row: {
+          created_at: string
+          end_time: string | null
+          hours_worked: number | null
+          id: string
+          maintenance_record_id: string
+          staff_count: number
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          end_time?: string | null
+          hours_worked?: number | null
+          id?: string
+          maintenance_record_id: string
+          staff_count?: number
+          start_time?: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string | null
+          hours_worked?: number | null
+          id?: string
+          maintenance_record_id?: string
+          staff_count?: number
+          start_time?: string
+        }
+        Relationships: []
+      }
       route_permits: {
         Row: {
           annual_fee: number | null
@@ -1219,6 +1318,36 @@ export type Database = {
           notes?: string | null
           role_rate_per_hour?: number | null
           service_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      service_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          hourly_rate: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
           updated_at?: string
         }
         Relationships: []

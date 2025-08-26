@@ -18,8 +18,11 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { format, parseISO, addBusinessDays, isWeekend, addDays } from "date-fns";
 import ServiceMasterUpload from "@/components/maintenance/ServiceMasterUpload";
 import MaintenanceTimer from "@/components/maintenance/MaintenanceTimer";
+import EnhancedMaintenanceTimer from "@/components/maintenance/EnhancedMaintenanceTimer";
 import BayManagement from "@/components/maintenance/BayManagement";
 import ServiceSuggestions from "@/components/maintenance/ServiceSuggestions";
+import ServiceTypesAdmin from "@/components/maintenance/ServiceTypesAdmin";
+import FinancialTable from "@/components/maintenance/FinancialTable";
 
 interface MaintenanceRecord {
   id: string;
@@ -714,7 +717,7 @@ export default function Maintenance() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="details" disabled={!selectedRecord}>
             {selectedRecord ? 'Details' : 'Select Record'}
@@ -722,6 +725,7 @@ export default function Maintenance() {
           <TabsTrigger value="timer" disabled={!selectedRecord}>
             {selectedRecord ? 'Timer' : 'No Timer'}
           </TabsTrigger>
+          {isSupervisor && <TabsTrigger value="admin">Admin</TabsTrigger>}
           {isSupervisor && <TabsTrigger value="upload">Master Data</TabsTrigger>}
         </TabsList>
 
@@ -840,8 +844,9 @@ export default function Maintenance() {
         <TabsContent value="timer" className="space-y-6">
           {selectedRecord && (
             <div className="grid gap-6 lg:grid-cols-2">
-              <MaintenanceTimer
+              <EnhancedMaintenanceTimer
                 maintenanceId={selectedRecord.id}
+                serviceType={selectedRecord.service_type}
                 bayId={selectedRecord.current_bay_id}
                 onTimerUpdate={fetchMaintenanceRecords}
               />
@@ -857,6 +862,13 @@ export default function Maintenance() {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="admin" className="space-y-6">
+          <div className="grid gap-6">
+            <ServiceTypesAdmin />
+            <FinancialTable />
+          </div>
         </TabsContent>
 
         {isSupervisor && (
