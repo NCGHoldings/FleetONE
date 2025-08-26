@@ -402,52 +402,12 @@ export type Database = {
           },
         ]
       }
-      feedback_comments: {
-        Row: {
-          comment_text: string
-          created_at: string
-          feedback_id: string
-          id: string
-          is_internal: boolean | null
-          user_id: string
-          user_name: string
-        }
-        Insert: {
-          comment_text: string
-          created_at?: string
-          feedback_id: string
-          id?: string
-          is_internal?: boolean | null
-          user_id: string
-          user_name: string
-        }
-        Update: {
-          comment_text?: string
-          created_at?: string
-          feedback_id?: string
-          id?: string
-          is_internal?: boolean | null
-          user_id?: string
-          user_name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feedback_comments_feedback_id_fkey"
-            columns: ["feedback_id"]
-            isOneToOne: false
-            referencedRelation: "feedback_complaints"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       feedback_complaints: {
         Row: {
           category: string
           created_at: string
           current_handler: string | null
-          current_handler_name: string | null
           description: string
-          escalated_at: string | null
           escalation_level: number | null
           feedback_date: string
           feedback_id: string | null
@@ -456,7 +416,6 @@ export type Database = {
           reported_by: string
           resolution: string | null
           resolved_at: string | null
-          resolved_by_name: string | null
           staff_group: string | null
           status: string | null
           title: string
@@ -467,9 +426,7 @@ export type Database = {
           category: string
           created_at?: string
           current_handler?: string | null
-          current_handler_name?: string | null
           description: string
-          escalated_at?: string | null
           escalation_level?: number | null
           feedback_date?: string
           feedback_id?: string | null
@@ -478,7 +435,6 @@ export type Database = {
           reported_by: string
           resolution?: string | null
           resolved_at?: string | null
-          resolved_by_name?: string | null
           staff_group?: string | null
           status?: string | null
           title: string
@@ -489,9 +445,7 @@ export type Database = {
           category?: string
           created_at?: string
           current_handler?: string | null
-          current_handler_name?: string | null
           description?: string
-          escalated_at?: string | null
           escalation_level?: number | null
           feedback_date?: string
           feedback_id?: string | null
@@ -500,7 +454,6 @@ export type Database = {
           reported_by?: string
           resolution?: string | null
           resolved_at?: string | null
-          resolved_by_name?: string | null
           staff_group?: string | null
           status?: string | null
           title?: string
@@ -520,47 +473,6 @@ export type Database = {
             columns: ["reported_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      feedback_escalations: {
-        Row: {
-          created_at: string
-          escalated_by: string
-          escalated_by_name: string
-          escalation_reason: string | null
-          feedback_id: string
-          from_level: number
-          id: string
-          to_level: number
-        }
-        Insert: {
-          created_at?: string
-          escalated_by: string
-          escalated_by_name: string
-          escalation_reason?: string | null
-          feedback_id: string
-          from_level: number
-          id?: string
-          to_level: number
-        }
-        Update: {
-          created_at?: string
-          escalated_by?: string
-          escalated_by_name?: string
-          escalation_reason?: string | null
-          feedback_id?: string
-          from_level?: number
-          id?: string
-          to_level?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feedback_escalations_feedback_id_fkey"
-            columns: ["feedback_id"]
-            isOneToOne: false
-            referencedRelation: "feedback_complaints"
             referencedColumns: ["id"]
           },
         ]
