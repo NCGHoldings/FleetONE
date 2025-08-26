@@ -64,50 +64,21 @@ export default function StaffPerformance() {
 
   const fetchStaff = async () => {
     try {
-      await initializeStaffTable();
-      
-      // Try to fetch from staff_performance table first using raw query
-      const { data: existingStaff, error: staffError } = await supabase
-        .from('staff_performance' as any)
-        .select('*')
-        .order('name');
-
-      if (staffError && !staffError.message.includes('does not exist')) {
-        console.warn('Staff table error:', staffError);
-      }
-
-      // If no staff exist, extract from allocation and trips data
-      if (!existingStaff || existingStaff.length === 0) {
-        await extractStaffFromTripsData();
-        return;
-      }
-      
-      const staffData = existingStaff || [];
-      setStaff((staffData as unknown) as StaffMember[]);
-      
-      // Fetch performance data for each staff member  
-      const performancePromises = staffData.map(async (member: any) => {
-        const performance = await fetchStaffPerformance(member.staff_id);
-        return { id: member.staff_id, performance };
-      });
-      
-      const performances = await Promise.all(performancePromises);
-      const performanceMap = performances.reduce((acc, { id, performance }) => {
-        acc[id] = performance;
-        return acc;
-      }, {} as Record<string, StaffPerformanceData>);
-      
-      setPerformanceData(performanceMap);
+      // Always sync with daily trips data to ensure real-time accuracy
+      await syncStaffFromTripsData();
     } catch (error) {
       console.error('Error fetching staff:', error);
-      // Fallback to extracting from trips
-      await extractStaffFromTripsData();
+      toast({
+        title: "Error",
+        description: "Failed to load staff data from trips",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const extractStaffFromTripsData = async () => {
+  const syncStaffFromTripsData = async () => {
     try {
       // Get all driver allocations
       const { data: allocations } = await supabase
@@ -124,234 +95,236 @@ export default function StaffPerformance() {
         .from('profiles')
         .select('user_id, first_name, last_name, phone, license_number');
 
-      const staffMap = new Map<string, { name: string; phone?: string; license?: string; roles: Set<string> }>();
+      const staffMap = new Map<string, { 
+        userId: string;
+        name: string; 
+        phone?: string; 
+        license?: string; 
+        roles: Set<string>;
+        tripIds: string[];
+      }>();
 
-      // Process allocations
+      // Process allocations first for names and roles
       allocations?.forEach(allocation => {
         const notes = allocation.notes ? (typeof allocation.notes === 'string' ? JSON.parse(allocation.notes) : allocation.notes) : {};
         
         if (allocation.driver_id) {
           const profile = profiles?.find(p => p.user_id === allocation.driver_id);
-          const name = notes.driver || (profile ? `${profile.first_name} ${profile.last_name}` : `Driver-${allocation.driver_id.slice(0, 8)}`);
+          const name = notes.driver || (profile ? `${profile.first_name} ${profile.last_name}`.trim() : `Driver-${allocation.driver_id.slice(0, 8)}`);
           
           if (!staffMap.has(allocation.driver_id)) {
             staffMap.set(allocation.driver_id, {
+              userId: allocation.driver_id,
               name,
               phone: notes.whatsapp || profile?.phone,
               license: profile?.license_number,
-              roles: new Set(['driver'])
+              roles: new Set(['driver']),
+              tripIds: [allocation.trip_id].filter(Boolean)
             });
           } else {
-            staffMap.get(allocation.driver_id)!.roles.add('driver');
+            const existing = staffMap.get(allocation.driver_id)!;
+            existing.roles.add('driver');
+            if (allocation.trip_id && !existing.tripIds.includes(allocation.trip_id)) {
+              existing.tripIds.push(allocation.trip_id);
+            }
           }
         }
 
         if (allocation.conductor_id) {
           const profile = profiles?.find(p => p.user_id === allocation.conductor_id);
-          const name = notes.conductor || (profile ? `${profile.first_name} ${profile.last_name}` : `Conductor-${allocation.conductor_id.slice(0, 8)}`);
+          const name = notes.conductor || (profile ? `${profile.first_name} ${profile.last_name}`.trim() : `Conductor-${allocation.conductor_id.slice(0, 8)}`);
           
           if (!staffMap.has(allocation.conductor_id)) {
             staffMap.set(allocation.conductor_id, {
+              userId: allocation.conductor_id,
               name,
               phone: profile?.phone,
               license: profile?.license_number,
-              roles: new Set(['conductor'])
+              roles: new Set(['conductor']),
+              tripIds: [allocation.trip_id].filter(Boolean)
             });
           } else {
-            staffMap.get(allocation.conductor_id)!.roles.add('conductor');
+            const existing = staffMap.get(allocation.conductor_id)!;
+            existing.roles.add('conductor');
+            if (allocation.trip_id && !existing.tripIds.includes(allocation.trip_id)) {
+              existing.tripIds.push(allocation.trip_id);
+            }
           }
         }
       });
 
-      // Process trips (in case there are trips without allocations)
+      // Process trips for additional role detection and trip association
       trips?.forEach(trip => {
         if (trip.driver_id) {
           const profile = profiles?.find(p => p.user_id === trip.driver_id);
-          const name = profile ? `${profile.first_name} ${profile.last_name}` : `Driver-${trip.driver_id.slice(0, 8)}`;
+          const name = profile ? `${profile.first_name} ${profile.last_name}`.trim() : `Driver-${trip.driver_id.slice(0, 8)}`;
           
           if (!staffMap.has(trip.driver_id)) {
             staffMap.set(trip.driver_id, {
+              userId: trip.driver_id,
               name,
               phone: profile?.phone,
               license: profile?.license_number,
-              roles: new Set(['driver'])
+              roles: new Set(['driver']),
+              tripIds: [trip.trip_no].filter(Boolean)
             });
           } else {
-            staffMap.get(trip.driver_id)!.roles.add('driver');
+            const existing = staffMap.get(trip.driver_id)!;
+            existing.roles.add('driver');
+            if (trip.trip_no && !existing.tripIds.includes(trip.trip_no)) {
+              existing.tripIds.push(trip.trip_no);
+            }
           }
         }
 
         if (trip.conductor_id) {
           const profile = profiles?.find(p => p.user_id === trip.conductor_id);
-          const name = profile ? `${profile.first_name} ${profile.last_name}` : `Conductor-${trip.conductor_id.slice(0, 8)}`;
+          const name = profile ? `${profile.first_name} ${profile.last_name}`.trim() : `Conductor-${trip.conductor_id.slice(0, 8)}`;
           
           if (!staffMap.has(trip.conductor_id)) {
             staffMap.set(trip.conductor_id, {
+              userId: trip.conductor_id,
               name,
               phone: profile?.phone,
               license: profile?.license_number,
-              roles: new Set(['conductor'])
+              roles: new Set(['conductor']),
+              tripIds: [trip.trip_no].filter(Boolean)
             });
           } else {
-            staffMap.get(trip.conductor_id)!.roles.add('conductor');
+            const existing = staffMap.get(trip.conductor_id)!;
+            existing.roles.add('conductor');
+            if (trip.trip_no && !existing.tripIds.includes(trip.trip_no)) {
+              existing.tripIds.push(trip.trip_no);
+            }
           }
         }
       });
 
-      // Convert to staff members with EMP001 format IDs
-      const staffMembers: Omit<StaffMember, 'id'>[] = [];
+      // Convert to staff members array with real-time performance data
+      const staffMembers: StaffMember[] = [];
       let empCounter = 1;
 
-      staffMap.forEach((data, userId) => {
+      const performancePromises = Array.from(staffMap.entries()).map(async ([userId, data]) => {
         const roleArray = Array.from(data.roles);
         const role = roleArray.length > 1 ? 'both' : roleArray[0] as 'driver' | 'conductor';
         
-        staffMembers.push({
-          staff_id: `EMP${empCounter.toString().padStart(3, '0')}`,
+        const staffId = `EMP${empCounter.toString().padStart(3, '0')}`;
+        empCounter++;
+
+        const staffMember: StaffMember = {
+          id: userId,
+          staff_id: staffId,
           name: data.name,
           phone: data.phone,
           license_number: data.license,
           role,
-          status: 'active'
-        });
-        empCounter++;
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        // Calculate real-time performance data
+        const performance = await calculateStaffPerformance(userId, data.tripIds, trips || []);
+        
+        return { staffMember, performance };
       });
 
-      if (staffMembers.length > 0) {
-        // Insert into staff_performance table using raw query
-        const { data: insertedStaff, error: insertError } = await supabase
-          .from('staff_performance' as any)
-          .insert(staffMembers)
-          .select();
+      const staffWithPerformance = await Promise.all(performancePromises);
+      
+      // Set staff data
+      const finalStaff = staffWithPerformance.map(item => item.staffMember);
+      setStaff(finalStaff);
+      
+      // Set performance data
+      const performanceMap = staffWithPerformance.reduce((acc, { staffMember, performance }) => {
+        acc[staffMember.staff_id] = performance;
+        return acc;
+      }, {} as Record<string, StaffPerformanceData>);
+      
+      setPerformanceData(performanceMap);
 
-        if (insertError) {
-          console.error('Insert error:', insertError);
-          // If insert fails, create mock data to display
-          const mockStaff = staffMembers.map((member, index) => ({
-            ...member,
-            id: `mock-${index}`,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }));
-          setStaff(mockStaff as StaffMember[]);
-          return;
+      // Optional: Update staff_performance table for persistence (but don't rely on it)
+      try {
+        await supabase.from('staff_performance' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (finalStaff.length > 0) {
+          const staffForDb = finalStaff.map(({ id, created_at, updated_at, ...rest }) => rest);
+          await supabase.from('staff_performance' as any).insert(staffForDb);
         }
-
-        setStaff((insertedStaff as unknown) as StaffMember[]);
-        
-        // Fetch performance data
-        const performancePromises = (insertedStaff || staffMembers).map(async (member: any) => {
-          const performance = await fetchStaffPerformance(member.staff_id);
-          return { id: member.staff_id, performance };
-        });
-        
-        const performances = await Promise.all(performancePromises);
-        const performanceMap = performances.reduce((acc, { id, performance }) => {
-          acc[id] = performance;
-          return acc;
-        }, {} as Record<string, StaffPerformanceData>);
-        
-        setPerformanceData(performanceMap);
-      } else {
-        // Create some mock data if no staff found
-        const mockData: StaffMember[] = [
-          {
-            id: 'mock-1',
-            staff_id: 'EMP001',
-            name: 'Sample Driver',
-            phone: '0771234567',
-            license_number: 'DL123456',
-            role: 'driver',
-            status: 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ];
-        setStaff(mockData);
+      } catch (dbError) {
+        console.warn('Optional database sync failed:', dbError);
       }
+
     } catch (error) {
-      console.error('Error extracting staff from trips data:', error);
+      console.error('Error syncing staff from trips data:', error);
       toast({
         title: "Error",
-        description: "Failed to extract staff data from trips",
+        description: "Failed to sync staff data from trips",
         variant: "destructive",
       });
     }
   };
 
-  const fetchStaffPerformance = async (staffId: string): Promise<StaffPerformanceData> => {
+  const calculateStaffPerformance = async (userId: string, tripIds: string[], trips: any[]): Promise<StaffPerformanceData> => {
     try {
-      // Find staff member by staff_id
-      const { data: staffMember } = await supabase
-        .from('staff_performance' as any)
-        .select('name')
-        .eq('staff_id', staffId)
-        .single();
+      // Get all trips for this staff member
+      const staffTrips = trips.filter(trip => 
+        trip.driver_id === userId || 
+        trip.conductor_id === userId ||
+        (tripIds.length > 0 && tripIds.includes(trip.trip_no))
+      );
 
-      const staffName = (staffMember as any)?.name || 'Unknown';
-
-      // Search for trips by staff name in allocation notes and trip data
-      const { data: allocations } = await supabase
-        .from('driver_allocations')
-        .select('*');
-
-      const { data: trips } = await supabase
-        .from('daily_trips')
-        .select('*');
-
-      // Find trips related to this staff member by matching names
-      const relatedTripIds = new Set<string>();
-      
-      allocations?.forEach(allocation => {
-        const notes = allocation.notes ? (typeof allocation.notes === 'string' ? JSON.parse(allocation.notes) : allocation.notes) : {};
-        if (notes.driver === staffName || notes.conductor === staffName) {
-          relatedTripIds.add(allocation.trip_id);
-        }
-      });
-
-      const relatedTrips = trips?.filter(trip => 
-        relatedTripIds.has(trip.trip_no) || 
-        trip.trip_no?.includes(staffId)
-      ) || [];
-
-      // Fetch complaints by searching for staff name
+      // Fetch complaints for this specific user
       const { data: complaints } = await supabase
         .from('feedback_complaints')
         .select('*')
-        .ilike('description', `%${staffName}%`);
+        .or(`description.ilike.%${userId}%,title.ilike.%${userId}%`);
 
-      const totalKm = relatedTrips.reduce((sum, trip) => sum + (trip.distance_km || 0), 0);
-      const totalTrips = relatedTrips.length;
+      const totalKm = staffTrips.reduce((sum, trip) => sum + (parseFloat(trip.distance_km) || 0), 0);
+      const totalTrips = staffTrips.length;
       
-      // Calculate fuel efficiency (average km per liter)
-      const fuelEfficiencyTrips = relatedTrips.filter(trip => trip.km_per_liter && trip.km_per_liter > 0);
+      // Calculate fuel efficiency (average km per liter) - only for drivers
+      const fuelEfficiencyTrips = staffTrips.filter(trip => 
+        trip.driver_id === userId && trip.km_per_liter && parseFloat(trip.km_per_liter) > 0
+      );
       const avgFuelEfficiency = fuelEfficiencyTrips.length > 0 
-        ? fuelEfficiencyTrips.reduce((sum, trip) => sum + trip.km_per_liter, 0) / fuelEfficiencyTrips.length 
+        ? fuelEfficiencyTrips.reduce((sum, trip) => sum + parseFloat(trip.km_per_liter), 0) / fuelEfficiencyTrips.length 
         : 0;
 
       // Calculate performance score based on fuel efficiency and complaints
-      let performanceScore = 0;
+      let performanceScore = 50; // Base score
+      
       if (avgFuelEfficiency > 0) {
-        // Assume expected efficiency is 8 km/l, scale accordingly
-        const efficiencyScore = Math.min(100, (avgFuelEfficiency / 8) * 100);
-        const complaintPenalty = Math.min(30, (complaints?.length || 0) * 10); // -10 points per complaint, max -30
-        performanceScore = Math.max(0, efficiencyScore - complaintPenalty);
+        // Expected efficiency baseline is 8 km/l
+        const efficiencyScore = Math.min(50, (avgFuelEfficiency / 8) * 50);
+        performanceScore = efficiencyScore;
       }
+      
+      // Add bonus points for completed trips
+      const tripBonus = Math.min(30, totalTrips * 2);
+      performanceScore += tripBonus;
+      
+      // Deduct points for complaints
+      const complaintPenalty = Math.min(40, (complaints?.length || 0) * 10);
+      performanceScore = Math.max(0, performanceScore - complaintPenalty);
 
       // Calculate rating based on performance score
       const rating = performanceScore > 0 ? (performanceScore / 100) * 5 : 0;
       
+      // Calculate on-time percentage based on completed vs cancelled trips
+      const completedTrips = staffTrips.filter(trip => trip.status === 'completed').length;
+      const onTimePercentage = totalTrips > 0 ? (completedTrips / totalTrips) * 100 : 0;
+      
       return {
-        totalKm,
+        totalKm: Math.round(totalKm * 10) / 10,
         totalTrips,
         performanceScore: Math.round(performanceScore * 10) / 10,
         complaints: complaints?.length || 0,
         fuelEfficiency: Math.round(avgFuelEfficiency * 10) / 10,
         rating: Math.round(rating * 10) / 10,
-        onTimePercentage: 85 + Math.random() * 10 // Mock data for compatibility
+        onTimePercentage: Math.round(onTimePercentage * 10) / 10
       };
     } catch (error) {
-      console.error('Error fetching staff performance:', error);
+      console.error('Error calculating staff performance:', error);
       return {
         totalKm: 0,
         totalTrips: 0,
