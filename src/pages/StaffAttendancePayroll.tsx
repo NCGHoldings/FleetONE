@@ -108,38 +108,17 @@ export default function StaffAttendancePayroll() {
   const syncFromTrips = async () => {
     if (!isAdmin) return toast.error('Access denied');
     try {
-      // Pull completed/ended trips in period with allocations
+      // Pull trips in period with notes containing driver/conductor data
       const { data: trips, error } = await supabase
         .from('daily_trips')
         .select(`
-          id, trip_no, trip_date, start_time, end_time, bus_id, route_id,
+          id, trip_no, trip_date, start_time, end_time, notes,
           buses(bus_no), routes(route_name)
         `)
         .gte('trip_date', period.start)
         .lte('trip_date', period.end)
         .not('end_time', 'is', null);
       if (error) throw error;
-
-      // Get allocations for the same period to extract driver/conductor names
-      const { data: allocations, error: allocError } = await supabase
-        .from('driver_allocations')
-        .select('trip_id, notes')
-        .gte('allocation_date', period.start)
-        .lte('allocation_date', period.end);
-      if (allocError) throw allocError;
-
-      // Create allocation map by trip_id
-      const allocationMap = new Map();
-      (allocations || []).forEach((alloc: any) => {
-        if (alloc.notes) {
-          try {
-            const notes = typeof alloc.notes === 'string' ? JSON.parse(alloc.notes) : alloc.notes;
-            allocationMap.set(alloc.trip_id, notes);
-          } catch (e) {
-            console.warn('Failed to parse allocation notes:', alloc.notes);
-          }
-        }
-      });
 
       const entries: any[] = [];
       (trips || []).forEach((t: any) => {
@@ -154,8 +133,8 @@ export default function StaffAttendancePayroll() {
         const base = {
           attendance_date: t.trip_date,
           trip_id: t.trip_no || t.id,
-          bus_no: t.buses?.bus_no,
-          route: t.routes?.route_name,
+          bus_no: t.buses?.bus_no || 'N/A',
+          route: t.routes?.route_name || 'N/A',
           start_time: t.start_time,
           end_time: t.end_time,
           hours_worked: Number(hours.toFixed(2)),
@@ -164,34 +143,43 @@ export default function StaffAttendancePayroll() {
           auto_generated: true
         };
 
-        // Get allocation data for this trip
-        const allocation = allocationMap.get(t.trip_no || t.id);
-        
-        if (allocation) {
-          // Extract driver
-          if (allocation.driver) {
-            const driverName = allocation.driver;
-            const staffId = `DRIVER_${driverName.replace(/\s+/g, '_').toUpperCase()}`;
-            entries.push({
-              ...base,
-              staff_id: staffId,
-              staff_name: driverName
-            });
-          }
-          
-          // Extract conductor
-          if (allocation.conductor) {
-            const conductorName = allocation.conductor;
-            const staffId = `CONDUCTOR_${conductorName.replace(/\s+/g, '_').toUpperCase()}`;
-            entries.push({
-              ...base,
-              staff_id: staffId,
-              staff_name: conductorName
-            });
+        // Extract driver and conductor from notes JSON
+        if (t.notes) {
+          try {
+            const notes = typeof t.notes === 'string' ? JSON.parse(t.notes) : t.notes;
+            
+            // Extract driver
+            if (notes.driver) {
+              const driverName = notes.driver;
+              const staffId = `DRIVER_${driverName.replace(/\s+/g, '_').toUpperCase()}`;
+              entries.push({
+                ...base,
+                staff_id: staffId,
+                staff_name: driverName,
+                bus_no: notes.bus_no || base.bus_no,
+                route: notes.route || base.route
+              });
+            }
+            
+            // Extract conductor
+            if (notes.conductor) {
+              const conductorName = notes.conductor;
+              const staffId = `CONDUCTOR_${conductorName.replace(/\s+/g, '_').toUpperCase()}`;
+              entries.push({
+                ...base,
+                staff_id: staffId,
+                staff_name: conductorName,
+                bus_no: notes.bus_no || base.bus_no,
+                route: notes.route || base.route
+              });
+            }
+          } catch (e) {
+            console.warn('Failed to parse trip notes:', t.notes);
           }
         }
       });
 
+      // Insert attendance records
       for (const e of entries) {
         // Upsert-like: avoid duplicates
         const { data: exists } = await supabase
