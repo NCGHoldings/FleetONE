@@ -74,16 +74,21 @@ export default function StaffAttendancePayroll() {
   const fetchAttendance = async () => {
     try {
       setLoading(true);
+      console.log('Fetching attendance for period:', period.start, 'to', period.end);
       const { data, error } = await supabase
         .from('staff_attendance')
         .select('*')
         .gte('attendance_date', period.start)
         .lte('attendance_date', period.end)
         .order('attendance_date', { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error('Fetch error:', error);
+        throw error;
+      }
+      console.log('Fetched attendance data:', data);
       setAttendance((data || []) as any);
     } catch (e) {
-      console.error(e);
+      console.error('Failed to fetch attendance:', e);
       toast.error('Failed to load attendance');
     } finally {
       setLoading(false);
@@ -180,7 +185,12 @@ export default function StaffAttendancePayroll() {
       });
 
       // Insert attendance records
+      console.log('Processing entries:', entries.length);
+      let inserted = 0;
+      let skipped = 0;
+      
       for (const e of entries) {
+        console.log('Processing entry:', e);
         // Upsert-like: avoid duplicates
         const { data: exists } = await supabase
           .from('staff_attendance')
@@ -189,13 +199,24 @@ export default function StaffAttendancePayroll() {
           .eq('attendance_date', e.attendance_date)
           .eq('trip_id', e.trip_id)
           .maybeSingle();
+        
         if (!exists) {
-          await supabase.from('staff_attendance').insert(e);
+          const { error: insertError } = await supabase.from('staff_attendance').insert(e);
+          if (insertError) {
+            console.error('Insert error:', insertError);
+          } else {
+            inserted++;
+            console.log('Inserted attendance record for:', e.staff_name);
+          }
+        } else {
+          skipped++;
+          console.log('Skipped duplicate for:', e.staff_name);
         }
       }
 
-      toast.success(`Attendance synced from trips - ${entries.length} records processed`);
-      fetchAttendance();
+      console.log(`Sync complete: ${inserted} inserted, ${skipped} skipped`);
+      toast.success(`Attendance synced: ${inserted} new records, ${skipped} duplicates skipped`);
+      await fetchAttendance();
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || 'Sync failed');
@@ -318,7 +339,21 @@ export default function StaffAttendancePayroll() {
             <Button onClick={syncFromTrips}><Calendar className="h-4 w-4 mr-2"/>Sync from Trips</Button>
             <Button variant="outline" onClick={() => attendance.length && exportCSV(attendance, 'attendance.csv')}><Download className="h-4 w-4 mr-2"/>Export CSV</Button>
           </div>
-          <DataTable columns={attendanceCols} data={attendance} searchKey="staff_name" />
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                <p className="text-muted-foreground">Loading attendance...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {attendance.length} attendance records
+              </div>
+              <DataTable columns={attendanceCols} data={attendance} searchKey="staff_name" />
+            </div>
+          )}
         </CardContent>
       </Card>
 
