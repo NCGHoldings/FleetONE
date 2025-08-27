@@ -3,16 +3,31 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus, Loader2 } from "lucide-react";
+import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus, Loader2, Eye, Edit, History, CalendarPlus, UserX } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { BusDetailsModal } from "@/components/fleet/BusDetailsModal";
+import { EditBusModal } from "@/components/fleet/EditBusModal";
+import { ServiceHistoryModal } from "@/components/fleet/ServiceHistoryModal";
+import { ScheduleMaintenanceModal } from "@/components/fleet/ScheduleMaintenanceModal";
 
 interface Fleet {
   id: string;
@@ -27,6 +42,19 @@ interface Fleet {
   next_service_date?: string;
   current_mileage: number;
   avg_daily_revenue?: number;
+  running_days?: number;
+  total_revenue?: number;
+  owner_name?: string;
+  owner_nic?: string;
+  owner_address?: string;
+  registration_number?: string;
+  engine_number?: string;
+  chassis_number?: string;
+  service_interval_km?: number;
+  expected_km_per_liter?: number;
+  last_service_mileage?: number;
+  next_service_mileage?: number;
+  insurance_expiry?: string;
 }
 
 const getStatusBadge = (status: Fleet['status']) => {
@@ -41,100 +69,254 @@ const getStatusBadge = (status: Fleet['status']) => {
   return <Badge className={`status-${config.variant.replace('secondary', 'neutral').replace('destructive', 'error')}`}>{config.label}</Badge>;
 };
 
-const columns: ColumnDef<Fleet>[] = [
-  {
-    accessorKey: "bus_no",
-    header: "Bus No.",
-  },
-  {
-    accessorKey: "type",
-    header: "Type",
-  },
-  {
-    accessorKey: "route",
-    header: "Route",
-    cell: ({ row }) => row.getValue("route") || "-",
-  },
-  {
-    accessorKey: "model",
-    header: "Model",
-  },
-  {
-    accessorKey: "year",
-    header: "Year",
-  },
-  {
-    accessorKey: "capacity",
-    header: "Capacity",
-    cell: ({ row }) => `${row.getValue("capacity")} seats`,
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => getStatusBadge(row.getValue("status")),
-  },
-  {
-    accessorKey: "current_mileage",
-    header: "Mileage (km)",
-    cell: ({ row }) => {
-      const mileage = row.getValue("current_mileage") as number;
-      return mileage.toLocaleString();
-    },
-  },
-  {
-    accessorKey: "avg_daily_revenue",
-    header: "Avg Daily Revenue (₨)",
-    cell: ({ row }) => {
-      const revenue = row.getValue("avg_daily_revenue") as number;
-      return revenue ? `₨ ${revenue.toLocaleString()}` : "-";
-    },
-  },
-  {
-    accessorKey: "next_service_date",
-    header: "Next Service",
-    cell: ({ row }) => {
-      const date = row.getValue("next_service_date");
-      return date ? new Date(date as string).toLocaleDateString() : "-";
-    },
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => {
-      const fleet = row.original;
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>View Details</DropdownMenuItem>
-            <DropdownMenuItem>Edit Bus</DropdownMenuItem>
-            <DropdownMenuItem>Service History</DropdownMenuItem>
-            <DropdownMenuItem>Schedule Maintenance</DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
-              Deactivate
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
-  },
-];
-
-export default function FleetManagement() {
+const FleetManagementComponent = () => {
   const [data, setData] = useState<Fleet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBus, setSelectedBus] = useState<Fleet | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [serviceHistoryModalOpen, setServiceHistoryModalOpen] = useState(false);
+  const [scheduleMaintenanceModalOpen, setScheduleMaintenanceModalOpen] = useState(false);
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  const handleViewDetails = (bus: Fleet) => {
+    setSelectedBus(bus);
+    setDetailsModalOpen(true);
+  };
+
+  const handleEditBus = (bus: Fleet) => {
+    setSelectedBus(bus);
+    setEditModalOpen(true);
+  };
+
+  const handleServiceHistory = (bus: Fleet) => {
+    setSelectedBus(bus);
+    setServiceHistoryModalOpen(true);
+  };
+
+  const handleScheduleMaintenance = (bus: Fleet) => {
+    setSelectedBus(bus);
+    setScheduleMaintenanceModalOpen(true);
+  };
+
+  const handleDeactivate = (bus: Fleet) => {
+    setSelectedBus(bus);
+    setDeactivateDialogOpen(true);
+  };
+
+  const confirmDeactivate = async () => {
+    if (!selectedBus) return;
+
+    try {
+      const { error } = await supabase
+        .from('buses')
+        .update({ 
+          status: selectedBus.status === 'retired' ? 'active' : 'retired',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedBus.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Bus ${selectedBus.status === 'retired' ? 'activated' : 'deactivated'} successfully.`,
+      });
+
+      fetchFleet();
+      setDeactivateDialogOpen(false);
+      setSelectedBus(null);
+    } catch (error) {
+      console.error('Error updating bus status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update bus status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const columns: ColumnDef<Fleet>[] = [
+    {
+      accessorKey: "bus_no",
+      header: "Bus No.",
+    },
+    {
+      accessorKey: "type",
+      header: "Type",
+    },
+    {
+      accessorKey: "route",
+      header: "Route",
+      cell: ({ row }) => row.getValue("route") || "-",
+    },
+    {
+      accessorKey: "model",
+      header: "Model",
+    },
+    {
+      accessorKey: "year",
+      header: "Year",
+    },
+    {
+      accessorKey: "capacity",
+      header: "Capacity",
+      cell: ({ row }) => `${row.getValue("capacity")} seats`,
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => getStatusBadge(row.getValue("status")),
+    },
+    {
+      accessorKey: "current_mileage",
+      header: "Mileage (km)",
+      cell: ({ row }) => {
+        const mileage = row.getValue("current_mileage") as number;
+        return mileage.toLocaleString();
+      },
+    },
+    {
+      accessorKey: "running_days",
+      header: "Running Days",
+      cell: ({ row }) => {
+        const days = row.getValue("running_days") as number;
+        return days || 0;
+      },
+    },
+    {
+      accessorKey: "avg_daily_revenue",
+      header: "Avg Daily Revenue (₨)",
+      cell: ({ row }) => {
+        const revenue = row.getValue("avg_daily_revenue") as number;
+        return revenue ? `₨ ${revenue.toLocaleString()}` : "-";
+      },
+    },
+    {
+      accessorKey: "next_service_date",
+      header: "Next Service",
+      cell: ({ row }) => {
+        const date = row.getValue("next_service_date");
+        return date ? new Date(date as string).toLocaleDateString() : "-";
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const fleet = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => handleViewDetails(fleet)} className="gap-2">
+                <Eye className="w-4 h-4" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleEditBus(fleet)} className="gap-2">
+                <Edit className="w-4 h-4" />
+                Edit Bus
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleServiceHistory(fleet)} className="gap-2">
+                <History className="w-4 h-4" />
+                Service History
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleScheduleMaintenance(fleet)} className="gap-2">
+                <CalendarPlus className="w-4 h-4" />
+                Schedule Maintenance
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => handleDeactivate(fleet)} 
+                className={`gap-2 ${fleet.status === 'retired' ? 'text-success' : 'text-destructive'}`}
+              >
+                <UserX className="w-4 h-4" />
+                {fleet.status === 'retired' ? 'Activate' : 'Deactivate'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
 
   useEffect(() => {
     fetchFleet();
   }, []);
 
+  // Auto-sync fleet data from daily trips and update buses
+  const syncFleetData = async () => {
+    try {
+      // First, get all buses from daily_trips that might not be in buses table
+      const { data: tripBuses, error: tripError } = await supabase
+        .from('daily_trips')
+        .select('bus_id, bus_no:buses!inner(bus_no)')
+        .order('trip_date', { ascending: false });
+
+      if (tripError) {
+        console.error('Error fetching trip buses:', tripError);
+        return;
+      }
+
+      // Get unique bus numbers from trips that have actual bus numbers (not just IDs)
+      const uniqueBusNumbers = [...new Set(
+        tripBuses
+          ?.map(trip => trip.bus_no?.bus_no)
+          .filter(busNo => busNo && busNo.trim() !== '') || []
+      )];
+
+      // Check for buses in daily_trips that don't exist in buses table
+      for (const busNo of uniqueBusNumbers) {
+        if (!busNo) continue;
+        
+        const { data: existingBus } = await supabase
+          .from('buses')
+          .select('id')
+          .eq('bus_no', busNo)
+          .single();
+
+        if (!existingBus) {
+          // Auto-create bus entry
+          const { error: insertError } = await supabase
+            .from('buses')
+            .insert({
+              bus_no: busNo,
+              type: 'Normal', // Default type
+              model: 'Unknown', // Default model
+              year: new Date().getFullYear(),
+              capacity: 50, // Default capacity
+              status: 'active',
+              current_mileage: 0,
+              service_interval_km: 10000,
+              expected_km_per_liter: 8.0,
+            });
+
+          if (insertError) {
+            console.error('Error auto-creating bus:', insertError);
+          } else {
+            console.log(`Auto-created bus: ${busNo}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in syncFleetData:', error);
+    }
+  };
+
   const fetchFleet = async () => {
     try {
-      // Fetch buses with calculated average daily revenue
+      setLoading(true);
+
+      // First sync any new buses from daily_trips
+      await syncFleetData();
+
+      // Fetch all buses with their details
       const { data: buses, error } = await supabase
         .from('buses')
         .select('*')
@@ -150,37 +332,58 @@ export default function FleetManagement() {
         return;
       }
 
-      // For each bus, calculate average daily revenue from trips
-      const busesWithRevenue = await Promise.all(
+      // For each bus, calculate metrics from daily_trips
+      const busesWithMetrics = await Promise.all(
         buses?.map(async (bus) => {
+          // Get all completed trips for this bus
           const { data: trips } = await supabase
             .from('daily_trips')
-            .select('income, trip_date')
+            .select('income, trip_date, odometer_end, odometer_start')
             .eq('bus_id', bus.id)
-            .eq('status', 'completed');
+            .eq('status', 'completed')
+            .order('trip_date', { ascending: false });
 
+          // Calculate metrics
           const totalRevenue = trips?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
-          const tripCount = trips?.length || 0;
-          const avgDailyRevenue = tripCount > 0 ? totalRevenue / tripCount : 0;
+          const runningDays = trips?.length || 0;
+          const avgDailyRevenue = runningDays > 0 ? totalRevenue / runningDays : 0;
+
+          // Get latest mileage from most recent trip
+          let latestMileage = bus.current_mileage || 0;
+          if (trips && trips.length > 0) {
+            const latestTrip = trips[0]; // Most recent trip due to ordering
+            if (latestTrip.odometer_end && latestTrip.odometer_end > latestMileage) {
+              latestMileage = latestTrip.odometer_end;
+              
+              // Update the bus current_mileage in database
+              await supabase
+                .from('buses')
+                .update({ current_mileage: latestMileage })
+                .eq('id', bus.id);
+            }
+          }
+
+          // Calculate unique trip dates for actual running days
+          const uniqueTripDates = [...new Set(trips?.map(trip => trip.trip_date) || [])];
+          const actualRunningDays = uniqueTripDates.length;
 
           return {
-            id: bus.id,
-            bus_no: bus.bus_no,
-            type: bus.type,
-            route: bus.route,
-            model: bus.model,
-            year: bus.year,
-            capacity: bus.capacity,
-            status: bus.status as Fleet['status'],
-            last_service_date: bus.last_service_date,
-            next_service_date: bus.next_service_date,
-            current_mileage: bus.current_mileage || 0,
+            ...bus,
+            current_mileage: latestMileage,
             avg_daily_revenue: Math.round(avgDailyRevenue),
+            total_revenue: totalRevenue,
+            running_days: actualRunningDays,
           } as Fleet;
         }) || []
       );
 
-      setData(busesWithRevenue);
+      setData(busesWithMetrics);
+      
+      toast({
+        title: "Fleet Data Updated",
+        description: `Loaded ${busesWithMetrics.length} buses with latest metrics.`,
+      });
+
     } catch (error) {
       console.error('Error in fetchFleet:', error);
       toast({
@@ -248,7 +451,7 @@ export default function FleetManagement() {
                 Fleet Management
               </h1>
               <p className="text-accent-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
-                Monitor and optimize your entire bus fleet
+                Auto-synced fleet data with real-time metrics
               </p>
             </div>
           </div>
@@ -268,7 +471,7 @@ export default function FleetManagement() {
       </div>
 
       {/* Enhanced KPI Cards with Animations */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
           <div className="professional-card hover:shadow-primary transition-all duration-500 group">
             <KPICard
@@ -304,10 +507,20 @@ export default function FleetManagement() {
         <div className="animate-scale-in" style={{ animationDelay: '0.4s' }}>
           <div className="professional-card hover:shadow-success transition-all duration-500 group">
             <KPICard
-              title="Daily Revenue"
-              value={`₨ ${totalRevenue.toLocaleString()}`}
+              title="Total Revenue"
+              value={`₨ ${data.reduce((sum, bus) => sum + (bus.total_revenue || 0), 0).toLocaleString()}`}
               icon={<DollarSign className="w-5 h-5 group-hover:animate-bounce-notification" />}
               description="Fleet total"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.5s' }}>
+          <div className="professional-card hover:shadow-info transition-all duration-500 group">
+            <KPICard
+              title="Avg Daily Revenue"
+              value={`₨ ${totalRevenue.toLocaleString()}`}
+              icon={<Calendar className="w-5 h-5 group-hover:animate-pulse-subtle" />}
+              description="Per bus daily"
             />
           </div>
         </div>
@@ -318,9 +531,63 @@ export default function FleetManagement() {
         columns={columns}
         data={data}
         searchKey="bus_no"
-        title="Fleet Overview"
+        title={`Fleet Overview (${data.length} buses)`}
         onExport={handleExport}
       />
+
+      {/* Modals */}
+      <BusDetailsModal
+        open={detailsModalOpen}
+        onOpenChange={setDetailsModalOpen}
+        bus={selectedBus}
+      />
+
+      <EditBusModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        bus={selectedBus}
+        onSuccess={fetchFleet}
+      />
+
+      <ServiceHistoryModal
+        open={serviceHistoryModalOpen}
+        onOpenChange={setServiceHistoryModalOpen}
+        bus={selectedBus}
+      />
+
+      <ScheduleMaintenanceModal
+        open={scheduleMaintenanceModalOpen}
+        onOpenChange={setScheduleMaintenanceModalOpen}
+        bus={selectedBus}
+        onSuccess={fetchFleet}
+      />
+
+      {/* Deactivate Confirmation Dialog */}
+      <AlertDialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {selectedBus?.status === 'retired' ? 'Activate Bus' : 'Deactivate Bus'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedBus?.status === 'retired' 
+                ? `Are you sure you want to activate bus ${selectedBus?.bus_no}? This will make it available for operations.`
+                : `Are you sure you want to deactivate bus ${selectedBus?.bus_no}? This will remove it from active operations.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeactivate}>
+              {selectedBus?.status === 'retired' ? 'Activate' : 'Deactivate'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
+};
+
+export default function FleetManagement() {
+  return <FleetManagementComponent />;
 }
