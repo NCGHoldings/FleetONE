@@ -105,7 +105,7 @@ export function AppSidebar() {
     <Sidebar className={collapsed ? "w-16" : "w-64"} collapsible="icon">
       <SidebarHeader className="border-b border-border/50 p-4 bg-gradient-to-r from-sidebar-background to-sidebar-accent/30">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-primary animate-logo-glow overflow-hidden p-1">
+          <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-primary animate-logo-glow overflow-hidden p-1">
             <img 
               src="/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png" 
               alt="NCG Express Logo" 
