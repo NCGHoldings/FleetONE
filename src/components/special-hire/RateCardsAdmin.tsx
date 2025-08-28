@@ -18,9 +18,9 @@ import { useToast } from '@/hooks/use-toast';
 const formSchema = z.object({
   hire_type: z.enum(['Outside', 'Lyceum']),
   bus_type_id: z.string().min(1, 'Bus type is required'),
-  flat_fee_lkr: z.number().min(0, 'Flat fee is required'),
-  first_100km_rate_per_km_lkr: z.number().min(0, 'First 100KM rate is required'),
-  additional_km_rate_per_km_lkr: z.number().min(0, 'Additional KM rate is required'),
+  flat_fee_lkr: z.number().min(0, 'Flat fee must be 0 or positive'),
+  first_100km_rate_per_km_lkr: z.number().min(0, 'First 100KM rate must be 0 or positive'),
+  additional_km_rate_per_km_lkr: z.number().min(0, 'Additional KM rate must be 0 or positive'),
   effective_from: z.date(),
   effective_to: z.date().optional(),
   is_active: z.boolean().default(true)
@@ -75,8 +75,7 @@ export function RateCardsAdmin() {
             *,
             bus_types:bus_type_id (name)
           `)
-          .order('hire_type')
-          .order('flat_fee_lkr'),
+          .order('hire_type'),
         supabase
           .from('bus_types')
           .select('id, name')
@@ -201,7 +200,7 @@ export function RateCardsAdmin() {
       header: "First 100KM Rate",
       cell: ({ row }) => {
         const rate = row.getValue("first_100km_rate_per_km_lkr");
-        return rate ? `LKR ${rate}/km` : "-";
+        return rate ? `LKR ${rate}/KM` : "-";
       },
     },
     {
@@ -209,7 +208,7 @@ export function RateCardsAdmin() {
       header: "Additional KM Rate",
       cell: ({ row }) => {
         const rate = row.getValue("additional_km_rate_per_km_lkr");
-        return rate ? `LKR ${rate}/km` : "-";
+        return rate ? `LKR ${rate}/KM` : "-";
       },
     },
     {
@@ -326,6 +325,7 @@ export function RateCardsAdmin() {
                               type="number"
                               step="0.01"
                               min="0"
+                              placeholder="Base flat fee"
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             />
@@ -340,12 +340,13 @@ export function RateCardsAdmin() {
                       name="first_100km_rate_per_km_lkr"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>First 100KM Rate per KM (LKR)</FormLabel>
+                          <FormLabel>First 100KM Rate (LKR per KM)</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               step="0.01"
                               min="0"
+                              placeholder="Rate for first 100 kilometers"
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             />
@@ -360,12 +361,13 @@ export function RateCardsAdmin() {
                       name="additional_km_rate_per_km_lkr"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Additional KM Rate per KM (LKR)</FormLabel>
+                          <FormLabel>Additional KM Rate (LKR per KM)</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               step="0.01"
                               min="0"
+                              placeholder="Rate for kilometers beyond 100"
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             />
