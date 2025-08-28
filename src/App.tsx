@@ -23,6 +23,7 @@ import RealTimeTracking from "./pages/RealTimeTracking";
 import DriverAllocation from "./pages/DriverAllocation";
 import StaffAttendancePayroll from "./pages/StaffAttendancePayroll";
 import DocumentManager from "./pages/DocumentManager";
+import SpecialHire from "./pages/SpecialHire";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
 
@@ -161,7 +162,7 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Special Hire module coming soon...</div>
+                    <SpecialHire />
                   </AppLayout>
                 </ProtectedRoute>
               } 
