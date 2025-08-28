@@ -139,11 +139,15 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         parking: { lat: fuelSettings.parking_lat, lng: fuelSettings.parking_lng }
       });
 
+      // Filter out empty intermediate stops
+      const validIntermediateStops = intermediateStops.filter(stop => stop.location && stop.location.trim());
+
       // Call edge function to calculate real distances using Mapbox API
       const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
         body: {
           pickupLocation: data.pickupLocation,
           dropLocation: data.dropLocation,
+          intermediateStops: validIntermediateStops,
           parkingLat: fuelSettings.parking_lat,
           parkingLng: fuelSettings.parking_lng
         }
@@ -268,6 +272,9 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
       // Calculate costs first
       const { costs, distanceData } = await calculateCosts(data);
 
+      // Filter out empty intermediate stops before creating quotation
+      const validIntermediateStops = intermediateStops.filter(stop => stop.location && stop.location.trim());
+
       // Create quotation
       const quotationData = {
         company_name: data.companyName || null,
@@ -280,7 +287,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         number_of_buses: data.numberOfBuses,
         pickup_location: data.pickupLocation,
         drop_location: data.dropLocation,
-        intermediate_stops: JSON.stringify(intermediateStops),
+        intermediate_stops: JSON.stringify(validIntermediateStops),
         number_of_passengers: data.numberOfPassengers,
         pickup_datetime: data.pickupDateTime.toISOString(),
         drop_datetime: data.dropDateTime.toISOString(),

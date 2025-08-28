@@ -26,6 +26,9 @@ interface QuotationData {
   hire_charge?: number;
   extra_charges?: number;
   commission_amount?: number;
+  intermediate_stops?: string;
+  route_description?: string;
+  valid_until?: string;
   created_at: string;
 }
 
@@ -50,6 +53,27 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
   const totalDistance = (quotation.km_parking_to_pickup || 0) + 
                        (quotation.km_trip || 0) + 
                        (quotation.km_drop_to_parking || 0);
+
+  // Parse intermediate stops for display
+  let intermediateStops = [];
+  try {
+    if (quotation.intermediate_stops) {
+      intermediateStops = JSON.parse(quotation.intermediate_stops);
+    }
+  } catch (e) {
+    console.warn('Failed to parse intermediate stops:', e);
+  }
+
+  // Build route description
+  let routeDescription = `From ${quotation.pickup_location}`;
+  if (intermediateStops.length > 0) {
+    intermediateStops.forEach((stop: any) => {
+      if (stop.location) {
+        routeDescription += ` → ${stop.location}`;
+      }
+    });
+  }
+  routeDescription += ` → ${quotation.drop_location}`;
 
   return (
     <div className={`bg-white text-black font-sans ${className}`} style={{ 
@@ -155,7 +179,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-2">{quotation.bus_type}</td>
               <td className="border border-gray-300 p-2">{quotation.number_of_buses.toString().padStart(2, '0')}</td>
               <td className="border border-gray-300 p-2">{quotation.seating_capacity || 54}</td>
-              <td className="border border-gray-300 p-2">From {quotation.pickup_location} To {quotation.drop_location}</td>
+              <td className="border border-gray-300 p-2">{quotation.route_description || routeDescription}</td>
               <td className="border border-gray-300 p-2">{totalDistance.toFixed(2)} Km</td>
               <td className="border border-gray-300 p-2">LKR {quotation.gross_revenue.toLocaleString()}</td>
             </tr>

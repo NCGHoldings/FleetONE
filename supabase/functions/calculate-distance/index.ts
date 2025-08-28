@@ -11,9 +11,9 @@ serve(async (req) => {
   }
 
   try {
-    const { pickupLocation, dropLocation, parkingLat, parkingLng } = await req.json()
+    const { pickupLocation, dropLocation, intermediateStops = [], parkingLat, parkingLng } = await req.json()
     
-    console.log('Distance calculation request:', { pickupLocation, dropLocation, parkingLat, parkingLng });
+    console.log('Distance calculation request:', { pickupLocation, dropLocation, intermediateStops, parkingLat, parkingLng });
     
     const MAPBOX_ACCESS_TOKEN = Deno.env.get('MAPBOX_ACCESS_TOKEN')
     if (!MAPBOX_ACCESS_TOKEN) {
@@ -62,67 +62,103 @@ serve(async (req) => {
     const pickupCoords = pickupData.features[0].geometry.coordinates
     const dropCoords = dropData.features[0].geometry.coordinates
 
-    console.log('Coordinates found:', { pickupCoords, dropCoords, parkingCoords: [parkingLng, parkingLat] });
+    // Geocode intermediate stops if any
+    const intermediateCoords = [];
+    for (const stop of intermediateStops) {
+      if (stop.location && stop.location.trim()) {
+        console.log('Geocoding intermediate stop:', stop.location);
+        const stopResponse = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(stop.location)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=LK&limit=1`
+        );
+        
+        if (stopResponse.ok) {
+          const stopData = await stopResponse.json();
+          if (stopData.features && stopData.features.length > 0) {
+            intermediateCoords.push(stopData.features[0].geometry.coordinates);
+            console.log('Intermediate stop geocoded:', stop.location, stopData.features[0].geometry.coordinates);
+          }
+        }
+      }
+    }
 
-    // Calculate distance from parking to pickup
-    console.log('Calculating parking to pickup distance...');
-    const parkingToPickupResponse = await fetch(
-      `https://api.mapbox.com/directions/v5/mapbox/driving/${parkingLng},${parkingLat};${pickupCoords[0]},${pickupCoords[1]}?access_token=${MAPBOX_ACCESS_TOKEN}&geometries=geojson`
+    console.log('Coordinates found:', { pickupCoords, dropCoords, intermediateCoords, parkingCoords: [parkingLng, parkingLat] });
+
+    // Build the complete route: Parking -> Pickup -> Intermediate Stops -> Drop -> Parking
+    const allWaypoints = [
+      [parkingLng, parkingLat],
+      pickupCoords,
+      ...intermediateCoords,
+      dropCoords,
+      [parkingLng, parkingLat]
+    ];
+
+    const waypointsString = allWaypoints.map(coord => `${coord[0]},${coord[1]}`).join(';');
+
+    // Calculate the complete optimized route
+    console.log('Calculating complete route with waypoints...');
+    const completeRouteResponse = await fetch(
+      `https://api.mapbox.com/directions/v5/mapbox/driving/${waypointsString}?access_token=${MAPBOX_ACCESS_TOKEN}&geometries=geojson&overview=full`
     )
     
-    if (!parkingToPickupResponse.ok) {
-      console.error('Parking to pickup routing failed:', await parkingToPickupResponse.text());
-      throw new Error(`Parking to pickup routing failed: ${parkingToPickupResponse.status}`);
+    if (!completeRouteResponse.ok) {
+      console.error('Complete route calculation failed:', await completeRouteResponse.text());
+      throw new Error(`Complete route calculation failed: ${completeRouteResponse.status}`);
     }
     
-    const parkingToPickupData = await parkingToPickupResponse.json()
-    console.log('Parking to pickup routing result:', parkingToPickupData);
+    const completeRouteData = await completeRouteResponse.json();
+    console.log('Complete route calculation result:', completeRouteData);
 
-    // Calculate distance for the main trip (pickup to drop)
-    console.log('Calculating main trip distance...');
-    const tripResponse = await fetch(
-      `https://api.mapbox.com/directions/v5/mapbox/driving/${pickupCoords[0]},${pickupCoords[1]};${dropCoords[0]},${dropCoords[1]}?access_token=${MAPBOX_ACCESS_TOKEN}&geometries=geojson`
-    )
-    
-    if (!tripResponse.ok) {
-      console.error('Main trip routing failed:', await tripResponse.text());
-      throw new Error(`Main trip routing failed: ${tripResponse.status}`);
+    if (!completeRouteData.routes || completeRouteData.routes.length === 0) {
+      throw new Error('No route found for the specified waypoints');
     }
-    
-    const tripData = await tripResponse.json()
-    console.log('Main trip routing result:', tripData);
 
-    // Calculate distance from drop back to parking
-    console.log('Calculating drop to parking distance...');
-    const dropToParkingResponse = await fetch(
-      `https://api.mapbox.com/directions/v5/mapbox/driving/${dropCoords[0]},${dropCoords[1]};${parkingLng},${parkingLat}?access_token=${MAPBOX_ACCESS_TOKEN}&geometries=geojson`
-    )
-    
-    if (!dropToParkingResponse.ok) {
-      console.error('Drop to parking routing failed:', await dropToParkingResponse.text());
-      throw new Error(`Drop to parking routing failed: ${dropToParkingResponse.status}`);
+    const route = completeRouteData.routes[0];
+    const totalDistance = route.distance ? Math.round((route.distance / 1000) * 10) / 10 : 0;
+
+    // Calculate individual segment distances for breakdown
+    let kmParkingToPickup = 0;
+    let kmTrip = 0; // This will be the trip through all intermediate stops
+    let kmDropToParking = 0;
+
+    if (route.legs && route.legs.length >= 2) {
+      // First leg: Parking to Pickup
+      kmParkingToPickup = route.legs[0].distance ? 
+        Math.round((route.legs[0].distance / 1000) * 10) / 10 : 0;
+      
+      // Last leg: Drop to Parking
+      const lastLegIndex = route.legs.length - 1;
+      kmDropToParking = route.legs[lastLegIndex].distance ? 
+        Math.round((route.legs[lastLegIndex].distance / 1000) * 10) / 10 : 0;
+      
+      // Middle legs: Pickup through intermediate stops to drop
+      kmTrip = 0;
+      for (let i = 1; i < lastLegIndex; i++) {
+        kmTrip += route.legs[i].distance ? route.legs[i].distance : 0;
+      }
+      kmTrip = Math.round((kmTrip / 1000) * 10) / 10;
     }
-    
-    const dropToParkingData = await dropToParkingResponse.json()
-    console.log('Drop to parking routing result:', dropToParkingData);
 
-    const kmParkingToPickup = parkingToPickupData.routes?.[0]?.distance ? 
-      Math.round((parkingToPickupData.routes[0].distance / 1000) * 10) / 10 : 0
-    
-    const kmTrip = tripData.routes?.[0]?.distance ? 
-      Math.round((tripData.routes[0].distance / 1000) * 10) / 10 : 0
-    
-    const kmDropToParking = dropToParkingData.routes?.[0]?.distance ? 
-      Math.round((dropToParkingData.routes[0].distance / 1000) * 10) / 10 : 0
+    // Build route description with intermediate stops
+    let routeDescription = `${pickupData.features[0].place_name}`;
+    for (let i = 0; i < intermediateStops.length; i++) {
+      if (intermediateStops[i].location && intermediateStops[i].location.trim() && i < intermediateCoords.length) {
+        routeDescription += ` → ${intermediateStops[i].location}`;
+      }
+    }
+    routeDescription += ` → ${dropData.features[0].place_name}`;
 
     const result = {
       kmParkingToPickup,
       kmTrip,
       kmDropToParking,
+      totalDistance,
       pickupCoords,
       dropCoords,
+      intermediateCoords,
       pickupAddress: pickupData.features[0].place_name,
-      dropAddress: dropData.features[0].place_name
+      dropAddress: dropData.features[0].place_name,
+      routeDescription,
+      intermediateStops: intermediateStops.filter(stop => stop.location && stop.location.trim())
     };
 
     console.log('Final distance calculation result:', result);

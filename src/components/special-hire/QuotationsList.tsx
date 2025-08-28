@@ -37,6 +37,8 @@ interface Quotation {
   hire_charge?: number;
   extra_charges?: number;
   commission_amount?: number;
+  intermediate_stops?: string;
+  route_description?: string;
   status: string;
   valid_until: string;
   created_at: string;
@@ -74,7 +76,8 @@ export function QuotationsList({ onRefresh }: Props) {
         ...item,
         bus_type: item.bus_types?.name || 'Unknown',
         seating_capacity: item.bus_types?.capacity || 54,
-        total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0)
+        total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
+        intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || [])
       })) || [];
       
       setQuotations(transformedData);
@@ -195,12 +198,39 @@ export function QuotationsList({ onRefresh }: Props) {
     {
       accessorKey: "pickup_location",
       header: "Route",
-      cell: ({ row }) => (
-        <div className="max-w-xs">
-          <div className="text-sm font-medium">{row.original.pickup_location}</div>
-          <div className="text-xs text-muted-foreground">to {row.original.drop_location}</div>
-        </div>
-      ),
+      cell: ({ row }) => {
+        // Parse intermediate stops for display
+        let intermediateStops = [];
+        try {
+          if (row.original.intermediate_stops) {
+            intermediateStops = JSON.parse(row.original.intermediate_stops);
+          }
+        } catch (e) {
+          console.warn('Failed to parse intermediate stops:', e);
+        }
+
+        // Build route description
+        let routeDescription = row.original.pickup_location;
+        if (intermediateStops.length > 0) {
+          intermediateStops.forEach((stop: any) => {
+            if (stop.location) {
+              routeDescription += ` → ${stop.location}`;
+            }
+          });
+        }
+        routeDescription += ` → ${row.original.drop_location}`;
+
+        return (
+          <div className="max-w-xs">
+            <div className="text-sm font-medium">{routeDescription}</div>
+            {intermediateStops.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                {intermediateStops.length} intermediate stop{intermediateStops.length > 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "pickup_datetime",
