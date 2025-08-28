@@ -19,6 +19,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -32,6 +33,8 @@ import {
   useSidebar,
   SidebarHeader
 } from "@/components/ui/sidebar";
+import { LogoUpload } from "./LogoUpload";
+import { supabase } from "@/integrations/supabase/client";
 
 const mainItems = [
   { title: "Dashboard", url: "/", icon: BarChart3 },
@@ -64,6 +67,33 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const currentPath = location.pathname;
+  const [logoUrl, setLogoUrl] = useState<string>('');
+
+  // Load company logo on mount
+  useEffect(() => {
+    loadLogo();
+  }, []);
+
+  const loadLogo = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('setting_value')
+        .eq('setting_key', 'company_logo_url')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error loading logo:', error);
+        return;
+      }
+
+      if (data?.setting_value) {
+        setLogoUrl(data.setting_value as string);
+      }
+    } catch (error) {
+      console.error('Error in loadLogo:', error);
+    }
+  };
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
@@ -75,14 +105,28 @@ export function AppSidebar() {
     <Sidebar className={collapsed ? "w-16" : "w-64"} collapsible="icon">
       <SidebarHeader className="border-b border-border/50 p-4 bg-gradient-to-r from-sidebar-background to-sidebar-accent/30">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary via-primary-hover to-accent rounded-xl flex items-center justify-center shadow-primary animate-logo-glow">
-            <Truck className="w-6 h-6 text-primary-foreground animate-bounce-subtle" />
+          <div className="w-10 h-10 bg-gradient-to-br from-primary via-primary-hover to-accent rounded-xl flex items-center justify-center shadow-primary animate-logo-glow overflow-hidden">
+            {logoUrl ? (
+              <img 
+                src={logoUrl} 
+                alt="Company Logo" 
+                className="w-full h-full object-contain rounded-xl"
+              />
+            ) : (
+              <Truck className="w-6 h-6 text-primary-foreground animate-bounce-subtle" />
+            )}
           </div>
           {!collapsed && (
-            <div className="animate-slide-in-right">
+            <div className="animate-slide-in-right flex-1">
               <h2 className="font-bold text-sidebar-foreground bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">NCG Speed</h2>
               <p className="text-xs text-sidebar-foreground/70">Transport Management</p>
             </div>
+          )}
+          {!collapsed && (
+            <LogoUpload 
+              currentLogoUrl={logoUrl} 
+              onLogoUpdate={(url) => setLogoUrl(url)} 
+            />
           )}
         </div>
         <SidebarTrigger className="ml-auto hover:scale-110 transition-transform duration-200 hover:rotate-180" />
