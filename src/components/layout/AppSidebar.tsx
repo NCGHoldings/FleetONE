@@ -104,20 +104,14 @@ export function AppSidebar() {
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"} collapsible="icon">
       <SidebarHeader className="border-b border-border/50 p-4 bg-gradient-to-r from-sidebar-background to-sidebar-accent/30">
-        <div className="flex items-center gap-2">
-          <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-primary animate-logo-glow overflow-hidden p-1">
+        <div className="flex items-center justify-center">
+          <div className="w-full h-16 bg-white rounded-xl flex items-center justify-center shadow-primary animate-logo-glow overflow-hidden p-2">
             <img 
               src="/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png" 
               alt="NCG Express Logo" 
               className="w-full h-full object-contain"
             />
           </div>
-          {!collapsed && (
-            <div className="animate-slide-in-right flex-1">
-              <h2 className="font-bold text-sidebar-foreground bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">NCG Express</h2>
-              <p className="text-xs text-sidebar-foreground/70">Transport Management</p>
-            </div>
-          )}
         </div>
         <SidebarTrigger className="ml-auto hover:scale-110 transition-transform duration-200 hover:rotate-180" />
       </SidebarHeader>
