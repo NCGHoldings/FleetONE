@@ -359,20 +359,29 @@ const FleetManagementComponent = () => {
           // Calculate average daily revenue
           const avgDailyRevenue = actualRunningDays > 0 ? totalRevenue / actualRunningDays : 0;
 
-          // Get latest mileage from most recent trip with valid odometer reading
+          // Get latest mileage from the last trip's odometer_end
           let latestMileage = bus.current_mileage || 0;
-          if (trips && trips.length > 0) {
-            // Find the most recent trip with valid odometer_end reading
-            const tripWithOdometer = trips.find(trip => trip.odometer_end && trip.odometer_end > 0);
-            if (tripWithOdometer && tripWithOdometer.odometer_end > latestMileage) {
-              latestMileage = tripWithOdometer.odometer_end;
-              
-              // Update the bus current_mileage in database
-              await supabase
-                .from('buses')
-                .update({ current_mileage: latestMileage })
-                .eq('id', bus.id);
+          try {
+            const { data: latestTrip } = await supabase
+              .from('daily_trips')
+              .select('odometer_end, trip_date, created_at')
+              .eq('bus_id', bus.id)
+              .order('trip_date', { ascending: false })
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (latestTrip && typeof latestTrip.odometer_end === 'number' && latestTrip.odometer_end > 0) {
+              if (latestTrip.odometer_end > latestMileage) {
+                latestMileage = latestTrip.odometer_end;
+                await supabase
+                  .from('buses')
+                  .update({ current_mileage: latestMileage })
+                  .eq('id', bus.id);
+              }
             }
+          } catch (e) {
+            console.warn(`Could not fetch latest odometer for ${bus.bus_no}`, e);
           }
 
           // Get most common route from trips
