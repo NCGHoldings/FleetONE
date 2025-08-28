@@ -27,6 +27,9 @@ interface Quotation {
   drop_location: string;
   pickup_datetime: string;
   drop_datetime?: string;
+  km_parking_to_pickup?: number;
+  km_trip?: number;
+  km_drop_to_parking?: number;
   total_distance_km?: number;
   gross_revenue: number;
   net_profit: number;
@@ -58,7 +61,8 @@ export function QuotationsList({ onRefresh }: Props) {
         .select(`
           *,
           bus_types!bus_type_id (
-            name
+            name,
+            capacity
           )
         `)
         .order('created_at', { ascending: false });
@@ -68,7 +72,9 @@ export function QuotationsList({ onRefresh }: Props) {
       // Transform the data to match our interface
       const transformedData = data?.map(item => ({
         ...item,
-        bus_type: item.bus_types?.name || 'Unknown'
+        bus_type: item.bus_types?.name || 'Unknown',
+        seating_capacity: item.bus_types?.capacity || 54,
+        total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0)
       })) || [];
       
       setQuotations(transformedData);

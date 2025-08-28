@@ -16,6 +16,9 @@ interface QuotationData {
   number_of_buses: number;
   bus_type: string;
   seating_capacity?: number;
+  km_parking_to_pickup?: number;
+  km_trip?: number;
+  km_drop_to_parking?: number;
   total_distance_km?: number;
   gross_revenue: number;
   net_profit: number;
@@ -42,6 +45,11 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
   const pickup = formatDateTime(quotation.pickup_datetime);
   const dropoff = quotation.drop_datetime ? formatDateTime(quotation.drop_datetime) : null;
+  
+  // Calculate total distance from individual components
+  const totalDistance = (quotation.km_parking_to_pickup || 0) + 
+                       (quotation.km_trip || 0) + 
+                       (quotation.km_drop_to_parking || 0);
 
   return (
     <div className={`bg-white text-black font-sans ${className}`} style={{ 
@@ -148,7 +156,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-2">{quotation.number_of_buses.toString().padStart(2, '0')}</td>
               <td className="border border-gray-300 p-2">{quotation.seating_capacity || 54}</td>
               <td className="border border-gray-300 p-2">From {quotation.pickup_location} To {quotation.drop_location}</td>
-              <td className="border border-gray-300 p-2">{quotation.total_distance_km?.toFixed(2) || '0.00'} Km</td>
+              <td className="border border-gray-300 p-2">{totalDistance.toFixed(2)} Km</td>
               <td className="border border-gray-300 p-2">LKR {quotation.gross_revenue.toLocaleString()}</td>
             </tr>
           </tbody>
