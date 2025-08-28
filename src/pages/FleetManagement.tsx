@@ -329,14 +329,26 @@ const FleetManagementComponent = () => {
         return;
       }
 
+      // Get all driver allocations with notes for fallback bus_no matching
+      const { data: allocations } = await supabase
+        .from('driver_allocations')
+        .select('trip_id, notes, bus_id');
+
+      // Get all daily trips for comprehensive matching
+      const { data: allDailyTrips } = await supabase
+        .from('daily_trips')
+        .select('*');
+
       // For each bus, get the latest data from daily_trips
       const busesWithMetrics = await Promise.all(
         buses?.map(async (bus) => {
           try {
-            // Get latest odometer reading for this bus
-            const { data: latestTrip } = await supabase
+            console.log(`🔍 Processing bus: ${bus.bus_no} (ID: ${bus.id})`);
+
+            // Method 1: Direct bus_id matching (Primary)
+            let latestTrip = await supabase
               .from('daily_trips')
-              .select('odometer_end, trip_date, created_at')
+              .select('odometer_end, trip_date, created_at, trip_no')
               .eq('bus_id', bus.id)
               .not('odometer_end', 'is', null)
               .order('trip_date', { ascending: false })
@@ -344,33 +356,87 @@ const FleetManagementComponent = () => {
               .limit(1)
               .maybeSingle();
 
-            // Get all trips for revenue calculation
-            const { data: allTrips } = await supabase
+            let allTrips = await supabase
               .from('daily_trips')
               .select('income, trip_date, route_id, routes(route_name)')
               .eq('bus_id', bus.id)
               .not('income', 'is', null);
 
+            // Method 2: Fallback - Match by bus_no from driver_allocations notes
+            if ((!latestTrip.data || !allTrips.data?.length) && allocations) {
+              console.log(`🔄 Fallback: Matching ${bus.bus_no} by notes...`);
+              
+              // Find allocations that mention this bus_no in notes
+              const matchingAllocations = allocations.filter(allocation => {
+                try {
+                  const notes = typeof allocation.notes === 'string' 
+                    ? JSON.parse(allocation.notes) 
+                    : allocation.notes;
+                  return notes?.bus_no === bus.bus_no;
+                } catch {
+                  return false;
+                }
+              });
+
+              if (matchingAllocations.length > 0) {
+                console.log(`📋 Found ${matchingAllocations.length} matching allocations for ${bus.bus_no}`);
+                
+                // Get trips for these allocations
+                const tripIds = matchingAllocations.map(a => a.trip_id);
+                const matchingTrips = allDailyTrips?.filter(trip => 
+                  tripIds.includes(trip.trip_no)
+                ) || [];
+
+                if (matchingTrips.length > 0) {
+                  // Get latest trip with odometer_end
+                  const tripsWithOdo = matchingTrips
+                    .filter(trip => trip.odometer_end != null)
+                    .sort((a, b) => {
+                      const dateA = new Date(a.trip_date + ' ' + (a.created_at || ''));
+                      const dateB = new Date(b.trip_date + ' ' + (b.created_at || ''));
+                      return dateB.getTime() - dateA.getTime();
+                    });
+
+                  if (tripsWithOdo.length > 0) {
+                    latestTrip.data = tripsWithOdo[0];
+                    console.log(`🎯 Found odometer reading: ${tripsWithOdo[0].odometer_end}km for ${bus.bus_no}`);
+                  }
+
+                  // Update allTrips data - transform to match expected structure
+                  allTrips.data = matchingTrips
+                    .filter(trip => trip.income != null)
+                    .map(trip => ({
+                      income: trip.income || 0,
+                      trip_date: trip.trip_date,
+                      route_id: trip.route_id || '',
+                      routes: { route_name: `Route-${trip.route_id?.slice(0, 8) || 'Unknown'}` }
+                    }));
+                }
+              }
+            }
+
             // Update mileage if we have a newer reading
             let currentMileage = bus.current_mileage || 0;
-            if (latestTrip?.odometer_end && latestTrip.odometer_end > currentMileage) {
-              currentMileage = latestTrip.odometer_end;
+            if (latestTrip.data?.odometer_end && latestTrip.data.odometer_end > currentMileage) {
+              currentMileage = latestTrip.data.odometer_end;
               
               // Update in database
               await supabase
                 .from('buses')
                 .update({ current_mileage: currentMileage })
                 .eq('id', bus.id);
+              
+              console.log(`📈 Updated ${bus.bus_no} mileage: ${currentMileage}km`);
             }
 
             // Calculate metrics
-            const totalRevenue = allTrips?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
-            const uniqueTripDates = [...new Set(allTrips?.map(trip => trip.trip_date) || [])];
+            const totalRevenue = allTrips.data?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
+            const uniqueTripDates = [...new Set(allTrips.data?.map(trip => trip.trip_date) || [])];
             const runningDays = uniqueTripDates.length;
             const avgDailyRevenue = runningDays > 0 ? totalRevenue / runningDays : 0;
 
             // Get most common route
-            const routeNames = allTrips?.map(trip => trip.routes?.route_name).filter(Boolean) || [];
+            const routeNames = allTrips.data?.map(trip => trip.routes?.route_name).filter(Boolean) || [];
             const mostCommonRoute = routeNames.length > 0 
               ? routeNames.sort((a, b) => 
                   routeNames.filter(v => v === a).length - routeNames.filter(v => v === b).length
@@ -402,10 +468,19 @@ const FleetManagementComponent = () => {
 
       setData(busesWithMetrics);
       
+      // Check for unlinked data and report
+      const busesWithData = busesWithMetrics.filter(bus => bus.current_mileage > 0 || bus.running_days > 0);
+      const busesWithoutData = busesWithMetrics.filter(bus => bus.current_mileage === 0 && bus.running_days === 0);
+      
       toast({
         title: "✅ Fleet Data Updated",
-        description: `Updated ${busesWithMetrics.length} buses with latest odometer readings.`,
+        description: `Updated ${busesWithData.length}/${busesWithMetrics.length} buses with trip data. ${busesWithoutData.length} buses need data linkage.`,
       });
+
+      // Log buses without data for debugging
+      if (busesWithoutData.length > 0) {
+        console.log('🔍 Buses without linked trip data:', busesWithoutData.map(b => b.bus_no));
+      }
 
     } catch (error) {
       console.error('Error in fetchFleet:', error);
