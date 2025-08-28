@@ -253,44 +253,41 @@ const FleetManagementComponent = () => {
   // Auto-sync fleet data from daily trips and update buses
   const syncFleetData = async () => {
     try {
-      // First, get all buses from daily_trips that might not be in buses table
+      // Get all distinct bus IDs from daily_trips
       const { data: tripBuses, error: tripError } = await supabase
         .from('daily_trips')
-        .select('bus_id, bus_no:buses!inner(bus_no)')
-        .order('trip_date', { ascending: false });
+        .select('bus_id')
+        .not('bus_id', 'is', null);
 
       if (tripError) {
         console.error('Error fetching trip buses:', tripError);
         return;
       }
 
-      // Get unique bus numbers from trips that have actual bus numbers (not just IDs)
-      const uniqueBusNumbers = [...new Set(
-        tripBuses
-          ?.map(trip => trip.bus_no?.bus_no)
-          .filter(busNo => busNo && busNo.trim() !== '') || []
-      )];
+      // Get unique bus IDs
+      const uniqueBusIds = [...new Set(tripBuses?.map(trip => trip.bus_id) || [])];
 
-      // Check for buses in daily_trips that don't exist in buses table
-      for (const busNo of uniqueBusNumbers) {
-        if (!busNo) continue;
+      // Check if these buses exist in buses table, if not create them
+      for (const busId of uniqueBusIds) {
+        if (!busId) continue;
         
         const { data: existingBus } = await supabase
           .from('buses')
           .select('id')
-          .eq('bus_no', busNo)
-          .single();
+          .eq('id', busId)
+          .maybeSingle();
 
         if (!existingBus) {
-          // Auto-create bus entry
+          // Auto-create bus entry with bus_id
           const { error: insertError } = await supabase
             .from('buses')
             .insert({
-              bus_no: busNo,
-              type: 'Normal', // Default type
-              model: 'Unknown', // Default model
+              id: busId,
+              bus_no: `BUS-${busId.slice(-8)}`, // Generate bus number from ID
+              type: 'Normal',
+              model: 'Unknown',
               year: new Date().getFullYear(),
-              capacity: 50, // Default capacity
+              capacity: 50,
               status: 'active',
               current_mileage: 0,
               service_interval_km: 10000,
@@ -300,7 +297,7 @@ const FleetManagementComponent = () => {
           if (insertError) {
             console.error('Error auto-creating bus:', insertError);
           } else {
-            console.log(`Auto-created bus: ${busNo}`);
+            console.log(`Auto-created bus with ID: ${busId}`);
           }
         }
       }
@@ -335,7 +332,7 @@ const FleetManagementComponent = () => {
       // For each bus, calculate metrics from daily_trips
       const busesWithMetrics = await Promise.all(
         buses?.map(async (bus) => {
-          // Get all trips for this bus by matching bus_no from the buses table
+          // Get all trips for this bus using the correct bus_id relationship
           const { data: trips } = await supabase
             .from('daily_trips')
             .select(`
@@ -343,13 +340,14 @@ const FleetManagementComponent = () => {
               trip_date, 
               odometer_end, 
               odometer_start,
-              buses!inner(bus_no)
+              route_id,
+              routes(route_name)
             `)
-            .eq('buses.bus_no', bus.bus_no)
+            .eq('bus_id', bus.id)
             .not('income', 'is', null)
             .order('trip_date', { ascending: false });
 
-          console.log(`Bus ${bus.bus_no} trips:`, trips?.length || 0);
+          console.log(`Bus ${bus.bus_no} (ID: ${bus.id}) trips:`, trips?.length || 0);
 
           // Calculate total revenue from all trips
           const totalRevenue = trips?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
@@ -377,15 +375,25 @@ const FleetManagementComponent = () => {
             }
           }
 
+          // Get most common route from trips
+          const routeNames = trips?.map(trip => trip.routes?.route_name).filter(Boolean) || [];
+          const mostCommonRoute = routeNames.length > 0 
+            ? routeNames.sort((a, b) => 
+                routeNames.filter(v => v === a).length - routeNames.filter(v => v === b).length
+              ).pop()
+            : null;
+
           console.log(`Bus ${bus.bus_no} metrics:`, {
             totalRevenue,
             actualRunningDays,
             avgDailyRevenue: Math.round(avgDailyRevenue),
-            latestMileage
+            latestMileage,
+            mostCommonRoute
           });
 
           return {
             ...bus,
+            route: mostCommonRoute || bus.route,
             current_mileage: latestMileage,
             avg_daily_revenue: Math.round(avgDailyRevenue),
             total_revenue: totalRevenue,
