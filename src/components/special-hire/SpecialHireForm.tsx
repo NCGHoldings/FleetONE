@@ -250,7 +250,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         description: `Trip: ${costs.km_trip}km, Pickup: ${costs.km_parking_to_pickup}km, Return: ${costs.km_drop_to_parking}km`
       });
 
-      return costs;
+      return { costs, distanceData };
     } catch (error: any) {
       console.error('Error calculating costs:', error);
       toast({
@@ -266,7 +266,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
     setLoading(true);
     try {
       // Calculate costs first
-      const costs = await calculateCosts(data);
+      const { costs, distanceData } = await calculateCosts(data);
 
       // Create quotation
       const quotationData = {
@@ -284,7 +284,23 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         number_of_passengers: data.numberOfPassengers,
         pickup_datetime: data.pickupDateTime.toISOString(),
         drop_datetime: data.dropDateTime.toISOString(),
-        ...costs,
+        pickup_lat: distanceData?.pickupCoords?.[1] || null,
+        pickup_lng: distanceData?.pickupCoords?.[0] || null,
+        drop_lat: distanceData?.dropCoords?.[1] || null,
+        drop_lng: distanceData?.dropCoords?.[0] || null,
+        km_parking_to_pickup: costs.km_parking_to_pickup,
+        km_trip: costs.km_trip,
+        km_drop_to_parking: costs.km_drop_to_parking,
+        fuel_cost_fuel_only: costs.fuel_cost_fuel_only,
+        hire_charge: costs.hire_charge,
+        extra_charges: costs.extra_charges,
+        gross_revenue: costs.gross_revenue,
+        driver_charge: costs.driver_charge,
+        other_expenses: costs.other_expenses,
+        commission_pct: costs.commission_pct,
+        commission_amount: costs.commission_amount,
+        total_expenses: costs.total_expenses,
+        net_profit: costs.net_profit,
         valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 7 days from now
       };
 
