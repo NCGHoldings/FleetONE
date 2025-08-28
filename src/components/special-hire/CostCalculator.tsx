@@ -57,6 +57,12 @@ export function CostCalculator() {
     setCalculating(true);
     
     try {
+      console.log('Starting distance calculation with:', {
+        pickup: formData.pickupLocation,
+        drop: formData.dropLocation,
+        parking: { lat: fuelSettings.parking_lat, lng: fuelSettings.parking_lng }
+      });
+
       // Call edge function to calculate distances using Mapbox API
       const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
         body: {
@@ -67,7 +73,16 @@ export function CostCalculator() {
         }
       });
 
-      if (error) throw error;
+      console.log('Distance calculation result:', distanceData, error);
+
+      if (error) {
+        console.error('Distance calculation error:', error);
+        throw new Error(`Distance calculation failed: ${error.message || 'Unknown error'}`);
+      }
+
+      if (!distanceData) {
+        throw new Error('No distance data received from calculation service');
+      }
 
       // Get selected bus type details
       const selectedBusType = busTypes.find(bt => bt.id === formData.busType);
@@ -80,12 +95,12 @@ export function CostCalculator() {
         .eq('hire_type', formData.hireType)
         .eq('bus_type_id', formData.busType)
         .eq('is_active', true)
-        .gte('to_km', distanceData.kmTrip)
+        .gte('to_km', distanceData.kmTrip || 0)
         .order('from_km', { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      const totalDistance = distanceData.kmParkingToPickup + distanceData.kmTrip + distanceData.kmDropToParking;
+      const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
       const fuelLiters = totalDistance / selectedBusType.avg_km_per_l;
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
@@ -94,11 +109,11 @@ export function CostCalculator() {
         if (rateCard.flat_fee_lkr) {
           hireCharge = rateCard.flat_fee_lkr;
         } else if (rateCard.rate_per_km_lkr) {
-          hireCharge = distanceData.kmTrip * rateCard.rate_per_km_lkr;
+          hireCharge = (distanceData.kmTrip || 0) * rateCard.rate_per_km_lkr;
         }
       } else {
         // Fallback rate if no rate card found
-        hireCharge = distanceData.kmTrip * 50; // 50 LKR per km as fallback
+        hireCharge = (distanceData.kmTrip || 0) * 50; // 50 LKR per km as fallback
       }
 
       const grossRevenue = hireCharge * formData.numberOfBuses;
@@ -124,8 +139,9 @@ export function CostCalculator() {
         fuelPrice: fuelSettings.diesel_price_lkr_per_l
       };
 
+      console.log('Final cost calculation result:', result);
       setCostData(result);
-      toast({ title: "Success", description: "Cost calculated successfully" });
+      toast({ title: "Success", description: `Distance calculated: Pickup ${distanceData.kmParkingToPickup}km + Trip ${distanceData.kmTrip}km + Return ${distanceData.kmDropToParking}km` });
     } catch (error) {
       console.error('Error calculating costs:', error);
       toast({ 

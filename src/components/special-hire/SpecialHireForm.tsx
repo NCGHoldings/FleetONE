@@ -121,26 +121,145 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
   };
 
   const calculateCosts = async (data: FormData) => {
-    // This would integrate with Mapbox for distance calculation
-    // For now, using mock data
-    const mockCosts = {
-      kmParkingToPickup: 15,
-      kmTrip: 120,
-      kmDropToParking: 20,
-      fuelCostFuelOnly: 2500,
-      hireCharge: 12000,
-      extraCharges: 0,
-      grossRevenue: 14500,
-      driverCharge: 1500,
-      otherExpenses: [],
-      commissionPct: 5,
-      commissionAmount: 725,
-      totalExpenses: 2225,
-      netProfit: 12275
-    };
-    
-    setCostData(mockCosts);
-    return mockCosts;
+    try {
+      // Get fuel settings for parking location
+      const { data: fuelSettings } = await supabase
+        .from('fuel_settings')
+        .select('*')
+        .eq('is_default', true)
+        .single();
+
+      if (!fuelSettings) {
+        throw new Error('Fuel settings not configured');
+      }
+
+      console.log('Calculating distance with real Mapbox API:', {
+        pickup: data.pickupLocation,
+        drop: data.dropLocation,
+        parking: { lat: fuelSettings.parking_lat, lng: fuelSettings.parking_lng }
+      });
+
+      // Call edge function to calculate real distances using Mapbox API
+      const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
+        body: {
+          pickupLocation: data.pickupLocation,
+          dropLocation: data.dropLocation,
+          parkingLat: fuelSettings.parking_lat,
+          parkingLng: fuelSettings.parking_lng
+        }
+      });
+
+      if (error) {
+        console.error('Distance calculation error:', error);
+        throw new Error(`Distance calculation failed: ${error.message || 'Unknown error'}`);
+      }
+
+      if (!distanceData) {
+        throw new Error('No distance data received from calculation service');
+      }
+
+      console.log('Distance calculation result:', distanceData);
+
+      // Get bus type details
+      const { data: busTypeData } = await supabase
+        .from('bus_types')
+        .select('*')
+        .eq('id', data.busTypeId)
+        .single();
+
+      if (!busTypeData) {
+        throw new Error('Bus type not found');
+      }
+
+      // Calculate costs based on real distances
+      const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
+      const fuelLiters = totalDistance / busTypeData.avg_km_per_l;
+      const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
+
+      // Get rate card for pricing
+      const { data: rateCard } = await supabase
+        .from('hire_rate_cards')
+        .select('*')
+        .eq('hire_type', data.hireType)
+        .eq('bus_type_id', data.busTypeId)
+        .eq('is_active', true)
+        .gte('to_km', distanceData.kmTrip || 0)
+        .order('from_km', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      let hireCharge = 0;
+      if (rateCard) {
+        if (rateCard.flat_fee_lkr) {
+          hireCharge = rateCard.flat_fee_lkr;
+        } else if (rateCard.rate_per_km_lkr) {
+          hireCharge = (distanceData.kmTrip || 0) * rateCard.rate_per_km_lkr;
+        }
+      } else {
+        // Fallback rate
+        hireCharge = (distanceData.kmTrip || 0) * 50; // 50 LKR per km
+      }
+
+      const grossRevenue = hireCharge * data.numberOfBuses;
+      const commissionAmount = grossRevenue * 0.05; // 5% default commission
+      const driverCharge = 1500; // Default driver charge
+      const totalExpenses = (driverCharge * data.numberOfBuses) + commissionAmount + (fuelCost * data.numberOfBuses);
+      const netProfit = grossRevenue - totalExpenses;
+
+      const costs = {
+        km_parking_to_pickup: Math.round((distanceData.kmParkingToPickup || 0) * 10) / 10,
+        km_trip: Math.round((distanceData.kmTrip || 0) * 10) / 10,
+        km_drop_to_parking: Math.round((distanceData.kmDropToParking || 0) * 10) / 10,
+        fuel_cost_fuel_only: Math.round(fuelCost),
+        hire_charge: Math.round(hireCharge),
+        extra_charges: 0,
+        gross_revenue: Math.round(grossRevenue),
+        driver_charge: driverCharge,
+        other_expenses: [],
+        commission_pct: 5.0,
+        commission_amount: Math.round(commissionAmount),
+        total_expenses: Math.round(totalExpenses),
+        net_profit: Math.round(netProfit)
+      };
+
+      // Also set display data for UI
+      setCostData({
+        kmParkingToPickup: costs.km_parking_to_pickup,
+        kmTrip: costs.km_trip,
+        kmDropToParking: costs.km_drop_to_parking,
+        fuelCostFuelOnly: costs.fuel_cost_fuel_only,
+        hireCharge: costs.hire_charge,
+        extraCharges: costs.extra_charges,
+        grossRevenue: costs.gross_revenue,
+        driverCharge: costs.driver_charge,
+        otherExpenses: costs.other_expenses,
+        commissionPct: costs.commission_pct,
+        commissionAmount: costs.commission_amount,
+        totalExpenses: costs.total_expenses,
+        netProfit: costs.net_profit,
+        totalDistance: totalDistance,
+        fuelLiters: Math.round(fuelLiters * 10) / 10,
+        busTypeName: busTypeData.name,
+        fuelPrice: fuelSettings.diesel_price_lkr_per_l,
+        pickupAddress: distanceData.pickupAddress,
+        dropAddress: distanceData.dropAddress
+      });
+
+      toast({
+        title: "Distance Calculated",
+        description: `Trip: ${costs.km_trip}km, Pickup: ${costs.km_parking_to_pickup}km, Return: ${costs.km_drop_to_parking}km`
+      });
+
+      return costs;
+    } catch (error: any) {
+      console.error('Error calculating costs:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to calculate distance",
+        variant: "destructive"
+      });
+      throw error;
+    }
   };
 
   const handleSubmit = async (data: FormData) => {

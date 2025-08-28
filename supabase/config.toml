@@ -1,1 +1,13 @@
 project_id = "wwjpdszkmtnzshbulkon"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+
+[db]
+password = "password"
+
+[functions.calculate-distance]
+verify_jwt = false
