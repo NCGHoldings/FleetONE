@@ -335,25 +335,39 @@ const FleetManagementComponent = () => {
       // For each bus, calculate metrics from daily_trips
       const busesWithMetrics = await Promise.all(
         buses?.map(async (bus) => {
-          // Get all completed trips for this bus
+          // Get all trips for this bus by matching bus_no from the buses table
           const { data: trips } = await supabase
             .from('daily_trips')
-            .select('income, trip_date, odometer_end, odometer_start')
-            .eq('bus_id', bus.id)
-            .eq('status', 'completed')
+            .select(`
+              income, 
+              trip_date, 
+              odometer_end, 
+              odometer_start,
+              buses!inner(bus_no)
+            `)
+            .eq('buses.bus_no', bus.bus_no)
+            .not('income', 'is', null)
             .order('trip_date', { ascending: false });
 
-          // Calculate metrics
-          const totalRevenue = trips?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
-          const runningDays = trips?.length || 0;
-          const avgDailyRevenue = runningDays > 0 ? totalRevenue / runningDays : 0;
+          console.log(`Bus ${bus.bus_no} trips:`, trips?.length || 0);
 
-          // Get latest mileage from most recent trip
+          // Calculate total revenue from all trips
+          const totalRevenue = trips?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
+          
+          // Calculate unique trip dates for actual running days
+          const uniqueTripDates = [...new Set(trips?.map(trip => trip.trip_date) || [])];
+          const actualRunningDays = uniqueTripDates.length;
+          
+          // Calculate average daily revenue
+          const avgDailyRevenue = actualRunningDays > 0 ? totalRevenue / actualRunningDays : 0;
+
+          // Get latest mileage from most recent trip with valid odometer reading
           let latestMileage = bus.current_mileage || 0;
           if (trips && trips.length > 0) {
-            const latestTrip = trips[0]; // Most recent trip due to ordering
-            if (latestTrip.odometer_end && latestTrip.odometer_end > latestMileage) {
-              latestMileage = latestTrip.odometer_end;
+            // Find the most recent trip with valid odometer_end reading
+            const tripWithOdometer = trips.find(trip => trip.odometer_end && trip.odometer_end > 0);
+            if (tripWithOdometer && tripWithOdometer.odometer_end > latestMileage) {
+              latestMileage = tripWithOdometer.odometer_end;
               
               // Update the bus current_mileage in database
               await supabase
@@ -363,9 +377,12 @@ const FleetManagementComponent = () => {
             }
           }
 
-          // Calculate unique trip dates for actual running days
-          const uniqueTripDates = [...new Set(trips?.map(trip => trip.trip_date) || [])];
-          const actualRunningDays = uniqueTripDates.length;
+          console.log(`Bus ${bus.bus_no} metrics:`, {
+            totalRevenue,
+            actualRunningDays,
+            avgDailyRevenue: Math.round(avgDailyRevenue),
+            latestMileage
+          });
 
           return {
             ...bus,
@@ -381,7 +398,7 @@ const FleetManagementComponent = () => {
       
       toast({
         title: "Fleet Data Updated",
-        description: `Loaded ${busesWithMetrics.length} buses with latest metrics.`,
+        description: `Loaded ${busesWithMetrics.length} buses with latest metrics from daily trips.`,
       });
 
     } catch (error) {
