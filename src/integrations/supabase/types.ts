@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      bus_types: {
+        Row: {
+          avg_km_per_l: number | null
+          capacity: number
+          created_at: string | null
+          features: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          avg_km_per_l?: number | null
+          capacity: number
+          created_at?: string | null
+          features?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          avg_km_per_l?: number | null
+          capacity?: number
+          created_at?: string | null
+          features?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       buses: {
         Row: {
           bus_no: string
@@ -561,6 +594,92 @@ export type Database = {
             columns: ["feedback_id"]
             isOneToOne: false
             referencedRelation: "feedback_complaints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fuel_settings: {
+        Row: {
+          created_at: string | null
+          diesel_price_lkr_per_l: number
+          id: string
+          is_default: boolean | null
+          parking_lat: number | null
+          parking_lng: number | null
+          parking_location_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          diesel_price_lkr_per_l?: number
+          id?: string
+          is_default?: boolean | null
+          parking_lat?: number | null
+          parking_lng?: number | null
+          parking_location_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          diesel_price_lkr_per_l?: number
+          id?: string
+          is_default?: boolean | null
+          parking_lat?: number | null
+          parking_lng?: number | null
+          parking_location_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hire_rate_cards: {
+        Row: {
+          bus_type_id: string | null
+          created_at: string | null
+          effective_from: string
+          effective_to: string | null
+          flat_fee_lkr: number | null
+          from_km: number
+          hire_type: string
+          id: string
+          is_active: boolean | null
+          rate_per_km_lkr: number | null
+          to_km: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          bus_type_id?: string | null
+          created_at?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          flat_fee_lkr?: number | null
+          from_km?: number
+          hire_type: string
+          id?: string
+          is_active?: boolean | null
+          rate_per_km_lkr?: number | null
+          to_km?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          bus_type_id?: string | null
+          created_at?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          flat_fee_lkr?: number | null
+          from_km?: number
+          hire_type?: string
+          id?: string
+          is_active?: boolean | null
+          rate_per_km_lkr?: number | null
+          to_km?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hire_rate_cards_bus_type_id_fkey"
+            columns: ["bus_type_id"]
+            isOneToOne: false
+            referencedRelation: "bus_types"
             referencedColumns: ["id"]
           },
         ]
@@ -1533,6 +1652,140 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      special_hire_quotations: {
+        Row: {
+          bus_type_id: string | null
+          commission_amount: number | null
+          commission_pct: number | null
+          company_name: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string
+          driver_charge: number | null
+          drop_datetime: string
+          drop_lat: number | null
+          drop_lng: number | null
+          drop_location: string
+          extra_charges: number | null
+          fuel_cost_fuel_only: number | null
+          gross_revenue: number | null
+          hire_charge: number | null
+          hire_type: string
+          id: string
+          intermediate_stops: Json | null
+          km_drop_to_parking: number | null
+          km_parking_to_pickup: number | null
+          km_trip: number | null
+          net_profit: number | null
+          number_of_buses: number
+          number_of_passengers: number
+          other_expenses: Json | null
+          pickup_datetime: string
+          pickup_lat: number | null
+          pickup_lng: number | null
+          pickup_location: string
+          quotation_no: string
+          special_request: string | null
+          status: string | null
+          total_expenses: number | null
+          trip_id: string | null
+          updated_at: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          bus_type_id?: string | null
+          commission_amount?: number | null
+          commission_pct?: number | null
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_email?: string | null
+          customer_name: string
+          customer_phone: string
+          driver_charge?: number | null
+          drop_datetime: string
+          drop_lat?: number | null
+          drop_lng?: number | null
+          drop_location: string
+          extra_charges?: number | null
+          fuel_cost_fuel_only?: number | null
+          gross_revenue?: number | null
+          hire_charge?: number | null
+          hire_type: string
+          id?: string
+          intermediate_stops?: Json | null
+          km_drop_to_parking?: number | null
+          km_parking_to_pickup?: number | null
+          km_trip?: number | null
+          net_profit?: number | null
+          number_of_buses?: number
+          number_of_passengers: number
+          other_expenses?: Json | null
+          pickup_datetime: string
+          pickup_lat?: number | null
+          pickup_lng?: number | null
+          pickup_location: string
+          quotation_no?: string
+          special_request?: string | null
+          status?: string | null
+          total_expenses?: number | null
+          trip_id?: string | null
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          bus_type_id?: string | null
+          commission_amount?: number | null
+          commission_pct?: number | null
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string
+          driver_charge?: number | null
+          drop_datetime?: string
+          drop_lat?: number | null
+          drop_lng?: number | null
+          drop_location?: string
+          extra_charges?: number | null
+          fuel_cost_fuel_only?: number | null
+          gross_revenue?: number | null
+          hire_charge?: number | null
+          hire_type?: string
+          id?: string
+          intermediate_stops?: Json | null
+          km_drop_to_parking?: number | null
+          km_parking_to_pickup?: number | null
+          km_trip?: number | null
+          net_profit?: number | null
+          number_of_buses?: number
+          number_of_passengers?: number
+          other_expenses?: Json | null
+          pickup_datetime?: string
+          pickup_lat?: number | null
+          pickup_lng?: number | null
+          pickup_location?: string
+          quotation_no?: string
+          special_request?: string | null
+          status?: string | null
+          total_expenses?: number | null
+          trip_id?: string | null
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_hire_quotations_bus_type_id_fkey"
+            columns: ["bus_type_id"]
+            isOneToOne: false
+            referencedRelation: "bus_types"
             referencedColumns: ["id"]
           },
         ]
