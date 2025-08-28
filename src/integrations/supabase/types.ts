@@ -633,10 +633,12 @@ export type Database = {
       }
       hire_rate_cards: {
         Row: {
+          additional_km_rate_per_km_lkr: number | null
           bus_type_id: string | null
           created_at: string | null
           effective_from: string
           effective_to: string | null
+          first_100km_rate_per_km_lkr: number | null
           flat_fee_lkr: number | null
           from_km: number
           hire_type: string
@@ -647,10 +649,12 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          additional_km_rate_per_km_lkr?: number | null
           bus_type_id?: string | null
           created_at?: string | null
           effective_from?: string
           effective_to?: string | null
+          first_100km_rate_per_km_lkr?: number | null
           flat_fee_lkr?: number | null
           from_km?: number
           hire_type: string
@@ -661,10 +665,12 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          additional_km_rate_per_km_lkr?: number | null
           bus_type_id?: string | null
           created_at?: string | null
           effective_from?: string
           effective_to?: string | null
+          first_100km_rate_per_km_lkr?: number | null
           flat_fee_lkr?: number | null
           from_km?: number
           hire_type?: string
