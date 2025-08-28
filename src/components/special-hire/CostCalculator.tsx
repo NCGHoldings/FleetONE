@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Calculator, MapPin } from 'lucide-react';
 import { CostBreakdown } from './CostBreakdown';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export function CostCalculator() {
   const [formData, setFormData] = useState({
@@ -20,31 +22,119 @@ export function CostCalculator() {
   
   const [costData, setCostData] = useState<any>(null);
   const [calculating, setCalculating] = useState(false);
+  const [busTypes, setBusTypes] = useState<any[]>([]);
+  const [fuelSettings, setFuelSettings] = useState<any>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchBusTypes();
+    fetchFuelSettings();
+  }, []);
+
+  const fetchBusTypes = async () => {
+    const { data } = await supabase
+      .from('bus_types')
+      .select('*')
+      .eq('is_active', true);
+    if (data) setBusTypes(data);
+  };
+
+  const fetchFuelSettings = async () => {
+    const { data } = await supabase
+      .from('fuel_settings')
+      .select('*')
+      .eq('is_default', true)
+      .single();
+    if (data) setFuelSettings(data);
+  };
 
   const calculateCosts = async () => {
+    if (!fuelSettings) {
+      toast({ title: "Error", description: "Fuel settings not loaded", variant: "destructive" });
+      return;
+    }
+
     setCalculating(true);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Mock calculation - in real implementation, this would call Mapbox API
-    const mockResult = {
-      kmParkingToPickup: 15,
-      kmTrip: 120,
-      kmDropToParking: 20,
-      fuelCostFuelOnly: 2500,
-      hireCharge: 12000,
-      extraCharges: 0,
-      grossRevenue: 14500,
-      driverCharge: formData.driverCharge,
-      otherExpenses: [],
-      commissionPct: formData.commissionPct,
-      commissionAmount: 14500 * (formData.commissionPct / 100),
-      totalExpenses: formData.driverCharge + (14500 * (formData.commissionPct / 100)),
-      netProfit: 14500 - (formData.driverCharge + (14500 * (formData.commissionPct / 100)))
-    };
+    try {
+      // Call edge function to calculate distances using Mapbox API
+      const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
+        body: {
+          pickupLocation: formData.pickupLocation,
+          dropLocation: formData.dropLocation,
+          parkingLat: fuelSettings.parking_lat,
+          parkingLng: fuelSettings.parking_lng
+        }
+      });
 
-    setCostData(mockResult);
+      if (error) throw error;
+
+      // Get selected bus type details
+      const selectedBusType = busTypes.find(bt => bt.id === formData.busType);
+      if (!selectedBusType) throw new Error('Please select a bus type');
+
+      // Get rate card for this hire type and bus type
+      const { data: rateCard } = await supabase
+        .from('hire_rate_cards')
+        .select('*')
+        .eq('hire_type', formData.hireType)
+        .eq('bus_type_id', formData.busType)
+        .eq('is_active', true)
+        .gte('to_km', distanceData.kmTrip)
+        .order('from_km', { ascending: true })
+        .limit(1)
+        .single();
+
+      const totalDistance = distanceData.kmParkingToPickup + distanceData.kmTrip + distanceData.kmDropToParking;
+      const fuelLiters = totalDistance / selectedBusType.avg_km_per_l;
+      const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
+
+      let hireCharge = 0;
+      if (rateCard) {
+        if (rateCard.flat_fee_lkr) {
+          hireCharge = rateCard.flat_fee_lkr;
+        } else if (rateCard.rate_per_km_lkr) {
+          hireCharge = distanceData.kmTrip * rateCard.rate_per_km_lkr;
+        }
+      } else {
+        // Fallback rate if no rate card found
+        hireCharge = distanceData.kmTrip * 50; // 50 LKR per km as fallback
+      }
+
+      const grossRevenue = hireCharge * formData.numberOfBuses;
+      const commissionAmount = grossRevenue * (formData.commissionPct / 100);
+      const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + commissionAmount + (fuelCost * formData.numberOfBuses);
+      const netProfit = grossRevenue - totalExpenses;
+
+      const result = {
+        ...distanceData,
+        totalDistance,
+        fuelLiters: Math.round(fuelLiters * 10) / 10,
+        fuelCostFuelOnly: Math.round(fuelCost),
+        hireCharge: Math.round(hireCharge),
+        extraCharges: 0,
+        grossRevenue: Math.round(grossRevenue),
+        driverCharge: formData.driverCharge,
+        otherExpenses: [],
+        commissionPct: formData.commissionPct,
+        commissionAmount: Math.round(commissionAmount),
+        totalExpenses: Math.round(totalExpenses),
+        netProfit: Math.round(netProfit),
+        busTypeName: selectedBusType.name,
+        fuelPrice: fuelSettings.diesel_price_lkr_per_l
+      };
+
+      setCostData(result);
+      toast({ title: "Success", description: "Cost calculated successfully" });
+    } catch (error) {
+      console.error('Error calculating costs:', error);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to calculate costs", 
+        variant: "destructive" 
+      });
+    }
+
     setCalculating(false);
   };
 
@@ -90,9 +180,11 @@ export function CostCalculator() {
                   <SelectValue placeholder="Select bus type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="standard">Standard Bus (45 seats)</SelectItem>
-                  <SelectItem value="luxury">Luxury Bus (35 seats)</SelectItem>
-                  <SelectItem value="mini">Mini Bus (25 seats)</SelectItem>
+                  {busTypes.map((busType) => (
+                    <SelectItem key={busType.id} value={busType.id}>
+                      {busType.name} ({busType.capacity} seats)
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
