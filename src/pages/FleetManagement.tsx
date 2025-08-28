@@ -329,100 +329,89 @@ const FleetManagementComponent = () => {
         return;
       }
 
-      // For each bus, calculate metrics from daily_trips
+      // For each bus, get the latest data from daily_trips
       const busesWithMetrics = await Promise.all(
         buses?.map(async (bus) => {
-          // Get all trips for this bus using the correct bus_id relationship
-          const { data: trips } = await supabase
-            .from('daily_trips')
-            .select(`
-              income, 
-              trip_date, 
-              odometer_end, 
-              odometer_start,
-              route_id,
-              routes(route_name)
-            `)
-            .eq('bus_id', bus.id)
-            .not('income', 'is', null)
-            .order('trip_date', { ascending: false });
-
-          console.log(`Bus ${bus.bus_no} (ID: ${bus.id}) trips:`, trips?.length || 0);
-
-          // Calculate total revenue from all trips
-          const totalRevenue = trips?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
-          
-          // Calculate unique trip dates for actual running days
-          const uniqueTripDates = [...new Set(trips?.map(trip => trip.trip_date) || [])];
-          const actualRunningDays = uniqueTripDates.length;
-          
-          // Calculate average daily revenue
-          const avgDailyRevenue = actualRunningDays > 0 ? totalRevenue / actualRunningDays : 0;
-
-          // Get latest mileage from the last trip's odometer_end
-          let latestMileage = bus.current_mileage || 0;
           try {
+            // Get latest odometer reading for this bus
             const { data: latestTrip } = await supabase
               .from('daily_trips')
               .select('odometer_end, trip_date, created_at')
               .eq('bus_id', bus.id)
+              .not('odometer_end', 'is', null)
               .order('trip_date', { ascending: false })
               .order('created_at', { ascending: false })
               .limit(1)
               .maybeSingle();
 
-            if (latestTrip && typeof latestTrip.odometer_end === 'number' && latestTrip.odometer_end > 0) {
-              if (latestTrip.odometer_end > latestMileage) {
-                latestMileage = latestTrip.odometer_end;
-                await supabase
-                  .from('buses')
-                  .update({ current_mileage: latestMileage })
-                  .eq('id', bus.id);
-              }
+            // Get all trips for revenue calculation
+            const { data: allTrips } = await supabase
+              .from('daily_trips')
+              .select('income, trip_date, route_id, routes(route_name)')
+              .eq('bus_id', bus.id)
+              .not('income', 'is', null);
+
+            // Update mileage if we have a newer reading
+            let currentMileage = bus.current_mileage || 0;
+            if (latestTrip?.odometer_end && latestTrip.odometer_end > currentMileage) {
+              currentMileage = latestTrip.odometer_end;
+              
+              // Update in database
+              await supabase
+                .from('buses')
+                .update({ current_mileage: currentMileage })
+                .eq('id', bus.id);
             }
-          } catch (e) {
-            console.warn(`Could not fetch latest odometer for ${bus.bus_no}`, e);
+
+            // Calculate metrics
+            const totalRevenue = allTrips?.reduce((sum, trip) => sum + (trip.income || 0), 0) || 0;
+            const uniqueTripDates = [...new Set(allTrips?.map(trip => trip.trip_date) || [])];
+            const runningDays = uniqueTripDates.length;
+            const avgDailyRevenue = runningDays > 0 ? totalRevenue / runningDays : 0;
+
+            // Get most common route
+            const routeNames = allTrips?.map(trip => trip.routes?.route_name).filter(Boolean) || [];
+            const mostCommonRoute = routeNames.length > 0 
+              ? routeNames.sort((a, b) => 
+                  routeNames.filter(v => v === a).length - routeNames.filter(v => v === b).length
+                ).pop()
+              : null;
+
+            console.log(`✅ ${bus.bus_no}: Mileage=${currentMileage}, Revenue=${totalRevenue}, Days=${runningDays}`);
+
+            return {
+              ...bus,
+              route: mostCommonRoute || bus.route,
+              current_mileage: currentMileage,
+              avg_daily_revenue: Math.round(avgDailyRevenue),
+              total_revenue: totalRevenue,
+              running_days: runningDays,
+            } as Fleet;
+
+          } catch (busError) {
+            console.error(`Error processing bus ${bus.bus_no}:`, busError);
+            return {
+              ...bus,
+              running_days: 0,
+              avg_daily_revenue: 0,
+              total_revenue: 0,
+            } as Fleet;
           }
-
-          // Get most common route from trips
-          const routeNames = trips?.map(trip => trip.routes?.route_name).filter(Boolean) || [];
-          const mostCommonRoute = routeNames.length > 0 
-            ? routeNames.sort((a, b) => 
-                routeNames.filter(v => v === a).length - routeNames.filter(v => v === b).length
-              ).pop()
-            : null;
-
-          console.log(`Bus ${bus.bus_no} metrics:`, {
-            totalRevenue,
-            actualRunningDays,
-            avgDailyRevenue: Math.round(avgDailyRevenue),
-            latestMileage,
-            mostCommonRoute
-          });
-
-          return {
-            ...bus,
-            route: mostCommonRoute || bus.route,
-            current_mileage: latestMileage,
-            avg_daily_revenue: Math.round(avgDailyRevenue),
-            total_revenue: totalRevenue,
-            running_days: actualRunningDays,
-          } as Fleet;
         }) || []
       );
 
       setData(busesWithMetrics);
       
       toast({
-        title: "Fleet Data Updated",
-        description: `Loaded ${busesWithMetrics.length} buses with latest metrics from daily trips.`,
+        title: "✅ Fleet Data Updated",
+        description: `Updated ${busesWithMetrics.length} buses with latest odometer readings.`,
       });
 
     } catch (error) {
       console.error('Error in fetchFleet:', error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred while loading fleet data.",
+        description: "Failed to load fleet data.",
         variant: "destructive",
       });
     } finally {
