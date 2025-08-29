@@ -181,7 +181,11 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-2">{quotation.seating_capacity || 54}</td>
               <td className="border border-gray-300 p-2">{quotation.route_description || routeDescription}</td>
               <td className="border border-gray-300 p-2">{totalDistance.toFixed(2)} Km</td>
-              <td className="border border-gray-300 p-2">LKR {quotation.gross_revenue.toLocaleString()}</td>
+              <td className="border border-gray-300 p-2">
+                <div>Hire Charges: LKR {quotation.gross_revenue.toLocaleString()}</div>
+                <div>Fuel Cost: LKR {quotation.fuel_cost_fuel_only?.toLocaleString() || '0'}</div>
+                <div className="font-semibold border-t pt-1 mt-1">Total: LKR {((quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0)).toLocaleString()}</div>
+              </td>
             </tr>
           </tbody>
         </table>

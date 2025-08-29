@@ -220,7 +220,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         fuel_cost_fuel_only: Math.round(fuelCost),
         hire_charge: Math.round(hireCharge),
         extra_charges: 0,
-        gross_revenue: Math.round(customerTotalWithFuel), // Save customer total (hire + fuel)
+        gross_revenue: Math.round(grossRevenue), // Save hire charges only (flat fee + exceeding)
         driver_charge: driverCharge,
         other_expenses: [],
         commission_pct: 5.0,
