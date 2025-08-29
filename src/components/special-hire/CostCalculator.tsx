@@ -129,9 +129,10 @@ export function CostCalculator() {
 
         const hireCharge = fixedRate + exceedingDistanceCharge;
 
-        // Fuel cost on trip distance only (pickup->drop)
+        // Fuel cost on empty running only (parking→pickup + drop→parking)
         const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
-        const fuelLiters = (tripDistance / (selectedBusType.avg_km_per_l || 8));
+        const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
+        const fuelLiters = (emptyRunKm / (selectedBusType.avg_km_per_l || 8));
         const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
         const grossRevenue = hireCharge * formData.numberOfBuses;
@@ -205,9 +206,10 @@ export function CostCalculator() {
 
       const hireCharge = fixedRate + exceedingDistanceCharge + overtimeCharge + overnightCharge;
 
-      // Fuel cost on trip distance only (pickup->drop)
+      // Fuel cost on empty running only (parking→pickup + drop→parking)
       const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
-      const fuelLiters = (tripDistance / (selectedBusType.avg_km_per_l || 8));
+      const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
+      const fuelLiters = (emptyRunKm / (selectedBusType.avg_km_per_l || 8));
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
       const grossRevenue = hireCharge * formData.numberOfBuses;

@@ -202,8 +202,9 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
       
       const hireCharge = fixedRate + exceedingDistanceCharge;
 
-      // Fuel cost on trip distance only (pickup->drop)
-      const fuelLiters = (tripDistance / (busTypeData.avg_km_per_l || 8));
+      // Fuel cost on empty running only (parking→pickup + drop→parking)
+      const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
+      const fuelLiters = (emptyRunKm / (busTypeData.avg_km_per_l || 8));
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
       const grossRevenue = hireCharge * data.numberOfBuses;
