@@ -13,7 +13,7 @@ interface CostData {
   overtimeCharge: number;
   overnightCharge: number;
   exceedingDistanceCharge: number;
-  rateCardDetails: {
+  rateCardDetails?: {
     standardHours: number;
     actualHours: number;
     overtimeHours: number;
@@ -75,12 +75,12 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Hire Charges Breakdown</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Fixed Rate ({data.rateCardDetails.agreedDistance} km)</span>
+              <span>Fixed Rate ({data.rateCardDetails?.agreedDistance || 0} km)</span>
               <span>LKR {data.fixedRate.toLocaleString()}</span>
             </div>
             {data.overtimeCharge > 0 && (
               <div className="flex justify-between">
-                <span>Overtime ({data.rateCardDetails.overtimeHours} hrs)</span>
+                <span>Overtime ({data.rateCardDetails?.overtimeHours || 0} hrs)</span>
                 <span>LKR {data.overtimeCharge.toLocaleString()}</span>
               </div>
             )}
@@ -92,7 +92,7 @@ export function CostBreakdown({ data }: Props) {
             )}
             {data.exceedingDistanceCharge > 0 && (
               <div className="flex justify-between">
-                <span>Exceeding Distance ({data.rateCardDetails.chargeableExceedingKm} km)</span>
+                <span>Exceeding Distance ({data.rateCardDetails?.chargeableExceedingKm || 0} km)</span>
                 <span>LKR {data.exceedingDistanceCharge.toLocaleString()}</span>
               </div>
             )}
@@ -125,11 +125,11 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Working Hours Analysis</h4>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="text-center">
-              <div className="font-medium text-blue-600">{data.rateCardDetails.standardHours} hrs</div>
+              <div className="font-medium text-blue-600">{data.rateCardDetails?.standardHours || 0} hrs</div>
               <div className="text-muted-foreground">Standard</div>
             </div>
             <div className="text-center">
-              <div className="font-medium text-green-600">{data.rateCardDetails.actualHours} hrs</div>
+              <div className="font-medium text-green-600">{data.rateCardDetails?.actualHours || 0} hrs</div>
               <div className="text-muted-foreground">Actual</div>
             </div>
           </div>
