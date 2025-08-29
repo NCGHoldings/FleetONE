@@ -633,50 +633,59 @@ export type Database = {
       }
       hire_rate_cards: {
         Row: {
-          additional_km_rate_per_km_lkr: number | null
           bus_type_id: string | null
           created_at: string | null
           effective_from: string
           effective_to: string | null
-          first_100km_rate_per_km_lkr: number | null
+          exceeding_km_rate_lkr: number | null
           flat_fee_lkr: number | null
+          free_exceeding_km: number | null
           from_km: number
           hire_type: string
           id: string
           is_active: boolean | null
+          overnight_charge_lkr_per_day: number | null
+          overtime_rate_lkr_per_hour: number | null
           rate_per_km_lkr: number | null
+          standard_hours: number | null
           to_km: number | null
           updated_at: string | null
         }
         Insert: {
-          additional_km_rate_per_km_lkr?: number | null
           bus_type_id?: string | null
           created_at?: string | null
           effective_from?: string
           effective_to?: string | null
-          first_100km_rate_per_km_lkr?: number | null
+          exceeding_km_rate_lkr?: number | null
           flat_fee_lkr?: number | null
+          free_exceeding_km?: number | null
           from_km?: number
           hire_type: string
           id?: string
           is_active?: boolean | null
+          overnight_charge_lkr_per_day?: number | null
+          overtime_rate_lkr_per_hour?: number | null
           rate_per_km_lkr?: number | null
+          standard_hours?: number | null
           to_km?: number | null
           updated_at?: string | null
         }
         Update: {
-          additional_km_rate_per_km_lkr?: number | null
           bus_type_id?: string | null
           created_at?: string | null
           effective_from?: string
           effective_to?: string | null
-          first_100km_rate_per_km_lkr?: number | null
+          exceeding_km_rate_lkr?: number | null
           flat_fee_lkr?: number | null
+          free_exceeding_km?: number | null
           from_km?: number
           hire_type?: string
           id?: string
           is_active?: boolean | null
+          overnight_charge_lkr_per_day?: number | null
+          overtime_rate_lkr_per_hour?: number | null
           rate_per_km_lkr?: number | null
+          standard_hours?: number | null
           to_km?: number | null
           updated_at?: string | null
         }

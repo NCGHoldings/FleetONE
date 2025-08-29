@@ -18,9 +18,14 @@ import { useToast } from '@/hooks/use-toast';
 const formSchema = z.object({
   hire_type: z.enum(['Outside', 'Lyceum']),
   bus_type_id: z.string().min(1, 'Bus type is required'),
-  flat_fee_lkr: z.number().min(0, 'Flat fee must be 0 or positive'),
-  first_100km_rate_per_km_lkr: z.number().min(0, 'First 100KM rate must be 0 or positive'),
-  additional_km_rate_per_km_lkr: z.number().min(0, 'Additional KM rate must be 0 or positive'),
+  from_km: z.number().min(0, 'From KM must be 0 or positive'),
+  to_km: z.number().min(0, 'To KM must be positive'),
+  flat_fee_lkr: z.number().min(0, 'Fixed rate must be positive'),
+  standard_hours: z.number().min(0, 'Standard hours must be positive'),
+  overtime_rate_lkr_per_hour: z.number().min(0, 'Overtime rate must be positive'),
+  overnight_charge_lkr_per_day: z.number().min(0, 'Overnight charge must be 0 or positive'),
+  exceeding_km_rate_lkr: z.number().min(0, 'Exceeding KM rate must be positive'),
+  free_exceeding_km: z.number().min(0, 'Free exceeding KM must be 0 or positive'),
   effective_from: z.date(),
   effective_to: z.date().optional(),
   is_active: z.boolean().default(true)
@@ -32,11 +37,16 @@ interface RateCard {
   id: string;
   hire_type: string;
   bus_type_id: string;
-  flat_fee_lkr: number | null;
-  first_100km_rate_per_km_lkr: number | null;
-  additional_km_rate_per_km_lkr: number | null;
+  from_km: number;
+  to_km: number;
+  flat_fee_lkr: number;
+  standard_hours: number;
+  overtime_rate_lkr_per_hour: number;
+  overnight_charge_lkr_per_day: number;
+  exceeding_km_rate_lkr: number;
+  free_exceeding_km: number;
   effective_from: string;
-  effective_to: string | null;
+  effective_to: string;
   is_active: boolean;
   bus_types?: { name: string };
 }
@@ -58,9 +68,14 @@ export function RateCardsAdmin() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       hire_type: 'Outside',
+      from_km: 0,
+      to_km: 0,
       flat_fee_lkr: 0,
-      first_100km_rate_per_km_lkr: 0,
-      additional_km_rate_per_km_lkr: 0,
+      standard_hours: 8,
+      overtime_rate_lkr_per_hour: 500,
+      overnight_charge_lkr_per_day: 0,
+      exceeding_km_rate_lkr: 175,
+      free_exceeding_km: 5,
       effective_from: new Date(),
       is_active: true
     }
@@ -75,7 +90,8 @@ export function RateCardsAdmin() {
             *,
             bus_types:bus_type_id (name)
           `)
-          .order('hire_type'),
+          .order('hire_type')
+          .order('from_km'),
         supabase
           .from('bus_types')
           .select('id, name')
@@ -146,9 +162,14 @@ export function RateCardsAdmin() {
     form.reset({
       hire_type: rateCard.hire_type as 'Outside' | 'Lyceum',
       bus_type_id: rateCard.bus_type_id,
+      from_km: rateCard.from_km || 0,
+      to_km: rateCard.to_km || 0,
       flat_fee_lkr: rateCard.flat_fee_lkr || 0,
-      first_100km_rate_per_km_lkr: rateCard.first_100km_rate_per_km_lkr || 0,
-      additional_km_rate_per_km_lkr: rateCard.additional_km_rate_per_km_lkr || 0,
+      standard_hours: rateCard.standard_hours || 8,
+      overtime_rate_lkr_per_hour: rateCard.overtime_rate_lkr_per_hour || 500,
+      overnight_charge_lkr_per_day: rateCard.overnight_charge_lkr_per_day || 0,
+      exceeding_km_rate_lkr: rateCard.exceeding_km_rate_lkr || 175,
+      free_exceeding_km: rateCard.free_exceeding_km || 5,
       effective_from: new Date(rateCard.effective_from),
       effective_to: rateCard.effective_to ? new Date(rateCard.effective_to) : undefined,
       is_active: rateCard.is_active
@@ -177,7 +198,7 @@ export function RateCardsAdmin() {
     }
   };
 
-  const columns: ColumnDef<RateCard>[] = [
+    const columns: ColumnDef<RateCard>[] = [
     {
       accessorKey: "hire_type",
       header: "Hire Type",
@@ -185,30 +206,41 @@ export function RateCardsAdmin() {
     {
       accessorKey: "bus_types.name",
       header: "Bus Type",
-      cell: ({ row }) => row.original.bus_types?.name || "-",
+      cell: ({ row }) => row.original.bus_types?.name || "N/A",
+    },
+    {
+      accessorKey: "from_km",
+      header: "Distance Range",
+      cell: ({ row }) => {
+        const fromKm = row.getValue("from_km");
+        const toKm = row.original.to_km;
+        return `${fromKm} - ${toKm || '∞'} km`;
+      },
     },
     {
       accessorKey: "flat_fee_lkr",
-      header: "Flat Fee",
+      header: "Fixed Rate",
       cell: ({ row }) => {
         const fee = row.getValue("flat_fee_lkr");
-        return fee ? `LKR ${fee}` : "-";
+        return `LKR ${fee?.toLocaleString() || '0'}`;
       },
     },
     {
-      accessorKey: "first_100km_rate_per_km_lkr",
-      header: "First 100KM Rate",
-      cell: ({ row }) => {
-        const rate = row.getValue("first_100km_rate_per_km_lkr");
-        return rate ? `LKR ${rate}/KM` : "-";
-      },
+      accessorKey: "standard_hours",
+      header: "Standard Hours",
+      cell: ({ row }) => `${row.getValue("standard_hours")} hrs`,
     },
     {
-      accessorKey: "additional_km_rate_per_km_lkr",
-      header: "Additional KM Rate",
+      accessorKey: "overtime_rate_lkr_per_hour",
+      header: "Overtime Rate",
+      cell: ({ row }) => `LKR ${row.getValue("overtime_rate_lkr_per_hour")}/hr`,
+    },
+    {
+      accessorKey: "overnight_charge_lkr_per_day",
+      header: "Overnight Charge",
       cell: ({ row }) => {
-        const rate = row.getValue("additional_km_rate_per_km_lkr");
-        return rate ? `LKR ${rate}/KM` : "-";
+        const charge = row.getValue("overnight_charge_lkr_per_day") as number;
+        return charge > 0 ? `LKR ${charge}/day` : "-";
       },
     },
     {
@@ -247,9 +279,14 @@ export function RateCardsAdmin() {
                 setEditingRateCard(null);
                 form.reset({
                   hire_type: 'Outside',
+                  from_km: 0,
+                  to_km: 0,
                   flat_fee_lkr: 0,
-                  first_100km_rate_per_km_lkr: 0,
-                  additional_km_rate_per_km_lkr: 0,
+                  standard_hours: 8,
+                  overtime_rate_lkr_per_hour: 500,
+                  overnight_charge_lkr_per_day: 0,
+                  exceeding_km_rate_lkr: 175,
+                  free_exceeding_km: 5,
                   effective_from: new Date(),
                   is_active: true
                 });
@@ -337,16 +374,15 @@ export function RateCardsAdmin() {
 
                     <FormField
                       control={form.control}
-                      name="first_100km_rate_per_km_lkr"
+                      name="from_km"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>First 100KM Rate (LKR per KM)</FormLabel>
+                          <FormLabel>From KM</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
-                              step="0.01"
                               min="0"
-                              placeholder="Rate for first 100 kilometers"
+                              placeholder="Minimum distance"
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             />
@@ -358,18 +394,159 @@ export function RateCardsAdmin() {
 
                     <FormField
                       control={form.control}
-                      name="additional_km_rate_per_km_lkr"
+                      name="to_km"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Additional KM Rate (LKR per KM)</FormLabel>
+                          <FormLabel>To KM</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="1"
+                              placeholder="Maximum distance"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="standard_hours"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Standard Hours</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              placeholder="Standard hours included"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="overtime_rate_lkr_per_hour"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Overtime Rate (LKR/hour)</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               step="0.01"
                               min="0"
-                              placeholder="Rate for kilometers beyond 100"
+                              placeholder="Rate per overtime hour"
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="overnight_charge_lkr_per_day"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Overnight Charge (LKR/day)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="Charge per overnight stay"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="exceeding_km_rate_lkr"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Exceeding KM Rate (LKR/km)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="Rate per km beyond agreed distance"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="free_exceeding_km"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Free Exceeding KM</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="Free kilometers before exceeding charges"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="effective_from"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Effective From</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              value={field.value ? field.value.toISOString().split('T')[0] : ''}
+                              onChange={(e) => field.onChange(new Date(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="effective_to"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Effective To (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              value={field.value ? field.value.toISOString().split('T')[0] : ''}
+                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
                             />
                           </FormControl>
                           <FormMessage />

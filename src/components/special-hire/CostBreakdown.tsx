@@ -9,7 +9,20 @@ interface CostData {
   kmDropToParking: number;
   fuelCostFuelOnly: number;
   hireCharge: number;
-  extraCharges: number;
+  fixedRate: number;
+  overtimeCharge: number;
+  overnightCharge: number;
+  exceedingDistanceCharge: number;
+  rateCardDetails: {
+    standardHours: number;
+    actualHours: number;
+    overtimeHours: number;
+    agreedDistance: number;
+    actualDistance: number;
+    exceedingKm: number;
+    freeExceedingKm: number;
+    chargeableExceedingKm: number;
+  };
   grossRevenue: number;
   driverCharge: number;
   otherExpenses: Array<{ label: string; amount: number }>;
@@ -58,26 +71,56 @@ export function CostBreakdown({ data }: Props) {
 
         {/* Revenue Section */}
         <div>
-          <h4 className="font-medium mb-2">Revenue</h4>
+          <h4 className="font-medium mb-2">Hire Charges Breakdown</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Fuel Cost (Parking legs)</span>
-              <span>LKR {data.fuelCostFuelOnly.toLocaleString()}</span>
+              <span>Fixed Rate ({data.rateCardDetails.agreedDistance} km)</span>
+              <span>LKR {data.fixedRate.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Hire Charge ({data.kmTrip} km)</span>
-              <span>LKR {data.hireCharge.toLocaleString()}</span>
-            </div>
-            {data.extraCharges > 0 && (
+            {data.overtimeCharge > 0 && (
               <div className="flex justify-between">
-                <span>Extra Charges</span>
-                <span>LKR {data.extraCharges.toLocaleString()}</span>
+                <span>Overtime ({data.rateCardDetails.overtimeHours} hrs)</span>
+                <span>LKR {data.overtimeCharge.toLocaleString()}</span>
               </div>
             )}
+            {data.overnightCharge > 0 && (
+              <div className="flex justify-between">
+                <span>Overnight Charges</span>
+                <span>LKR {data.overnightCharge.toLocaleString()}</span>
+              </div>
+            )}
+            {data.exceedingDistanceCharge > 0 && (
+              <div className="flex justify-between">
+                <span>Exceeding Distance ({data.rateCardDetails.chargeableExceedingKm} km)</span>
+                <span>LKR {data.exceedingDistanceCharge.toLocaleString()}</span>
+              </div>
+            )}
+            <Separator />
+            <div className="flex justify-between font-medium text-blue-600">
+              <span>Total Hire Charge</span>
+              <span>LKR {data.hireCharge.toLocaleString()}</span>
+            </div>
             <Separator />
             <div className="flex justify-between font-medium text-green-600">
               <span>Gross Revenue</span>
               <span>LKR {data.grossRevenue.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Working Hours Analysis */}
+        <div>
+          <h4 className="font-medium mb-2">Working Hours Analysis</h4>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="text-center">
+              <div className="font-medium text-blue-600">{data.rateCardDetails.standardHours} hrs</div>
+              <div className="text-muted-foreground">Standard</div>
+            </div>
+            <div className="text-center">
+              <div className="font-medium text-green-600">{data.rateCardDetails.actualHours} hrs</div>
+              <div className="text-muted-foreground">Actual</div>
             </div>
           </div>
         </div>

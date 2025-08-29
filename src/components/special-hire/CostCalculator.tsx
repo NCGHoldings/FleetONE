@@ -17,7 +17,10 @@ export function CostCalculator() {
     hireType: 'Outside',
     numberOfBuses: 1,
     driverCharge: 1500,
-    commissionPct: 5
+    commissionPct: 5,
+    expectedWorkHours: 8,
+    overnightDays: 0,
+    agreedDistance: 0
   });
   
   const [costData, setCostData] = useState<any>(null);
@@ -88,34 +91,49 @@ export function CostCalculator() {
       const selectedBusType = busTypes.find(bt => bt.id === formData.busType);
       if (!selectedBusType) throw new Error('Please select a bus type');
 
-      // Get rate card for this hire type and bus type
+      // Find appropriate rate card based on trip distance
+      const tripDistance = distanceData.kmTrip || 0;
       const { data: rateCard } = await supabase
         .from('hire_rate_cards')
         .select('*')
         .eq('hire_type', formData.hireType)
         .eq('bus_type_id', formData.busType)
         .eq('is_active', true)
-        .gte('to_km', distanceData.kmTrip || 0)
-        .order('from_km', { ascending: true })
+        .lte('from_km', tripDistance)
+        .gte('to_km', tripDistance)
         .limit(1)
         .maybeSingle();
 
+      if (!rateCard) {
+        throw new Error(`No rate card found for ${formData.hireType} hire type, ${tripDistance}km distance`);
+      }
+
+      // Calculate base charges
+      const fixedRate = rateCard.flat_fee_lkr || 0;
+      
+      // Calculate overtime charges
+      const overtimeHours = Math.max(0, formData.expectedWorkHours - rateCard.standard_hours);
+      const overtimeCharge = overtimeHours * rateCard.overtime_rate_lkr_per_hour;
+      
+      // Calculate overnight charges (Outside customers only)
+      const overnightCharge = formData.hireType === 'Outside' ? 
+        formData.overnightDays * rateCard.overnight_charge_lkr_per_day : 0;
+      
+      // Calculate exceeding distance charges
+      const agreedDistance = formData.agreedDistance || tripDistance;
+      const exceedingKm = Math.max(0, tripDistance - agreedDistance);
+      const chargeableExceedingKm = Math.max(0, exceedingKm - rateCard.free_exceeding_km);
+      const exceedingDistanceCharge = chargeableExceedingKm * rateCard.exceeding_km_rate_lkr;
+
+      // Calculate total hire charge
+      const hireCharge = fixedRate + overtimeCharge + overnightCharge + exceedingDistanceCharge;
+
+      // Calculate fuel costs
       const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
       const fuelLiters = totalDistance / selectedBusType.avg_km_per_l;
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
-      let hireCharge = 0;
-      if (rateCard) {
-        if (rateCard.flat_fee_lkr) {
-          hireCharge = rateCard.flat_fee_lkr;
-        } else if (rateCard.rate_per_km_lkr) {
-          hireCharge = (distanceData.kmTrip || 0) * rateCard.rate_per_km_lkr;
-        }
-      } else {
-        // Fallback rate if no rate card found
-        hireCharge = (distanceData.kmTrip || 0) * 50; // 50 LKR per km as fallback
-      }
-
+      // Calculate financial breakdown
       const grossRevenue = hireCharge * formData.numberOfBuses;
       const commissionAmount = grossRevenue * (formData.commissionPct / 100);
       const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + commissionAmount + (fuelCost * formData.numberOfBuses);
@@ -127,7 +145,20 @@ export function CostCalculator() {
         fuelLiters: Math.round(fuelLiters * 10) / 10,
         fuelCostFuelOnly: Math.round(fuelCost),
         hireCharge: Math.round(hireCharge),
-        extraCharges: 0,
+        fixedRate: Math.round(fixedRate),
+        overtimeCharge: Math.round(overtimeCharge),
+        overnightCharge: Math.round(overnightCharge),
+        exceedingDistanceCharge: Math.round(exceedingDistanceCharge),
+        rateCardDetails: {
+          standardHours: rateCard.standard_hours,
+          actualHours: formData.expectedWorkHours,
+          overtimeHours,
+          agreedDistance,
+          actualDistance: tripDistance,
+          exceedingKm,
+          freeExceedingKm: rateCard.free_exceeding_km,
+          chargeableExceedingKm
+        },
         grossRevenue: Math.round(grossRevenue),
         driverCharge: formData.driverCharge,
         otherExpenses: [],
@@ -141,7 +172,10 @@ export function CostCalculator() {
 
       console.log('Final cost calculation result:', result);
       setCostData(result);
-      toast({ title: "Success", description: `Distance calculated: Pickup ${distanceData.kmParkingToPickup}km + Trip ${distanceData.kmTrip}km + Return ${distanceData.kmDropToParking}km` });
+      toast({ 
+        title: "Cost Calculated Successfully", 
+        description: `Trip: ${tripDistance}km | Fixed Rate: LKR ${fixedRate.toLocaleString()} | Overtime: LKR ${overtimeCharge.toLocaleString()} | Total: LKR ${hireCharge.toLocaleString()}`
+      });
     } catch (error) {
       console.error('Error calculating costs:', error);
       toast({ 
@@ -246,6 +280,38 @@ export function CostCalculator() {
                 step="0.1"
                 value={formData.commissionPct}
                 onChange={(e) => setFormData({...formData, commissionPct: parseFloat(e.target.value) || 0})}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Expected Work Hours</Label>
+              <Input
+                type="number"
+                min="1"
+                step="0.5"
+                value={formData.expectedWorkHours}
+                onChange={(e) => setFormData({...formData, expectedWorkHours: parseFloat(e.target.value) || 8})}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Overnight Days (Outside only)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={formData.overnightDays}
+                onChange={(e) => setFormData({...formData, overnightDays: parseInt(e.target.value) || 0})}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Agreed Distance (km)</Label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="Leave empty to use trip distance"
+                value={formData.agreedDistance || ''}
+                onChange={(e) => setFormData({...formData, agreedDistance: parseFloat(e.target.value) || 0})}
               />
             </div>
           </div>
