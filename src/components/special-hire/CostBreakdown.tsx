@@ -97,7 +97,7 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Hire Charges Breakdown</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Fixed Rate ({safeData.rateCardDetails?.agreedDistance || 0} km)</span>
+              <span>Flat Fee (First 100 km)</span>
               <span>LKR {safeData.fixedRate.toLocaleString()}</span>
             </div>
             {safeData.overtimeCharge > 0 && (

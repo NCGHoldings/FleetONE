@@ -175,40 +175,43 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         throw new Error('Bus type not found');
       }
 
-      // Calculate costs based on real distances
-      const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
-      const fuelLiters = totalDistance / busTypeData.avg_km_per_l;
-      const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
-
-      // Get rate card for pricing
-      const { data: rateCard } = await supabase
+      // Get rate card for unified 100km flat fee + exceeding rate pricing
+      const { data: allRateCards } = await supabase
         .from('hire_rate_cards')
         .select('*')
         .eq('hire_type', data.hireType)
         .eq('bus_type_id', data.busTypeId)
         .eq('is_active', true)
-        .gte('to_km', distanceData.kmTrip || 0)
-        .order('from_km', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .order('from_km');
 
-      let hireCharge = 0;
-      if (rateCard) {
-        if (rateCard.flat_fee_lkr) {
-          hireCharge = rateCard.flat_fee_lkr;
-        } else if (rateCard.rate_per_km_lkr) {
-          hireCharge = (distanceData.kmTrip || 0) * rateCard.rate_per_km_lkr;
-        }
-      } else {
-        // Fallback rate
-        hireCharge = (distanceData.kmTrip || 0) * 50; // 50 LKR per km
+      let rateCard = null;
+      if (allRateCards && allRateCards.length > 0) {
+        rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
       }
 
+      if (!rateCard) {
+        throw new Error(`No rate card found for ${data.hireType} hire type. Please configure flat fee and exceeding km rate.`);
+      }
+
+      // Apply unified 100km flat fee + exceeding rate formula
+      const tripDistance = distanceData.kmTrip || 0;
+      const fixedRate = rateCard.flat_fee_lkr || 0;
+      const baseCoverageKm = 100;
+      const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+      const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
+      
+      const hireCharge = fixedRate + exceedingDistanceCharge;
+
+      // Fuel cost on trip distance only (pickup->drop)
+      const fuelLiters = (tripDistance / (busTypeData.avg_km_per_l || 8));
+      const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
+
       const grossRevenue = hireCharge * data.numberOfBuses;
-      const commissionAmount = grossRevenue * 0.05; // 5% default commission
+      const customerTotalWithFuel = grossRevenue + (fuelCost * data.numberOfBuses);
+      const commissionAmount = customerTotalWithFuel * 0.05; // 5% default commission
       const driverCharge = 1500; // Default driver charge
       const totalExpenses = (driverCharge * data.numberOfBuses) + commissionAmount + (fuelCost * data.numberOfBuses);
-      const netProfit = grossRevenue - totalExpenses;
+      const netProfit = customerTotalWithFuel - totalExpenses;
 
       const costs = {
         km_parking_to_pickup: Math.round((distanceData.kmParkingToPickup || 0) * 10) / 10,
@@ -217,7 +220,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         fuel_cost_fuel_only: Math.round(fuelCost),
         hire_charge: Math.round(hireCharge),
         extra_charges: 0,
-        gross_revenue: Math.round(grossRevenue),
+        gross_revenue: Math.round(customerTotalWithFuel), // Save customer total (hire + fuel)
         driver_charge: driverCharge,
         other_expenses: [],
         commission_pct: 5.0,
@@ -232,16 +235,30 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         kmTrip: costs.km_trip,
         kmDropToParking: costs.km_drop_to_parking,
         fuelCostFuelOnly: costs.fuel_cost_fuel_only,
-        hireCharge: costs.hire_charge,
-        extraCharges: costs.extra_charges,
-        grossRevenue: costs.gross_revenue,
+        hireCharge: Math.round(hireCharge),
+        fixedRate: Math.round(fixedRate),
+        exceedingDistanceCharge: Math.round(exceedingDistanceCharge),
+        overtimeCharge: 0,
+        overnightCharge: 0,
+        rateCardDetails: {
+          standardHours: rateCard.standard_hours || 8,
+          actualHours: 8,
+          overtimeHours: 0,
+          agreedDistance: baseCoverageKm,
+          actualDistance: tripDistance,
+          exceedingKm,
+          freeExceedingKm: 0,
+          chargeableExceedingKm: exceedingKm
+        },
+        grossRevenue: Math.round(hireCharge * data.numberOfBuses),
+        customerTotalWithFuel: Math.round(customerTotalWithFuel),
         driverCharge: costs.driver_charge,
         otherExpenses: costs.other_expenses,
         commissionPct: costs.commission_pct,
         commissionAmount: costs.commission_amount,
         totalExpenses: costs.total_expenses,
         netProfit: costs.net_profit,
-        totalDistance: totalDistance,
+        totalDistance: (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0),
         fuelLiters: Math.round(fuelLiters * 10) / 10,
         busTypeName: busTypeData.name,
         fuelPrice: fuelSettings.diesel_price_lkr_per_l,
@@ -250,8 +267,8 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
       });
 
       toast({
-        title: "Distance Calculated",
-        description: `Trip: ${costs.km_trip}km, Pickup: ${costs.km_parking_to_pickup}km, Return: ${costs.km_drop_to_parking}km`
+        title: "Cost Calculated",
+        description: `Trip: ${tripDistance}km | Flat: LKR ${Math.round(fixedRate).toLocaleString()} | Exceeding: LKR ${Math.round(exceedingDistanceCharge).toLocaleString()} | Customer Total: LKR ${Math.round(customerTotalWithFuel).toLocaleString()}`
       });
 
       return { costs, distanceData };

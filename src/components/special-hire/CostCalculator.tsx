@@ -184,41 +184,30 @@ export function CostCalculator() {
         return;
       }
 
-      // Default logic for other hire types (range-based)
-      // Find the appropriate rate card for the distance
+      // All hire types now use unified 100km flat fee + exceeding rate logic
       if (allRateCards && allRateCards.length > 0) {
-        rateCard = allRateCards.find(card => 
-          tripDistance >= card.from_km && tripDistance <= card.to_km
-        );
-        if (!rateCard) {
-          rateCard = allRateCards
-            .filter(card => tripDistance >= card.from_km)
-            .sort((a, b) => b.to_km - a.to_km)[0];
-        }
+        rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
       }
-
       if (!rateCard) {
-        const ranges = allRateCards?.map(card => `${card.from_km}-${card.to_km}km`).join(', ') || 'None';
-        throw new Error(`No rate card found for ${formData.hireType} hire type, ${tripDistance}km distance. Available ranges: ${ranges}`);
+        throw new Error(`No rate card found for ${formData.hireType} hire type. Please configure flat fee and exceeding km rate.`);
       }
-
       setSelectedRateCard(rateCard);
 
-      // Calculate base charges (range-based logic)
       const fixedRate = rateCard.flat_fee_lkr || 0;
-      const overtimeHours = Math.max(0, formData.expectedWorkHours - rateCard.standard_hours);
-      const overtimeCharge = overtimeHours * rateCard.overtime_rate_lkr_per_hour;
-      const overnightCharge = 0;
+      const baseCoverageKm = 100;
+      const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+      const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
 
-      const agreedDistance = formData.agreedDistance || rateCard.to_km;
-      const exceedingKm = Math.max(0, tripDistance - agreedDistance);
-      const chargeableExceedingKm = Math.max(0, exceedingKm - rateCard.free_exceeding_km);
-      const exceedingDistanceCharge = chargeableExceedingKm * rateCard.exceeding_km_rate_lkr;
+      // Calculate overtime charges
+      const overtimeHours = Math.max(0, formData.expectedWorkHours - (rateCard.standard_hours || 8));
+      const overtimeCharge = overtimeHours * (rateCard.overtime_rate_lkr_per_hour || 0);
+      const overnightCharge = formData.overnightDays * (rateCard.overnight_charge_lkr_per_day || 0);
 
-      const hireCharge = fixedRate + overtimeCharge + overnightCharge + exceedingDistanceCharge;
+      const hireCharge = fixedRate + exceedingDistanceCharge + overtimeCharge + overnightCharge;
 
+      // Fuel cost on trip distance only (pickup->drop)
       const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
-      const fuelLiters = totalDistance / selectedBusType.avg_km_per_l;
+      const fuelLiters = (tripDistance / (selectedBusType.avg_km_per_l || 8));
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
       const grossRevenue = hireCharge * formData.numberOfBuses;
@@ -238,15 +227,15 @@ export function CostCalculator() {
         overnightCharge: Math.round(overnightCharge),
         exceedingDistanceCharge: Math.round(exceedingDistanceCharge),
         rateCardDetails: {
-          standardHours: rateCard.standard_hours,
+          standardHours: rateCard.standard_hours || 8,
           actualHours: formData.expectedWorkHours,
           overtimeHours,
-          agreedDistance,
+          agreedDistance: baseCoverageKm,
           actualDistance: tripDistance,
           exceedingKm,
-          freeExceedingKm: rateCard.free_exceeding_km,
-          chargeableExceedingKm,
-          rateCardRange: `${rateCard.from_km}-${rateCard.to_km}km`,
+          freeExceedingKm: 0,
+          chargeableExceedingKm: exceedingKm,
+          rateCardRange: `0-999999km`,
           rateCardId: rateCard.id
         },
         grossRevenue: Math.round(grossRevenue),
@@ -265,7 +254,7 @@ export function CostCalculator() {
       setCostData(result);
       toast({ 
         title: "Cost Calculated Successfully", 
-        description: `Trip: ${tripDistance}km | Fixed Rate: LKR ${fixedRate.toLocaleString()} | Overtime: LKR ${overtimeCharge.toLocaleString()} | Total: LKR ${hireCharge.toLocaleString()}`
+        description: `Trip: ${tripDistance}km | Flat: LKR ${Math.round(fixedRate).toLocaleString()} | Exceeding: LKR ${Math.round(exceedingDistanceCharge).toLocaleString()} | Total: LKR ${Math.round(hireCharge).toLocaleString()} (+ fuel)`
       });
     } catch (error) {
       console.error('Error calculating costs:', error);
