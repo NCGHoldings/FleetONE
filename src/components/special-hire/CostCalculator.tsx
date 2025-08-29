@@ -27,6 +27,8 @@ export function CostCalculator() {
   const [calculating, setCalculating] = useState(false);
   const [busTypes, setBusTypes] = useState<any[]>([]);
   const [fuelSettings, setFuelSettings] = useState<any>(null);
+  const [intermediateStops, setIntermediateStops] = useState<Array<{id: string, location: string}>>([]);
+  const [selectedRateCard, setSelectedRateCard] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -71,6 +73,7 @@ export function CostCalculator() {
         body: {
           pickupLocation: formData.pickupLocation,
           dropLocation: formData.dropLocation,
+          intermediateStops,
           parkingLat: fuelSettings.parking_lat,
           parkingLng: fuelSettings.parking_lng
         }
@@ -93,20 +96,38 @@ export function CostCalculator() {
 
       // Find appropriate rate card based on trip distance
       const tripDistance = distanceData.kmTrip || 0;
-      const { data: rateCard } = await supabase
+      
+      // Get all rate cards for this hire type and bus type to find the best match
+      const { data: allRateCards } = await supabase
         .from('hire_rate_cards')
         .select('*')
         .eq('hire_type', formData.hireType)
         .eq('bus_type_id', formData.busType)
         .eq('is_active', true)
-        .lte('from_km', tripDistance)
-        .gte('to_km', tripDistance)
-        .limit(1)
-        .maybeSingle();
+        .order('from_km');
+
+      // Find the appropriate rate card for the distance
+      let rateCard = null;
+      if (allRateCards && allRateCards.length > 0) {
+        rateCard = allRateCards.find(card => 
+          tripDistance >= card.from_km && tripDistance <= card.to_km
+        );
+        
+        // If no exact match, find the card with the highest to_km that still covers this distance
+        if (!rateCard) {
+          rateCard = allRateCards
+            .filter(card => tripDistance >= card.from_km)
+            .sort((a, b) => b.to_km - a.to_km)[0];
+        }
+      }
 
       if (!rateCard) {
-        throw new Error(`No rate card found for ${formData.hireType} hire type, ${tripDistance}km distance`);
+        // Show available ranges for debugging
+        const ranges = allRateCards?.map(card => `${card.from_km}-${card.to_km}km`).join(', ') || 'None';
+        throw new Error(`No rate card found for ${formData.hireType} hire type, ${tripDistance}km distance. Available ranges: ${ranges}`);
       }
+
+      setSelectedRateCard(rateCard);
 
       // Calculate base charges
       const fixedRate = rateCard.flat_fee_lkr || 0;
@@ -158,7 +179,9 @@ export function CostCalculator() {
           actualDistance: tripDistance,
           exceedingKm,
           freeExceedingKm: rateCard.free_exceeding_km,
-          chargeableExceedingKm
+          chargeableExceedingKm,
+          rateCardRange: `${rateCard.from_km}-${rateCard.to_km}km`,
+          rateCardId: rateCard.id
         },
         grossRevenue: Math.round(grossRevenue),
         customerTotalWithFuel: Math.round(customerTotalWithFuel),
@@ -317,6 +340,55 @@ export function CostCalculator() {
               />
             </div>
           </div>
+
+          {/* Intermediate Stops */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Intermediate Stops</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIntermediateStops([...intermediateStops, { id: Date.now().toString(), location: '' }])}
+              >
+                Add Stop
+              </Button>
+            </div>
+            {intermediateStops.map((stop, index) => (
+              <div key={stop.id} className="flex gap-2 items-center">
+                <Input
+                  placeholder={`Stop ${index + 1} location`}
+                  value={stop.location}
+                  onChange={(e) => {
+                    const updated = [...intermediateStops];
+                    updated[index].location = e.target.value;
+                    setIntermediateStops(updated);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIntermediateStops(intermediateStops.filter(s => s.id !== stop.id))}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Rate Card Information */}
+          {selectedRateCard && (
+            <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+              <h4 className="font-medium">Selected Rate Card</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Range: {selectedRateCard.from_km}-{selectedRateCard.to_km}km</div>
+                <div>Base Rate: LKR {selectedRateCard.flat_fee_lkr?.toLocaleString()}</div>
+                <div>Standard Hours: {selectedRateCard.standard_hours}hrs</div>
+                <div>Overtime Rate: LKR {selectedRateCard.overtime_rate_lkr_per_hour}/hr</div>
+              </div>
+            </div>
+          )}
 
           <Button 
             onClick={calculateCosts} 

@@ -4,12 +4,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, FileText, Calculator, MapPin, Truck } from 'lucide-react';
-import { SpecialHireForm } from '@/components/special-hire/SpecialHireForm';
-import { QuotationsList } from '@/components/special-hire/QuotationsList';
-import { CostCalculator } from '@/components/special-hire/CostCalculator';
-import { BusTypesAdmin } from '@/components/special-hire/BusTypesAdmin';
-import { RateCardsAdmin } from '@/components/special-hire/RateCardsAdmin';
-import { FuelSettingsAdmin } from '@/components/special-hire/FuelSettingsAdmin';
+import { CostCalculator } from "@/components/special-hire/CostCalculator";
+import { RateCardsAdmin } from "@/components/special-hire/RateCardsAdmin";
+import { BusTypesAdmin } from "@/components/special-hire/BusTypesAdmin";
+import { FuelSettingsAdmin } from "@/components/special-hire/FuelSettingsAdmin";
+import { QuotationsList } from "@/components/special-hire/QuotationsList";
+import { SpecialHireForm } from "@/components/special-hire/SpecialHireForm";
+import { RateCoverageMaps } from "@/components/special-hire/RateCoverageMaps";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -149,7 +150,10 @@ export default function SpecialHire() {
         </TabsContent>
 
         <TabsContent value="rate-cards" className="space-y-4">
-          <RateCardsAdmin />
+          <div className="space-y-6">
+            <RateCoverageMaps />
+            <RateCardsAdmin />
+          </div>
         </TabsContent>
 
         <TabsContent value="fuel-settings" className="space-y-4">

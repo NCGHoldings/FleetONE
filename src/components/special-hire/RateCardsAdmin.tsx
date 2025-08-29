@@ -62,6 +62,7 @@ export function RateCardsAdmin() {
   const [loading, setLoading] = useState(true);
   const [editingRateCard, setEditingRateCard] = useState<RateCard | null>(null);
   const [showDialog, setShowDialog] = useState(false);
+  const [coverageGaps, setCoverageGaps] = useState<Array<{hireType: string, busType: string, gaps: Array<{from: number, to: number}>}>>([]);
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -104,6 +105,9 @@ export function RateCardsAdmin() {
 
       setRateCards(rateCardsResult.data || []);
       setBusTypes(busTypesResult.data || []);
+      
+      // Check for coverage gaps
+      checkCoverageGaps(rateCardsResult.data || [], busTypesResult.data || []);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -118,6 +122,118 @@ export function RateCardsAdmin() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const checkCoverageGaps = (cards: RateCard[], busTypes: BusType[]) => {
+    const gaps: Array<{hireType: string, busType: string, gaps: Array<{from: number, to: number}>}> = [];
+    
+    ['Outside', 'Lyceum'].forEach(hireType => {
+      busTypes.forEach(busType => {
+        const typeCards = cards
+          .filter(card => card.hire_type === hireType && card.bus_type_id === busType.id && card.is_active)
+          .sort((a, b) => a.from_km - b.from_km);
+        
+        const typeGaps: Array<{from: number, to: number}> = [];
+        
+        if (typeCards.length === 0) {
+          typeGaps.push({ from: 0, to: 1000 });
+        } else {
+          // Check for gap at the beginning
+          if (typeCards[0].from_km > 0) {
+            typeGaps.push({ from: 0, to: typeCards[0].from_km - 1 });
+          }
+          
+          // Check for gaps between cards
+          for (let i = 0; i < typeCards.length - 1; i++) {
+            const currentEnd = typeCards[i].to_km;
+            const nextStart = typeCards[i + 1].from_km;
+            if (currentEnd + 1 < nextStart) {
+              typeGaps.push({ from: currentEnd + 1, to: nextStart - 1 });
+            }
+          }
+        }
+        
+        if (typeGaps.length > 0) {
+          gaps.push({
+            hireType,
+            busType: busType.name,
+            gaps: typeGaps
+          });
+        }
+      });
+    });
+    
+    setCoverageGaps(gaps);
+  };
+
+  const columns: ColumnDef<RateCard>[] = [
+    {
+      accessorKey: "hire_type",
+      header: "Hire Type",
+    },
+    {
+      accessorKey: "bus_types.name",
+      header: "Bus Type",
+      cell: ({ row }) => row.original.bus_types?.name || "N/A",
+    },
+    {
+      accessorKey: "from_km",
+      header: "Distance Range",
+      cell: ({ row }) => {
+        const fromKm = row.getValue("from_km");
+        const toKm = row.original.to_km;
+        return `${fromKm} - ${toKm || '∞'} km`;
+      },
+    },
+    {
+      accessorKey: "flat_fee_lkr",
+      header: "Fixed Rate",
+      cell: ({ row }) => {
+        const fee = row.getValue("flat_fee_lkr");
+        return `LKR ${fee?.toLocaleString() || '0'}`;
+      },
+    },
+    {
+      accessorKey: "standard_hours",
+      header: "Standard Hours",
+      cell: ({ row }) => `${row.getValue("standard_hours")} hrs`,
+    },
+    {
+      accessorKey: "overtime_rate_lkr_per_hour",
+      header: "Overtime Rate",
+      cell: ({ row }) => `LKR ${row.getValue("overtime_rate_lkr_per_hour")}/hr`,
+    },
+    {
+      accessorKey: "overnight_charge_lkr_per_day",
+      header: "Overnight Charge",
+      cell: ({ row }) => {
+        const charge = row.getValue("overnight_charge_lkr_per_day") as number;
+        return charge > 0 ? `LKR ${charge}/day` : "-";
+      },
+    },
+    {
+      accessorKey: "is_active",
+      header: "Status",
+      cell: ({ row }) => (
+        <span className={row.getValue("is_active") ? "text-green-600" : "text-red-600"}>
+          {row.getValue("is_active") ? "Active" : "Inactive"}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <div className="flex space-x-2">
+          <Button variant="outline" size="sm" onClick={() => handleEdit(row.original)}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleDelete(row.original.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   const handleSubmit = async (data: FormData) => {
     try {
@@ -198,396 +314,347 @@ export function RateCardsAdmin() {
     }
   };
 
-    const columns: ColumnDef<RateCard>[] = [
-    {
-      accessorKey: "hire_type",
-      header: "Hire Type",
-    },
-    {
-      accessorKey: "bus_types.name",
-      header: "Bus Type",
-      cell: ({ row }) => row.original.bus_types?.name || "N/A",
-    },
-    {
-      accessorKey: "from_km",
-      header: "Distance Range",
-      cell: ({ row }) => {
-        const fromKm = row.getValue("from_km");
-        const toKm = row.original.to_km;
-        return `${fromKm} - ${toKm || '∞'} km`;
-      },
-    },
-    {
-      accessorKey: "flat_fee_lkr",
-      header: "Fixed Rate",
-      cell: ({ row }) => {
-        const fee = row.getValue("flat_fee_lkr");
-        return `LKR ${fee?.toLocaleString() || '0'}`;
-      },
-    },
-    {
-      accessorKey: "standard_hours",
-      header: "Standard Hours",
-      cell: ({ row }) => `${row.getValue("standard_hours")} hrs`,
-    },
-    {
-      accessorKey: "overtime_rate_lkr_per_hour",
-      header: "Overtime Rate",
-      cell: ({ row }) => `LKR ${row.getValue("overtime_rate_lkr_per_hour")}/hr`,
-    },
-    {
-      accessorKey: "overnight_charge_lkr_per_day",
-      header: "Overnight Charge",
-      cell: ({ row }) => {
-        const charge = row.getValue("overnight_charge_lkr_per_day") as number;
-        return charge > 0 ? `LKR ${charge}/day` : "-";
-      },
-    },
-    {
-      accessorKey: "is_active",
-      header: "Status",
-      cell: ({ row }) => (
-        <span className={row.getValue("is_active") ? "text-green-600" : "text-red-600"}>
-          {row.getValue("is_active") ? "Active" : "Inactive"}
-        </span>
-      ),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex space-x-2">
-          <Button variant="outline" size="sm" onClick={() => handleEdit(row.original)}>
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handleDelete(row.original.id)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Rate Cards Management</CardTitle>
-          <Dialog open={showDialog} onOpenChange={setShowDialog}>
-            <DialogTrigger asChild>
-              <Button onClick={() => {
-                setEditingRateCard(null);
-                form.reset({
-                  hire_type: 'Outside',
-                  from_km: 0,
-                  to_km: 0,
-                  flat_fee_lkr: 0,
-                  standard_hours: 8,
-                  overtime_rate_lkr_per_hour: 500,
-                  overnight_charge_lkr_per_day: 0,
-                  exceeding_km_rate_lkr: 175,
-                  free_exceeding_km: 5,
-                  effective_from: new Date(),
-                  is_active: true
-                });
-              }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Rate Card
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingRateCard ? 'Edit Rate Card' : 'Add New Rate Card'}
-                </DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="hire_type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Hire Type</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+    <div className="space-y-6">
+      {/* Coverage Gaps Warning */}
+      {coverageGaps.length > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardHeader>
+            <CardTitle className="text-yellow-800">Coverage Gaps Detected</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {coverageGaps.map((gap, index) => (
+                <div key={index} className="text-sm">
+                  <strong>{gap.hireType} - {gap.busType}:</strong> Missing coverage for{' '}
+                  {gap.gaps.map(g => `${g.from}-${g.to}km`).join(', ')}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Rate Cards Management</CardTitle>
+            <Dialog open={showDialog} onOpenChange={setShowDialog}>
+              <DialogTrigger asChild>
+                <Button onClick={() => {
+                  setEditingRateCard(null);
+                  form.reset({
+                    hire_type: 'Outside',
+                    from_km: 0,
+                    to_km: 0,
+                    flat_fee_lkr: 0,
+                    standard_hours: 8,
+                    overtime_rate_lkr_per_hour: 500,
+                    overnight_charge_lkr_per_day: 0,
+                    exceeding_km_rate_lkr: 175,
+                    free_exceeding_km: 5,
+                    effective_from: new Date(),
+                    is_active: true
+                  });
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Rate Card
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingRateCard ? 'Edit Rate Card' : 'Add New Rate Card'}
+                  </DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="hire_type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Hire Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Outside">Outside</SelectItem>
+                                <SelectItem value="Lyceum">Lyceum</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="bus_type_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bus Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select bus type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {busTypes.map((busType) => (
+                                  <SelectItem key={busType.id} value={busType.id}>
+                                    {busType.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="flat_fee_lkr"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Flat Fee (LKR)</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="Base flat fee"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Outside">Outside</SelectItem>
-                              <SelectItem value="Lyceum">Lyceum</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="bus_type_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bus Type</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormField
+                        control={form.control}
+                        name="from_km"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>From KM</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select bus type" />
-                              </SelectTrigger>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="Minimum distance"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
                             </FormControl>
-                            <SelectContent>
-                              {busTypes.map((busType) => (
-                                <SelectItem key={busType.id} value={busType.id}>
-                                  {busType.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="to_km"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>To KM</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="1"
+                                placeholder="Maximum distance"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="standard_hours"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Standard Hours</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                placeholder="Standard hours included"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="overtime_rate_lkr_per_hour"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Overtime Rate (LKR/hour)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="Rate per overtime hour"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="overnight_charge_lkr_per_day"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Overnight Charge (LKR/day)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="Charge per overnight stay"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="exceeding_km_rate_lkr"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Exceeding KM Rate (LKR/km)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="Rate per km beyond agreed distance"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="free_exceeding_km"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Free Exceeding KM</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="Free kilometers before exceeding charges"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="effective_from"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Effective From</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                {...field}
+                                value={field.value ? field.value.toISOString().split('T')[0] : ''}
+                                onChange={(e) => field.onChange(new Date(e.target.value))}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="effective_to"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Effective To (Optional)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                {...field}
+                                value={field.value ? field.value.toISOString().split('T')[0] : ''}
+                                onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                     <FormField
                       control={form.control}
-                      name="flat_fee_lkr"
+                      name="is_active"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Flat Fee (LKR)</FormLabel>
+                        <FormItem className="flex items-center space-x-2">
                           <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="Base flat fee"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
                             />
                           </FormControl>
-                          <FormMessage />
+                          <FormLabel>Active</FormLabel>
                         </FormItem>
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="from_km"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>From KM</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="Minimum distance"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="to_km"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>To KM</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="1"
-                              placeholder="Maximum distance"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="standard_hours"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Standard Hours</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.5"
-                              min="0"
-                              placeholder="Standard hours included"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="overtime_rate_lkr_per_hour"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Overtime Rate (LKR/hour)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="Rate per overtime hour"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="overnight_charge_lkr_per_day"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Overnight Charge (LKR/day)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="Charge per overnight stay"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="exceeding_km_rate_lkr"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Exceeding KM Rate (LKR/km)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="Rate per km beyond agreed distance"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="free_exceeding_km"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Free Exceeding KM</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="Free kilometers before exceeding charges"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="effective_from"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Effective From</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="date"
-                              {...field}
-                              value={field.value ? field.value.toISOString().split('T')[0] : ''}
-                              onChange={(e) => field.onChange(new Date(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="effective_to"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Effective To (Optional)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="date"
-                              {...field}
-                              value={field.value ? field.value.toISOString().split('T')[0] : ''}
-                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="is_active"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-2">
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <FormLabel>Active</FormLabel>
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex justify-end space-x-2">
-                    <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit">
-                      {editingRateCard ? 'Update' : 'Create'}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <DataTable columns={columns} data={rateCards} searchKey="hire_type" />
-      </CardContent>
-    </Card>
+                    <div className="flex justify-end space-x-2">
+                      <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit">
+                        {editingRateCard ? 'Update' : 'Create'}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <DataTable columns={columns} data={rateCards} searchKey="hire_type" />
+        </CardContent>
+      </Card>
+    </div>
   );
 }
