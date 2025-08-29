@@ -24,6 +24,7 @@ interface CostData {
     chargeableExceedingKm: number;
   };
   grossRevenue: number;
+  customerTotalWithFuel: number;
   driverCharge: number;
   otherExpenses: Array<{ label: string; amount: number }>;
   commissionPct: number;
@@ -101,9 +102,18 @@ export function CostBreakdown({ data }: Props) {
               <span>LKR {data.hireCharge.toLocaleString()}</span>
             </div>
             <Separator />
-            <div className="flex justify-between font-medium text-green-600">
+            <div className="flex justify-between font-medium text-blue-600">
               <span>Gross Revenue</span>
               <span>LKR {data.grossRevenue.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Fuel Cost</span>
+              <span>LKR {data.fuelCostFuelOnly.toLocaleString()}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between font-medium text-green-600">
+              <span>Customer Total (incl. Fuel)</span>
+              <span>LKR {data.customerTotalWithFuel.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -134,6 +144,10 @@ export function CostBreakdown({ data }: Props) {
             <div className="flex justify-between">
               <span>Driver Charge</span>
               <span>LKR {data.driverCharge.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Fuel Cost (Internal)</span>
+              <span>LKR {data.fuelCostFuelOnly.toLocaleString()}</span>
             </div>
             {data.otherExpenses.map((expense, index) => (
               <div key={index} className="flex justify-between">

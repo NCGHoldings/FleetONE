@@ -120,7 +120,7 @@ export function CostCalculator() {
         formData.overnightDays * rateCard.overnight_charge_lkr_per_day : 0;
       
       // Calculate exceeding distance charges
-      const agreedDistance = formData.agreedDistance || tripDistance;
+      const agreedDistance = formData.agreedDistance || rateCard.to_km;
       const exceedingKm = Math.max(0, tripDistance - agreedDistance);
       const chargeableExceedingKm = Math.max(0, exceedingKm - rateCard.free_exceeding_km);
       const exceedingDistanceCharge = chargeableExceedingKm * rateCard.exceeding_km_rate_lkr;
@@ -133,11 +133,12 @@ export function CostCalculator() {
       const fuelLiters = totalDistance / selectedBusType.avg_km_per_l;
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
-      // Calculate financial breakdown
+      // Calculate financial breakdown (include fuel in customer total)
       const grossRevenue = hireCharge * formData.numberOfBuses;
-      const commissionAmount = grossRevenue * (formData.commissionPct / 100);
+      const customerTotalWithFuel = grossRevenue + (fuelCost * formData.numberOfBuses);
+      const commissionAmount = customerTotalWithFuel * (formData.commissionPct / 100);
       const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + commissionAmount + (fuelCost * formData.numberOfBuses);
-      const netProfit = grossRevenue - totalExpenses;
+      const netProfit = customerTotalWithFuel - totalExpenses;
 
       const result = {
         ...distanceData,
@@ -160,6 +161,7 @@ export function CostCalculator() {
           chargeableExceedingKm
         },
         grossRevenue: Math.round(grossRevenue),
+        customerTotalWithFuel: Math.round(customerTotalWithFuel),
         driverCharge: formData.driverCharge,
         otherExpenses: [],
         commissionPct: formData.commissionPct,
