@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Mail } from 'lucide-react';
+import { Download, Printer, Mail, Loader2 } from 'lucide-react';
 import { QuotationPreview } from './QuotationPreview';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface QuotationData {
   id: string;
@@ -38,6 +40,7 @@ interface Props {
 
 export function QuotationModal({ quotation, open, onOpenChange }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const handlePrint = () => {
     if (printRef.current) {
@@ -248,13 +251,47 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
   };
 
   const handleDownload = async () => {
+    if (!printRef.current || !quotation) return;
+
+    setIsDownloading(true);
     try {
-      // For now, we'll use the print functionality
-      // In a production environment, you'd want to use a proper PDF generation library
-      handlePrint();
-      toast.success('Quotation download initiated');
+      // Use html2canvas to capture the quotation content
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+
+      // Create PDF with proper dimensions
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      // Calculate dimensions to fit content properly
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 0;
+
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+
+      // Generate filename with quotation number and date
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
+      
+      // Download the PDF
+      pdf.save(filename);
+      
+      toast.success('Quotation downloaded successfully');
     } catch (error) {
+      console.error('Error generating PDF:', error);
       toast.error('Failed to download quotation');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -285,9 +322,13 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
                 <Printer className="h-4 w-4 mr-2" />
                 Print
               </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload}>
-                <Download className="h-4 w-4 mr-2" />
-                Download
+              <Button variant="outline" size="sm" onClick={handleDownload} disabled={isDownloading}>
+                {isDownloading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {isDownloading ? 'Generating...' : 'Download'}
               </Button>
             </div>
           </DialogTitle>
