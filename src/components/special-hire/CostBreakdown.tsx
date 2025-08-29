@@ -38,6 +38,28 @@ interface Props {
 }
 
 export function CostBreakdown({ data }: Props) {
+  // Provide default values to prevent undefined errors
+  const safeData = {
+    kmParkingToPickup: data.kmParkingToPickup || 0,
+    kmTrip: data.kmTrip || 0,
+    kmDropToParking: data.kmDropToParking || 0,
+    fuelCostFuelOnly: data.fuelCostFuelOnly || 0,
+    hireCharge: data.hireCharge || 0,
+    fixedRate: data.fixedRate || 0,
+    overtimeCharge: data.overtimeCharge || 0,
+    overnightCharge: data.overnightCharge || 0,
+    exceedingDistanceCharge: data.exceedingDistanceCharge || 0,
+    grossRevenue: data.grossRevenue || 0,
+    customerTotalWithFuel: data.customerTotalWithFuel || 0,
+    driverCharge: data.driverCharge || 0,
+    commissionAmount: data.commissionAmount || 0,
+    commissionPct: data.commissionPct || 0,
+    totalExpenses: data.totalExpenses || 0,
+    netProfit: data.netProfit || 0,
+    otherExpenses: data.otherExpenses || [],
+    rateCardDetails: data.rateCardDetails
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -54,15 +76,15 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Distance Analysis</h4>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="text-center">
-              <div className="font-medium text-blue-600">{data.kmParkingToPickup} km</div>
+              <div className="font-medium text-blue-600">{safeData.kmParkingToPickup} km</div>
               <div className="text-muted-foreground">Parking → Pickup</div>
             </div>
             <div className="text-center">
-              <div className="font-medium text-green-600">{data.kmTrip} km</div>
+              <div className="font-medium text-green-600">{safeData.kmTrip} km</div>
               <div className="text-muted-foreground">Trip Distance</div>
             </div>
             <div className="text-center">
-              <div className="font-medium text-blue-600">{data.kmDropToParking} km</div>
+              <div className="font-medium text-blue-600">{safeData.kmDropToParking} km</div>
               <div className="text-muted-foreground">Drop → Parking</div>
             </div>
           </div>
@@ -75,45 +97,45 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Hire Charges Breakdown</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Fixed Rate ({data.rateCardDetails?.agreedDistance || 0} km)</span>
-              <span>LKR {data.fixedRate.toLocaleString()}</span>
+              <span>Fixed Rate ({safeData.rateCardDetails?.agreedDistance || 0} km)</span>
+              <span>LKR {safeData.fixedRate.toLocaleString()}</span>
             </div>
-            {data.overtimeCharge > 0 && (
+            {safeData.overtimeCharge > 0 && (
               <div className="flex justify-between">
-                <span>Overtime ({data.rateCardDetails?.overtimeHours || 0} hrs)</span>
-                <span>LKR {data.overtimeCharge.toLocaleString()}</span>
+                <span>Overtime ({safeData.rateCardDetails?.overtimeHours || 0} hrs)</span>
+                <span>LKR {safeData.overtimeCharge.toLocaleString()}</span>
               </div>
             )}
-            {data.overnightCharge > 0 && (
+            {safeData.overnightCharge > 0 && (
               <div className="flex justify-between">
                 <span>Overnight Charges</span>
-                <span>LKR {data.overnightCharge.toLocaleString()}</span>
+                <span>LKR {safeData.overnightCharge.toLocaleString()}</span>
               </div>
             )}
-            {data.exceedingDistanceCharge > 0 && (
+            {safeData.exceedingDistanceCharge > 0 && (
               <div className="flex justify-between">
-                <span>Exceeding Distance ({data.rateCardDetails?.chargeableExceedingKm || 0} km)</span>
-                <span>LKR {data.exceedingDistanceCharge.toLocaleString()}</span>
+                <span>Exceeding Distance ({safeData.rateCardDetails?.chargeableExceedingKm || 0} km)</span>
+                <span>LKR {safeData.exceedingDistanceCharge.toLocaleString()}</span>
               </div>
             )}
             <Separator />
             <div className="flex justify-between font-medium text-blue-600">
               <span>Total Hire Charge</span>
-              <span>LKR {data.hireCharge.toLocaleString()}</span>
+              <span>LKR {safeData.hireCharge.toLocaleString()}</span>
             </div>
             <Separator />
             <div className="flex justify-between font-medium text-blue-600">
               <span>Gross Revenue</span>
-              <span>LKR {data.grossRevenue.toLocaleString()}</span>
+              <span>LKR {safeData.grossRevenue.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span>Fuel Cost</span>
-              <span>LKR {data.fuelCostFuelOnly.toLocaleString()}</span>
+              <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
             </div>
             <Separator />
             <div className="flex justify-between font-medium text-green-600">
               <span>Customer Total (incl. Fuel)</span>
-              <span>LKR {data.customerTotalWithFuel.toLocaleString()}</span>
+              <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -125,11 +147,11 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Working Hours Analysis</h4>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="text-center">
-              <div className="font-medium text-blue-600">{data.rateCardDetails?.standardHours || 0} hrs</div>
+              <div className="font-medium text-blue-600">{safeData.rateCardDetails?.standardHours || 0} hrs</div>
               <div className="text-muted-foreground">Standard</div>
             </div>
             <div className="text-center">
-              <div className="font-medium text-green-600">{data.rateCardDetails?.actualHours || 0} hrs</div>
+              <div className="font-medium text-green-600">{safeData.rateCardDetails?.actualHours || 0} hrs</div>
               <div className="text-muted-foreground">Actual</div>
             </div>
           </div>
@@ -143,26 +165,26 @@ export function CostBreakdown({ data }: Props) {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span>Driver Charge</span>
-              <span>LKR {data.driverCharge.toLocaleString()}</span>
+              <span>LKR {safeData.driverCharge.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span>Fuel Cost (Internal)</span>
-              <span>LKR {data.fuelCostFuelOnly.toLocaleString()}</span>
+              <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
             </div>
-            {data.otherExpenses.map((expense, index) => (
+            {safeData.otherExpenses.map((expense, index) => (
               <div key={index} className="flex justify-between">
                 <span>{expense.label}</span>
                 <span>LKR {expense.amount.toLocaleString()}</span>
               </div>
             ))}
             <div className="flex justify-between">
-              <span>Commission ({data.commissionPct}%)</span>
-              <span>LKR {data.commissionAmount.toLocaleString()}</span>
+              <span>Commission ({safeData.commissionPct}%)</span>
+              <span>LKR {safeData.commissionAmount.toLocaleString()}</span>
             </div>
             <Separator />
             <div className="flex justify-between font-medium text-red-600">
               <span>Total Expenses</span>
-              <span>LKR {data.totalExpenses.toLocaleString()}</span>
+              <span>LKR {safeData.totalExpenses.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -172,8 +194,8 @@ export function CostBreakdown({ data }: Props) {
         {/* Net Profit */}
         <div className="flex justify-between items-center text-lg font-bold">
           <span>Net Profit</span>
-          <span className={data.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
-            LKR {data.netProfit.toLocaleString()}
+          <span className={safeData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
+            LKR {safeData.netProfit.toLocaleString()}
           </span>
         </div>
       </CardContent>
