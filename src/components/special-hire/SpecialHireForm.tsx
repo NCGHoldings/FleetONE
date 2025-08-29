@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CostBreakdown } from './CostBreakdown';
+import { LocationAutocomplete } from '@/components/ui/location-autocomplete';
 
 const formSchema = z.object({
   // Customer Details
@@ -511,39 +512,41 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="pickupLocation"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Pickup Location *</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input placeholder="Enter pickup location" {...field} />
-                            <MapPin className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                   <FormField
+                     control={form.control}
+                     name="pickupLocation"
+                     render={({ field }) => (
+                       <FormItem>
+                         <FormLabel>Pickup Location *</FormLabel>
+                         <FormControl>
+                           <LocationAutocomplete
+                             value={field.value || ""}
+                             onChange={field.onChange}
+                             placeholder="Enter pickup location"
+                           />
+                         </FormControl>
+                         <FormMessage />
+                       </FormItem>
+                     )}
+                   />
 
-                  <FormField
-                    control={form.control}
-                    name="dropLocation"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Drop Location *</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input placeholder="Enter drop location" {...field} />
-                            <MapPin className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                   <FormField
+                     control={form.control}
+                     name="dropLocation"
+                     render={({ field }) => (
+                       <FormItem>
+                         <FormLabel>Drop Location *</FormLabel>
+                         <FormControl>
+                           <LocationAutocomplete
+                             value={field.value || ""}
+                             onChange={field.onChange}
+                             placeholder="Enter drop location"
+                           />
+                         </FormControl>
+                         <FormMessage />
+                       </FormItem>
+                     )}
+                   />
                 </div>
 
                 {/* Intermediate Stops */}
@@ -555,23 +558,24 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
                       Add Stop
                     </Button>
                   </div>
-                  {intermediateStops.map((stop) => (
-                    <div key={stop.id} className="flex items-center gap-2">
-                      <Input
-                        placeholder="Stop location"
-                        value={stop.location}
-                        onChange={(e) => updateIntermediateStop(stop.id, e.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeIntermediateStop(stop.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                   {intermediateStops.map((stop) => (
+                     <div key={stop.id} className="flex items-center gap-2">
+                       <LocationAutocomplete
+                         value={stop.location}
+                         onChange={(value) => updateIntermediateStop(stop.id, value)}
+                         placeholder="Enter intermediate location"
+                         className="flex-1"
+                       />
+                       <Button
+                         type="button"
+                         variant="outline"
+                         size="sm"
+                         onClick={() => removeIntermediateStop(stop.id)}
+                       >
+                         <X className="h-4 w-4" />
+                       </Button>
+                     </div>
+                   ))}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
