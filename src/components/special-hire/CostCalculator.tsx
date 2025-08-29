@@ -106,14 +106,90 @@ export function CostCalculator() {
         .eq('is_active', true)
         .order('from_km');
 
+      let rateCard: any = null;
+
+      // Outside hire special logic: Flat rate covers first 100km, then exceeding rate per km over 100. Add fuel cost (trip km only).
+      if (formData.hireType === 'Outside') {
+        if (allRateCards && allRateCards.length > 0) {
+          rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
+        }
+        if (!rateCard) {
+          throw new Error('No Outside rate card found for this bus type. Please configure flat fee and exceeding km rate.');
+        }
+        setSelectedRateCard(rateCard);
+
+        const fixedRate = rateCard.flat_fee_lkr || 0;
+        const baseCoverageKm = 100;
+        const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+        const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
+
+        // For this step, ignore overtime/overnight for Outside as requested
+        const overtimeCharge = 0;
+        const overnightCharge = 0;
+
+        const hireCharge = fixedRate + exceedingDistanceCharge;
+
+        // Fuel cost on trip distance only (pickup->drop)
+        const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
+        const fuelLiters = (tripDistance / (selectedBusType.avg_km_per_l || 8));
+        const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
+
+        const grossRevenue = hireCharge * formData.numberOfBuses;
+        const customerTotalWithFuel = grossRevenue + (fuelCost * formData.numberOfBuses);
+        const commissionAmount = customerTotalWithFuel * (formData.commissionPct / 100);
+        const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + commissionAmount + (fuelCost * formData.numberOfBuses);
+        const netProfit = customerTotalWithFuel - totalExpenses;
+
+        const result = {
+          ...distanceData,
+          totalDistance,
+          fuelLiters: Math.round(fuelLiters * 10) / 10,
+          fuelCostFuelOnly: Math.round(fuelCost),
+          hireCharge: Math.round(hireCharge),
+          fixedRate: Math.round(fixedRate),
+          overtimeCharge: Math.round(overtimeCharge),
+          overnightCharge: Math.round(overnightCharge),
+          exceedingDistanceCharge: Math.round(exceedingDistanceCharge),
+          rateCardDetails: {
+            standardHours: rateCard.standard_hours,
+            actualHours: formData.expectedWorkHours,
+            overtimeHours: 0,
+            agreedDistance: baseCoverageKm,
+            actualDistance: tripDistance,
+            exceedingKm,
+            freeExceedingKm: 0,
+            chargeableExceedingKm: exceedingKm,
+            rateCardRange: `${rateCard.from_km}-${rateCard.to_km}km`,
+            rateCardId: rateCard.id
+          },
+          grossRevenue: Math.round(grossRevenue),
+          customerTotalWithFuel: Math.round(customerTotalWithFuel),
+          driverCharge: formData.driverCharge,
+          otherExpenses: [],
+          commissionPct: formData.commissionPct,
+          commissionAmount: Math.round(commissionAmount),
+          totalExpenses: Math.round(totalExpenses),
+          netProfit: Math.round(netProfit),
+          busTypeName: selectedBusType.name,
+          fuelPrice: fuelSettings.diesel_price_lkr_per_l
+        };
+
+        console.log('Final cost calculation result (Outside):', result);
+        setCostData(result);
+        toast({ 
+          title: "Cost Calculated (Outside)", 
+          description: `Trip: ${tripDistance}km | Flat: LKR ${Math.round(fixedRate).toLocaleString()} | Exceeding: LKR ${Math.round(exceedingDistanceCharge).toLocaleString()} | Total: LKR ${Math.round(hireCharge).toLocaleString()} (+ fuel)`
+        });
+
+        return;
+      }
+
+      // Default logic for other hire types (range-based)
       // Find the appropriate rate card for the distance
-      let rateCard = null;
       if (allRateCards && allRateCards.length > 0) {
         rateCard = allRateCards.find(card => 
           tripDistance >= card.from_km && tripDistance <= card.to_km
         );
-        
-        // If no exact match, find the card with the highest to_km that still covers this distance
         if (!rateCard) {
           rateCard = allRateCards
             .filter(card => tripDistance >= card.from_km)
@@ -122,39 +198,29 @@ export function CostCalculator() {
       }
 
       if (!rateCard) {
-        // Show available ranges for debugging
         const ranges = allRateCards?.map(card => `${card.from_km}-${card.to_km}km`).join(', ') || 'None';
         throw new Error(`No rate card found for ${formData.hireType} hire type, ${tripDistance}km distance. Available ranges: ${ranges}`);
       }
 
       setSelectedRateCard(rateCard);
 
-      // Calculate base charges
+      // Calculate base charges (range-based logic)
       const fixedRate = rateCard.flat_fee_lkr || 0;
-      
-      // Calculate overtime charges
       const overtimeHours = Math.max(0, formData.expectedWorkHours - rateCard.standard_hours);
       const overtimeCharge = overtimeHours * rateCard.overtime_rate_lkr_per_hour;
-      
-      // Calculate overnight charges (Outside customers only)
-      const overnightCharge = formData.hireType === 'Outside' ? 
-        formData.overnightDays * rateCard.overnight_charge_lkr_per_day : 0;
-      
-      // Calculate exceeding distance charges
+      const overnightCharge = 0;
+
       const agreedDistance = formData.agreedDistance || rateCard.to_km;
       const exceedingKm = Math.max(0, tripDistance - agreedDistance);
       const chargeableExceedingKm = Math.max(0, exceedingKm - rateCard.free_exceeding_km);
       const exceedingDistanceCharge = chargeableExceedingKm * rateCard.exceeding_km_rate_lkr;
 
-      // Calculate total hire charge
       const hireCharge = fixedRate + overtimeCharge + overnightCharge + exceedingDistanceCharge;
 
-      // Calculate fuel costs
       const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
       const fuelLiters = totalDistance / selectedBusType.avg_km_per_l;
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
-      // Calculate financial breakdown (include fuel in customer total)
       const grossRevenue = hireCharge * formData.numberOfBuses;
       const customerTotalWithFuel = grossRevenue + (fuelCost * formData.numberOfBuses);
       const commissionAmount = customerTotalWithFuel * (formData.commissionPct / 100);
