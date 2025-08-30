@@ -16,6 +16,8 @@ interface PaymentConfirmationModalProps {
     quotation_no: string;
     customer_name: string;
     gross_revenue: number;
+    advance_paid?: number;
+    balance_due?: number;
   };
   loading?: boolean;
 }
@@ -37,20 +39,30 @@ export const PaymentConfirmationModal = ({
   quotationData,
   loading = false 
 }: PaymentConfirmationModalProps) => {
-  const [paymentType, setPaymentType] = useState<'advance' | 'full' | 'other'>('advance');
-  const [amount, setAmount] = useState<number>(quotationData.gross_revenue * 0.5);
+  const advancePaid = quotationData.advance_paid || 0;
+  const balanceDue = quotationData.balance_due || quotationData.gross_revenue;
+  const isAdvanceAlreadyPaid = advancePaid > 0;
+  
+  const [paymentType, setPaymentType] = useState<'advance' | 'full' | 'final' | 'other'>(
+    isAdvanceAlreadyPaid ? 'final' : 'advance'
+  );
+  const [amount, setAmount] = useState<number>(
+    isAdvanceAlreadyPaid ? balanceDue : quotationData.gross_revenue * 0.5
+  );
   const [method, setMethod] = useState<string>('cash');
   const [reference, setReference] = useState<string>('');
   const [driverName, setDriverName] = useState<string>('');
   const [conductorName, setConductorName] = useState<string>('');
   const [busNo, setBusNo] = useState<string>('');
 
-  const handlePaymentTypeChange = (type: 'advance' | 'full' | 'other') => {
+  const handlePaymentTypeChange = (type: 'advance' | 'full' | 'final' | 'other') => {
     setPaymentType(type);
-    if (type === 'advance') {
+    if (type === 'advance' && !isAdvanceAlreadyPaid) {
       setAmount(quotationData.gross_revenue * 0.5);
     } else if (type === 'full') {
       setAmount(quotationData.gross_revenue);
+    } else if (type === 'final') {
+      setAmount(balanceDue);
     }
   };
 
@@ -90,6 +102,18 @@ export const PaymentConfirmationModal = ({
                   <p className="font-medium">Total Amount:</p>
                   <p className="text-muted-foreground">LKR {quotationData.gross_revenue.toLocaleString()}</p>
                 </div>
+                {isAdvanceAlreadyPaid && (
+                  <>
+                    <div>
+                      <p className="font-medium">Advance Paid:</p>
+                      <p className="text-green-600">LKR {advancePaid.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Balance Due:</p>
+                      <p className="text-red-600">LKR {balanceDue.toLocaleString()}</p>
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -102,17 +126,27 @@ export const PaymentConfirmationModal = ({
               <Label>Payment Type</Label>
               <RadioGroup 
                 value={paymentType} 
-                onValueChange={(value) => handlePaymentTypeChange(value as 'advance' | 'full' | 'other')}
-                className="grid grid-cols-3 gap-4"
+                onValueChange={(value) => handlePaymentTypeChange(value as 'advance' | 'full' | 'final' | 'other')}
+                className="grid grid-cols-2 gap-4"
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="advance" id="advance" />
-                  <Label htmlFor="advance">Advance Payment (50%)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="full" id="full" />
-                  <Label htmlFor="full">Full Payment (100%)</Label>
-                </div>
+                {!isAdvanceAlreadyPaid && (
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="advance" id="advance" />
+                    <Label htmlFor="advance">Advance Payment (50%)</Label>
+                  </div>
+                )}
+                {!isAdvanceAlreadyPaid && (
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="full" id="full" />
+                    <Label htmlFor="full">Full Payment (100%)</Label>
+                  </div>
+                )}
+                {isAdvanceAlreadyPaid && (
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="final" id="final" />
+                    <Label htmlFor="final">Final Payment (Balance)</Label>
+                  </div>
+                )}
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="other" id="other" />
                   <Label htmlFor="other">Custom Amount</Label>

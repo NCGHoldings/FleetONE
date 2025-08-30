@@ -80,27 +80,63 @@ export function ConfirmedTripsTable() {
   };
 
   const fetchConfirmedTrips = async () => {
-    // For now, use existing quotations with confirmed status as a temporary solution
+    // Fall back to existing quotations approach but enhance it
     const { data: quotations } = await supabase
       .from('special_hire_quotations')
       .select('*')
-      .eq('status', 'confirmed')
+      .in('status', ['confirmed', 'paid', 'completed'])
       .order('created_at', { ascending: false });
 
     if (quotations) {
-      // Map quotations to our expected format temporarily
-      const mappedTrips = quotations.map(q => ({
-        id: q.id,
-        quotation_id: q.id,
-        status: q.status,
-        total_amount: q.gross_revenue,
-        advance_paid: 0,
-        balance_due: q.gross_revenue,
-        created_at: q.created_at,
-        quotation: q,
-        payments: [],
-        invoices: []
-      }));
+      const mappedTrips = quotations.map(q => {
+        // Check localStorage for payment tracking
+        const advanceInvoice = localStorage.getItem(`invoice_${q.id}_advance`);
+        const finalInvoice = localStorage.getItem(`invoice_${q.id}_final`);
+        
+        let advancePaid = 0;
+        let invoices: any[] = [];
+        
+        if (advanceInvoice) {
+          const advance = JSON.parse(advanceInvoice);
+          advancePaid = advance.amount;
+          invoices.push({
+            id: `adv_${q.id}`,
+            invoice_no: advance.invoiceNo,
+            invoice_type: 'advance',
+            amount: advance.amount,
+            pdf_path: '',
+            issued_at: advance.generated_at
+          });
+        }
+        
+        if (finalInvoice) {
+          const final = JSON.parse(finalInvoice);
+          invoices.push({
+            id: `final_${q.id}`,
+            invoice_no: final.invoiceNo,
+            invoice_type: 'final',
+            amount: final.amount,
+            pdf_path: '',
+            issued_at: final.generated_at
+          });
+        }
+
+        return {
+          id: q.id,
+          quotation_id: q.id,
+          status: q.status,
+          total_amount: q.gross_revenue,
+          advance_paid: advancePaid,
+          balance_due: q.gross_revenue - advancePaid,
+          driver_name: undefined,
+          conductor_name: undefined,
+          bus_no: undefined,
+          created_at: q.created_at,
+          quotation: q,
+          payments: [], // Will be populated if we have payment data
+          invoices
+        };
+      });
       setTrips(mappedTrips);
     }
   };
@@ -110,10 +146,17 @@ export function ConfirmedTripsTable() {
 
     setLoading(true);
     try {
-      // Generate and store invoice
+      // Determine invoice type
+      const isFullPayment = paymentData.amount >= selectedTrip.quotation.gross_revenue;
+      const invoiceType: 'advance' | 'final' = isFullPayment || paymentData.paymentType === 'full' ? 'final' : 'advance';
+
+      // Generate invoice number
+      const invoiceNo = `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+
+      // Generate invoice data
       const invoiceData: InvoiceData = {
-        invoiceNo: `INV-${new Date().getFullYear()}-${Math.random().toString().substr(2, 4)}`,
-        invoiceType: paymentData.paymentType === 'full' ? 'final' : 'advance',
+        invoiceNo,
+        invoiceType,
         quotationNo: selectedTrip.quotation.quotation_no,
         customerName: selectedTrip.quotation.customer_name,
         customerPhone: selectedTrip.quotation.customer_phone,
@@ -127,32 +170,45 @@ export function ConfirmedTripsTable() {
         numberOfBuses: selectedTrip.quotation.number_of_buses,
         numberOfPassengers: selectedTrip.quotation.number_of_passengers,
         totalAmount: selectedTrip.quotation.gross_revenue,
+        advanceAmount: selectedTrip.advance_paid,
         paidAmount: paymentData.amount,
         companyLogo
       };
 
+      // Generate PDF
       const pdfBlob = await generateInvoicePDF(invoiceData);
       
-      // Upload invoice PDF to storage
-      const fileName = `invoices/${invoiceData.invoiceNo}.pdf`;
-      await supabase.storage
-        .from('documents')
-        .upload(fileName, pdfBlob, {
-          contentType: 'application/pdf',
-          upsert: true
-        });
+      // Auto-download the generated PDF immediately
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${invoiceNo}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      // Store invoice info in localStorage temporarily (until DB schema is fixed)
+      const storageKey = `invoice_${selectedTrip.id}_${invoiceType}`;
+      localStorage.setItem(storageKey, JSON.stringify({
+        invoiceNo,
+        invoiceType,
+        amount: paymentData.amount,
+        generated_at: new Date().toISOString()
+      }));
 
       // Update quotation status
+      let newStatus = 'paid';
+      if (invoiceType === 'final' || isFullPayment) {
+        newStatus = 'completed';
+      }
+
       await supabase
         .from('special_hire_quotations')
-        .update({ 
-          status: paymentData.paymentType === 'full' ? 'completed' : 'paid'
-        })
+        .update({ status: newStatus })
         .eq('id', selectedTrip.quotation_id);
 
       toast({
-        title: 'Payment Confirmed',
-        description: `${paymentData.paymentType === 'full' ? 'Full payment' : 'Advance payment'} confirmed and invoice generated successfully`
+        title: 'Success!',
+        description: `${invoiceType === 'final' ? 'Final payment' : 'Advance payment'} confirmed and invoice PDF downloaded successfully`
       });
 
       setPaymentModalOpen(false);
@@ -225,13 +281,9 @@ export function ConfirmedTripsTable() {
   };
 
   const getPaymentStatusBadge = (trip: ConfirmedTrip) => {
-    const hasAdvancePayment = trip.payments.some(p => p.payment_type === 'advance' && p.payment_status === 'confirmed');
-    const hasFullPayment = trip.payments.some(p => p.payment_type === 'full' && p.payment_status === 'confirmed');
-    const hasFinalPayment = trip.payments.some(p => p.payment_type === 'final' && p.payment_status === 'confirmed');
-
-    if (hasFullPayment || (hasAdvancePayment && hasFinalPayment)) {
+    if (trip.status === 'completed' || trip.balance_due <= 0) {
       return <Badge variant="default" className="bg-green-500">Fully Paid</Badge>;
-    } else if (hasAdvancePayment) {
+    } else if (trip.advance_paid > 0) {
       return <Badge variant="secondary">Advance Paid</Badge>;
     } else {
       return <Badge variant="outline">Payment Pending</Badge>;
@@ -420,7 +472,9 @@ export function ConfirmedTripsTable() {
           quotationData={{
             quotation_no: selectedTrip.quotation.quotation_no,
             customer_name: selectedTrip.quotation.customer_name,
-            gross_revenue: selectedTrip.quotation.gross_revenue
+            gross_revenue: selectedTrip.quotation.gross_revenue,
+            advance_paid: selectedTrip.advance_paid,
+            balance_due: selectedTrip.balance_due
           }}
           loading={loading}
         />
