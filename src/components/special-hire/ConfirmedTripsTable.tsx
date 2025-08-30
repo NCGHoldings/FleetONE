@@ -135,52 +135,87 @@ export function ConfirmedTripsTable() {
 
     setLoading(true);
     try {
-      // Upload file to Supabase Storage
       const fileExt = paymentProof.name.split('.').pop();
       const fileName = `payment-proof-${selectedTrip.quotation_no}-${Date.now()}.${fileExt}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
+
+      const { error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(fileName, paymentProof);
+        .upload(fileName, paymentProof, {
+          contentType: paymentProof.type,
+          upsert: true,
+        });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
-      // Update payment record
+      // Store the storage path only. We'll generate a signed URL when viewing.
       const { error: updateError } = await supabase
         .from('trip_payments')
         .update({
-          payment_proof_url: publicUrl,
+          payment_proof_url: fileName,
           payment_proof_filename: paymentProof.name,
-          payment_status: 'received'
+          payment_status: 'received',
         })
         .eq('id', selectedTrip.advance_payment.id);
 
       if (updateError) throw updateError;
 
       toast({
-        title: "Payment Proof Uploaded",
-        description: "Payment proof has been uploaded successfully"
+        title: 'Payment Proof Uploaded',
+        description: 'Payment proof has been uploaded successfully',
       });
 
       setProofModalOpen(false);
       setPaymentProof(null);
       fetchConfirmedTrips();
-
     } catch (error: any) {
       console.error('Error uploading payment proof:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to upload payment proof",
-        variant: "destructive"
+        title: 'Error',
+        description: error.message || 'Failed to upload payment proof',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const openPaymentProof = async (trip: ConfirmedTrip) => {
+    const raw = trip.advance_payment?.payment_proof_url;
+    if (!raw) return;
+
+    let storagePath = raw;
+
+    // If a full URL was previously stored for a private bucket, convert it to a storage path
+    if (/^https?:\/\//i.test(raw)) {
+      try {
+        const match = raw.match(/\/storage\/v1\/object\/public\/documents\/(.*)$/);
+        if (match && match[1]) {
+          storagePath = match[1];
+        } else {
+          // Not a Supabase public URL to documents; just open as-is
+          window.open(raw, '_blank');
+          return;
+        }
+      } catch {
+        window.open(raw, '_blank');
+        return;
+      }
+    }
+
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(storagePath, 60 * 10);
+
+    if (error || !data?.signedUrl) {
+      toast({
+        title: 'Error',
+        description: 'Unable to open payment proof. Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    window.open(data.signedUrl, '_blank');
   };
 
   const getStatusBadge = (status: string) => {
@@ -289,7 +324,7 @@ export function ConfirmedTripsTable() {
 
                       {trip.advance_payment?.payment_proof_url && (
                         <Button
-                          onClick={() => window.open(trip.advance_payment?.payment_proof_url, '_blank')}
+                          onClick={() => openPaymentProof(trip)}
                           size="sm"
                           variant="outline"
                         >
