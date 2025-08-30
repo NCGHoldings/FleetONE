@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, FileText, Calculator, MapPin, Truck } from 'lucide-react';
 import { CostCalculator } from "@/components/special-hire/CostCalculator";
+import { EnhancedCostCalculator } from "@/components/special-hire/EnhancedCostCalculator";
+import { ConfirmedTripsTable } from "@/components/special-hire/ConfirmedTripsTable";
 import { RateCardsAdmin } from "@/components/special-hire/RateCardsAdmin";
 import { BusTypesAdmin } from "@/components/special-hire/BusTypesAdmin";
 import { FuelSettingsAdmin } from "@/components/special-hire/FuelSettingsAdmin";
@@ -128,9 +130,10 @@ export default function SpecialHire() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="quotations">Quotations</TabsTrigger>
-          <TabsTrigger value="calculator">Cost Calculator</TabsTrigger>
+          <TabsTrigger value="trip-calculator">Trip Calculator</TabsTrigger>
+          <TabsTrigger value="confirmed-trips">Confirmed Trips</TabsTrigger>
           <TabsTrigger value="bus-types">Bus Types</TabsTrigger>
           <TabsTrigger value="rate-cards">Rate Cards</TabsTrigger>
           <TabsTrigger value="fuel-settings">Fuel Settings</TabsTrigger>
@@ -141,8 +144,12 @@ export default function SpecialHire() {
           <QuotationsList onRefresh={loadStats} />
         </TabsContent>
 
-        <TabsContent value="calculator" className="space-y-4">
-          <CostCalculator />
+        <TabsContent value="trip-calculator" className="space-y-4">
+          <EnhancedCostCalculator />
+        </TabsContent>
+
+        <TabsContent value="confirmed-trips" className="space-y-4">
+          <ConfirmedTripsTable />
         </TabsContent>
 
         <TabsContent value="bus-types" className="space-y-4">

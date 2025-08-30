@@ -1925,6 +1925,284 @@ export type Database = {
         }
         Relationships: []
       }
+      trip_confirmations: {
+        Row: {
+          actual_bus_number: string | null
+          actual_conductor_id: string | null
+          actual_distance_km: number | null
+          actual_driver_id: string | null
+          actual_fuel_cost: number | null
+          bus_type_id: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          customer_name: string
+          drop_datetime: string
+          drop_location: string
+          id: string
+          number_of_buses: number
+          number_of_passengers: number
+          pickup_datetime: string
+          pickup_location: string
+          quotation_id: string
+          quotation_no: string
+          status: string
+          trip_completed_at: string | null
+          trip_started_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_bus_number?: string | null
+          actual_conductor_id?: string | null
+          actual_distance_km?: number | null
+          actual_driver_id?: string | null
+          actual_fuel_cost?: number | null
+          bus_type_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          customer_name: string
+          drop_datetime: string
+          drop_location: string
+          id?: string
+          number_of_buses?: number
+          number_of_passengers: number
+          pickup_datetime: string
+          pickup_location: string
+          quotation_id: string
+          quotation_no: string
+          status?: string
+          trip_completed_at?: string | null
+          trip_started_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_bus_number?: string | null
+          actual_conductor_id?: string | null
+          actual_distance_km?: number | null
+          actual_driver_id?: string | null
+          actual_fuel_cost?: number | null
+          bus_type_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          customer_name?: string
+          drop_datetime?: string
+          drop_location?: string
+          id?: string
+          number_of_buses?: number
+          number_of_passengers?: number
+          pickup_datetime?: string
+          pickup_location?: string
+          quotation_id?: string
+          quotation_no?: string
+          status?: string
+          trip_completed_at?: string | null
+          trip_started_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_confirmations_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          expense_description: string | null
+          expense_type: string
+          id: string
+          is_estimated: boolean | null
+          notes: string | null
+          trip_confirmation_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          expense_description?: string | null
+          expense_type: string
+          id?: string
+          is_estimated?: boolean | null
+          notes?: string | null
+          trip_confirmation_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          expense_description?: string | null
+          expense_type?: string
+          id?: string
+          is_estimated?: boolean | null
+          notes?: string | null
+          trip_confirmation_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_expenses_trip_confirmation_id_fkey"
+            columns: ["trip_confirmation_id"]
+            isOneToOne: false
+            referencedRelation: "trip_confirmations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_invoices: {
+        Row: {
+          additional_charges: number | null
+          advance_paid: number | null
+          balance_due: number | null
+          created_at: string
+          created_by: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          due_date: string | null
+          final_amount: number
+          id: string
+          invoice_date: string
+          invoice_no: string
+          invoice_status: string
+          quotation_no: string
+          refund_amount: number | null
+          total_actual_amount: number
+          total_quoted_amount: number
+          trip_confirmation_id: string
+          updated_at: string
+        }
+        Insert: {
+          additional_charges?: number | null
+          advance_paid?: number | null
+          balance_due?: number | null
+          created_at?: string
+          created_by?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          due_date?: string | null
+          final_amount?: number
+          id?: string
+          invoice_date?: string
+          invoice_no?: string
+          invoice_status?: string
+          quotation_no: string
+          refund_amount?: number | null
+          total_actual_amount?: number
+          total_quoted_amount?: number
+          trip_confirmation_id: string
+          updated_at?: string
+        }
+        Update: {
+          additional_charges?: number | null
+          advance_paid?: number | null
+          balance_due?: number | null
+          created_at?: string
+          created_by?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          due_date?: string | null
+          final_amount?: number
+          id?: string
+          invoice_date?: string
+          invoice_no?: string
+          invoice_status?: string
+          quotation_no?: string
+          refund_amount?: number | null
+          total_actual_amount?: number
+          total_quoted_amount?: number
+          trip_confirmation_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_invoices_trip_confirmation_id_fkey"
+            columns: ["trip_confirmation_id"]
+            isOneToOne: false
+            referencedRelation: "trip_confirmations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          payment_date: string | null
+          payment_method: string | null
+          payment_proof_filename: string | null
+          payment_proof_url: string | null
+          payment_reference: string | null
+          payment_status: string
+          payment_type: string
+          quotation_no: string
+          received_at: string | null
+          received_by: string | null
+          rejection_reason: string | null
+          rounded_amount: number
+          trip_confirmation_id: string
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_proof_filename?: string | null
+          payment_proof_url?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          payment_type?: string
+          quotation_no: string
+          received_at?: string | null
+          received_by?: string | null
+          rejection_reason?: string | null
+          rounded_amount: number
+          trip_confirmation_id: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_proof_filename?: string | null
+          payment_proof_url?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          payment_type?: string
+          quotation_no?: string
+          received_at?: string | null
+          received_by?: string | null
+          rejection_reason?: string | null
+          rounded_amount?: number
+          trip_confirmation_id?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_payments_trip_confirmation_id_fkey"
+            columns: ["trip_confirmation_id"]
+            isOneToOne: false
+            referencedRelation: "trip_confirmations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           assigned_at: string | null
