@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { FileText, Eye, Edit, Mail, Download, Search } from 'lucide-react';
+import { FileText, Eye, Edit, Mail, Download, Search, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { QuotationModal } from './QuotationModal';
@@ -156,6 +156,10 @@ export function QuotationsList({ onRefresh }: Props) {
     setShowModal(true);
   };
 
+  const handleSendQuotation = async (quotation: Quotation) => {
+    await handleStatusUpdate(quotation.id, 'sent');
+  };
+
   const handleEmailQuotation = (quotation: Quotation) => {
     if (quotation.customer_email) {
       const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
@@ -264,7 +268,7 @@ export function QuotationsList({ onRefresh }: Props) {
       cell: ({ row }) => {
         const quotation = row.original;
         return (
-          <div className="flex space-x-2">
+          <div className="flex space-x-1">
             <Button 
               variant="outline" 
               size="sm" 
@@ -273,9 +277,38 @@ export function QuotationsList({ onRefresh }: Props) {
             >
               <Eye className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" title="Edit Quotation">
-              <Edit className="h-4 w-4" />
-            </Button>
+            {quotation.status === 'draft' && (
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => handleSendQuotation(quotation)}
+                title="Send Quotation"
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            )}
+            {quotation.status === 'sent' && (
+              <>
+                <Button 
+                  variant="default"
+                  size="sm" 
+                  onClick={() => handleStatusUpdate(quotation.id, 'confirmed')}
+                  title="Confirm Quotation"
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  Confirm
+                </Button>
+                <Button 
+                  variant="destructive"
+                  size="sm" 
+                  onClick={() => handleStatusUpdate(quotation.id, 'declined')}
+                  title="Decline Quotation"
+                >
+                  Decline
+                </Button>
+              </>
+            )}
             <Button 
               variant="outline" 
               size="sm" 
