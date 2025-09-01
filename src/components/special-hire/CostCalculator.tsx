@@ -123,14 +123,45 @@ export function CostCalculator() {
         const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
         const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
 
-        // For this step, ignore overtime/overnight for Outside as requested
-        const overtimeCharge = 0;
-        const overnightCharge = 0;
+        // Calculate total distance first
+        const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
+        
+        // Calculate extra time charges for Outside hire type using work hours
+        let overtimeCharge = 0;
+        let overnightCharge = 0;
+        let totalExtraTimeCharge = 0;
+        
+        if (formData.expectedWorkHours && formData.expectedWorkHours > 0) {
+          const estimatedActualHours = formData.expectedWorkHours;
+          const availableHours = totalDistance / 10; // baseline speed 10 kmph
+          const extraHours = Math.max(0, estimatedActualHours - availableHours);
+          
+          if (extraHours > 0) {
+            if (extraHours <= 10) {
+              overtimeCharge = extraHours * (rateCard.overtime_rate_lkr_per_hour || 500);
+            } else {
+              // First night block
+              overnightCharge += (rateCard.overnight_charge_lkr_per_day || 3000);
+              let remaining = extraHours - 24;
+              
+              // Additional blocks
+              while (remaining > 0) {
+                if (remaining > 10) {
+                  overnightCharge += (rateCard.overnight_charge_lkr_per_day || 3000);
+                  remaining -= 24;
+                } else {
+                  overtimeCharge += remaining * (rateCard.overtime_rate_lkr_per_hour || 500);
+                  remaining = 0;
+                }
+              }
+            }
+            totalExtraTimeCharge = overtimeCharge + overnightCharge;
+          }
+        }
 
-        const hireCharge = fixedRate + exceedingDistanceCharge;
+        const hireCharge = fixedRate + exceedingDistanceCharge + totalExtraTimeCharge;
 
         // Fuel cost on empty running only (parking→pickup + drop→parking)
-        const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
         const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
         const fuelLiters = (emptyRunKm / (selectedBusType.avg_km_per_l || 8));
         const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;

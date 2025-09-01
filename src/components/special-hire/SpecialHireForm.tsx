@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CostBreakdown } from './CostBreakdown';
 import { LocationAutocomplete } from '@/components/ui/location-autocomplete';
+import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
 
 const formSchema = z.object({
   // Customer Details
@@ -201,7 +202,30 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
       const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
       const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
       
-      const hireCharge = fixedRate + exceedingDistanceCharge;
+      // Calculate extra time charges for Outside hire type
+      let overtimeCharge = 0;
+      let overnightCharge = 0;
+      let totalExtraTimeCharge = 0;
+      
+      if (data.hireType === 'Outside') {
+        const totalDistance = tripDistance + (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
+        const extraTimeResult = calculateExtraTimeCharge(
+          totalDistance,
+          data.pickupDateTime,
+          data.dropDateTime,
+          {
+            baselineSpeedKmph: 10,
+            hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000
+          }
+        );
+        
+        overtimeCharge = extraTimeResult.overtimeCharge;
+        overnightCharge = extraTimeResult.overnightCharge;
+        totalExtraTimeCharge = extraTimeResult.totalExtraCharge;
+      }
+      
+      const hireCharge = fixedRate + exceedingDistanceCharge + totalExtraTimeCharge;
 
       // Fuel cost on empty running only (parking→pickup + drop→parking)
       const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
@@ -221,7 +245,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         km_drop_to_parking: Math.round((distanceData.kmDropToParking || 0) * 10) / 10,
         fuel_cost_fuel_only: Math.round(fuelCost),
         hire_charge: Math.round(hireCharge),
-        extra_charges: 0,
+        extra_charges: Math.round(totalExtraTimeCharge),
         gross_revenue: Math.round(grossRevenue), // Save hire charges only (flat fee + exceeding)
         driver_charge: driverCharge,
         other_expenses: [],
@@ -240,12 +264,12 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         hireCharge: Math.round(hireCharge),
         fixedRate: Math.round(fixedRate),
         exceedingDistanceCharge: Math.round(exceedingDistanceCharge),
-        overtimeCharge: 0,
-        overnightCharge: 0,
+        overtimeCharge: Math.round(overtimeCharge),
+        overnightCharge: Math.round(overnightCharge),
         rateCardDetails: {
           standardHours: rateCard.standard_hours || 8,
-          actualHours: 8,
-          overtimeHours: 0,
+          actualHours: data.hireType === 'Outside' ? Math.round(((new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60)) * 100) / 100 : 8,
+          overtimeHours: data.hireType === 'Outside' ? Math.round((Math.max(0, (new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60) - ((tripDistance + (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0)) / 10))) * 100) / 100 : 0,
           agreedDistance: baseCoverageKm,
           actualDistance: tripDistance,
           exceedingKm,
