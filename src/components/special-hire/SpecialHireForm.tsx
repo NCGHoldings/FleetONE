@@ -624,14 +624,44 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
                             </FormControl>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              disabled={(date) => date < new Date()}
-                              initialFocus
-                              className="pointer-events-auto"
-                            />
+                            <div className="flex">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    const newDateTime = new Date(date);
+                                    if (field.value) {
+                                      newDateTime.setHours(field.value.getHours());
+                                      newDateTime.setMinutes(field.value.getMinutes());
+                                    }
+                                    field.onChange(newDateTime);
+                                  }
+                                }}
+                                disabled={(date) => date < new Date()}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                              <div className="border-l p-3 space-y-3">
+                                <div className="text-sm font-medium">Time</div>
+                                <div className="space-y-2">
+                                  <Input
+                                    type="time"
+                                    value={field.value ? format(field.value, "HH:mm") : ""}
+                                    onChange={(e) => {
+                                      if (e.target.value && field.value) {
+                                        const [hours, minutes] = e.target.value.split(':');
+                                        const newDateTime = new Date(field.value);
+                                        newDateTime.setHours(parseInt(hours));
+                                        newDateTime.setMinutes(parseInt(minutes));
+                                        field.onChange(newDateTime);
+                                      }
+                                    }}
+                                    className="w-[120px]"
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           </PopoverContent>
                         </Popover>
                         <FormMessage />
@@ -665,14 +695,50 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
                             </FormControl>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              disabled={(date) => date < new Date()}
-                              initialFocus
-                              className="pointer-events-auto"
-                            />
+                            <div className="flex">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    const newDateTime = new Date(date);
+                                    if (field.value) {
+                                      newDateTime.setHours(field.value.getHours());
+                                      newDateTime.setMinutes(field.value.getMinutes());
+                                    }
+                                    field.onChange(newDateTime);
+                                  }
+                                }}
+                                disabled={(date) => date < new Date()}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                              <div className="border-l p-3 space-y-3">
+                                <div className="text-sm font-medium">Time</div>
+                                <div className="space-y-2">
+                                  <Input
+                                    type="time"
+                                    value={field.value ? format(field.value, "HH:mm") : ""}
+                                    onChange={(e) => {
+                                      if (e.target.value && field.value) {
+                                        const [hours, minutes] = e.target.value.split(':');
+                                        const newDateTime = new Date(field.value);
+                                        newDateTime.setHours(parseInt(hours));
+                                        newDateTime.setMinutes(parseInt(minutes));
+                                      } else if (e.target.value) {
+                                        // If no date is set, set to today with selected time
+                                        const [hours, minutes] = e.target.value.split(':');
+                                        const newDateTime = new Date();
+                                        newDateTime.setHours(parseInt(hours));
+                                        newDateTime.setMinutes(parseInt(minutes));
+                                        field.onChange(newDateTime);
+                                      }
+                                    }}
+                                    className="w-[120px]"
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           </PopoverContent>
                         </Popover>
                         <FormMessage />
