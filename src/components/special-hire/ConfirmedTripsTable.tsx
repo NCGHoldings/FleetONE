@@ -172,9 +172,13 @@ export function ConfirmedTripsTable() {
         totalAmount: selectedTrip.quotation.gross_revenue,
         advanceAmount: selectedTrip.advance_paid,
         paidAmount: paymentData.amount,
-        companyLogo
+        companyLogo,
+        // New fields for NCG template
+        vehicleNo: paymentData.busNo,
+        driverName: paymentData.driverName,
+        conductorName: paymentData.conductorName,
+        itemDetail: `${format(new Date(selectedTrip.quotation.pickup_datetime), 'dd/MM/yyyy')} ${selectedTrip.quotation.pickup_location} → ${selectedTrip.quotation.drop_location}; ${selectedTrip.quotation.number_of_passengers} Pax, ${selectedTrip.quotation.number_of_buses} bus(es), Standard Bus`,
       };
-
       // Generate PDF
       const pdfBlob = await generateInvoicePDF(invoiceData);
       
@@ -250,9 +254,13 @@ export function ConfirmedTripsTable() {
       totalAmount: trip.quotation.gross_revenue,
       advanceAmount: trip.advance_paid,
       paidAmount: invoice.amount,
-      companyLogo
+      companyLogo,
+      // New fields for NCG template
+      vehicleNo: trip.bus_no,
+      driverName: trip.driver_name,
+      conductorName: trip.conductor_name,
+      itemDetail: `${format(new Date(trip.quotation.pickup_datetime), 'dd/MM/yyyy')} ${trip.quotation.pickup_location} → ${trip.quotation.drop_location}; ${trip.quotation.number_of_passengers} Pax, ${trip.quotation.number_of_buses} bus(es), ${busTypeName}`,
     };
-
     setCurrentInvoiceData(invoiceData);
     setInvoiceViewerOpen(true);
   };

@@ -22,123 +22,139 @@ export interface InvoiceData {
   balanceAmount?: number;
   paidAmount: number;
   companyLogo?: string;
+  // New optional fields to align with NCG invoice template
+  vehicleNo?: string;
+  driverName?: string;
+  conductorName?: string;
+  itemDetail?: string;
+  discountAmount?: number;
 }
 
 export const generateInvoiceHTML = (data: InvoiceData): string => {
   const isAdvanceInvoice = data.invoiceType === 'advance';
   const currentDate = format(new Date(), 'dd/MM/yyyy');
-  
+  const discount = data.discountAmount || 0;
+  const subTotal = data.totalAmount;
+  const totalAfterDiscount = Math.max(subTotal - discount, 0);
+  const previousAdvance = !isAdvanceInvoice ? (data.advanceAmount || 0) : 0;
+  const totalPaid = previousAdvance + data.paidAmount;
+
+  const itemDetail = data.itemDetail || `Date(s): ${format(data.pickupDate, 'dd/MM/yyyy')} - ${format(data.dropDate, 'dd/MM/yyyy')} | ${data.numberOfPassengers} Pax | ${data.numberOfBuses} Bus(es) | ${data.busType}`;
+
   return `
-    <div style="width: 210mm; min-height: 297mm; margin: 0; padding: 20mm; font-family: Arial, sans-serif; background: white; color: black;">
+    <div style="width: 210mm; min-height: 297mm; margin: 0; padding: 16mm; font-family: Arial, sans-serif; background: white; color: #111827;">
       <!-- Header -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px;">
+      <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
         <div style="flex: 1;">
-          ${data.companyLogo ? `<img src="${data.companyLogo}" style="max-width: 120px; max-height: 80px; margin-bottom: 10px;" alt="Company Logo">` : ''}
-          <h1 style="margin: 0; color: #2563eb; font-size: 28px; font-weight: bold;">Your Company Name</h1>
-          <p style="margin: 5px 0; color: #64748b; font-size: 14px;">Address Line 1<br>City, Postal Code<br>Phone: +94 XX XXX XXXX<br>Email: info@company.com</p>
+          ${data.companyLogo ? `<img src="${data.companyLogo}" alt="Company Logo" style="max-height: 80px; object-fit: contain; margin-bottom: 8px;"/>` : ''}
+          <div style="font-size: 22px; font-weight: 700; letter-spacing: 0.5px;">NCG Express</div>
+          <div style="font-size: 12px; color: #6B7280; line-height: 1.4;">
+            Address line<br/>
+            Phone | Email
+          </div>
         </div>
         <div style="text-align: right;">
-          <h2 style="margin: 0; color: #dc2626; font-size: 24px; font-weight: bold;">${isAdvanceInvoice ? 'ADVANCE PAYMENT' : 'FINAL INVOICE'}</h2>
-          <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
-            <p style="margin: 0; font-weight: bold;">Invoice No: ${data.invoiceNo}</p>
-            <p style="margin: 5px 0 0 0;">Date: ${currentDate}</p>
+          <div style="font-size: 24px; font-weight: 800; color: ${isAdvanceInvoice ? '#065f46' : '#1f2937'}; text-transform: uppercase;">
+            ${isAdvanceInvoice ? 'Advance Payment' : 'Final Invoice'}
+          </div>
+          <div style="margin-top: 8px; background: #F3F4F6; padding: 12px; border-radius: 8px; font-size: 12px;">
+            <div><strong>Invoice No:</strong> ${data.invoiceNo}</div>
+            <div><strong>Date:</strong> ${currentDate}</div>
+            <div><strong>Quotation No:</strong> ${data.quotationNo}</div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <!-- Customer Information -->
-      <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
-        <div style="flex: 1; margin-right: 20px;">
-          <h3 style="margin: 0 0 15px 0; color: #374151; font-size: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">BILL TO</h3>
-          <p style="margin: 0; font-weight: bold; font-size: 16px;">${data.customerName}</p>
-          ${data.companyName ? `<p style="margin: 5px 0;">${data.companyName}</p>` : ''}
-          <p style="margin: 5px 0;">Phone: ${data.customerPhone}</p>
-          ${data.customerEmail ? `<p style="margin: 5px 0;">Email: ${data.customerEmail}</p>` : ''}
-        </div>
-        <div style="flex: 1;">
-          <h3 style="margin: 0 0 15px 0; color: #374151; font-size: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">SERVICE DETAILS</h3>
-          <p style="margin: 0;"><strong>Quotation:</strong> ${data.quotationNo}</p>
-          <p style="margin: 5px 0;"><strong>Service Type:</strong> Special Hire</p>
-          <p style="margin: 5px 0;"><strong>Bus Type:</strong> ${data.busType}</p>
-          <p style="margin: 5px 0;"><strong>Number of Buses:</strong> ${data.numberOfBuses}</p>
-          <p style="margin: 5px 0;"><strong>Passengers:</strong> ${data.numberOfPassengers}</p>
-        </div>
-      </div>
+      <!-- Parties -->
+      <section style="display: flex; gap: 16px; margin-bottom: 16px;">
+        <article style="flex:1; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px;">
+          <div style="font-size: 12px; color: #6B7280; font-weight: 700;">Bill To</div>
+          <div style="font-size: 16px; font-weight: 700; margin-top: 4px;">${data.customerName}</div>
+          ${data.companyName ? `<div style=\"margin-top:4px; font-size: 14px;\">${data.companyName}</div>` : ''}
+          <div style="margin-top: 4px; font-size: 14px;">${data.customerPhone}${data.customerEmail ? ` | ${data.customerEmail}` : ''}</div>
+        </article>
+        <article style="flex:1; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px;">
+          <div style="font-size: 12px; color: #6B7280; font-weight: 700;">Trip</div>
+          <div style="margin-top: 4px; font-size: 14px;"><strong>From:</strong> ${data.pickupLocation}</div>
+          <div style="margin-top: 2px; font-size: 14px;"><strong>To:</strong> ${data.dropLocation}</div>
+          <div style="margin-top: 2px; font-size: 14px;"><strong>Date(s):</strong> ${format(data.pickupDate, 'dd/MM/yyyy')} - ${format(data.dropDate, 'dd/MM/yyyy')}</div>
+        </article>
+      </section>
 
-      <!-- Trip Details -->
-      <div style="margin-bottom: 30px;">
-        <h3 style="margin: 0 0 15px 0; color: #374151; font-size: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">TRIP INFORMATION</h3>
-        <div style="background: #f9fafb; padding: 20px; border-radius: 8px; border-left: 4px solid #2563eb;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-            <div style="flex: 1; margin-right: 20px;">
-              <p style="margin: 0; font-weight: bold; color: #16a34a;">FROM</p>
-              <p style="margin: 5px 0; font-size: 16px;">${data.pickupLocation}</p>
-              <p style="margin: 0; color: #64748b;">Date: ${format(data.pickupDate, 'dd/MM/yyyy')}</p>
-            </div>
-            <div style="flex: 1;">
-              <p style="margin: 0; font-weight: bold; color: #dc2626;">TO</p>
-              <p style="margin: 5px 0; font-size: 16px;">${data.dropLocation}</p>
-              <p style="margin: 0; color: #64748b;">Date: ${format(data.dropDate, 'dd/MM/yyyy')}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Financial Summary -->
-      <div style="margin-bottom: 30px;">
-        <h3 style="margin: 0 0 15px 0; color: #374151; font-size: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">PAYMENT DETAILS</h3>
-        <table style="width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e7eb;">
-          <tr style="background: #f3f4f6;">
-            <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold;">Description</td>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold; text-align: right;">Amount (LKR)</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border: 1px solid #e5e7eb;">Total Service Charge</td>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; text-align: right;">${data.totalAmount.toLocaleString()}.00</td>
-          </tr>
-          ${isAdvanceInvoice ? `
-          <tr>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold; color: #16a34a;">Advance Payment (This Invoice)</td>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold; color: #16a34a;">${data.paidAmount.toLocaleString()}.00</td>
-          </tr>
-          <tr>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold; color: #dc2626;">Remaining Balance</td>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold; color: #dc2626;">${(data.totalAmount - data.paidAmount).toLocaleString()}.00</td>
-          </tr>
-          ` : `
-          ${data.advanceAmount ? `
-          <tr>
-            <td style="padding: 12px; border: 1px solid #e5e7eb;">Previous Advance Payment</td>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; text-align: right;">${data.advanceAmount.toLocaleString()}.00</td>
-          </tr>
-          ` : ''}
-          <tr>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold; color: #16a34a;">Final Payment (This Invoice)</td>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold; color: #16a34a;">${data.paidAmount.toLocaleString()}.00</td>
-          </tr>
-          <tr style="background: #16a34a; color: white;">
-            <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold;">TOTAL PAID</td>
-            <td style="padding: 12px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold;">${(data.advanceAmount ? data.advanceAmount + data.paidAmount : data.paidAmount).toLocaleString()}.00</td>
-          </tr>
-          `}
+      <!-- Items table -->
+      <section>
+        <table style="width:100%; border-collapse: collapse; border: 1px solid #E5E7EB;">
+          <thead>
+            <tr style="background:#F9FAFB;">
+              <th style="text-align:left; padding:10px; border-bottom:1px solid #E5E7EB; font-size:12px; color:#6B7280; width:28%">Description</th>
+              <th style="text-align:left; padding:10px; border-bottom:1px solid #E5E7EB; font-size:12px; color:#6B7280; width:44%">Item Detail</th>
+              <th style="text-align:left; padding:10px; border-bottom:1px solid #E5E7EB; font-size:12px; color:#6B7280; width:14%">Vehicle No</th>
+              <th style="text-align:right; padding:10px; border-bottom:1px solid #E5E7EB; font-size:12px; color:#6B7280; width:14%">Amount (LKR)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:10px; border-bottom:1px solid #F3F4F6; font-weight:600;">Special Hire</td>
+              <td style="padding:10px; border-bottom:1px solid #F3F4F6;">
+                ${itemDetail}
+                ${data.driverName || data.conductorName ? `<div style=\"margin-top:4px; font-size:12px; color:#6B7280;\">${data.driverName ? `Driver: ${data.driverName}` : ''}${data.driverName && data.conductorName ? ' | ' : ''}${data.conductorName ? `Conductor: ${data.conductorName}` : ''}</div>` : ''}
+              </td>
+              <td style="padding:10px; border-bottom:1px solid #F3F4F6;">${data.vehicleNo || '-'}</td>
+              <td style="padding:10px; border-bottom:1px solid #F3F4F6; text-align:right;">${subTotal.toLocaleString()}.00</td>
+            </tr>
+          </tbody>
         </table>
-      </div>
+      </section>
 
-      <!-- Terms and Footer -->
-      <div style="margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-        <h4 style="margin: 0 0 10px 0; color: #374151;">Terms & Conditions:</h4>
-        <ul style="margin: 0; padding-left: 20px; color: #64748b; font-size: 12px;">
-          <li>Payment must be made as per the agreed schedule</li>
-          <li>Service is subject to terms and conditions mentioned in the quotation</li>
-          <li>Any changes to the service schedule must be notified 24 hours in advance</li>
-          <li>Company reserves the right to modify terms with prior notice</li>
-        </ul>
-        
-        <div style="margin-top: 30px; text-align: center; color: #64748b; font-size: 12px; border-top: 1px solid #e5e7eb; padding-top: 15px;">
-          <p style="margin: 0;">Thank you for choosing our services!</p>
-          <p style="margin: 5px 0 0 0;">This is a computer generated invoice and does not require signature.</p>
-        </div>
-      </div>
+      <!-- Summary -->
+      <section style="margin-top: 16px; display:flex; justify-content:flex-end;">
+        <table style="width: 60%; border-collapse: collapse;">
+          <tbody>
+            <tr>
+              <td style="padding:8px; color:#6B7280;">Sub-total</td>
+              <td style="padding:8px; text-align:right;">${subTotal.toLocaleString()}.00</td>
+            </tr>
+            <tr>
+              <td style="padding:8px; color:#6B7280;">Discount</td>
+              <td style="padding:8px; text-align:right;">${discount.toLocaleString()}.00</td>
+            </tr>
+            <tr style="border-top:1px solid #E5E7EB;">
+              <td style="padding:8px; font-weight:700;">Price after discount</td>
+              <td style="padding:8px; text-align:right; font-weight:700;">${totalAfterDiscount.toLocaleString()}.00</td>
+            </tr>
+            ${isAdvanceInvoice ? `
+            <tr>
+              <td style="padding:8px; font-weight:700; color:#065f46;">Advance Payment (this invoice)</td>
+              <td style="padding:8px; text-align:right; font-weight:700; color:#065f46;">${data.paidAmount.toLocaleString()}.00</td>
+            </tr>
+            <tr style="background:#FEF2F2;">
+              <td style="padding:8px; font-weight:700; color:#b91c1c;">Balance Payment</td>
+              <td style="padding:8px; text-align:right; font-weight:700; color:#b91c1c;">${(totalAfterDiscount - data.paidAmount).toLocaleString()}.00</td>
+            </tr>
+            ` : `
+            ${previousAdvance ? `
+            <tr>
+              <td style="padding:8px;">Previous Advance Payment</td>
+              <td style="padding:8px; text-align:right;">${previousAdvance.toLocaleString()}.00</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding:8px; font-weight:700; color:#065f46;">Final Payment (this invoice)</td>
+              <td style="padding:8px; text-align:right; font-weight:700; color:#065f46;">${data.paidAmount.toLocaleString()}.00</td>
+            </tr>
+            <tr style="background:#059669; color:white;">
+              <td style="padding:8px; font-weight:700;">Total Paid</td>
+              <td style="padding:8px; text-align:right; font-weight:700;">${totalPaid.toLocaleString()}.00</td>
+            </tr>
+            `}
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Footer -->
+      <footer style="margin-top: 24px; border-top: 1px solid #E5E7EB; padding-top: 12px; font-size: 12px; color:#6B7280;">
+        <div>Thank you for your business.</div>
+        <div style="margin-top: 6px;">This is a computer-generated document and does not require a signature.</div>
+      </footer>
     </div>
   `;
 };
