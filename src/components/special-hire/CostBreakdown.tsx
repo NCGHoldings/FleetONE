@@ -16,6 +16,7 @@ interface CostData {
   rateCardDetails?: {
     standardHours: number;
     actualHours: number;
+    availableHours?: number;
     overtimeHours: number;
     agreedDistance: number;
     actualDistance: number;
@@ -145,16 +146,25 @@ export function CostBreakdown({ data }: Props) {
         {/* Working Hours Analysis */}
         <div>
           <h4 className="font-medium mb-2">Working Hours Analysis</h4>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="text-center">
               <div className="font-medium text-blue-600">{safeData.rateCardDetails?.standardHours || 0} hrs</div>
               <div className="text-muted-foreground">Standard</div>
+            </div>
+            <div className="text-center">
+              <div className="font-medium text-orange-600">{safeData.rateCardDetails?.availableHours?.toFixed(1) || '0.0'} hrs</div>
+              <div className="text-muted-foreground">Available</div>
             </div>
             <div className="text-center">
               <div className="font-medium text-green-600">{safeData.rateCardDetails?.actualHours || 0} hrs</div>
               <div className="text-muted-foreground">Actual</div>
             </div>
           </div>
+          {safeData.rateCardDetails?.availableHours && (
+            <div className="text-xs text-muted-foreground mt-1 text-center">
+              Available: {safeData.kmTrip}km ÷ 10 kmph = {safeData.rateCardDetails.availableHours.toFixed(1)} hrs
+            </div>
+          )}
         </div>
 
         <Separator />

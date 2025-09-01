@@ -208,9 +208,9 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
       let totalExtraTimeCharge = 0;
       
       if (data.hireType === 'Outside') {
-        const totalDistance = tripDistance + (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
+        // Use only quoted distance (tripDistance) for available hours calculation
         const extraTimeResult = calculateExtraTimeCharge(
-          totalDistance,
+          tripDistance,
           data.pickupDateTime,
           data.dropDateTime,
           {
@@ -269,7 +269,8 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         rateCardDetails: {
           standardHours: rateCard.standard_hours || 8,
           actualHours: data.hireType === 'Outside' ? Math.round(((new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60)) * 100) / 100 : 8,
-          overtimeHours: data.hireType === 'Outside' ? Math.round((Math.max(0, (new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60) - ((tripDistance + (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0)) / 10))) * 100) / 100 : 0,
+          availableHours: Math.round((tripDistance / 10) * 100) / 100, // Available hours based on quoted distance only
+          overtimeHours: data.hireType === 'Outside' ? Math.round((Math.max(0, (new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60) - (tripDistance / 10))) * 100) / 100 : 0,
           agreedDistance: baseCoverageKm,
           actualDistance: tripDistance,
           exceedingKm,

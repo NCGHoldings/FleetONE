@@ -123,9 +123,6 @@ export function CostCalculator() {
         const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
         const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
 
-        // Calculate total distance first
-        const totalDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
-        
         // Calculate extra time charges for Outside hire type using work hours
         let overtimeCharge = 0;
         let overnightCharge = 0;
@@ -133,7 +130,8 @@ export function CostCalculator() {
         
         if (formData.expectedWorkHours && formData.expectedWorkHours > 0) {
           const estimatedActualHours = formData.expectedWorkHours;
-          const availableHours = totalDistance / 10; // baseline speed 10 kmph
+          // Use only quoted distance (tripDistance) for available hours calculation
+          const availableHours = tripDistance / 10; // baseline speed 10 kmph
           const extraHours = Math.max(0, estimatedActualHours - availableHours);
           
           if (extraHours > 0) {
@@ -174,7 +172,7 @@ export function CostCalculator() {
 
         const result = {
           ...distanceData,
-          totalDistance,
+          totalDistance: (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0),
           fuelLiters: Math.round(fuelLiters * 10) / 10,
           fuelCostFuelOnly: Math.round(fuelCost),
           hireCharge: Math.round(hireCharge),
@@ -185,6 +183,7 @@ export function CostCalculator() {
           rateCardDetails: {
             standardHours: rateCard.standard_hours,
             actualHours: formData.expectedWorkHours,
+            availableHours: tripDistance / 10, // Available hours based on quoted distance
             overtimeHours: 0,
             agreedDistance: baseCoverageKm,
             actualDistance: tripDistance,

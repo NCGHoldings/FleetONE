@@ -19,7 +19,7 @@ export interface ExtraTimeResult {
 }
 
 export function calculateExtraTimeCharge(
-  totalDistanceKm: number,
+  quotedDistanceKm: number,
   pickupDatetime: string | Date,
   dropDatetime: string | Date,
   config: ExtraTimeConfig = {}
@@ -30,8 +30,8 @@ export function calculateExtraTimeCharge(
     nightBlockFee = 3000
   } = config;
 
-  // Calculate available hours based on distance and baseline speed
-  const availableHours = totalDistanceKm / baselineSpeedKmph;
+  // Calculate available hours based on quoted distance only (excludes parking distances)
+  const availableHours = quotedDistanceKm / baselineSpeedKmph;
 
   // Calculate actual hours from pickup to drop
   const pickupTime = new Date(pickupDatetime).getTime();
