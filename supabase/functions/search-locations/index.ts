@@ -24,11 +24,11 @@ serve(async (req) => {
       );
     }
 
-    const mapboxToken = Deno.env.get('MAPBOX_ACCESS_TOKEN');
-    if (!mapboxToken) {
-      console.error('MAPBOX_ACCESS_TOKEN not found');
+    const googleApiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
+    if (!googleApiKey) {
+      console.error('GOOGLE_PLACES_API_KEY not found');
       return new Response(
-        JSON.stringify({ error: 'Mapbox token not configured' }),
+        JSON.stringify({ error: 'Google Places API key not configured' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500 
@@ -38,15 +38,26 @@ serve(async (req) => {
 
     console.log(`Searching locations for query: ${query}`);
 
-    // Use Mapbox Geocoding API to search for locations in Sri Lanka
-    const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=LK&limit=5&types=place,locality,neighborhood,address`;
+    // Use Google Places Autocomplete API to search for all types of locations in Sri Lanka
+    const placesUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:lk&types=establishment|geocode&key=${googleApiKey}`;
     
-    const response = await fetch(geocodingUrl);
+    const response = await fetch(placesUrl);
     const data = await response.json();
 
-    console.log(`Mapbox response:`, data);
+    console.log(`Google Places response:`, data);
 
-    if (!data.features) {
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      console.error('Google Places API error:', data.error_message);
+      return new Response(
+        JSON.stringify({ error: 'Failed to search locations' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      );
+    }
+
+    if (!data.predictions || data.predictions.length === 0) {
       return new Response(
         JSON.stringify({ suggestions: [] }),
         { 
@@ -56,14 +67,39 @@ serve(async (req) => {
       );
     }
 
-    // Format the suggestions
-    const suggestions = data.features.map((feature: any) => ({
-      id: feature.id,
-      place_name: feature.place_name,
-      text: feature.text,
-      coordinates: feature.center,
-      context: feature.context || []
-    }));
+    // Format the suggestions to match the expected interface
+    const suggestions = await Promise.all(
+      data.predictions.slice(0, 5).map(async (prediction: any) => {
+        // Get place details to retrieve coordinates
+        const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=geometry&key=${googleApiKey}`;
+        
+        try {
+          const detailsResponse = await fetch(detailsUrl);
+          const detailsData = await detailsResponse.json();
+          
+          const coordinates = detailsData.result?.geometry?.location 
+            ? [detailsData.result.geometry.location.lng, detailsData.result.geometry.location.lat]
+            : [0, 0];
+
+          return {
+            id: prediction.place_id,
+            place_name: prediction.description,
+            text: prediction.structured_formatting?.main_text || prediction.description,
+            coordinates: coordinates,
+            context: prediction.terms || []
+          };
+        } catch (error) {
+          console.error('Error fetching place details:', error);
+          return {
+            id: prediction.place_id,
+            place_name: prediction.description,
+            text: prediction.structured_formatting?.main_text || prediction.description,
+            coordinates: [0, 0],
+            context: prediction.terms || []
+          };
+        }
+      })
+    );
 
     console.log(`Returning ${suggestions.length} suggestions`);
 
