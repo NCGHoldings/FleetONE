@@ -38,9 +38,9 @@ interface YutongQuotationFormProps {
 interface BusModel {
   id: string;
   bus_name: string;
-  model: string;
-  seating_capacity: number;
-  unit_price: number;
+  model_name: string;
+  capacity: number;
+  base_price: number;
 }
 
 export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormProps) {
@@ -65,7 +65,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     try {
       const { data, error } = await supabase
         .from('yutong_bus_models')
-        .select('id, bus_name, model, seating_capacity, unit_price')
+        .select('id, bus_name, model_name, capacity, base_price')
         .eq('is_active', true)
         .order('bus_name');
 
@@ -84,7 +84,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     const model = busModels.find(m => m.id === modelId);
     if (model) {
       setSelectedModel(model);
-      form.setValue('unit_price', model.unit_price);
+      form.setValue('unit_price', model.base_price);
     }
   };
 
@@ -113,7 +113,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         customer_phone: data.customer_phone,
         customer_email: data.customer_email,
         company_name: data.company_name || '',
-        bus_model: selectedModel ? `${selectedModel.bus_name} ${selectedModel.model}` : '',
+        bus_model: selectedModel ? `${selectedModel.bus_name} ${selectedModel.model_name}` : '',
         quantity: data.quantity,
         unit_price: data.unit_price,
         total_price: totalPrice,
@@ -230,7 +230,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                       <SelectContent>
                         {busModels.map((model) => (
                           <SelectItem key={model.id} value={model.id}>
-                            {model.bus_name} ({model.seating_capacity} seats)
+                            {model.bus_name} ({model.capacity} seats)
                           </SelectItem>
                         ))}
                       </SelectContent>
