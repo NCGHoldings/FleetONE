@@ -65,6 +65,7 @@ export function QuotationAddOnsSection({ quotationId, onAddOnsChange }: Quotatio
 
   const loadAvailableAddOns = async () => {
     try {
+      console.log('Loading available add-ons...');
       const { data, error } = await supabase
         .from('yutong_addons')
         .select('id, addon_name, price, category')
@@ -72,9 +73,15 @@ export function QuotationAddOnsSection({ quotationId, onAddOnsChange }: Quotatio
         .order('addon_name');
 
       if (error) throw error;
+      console.log('Add-ons loaded:', data);
       setAvailableAddOns(data || []);
     } catch (error: any) {
       console.error('Error loading add-ons:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load add-ons",
+        variant: "destructive",
+      });
     }
   };
 
