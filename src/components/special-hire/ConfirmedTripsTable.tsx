@@ -199,9 +199,9 @@ export function ConfirmedTripsTable() {
         generated_at: new Date().toISOString()
       }));
 
-      // Update quotation status
+      // Update quotation status - auto-mark as completed when full payment is received
       let newStatus = 'paid';
-      if (invoiceType === 'final' || isFullPayment) {
+      if (invoiceType === 'final' || isFullPayment || paymentData.paymentType === 'full' || paymentData.paymentType === 'final') {
         newStatus = 'completed';
       }
 

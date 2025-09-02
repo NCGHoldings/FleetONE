@@ -36,15 +36,15 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
   const companyLogo = data.companyLogo || '/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png';
 
   if (isAdvanceInvoice) {
-    // Use Sales Receipt format for advance payments
+    // Use Sales Receipt format for advance payments with fixed padding
     return `
-      <div style="font-family: Arial, sans-serif; font-size: 14px; margin: 40px; width: 210mm; min-height: 297mm; background: white; color: black;">
+      <div style="font-family: Arial, sans-serif; font-size: 14px; margin: 0; padding: 20px; width: 210mm; min-height: 297mm; background: white; color: black; box-sizing: border-box;">
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <img src="${companyLogo}" alt="Company Logo" style="width: 150px;">
           <div style="text-align: right; font-size: 13px;">
             <b>NCG EXPRESS (PRIVATE) LIMITED</b><br>
-            157Y, Kebellawita, Weniwelkola, Polgasowita<br>
+            157/1, Kebellaowita, Wenwellkola, Polgasowita<br>
             0777556322
           </div>
         </div>
@@ -114,118 +114,348 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
       </div>
     `;
   } else {
-    // Use Invoice format for final payments
+    // Use NCG Invoice format for final payments
     const discount = data.discountAmount || 0;
     const subTotal = data.totalAmount;
-    const totalAfterDiscount = Math.max(subTotal - discount, 0);
+    const priceAfterDiscount = subTotal - discount;
     const previousAdvance = data.advanceAmount || 0;
-    const totalPaid = previousAdvance + data.paidAmount;
-    const itemDetail = data.itemDetail || `Date(s): ${format(data.pickupDate, 'dd/MM/yyyy')} - ${format(data.dropDate, 'dd/MM/yyyy')} | ${data.numberOfPassengers} Pax | ${data.numberOfBuses} Bus(es) | ${data.busType}`;
+    const balancePayment = priceAfterDiscount - previousAdvance;
+    const itemDetail = data.itemDetail || `${data.pickupLocation} to ${data.dropLocation}`;
+    const mileage = data.numberOfBuses * 100; // Placeholder mileage calculation
 
     return `
-      <div style="width: 210mm; min-height: 297mm; margin: 0; padding: 16mm; font-family: Arial, sans-serif; background: white; color: #111827;">
-        <!-- Header -->
-        <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
-          <div style="flex: 1;">
-            <img src="${companyLogo}" alt="Company Logo" style="max-height: 80px; object-fit: contain; margin-bottom: 8px;"/>
-            <div style="font-size: 22px; font-weight: 700; letter-spacing: 0.5px;">NCG EXPRESS</div>
-            <div style="font-size: 12px; color: #6B7280; line-height: 1.4;">
-              157Y, Kebellawita, Weniwelkola, Polgasowita<br/>
-              0777556322
-            </div>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>NCG Express Invoice</title>
+          <style>
+              body {
+                  font-family: Arial, sans-serif;
+                  margin: 0;
+                  padding: 20px;
+                  background-color: white;
+                  font-size: 12px;
+              }
+              
+              .invoice-container {
+                  max-width: 800px;
+                  margin: 0 auto;
+                  background: white;
+                  border: 1px solid #000;
+              }
+              
+              .header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: flex-start;
+                  padding: 20px;
+                  border-bottom: 1px solid #000;
+              }
+              
+              .logo-section {
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+              }
+              
+              .logo {
+                  width: 60px;
+                  height: 40px;
+                  background: #4A90E2;
+                  border-radius: 5px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: white;
+                  font-weight: bold;
+                  font-size: 14px;
+              }
+              
+              .company-name {
+                  font-size: 16px;
+                  font-weight: bold;
+                  color: #4A90E2;
+              }
+              
+              .company-info {
+                  text-align: right;
+                  font-size: 11px;
+              }
+              
+              .invoice-title {
+                  text-align: center;
+                  font-size: 24px;
+                  font-weight: bold;
+                  margin: 20px 0;
+              }
+              
+              .customer-info {
+                  display: grid;
+                  grid-template-columns: 1fr 1fr;
+                  gap: 20px;
+                  padding: 0 20px;
+                  margin-bottom: 20px;
+              }
+              
+              .info-row {
+                  display: flex;
+                  justify-content: space-between;
+                  margin: 5px 0;
+                  border-bottom: 1px solid #ddd;
+                  padding-bottom: 2px;
+              }
+              
+              .info-label {
+                  font-weight: bold;
+                  width: 120px;
+              }
+              
+              .service-details {
+                  margin: 20px;
+                  border: 1px solid #000;
+              }
+              
+              .service-header {
+                  display: grid;
+                  grid-template-columns: 2fr 2fr 1fr 1fr;
+                  background-color: #f5f5f5;
+                  padding: 10px;
+                  border-bottom: 1px solid #000;
+                  font-weight: bold;
+              }
+              
+              .service-row {
+                  display: grid;
+                  grid-template-columns: 2fr 2fr 1fr 1fr;
+                  padding: 10px;
+                  border-bottom: 1px solid #ddd;
+              }
+              
+              .remark-section {
+                  margin: 20px;
+                  padding: 10px 0;
+              }
+              
+              .totals-section {
+                  margin: 20px;
+                  float: right;
+                  width: 300px;
+                  border: 1px solid #000;
+              }
+              
+              .total-row {
+                  display: flex;
+                  justify-content: space-between;
+                  padding: 8px 15px;
+                  border-bottom: 1px solid #ddd;
+              }
+              
+              .total-row:last-child {
+                  border-bottom: none;
+                  font-weight: bold;
+              }
+              
+              .payment-info {
+                  clear: both;
+                  margin: 20px;
+                  border: 1px solid #000;
+                  padding: 15px;
+                  display: grid;
+                  grid-template-columns: 2fr 1fr;
+                  gap: 20px;
+              }
+              
+              .signatures {
+                  display: flex;
+                  justify-content: space-between;
+                  margin: 40px 20px;
+                  padding-top: 20px;
+              }
+              
+              .signature-section {
+                  text-align: center;
+                  width: 200px;
+              }
+              
+              .signature-line {
+                  border-top: 1px dotted #000;
+                  margin: 30px 0 10px 0;
+              }
+              
+              .footer-note {
+                  text-align: center;
+                  font-style: italic;
+                  margin: 20px;
+                  font-size: 11px;
+              }
+              
+              .amount {
+                  text-align: right;
+              }
+              
+              .thank-you {
+                  text-align: center;
+                  font-weight: bold;
+                  padding: 20px;
+                  margin-left: 20px;
+              }
+          </style>
+      </head>
+      <body>
+          <div class="invoice-container">
+              <div class="header">
+                  <div class="logo-section">
+                      <div class="logo">NCG</div>
+                      <div>
+                          <div class="company-name">NCG<br>EXPRESS</div>
+                      </div>
+                  </div>
+                  <div class="company-info">
+                      <strong>NCG EXPRESS (PRIVATE) LIMITED</strong><br>
+                      157/1, Kebellaowita, Wenwellkola, Polgasowita<br>
+                      0777556322
+                  </div>
+              </div>
+              
+              <div class="invoice-title">INVOICE</div>
+              
+              <div class="customer-info">
+                  <div class="left-column">
+                      <div class="info-row">
+                          <span class="info-label">Customer Code</span>
+                          <span>NCG-${data.invoiceNo.split('-').pop()}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Customer Name</span>
+                          <span>${data.customerName}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Branch</span>
+                          <span>SHS</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Contact Person</span>
+                          <span>${data.customerName}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Contact Number</span>
+                          <span>${data.customerPhone}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Address</span>
+                          <span>${data.companyName || ''}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Mileage</span>
+                          <span>${mileage}</span>
+                      </div>
+                  </div>
+                  <div class="right-column">
+                      <div class="info-row">
+                          <span class="info-label">Invoice No</span>
+                          <span>${data.invoiceNo}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Invoice Date</span>
+                          <span>${currentDate}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Ref No</span>
+                          <span>${data.quotationNo}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Dates of Hire</span>
+                          <span>${format(data.pickupDate, 'dd/MM/yyyy')}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Quote No</span>
+                          <span>${data.quotationNo}</span>
+                      </div>
+                      <div class="info-row">
+                          <span class="info-label">Bus Type</span>
+                          <span>${data.busType}</span>
+                      </div>
+                  </div>
+              </div>
+              
+              <div class="service-details">
+                  <div class="service-header">
+                      <div>Description</div>
+                      <div>Item Detail</div>
+                      <div>Vehicle No</div>
+                      <div>Amount</div>
+                  </div>
+                  <div class="service-row">
+                      <div>${data.busType} - Special Hire Service</div>
+                      <div>${itemDetail}</div>
+                      <div>${data.vehicleNo || 'TBA'}</div>
+                      <div class="amount">${subTotal.toLocaleString()}.00</div>
+                  </div>
+              </div>
+              
+              <div class="remark-section">
+                  <strong>Remark :</strong> &nbsp;&nbsp;&nbsp; ${data.vehicleNo || 'TBA'} ${data.driverName ? `(D) ${data.driverName}` : ''} ${data.conductorName ? `(A) ${data.conductorName}` : ''}
+              </div>
+              
+              <div class="totals-section">
+                  <div class="total-row">
+                      <span>Sub-Total</span>
+                      <span>${subTotal.toLocaleString()}.00</span>
+                  </div>
+                  <div class="total-row">
+                      <span>Discount</span>
+                      <span>${discount.toLocaleString()}.00</span>
+                  </div>
+                  <div class="total-row">
+                      <span>Price After Discount</span>
+                      <span>${priceAfterDiscount.toLocaleString()}.00</span>
+                  </div>
+                  <div class="total-row">
+                      <span>Advance Payment</span>
+                      <span>${previousAdvance.toLocaleString()}.00</span>
+                  </div>
+                  <div class="total-row">
+                      <span>Balance Payment</span>
+                      <span>${balancePayment.toLocaleString()}.00</span>
+                  </div>
+              </div>
+              
+              <div class="payment-info">
+                  <div>
+                      <strong>Payment Info :</strong><br>
+                      Account No &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :193414017578<br>
+                      Account Name &nbsp;&nbsp;&nbsp;&nbsp; :NCG Express (Pvt) Limited<br>
+                      Bank & Branch &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :Sampath Bank - Nugegoda<br>
+                      <strong>Terms & Conditions :</strong><br>
+                      1. Cheques are to be drawn in favour of <strong>NCG EXPRESS (PVT) LIMITED</strong> and A/C payee only.
+                  </div>
+                  <div class="thank-you">
+                      Thank you for<br>
+                      your business !
+                  </div>
+              </div>
+              
+              <div class="signatures">
+                  <div class="signature-section">
+                      <div class="signature-line"></div>
+                      <div>Prepared By</div>
+                      <div>${currentDate}</div>
+                  </div>
+                  <div class="signature-section">
+                      <div class="signature-line"></div>
+                      <div>Approved By</div>
+                      <div>${currentDate}</div>
+                  </div>
+              </div>
+              
+              <div class="footer-note">
+                  "This is a computer-generated invoice and does not require a physical signature."
+              </div>
           </div>
-          <div style="text-align: right;">
-            <div style="font-size: 24px; font-weight: 800; color: #1f2937; text-transform: uppercase;">
-              FINAL INVOICE
-            </div>
-            <div style="margin-top: 8px; background: #F3F4F6; padding: 12px; border-radius: 8px; font-size: 12px;">
-              <div><strong>Invoice No:</strong> ${data.invoiceNo}</div>
-              <div><strong>Date:</strong> ${currentDate}</div>
-              <div><strong>Quotation No:</strong> ${data.quotationNo}</div>
-            </div>
-          </div>
-        </header>
-
-        <!-- Parties -->
-        <section style="display: flex; gap: 16px; margin-bottom: 16px;">
-          <article style="flex:1; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 12px; color: #6B7280; font-weight: 700;">Bill To</div>
-            <div style="font-size: 16px; font-weight: 700; margin-top: 4px;">${data.customerName}</div>
-            ${data.companyName ? `<div style=\"margin-top:4px; font-size: 14px;\">${data.companyName}</div>` : ''}
-            <div style="margin-top: 4px; font-size: 14px;">${data.customerPhone}${data.customerEmail ? ` | ${data.customerEmail}` : ''}</div>
-          </article>
-          <article style="flex:1; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 12px; color: #6B7280; font-weight: 700;">Trip</div>
-            <div style="margin-top: 4px; font-size: 14px;"><strong>From:</strong> ${data.pickupLocation}</div>
-            <div style="margin-top: 2px; font-size: 14px;"><strong>To:</strong> ${data.dropLocation}</div>
-            <div style="margin-top: 2px; font-size: 14px;"><strong>Date(s):</strong> ${format(data.pickupDate, 'dd/MM/yyyy')} - ${format(data.dropDate, 'dd/MM/yyyy')}</div>
-          </article>
-        </section>
-
-        <!-- Items table -->
-        <section>
-          <table style="width:100%; border-collapse: collapse; border: 1px solid #E5E7EB;">
-            <thead>
-              <tr style="background:#F9FAFB;">
-                <th style="text-align:left; padding:10px; border-bottom:1px solid #E5E7EB; font-size:12px; color:#6B7280; width:28%">Description</th>
-                <th style="text-align:left; padding:10px; border-bottom:1px solid #E5E7EB; font-size:12px; color:#6B7280; width:44%">Item Detail</th>
-                <th style="text-align:left; padding:10px; border-bottom:1px solid #E5E7EB; font-size:12px; color:#6B7280; width:14%">Vehicle No</th>
-                <th style="text-align:right; padding:10px; border-bottom:1px solid #E5E7EB; font-size:12px; color:#6B7280; width:14%">Amount (LKR)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="padding:10px; border-bottom:1px solid #F3F4F6; font-weight:600;">Special Hire</td>
-                <td style="padding:10px; border-bottom:1px solid #F3F4F6;">
-                  ${itemDetail}
-                  ${data.driverName || data.conductorName ? `<div style=\"margin-top:4px; font-size:12px; color:#6B7280;\">${data.driverName ? `Driver: ${data.driverName}` : ''}${data.driverName && data.conductorName ? ' | ' : ''}${data.conductorName ? `Conductor: ${data.conductorName}` : ''}</div>` : ''}
-                </td>
-                <td style="padding:10px; border-bottom:1px solid #F3F4F6;">${data.vehicleNo || '-'}</td>
-                <td style="padding:10px; border-bottom:1px solid #F3F4F6; text-align:right;">${subTotal.toLocaleString()}.00</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <!-- Summary -->
-        <section style="margin-top: 16px; display:flex; justify-content:flex-end;">
-          <table style="width: 60%; border-collapse: collapse;">
-            <tbody>
-              <tr>
-                <td style="padding:8px; color:#6B7280;">Sub-total</td>
-                <td style="padding:8px; text-align:right;">${subTotal.toLocaleString()}.00</td>
-              </tr>
-              <tr>
-                <td style="padding:8px; color:#6B7280;">Discount</td>
-                <td style="padding:8px; text-align:right;">${discount.toLocaleString()}.00</td>
-              </tr>
-              <tr style="border-top:1px solid #E5E7EB;">
-                <td style="padding:8px; font-weight:700;">Price after discount</td>
-                <td style="padding:8px; text-align:right; font-weight:700;">${totalAfterDiscount.toLocaleString()}.00</td>
-              </tr>
-              ${previousAdvance ? `
-              <tr>
-                <td style="padding:8px;">Previous Advance Payment</td>
-                <td style="padding:8px; text-align:right;">${previousAdvance.toLocaleString()}.00</td>
-              </tr>` : ''}
-              <tr>
-                <td style="padding:8px; font-weight:700; color:#065f46;">Final Payment (this invoice)</td>
-                <td style="padding:8px; text-align:right; font-weight:700; color:#065f46;">${data.paidAmount.toLocaleString()}.00</td>
-              </tr>
-              <tr style="background:#059669; color:white;">
-                <td style="padding:8px; font-weight:700;">Total Paid</td>
-                <td style="padding:8px; text-align:right; font-weight:700;">${totalPaid.toLocaleString()}.00</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <!-- Footer -->
-        <footer style="margin-top: 24px; border-top: 1px solid #E5E7EB; padding-top: 12px; font-size: 12px; color:#6B7280;">
-          <div>Thank you for your business.</div>
-          <div style="margin-top: 6px;">This is a computer-generated document and does not require a signature.</div>
-        </footer>
-      </div>
+      </body>
+      </html>
     `;
   }
 };
@@ -238,26 +468,32 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
   tempDiv.style.left = '-9999px';
   tempDiv.style.top = '-9999px';
   tempDiv.style.width = '210mm';
+  tempDiv.style.height = 'auto';
   document.body.appendChild(tempDiv);
 
   try {
-    // Convert HTML to canvas
+    // Convert HTML to canvas with improved settings
     const canvas = await html2canvas(tempDiv.children[0] as HTMLElement, {
       scale: 2,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       width: 794, // A4 width in pixels at 96 DPI
-      height: 1123 // A4 height in pixels at 96 DPI
+      height: undefined, // Let it auto-calculate
+      scrollX: 0,
+      scrollY: 0,
+      foreignObjectRendering: true,
+      removeContainer: true
     });
 
-    // Create PDF
+    // Create PDF with proper margins
+    const pdf = new jsPDF('p', 'mm', 'a4');
     const imgWidth = 210; // A4 width in mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/png', 1.0);
     
+    // Add image with no margins for clean edge-to-edge rendering
     pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
     
     return pdf.output('blob');
