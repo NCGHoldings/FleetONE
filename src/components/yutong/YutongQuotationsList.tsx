@@ -37,7 +37,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
 
   const loadQuotations = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('yutong_quotations')
         .select('*')
         .order('created_at', { ascending: false });
@@ -83,7 +83,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
 
   const handleStatusUpdate = async (id: string, newStatus: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('yutong_quotations')
         .update({ status: newStatus })
         .eq('id', id);
@@ -110,7 +110,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
     if (!confirm('Are you sure you want to delete this quotation?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('yutong_quotations')
         .delete()
         .eq('id', id);

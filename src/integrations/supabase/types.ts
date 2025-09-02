@@ -2266,6 +2266,128 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_bus_models: {
+        Row: {
+          base_price: number
+          capacity: number
+          created_at: string
+          dimensions: string | null
+          engine_type: string | null
+          features: string | null
+          fuel_type: string | null
+          id: string
+          is_active: boolean | null
+          model_name: string
+          updated_at: string
+        }
+        Insert: {
+          base_price: number
+          capacity: number
+          created_at?: string
+          dimensions?: string | null
+          engine_type?: string | null
+          features?: string | null
+          fuel_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          model_name: string
+          updated_at?: string
+        }
+        Update: {
+          base_price?: number
+          capacity?: number
+          created_at?: string
+          dimensions?: string | null
+          engine_type?: string | null
+          features?: string | null
+          fuel_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          model_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      yutong_quotations: {
+        Row: {
+          bus_model: string
+          bus_model_id: string | null
+          company_name: string | null
+          created_at: string
+          created_by: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          delivery_timeline: string | null
+          discount_percentage: number | null
+          id: string
+          payment_terms: string | null
+          quantity: number
+          special_features: string | null
+          status: string
+          total_price: number
+          unit_price: number
+          updated_at: string
+          valid_days: number
+          valid_until: string
+          warranty_terms: string | null
+        }
+        Insert: {
+          bus_model: string
+          bus_model_id?: string | null
+          company_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          delivery_timeline?: string | null
+          discount_percentage?: number | null
+          id?: string
+          payment_terms?: string | null
+          quantity?: number
+          special_features?: string | null
+          status?: string
+          total_price: number
+          unit_price: number
+          updated_at?: string
+          valid_days?: number
+          valid_until: string
+          warranty_terms?: string | null
+        }
+        Update: {
+          bus_model?: string
+          bus_model_id?: string | null
+          company_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          delivery_timeline?: string | null
+          discount_percentage?: number | null
+          id?: string
+          payment_terms?: string | null
+          quantity?: number
+          special_features?: string | null
+          status?: string
+          total_price?: number
+          unit_price?: number
+          updated_at?: string
+          valid_days?: number
+          valid_until?: string
+          warranty_terms?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_quotations_bus_model_id_fkey"
+            columns: ["bus_model_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_bus_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

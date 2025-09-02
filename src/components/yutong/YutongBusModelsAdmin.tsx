@@ -58,7 +58,7 @@ export function YutongBusModelsAdmin() {
 
   const loadBusModels = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('yutong_bus_models')
         .select('*')
         .order('model_name');
@@ -83,7 +83,7 @@ export function YutongBusModelsAdmin() {
   const handleSubmit = async (data: FormData) => {
     try {
       if (editingModel) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('yutong_bus_models')
           .update(data)
           .eq('id', editingModel.id);
@@ -91,7 +91,7 @@ export function YutongBusModelsAdmin() {
         if (error) throw error;
         toast({ title: "Success", description: "Bus model updated successfully" });
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('yutong_bus_models')
           .insert([data as any]);
 
@@ -131,7 +131,7 @@ export function YutongBusModelsAdmin() {
     if (!confirm('Are you sure you want to delete this bus model?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('yutong_bus_models')
         .delete()
         .eq('id', id);

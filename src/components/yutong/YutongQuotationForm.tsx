@@ -62,7 +62,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
 
   const loadBusModels = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('yutong_bus_models')
         .select('*')
         .eq('is_active', true)
@@ -111,7 +111,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         status: 'draft'
       };
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('yutong_quotations')
         .insert([quotationData]);
 
