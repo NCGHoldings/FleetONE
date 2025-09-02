@@ -181,25 +181,27 @@ export function CostCalculator() {
         // Revenue and commission split calculations
         const grossRevenue = hireCharge * formData.numberOfBuses;
         const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses);
-
+        
         const commissionExpenseAmount = customerSubtotal * (formData.commissionPct / 100);
         const commissionPassThroughAmount = customerSubtotal * (formData.commissionPassThroughPct / 100);
 
+        // Customer total calculation: base + commission passthrough + fuel + percentage adjustment
         const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount;
         const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
-        const customerTotalWithFuel = customerTotalBeforeAdjustment + adjustmentAmount;
+        const finalCustomerTotal = customerTotalBeforeAdjustment + adjustmentAmount;
         
         console.log('Outside hire calculation debug:', {
           customerSubtotal,
+          fuelCost,
           commissionPassThroughAmount,
           customerTotalBeforeAdjustment,
           percentageAdjustment: formData.percentageAdjustment,
           adjustmentAmount,
-          customerTotalWithFuel
+          finalCustomerTotal
         });
 
         const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + commissionExpenseAmount;
-        const netProfit = customerTotalWithFuel - totalExpenses;
+        const netProfit = finalCustomerTotal - totalExpenses;
 
         const result = {
           ...distanceData,
@@ -224,8 +226,8 @@ export function CostCalculator() {
             rateCardRange: `${rateCard.from_km}-${rateCard.to_km}km`,
             rateCardId: rateCard.id
           },
-          grossRevenue: Math.round(grossRevenue),
-          customerTotalWithFuel: Math.round(customerTotalWithFuel),
+        grossRevenue: Math.round(grossRevenue),
+        customerTotalWithFuel: Math.round(finalCustomerTotal),
           driverCharge: formData.driverCharge,
           otherExpenses: [],
           // Commission and adjustments (new)
@@ -281,25 +283,28 @@ export function CostCalculator() {
       // Revenue and commission split calculations
       const grossRevenue = hireCharge * formData.numberOfBuses;
       const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses);
-
+      
       const commissionExpenseAmount = customerSubtotal * (formData.commissionPct / 100);
       const commissionPassThroughAmount = customerSubtotal * (formData.commissionPassThroughPct / 100);
 
-        const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount;
-        const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
-        const customerTotalWithFuel = customerTotalBeforeAdjustment + adjustmentAmount;
+      // Customer total calculation: base + commission passthrough + percentage adjustment
+      const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount;
+      const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
+      const finalCustomerTotal = customerTotalBeforeAdjustment + adjustmentAmount;
+
         
         console.log('General hire calculation debug:', {
           customerSubtotal,
+          fuelCost,
           commissionPassThroughAmount,
           customerTotalBeforeAdjustment,
           percentageAdjustment: formData.percentageAdjustment,
           adjustmentAmount,
-          customerTotalWithFuel
+          finalCustomerTotal
         });
 
       const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + commissionExpenseAmount;
-      const netProfit = customerTotalWithFuel - totalExpenses;
+      const netProfit = finalCustomerTotal - totalExpenses;
 
       const result = {
         ...distanceData,
@@ -324,7 +329,7 @@ export function CostCalculator() {
           rateCardId: rateCard.id
         },
         grossRevenue: Math.round(grossRevenue),
-        customerTotalWithFuel: Math.round(customerTotalWithFuel),
+        customerTotalWithFuel: Math.round(finalCustomerTotal),
         driverCharge: formData.driverCharge,
         otherExpenses: [],
         // Commission and adjustments (new)
