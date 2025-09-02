@@ -223,6 +223,7 @@ export default function StaffManagement() {
               <SelectItem value="mechanic">Mechanic</SelectItem>
               <SelectItem value="supervisor">Supervisor</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
+              {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
             </SelectContent>
           </Select>
           {isSuperAdmin && (
@@ -350,6 +351,7 @@ export default function StaffManagement() {
                       <SelectItem value="mechanic">Mechanic</SelectItem>
                       <SelectItem value="supervisor">Supervisor</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
+                      {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
