@@ -134,18 +134,16 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 0;
+            padding: 20px;
             background-color: white;
             font-size: 12px;
         }
               
         .invoice-container {
-            width: 100%;
-            max-width: none;
-            margin: 0;
+            max-width: 800px;
+            margin: 0 auto;
             background: white;
             border: 1px solid #000;
-            box-sizing: border-box;
         }
               
               .header {
@@ -297,12 +295,13 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                   text-align: right;
               }
               
-              .thank-you {
-                  text-align: center;
-                  font-weight: bold;
-                  padding: 20px;
-                  margin-left: 20px;
-              }
+               .thank-you {
+                   text-align: center;
+                   font-weight: bold;
+                   padding: 20px;
+                   border: 1px solid #000;
+                   margin-left: 20px;
+               }
           </style>
       </head>
       <body>
@@ -439,18 +438,18 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                   </div>
               </div>
               
-              <div class="signatures">
-                  <div class="signature-section">
-                      <div class="signature-line"></div>
-                      <div>Prepared By</div>
-                      <div>${currentDate}</div>
-                  </div>
-                  <div class="signature-section">
-                      <div class="signature-line"></div>
-                      <div>Approved By</div>
-                      <div>${currentDate}</div>
-                  </div>
-              </div>
+               <div class="signatures">
+                   <div class="signature-section">
+                       <div class="signature-line">Darshini Pallewela</div>
+                       <div>Prepared By</div>
+                       <div>${currentDate}</div>
+                   </div>
+                   <div class="signature-section">
+                       <div class="signature-line">Sithara Thennakoon</div>
+                       <div>Approved By</div>
+                       <div>${currentDate}</div>
+                   </div>
+               </div>
               
               <div class="footer-note">
                   "This is a computer-generated invoice and does not require a physical signature."
@@ -463,6 +462,8 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 };
 
 export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
+  console.log('Starting PDF generation for:', data.invoiceType);
+  
   // Create a temporary div with the invoice HTML
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = generateInvoiceHTML(data);
@@ -474,33 +475,68 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
   document.body.appendChild(tempDiv);
 
   try {
-    // Convert HTML to canvas with improved settings
+    console.log('Converting HTML to canvas...');
+    
+    // Wait a bit for any async content to load
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Convert HTML to canvas with improved settings and error handling
     const canvas = await html2canvas(tempDiv.children[0] as HTMLElement, {
       scale: 2,
       useCORS: true,
-      allowTaint: true,
+      allowTaint: false, // Changed to false to avoid PNG signature issues
       backgroundColor: '#ffffff',
       width: 794, // A4 width in pixels at 96 DPI
       height: undefined, // Let it auto-calculate
       scrollX: 0,
       scrollY: 0,
-      foreignObjectRendering: true,
-      removeContainer: true
+      foreignObjectRendering: false, // Changed to false to avoid issues
+      removeContainer: true,
+      logging: false, // Disable logging to avoid console clutter
+      onclone: (clonedDoc) => {
+        // Remove any potentially problematic elements
+        const images = clonedDoc.querySelectorAll('img');
+        images.forEach(img => {
+          if (!img.complete || img.naturalHeight === 0) {
+            img.remove();
+          }
+        });
+      }
     });
 
+    console.log('Canvas created, generating PDF...');
+    
     // Create PDF with proper margins
     const pdf = new jsPDF('p', 'mm', 'a4');
     const imgWidth = 210; // A4 width in mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     
-    const imgData = canvas.toDataURL('image/png', 1.0);
+    // Convert canvas to data URL with error handling
+    let imgData;
+    try {
+      imgData = canvas.toDataURL('image/jpeg', 0.95); // Use JPEG instead of PNG to avoid signature issues
+    } catch (error) {
+      console.warn('Failed to convert canvas to JPEG, trying PNG:', error);
+      try {
+        imgData = canvas.toDataURL('image/png', 1.0);
+      } catch (pngError) {
+        console.error('Failed to convert canvas to any format:', pngError);
+        throw new Error('Failed to generate image data for PDF');
+      }
+    }
     
     // Add image with no margins for clean edge-to-edge rendering
-    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+    pdf.addImage(imgData, imgData.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG', 0, 0, imgWidth, imgHeight);
     
+    console.log('PDF generation completed successfully');
     return pdf.output('blob');
+  } catch (error) {
+    console.error('PDF generation failed:', error);
+    throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
   } finally {
     // Clean up
-    document.body.removeChild(tempDiv);
+    if (document.body.contains(tempDiv)) {
+      document.body.removeChild(tempDiv);
+    }
   }
 };

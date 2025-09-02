@@ -170,24 +170,29 @@ export function ConfirmedTripsTable() {
       // Generate invoice number
       const invoiceNo = `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
 
-      // Generate invoice data
+      // Prepare invoice data with proper advance amount handling
+      const advanceAmountForInvoice = invoiceType === 'final' 
+        ? selectedTrip.advance_paid 
+        : paymentData.amount;
+        
       const invoiceData: InvoiceData = {
         invoiceNo,
         invoiceType,
         quotationNo: selectedTrip.quotation.quotation_no,
         customerName: selectedTrip.quotation.customer_name,
-        customerPhone: selectedTrip.quotation.customer_phone,
+        customerPhone: selectedTrip.quotation.customer_phone || '',
         customerEmail: selectedTrip.quotation.customer_email,
         companyName: selectedTrip.quotation.company_name,
         pickupLocation: selectedTrip.quotation.pickup_location,
         dropLocation: selectedTrip.quotation.drop_location,
         pickupDate: new Date(selectedTrip.quotation.pickup_datetime),
         dropDate: new Date(selectedTrip.quotation.drop_datetime),
-        busType: 'Standard Bus',
+        busType: 'Standard Bus', // Will need to fetch actual bus type name from bus_type_id
         numberOfBuses: selectedTrip.quotation.number_of_buses,
         numberOfPassengers: selectedTrip.quotation.number_of_passengers,
         totalAmount: selectedTrip.quotation.gross_revenue,
-        advanceAmount: selectedTrip.advance_paid,
+        advanceAmount: advanceAmountForInvoice, // Use properly calculated advance amount
+        balanceAmount: selectedTrip.balance_due,
         paidAmount: paymentData.amount,
         companyLogo,
         // New fields for NCG template
@@ -231,10 +236,15 @@ export function ConfirmedTripsTable() {
         quotationId: selectedTrip.quotation_id
       });
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('special_hire_quotations')
         .update({ status: newStatus })
         .eq('id', selectedTrip.quotation_id);
+
+      if (updateError) {
+        console.error('Error updating quotation status:', updateError);
+        throw updateError;
+      }
 
       toast({
         title: 'Success!',
