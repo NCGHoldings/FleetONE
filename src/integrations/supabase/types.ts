@@ -1673,6 +1673,7 @@ export type Database = {
       }
       special_hire_quotations: {
         Row: {
+          audit_log: Json | null
           bus_type_id: string | null
           commission_amount: number | null
           commission_pct: number | null
@@ -1701,6 +1702,7 @@ export type Database = {
           number_of_buses: number
           number_of_passengers: number
           other_expenses: Json | null
+          percentage_adjustment: number | null
           pickup_datetime: string
           pickup_lat: number | null
           pickup_lng: number | null
@@ -1714,6 +1716,7 @@ export type Database = {
           valid_until: string | null
         }
         Insert: {
+          audit_log?: Json | null
           bus_type_id?: string | null
           commission_amount?: number | null
           commission_pct?: number | null
@@ -1742,6 +1745,7 @@ export type Database = {
           number_of_buses?: number
           number_of_passengers: number
           other_expenses?: Json | null
+          percentage_adjustment?: number | null
           pickup_datetime: string
           pickup_lat?: number | null
           pickup_lng?: number | null
@@ -1755,6 +1759,7 @@ export type Database = {
           valid_until?: string | null
         }
         Update: {
+          audit_log?: Json | null
           bus_type_id?: string | null
           commission_amount?: number | null
           commission_pct?: number | null
@@ -1783,6 +1788,7 @@ export type Database = {
           number_of_buses?: number
           number_of_passengers?: number
           other_expenses?: Json | null
+          percentage_adjustment?: number | null
           pickup_datetime?: string
           pickup_lat?: number | null
           pickup_lng?: number | null

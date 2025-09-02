@@ -6,10 +6,22 @@ import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { FileText, Eye, Edit, Mail, Download, Search, Send } from 'lucide-react';
+import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { QuotationModal } from './QuotationModal';
+import { EditQuotationModal } from './EditQuotationModal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Quotation {
   id: string;
@@ -42,6 +54,8 @@ interface Quotation {
   status: string;
   valid_until: string;
   created_at: string;
+  percentage_adjustment?: number;
+  audit_log?: any[];
 }
 
 interface Props {
@@ -54,6 +68,8 @@ export function QuotationsList({ onRefresh }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
   const { toast } = useToast();
 
   const loadQuotations = async () => {
@@ -77,7 +93,8 @@ export function QuotationsList({ onRefresh }: Props) {
         bus_type: item.bus_types?.name || 'Unknown',
         seating_capacity: item.bus_types?.capacity || 54,
         total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
-        intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || [])
+        intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
+        audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : [])
       })) || [];
       
       setQuotations(transformedData);
@@ -174,6 +191,58 @@ export function QuotationsList({ onRefresh }: Props) {
     }
   };
 
+  const handleEditQuotation = (quotation: Quotation) => {
+    setEditingQuotation(quotation);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteQuotation = async (quotation: Quotation) => {
+    try {
+      // Add audit log entry
+      const currentUser = await supabase.auth.getUser();
+      const auditEntry = {
+        action: 'DELETE',
+        timestamp: new Date().toISOString(),
+        user_id: currentUser.data.user?.id,
+        user_email: currentUser.data.user?.email,
+        changes: {
+          quotation_no: quotation.quotation_no,
+          customer_name: quotation.customer_name,
+          status: quotation.status
+        }
+      };
+
+      const existingAuditLog = quotation.audit_log || [];
+      
+      const { error } = await supabase
+        .from('special_hire_quotations')
+        .delete()
+        .eq('id', quotation.id);
+
+      if (error) throw error;
+
+      await loadQuotations();
+      onRefresh();
+      toast({
+        title: "Success",
+        description: "Quotation deleted successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditSubmit = async () => {
+    await loadQuotations();
+    onRefresh();
+    setShowEditModal(false);
+    setEditingQuotation(null);
+  };
+
   const columns: ColumnDef<Quotation>[] = [
     {
       accessorKey: "quotation_no",
@@ -268,64 +337,104 @@ export function QuotationsList({ onRefresh }: Props) {
       cell: ({ row }) => {
         const quotation = row.original;
         return (
-          <div className="flex space-x-1">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handleViewQuotation(quotation)}
-              title="View Quotation"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            {quotation.status === 'draft' && (
+            <div className="flex space-x-1">
               <Button 
-                variant="default" 
+                variant="outline" 
                 size="sm" 
-                onClick={() => handleSendQuotation(quotation)}
-                title="Send Quotation"
-                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => handleViewQuotation(quotation)}
+                title="View Quotation"
               >
-                <Send className="h-4 w-4" />
+                <Eye className="h-4 w-4" />
               </Button>
-            )}
-            {quotation.status === 'sent' && (
-              <>
+              {quotation.status === 'draft' && (
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleEditQuotation(quotation)}
+                    title="Edit Quotation"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        title="Delete Quotation"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Quotation</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete quotation {quotation.quotation_no}? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteQuotation(quotation)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
+              {quotation.status === 'draft' && (
                 <Button 
-                  variant="default"
+                  variant="default" 
                   size="sm" 
-                  onClick={() => handleStatusUpdate(quotation.id, 'confirmed')}
-                  title="Confirm Quotation"
-                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => handleSendQuotation(quotation)}
+                  title="Send Quotation"
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
-                  Confirm
+                  <Send className="h-4 w-4" />
                 </Button>
-                <Button 
-                  variant="destructive"
-                  size="sm" 
-                  onClick={() => handleStatusUpdate(quotation.id, 'declined')}
-                  title="Decline Quotation"
-                >
-                  Decline
-                </Button>
-              </>
-            )}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handleEmailQuotation(quotation)}
-              title="Email Quotation"
-            >
-              <Mail className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handleDownloadQuotation(quotation)}
-              title="Download Quotation"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-          </div>
+              )}
+              {quotation.status === 'sent' && (
+                <>
+                  <Button 
+                    variant="default"
+                    size="sm" 
+                    onClick={() => handleStatusUpdate(quotation.id, 'confirmed')}
+                    title="Confirm Quotation"
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    Confirm
+                  </Button>
+                  <Button 
+                    variant="destructive"
+                    size="sm" 
+                    onClick={() => handleStatusUpdate(quotation.id, 'declined')}
+                    title="Decline Quotation"
+                  >
+                    Decline
+                  </Button>
+                </>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleEmailQuotation(quotation)}
+                title="Email Quotation"
+              >
+                <Mail className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleDownloadQuotation(quotation)}
+                title="Download Quotation"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
         );
       },
     },
@@ -370,6 +479,17 @@ export function QuotationsList({ onRefresh }: Props) {
         open={showModal}
         onOpenChange={setShowModal}
       />
+
+      {showEditModal && editingQuotation && (
+        <EditQuotationModal
+          quotation={editingQuotation}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingQuotation(null);
+          }}
+          onUpdate={handleEditSubmit}
+        />
+      )}
     </>
   );
 }

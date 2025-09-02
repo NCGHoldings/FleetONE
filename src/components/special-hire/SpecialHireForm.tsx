@@ -39,6 +39,7 @@ const formSchema = z.object({
   numberOfPassengers: z.number().min(1, 'Number of passengers is required'),
   pickupDateTime: z.date(),
   dropDateTime: z.date(),
+  percentageAdjustment: z.number().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -61,9 +62,11 @@ interface IntermediateStop {
 interface Props {
   onSubmit: () => void;
   onCancel: () => void;
+  initialData?: any;
+  isEditing?: boolean;
 }
 
-export function SpecialHireForm({ onSubmit, onCancel }: Props) {
+export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = false }: Props) {
   const [busTypes, setBusTypes] = useState<BusType[]>([]);
   const [intermediateStops, setIntermediateStops] = useState<IntermediateStop[]>([]);
   const [costData, setCostData] = useState<any>(null);
@@ -72,18 +75,47 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
+    defaultValues: initialData ? {
+      companyName: initialData.company_name || '',
+      customerName: initialData.customer_name || '',
+      customerPhone: initialData.customer_phone || '',
+      customerEmail: initialData.customer_email || '',
+      specialRequest: initialData.special_request || '',
+      busTypeId: initialData.bus_type_id || '',
+      hireType: initialData.hire_type || 'Outside',
+      numberOfBuses: initialData.number_of_buses || 1,
+      pickupLocation: initialData.pickup_location || '',
+      dropLocation: initialData.drop_location || '',
+      numberOfPassengers: initialData.number_of_passengers || 1,
+      pickupDateTime: initialData.pickup_datetime ? new Date(initialData.pickup_datetime) : new Date(),
+      dropDateTime: initialData.drop_datetime ? new Date(initialData.drop_datetime) : new Date(),
+      percentageAdjustment: initialData.percentage_adjustment || 0,
+    } : {
       hireType: 'Outside',
       numberOfBuses: 1,
       numberOfPassengers: 1,
       pickupDateTime: new Date(),
       dropDateTime: new Date(),
+      percentageAdjustment: 0,
     }
   });
 
   useEffect(() => {
     loadBusTypes();
-  }, []);
+    
+    // If editing, set intermediate stops from initial data
+    if (isEditing && initialData?.intermediate_stops) {
+      try {
+        const stops = Array.isArray(initialData.intermediate_stops) 
+          ? initialData.intermediate_stops 
+          : JSON.parse(initialData.intermediate_stops);
+        setIntermediateStops(stops || []);
+      } catch (e) {
+        console.warn('Failed to parse intermediate stops:', e);
+        setIntermediateStops([]);
+      }
+    }
+  }, [isEditing, initialData]);
 
   const loadBusTypes = async () => {
     try {
@@ -234,10 +266,16 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
 
       const grossRevenue = hireCharge * data.numberOfBuses;
       const customerTotalWithFuel = grossRevenue + (fuelCost * data.numberOfBuses);
-      const commissionAmount = customerTotalWithFuel * 0.05; // 5% default commission
+      
+      // Apply percentage adjustment to customer total
+      const percentageAdjustment = data.percentageAdjustment || 0;
+      const adjustmentAmount = customerTotalWithFuel * (percentageAdjustment / 100);
+      const adjustedCustomerTotal = customerTotalWithFuel + adjustmentAmount;
+      
+      const commissionAmount = adjustedCustomerTotal * 0.05; // 5% default commission
       const driverCharge = 1500; // Default driver charge
       const totalExpenses = (driverCharge * data.numberOfBuses) + commissionAmount + (fuelCost * data.numberOfBuses);
-      const netProfit = customerTotalWithFuel - totalExpenses;
+      const netProfit = adjustedCustomerTotal - totalExpenses;
 
       const costs = {
         km_parking_to_pickup: Math.round((distanceData.kmParkingToPickup || 0) * 10) / 10,
@@ -247,6 +285,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         hire_charge: Math.round(hireCharge),
         extra_charges: Math.round(totalExtraTimeCharge),
         gross_revenue: Math.round(grossRevenue), // Save hire charges only (flat fee + exceeding)
+        percentage_adjustment: percentageAdjustment,
         driver_charge: driverCharge,
         other_expenses: [],
         commission_pct: 5.0,
@@ -279,6 +318,9 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         },
         grossRevenue: Math.round(hireCharge * data.numberOfBuses),
         customerTotalWithFuel: Math.round(customerTotalWithFuel),
+        percentageAdjustment: percentageAdjustment,
+        adjustmentAmount: Math.round(adjustmentAmount),
+        adjustedCustomerTotal: Math.round(adjustedCustomerTotal),
         driverCharge: costs.driver_charge,
         otherExpenses: costs.other_expenses,
         commissionPct: costs.commission_pct,
@@ -295,7 +337,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
 
       toast({
         title: "Cost Calculated",
-        description: `Trip: ${tripDistance}km | Flat: LKR ${Math.round(fixedRate).toLocaleString()} | Exceeding: LKR ${Math.round(exceedingDistanceCharge).toLocaleString()} | Customer Total: LKR ${Math.round(customerTotalWithFuel).toLocaleString()}`
+        description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(adjustedCustomerTotal).toLocaleString()} ${percentageAdjustment !== 0 ? `(${percentageAdjustment > 0 ? '+' : ''}${percentageAdjustment}%)` : ''}`
       });
 
       return { costs, distanceData };
@@ -319,7 +361,26 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
       // Filter out empty intermediate stops before creating quotation
       const validIntermediateStops = intermediateStops.filter(stop => stop.location && stop.location.trim());
 
-      // Create quotation
+      // Create audit log entry for editing
+      let auditEntry = null;
+      if (isEditing && initialData) {
+        const currentUser = await supabase.auth.getUser();
+        auditEntry = {
+          action: 'UPDATE',
+          timestamp: new Date().toISOString(),
+          user_id: currentUser.data.user?.id,
+          user_email: currentUser.data.user?.email,
+          changes: {
+            // Track what fields were changed
+            customer_name: data.customerName !== initialData.customer_name ? { from: initialData.customer_name, to: data.customerName } : undefined,
+            pickup_location: data.pickupLocation !== initialData.pickup_location ? { from: initialData.pickup_location, to: data.pickupLocation } : undefined,
+            drop_location: data.dropLocation !== initialData.drop_location ? { from: initialData.drop_location, to: data.dropLocation } : undefined,
+            percentage_adjustment: (data.percentageAdjustment || 0) !== (initialData.percentage_adjustment || 0) ? { from: initialData.percentage_adjustment || 0, to: data.percentageAdjustment || 0 } : undefined,
+          }
+        };
+      }
+
+      // Create quotation data
       const quotationData = {
         company_name: data.companyName || null,
         customer_name: data.customerName,
@@ -352,14 +413,35 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
         commission_amount: costs.commission_amount,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
-        valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 7 days from now
+        percentage_adjustment: costs.percentage_adjustment,
+        valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+        audit_log: isEditing ? [...(initialData?.audit_log || []), auditEntry].filter(Boolean) : []
       };
 
-      const { error } = await supabase
-        .from('special_hire_quotations')
-        .insert([quotationData]);
+      if (isEditing && initialData) {
+        const { error } = await supabase
+          .from('special_hire_quotations')
+          .update(quotationData)
+          .eq('id', initialData.id);
 
-      if (error) throw error;
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Quotation updated successfully"
+        });
+      } else {
+        const { error } = await supabase
+          .from('special_hire_quotations')
+          .insert([quotationData]);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Quotation created successfully"
+        });
+      }
 
       onSubmit();
     } catch (error: any) {
@@ -377,7 +459,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
     <Dialog open={true} onOpenChange={() => onCancel()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Special Hire Quotation</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Special Hire Quotation' : 'New Special Hire Quotation'}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -750,6 +832,7 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
                                         const newDateTime = new Date(field.value);
                                         newDateTime.setHours(parseInt(hours));
                                         newDateTime.setMinutes(parseInt(minutes));
+                                        field.onChange(newDateTime);
                                       } else if (e.target.value) {
                                         // If no date is set, set to today with selected time
                                         const [hours, minutes] = e.target.value.split(':');
@@ -770,23 +853,55 @@ export function SpecialHireForm({ onSubmit, onCancel }: Props) {
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="percentageAdjustment"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Adjustment (%)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            placeholder="0"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                        <div className="text-xs text-muted-foreground">
+                          Positive for surcharge, negative for discount
+                        </div>
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Cost Breakdown */}
-            {costData && (
-              <CostBreakdown data={costData} />
-            )}
+        {/* Cost Breakdown */}
+        {costData && (
+          <CostBreakdown data={costData} />
+        )}
 
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={onCancel}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Creating...' : 'Create Quotation'}
-              </Button>
-            </div>
+        <div className="flex justify-between items-center">
+          <Button 
+            type="button" 
+            variant="outline"
+            onClick={() => form.handleSubmit(calculateCosts)()}
+          >
+            Calculate Costs
+          </Button>
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading || !costData}>
+              {loading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Quotation' : 'Create Quotation')}
+            </Button>
+          </div>
+        </div>
           </form>
         </Form>
       </DialogContent>
