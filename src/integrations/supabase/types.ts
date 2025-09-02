@@ -2317,41 +2317,62 @@ export type Database = {
       yutong_bus_models: {
         Row: {
           base_price: number
+          bus_name: string | null
           capacity: number
+          condition: string | null
           created_at: string
           dimensions: string | null
+          engine: string | null
           engine_type: string | null
           features: string | null
           fuel_type: string | null
           id: string
           is_active: boolean | null
+          manufactured_year: number | null
+          model: string | null
           model_name: string
+          seating_capacity: number | null
+          unit_price: number | null
           updated_at: string
         }
         Insert: {
           base_price: number
+          bus_name?: string | null
           capacity: number
+          condition?: string | null
           created_at?: string
           dimensions?: string | null
+          engine?: string | null
           engine_type?: string | null
           features?: string | null
           fuel_type?: string | null
           id?: string
           is_active?: boolean | null
+          manufactured_year?: number | null
+          model?: string | null
           model_name: string
+          seating_capacity?: number | null
+          unit_price?: number | null
           updated_at?: string
         }
         Update: {
           base_price?: number
+          bus_name?: string | null
           capacity?: number
+          condition?: string | null
           created_at?: string
           dimensions?: string | null
+          engine?: string | null
           engine_type?: string | null
           features?: string | null
           fuel_type?: string | null
           id?: string
           is_active?: boolean | null
+          manufactured_year?: number | null
+          model?: string | null
           model_name?: string
+          seating_capacity?: number | null
+          unit_price?: number | null
           updated_at?: string
         }
         Relationships: []

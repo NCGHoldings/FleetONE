@@ -37,9 +37,10 @@ interface YutongQuotationFormProps {
 
 interface BusModel {
   id: string;
-  model_name: string;
-  capacity: number;
-  base_price: number;
+  bus_name: string;
+  model: string;
+  seating_capacity: number;
+  unit_price: number;
 }
 
 export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormProps) {
@@ -62,11 +63,11 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
 
   const loadBusModels = async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('yutong_bus_models')
-        .select('*')
+        .select('id, bus_name, model, seating_capacity, unit_price')
         .eq('is_active', true)
-        .order('model_name');
+        .order('bus_name');
 
       if (error) throw error;
       setBusModels(data || []);
@@ -83,7 +84,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     const model = busModels.find(m => m.id === modelId);
     if (model) {
       setSelectedModel(model);
-      form.setValue('unit_price', model.base_price);
+      form.setValue('unit_price', model.unit_price);
     }
   };
 
@@ -103,15 +104,28 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + data.valid_days);
 
+      // Generate quotation number
+      const quotationNo = `YTQ-${Date.now()}`;
+
       const quotationData = {
-        ...data,
-        bus_model: selectedModel?.model_name || '',
+        quotation_no: quotationNo,
+        customer_name: data.customer_name,
+        customer_phone: data.customer_phone,
+        customer_email: data.customer_email,
+        company_name: data.company_name || '',
+        bus_model: selectedModel ? `${selectedModel.bus_name} ${selectedModel.model}` : '',
+        quantity: data.quantity,
+        unit_price: data.unit_price,
         total_price: totalPrice,
         valid_until: validUntil.toISOString().split('T')[0],
-        status: 'draft'
+        status: 'draft',
+        special_features: data.special_features || '',
+        delivery_timeline: data.delivery_timeline || '',
+        payment_terms: data.payment_terms || '',
+        warranty_terms: data.warranty_terms || ''
       };
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('yutong_quotations')
         .insert([quotationData]);
 
@@ -216,7 +230,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                       <SelectContent>
                         {busModels.map((model) => (
                           <SelectItem key={model.id} value={model.id}>
-                            {model.model_name} ({model.capacity} seats)
+                            {model.bus_name} ({model.seating_capacity} seats)
                           </SelectItem>
                         ))}
                       </SelectContent>

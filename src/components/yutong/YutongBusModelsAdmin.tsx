@@ -6,7 +6,6 @@ import { DataTable } from '@/components/ui/data-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
@@ -58,7 +57,7 @@ export function YutongBusModelsAdmin() {
 
   const loadBusModels = async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('yutong_bus_models')
         .select('*')
         .order('bus_name');
@@ -83,7 +82,7 @@ export function YutongBusModelsAdmin() {
   const handleSubmit = async (data: FormData) => {
     try {
       if (editingModel) {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from('yutong_bus_models')
           .update(data)
           .eq('id', editingModel.id);
@@ -91,9 +90,9 @@ export function YutongBusModelsAdmin() {
         if (error) throw error;
         toast({ title: "Success", description: "Bus model updated successfully" });
       } else {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from('yutong_bus_models')
-          .insert([data as any]);
+          .insert([data]);
 
         if (error) throw error;
         toast({ title: "Success", description: "Bus model created successfully" });
@@ -131,7 +130,7 @@ export function YutongBusModelsAdmin() {
     if (!confirm('Are you sure you want to delete this bus model?')) return;
 
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('yutong_bus_models')
         .delete()
         .eq('id', id);
