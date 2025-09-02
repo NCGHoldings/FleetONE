@@ -57,6 +57,7 @@ const operationsItems = [
 
 const businessItems = [
   { title: "Special Hire", url: "/special-hire", icon: Star },
+  { title: "Yutong Quotations", url: "/yutong-quotations", icon: Truck },
   { title: "Business Ideas", url: "/business", icon: Lightbulb },
   { title: "Document Manager", url: "/documents", icon: FileText },
   { title: "Feedback", url: "/feedback", icon: MessageSquare },

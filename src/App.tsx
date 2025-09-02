@@ -24,6 +24,7 @@ import DriverAllocation from "./pages/DriverAllocation";
 import StaffAttendancePayroll from "./pages/StaffAttendancePayroll";
 import DocumentManager from "./pages/DocumentManager";
 import SpecialHire from "./pages/SpecialHire";
+import YutongQuotations from "./pages/YutongQuotations";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
 
@@ -213,6 +214,17 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <div className="p-8 text-center text-muted-foreground">Feedback module coming soon...</div>
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/yutong-quotations" 
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <YutongQuotations />
                   </AppLayout>
                 </ProtectedRoute>
               } 
