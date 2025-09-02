@@ -37,37 +37,39 @@ import {
 } from "@/components/ui/sidebar";
 import { LogoUpload } from "./LogoUpload";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { usePagePermissions } from "@/hooks/usePagePermissions";
 
 const mainItems = [
-  { title: "Dashboard", url: "/", icon: BarChart3 },
-  { title: "Daily Trips", url: "/trips", icon: Calendar },
-  { title: "Fleet Management", url: "/fleet", icon: Bus },
-  { title: "Maintenance", url: "/maintenance", icon: Wrench },
-  { title: "Insurance", url: "/insurance", icon: Shield },
-  { title: "Staff Management", url: "/staff", icon: Users },
-  { title: "Staff Performance", url: "/staff-performance", icon: TrendingUp },
+  { id: "dashboard", title: "Dashboard", url: "/", icon: BarChart3 },
+  { id: "daily_trips", title: "Daily Trips", url: "/trips", icon: Calendar },
+  { id: "fleet_management", title: "Fleet Management", url: "/fleet", icon: Bus },
+  { id: "maintenance", title: "Maintenance", url: "/maintenance", icon: Wrench },
+  { id: "insurance", title: "Insurance", url: "/insurance", icon: Shield },
+  { id: "staff_management", title: "Staff Management", url: "/staff", icon: Users },
+  { id: "staff_performance", title: "Staff Performance", url: "/staff-performance", icon: TrendingUp },
 ];
 
 const operationsItems = [
-  { title: "Route Permits", url: "/permits", icon: FileText },
-  { title: "Driver Training", url: "/training", icon: UserCheck },
-  { title: "Real-Time Tracking", url: "/tracking", icon: MapPin },
-  { title: "Driver Allocation", url: "/allocation", icon: UserCheck },
-  { title: "Staff Attendance", url: "/attendance", icon: Calendar },
-  { title: "Complaints", url: "/complaints", icon: AlertTriangle },
+  { id: "route_permits", title: "Route Permits", url: "/permits", icon: FileText },
+  { id: "driver_training", title: "Driver Training", url: "/training", icon: UserCheck },
+  { id: "real_time_tracking", title: "Real-Time Tracking", url: "/tracking", icon: MapPin },
+  { id: "driver_allocation", title: "Driver Allocation", url: "/allocation", icon: UserCheck },
+  { id: "staff_attendance", title: "Staff Attendance", url: "/attendance", icon: Calendar },
+  { id: "complaints", title: "Complaints", url: "/complaints", icon: AlertTriangle },
 ];
 
 const businessItems = [
-  { title: "Special Hire", url: "/special-hire", icon: Star },
-  { title: "Business Ideas", url: "/business", icon: Lightbulb },
-  { title: "Document Manager", url: "/documents", icon: FileText },
-  { title: "Feedback", url: "/feedback", icon: MessageSquare },
+  { id: "special_hire", title: "Special Hire", url: "/special-hire", icon: Star },
+  { id: "business_ideas", title: "Business Ideas", url: "/business", icon: Lightbulb },
+  { id: "document_manager", title: "Document Manager", url: "/documents", icon: FileText },
+  { id: "feedback", title: "Feedback", url: "/feedback", icon: MessageSquare },
 ];
 
 const yutongItems = [
-  { title: "Quotations", url: "/yutong-quotations", icon: FileText },
-  { title: "Bus Models", url: "/yutong-quotations?tab=bus-models", icon: Truck },
-  { title: "Add-ons", url: "/yutong-quotations?tab=addons", icon: Package },
+  { id: "yutong_quotations", title: "Quotations", url: "/yutong-quotations", icon: FileText },
+  { id: "yutong_bus_models", title: "Bus Models", url: "/yutong-quotations?tab=bus-models", icon: Truck },
+  { id: "yutong_addons", title: "Add-ons", url: "/yutong-quotations?tab=addons", icon: Package },
 ];
 
 export function AppSidebar() {
@@ -76,6 +78,9 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
   const [logoUrl, setLogoUrl] = useState<string>('');
+  const { user } = useAuth();
+  const { hasAccess } = usePagePermissions(user?.id);
+
 
   // Load company logo on mount
   useEffect(() => {
@@ -103,11 +108,17 @@ export function AppSidebar() {
     }
   };
 
-  const isActive = (path: string) => currentPath === path;
-  const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive 
-      ? "bg-gradient-to-r from-primary to-primary-hover text-primary-foreground font-medium shadow-primary animate-pulse-subtle" 
-      : "hover:bg-accent/10 text-sidebar-foreground hover:text-primary hover:bg-gradient-to-r hover:from-accent/5 hover:to-primary/5 transition-all duration-300 ease-out hover:shadow-sm hover:scale-[1.02]";
+const isActive = (path: string) => currentPath === path;
+const getNavCls = ({ isActive }: { isActive: boolean }) =>
+  isActive 
+    ? "bg-gradient-to-r from-primary to-primary-hover text-primary-foreground font-medium shadow-primary animate-pulse-subtle" 
+    : "hover:bg-accent/10 text-sidebar-foreground hover:text-primary hover:bg-gradient-to-r hover:from-accent/5 hover:to-primary/5 transition-all duration-300 ease-out hover:shadow-sm hover:scale-[1.02]";
+
+// Filter items based on user-specific page permissions (default allow)
+const visibleMain = mainItems.filter((i) => hasAccess(i.id));
+const visibleOperations = operationsItems.filter((i) => hasAccess(i.id));
+const visibleBusiness = businessItems.filter((i) => hasAccess(i.id));
+const visibleYutong = yutongItems.filter((i) => hasAccess(i.id));
 
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"} collapsible="icon">
@@ -132,16 +143,16 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end className={getNavCls}>
-                      <item.icon className="w-5 h-5 transition-all duration-300" />
-                      {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+{visibleMain.map((item) => (
+  <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} end className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -153,16 +164,16 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {operationsItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavCls}>
-                      <item.icon className="w-5 h-5 transition-all duration-300" />
-                      {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+{visibleOperations.map((item) => (
+  <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -174,16 +185,16 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {businessItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavCls}>
-                      <item.icon className="w-5 h-5 transition-all duration-300" />
-                      {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+{visibleBusiness.map((item) => (
+  <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -195,16 +206,16 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {yutongItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavCls}>
-                      <item.icon className="w-5 h-5 transition-all duration-300" />
-                      {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+{visibleYutong.map((item) => (
+  <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

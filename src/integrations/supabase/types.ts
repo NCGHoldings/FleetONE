@@ -2215,6 +2215,36 @@ export type Database = {
           },
         ]
       }
+      user_page_permissions: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          has_access: boolean
+          id: string
+          page_identifier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          has_access?: boolean
+          id?: string
+          page_identifier: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          has_access?: boolean
+          id?: string
+          page_identifier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           assigned_at: string | null
@@ -2522,6 +2552,13 @@ export type Database = {
       create_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      get_user_page_permissions: {
+        Args: { _user_id: string }
+        Returns: {
+          has_access: boolean
+          page_identifier: string
+        }[]
       }
       get_user_roles: {
         Args: { _user_id: string }

@@ -9,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Users, UserPlus, Shield, Edit, Trash2 } from "lucide-react";
+import { Users, UserPlus, Shield, Edit, Trash2, Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
+import { PageAccessModal } from "@/components/staff/PageAccessModal";
 
 interface Profile {
   id: string;
@@ -33,6 +34,8 @@ export default function StaffManagement() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Profile | null>(null);
+  const [pageAccessOpen, setPageAccessOpen] = useState(false);
+  const [pageAccessTarget, setPageAccessTarget] = useState<Profile | null>(null);
   
   // Form states
   const [firstName, setFirstName] = useState("");
@@ -42,6 +45,7 @@ export default function StaffManagement() {
   const [role, setRole] = useState("staff");
 
   const isAdmin = hasRole('super_admin') || hasRole('admin');
+  const isSuperAdmin = hasRole('super_admin');
 
   const fetchStaff = async () => {
     try {
@@ -221,6 +225,12 @@ export default function StaffManagement() {
               <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
+          {isSuperAdmin && (
+            <Button variant="outline" size="sm" onClick={() => { setPageAccessTarget(row.original); setPageAccessOpen(true); }}>
+              <Lock className="h-4 w-4 mr-2" />
+              Page Access
+            </Button>
+          )}
         </div>
       ),
     }] : []),
@@ -419,6 +429,15 @@ export default function StaffManagement() {
         </CardHeader>
         <CardContent>
           <DataTable columns={columns} data={staff} />
+          {isSuperAdmin && (
+            <PageAccessModal
+              open={pageAccessOpen}
+              onOpenChange={setPageAccessOpen}
+              userId={pageAccessTarget?.user_id || null}
+              userName={pageAccessTarget ? `${pageAccessTarget.first_name} ${pageAccessTarget.last_name}` : undefined}
+            />
+          )}
+
         </CardContent>
       </Card>
     </div>
