@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -19,8 +20,9 @@ interface DashboardStats {
 }
 
 export default function YutongQuotations() {
-  const [activeTab, setActiveTab] = useState('quotations');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
+  const activeTab = searchParams.get('tab') || 'quotations';
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
     pendingQuotations: 0,
@@ -56,6 +58,10 @@ export default function YutongQuotations() {
   useEffect(() => {
     loadStats();
   }, []);
+
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value });
+  };
 
   const handleFormSubmit = () => {
     setShowForm(false);
@@ -124,7 +130,7 @@ export default function YutongQuotations() {
       </div>
 
       {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="quotations">Quotations</TabsTrigger>
           <TabsTrigger value="bus-models">Bus Models</TabsTrigger>
