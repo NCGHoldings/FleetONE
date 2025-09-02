@@ -2392,6 +2392,7 @@ export type Database = {
           id: string
           payment_terms: string | null
           quantity: number
+          quotation_no: string
           special_features: string | null
           status: string
           total_price: number
@@ -2415,6 +2416,7 @@ export type Database = {
           id?: string
           payment_terms?: string | null
           quantity?: number
+          quotation_no?: string
           special_features?: string | null
           status?: string
           total_price: number
@@ -2438,6 +2440,7 @@ export type Database = {
           id?: string
           payment_terms?: string | null
           quantity?: number
+          quotation_no?: string
           special_features?: string | null
           status?: string
           total_price?: number
