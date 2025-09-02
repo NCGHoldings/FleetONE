@@ -17,13 +17,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
-  model_name: z.string().min(1, 'Model name is required'),
-  capacity: z.number().min(1, 'Capacity must be at least 1'),
-  base_price: z.number().min(1, 'Base price is required'),
-  engine_type: z.string().optional(),
-  fuel_type: z.string().optional(),
-  dimensions: z.string().optional(),
-  features: z.string().optional(),
+  bus_name: z.string().min(1, 'Bus name is required'),
+  model: z.string().min(1, 'Model is required'),
+  seating_capacity: z.number().min(1, 'Seating capacity must be at least 1'),
+  engine: z.string().min(1, 'Engine is required'),
+  manufactured_year: z.number().min(1900, 'Valid year required').max(new Date().getFullYear() + 1),
+  condition: z.string().min(1, 'Condition is required'),
+  unit_price: z.number().min(1, 'Unit price is required'),
   is_active: z.boolean().default(true)
 });
 
@@ -31,13 +31,13 @@ type FormData = z.infer<typeof formSchema>;
 
 interface BusModel {
   id: string;
-  model_name: string;
-  capacity: number;
-  base_price: number;
-  engine_type: string;
-  fuel_type: string;
-  dimensions: string;
-  features: string;
+  bus_name: string;
+  model: string;
+  seating_capacity: number;
+  engine: string;
+  manufactured_year: number;
+  condition: string;
+  unit_price: number;
   is_active: boolean;
   created_at: string;
 }
@@ -61,7 +61,7 @@ export function YutongBusModelsAdmin() {
       const { data, error } = await (supabase as any)
         .from('yutong_bus_models')
         .select('*')
-        .order('model_name');
+        .order('bus_name');
 
       if (error) throw error;
       setBusModels(data || []);
@@ -115,13 +115,13 @@ export function YutongBusModelsAdmin() {
   const handleEdit = (model: BusModel) => {
     setEditingModel(model);
     form.reset({
-      model_name: model.model_name,
-      capacity: model.capacity,
-      base_price: model.base_price,
-      engine_type: model.engine_type || '',
-      fuel_type: model.fuel_type || '',
-      dimensions: model.dimensions || '',
-      features: model.features || '',
+      bus_name: model.bus_name,
+      model: model.model,
+      seating_capacity: model.seating_capacity,
+      engine: model.engine,
+      manufactured_year: model.manufactured_year,
+      condition: model.condition,
+      unit_price: model.unit_price,
       is_active: model.is_active
     });
     setShowDialog(true);
@@ -150,23 +150,30 @@ export function YutongBusModelsAdmin() {
 
   const columns: ColumnDef<BusModel>[] = [
     {
-      accessorKey: "model_name",
-      header: "Model Name",
+      accessorKey: "bus_name",
+      header: "Bus Name",
     },
     {
-      accessorKey: "capacity",
+      accessorKey: "model",
+      header: "Model",
+    },
+    {
+      accessorKey: "seating_capacity",
       header: "Capacity",
-      cell: ({ row }) => `${row.getValue("capacity")} seats`,
+      cell: ({ row }) => `${row.getValue("seating_capacity")} seats`,
     },
     {
-      accessorKey: "base_price",
-      header: "Base Price",
-      cell: ({ row }) => `LKR ${row.getValue<number>("base_price").toLocaleString()}`,
+      accessorKey: "manufactured_year",
+      header: "Year",
     },
     {
-      accessorKey: "fuel_type",
-      header: "Fuel Type",
-      cell: ({ row }) => row.getValue("fuel_type") || "-",
+      accessorKey: "condition",
+      header: "Condition",
+    },
+    {
+      accessorKey: "unit_price",
+      header: "Unit Price",
+      cell: ({ row }) => `LKR ${row.getValue<number>("unit_price").toLocaleString()}`,
     },
     {
       accessorKey: "is_active",
@@ -219,10 +226,24 @@ export function YutongBusModelsAdmin() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="model_name"
+                      name="bus_name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Model Name</FormLabel>
+                          <FormLabel>Bus Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., Yutong ZK6129H" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="model"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Model</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g., ZK6129H" {...field} />
                           </FormControl>
@@ -233,14 +254,15 @@ export function YutongBusModelsAdmin() {
 
                     <FormField
                       control={form.control}
-                      name="capacity"
+                      name="seating_capacity"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Capacity (seats)</FormLabel>
+                          <FormLabel>Seating Capacity</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               min="1"
+                              placeholder="e.g., 49"
                               {...field}
                               onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                             />
@@ -252,43 +274,10 @@ export function YutongBusModelsAdmin() {
 
                     <FormField
                       control={form.control}
-                      name="base_price"
+                      name="engine"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Base Price (LKR)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="fuel_type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Fuel Type</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., Diesel, CNG" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="engine_type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Engine Type</FormLabel>
+                          <FormLabel>Engine</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g., YC6L280-30" {...field} />
                           </FormControl>
@@ -299,35 +288,59 @@ export function YutongBusModelsAdmin() {
 
                     <FormField
                       control={form.control}
-                      name="dimensions"
+                      name="manufactured_year"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Dimensions</FormLabel>
+                          <FormLabel>Manufactured Year</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., 12m x 2.5m x 3.2m" {...field} />
+                            <Input
+                              type="number"
+                              min="1900"
+                              max={new Date().getFullYear() + 1}
+                              placeholder="e.g., 2024"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="condition"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Condition</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., New, Used, Refurbished" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="unit_price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Unit Price (LKR)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g., 12500000"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
-
-                  <FormField
-                    control={form.control}
-                    name="features"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Features</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Key features and specifications" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
 
                   <FormField
                     control={form.control}
@@ -360,7 +373,7 @@ export function YutongBusModelsAdmin() {
         </div>
       </CardHeader>
       <CardContent>
-        <DataTable columns={columns} data={busModels} searchKey="model_name" />
+        <DataTable columns={columns} data={busModels} searchKey="bus_name" />
       </CardContent>
     </Card>
   );
