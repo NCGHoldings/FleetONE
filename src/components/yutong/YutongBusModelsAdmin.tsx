@@ -57,14 +57,20 @@ export function YutongBusModelsAdmin() {
 
   const loadBusModels = async () => {
     try {
+      setLoading(true);
+      console.log('Loading bus models...');
       const { data, error } = await supabase
         .from('yutong_bus_models')
         .select('*')
         .order('bus_name');
 
+      console.log('Bus models query result:', { data, error });
+
       if (error) throw error;
       setBusModels(data || []);
+      console.log('Bus models loaded successfully:', data?.length || 0, 'records');
     } catch (error: any) {
+      console.error('Error loading bus models:', error);
       toast({
         title: "Error",
         description: "Failed to load bus models",
