@@ -5,7 +5,8 @@ import { DataTable } from '@/components/ui/data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ColumnDef } from '@tanstack/react-table';
-import { Eye, Edit, Trash2, Send, CheckCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Eye, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -213,24 +214,20 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
             <Button variant="outline" size="sm">
               <Edit className="h-4 w-4" />
             </Button>
-            {quotation.status === 'draft' && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => handleStatusUpdate(quotation.id, 'sent')}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            )}
-            {quotation.status === 'sent' && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => handleStatusUpdate(quotation.id, 'confirmed')}
-              >
-                <CheckCircle className="h-4 w-4" />
-              </Button>
-            )}
+            <Select
+              value={quotation.status}
+              onValueChange={(value) => handleStatusUpdate(quotation.id, value)}
+            >
+              <SelectTrigger className="w-24 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="sent">Sent</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+              </SelectContent>
+            </Select>
             <Button 
               variant="outline" 
               size="sm"
