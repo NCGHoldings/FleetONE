@@ -246,12 +246,40 @@ export function ConfirmedTripsTable() {
         throw updateError;
       }
 
+      // Optimistically update UI so action buttons reflect the new state immediately
+      setTrips((prev) => prev.map((t) => {
+        if (t.id !== selectedTrip.id) return t;
+        const updatedInvoices = [
+          ...t.invoices,
+          {
+            id: `${invoiceType}_${t.id}`,
+            invoice_no: invoiceNo,
+            invoice_type: invoiceType,
+            amount: paymentData.amount,
+            pdf_path: '',
+            issued_at: new Date().toISOString(),
+          },
+        ];
+        const newAdvancePaid = invoiceType === 'advance'
+          ? (t.advance_paid || 0) + paymentData.amount
+          : t.advance_paid || 0;
+        const newBalance = Math.max((t.total_amount || 0) - newAdvancePaid - (invoiceType === 'final' ? paymentData.amount : 0), 0);
+        return {
+          ...t,
+          status: newStatus,
+          invoices: updatedInvoices,
+          advance_paid: newAdvancePaid,
+          balance_due: invoiceType === 'final' ? 0 : newBalance,
+        };
+      }));
+
       toast({
         title: 'Success!',
         description: `${invoiceType === 'final' ? 'Final payment' : 'Advance payment'} confirmed and invoice PDF downloaded successfully`
       });
 
       setPaymentModalOpen(false);
+      // Refresh from DB as well (kept for consistency)
       fetchConfirmedTrips();
     } catch (error: any) {
       console.error('Error confirming payment:', error);
@@ -427,7 +455,7 @@ export function ConfirmedTripsTable() {
                     <div className="text-sm">
                       <div>Total: LKR {trip.total_amount.toLocaleString()}</div>
                       <div className="text-muted-foreground">
-                        Paid: LKR {trip.advance_paid.toLocaleString()}
+                        Paid: LKR {(trip.invoices?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0).toLocaleString()}
                       </div>
                       {trip.balance_due > 0 && (
                         <div className="text-red-600">
