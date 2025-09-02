@@ -188,6 +188,15 @@ export function CostCalculator() {
         const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount;
         const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
         const customerTotalWithFuel = customerTotalBeforeAdjustment + adjustmentAmount;
+        
+        console.log('Outside hire calculation debug:', {
+          customerSubtotal,
+          commissionPassThroughAmount,
+          customerTotalBeforeAdjustment,
+          percentageAdjustment: formData.percentageAdjustment,
+          adjustmentAmount,
+          customerTotalWithFuel
+        });
 
         const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + commissionExpenseAmount;
         const netProfit = customerTotalWithFuel - totalExpenses;
@@ -276,9 +285,18 @@ export function CostCalculator() {
       const commissionExpenseAmount = customerSubtotal * (formData.commissionPct / 100);
       const commissionPassThroughAmount = customerSubtotal * (formData.commissionPassThroughPct / 100);
 
-      const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount;
-      const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
-      const customerTotalWithFuel = customerTotalBeforeAdjustment + adjustmentAmount;
+        const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount;
+        const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
+        const customerTotalWithFuel = customerTotalBeforeAdjustment + adjustmentAmount;
+        
+        console.log('General hire calculation debug:', {
+          customerSubtotal,
+          commissionPassThroughAmount,
+          customerTotalBeforeAdjustment,
+          percentageAdjustment: formData.percentageAdjustment,
+          adjustmentAmount,
+          customerTotalWithFuel
+        });
 
       const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + commissionExpenseAmount;
       const netProfit = customerTotalWithFuel - totalExpenses;
