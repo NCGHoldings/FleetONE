@@ -13,6 +13,7 @@ import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { QuotationAddOnsSection } from './QuotationAddOnsSection';
+import { InlineAddOnsSection } from './InlineAddOnsSection';
 
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
@@ -45,11 +46,23 @@ interface BusModel {
   base_price: number;
 }
 
+interface TempAddOn {
+  id: string;
+  addon_id: string;
+  addon_name: string;
+  category: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  notes?: string;
+}
+
 export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormProps) {
   const [busModels, setBusModels] = useState<BusModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<BusModel | null>(null);
   const [createdQuotationId, setCreatedQuotationId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("basic");
+  const [tempAddOns, setTempAddOns] = useState<TempAddOn[]>([]);
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -105,6 +118,9 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const handleFormSubmit = async (data: FormData) => {
     try {
       const totalPrice = calculateTotalPrice();
+      const addOnsTotal = tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0);
+      const grandTotal = totalPrice + addOnsTotal;
+      
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + data.valid_days);
 
@@ -120,7 +136,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         bus_model: selectedModel ? `${selectedModel.bus_name} ${selectedModel.model_name}` : '',
         quantity: data.quantity,
         unit_price: data.unit_price,
-        total_price: totalPrice,
+        total_price: grandTotal,
         valid_until: validUntil.toISOString().split('T')[0],
         status: 'draft',
         special_features: data.special_features || '',
@@ -137,13 +153,30 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
 
       if (error) throw error;
 
-      setCreatedQuotationId(insertedData.id);
-      setActiveTab("addons");
+      // Save add-ons if any
+      if (tempAddOns.length > 0) {
+        const addOnsData = tempAddOns.map(addon => ({
+          quotation_id: insertedData.id,
+          addon_id: addon.addon_id,
+          quantity: addon.quantity,
+          unit_price: addon.unit_price,
+          total_price: addon.total_price,
+          notes: addon.notes
+        }));
+
+        const { error: addOnsError } = await supabase
+          .from('yutong_quotation_addons')
+          .insert(addOnsData);
+
+        if (addOnsError) throw addOnsError;
+      }
 
       toast({
         title: "Success",
-        description: "Quotation created successfully. You can now add add-ons."
+        description: `Quotation created successfully${tempAddOns.length > 0 ? ` with ${tempAddOns.length} add-ons` : ''}.`
       });
+
+      onSubmit();
 
     } catch (error: any) {
       toast({
@@ -402,6 +435,14 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
               />
             </div>
 
+            {/* Add-ons Section */}
+            <div className="space-y-4">
+              <InlineAddOnsSection 
+                addOns={tempAddOns} 
+                onAddOnsChange={setTempAddOns}
+              />
+            </div>
+
             {/* Price Summary */}
             <div className="bg-muted p-4 rounded-lg">
               <h4 className="font-medium mb-2">Price Summary</h4>
@@ -422,9 +463,19 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   <span>Discount ({form.watch('discount_percentage') || 0}%):</span>
                   <span>-LKR {(((form.watch('quantity') || 0) * (form.watch('unit_price') || 0)) * ((form.watch('discount_percentage') || 0) / 100)).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between font-bold text-lg border-t pt-2">
-                  <span>Total Price:</span>
+                <div className="flex justify-between">
+                  <span>Bus Total:</span>
                   <span>LKR {calculateTotalPrice().toLocaleString()}</span>
+                </div>
+                {tempAddOns.length > 0 && (
+                  <div className="flex justify-between">
+                    <span>Add-ons Total:</span>
+                    <span>LKR {tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0).toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-lg border-t pt-2">
+                  <span>Grand Total:</span>
+                  <span>LKR {(calculateTotalPrice() + tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0)).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -434,7 +485,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                 Cancel
               </Button>
               <Button type="submit">
-                Create Quotation
+                Create Quotation {tempAddOns.length > 0 && `with ${tempAddOns.length} Add-ons`}
               </Button>
             </div>
           </form>
