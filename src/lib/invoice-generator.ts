@@ -131,20 +131,22 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>NCG Express Invoice</title>
           <style>
-              body {
-                  font-family: Arial, sans-serif;
-                  margin: 0;
-                  padding: 20px;
-                  background-color: white;
-                  font-size: 12px;
-              }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: white;
+            font-size: 12px;
+        }
               
-              .invoice-container {
-                  max-width: 800px;
-                  margin: 0 auto;
-                  background: white;
-                  border: 1px solid #000;
-              }
+        .invoice-container {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            background: white;
+            border: 1px solid #000;
+            box-sizing: border-box;
+        }
               
               .header {
                   display: flex;

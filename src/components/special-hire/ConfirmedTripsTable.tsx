@@ -144,11 +144,28 @@ export function ConfirmedTripsTable() {
   const handlePaymentConfirmation = async (paymentData: PaymentConfirmationData) => {
     if (!selectedTrip) return;
 
+    console.log('Payment confirmation started:', {
+      paymentData,
+      selectedTrip: selectedTrip.quotation,
+      advancePaid: selectedTrip.advance_paid,
+      balanceDue: selectedTrip.balance_due
+    });
+
     setLoading(true);
     try {
-      // Determine invoice type
+      // Determine invoice type based on payment type or if it's a full payment
       const isFullPayment = paymentData.amount >= selectedTrip.quotation.gross_revenue;
-      const invoiceType: 'advance' | 'final' = isFullPayment || paymentData.paymentType === 'full' ? 'final' : 'advance';
+      const isFinalPayment = paymentData.paymentType === 'final' || paymentData.paymentType === 'full';
+      const invoiceType: 'advance' | 'final' = isFinalPayment || isFullPayment ? 'final' : 'advance';
+
+      console.log('Invoice type determination:', {
+        isFullPayment,
+        isFinalPayment,
+        paymentType: paymentData.paymentType,
+        amount: paymentData.amount,
+        grossRevenue: selectedTrip.quotation.gross_revenue,
+        invoiceType
+      });
 
       // Generate invoice number
       const invoiceNo = `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
@@ -179,6 +196,8 @@ export function ConfirmedTripsTable() {
         conductorName: paymentData.conductorName,
         itemDetail: `${format(new Date(selectedTrip.quotation.pickup_datetime), 'dd/MM/yyyy')} ${selectedTrip.quotation.pickup_location} → ${selectedTrip.quotation.drop_location}; ${selectedTrip.quotation.number_of_passengers} Pax, ${selectedTrip.quotation.number_of_buses} bus(es), Standard Bus`,
       };
+      console.log('Generated invoice data:', invoiceData);
+      
       // Generate PDF
       const pdfBlob = await generateInvoicePDF(invoiceData);
       
@@ -199,11 +218,18 @@ export function ConfirmedTripsTable() {
         generated_at: new Date().toISOString()
       }));
 
-      // Update quotation status - auto-mark as completed when full payment is received
+      // Update quotation status - auto-mark as completed when final payment is received
       let newStatus = 'paid';
-      if (invoiceType === 'final' || isFullPayment || paymentData.paymentType === 'full' || paymentData.paymentType === 'final') {
+      if (invoiceType === 'final') {
         newStatus = 'completed';
       }
+
+      console.log('Invoice storage and status update:', {
+        storageKey,
+        invoiceType,
+        newStatus,
+        quotationId: selectedTrip.quotation_id
+      });
 
       await supabase
         .from('special_hire_quotations')
