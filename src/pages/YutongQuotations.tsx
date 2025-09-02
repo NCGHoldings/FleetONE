@@ -7,6 +7,7 @@ import { Plus, FileText, Calculator, Truck } from 'lucide-react';
 import { YutongQuotationsList } from "@/components/yutong/YutongQuotationsList";
 import { YutongQuotationForm } from "@/components/yutong/YutongQuotationForm";
 import { YutongBusModelsAdmin } from "@/components/yutong/YutongBusModelsAdmin";
+import { YutongAddOnsAdmin } from "@/components/yutong/YutongAddOnsAdmin";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -124,9 +125,10 @@ export default function YutongQuotations() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="quotations">Quotations</TabsTrigger>
           <TabsTrigger value="bus-models">Bus Models</TabsTrigger>
+          <TabsTrigger value="addons">Add-ons</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
@@ -136,6 +138,10 @@ export default function YutongQuotations() {
 
         <TabsContent value="bus-models" className="space-y-4">
           <YutongBusModelsAdmin />
+        </TabsContent>
+
+        <TabsContent value="addons" className="space-y-4">
+          <YutongAddOnsAdmin />
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">

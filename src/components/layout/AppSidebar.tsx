@@ -16,7 +16,9 @@ import {
   ChevronDown,
   Truck,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  Package,
+  Settings2
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -57,10 +59,15 @@ const operationsItems = [
 
 const businessItems = [
   { title: "Special Hire", url: "/special-hire", icon: Star },
-  { title: "Yutong Quotations", url: "/yutong-quotations", icon: Truck },
   { title: "Business Ideas", url: "/business", icon: Lightbulb },
   { title: "Document Manager", url: "/documents", icon: FileText },
   { title: "Feedback", url: "/feedback", icon: MessageSquare },
+];
+
+const yutongItems = [
+  { title: "Quotations", url: "/yutong-quotations", icon: FileText },
+  { title: "Bus Models", url: "/yutong-quotations?tab=bus-models", icon: Truck },
+  { title: "Add-ons", url: "/yutong-quotations?tab=addons", icon: Package },
 ];
 
 export function AppSidebar() {
@@ -168,6 +175,27 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {businessItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} className={getNavCls}>
+                      <item.icon className="w-5 h-5 transition-all duration-300" />
+                      {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-warning to-accent rounded-full animate-pulse"></div>
+            Yutong Sales
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {yutongItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavCls}>

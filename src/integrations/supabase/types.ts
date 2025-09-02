@@ -2266,6 +2266,54 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_addons: {
+        Row: {
+          addon_code: string | null
+          addon_name: string
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          installation_time_hours: number | null
+          is_active: boolean | null
+          price: number
+          supplier_contact: string | null
+          supplier_name: string | null
+          updated_at: string
+          warranty_months: number | null
+        }
+        Insert: {
+          addon_code?: string | null
+          addon_name: string
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          installation_time_hours?: number | null
+          is_active?: boolean | null
+          price?: number
+          supplier_contact?: string | null
+          supplier_name?: string | null
+          updated_at?: string
+          warranty_months?: number | null
+        }
+        Update: {
+          addon_code?: string | null
+          addon_name?: string
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          installation_time_hours?: number | null
+          is_active?: boolean | null
+          price?: number
+          supplier_contact?: string | null
+          supplier_name?: string | null
+          updated_at?: string
+          warranty_months?: number | null
+        }
+        Relationships: []
+      }
       yutong_bus_models: {
         Row: {
           base_price: number
