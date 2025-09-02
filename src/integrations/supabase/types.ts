@@ -2266,68 +2266,12 @@ export type Database = {
         }
         Relationships: []
       }
-      yutong_addon_bus_allocations: {
-        Row: {
-          addon_id: string
-          allocation_date: string
-          bus_id: string | null
-          bus_registration: string | null
-          created_at: string
-          created_by: string | null
-          id: string
-          notes: string | null
-          quantity: number
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          addon_id: string
-          allocation_date?: string
-          bus_id?: string | null
-          bus_registration?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          quantity?: number
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          addon_id?: string
-          allocation_date?: string
-          bus_id?: string | null
-          bus_registration?: string | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          quantity?: number
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "yutong_addon_bus_allocations_addon_id_fkey"
-            columns: ["addon_id"]
-            isOneToOne: false
-            referencedRelation: "yutong_addons"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "yutong_addon_bus_allocations_bus_id_fkey"
-            columns: ["bus_id"]
-            isOneToOne: false
-            referencedRelation: "buses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       yutong_addons: {
         Row: {
           addon_code: string | null
           addon_name: string
           category: string
+          compatible_bus_models: Json | null
           created_at: string
           description: string | null
           id: string
@@ -2343,6 +2287,7 @@ export type Database = {
           addon_code?: string | null
           addon_name: string
           category?: string
+          compatible_bus_models?: Json | null
           created_at?: string
           description?: string | null
           id?: string
@@ -2358,6 +2303,7 @@ export type Database = {
           addon_code?: string | null
           addon_name?: string
           category?: string
+          compatible_bus_models?: Json | null
           created_at?: string
           description?: string | null
           id?: string
