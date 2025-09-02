@@ -236,7 +236,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         <DataTable 
           columns={columns} 
           data={quotations} 
-          searchKey="customer_name"
+          searchKey="quotation_no"
         />
       </CardContent>
     </Card>
