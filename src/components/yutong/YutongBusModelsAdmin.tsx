@@ -31,12 +31,12 @@ type FormData = z.infer<typeof formSchema>;
 interface BusModel {
   id: string;
   bus_name: string;
-  model: string;
-  seating_capacity: number;
+  model_name: string; // This maps to 'model' in our form
+  capacity: number; // This maps to 'seating_capacity' in our form
   engine: string;
   manufactured_year: number;
   condition: string;
-  unit_price: number;
+  base_price: number; // This maps to 'unit_price' in our form
   is_active: boolean;
   created_at: string;
 }
@@ -81,10 +81,22 @@ export function YutongBusModelsAdmin() {
 
   const handleSubmit = async (data: FormData) => {
     try {
+      // Map form data to database column names
+      const dbData = {
+        bus_name: data.bus_name,
+        model_name: data.model,
+        capacity: data.seating_capacity,
+        engine: data.engine,
+        manufactured_year: data.manufactured_year,
+        condition: data.condition,
+        base_price: data.unit_price,
+        is_active: data.is_active
+      };
+
       if (editingModel) {
         const { error } = await supabase
           .from('yutong_bus_models')
-          .update(data)
+          .update(dbData)
           .eq('id', editingModel.id);
 
         if (error) throw error;
@@ -92,7 +104,7 @@ export function YutongBusModelsAdmin() {
       } else {
         const { error } = await supabase
           .from('yutong_bus_models')
-          .insert([data]);
+          .insert([dbData]);
 
         if (error) throw error;
         toast({ title: "Success", description: "Bus model created successfully" });
@@ -113,14 +125,15 @@ export function YutongBusModelsAdmin() {
 
   const handleEdit = (model: BusModel) => {
     setEditingModel(model);
+    // Map database fields to form fields
     form.reset({
       bus_name: model.bus_name,
-      model: model.model,
-      seating_capacity: model.seating_capacity,
+      model: model.model_name,
+      seating_capacity: model.capacity,
       engine: model.engine,
       manufactured_year: model.manufactured_year,
       condition: model.condition,
-      unit_price: model.unit_price,
+      unit_price: model.base_price,
       is_active: model.is_active
     });
     setShowDialog(true);
@@ -153,13 +166,13 @@ export function YutongBusModelsAdmin() {
       header: "Bus Name",
     },
     {
-      accessorKey: "model",
+      accessorKey: "model_name",
       header: "Model",
     },
     {
-      accessorKey: "seating_capacity",
+      accessorKey: "capacity",
       header: "Capacity",
-      cell: ({ row }) => `${row.getValue("seating_capacity")} seats`,
+      cell: ({ row }) => `${row.getValue("capacity")} seats`,
     },
     {
       accessorKey: "manufactured_year",
@@ -170,9 +183,9 @@ export function YutongBusModelsAdmin() {
       header: "Condition",
     },
     {
-      accessorKey: "unit_price",
+      accessorKey: "base_price",
       header: "Unit Price",
-      cell: ({ row }) => `LKR ${row.getValue<number>("unit_price").toLocaleString()}`,
+      cell: ({ row }) => `LKR ${row.getValue<number>("base_price").toLocaleString()}`,
     },
     {
       accessorKey: "is_active",
