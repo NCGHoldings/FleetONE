@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { QuotationAddOnsSection } from './QuotationAddOnsSection';
 
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
@@ -46,6 +48,8 @@ interface BusModel {
 export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormProps) {
   const [busModels, setBusModels] = useState<BusModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<BusModel | null>(null);
+  const [createdQuotationId, setCreatedQuotationId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("basic");
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -125,18 +129,22 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         warranty_terms: data.warranty_terms || ''
       };
 
-      const { error } = await supabase
+      const { data: insertedData, error } = await supabase
         .from('yutong_quotations')
-        .insert([quotationData]);
+        .insert([quotationData])
+        .select()
+        .single();
 
       if (error) throw error;
 
+      setCreatedQuotationId(insertedData.id);
+      setActiveTab("addons");
+
       toast({
         title: "Success",
-        description: "Quotation created successfully"
+        description: "Quotation created successfully. You can now add add-ons."
       });
 
-      onSubmit();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -146,15 +154,28 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     }
   };
 
+  const handleFinalSubmit = () => {
+    onSubmit();
+  };
+
   return (
     <Dialog open={true} onOpenChange={onCancel}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Yutong Bus Quotation</DialogTitle>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="basic">Basic Information</TabsTrigger>
+            <TabsTrigger value="addons" disabled={!createdQuotationId}>
+              Add-ons {createdQuotationId ? '✓' : ''}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="basic" className="space-y-4">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -418,7 +439,26 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
             </div>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+      </TabsContent>
+
+      <TabsContent value="addons" className="space-y-4">
+        <QuotationAddOnsSection quotationId={createdQuotationId} />
+        
+        <div className="flex justify-end space-x-2 pt-4">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => setActiveTab("basic")}
+          >
+            Back to Basic Info
+          </Button>
+          <Button onClick={handleFinalSubmit}>
+            Complete Quotation
+          </Button>
+        </div>
+      </TabsContent>
+    </Tabs>
+  </DialogContent>
+</Dialog>
   );
 }

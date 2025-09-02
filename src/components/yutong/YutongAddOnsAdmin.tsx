@@ -12,10 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Bus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ColumnDef } from '@tanstack/react-table';
+import { BusAllocationModal } from './BusAllocationModal';
 
 const formSchema = z.object({
   addon_name: z.string().min(1, 'Add-on name is required'),
@@ -51,6 +52,8 @@ export function YutongAddOnsAdmin() {
   const [loading, setLoading] = useState(true);
   const [editingAddOn, setEditingAddOn] = useState<AddOn | null>(null);
   const [showDialog, setShowDialog] = useState(false);
+  const [showBusAllocation, setShowBusAllocation] = useState(false);
+  const [selectedAddOnForAllocation, setSelectedAddOnForAllocation] = useState<AddOn | null>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -173,6 +176,11 @@ export function YutongAddOnsAdmin() {
     }
   };
 
+  const handleManageBuses = (addOn: AddOn) => {
+    setSelectedAddOnForAllocation(addOn);
+    setShowBusAllocation(true);
+  };
+
   const columns: ColumnDef<AddOn>[] = [
     {
       accessorKey: 'addon_name',
@@ -237,6 +245,14 @@ export function YutongAddOnsAdmin() {
       header: 'Actions',
       cell: ({ row }) => (
         <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleManageBuses(row.original)}
+            title="Manage Bus Allocations"
+          >
+            <Bus className="w-4 h-4" />
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -486,6 +502,15 @@ export function YutongAddOnsAdmin() {
           data={addOns}
         />
       </CardContent>
+
+      <BusAllocationModal
+        addon={selectedAddOnForAllocation}
+        open={showBusAllocation}
+        onClose={() => {
+          setShowBusAllocation(false);
+          setSelectedAddOnForAllocation(null);
+        }}
+      />
     </Card>
   );
 }

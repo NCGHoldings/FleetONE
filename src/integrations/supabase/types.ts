@@ -2266,6 +2266,63 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_addon_bus_allocations: {
+        Row: {
+          addon_id: string
+          allocation_date: string
+          bus_id: string | null
+          bus_registration: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          quantity: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          addon_id: string
+          allocation_date?: string
+          bus_id?: string | null
+          bus_registration?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          addon_id?: string
+          allocation_date?: string
+          bus_id?: string | null
+          bus_registration?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_addon_bus_allocations_addon_id_fkey"
+            columns: ["addon_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_addons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_addon_bus_allocations_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_addons: {
         Row: {
           addon_code: string | null
@@ -2376,6 +2433,57 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      yutong_quotation_addons: {
+        Row: {
+          addon_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          quantity: number
+          quotation_id: string
+          total_price: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          addon_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          quantity?: number
+          quotation_id: string
+          total_price?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          addon_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          quantity?: number
+          quotation_id?: string
+          total_price?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_quotation_addons_addon_id_fkey"
+            columns: ["addon_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_addons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_quotation_addons_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       yutong_quotations: {
         Row: {
