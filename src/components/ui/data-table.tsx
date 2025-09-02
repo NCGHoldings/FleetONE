@@ -28,30 +28,55 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, Filter, Download, Eye, Settings } from "lucide-react";
+import { EnhancedSearch } from "@/components/ui/enhanced-search";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   searchKey?: string;
+  searchKeys?: string[];
   title?: string;
   onExport?: () => void;
   onAdd?: () => void;
+  customSearch?: (data: TData[], query: string) => TData[];
+  customFilter?: (data: TData[]) => TData[];
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
   searchKey = "name",
+  searchKeys = [],
   title,
   onExport,
   onAdd,
+  customSearch,
+  customFilter,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [globalFilter, setGlobalFilter] = React.useState("");
+
+  // Apply custom filtering and search
+  const filteredData = React.useMemo(() => {
+    let result = data;
+    
+    // Apply custom filter first
+    if (customFilter) {
+      result = customFilter(result);
+    }
+    
+    // Apply custom search
+    if (globalFilter && customSearch) {
+      result = customSearch(result, globalFilter);
+    }
+    
+    return result;
+  }, [data, customFilter, customSearch, globalFilter]);
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -92,17 +117,25 @@ export function DataTable<TData, TValue>({
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 flex-1">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              placeholder={`Search ${searchKey}...`}
-              value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-              onChange={(event) =>
-                table.getColumn(searchKey)?.setFilterValue(event.target.value)
-              }
-              className="pl-10"
+          {customSearch ? (
+            <EnhancedSearch
+              onSearch={setGlobalFilter}
+              searchKeys={searchKeys}
+              className="max-w-sm"
             />
-          </div>
+          ) : (
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder={`Search ${searchKey}...`}
+                value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+                onChange={(event) =>
+                  table.getColumn(searchKey)?.setFilterValue(event.target.value)
+                }
+                className="pl-10"
+              />
+            </div>
+          )}
         </div>
 
         {/* Column Visibility */}

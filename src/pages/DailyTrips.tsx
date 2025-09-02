@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2, FileText, Edit, Calculator, Download, CalendarIcon } from "lucide-react";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -288,6 +289,7 @@ export default function DailyTrips() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [importing, setImporting] = useState(false);
+  const [dateFilter, setDateFilter] = useState<{ from?: Date; to?: Date } | undefined>();
   const { toast } = useToast();
 
   const handleViewDetailsLocal = (tripId: string) => {
@@ -615,12 +617,48 @@ export default function DailyTrips() {
     }
   };
 
-  // Calculate KPIs
-  const totalTrips = data.length;
-  const completedTrips = data.filter(trip => trip.status === 'completed').length;
-  const totalIncome = data.reduce((sum, trip) => sum + trip.income, 0);
-  const totalDistance = data.reduce((sum, trip) => sum + trip.distance_km, 0);
-  const avgKmPerLiter = data.filter(trip => trip.km_per_liter > 0)
+  // Multi-field search function
+  const customSearch = (trips: Trip[], query: string): Trip[] => {
+    if (!query.trim()) return trips;
+    
+    const searchLower = query.toLowerCase();
+    return trips.filter(trip => 
+      trip.bus_no?.toLowerCase().includes(searchLower) ||
+      trip.route_no?.toLowerCase().includes(searchLower) ||
+      trip.route?.toLowerCase().includes(searchLower) ||
+      trip.driver_name?.toLowerCase().includes(searchLower) ||
+      trip.conductor_name?.toLowerCase().includes(searchLower) ||
+      trip.trip_no?.toLowerCase().includes(searchLower)
+    );
+  };
+
+  // Date range filter function
+  const customFilter = (trips: Trip[]): Trip[] => {
+    if (!dateFilter || (!dateFilter.from && !dateFilter.to)) return trips;
+    
+    return trips.filter(trip => {
+      const tripDate = new Date(trip.trip_date);
+      
+      if (dateFilter.from && dateFilter.to) {
+        return tripDate >= dateFilter.from && tripDate <= dateFilter.to;
+      } else if (dateFilter.from) {
+        return tripDate >= dateFilter.from;
+      } else if (dateFilter.to) {
+        return tripDate <= dateFilter.to;
+      }
+      
+      return true;
+    });
+  };
+  // Calculate KPIs from filtered data
+  const filteredData = customFilter(data);
+  const searchedData = customSearch(filteredData, ""); // Empty query for KPI calculation
+  
+  const totalTrips = searchedData.length;
+  const completedTrips = searchedData.filter(trip => trip.status === 'completed').length;
+  const totalIncome = searchedData.reduce((sum, trip) => sum + trip.income, 0);
+  const totalDistance = searchedData.reduce((sum, trip) => sum + trip.distance_km, 0);
+  const avgKmPerLiter = searchedData.filter(trip => trip.km_per_liter > 0)
     .reduce((sum, trip, _, arr) => sum + trip.km_per_liter / arr.length, 0);
 
   if (loading) {
@@ -742,13 +780,41 @@ export default function DailyTrips() {
         />
       </div>
 
+      {/* Date Range Filter */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5" />
+            Filter by Date Range
+          </CardTitle>
+          <CardDescription>
+            Filter trips by selecting a specific date or date range
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <DateRangePicker
+              onDateRangeChange={setDateFilter}
+              className="flex-1"
+            />
+            {dateFilter && (
+              <div className="text-sm text-muted-foreground">
+                {filteredData.length} trip{filteredData.length !== 1 ? 's' : ''} found
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Data Table */}
       <DataTable
         columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal)}
         data={data}
-        searchKey="bus_no"
+        searchKeys={["Bus No.", "Route No.", "Route", "Driver", "Conductor"]}
         title="Daily Trips"
         onExport={handleExport}
+        customSearch={customSearch}
+        customFilter={customFilter}
       />
 
       {/* Modals */}
