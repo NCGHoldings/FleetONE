@@ -9,6 +9,7 @@ import { Eye, Edit, Trash2, Send, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { YutongQuotationViewModal } from './YutongQuotationViewModal';
 
 interface YutongQuotation {
   id: string;
@@ -24,6 +25,11 @@ interface YutongQuotation {
   status: string;
   valid_until: string;
   created_at: string;
+  special_features?: string;
+  delivery_timeline?: string;
+  payment_terms?: string;
+  warranty_terms?: string;
+  discount_percentage?: number;
 }
 
 interface YutongQuotationsListProps {
@@ -33,6 +39,8 @@ interface YutongQuotationsListProps {
 export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
   const [quotations, setQuotations] = useState<YutongQuotation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedQuotation, setSelectedQuotation] = useState<YutongQuotation | null>(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
   const { toast } = useToast();
 
   const loadQuotations = async () => {
@@ -133,6 +141,11 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
     }
   };
 
+  const handleViewQuotation = (quotation: YutongQuotation) => {
+    setSelectedQuotation(quotation);
+    setViewModalOpen(true);
+  };
+
   const columns: ColumnDef<YutongQuotation>[] = [
     {
       accessorKey: "quotation_no",
@@ -190,7 +203,11 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         const quotation = row.original;
         return (
           <div className="flex space-x-1">
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleViewQuotation(quotation)}
+            >
               <Eye className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm">
@@ -228,17 +245,25 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
   ];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Yutong Bus Quotations</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <DataTable 
-          columns={columns} 
-          data={quotations} 
-          searchKey="quotation_no"
-        />
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Yutong Bus Quotations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable 
+            columns={columns} 
+            data={quotations} 
+            searchKey="quotation_no"
+          />
+        </CardContent>
+      </Card>
+
+      <YutongQuotationViewModal
+        quotation={selectedQuotation}
+        open={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
+      />
+    </>
   );
 }
