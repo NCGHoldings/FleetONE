@@ -17,7 +17,11 @@ export function CostCalculator() {
     hireType: 'Outside',
     numberOfBuses: 1,
     driverCharge: 1500,
-    commissionPct: 5,
+    // Commission handling (new): total commission to pay and portion passed to customer
+    commissionPct: 0,
+    commissionPassThroughPct: 0,
+    // General adjustment applied to customer total (positive=surcharge, negative=discount)
+    percentageAdjustment: 0,
     expectedWorkHours: 8,
     overnightDays: 0,
     agreedDistance: 0
@@ -56,6 +60,16 @@ export function CostCalculator() {
   const calculateCosts = async () => {
     if (!fuelSettings) {
       toast({ title: "Error", description: "Fuel settings not loaded", variant: "destructive" });
+      return;
+    }
+
+    // Validate commission split
+    if (formData.commissionPassThroughPct > formData.commissionPct) {
+      toast({ 
+        title: "Invalid Commission Split", 
+        description: "Pass to customer (%) cannot be greater than Commission to pay (%).", 
+        variant: "destructive" 
+      });
       return;
     }
 
@@ -164,10 +178,18 @@ export function CostCalculator() {
         const fuelLiters = (emptyRunKm / (selectedBusType.avg_km_per_l || 8));
         const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
+        // Revenue and commission split calculations
         const grossRevenue = hireCharge * formData.numberOfBuses;
-        const customerTotalWithFuel = grossRevenue + (fuelCost * formData.numberOfBuses);
-        const commissionAmount = customerTotalWithFuel * (formData.commissionPct / 100);
-        const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + commissionAmount + (fuelCost * formData.numberOfBuses);
+        const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses);
+
+        const commissionExpenseAmount = customerSubtotal * (formData.commissionPct / 100);
+        const commissionPassThroughAmount = customerSubtotal * (formData.commissionPassThroughPct / 100);
+
+        const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount;
+        const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
+        const customerTotalWithFuel = customerTotalBeforeAdjustment + adjustmentAmount;
+
+        const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + commissionExpenseAmount;
         const netProfit = customerTotalWithFuel - totalExpenses;
 
         const result = {
@@ -197,8 +219,13 @@ export function CostCalculator() {
           customerTotalWithFuel: Math.round(customerTotalWithFuel),
           driverCharge: formData.driverCharge,
           otherExpenses: [],
+          // Commission and adjustments (new)
           commissionPct: formData.commissionPct,
-          commissionAmount: Math.round(commissionAmount),
+          commissionAmount: Math.round(commissionExpenseAmount),
+          commissionPassThroughPct: formData.commissionPassThroughPct,
+          commissionPassThroughAmount: Math.round(commissionPassThroughAmount),
+          percentageAdjustment: formData.percentageAdjustment,
+          adjustmentAmount: Math.round(adjustmentAmount),
           totalExpenses: Math.round(totalExpenses),
           netProfit: Math.round(netProfit),
           busTypeName: selectedBusType.name,
@@ -209,7 +236,7 @@ export function CostCalculator() {
         setCostData(result);
         toast({ 
           title: "Cost Calculated (Outside)", 
-          description: `Trip: ${tripDistance}km | Flat: LKR ${Math.round(fixedRate).toLocaleString()} | Exceeding: LKR ${Math.round(exceedingDistanceCharge).toLocaleString()} | Total: LKR ${Math.round(hireCharge).toLocaleString()} (+ fuel)`
+          description: `Trip: ${tripDistance}km | Flat: LKR ${Math.round(fixedRate).toLocaleString()} | Exceeding: LKR ${Math.round(exceedingDistanceCharge).toLocaleString()} | Pass-through: ${formData.commissionPassThroughPct}% | Adj: ${formData.percentageAdjustment}%`
         });
 
         return;
@@ -242,10 +269,18 @@ export function CostCalculator() {
       const fuelLiters = (emptyRunKm / (selectedBusType.avg_km_per_l || 8));
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
+      // Revenue and commission split calculations
       const grossRevenue = hireCharge * formData.numberOfBuses;
-      const customerTotalWithFuel = grossRevenue + (fuelCost * formData.numberOfBuses);
-      const commissionAmount = customerTotalWithFuel * (formData.commissionPct / 100);
-      const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + commissionAmount + (fuelCost * formData.numberOfBuses);
+      const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses);
+
+      const commissionExpenseAmount = customerSubtotal * (formData.commissionPct / 100);
+      const commissionPassThroughAmount = customerSubtotal * (formData.commissionPassThroughPct / 100);
+
+      const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount;
+      const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
+      const customerTotalWithFuel = customerTotalBeforeAdjustment + adjustmentAmount;
+
+      const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + commissionExpenseAmount;
       const netProfit = customerTotalWithFuel - totalExpenses;
 
       const result = {
@@ -274,8 +309,13 @@ export function CostCalculator() {
         customerTotalWithFuel: Math.round(customerTotalWithFuel),
         driverCharge: formData.driverCharge,
         otherExpenses: [],
+        // Commission and adjustments (new)
         commissionPct: formData.commissionPct,
-        commissionAmount: Math.round(commissionAmount),
+        commissionAmount: Math.round(commissionExpenseAmount),
+        commissionPassThroughPct: formData.commissionPassThroughPct,
+        commissionPassThroughAmount: Math.round(commissionPassThroughAmount),
+        percentageAdjustment: formData.percentageAdjustment,
+        adjustmentAmount: Math.round(adjustmentAmount),
         totalExpenses: Math.round(totalExpenses),
         netProfit: Math.round(netProfit),
         busTypeName: selectedBusType.name,
@@ -286,9 +326,9 @@ export function CostCalculator() {
       setCostData(result);
       toast({ 
         title: "Cost Calculated Successfully", 
-        description: `Trip: ${tripDistance}km | Flat: LKR ${Math.round(fixedRate).toLocaleString()} | Exceeding: LKR ${Math.round(exceedingDistanceCharge).toLocaleString()} | Total: LKR ${Math.round(hireCharge).toLocaleString()} (+ fuel)`
+        description: `Trip: ${tripDistance}km | Flat: LKR ${Math.round(fixedRate).toLocaleString()} | Exceeding: LKR ${Math.round(exceedingDistanceCharge).toLocaleString()} | Pass-through: ${formData.commissionPassThroughPct}% | Adj: ${formData.percentageAdjustment}%`
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error calculating costs:', error);
       toast({ 
         title: "Error", 
@@ -384,15 +424,28 @@ export function CostCalculator() {
             </div>
 
             <div className="space-y-2">
-              <Label>Commission (%)</Label>
+              <Label>Commission to pay (%)</Label>
               <Input
                 type="number"
                 min="0"
-                max="100"
                 step="0.1"
                 value={formData.commissionPct}
                 onChange={(e) => setFormData({...formData, commissionPct: parseFloat(e.target.value) || 0})}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Pass to customer (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.1"
+                value={formData.commissionPassThroughPct}
+                onChange={(e) => setFormData({...formData, commissionPassThroughPct: parseFloat(e.target.value) || 0})}
+              />
+              <p className="text-xs text-muted-foreground">
+                Must be less than or equal to Commission to pay (%). This portion is added to the customer total.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -414,6 +467,19 @@ export function CostCalculator() {
                 value={formData.overnightDays}
                 onChange={(e) => setFormData({...formData, overnightDays: parseInt(e.target.value) || 0})}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Adjustment (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={formData.percentageAdjustment}
+                onChange={(e) => setFormData({...formData, percentageAdjustment: parseFloat(e.target.value) || 0})}
+              />
+              <p className="text-xs text-muted-foreground">
+                Positive for surcharge, negative for discount. Applied to the customer total at the end.
+              </p>
             </div>
 
             <div className="space-y-2">

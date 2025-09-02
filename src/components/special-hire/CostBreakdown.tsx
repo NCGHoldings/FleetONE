@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -28,8 +29,13 @@ interface CostData {
   customerTotalWithFuel: number;
   driverCharge: number;
   otherExpenses: Array<{ label: string; amount: number }>;
+  // Commission and adjustment
   commissionPct: number;
   commissionAmount: number;
+  commissionPassThroughPct?: number;
+  commissionPassThroughAmount?: number;
+  percentageAdjustment?: number;
+  adjustmentAmount?: number;
   totalExpenses: number;
   netProfit: number;
 }
@@ -55,6 +61,10 @@ export function CostBreakdown({ data }: Props) {
     driverCharge: data.driverCharge || 0,
     commissionAmount: data.commissionAmount || 0,
     commissionPct: data.commissionPct || 0,
+    commissionPassThroughPct: data.commissionPassThroughPct || 0,
+    commissionPassThroughAmount: data.commissionPassThroughAmount || 0,
+    percentageAdjustment: data.percentageAdjustment || 0,
+    adjustmentAmount: data.adjustmentAmount || 0,
     totalExpenses: data.totalExpenses || 0,
     netProfit: data.netProfit || 0,
     otherExpenses: data.otherExpenses || [],
@@ -133,6 +143,18 @@ export function CostBreakdown({ data }: Props) {
               <span>Fuel Cost</span>
               <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
             </div>
+            {safeData.commissionPassThroughAmount > 0 && (
+              <div className="flex justify-between">
+                <span>Commission passed to customer ({safeData.commissionPassThroughPct}%)</span>
+                <span>LKR {safeData.commissionPassThroughAmount.toLocaleString()}</span>
+              </div>
+            )}
+            {safeData.percentageAdjustment !== 0 && (
+              <div className="flex justify-between">
+                <span>Adjustment ({safeData.percentageAdjustment}%)</span>
+                <span>LKR {safeData.adjustmentAmount.toLocaleString()}</span>
+              </div>
+            )}
             <Separator />
             <div className="flex justify-between font-medium text-green-600">
               <span>Customer Total (incl. Fuel)</span>
@@ -188,7 +210,7 @@ export function CostBreakdown({ data }: Props) {
               </div>
             ))}
             <div className="flex justify-between">
-              <span>Commission ({safeData.commissionPct}%)</span>
+              <span>Commission to pay ({safeData.commissionPct}%)</span>
               <span>LKR {safeData.commissionAmount.toLocaleString()}</span>
             </div>
             <Separator />

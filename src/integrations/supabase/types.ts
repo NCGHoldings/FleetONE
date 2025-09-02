@@ -1676,6 +1676,8 @@ export type Database = {
           audit_log: Json | null
           bus_type_id: string | null
           commission_amount: number | null
+          commission_pass_through_amount: number | null
+          commission_pass_through_pct: number | null
           commission_pct: number | null
           company_name: string | null
           created_at: string | null
@@ -1719,6 +1721,8 @@ export type Database = {
           audit_log?: Json | null
           bus_type_id?: string | null
           commission_amount?: number | null
+          commission_pass_through_amount?: number | null
+          commission_pass_through_pct?: number | null
           commission_pct?: number | null
           company_name?: string | null
           created_at?: string | null
@@ -1762,6 +1766,8 @@ export type Database = {
           audit_log?: Json | null
           bus_type_id?: string | null
           commission_amount?: number | null
+          commission_pass_through_amount?: number | null
+          commission_pass_through_pct?: number | null
           commission_pct?: number | null
           company_name?: string | null
           created_at?: string | null
