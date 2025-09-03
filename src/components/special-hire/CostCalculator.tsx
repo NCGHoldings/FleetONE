@@ -21,7 +21,9 @@ export function CostCalculator() {
     commissionPct: 5,
     commissionPassThroughPct: 0,
     // Discount handling (requires admin approval if > 0)
+    discountType: 'percentage' as 'percentage' | 'amount',
     discountPct: 0,
+    discountAmount: 0,
     // General adjustment for other purposes (positive=surcharge, negative=discount)
     percentageAdjustment: 0,
     expectedWorkHours: 8,

@@ -458,7 +458,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         discount_percentage: costs.discount_percentage,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
-        approval_status: (data.discountPct > 0 ? 'pending' : 'approved') as 'pending' | 'approved' | 'rejected',
+        approval_status: ((data.discountType === 'percentage' && data.discountPct > 0) || 
+                         (data.discountType === 'amount' && data.discountAmount > 0) ? 'pending' : 'approved') as 'pending' | 'approved' | 'rejected',
         valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
         audit_log: isEditing ? [...(initialData?.audit_log || []), auditEntry].filter(Boolean) : []
       };
