@@ -81,8 +81,8 @@ export default function StaffManagement() {
   }, []);
 
   const handleCreateStaff = async () => {
-    if (!isAdmin) {
-      toast.error('Access denied');
+    if (!isSuperAdmin) {
+      toast.error('Access denied - Super Admin only');
       return;
     }
 
@@ -134,8 +134,8 @@ export default function StaffManagement() {
   };
 
   const handleUpdateRole = async (userId: string, newRole: string) => {
-    if (!isAdmin) {
-      toast.error('Access denied');
+    if (!isSuperAdmin) {
+      toast.error('Access denied - Super Admin only');
       return;
     }
 
@@ -207,7 +207,7 @@ export default function StaffManagement() {
         </Badge>
       ),
     },
-    ...(isAdmin ? [{
+    ...(isSuperAdmin ? [{
       id: "actions",
       header: "Actions",
       cell: ({ row }: { row: any }) => (
@@ -242,7 +242,7 @@ export default function StaffManagement() {
   const adminCount = staff.filter(s => s.roles.includes('admin') || s.roles.includes('super_admin')).length;
   const driverCount = staff.filter(s => s.roles.includes('driver')).length;
 
-  if (!isAdmin) {
+  if (!isSuperAdmin) {
     return (
       <div className="p-6">
         <Card>
@@ -252,7 +252,7 @@ export default function StaffManagement() {
               Access Denied
             </CardTitle>
             <CardDescription>
-              You don't have permission to access staff management.
+              You need Super Admin access to manage staff. Only Super Admins can create and manage user accounts.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -280,17 +280,18 @@ export default function StaffManagement() {
             </div>
           </div>
           
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                onClick={resetForm}
-                className="bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in"
-                style={{ animationDelay: '0.2s' }}
-              >
-                <UserPlus className="h-4 w-4 mr-2 animate-pulse-subtle" />
-                Add Staff Member
-              </Button>
-            </DialogTrigger>
+          {isSuperAdmin && (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  onClick={resetForm}
+                  className="bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-300 animate-scale-in"
+                  style={{ animationDelay: '0.2s' }}
+                >
+                  <UserPlus className="h-4 w-4 mr-2 animate-pulse-subtle" />
+                  Add Staff Member
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Add New Staff Member</DialogTitle>
@@ -361,7 +362,8 @@ export default function StaffManagement() {
                 </Button>
               </div>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          )}
         </div>
         
         {/* Animated Background Elements */}
