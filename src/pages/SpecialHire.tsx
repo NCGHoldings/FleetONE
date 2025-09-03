@@ -16,6 +16,7 @@ import { SpecialHireForm } from "@/components/special-hire/SpecialHireForm";
 import { RateCoverageMaps } from "@/components/special-hire/RateCoverageMaps";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface DashboardStats {
   totalQuotations: number;
