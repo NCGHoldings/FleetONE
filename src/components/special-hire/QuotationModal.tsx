@@ -30,6 +30,8 @@ interface QuotationData {
   extra_charges?: number;
   commission_amount?: number;
   created_at: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  discount_percentage?: number;
 }
 
 interface Props {
@@ -179,17 +181,53 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
                   background-color: #fafafa;
                 }
                 
-                /* Print Specific Styles */
-                @media print {
-                  body { 
-                    margin: 0; 
-                    padding: 10px;
-                    background: white !important;
-                    -webkit-print-color-adjust: exact;
-                    color-adjust: exact;
+                  /* DRAFT Watermark Styles */
+                  .draft-watermark {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    pointer-events: none;
+                    z-index: 10;
+                    background: rgba(0, 0, 0, 0.05);
                   }
                   
-                  .no-print { display: none !important; }
+                  .draft-text {
+                    color: rgba(156, 163, 175, 0.3);
+                    font-size: 120px;
+                    font-weight: bold;
+                    transform: rotate(-45deg);
+                    letter-spacing: 20px;
+                    text-shadow: 0 0 10px rgba(0,0,0,0.1);
+                    font-family: Arial, sans-serif;
+                    user-select: none;
+                  }
+
+                  /* Print Specific Styles */
+                  @media print {
+                    body { 
+                      margin: 0; 
+                      padding: 10px;
+                      background: white !important;
+                      -webkit-print-color-adjust: exact;
+                      color-adjust: exact;
+                    }
+                    
+                    .no-print { display: none !important; }
+                    
+                    .draft-watermark {
+                      background: rgba(0, 0, 0, 0.05) !important;
+                      -webkit-print-color-adjust: exact;
+                    }
+                    
+                    .draft-text {
+                      color: rgba(156, 163, 175, 0.3) !important;
+                      -webkit-print-color-adjust: exact;
+                    }
                   
                   table {
                     page-break-inside: avoid;

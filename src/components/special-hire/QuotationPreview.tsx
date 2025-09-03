@@ -30,6 +30,8 @@ interface QuotationData {
   route_description?: string;
   valid_until?: string;
   created_at: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  discount_percentage?: number;
 }
 
 interface Props {
@@ -75,6 +77,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
   }
   routeDescription += ` → ${quotation.drop_location}`;
 
+  // Check if DRAFT watermark should be shown
+  const showDraftWatermark = quotation.approval_status === 'pending' && (quotation.discount_percentage || 0) > 0;
+
   return (
     <div className={`bg-white text-black font-sans ${className}`} style={{ 
       fontFamily: '"Segoe UI", Arial, sans-serif',
@@ -82,7 +87,31 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
       margin: 0,
       padding: '30px'
     }}>
-      <div className="max-w-4xl mx-auto bg-white p-10 shadow-lg">
+      <div className="max-w-4xl mx-auto bg-white p-10 shadow-lg relative">
+        
+        {/* DRAFT Watermark */}
+        {showDraftWatermark && (
+          <div 
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+            style={{
+              background: 'rgba(0, 0, 0, 0.05)',
+            }}
+          >
+            <div 
+              className="text-gray-400 font-bold select-none"
+              style={{
+                fontSize: '120px',
+                transform: 'rotate(-45deg)',
+                opacity: 0.3,
+                letterSpacing: '20px',
+                textShadow: '0 0 10px rgba(0,0,0,0.1)',
+                fontFamily: 'Arial, sans-serif'
+              }}
+            >
+              DRAFT
+            </div>
+          </div>
+        )}
         
         {/* Header */}
         <div className="flex justify-between items-start mb-8">

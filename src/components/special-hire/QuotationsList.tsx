@@ -56,6 +56,8 @@ interface Quotation {
   created_at: string;
   percentage_adjustment?: number;
   audit_log?: any[];
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  discount_percentage?: number;
 }
 
 interface Props {
@@ -329,7 +331,21 @@ export function QuotationsList({ onRefresh }: Props) {
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }) => getStatusBadge(row.getValue("status")),
+      cell: ({ row }) => {
+        const quotation = row.original;
+        const isDraft = quotation.approval_status === 'pending' && (quotation.discount_percentage || 0) > 0;
+        
+        return (
+          <div className="flex flex-col gap-1">
+            {getStatusBadge(row.getValue("status"))}
+            {isDraft && (
+              <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                DRAFT
+              </Badge>
+            )}
+          </div>
+        );
+      },
     },
     {
       id: "actions",
