@@ -1673,6 +1673,10 @@ export type Database = {
       }
       special_hire_quotations: {
         Row: {
+          approval_comments: string | null
+          approval_date: string | null
+          approval_status: Database["public"]["Enums"]["approval_status"] | null
+          approved_by: string | null
           audit_log: Json | null
           bus_type_id: string | null
           commission_amount: number | null
@@ -1685,6 +1689,7 @@ export type Database = {
           customer_email: string | null
           customer_name: string
           customer_phone: string
+          discount_percentage: number | null
           driver_charge: number | null
           drop_datetime: string
           drop_lat: number | null
@@ -1718,6 +1723,12 @@ export type Database = {
           valid_until: string | null
         }
         Insert: {
+          approval_comments?: string | null
+          approval_date?: string | null
+          approval_status?:
+            | Database["public"]["Enums"]["approval_status"]
+            | null
+          approved_by?: string | null
           audit_log?: Json | null
           bus_type_id?: string | null
           commission_amount?: number | null
@@ -1730,6 +1741,7 @@ export type Database = {
           customer_email?: string | null
           customer_name: string
           customer_phone: string
+          discount_percentage?: number | null
           driver_charge?: number | null
           drop_datetime: string
           drop_lat?: number | null
@@ -1763,6 +1775,12 @@ export type Database = {
           valid_until?: string | null
         }
         Update: {
+          approval_comments?: string | null
+          approval_date?: string | null
+          approval_status?:
+            | Database["public"]["Enums"]["approval_status"]
+            | null
+          approved_by?: string | null
           audit_log?: Json | null
           bus_type_id?: string | null
           commission_amount?: number | null
@@ -1775,6 +1793,7 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string
+          discount_percentage?: number | null
           driver_charge?: number | null
           drop_datetime?: string
           drop_lat?: number | null
@@ -2581,6 +2600,7 @@ export type Database = {
         | "conductor"
         | "mechanic"
         | "staff"
+      approval_status: "pending" | "approved" | "rejected"
       fleet_status: "active" | "maintenance" | "idle" | "retired"
       maintenance_status: "pending" | "in_progress" | "completed" | "cancelled"
       permit_status: "valid" | "expired" | "suspended" | "cancelled"
@@ -2722,6 +2742,7 @@ export const Constants = {
         "mechanic",
         "staff",
       ],
+      approval_status: ["pending", "approved", "rejected"],
       fleet_status: ["active", "maintenance", "idle", "retired"],
       maintenance_status: ["pending", "in_progress", "completed", "cancelled"],
       permit_status: ["valid", "expired", "suspended", "cancelled"],

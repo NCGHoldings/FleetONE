@@ -39,7 +39,13 @@ const formSchema = z.object({
   numberOfPassengers: z.number().min(1, 'Number of passengers is required'),
   pickupDateTime: z.date(),
   dropDateTime: z.date(),
-  percentageAdjustment: z.number().optional(),
+  
+  // Commission Settings (company expenses)
+  commissionPct: z.number().min(0, 'Commission percentage must be positive').max(100, 'Commission cannot exceed 100%'),
+  commissionPassThroughPct: z.number().min(0, 'Pass-through percentage must be positive').max(100, 'Pass-through cannot exceed 100%'),
+  
+  // Discount Settings (requires admin approval if > 0)
+  discountPct: z.number().min(0, 'Discount percentage must be positive').max(100, 'Discount cannot exceed 100%'),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -89,14 +95,18 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       numberOfPassengers: initialData.number_of_passengers || 1,
       pickupDateTime: initialData.pickup_datetime ? new Date(initialData.pickup_datetime) : new Date(),
       dropDateTime: initialData.drop_datetime ? new Date(initialData.drop_datetime) : new Date(),
-      percentageAdjustment: initialData.percentage_adjustment || 0,
+      commissionPct: initialData.commission_pct || 5,
+      commissionPassThroughPct: initialData.commission_pass_through_pct || 0,
+      discountPct: initialData.discount_percentage || 0,
     } : {
       hireType: 'Outside',
       numberOfBuses: 1,
       numberOfPassengers: 1,
       pickupDateTime: new Date(),
       dropDateTime: new Date(),
-      percentageAdjustment: 0,
+      commissionPct: 5,
+      commissionPassThroughPct: 0,
+      discountPct: 0,
     }
   });
 
@@ -265,17 +275,23 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
       const grossRevenue = hireCharge * data.numberOfBuses;
-      const customerTotalWithFuel = grossRevenue + (fuelCost * data.numberOfBuses);
+      // Commission and discount calculations
+      const baseCustomerTotal = grossRevenue + (fuelCost * data.numberOfBuses);
       
-      // Apply percentage adjustment to customer total
-      const percentageAdjustment = data.percentageAdjustment || 0;
-      const adjustmentAmount = customerTotalWithFuel * (percentageAdjustment / 100);
-      const adjustedCustomerTotal = customerTotalWithFuel + adjustmentAmount;
+      // Commission pass-through (added to customer bill)
+      const commissionPassThroughAmount = baseCustomerTotal * (data.commissionPassThroughPct / 100);
       
-      const commissionAmount = adjustedCustomerTotal * 0.05; // 5% default commission
+      // Discount (subtracted from customer bill)
+      const discountAmount = baseCustomerTotal * (data.discountPct / 100);
+      
+      // Final customer total
+      const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount;
+      
+      // Company expenses
+      const commissionExpense = baseCustomerTotal * (data.commissionPct / 100); // Total commission company pays
       const driverCharge = 1500; // Default driver charge
-      const totalExpenses = (driverCharge * data.numberOfBuses) + commissionAmount + (fuelCost * data.numberOfBuses);
-      const netProfit = adjustedCustomerTotal - totalExpenses;
+      const totalExpenses = (driverCharge * data.numberOfBuses) + commissionExpense + (fuelCost * data.numberOfBuses);
+      const netProfit = finalCustomerTotal - totalExpenses;
 
       const costs = {
         km_parking_to_pickup: Math.round((distanceData.kmParkingToPickup || 0) * 10) / 10,
@@ -284,12 +300,15 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         fuel_cost_fuel_only: Math.round(fuelCost),
         hire_charge: Math.round(hireCharge),
         extra_charges: Math.round(totalExtraTimeCharge),
-        gross_revenue: Math.round(grossRevenue), // Save hire charges only (flat fee + exceeding)
-        percentage_adjustment: percentageAdjustment,
+        gross_revenue: Math.round(grossRevenue), // Base hire charges
+        commission_pct: data.commissionPct,
+        commission_pass_through_pct: data.commissionPassThroughPct,
+        commission_pass_through_amount: Math.round(commissionPassThroughAmount),
+        discount_percentage: data.discountPct,
+        discount_amount: Math.round(discountAmount),
         driver_charge: driverCharge,
         other_expenses: [],
-        commission_pct: 5.0,
-        commission_amount: Math.round(commissionAmount),
+        commission_amount: Math.round(commissionExpense),
         total_expenses: Math.round(totalExpenses),
         net_profit: Math.round(netProfit)
       };
@@ -317,10 +336,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           chargeableExceedingKm: exceedingKm
         },
         grossRevenue: Math.round(hireCharge * data.numberOfBuses),
-        customerTotalWithFuel: Math.round(customerTotalWithFuel),
-        percentageAdjustment: percentageAdjustment,
-        adjustmentAmount: Math.round(adjustmentAmount),
-        adjustedCustomerTotal: Math.round(adjustedCustomerTotal),
+        customerTotalWithFuel: Math.round(finalCustomerTotal),
+        commissionPassThroughPct: data.commissionPassThroughPct,
+        commissionPassThroughAmount: Math.round(commissionPassThroughAmount),
+        discountPct: data.discountPct,
+        discountAmount: Math.round(discountAmount),
         driverCharge: costs.driver_charge,
         otherExpenses: costs.other_expenses,
         commissionPct: costs.commission_pct,
@@ -337,7 +357,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       toast({
         title: "Cost Calculated",
-        description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(adjustedCustomerTotal).toLocaleString()} ${percentageAdjustment !== 0 ? `(${percentageAdjustment > 0 ? '+' : ''}${percentageAdjustment}%)` : ''}`
+        description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()} ${data.discountPct > 0 ? `(${data.discountPct}% discount)` : ''}`
       });
 
       return { costs, distanceData };
@@ -355,6 +375,25 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const handleSubmit = async (data: FormData) => {
     setLoading(true);
     try {
+      // Check if discount requires admin approval
+      if (data.discountPct > 0) {
+        const { data: userData } = await supabase.auth.getUser();
+        const { data: userRoles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userData.user?.id);
+        
+        const isAdmin = userRoles?.some(r => r.role === 'admin' || r.role === 'super_admin');
+        
+        if (!isAdmin) {
+          toast({
+            title: "Admin Approval Required",
+            description: "Quotations with discounts require admin approval. This quotation will be marked as pending approval.",
+            variant: "default"
+          });
+        }
+      }
+
       // Calculate costs first
       const { costs, distanceData } = await calculateCosts(data);
 
@@ -375,7 +414,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             customer_name: data.customerName !== initialData.customer_name ? { from: initialData.customer_name, to: data.customerName } : undefined,
             pickup_location: data.pickupLocation !== initialData.pickup_location ? { from: initialData.pickup_location, to: data.pickupLocation } : undefined,
             drop_location: data.dropLocation !== initialData.drop_location ? { from: initialData.drop_location, to: data.dropLocation } : undefined,
-            percentage_adjustment: (data.percentageAdjustment || 0) !== (initialData.percentage_adjustment || 0) ? { from: initialData.percentage_adjustment || 0, to: data.percentageAdjustment || 0 } : undefined,
+            commission_pct: data.commissionPct !== (initialData.commission_pct || 5) ? { from: initialData.commission_pct || 5, to: data.commissionPct } : undefined,
+            discount_percentage: data.discountPct !== (initialData.discount_percentage || 0) ? { from: initialData.discount_percentage || 0, to: data.discountPct } : undefined,
           }
         };
       }
@@ -410,10 +450,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         driver_charge: costs.driver_charge,
         other_expenses: costs.other_expenses,
         commission_pct: costs.commission_pct,
+        commission_pass_through_pct: costs.commission_pass_through_pct,
+        commission_pass_through_amount: costs.commission_pass_through_amount,
         commission_amount: costs.commission_amount,
+        discount_percentage: costs.discount_percentage,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
-        percentage_adjustment: costs.percentage_adjustment,
+        approval_status: (data.discountPct > 0 ? 'pending' : 'approved') as 'pending' | 'approved' | 'rejected',
         valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
         audit_log: isEditing ? [...(initialData?.audit_log || []), auditEntry].filter(Boolean) : []
       };
@@ -854,16 +897,45 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     )}
                   />
 
+                {/* Commission and Discount Settings */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
-                    name="percentageAdjustment"
+                    name="commissionPct"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Adjustment (%)</FormLabel>
+                        <FormLabel>Commission (%)</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
                             step="0.1"
+                            min="0"
+                            max="100"
+                            placeholder="5"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                        <div className="text-xs text-muted-foreground">
+                          Commission company pays
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="commissionPassThroughPct"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pass to Customer (%)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
                             placeholder="0"
                             {...field}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
@@ -871,11 +943,39 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                         </FormControl>
                         <FormMessage />
                         <div className="text-xs text-muted-foreground">
-                          Positive for surcharge, negative for discount
+                          Commission passed to customer
                         </div>
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="discountPct"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Discount (%) 
+                          {field.value > 0 && <Badge variant="secondary" className="ml-2">Admin Approval Required</Badge>}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            placeholder="0"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                        <div className="text-xs text-muted-foreground">
+                          Customer discount (requires admin approval)
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 </div>
               </CardContent>
             </Card>

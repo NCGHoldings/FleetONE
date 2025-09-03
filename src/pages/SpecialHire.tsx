@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, FileText, Calculator, MapPin, Truck } from 'lucide-react';
+import { AdminApprovalInterface } from '../components/special-hire/AdminApprovalInterface';
+import { Clock, FileText, TrendingUp, CheckCircle, Plus } from 'lucide-react';
 import { CostCalculator } from "@/components/special-hire/CostCalculator";
 import { EnhancedCostCalculator } from "@/components/special-hire/EnhancedCostCalculator";
 import { ConfirmedTripsTable } from "@/components/special-hire/ConfirmedTripsTable";
@@ -21,6 +22,7 @@ interface DashboardStats {
   pendingQuotations: number;
   confirmedTrips: number;
   totalRevenue: number;
+  pendingApprovals: number;
 }
 
 export default function SpecialHire() {
@@ -30,7 +32,8 @@ export default function SpecialHire() {
     totalQuotations: 0,
     pendingQuotations: 0,
     confirmedTrips: 0,
-    totalRevenue: 0
+    totalRevenue: 0,
+    pendingApprovals: 0
   });
   const { toast } = useToast();
 
@@ -38,7 +41,7 @@ export default function SpecialHire() {
     try {
       const { data: quotations, error } = await supabase
         .from('special_hire_quotations')
-        .select('status, gross_revenue');
+        .select('status, gross_revenue, approval_status');
 
       if (error) throw error;
 
@@ -46,12 +49,14 @@ export default function SpecialHire() {
       const pending = quotations?.filter(q => ['draft', 'sent'].includes(q.status)).length || 0;
       const confirmed = quotations?.filter(q => q.status === 'confirmed').length || 0;
       const revenue = quotations?.reduce((sum, q) => sum + (q.gross_revenue || 0), 0) || 0;
+      const pendingApprovals = quotations?.filter(q => q.approval_status === 'pending').length || 0;
 
       setStats({
         totalQuotations: total,
         pendingQuotations: pending,
         confirmedTrips: confirmed,
-        totalRevenue: revenue
+        totalRevenue: revenue,
+        pendingApprovals
       });
     } catch (error: any) {
       console.error('Error loading stats:', error);
@@ -130,13 +135,21 @@ export default function SpecialHire() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="quotations">Quotations</TabsTrigger>
-          <TabsTrigger value="trip-calculator">Trip Calculator</TabsTrigger>
-          <TabsTrigger value="confirmed-trips">Confirmed Trips</TabsTrigger>
+          <TabsTrigger value="trip-calculator">Calculator</TabsTrigger>
+          <TabsTrigger value="confirmed-trips">Trips</TabsTrigger>
+          <TabsTrigger value="approvals" className="relative">
+            Approvals
+            {stats.pendingApprovals > 0 && (
+              <span className="ml-1 bg-amber-500 text-white text-xs rounded-full px-1">
+                {stats.pendingApprovals}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="bus-types">Bus Types</TabsTrigger>
-          <TabsTrigger value="rate-cards">Rate Cards</TabsTrigger>
-          <TabsTrigger value="fuel-settings">Fuel Settings</TabsTrigger>
+          <TabsTrigger value="rate-cards">Rates</TabsTrigger>
+          <TabsTrigger value="fuel-settings">Fuel</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
@@ -150,6 +163,10 @@ export default function SpecialHire() {
 
         <TabsContent value="confirmed-trips" className="space-y-4">
           <ConfirmedTripsTable />
+        </TabsContent>
+
+        <TabsContent value="approvals" className="space-y-4">
+          <AdminApprovalInterface onRefresh={loadStats} />
         </TabsContent>
 
         <TabsContent value="bus-types" className="space-y-4">

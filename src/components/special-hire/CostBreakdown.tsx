@@ -29,13 +29,13 @@ interface CostData {
   customerTotalWithFuel: number;
   driverCharge: number;
   otherExpenses: Array<{ label: string; amount: number }>;
-  // Commission and adjustment
+  // Separated Commission and Discount
   commissionPct: number;
   commissionAmount: number;
   commissionPassThroughPct?: number;
   commissionPassThroughAmount?: number;
-  percentageAdjustment?: number;
-  adjustmentAmount?: number;
+  discountPct?: number;
+  discountAmount?: number;
   totalExpenses: number;
   netProfit: number;
 }
@@ -63,8 +63,8 @@ export function CostBreakdown({ data }: Props) {
     commissionPct: data.commissionPct || 0,
     commissionPassThroughPct: data.commissionPassThroughPct || 0,
     commissionPassThroughAmount: data.commissionPassThroughAmount || 0,
-    percentageAdjustment: data.percentageAdjustment || 0,
-    adjustmentAmount: data.adjustmentAmount || 0,
+    discountPct: data.discountPct || 0,
+    discountAmount: data.discountAmount || 0,
     totalExpenses: data.totalExpenses || 0,
     netProfit: data.netProfit || 0,
     otherExpenses: data.otherExpenses || [],
@@ -149,10 +149,10 @@ export function CostBreakdown({ data }: Props) {
                 <span>LKR {safeData.commissionPassThroughAmount.toLocaleString()}</span>
               </div>
             )}
-            {safeData.percentageAdjustment !== 0 && (
-              <div className="flex justify-between">
-                <span>Adjustment ({safeData.percentageAdjustment}%)</span>
-                <span>LKR {safeData.adjustmentAmount.toLocaleString()}</span>
+            {safeData.discountAmount > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Discount ({safeData.discountPct}%)</span>
+                <span>-LKR {safeData.discountAmount.toLocaleString()}</span>
               </div>
             )}
             <Separator />
