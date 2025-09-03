@@ -30,7 +30,7 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
@@ -45,27 +45,55 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     reader.readAsArrayBuffer(file);
   };
 
-  const mapExcelToDatabase = (row: any) => {
-    // Validate required fields
-    const permitNo = row['Permit Number']?.toString() || `TEMP-${Date.now()}`;
-    const ownerName = row['Name of the Owner']?.toString() || 'Unknown Owner';
-    const issueDate = row['Issue Date'] ? new Date(row['Issue Date']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-    const expiryDate = row['Expirary Date'] || row['Expiry Date'] ? new Date(row['Expirary Date'] || row['Expiry Date']).toISOString().split('T')[0] : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // Helper to safely convert Excel cell values (string/date/number) to YYYY-MM-DD
+  const formatExcelDate = (value: any) => {
+    if (!value) return new Date().toISOString().split('T')[0];
+    try {
+      // If already a Date instance (when cellDates: true)
+      if (value instanceof Date) {
+        return new Date(value.getTime() - value.getTimezoneOffset() * 60000)
+          .toISOString()
+          .split('T')[0];
+      }
+      // If number (Excel serial), approximate by treating as days since 1899-12-30
+      if (typeof value === 'number') {
+        const epoch = new Date(Date.UTC(1899, 11, 30));
+        const d = new Date(epoch.getTime() + value * 24 * 60 * 60 * 1000);
+        return d.toISOString().split('T')[0];
+      }
+      // Fallback: parse as string
+      const d = new Date(value);
+      if (!isNaN(d.getTime())) {
+        return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+          .toISOString()
+          .split('T')[0];
+      }
+    } catch {}
+    return new Date().toISOString().split('T')[0];
+  };
 
-    // Map permit status to valid enum values
-    const permitStatusRaw = row['Permit Active or Inactive']?.toString().toLowerCase();
-    const permitStatus: 'valid' | 'suspended' | 'cancelled' | 'expired' = 
-      permitStatusRaw === 'active' ? 'valid' : 
-      permitStatusRaw === 'suspended' ? 'suspended' : 
-      permitStatusRaw === 'cancelled' ? 'cancelled' : 
-      permitStatusRaw === 'expired' ? 'expired' : 'valid';
+  const mapExcelToDatabase = (row: any) => {
+    const ownerName = row['Name of the Owner']?.toString().trim() || 'Unknown Owner';
+
+    const issueDate = row['Issue Date'] ? formatExcelDate(row['Issue Date']) : new Date().toISOString().split('T')[0];
+    const expiryDateRaw = row['Expirary Date'] ?? row['Expiry Date'];
+    const expiryDate = expiryDateRaw ? formatExcelDate(expiryDateRaw) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const routeNumbersRaw = row['Route Number'] ?? row['Route Numbers'];
+    const routeNumbers = routeNumbersRaw
+      ? routeNumbersRaw
+          .toString()
+          .split(/[\s,\/]+/)
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 0)
+      : null;
 
     return {
       route_name: row['Permanent Route']?.toString() || row['Route Name']?.toString() || '',
       temporary_route_name: row['Temporary Route Name']?.toString() || '',
       via: row['Via']?.toString() || '',
-      route_numbers: row['Route Number'] ? [row['Route Number'].toString()] : null,
-      permit_no: permitNo,
+      route_numbers: routeNumbers,
+      // permit_no will be assigned sequentially later
       owner_name: ownerName,
       owner_address: row['Permit Holder Address']?.toString() || '',
       owner_nic: row['Permit Holder NIC']?.toString() || '',
@@ -76,9 +104,13 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
       issue_date: issueDate,
       expiry_date: expiryDate,
       annual_fee: row['Annual Fee'] ? parseFloat(row['Annual Fee']) : null,
-      operation_status: row['Active in Operation']?.toString().toLowerCase() === 'yes' || row['Active in Operation']?.toString().toLowerCase() === 'active' ? 'active' : 'inactive',
-      permit_status: permitStatus
-    };
+      operation_status:
+        (row['Active in Operation']?.toString().toLowerCase() === 'yes' ||
+          row['Active in Operation']?.toString().toLowerCase() === 'active')
+          ? 'active'
+          : 'inactive',
+      // omit permit_status to let DB default handle it safely
+    } as any;
   };
 
   const handleUpload = async () => {
@@ -93,20 +125,38 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
       reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
+          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
+          // Clear existing data first as requested
+          const { error: clearError } = await supabase
+            .from('route_permits')
+            .delete()
+            .gt('created_at', '1900-01-01');
+          if (clearError) {
+            console.error('Failed to clear existing permits:', clearError);
+            toast.error(`Failed to clear existing permits: ${clearError.message}`);
+            return;
+          }
+
           // Map Excel data to database format
-          const mappedData = jsonData.map(mapExcelToDatabase);
+          const mappedData = (jsonData as any[]).map(mapExcelToDatabase);
+
+          // Assign sequential permit numbers PRM001, PRM002, ...
+          const pad = (n: number) => n.toString().padStart(3, '0');
+          const assignedData = mappedData.map((row, idx) => ({
+            ...row,
+            permit_no: `PRM${pad(idx + 1)}`,
+          }));
 
           // Insert data in batches
           const batchSize = 100;
           let imported = 0;
 
-          for (let i = 0; i < mappedData.length; i += batchSize) {
-            const batch = mappedData.slice(i, i + batchSize);
+          for (let i = 0; i < assignedData.length; i += batchSize) {
+            const batch = assignedData.slice(i, i + batchSize);
             const { error } = await supabase
               .from('route_permits')
               .insert(batch);
@@ -198,7 +248,7 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
                 <span>• Temporary Route Name</span>
                 <span>• Via</span>
                 <span>• Route Number</span>
-                <span>• Permit Number</span>
+                <span>• Permit Number (auto-generated: PRM001, PRM002, ...)</span>
                 <span>• Allocated Bus Number</span>
                 <span>• Name of the Owner</span>
                 <span>• Permit Holder Address</span>
