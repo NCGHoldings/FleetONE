@@ -45,7 +45,9 @@ const formSchema = z.object({
   commissionPassThroughPct: z.number().min(0, 'Pass-through percentage must be positive').max(100, 'Pass-through cannot exceed 100%'),
   
   // Discount Settings (requires admin approval if > 0)
-  discountPct: z.number().min(0, 'Discount percentage must be positive').max(100, 'Discount cannot exceed 100%'),
+  discountType: z.enum(['percentage', 'amount']).default('percentage'),
+  discountPct: z.number().min(0, 'Discount percentage must be positive').max(100, 'Discount cannot exceed 100%').default(0),
+  discountAmount: z.number().min(0, 'Discount amount must be positive').default(0),
 });
 
 type FormData = z.infer<typeof formSchema>;

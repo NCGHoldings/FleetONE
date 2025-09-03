@@ -1689,7 +1689,9 @@ export type Database = {
           customer_email: string | null
           customer_name: string
           customer_phone: string
+          discount_amount_lkr: number | null
           discount_percentage: number | null
+          discount_type: string | null
           driver_charge: number | null
           drop_datetime: string
           drop_lat: number | null
@@ -1741,7 +1743,9 @@ export type Database = {
           customer_email?: string | null
           customer_name: string
           customer_phone: string
+          discount_amount_lkr?: number | null
           discount_percentage?: number | null
+          discount_type?: string | null
           driver_charge?: number | null
           drop_datetime: string
           drop_lat?: number | null
@@ -1793,7 +1797,9 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string
+          discount_amount_lkr?: number | null
           discount_percentage?: number | null
+          discount_type?: string | null
           driver_charge?: number | null
           drop_datetime?: string
           drop_lat?: number | null

@@ -75,7 +75,10 @@ export function CostCalculator() {
       return;
     }
 
-    if (formData.discountPct > 0) {
+    const hasDiscount = (formData.discountType === 'percentage' && formData.discountPct > 0) || 
+                        (formData.discountType === 'amount' && formData.discountAmount > 0);
+    
+    if (hasDiscount) {
       // Check if user is admin for discount approval
       const { data: userData } = await supabase.auth.getUser();
       const { data: userRoles } = await supabase

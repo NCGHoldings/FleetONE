@@ -34,6 +34,7 @@ interface CostData {
   commissionAmount: number;
   commissionPassThroughPct?: number;
   commissionPassThroughAmount?: number;
+  discountType?: string;
   discountPct?: number;
   discountAmount?: number;
   totalExpenses: number;
@@ -63,6 +64,7 @@ export function CostBreakdown({ data }: Props) {
     commissionPct: data.commissionPct || 0,
     commissionPassThroughPct: data.commissionPassThroughPct || 0,
     commissionPassThroughAmount: data.commissionPassThroughAmount || 0,
+    discountType: data.discountType || 'percentage',
     discountPct: data.discountPct || 0,
     discountAmount: data.discountAmount || 0,
     totalExpenses: data.totalExpenses || 0,
@@ -151,7 +153,11 @@ export function CostBreakdown({ data }: Props) {
             )}
             {safeData.discountAmount > 0 && (
               <div className="flex justify-between text-green-600">
-                <span>Discount ({safeData.discountPct}%)</span>
+                <span>
+                  Discount {safeData.discountType === 'percentage' 
+                    ? `(${safeData.discountPct}%)` 
+                    : '(Fixed Amount)'}
+                </span>
                 <span>-LKR {safeData.discountAmount.toLocaleString()}</span>
               </div>
             )}
