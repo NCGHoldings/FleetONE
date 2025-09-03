@@ -463,9 +463,28 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
   console.log('Starting PDF generation for:', data.invoiceType);
   
-  // Create a temporary div with the invoice HTML
+  // Create a temporary offscreen container and sanitize HTML
   const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = generateInvoiceHTML(data);
+  const rawHtml = generateInvoiceHTML(data);
+  let contentHtml = rawHtml;
+
+  // If a full HTML document was returned, extract the main invoice container
+  const containerMatch = rawHtml.match(/<div class=\"invoice-container\">[\s\S]*?<\/div>/);
+  if (containerMatch) {
+    contentHtml = `<div id="invoice-root">${containerMatch[0]}</div>`;
+  } else {
+    // Strip doctype and html/head/body wrappers just in case
+    const stripped = rawHtml
+      .replace(/<!DOCTYPE[^>]*>/gi, '')
+      .replace(/<html[^>]*>/gi, '')
+      .replace(/<\/html>/gi, '')
+      .replace(/<head>[\s\S]*?<\/head>/gi, '')
+      .replace(/<body[^>]*>/gi, '')
+      .replace(/<\/body>/gi, '');
+    contentHtml = `<div id="invoice-root">${stripped}</div>`;
+  }
+
+  tempDiv.innerHTML = contentHtml;
   tempDiv.style.position = 'absolute';
   tempDiv.style.left = '-9999px';
   tempDiv.style.top = '-9999px';
@@ -479,29 +498,31 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
     // Wait a bit for any async content to load
     await new Promise(resolve => setTimeout(resolve, 100));
     
-    // Convert HTML to canvas with improved settings and error handling
-    const canvas = await html2canvas(tempDiv.children[0] as HTMLElement, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: false, // Changed to false to avoid PNG signature issues
-      backgroundColor: '#ffffff',
-      width: 794, // A4 width in pixels at 96 DPI
-      height: undefined, // Let it auto-calculate
-      scrollX: 0,
-      scrollY: 0,
-      foreignObjectRendering: false, // Changed to false to avoid issues
-      removeContainer: true,
-      logging: false, // Disable logging to avoid console clutter
-      onclone: (clonedDoc) => {
-        // Remove any potentially problematic elements
-        const images = clonedDoc.querySelectorAll('img');
-        images.forEach(img => {
-          if (!img.complete || img.naturalHeight === 0) {
-            img.remove();
-          }
-        });
-      }
-    });
+  // Convert HTML to canvas with improved settings and error handling
+  const rootEl = tempDiv.querySelector('#invoice-root') as HTMLElement | null;
+  if (!rootEl) {
+    throw new Error('Invoice root element not found');
+  }
+
+  const canvas = await html2canvas(rootEl, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: false, // avoid PNG signature issues
+    backgroundColor: '#ffffff',
+    scrollX: 0,
+    scrollY: 0,
+    foreignObjectRendering: false,
+    removeContainer: true,
+    logging: false,
+    onclone: (clonedDoc) => {
+      const images = clonedDoc.querySelectorAll('img');
+      images.forEach((img) => {
+        if (!img.complete || img.naturalHeight === 0) {
+          img.remove();
+        }
+      });
+    },
+  });
 
     console.log('Canvas created, generating PDF...');
     
@@ -510,19 +531,14 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
     const imgWidth = 210; // A4 width in mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     
-    // Convert canvas to data URL with error handling
-    let imgData;
-    try {
-      imgData = canvas.toDataURL('image/jpeg', 0.95); // Use JPEG instead of PNG to avoid signature issues
-    } catch (error) {
-      console.warn('Failed to convert canvas to JPEG, trying PNG:', error);
-      try {
-        imgData = canvas.toDataURL('image/png', 1.0);
-      } catch (pngError) {
-        console.error('Failed to convert canvas to any format:', pngError);
-        throw new Error('Failed to generate image data for PDF');
-      }
-    }
+  // Convert canvas to JPEG data URL only (avoid PNG signature errors)
+  let imgData: string;
+  try {
+    imgData = canvas.toDataURL('image/jpeg', 0.95);
+  } catch (error) {
+    console.error('Failed to convert canvas to JPEG:', error);
+    throw new Error('Failed to generate image (JPEG) for PDF');
+  }
     
     // Add image with no margins for clean edge-to-edge rendering
     pdf.addImage(imgData, imgData.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG', 0, 0, imgWidth, imgHeight);
