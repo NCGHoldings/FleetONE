@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { format, parseISO, differenceInDays } from "date-fns";
+import { RoutePermitImport } from "@/components/route-permits/RoutePermitImport";
+import { RoutePermitDetailsModal } from "@/components/route-permits/RoutePermitDetailsModal";
 
 interface RoutePermit {
   id: string;
@@ -60,6 +62,9 @@ export default function RoutePermits() {
   const [editingPermit, setEditingPermit] = useState<RoutePermit | null>(null);
   const [permitPrefix, setPermitPrefix] = useState("PRM");
   const [expiryThreshold, setExpiryThreshold] = useState(30);
+  const [selectedPermit, setSelectedPermit] = useState<RoutePermit | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -433,7 +438,14 @@ export default function RoutePermits() {
           <Button size="sm" variant="outline" onClick={() => handleEdit(row.original)}>
             <Settings className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="outline">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => {
+              setSelectedPermit(row.original);
+              setShowDetailsModal(true);
+            }}
+          >
             <Eye className="h-4 w-4" />
           </Button>
           <Button size="sm" variant="outline">
@@ -479,6 +491,18 @@ export default function RoutePermits() {
               <Download className="h-4 w-4 mr-2 animate-pulse-subtle" />
               Export Report
             </Button>
+            
+            {isAdmin && (
+              <Button 
+                variant="outline"
+                onClick={() => setShowImportDialog(true)}
+                className="bg-white/10 backdrop-blur-sm border border-white/30 hover:bg-white/20 transition-all duration-300 animate-scale-in"
+                style={{ animationDelay: '0.25s' }}
+              >
+                <Upload className="h-4 w-4 mr-2 animate-pulse-subtle" />
+                Import Excel
+              </Button>
+            )}
             
             {isAdmin && (
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -787,6 +811,25 @@ export default function RoutePermits() {
           </CardContent>
         </Card>
       )}
+
+      {/* Import Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <RoutePermitImport 
+            onImportComplete={() => {
+              setShowImportDialog(false);
+              fetchPermits();
+            }} 
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Details Modal */}
+      <RoutePermitDetailsModal
+        permit={selectedPermit}
+        open={showDetailsModal}
+        onOpenChange={setShowDetailsModal}
+      />
     </div>
   );
 }
