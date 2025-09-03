@@ -212,7 +212,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-2">{totalDistance.toFixed(2)} Km</td>
               <td className="border border-gray-300 p-2">
                 <div>Hire Charges: LKR {quotation.gross_revenue.toLocaleString()}</div>
-                <div>Fuel Cost: LKR {quotation.fuel_cost_fuel_only?.toLocaleString() || '0'}</div>
+                <div>Service Charge: LKR {quotation.fuel_cost_fuel_only?.toLocaleString() || '0'}</div>
                 <div className="font-semibold border-t pt-1 mt-1">Total: LKR {((quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0)).toLocaleString()}</div>
               </td>
             </tr>
