@@ -478,7 +478,7 @@ export function ConfirmedTripsTable() {
                           className="h-8"
                         >
                           <Receipt className="w-3 h-3 mr-1" />
-                          Confirm Payment
+                          {trip.advance_paid > 0 ? 'Final Payment' : 'Confirm Payment'}
                         </Button>
                       )}
                       
@@ -492,7 +492,7 @@ export function ConfirmedTripsTable() {
                             className="h-8"
                           >
                             <Eye className="w-3 h-3 mr-1" />
-                            {invoice.invoice_type === 'advance' ? 'Advance' : 'Final'}
+                            View {invoice.invoice_type === 'advance' ? 'Advance' : 'Final'}
                           </Button>
                           <Button
                             onClick={() => downloadInvoice(trip, invoice.invoice_type as 'advance' | 'final')}

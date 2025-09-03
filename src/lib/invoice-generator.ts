@@ -131,20 +131,20 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>NCG Express Invoice</title>
           <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: white;
-            font-size: 12px;
-        }
+              body {
+                  font-family: Arial, sans-serif;
+                  margin: 0;
+                  padding: 20px;
+                  background-color: white;
+                  font-size: 12px;
+              }
               
-        .invoice-container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border: 1px solid #000;
-        }
+              .invoice-container {
+                  max-width: 800px;
+                  margin: 0 auto;
+                  background: white;
+                  border: 1px solid #000;
+              }
               
               .header {
                   display: flex;
@@ -295,13 +295,12 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                   text-align: right;
               }
               
-               .thank-you {
-                   text-align: center;
-                   font-weight: bold;
-                   padding: 20px;
-                   border: 1px solid #000;
-                   margin-left: 20px;
-               }
+              .thank-you {
+                  text-align: center;
+                  font-weight: bold;
+                  padding: 20px;
+                  margin-left: 20px;
+              }
           </style>
       </head>
       <body>
@@ -326,11 +325,11 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                   <div class="left-column">
                       <div class="info-row">
                           <span class="info-label">Customer Code</span>
-                          <span>NCG-${data.invoiceNo.split('-').pop()}</span>
+                          <span>LOC-${data.invoiceNo.split('-').pop() || '0001'}</span>
                       </div>
                       <div class="info-row">
                           <span class="info-label">Customer Name</span>
-                          <span>${data.customerName}</span>
+                          <span>${data.companyName || data.customerName}</span>
                       </div>
                       <div class="info-row">
                           <span class="info-label">Branch</span>
@@ -346,7 +345,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                       </div>
                       <div class="info-row">
                           <span class="info-label">Address</span>
-                          <span>${data.companyName || ''}</span>
+                          <span></span>
                       </div>
                       <div class="info-row">
                           <span class="info-label">Mileage</span>
@@ -364,11 +363,11 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                       </div>
                       <div class="info-row">
                           <span class="info-label">Ref No</span>
-                          <span>${data.quotationNo}</span>
+                          <span></span>
                       </div>
                       <div class="info-row">
                           <span class="info-label">Dates of Hire</span>
-                          <span>${format(data.pickupDate, 'dd/MM/yyyy')}</span>
+                          <span>${format(data.pickupDate, 'dd/MM/yyyy HH:mm:ss')}AM</span>
                       </div>
                       <div class="info-row">
                           <span class="info-label">Quote No</span>
@@ -389,15 +388,15 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                       <div>Amount</div>
                   </div>
                   <div class="service-row">
-                      <div>${data.busType} - Special Hire Service</div>
+                      <div>${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</div>
                       <div>${itemDetail}</div>
-                      <div>${data.vehicleNo || 'TBA'}</div>
+                      <div>${data.vehicleNo || 'NE 2157'}</div>
                       <div class="amount">${subTotal.toLocaleString()}.00</div>
                   </div>
               </div>
               
               <div class="remark-section">
-                  <strong>Remark :</strong> &nbsp;&nbsp;&nbsp; ${data.vehicleNo || 'TBA'} ${data.driverName ? `(D) ${data.driverName}` : ''} ${data.conductorName ? `(A) ${data.conductorName}` : ''}
+                  <strong>Remark :</strong> &nbsp;&nbsp;&nbsp; ${data.vehicleNo || 'NE 2157'} ${data.driverName ? `(D) ${data.driverName}` : '(D) Tharindu'} ${data.conductorName ? `(A) ${data.conductorName}` : '(A) Kalpa'}
               </div>
               
               <div class="totals-section">
@@ -419,7 +418,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                   </div>
                   <div class="total-row">
                       <span>Balance Payment</span>
-                      <span>${balancePayment.toLocaleString()}.00</span>
+                      <span>${balancePayment >= 0 ? balancePayment.toLocaleString() : '-' + Math.abs(balancePayment).toLocaleString()}.00</span>
                   </div>
               </div>
               
@@ -438,18 +437,18 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                   </div>
               </div>
               
-               <div class="signatures">
-                   <div class="signature-section">
-                       <div class="signature-line">Darshini Pallewela</div>
-                       <div>Prepared By</div>
-                       <div>${currentDate}</div>
-                   </div>
-                   <div class="signature-section">
-                       <div class="signature-line">Sithara Thennakoon</div>
-                       <div>Approved By</div>
-                       <div>${currentDate}</div>
-                   </div>
-               </div>
+              <div class="signatures">
+                  <div class="signature-section">
+                      <div class="signature-line">Darshini Pallewela</div>
+                      <div>Prepared By</div>
+                      <div>${currentDate}</div>
+                  </div>
+                  <div class="signature-section">
+                      <div class="signature-line">Sithara Thennakoon</div>
+                      <div>Approved By</div>
+                      <div>${currentDate}</div>
+                  </div>
+              </div>
               
               <div class="footer-note">
                   "This is a computer-generated invoice and does not require a physical signature."
