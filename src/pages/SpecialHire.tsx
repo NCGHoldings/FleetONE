@@ -37,6 +37,10 @@ export default function SpecialHire() {
     pendingApprovals: 0
   });
   const { toast } = useToast();
+  const { hasRole } = useAuth();
+  
+  // Check if user has admin or super_admin role
+  const isAdmin = hasRole('admin') || hasRole('super_admin');
 
   const loadStats = async () => {
     try {
@@ -67,6 +71,13 @@ export default function SpecialHire() {
   useEffect(() => {
     loadStats();
   }, []);
+
+  // Protect against accessing approvals tab if not admin
+  useEffect(() => {
+    if (activeTab === 'approvals' && !isAdmin) {
+      setActiveTab('quotations');
+    }
+  }, [activeTab, isAdmin]);
 
   const handleFormSubmit = () => {
     setShowForm(false);
@@ -136,18 +147,20 @@ export default function SpecialHire() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-8' : 'grid-cols-7'}`}>
           <TabsTrigger value="quotations">Quotations</TabsTrigger>
           <TabsTrigger value="trip-calculator">Calculator</TabsTrigger>
           <TabsTrigger value="confirmed-trips">Trips</TabsTrigger>
-          <TabsTrigger value="approvals" className="relative">
-            Approvals
-            {stats.pendingApprovals > 0 && (
-              <span className="ml-1 bg-amber-500 text-white text-xs rounded-full px-1">
-                {stats.pendingApprovals}
-              </span>
-            )}
-          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="approvals" className="relative">
+              Approvals
+              {stats.pendingApprovals > 0 && (
+                <span className="ml-1 bg-amber-500 text-white text-xs rounded-full px-1">
+                  {stats.pendingApprovals}
+                </span>
+              )}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="bus-types">Bus Types</TabsTrigger>
           <TabsTrigger value="rate-cards">Rates</TabsTrigger>
           <TabsTrigger value="fuel-settings">Fuel</TabsTrigger>
@@ -166,9 +179,11 @@ export default function SpecialHire() {
           <ConfirmedTripsTable />
         </TabsContent>
 
-        <TabsContent value="approvals" className="space-y-4">
-          <AdminApprovalInterface onRefresh={loadStats} />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="approvals" className="space-y-4">
+            <AdminApprovalInterface onRefresh={loadStats} />
+          </TabsContent>
+        )}
 
         <TabsContent value="bus-types" className="space-y-4">
           <BusTypesAdmin />
