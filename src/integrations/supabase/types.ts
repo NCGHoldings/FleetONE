@@ -2578,6 +2578,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      generate_employee_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_page_permissions: {
         Args: { _user_id: string }
         Returns: {
