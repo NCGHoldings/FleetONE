@@ -599,7 +599,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
               <CardHeader>
                 <CardTitle className="text-lg">Customer Details</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
                 <FormField
                   control={form.control}
                   name="companyName"
@@ -679,8 +679,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
               <CardHeader>
                 <CardTitle className="text-lg">Trip Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <CardContent className="space-y-6 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <FormField
                     control={form.control}
                     name="busTypeId"
@@ -777,7 +777,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <FormField
                      control={form.control}
                      name="pickupLocation"
@@ -816,7 +816,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                 </div>
 
                 {/* Intermediate Stops */}
-                <div className="space-y-2">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium">Intermediate Stops</label>
                     <Button type="button" variant="outline" size="sm" onClick={addIntermediateStop}>
@@ -825,7 +825,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     </Button>
                   </div>
                    {intermediateStops.map((stop) => (
-                     <div key={stop.id} className="flex items-center gap-2">
+                     <div key={stop.id} className="flex items-center gap-3">
                        <LocationAutocomplete
                          value={stop.location}
                          onChange={(value) => updateIntermediateStop(stop.id, value)}
@@ -844,7 +844,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                    ))}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormField
                     control={form.control}
                     name="numberOfPassengers"
@@ -1014,13 +1014,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   />
 
                 {/* Commission and Discount Settings */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <FormField
                     control={form.control}
                     name="commissionPct"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Commission (%)</FormLabel>
+                        <FormLabel className="text-sm font-medium">Commission (%)</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -1028,12 +1028,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                             min="0"
                             max="100"
                             placeholder="5"
+                            className="h-10"
                             {...field}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                           />
                         </FormControl>
                         <FormMessage />
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground mt-1">
                           Commission company pays
                         </div>
                       </FormItem>
@@ -1045,7 +1046,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     name="commissionPassThroughPct"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Pass to Customer (%)</FormLabel>
+                        <FormLabel className="text-sm font-medium">Pass to Customer (%)</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -1053,12 +1054,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                             min="0"
                             max="100"
                             placeholder="0"
+                            className="h-10"
                             {...field}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                           />
                         </FormControl>
                         <FormMessage />
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground mt-1">
                           Commission passed to customer
                         </div>
                       </FormItem>
@@ -1070,7 +1072,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     name="discountType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Discount Type</FormLabel>
+                        <FormLabel className="text-sm font-medium">Discount Type</FormLabel>
                         <Select onValueChange={(value) => {
                           field.onChange(value);
                           // Reset discount values when type changes
@@ -1078,7 +1080,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                           form.setValue('discountAmount', 0);
                         }} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-10">
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
@@ -1098,8 +1100,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       name="discountPct"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Discount (%)
-                            {field.value > 0 && <Badge variant="secondary" className="ml-2">Admin Approval Required</Badge>}
+                          <FormLabel className="text-sm font-medium">Discount (%)
+                            {field.value > 0 && <Badge variant="secondary" className="ml-2 text-xs">Admin Approval Required</Badge>}
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -1108,12 +1110,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                               min="0"
                               max="100"
                               placeholder="0"
+                              className="h-10"
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             />
                           </FormControl>
                           <FormMessage />
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground mt-1">
                             Percentage discount (requires admin approval)
                           </div>
                         </FormItem>
@@ -1125,8 +1128,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       name="discountAmount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Discount (LKR)
-                            {field.value > 0 && <Badge variant="secondary" className="ml-2">Admin Approval Required</Badge>}
+                          <FormLabel className="text-sm font-medium">Discount (LKR)
+                            {field.value > 0 && <Badge variant="secondary" className="ml-2 text-xs">Admin Approval Required</Badge>}
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -1134,12 +1137,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                               step="0.01"
                               min="0"
                               placeholder="0"
+                              className="h-10"
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             />
                           </FormControl>
                           <FormMessage />
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground mt-1">
                             Fixed amount discount (requires admin approval)
                           </div>
                         </FormItem>
@@ -1156,23 +1160,24 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           <CostBreakdown data={costData} />
         )}
 
-        <div className="flex justify-between items-center">
-          <Button 
-            type="button" 
-            variant="outline"
-            onClick={() => form.handleSubmit(calculateCosts)()}
-          >
-            Calculate Costs
-          </Button>
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading || !costData}>
-              {loading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Quotation' : 'Create Quotation')}
-            </Button>
-          </div>
-        </div>
+         <div className="flex justify-between items-center pt-6 border-t">
+           <Button 
+             type="button" 
+             variant="outline"
+             size="lg"
+             onClick={() => form.handleSubmit(calculateCosts)()}
+           >
+             Calculate Costs
+           </Button>
+           <div className="flex justify-end space-x-3">
+             <Button type="button" variant="outline" size="lg" onClick={onCancel}>
+               Cancel
+             </Button>
+             <Button type="submit" size="lg" disabled={loading || !costData}>
+               {loading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Quotation' : 'Create Quotation')}
+             </Button>
+           </div>
+         </div>
           </form>
         </Form>
       </DialogContent>
