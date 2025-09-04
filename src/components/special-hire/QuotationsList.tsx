@@ -6,11 +6,14 @@ import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2 } from 'lucide-react';
+import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { QuotationModal } from './QuotationModal';
 import { EditQuotationModal } from './EditQuotationModal';
+import { QuotationPreview } from './QuotationPreview';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +75,7 @@ export function QuotationsList({ onRefresh }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
+  const [emailingQuotationId, setEmailingQuotationId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const loadQuotations = async () => {
@@ -179,17 +183,118 @@ export function QuotationsList({ onRefresh }: Props) {
     await handleStatusUpdate(quotation.id, 'sent');
   };
 
-  const handleEmailQuotation = (quotation: Quotation) => {
-    if (quotation.customer_email) {
-      const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
-      const body = `Dear ${quotation.customer_name},\n\nPlease find your quotation details.\n\nThank you for choosing NCG Express.`;
-      window.open(`mailto:${quotation.customer_email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-    } else {
+  const generatePDFBase64 = async (quotation: Quotation): Promise<string> => {
+    // Create a temporary div to render the quotation
+    const tempDiv = document.createElement('div');
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.top = '-9999px';
+    tempDiv.style.width = '210mm';
+    tempDiv.style.background = 'white';
+    document.body.appendChild(tempDiv);
+
+    // Import React and ReactDOM dynamically
+    const React = await import('react');
+    const ReactDOM = await import('react-dom/client');
+
+    try {
+      // Create React element and render it
+      const root = ReactDOM.createRoot(tempDiv);
+      const quotationElement = React.createElement(QuotationPreview, { quotation });
+      
+      await new Promise<void>((resolve) => {
+        root.render(quotationElement);
+        // Wait for render to complete
+        setTimeout(resolve, 1000);
+      });
+
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 0;
+
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      
+      root.unmount();
+      return pdf.output('datauristring').split(',')[1];
+    } finally {
+      document.body.removeChild(tempDiv);
+    }
+  };
+
+  const handleEmailQuotation = async (quotation: Quotation) => {
+    if (!quotation.customer_email) {
       toast({
         title: "Error",
         description: "No email address available for this customer",
         variant: "destructive"
       });
+      return;
+    }
+
+    setEmailingQuotationId(quotation.id);
+    try {
+      const pdfBase64 = await generatePDFBase64(quotation);
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
+      
+      const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">NCG Express</h2>
+          <p>Dear ${quotation.customer_name},</p>
+          <p>Please find your quotation details attached.</p>
+          <p>Thank you for choosing NCG Express.</p>
+          <br>
+          <p>Best regards,<br>NCG Express Team</p>
+        </div>
+      `;
+
+      const { error } = await supabase.functions.invoke('send-quotation-email', {
+        body: {
+          to: quotation.customer_email,
+          subject,
+          html,
+          attachment: {
+            filename,
+            contentBase64: pdfBase64,
+            contentType: 'application/pdf'
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      // Update status to sent
+      await handleStatusUpdate(quotation.id, 'sent');
+      
+      toast({
+        title: "Success",
+        description: `Quotation emailed successfully to ${quotation.customer_email}`
+      });
+    } catch (error: any) {
+      console.error('Error sending email:', error);
+      toast({
+        title: "Error",
+        description: 'Failed to send email: ' + (error.message || 'Unknown error'),
+        variant: "destructive"
+      });
+    } finally {
+      setEmailingQuotationId(null);
     }
   };
 
@@ -439,8 +544,13 @@ export function QuotationsList({ onRefresh }: Props) {
                 size="sm" 
                 onClick={() => handleEmailQuotation(quotation)}
                 title="Email Quotation"
+                disabled={emailingQuotationId === quotation.id}
               >
-                <Mail className="h-4 w-4" />
+                {emailingQuotationId === quotation.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4" />
+                )}
               </Button>
               <Button 
                 variant="outline" 

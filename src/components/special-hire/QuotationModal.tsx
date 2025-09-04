@@ -6,6 +6,7 @@ import { QuotationPreview } from './QuotationPreview';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { supabase } from '@/integrations/supabase/client';
 
 interface QuotationData {
   id: string;
@@ -43,6 +44,7 @@ interface Props {
 export function QuotationModal({ quotation, open, onOpenChange }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isEmailing, setIsEmailing] = useState(false);
 
   const handlePrint = () => {
     if (printRef.current) {
@@ -333,13 +335,78 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
     }
   };
 
-  const handleEmail = () => {
-    if (quotation?.customer_email) {
-      const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
-      const body = `Dear ${quotation.customer_name},\n\nPlease find your quotation details attached.\n\nThank you for choosing NCG Express.`;
-      window.open(`mailto:${quotation.customer_email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-    } else {
+  const generatePDFBase64 = async (): Promise<string> => {
+    if (!printRef.current || !quotation) throw new Error('No content to generate PDF');
+
+    const canvas = await html2canvas(printRef.current, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff'
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    
+    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+    const imgX = (pdfWidth - imgWidth * ratio) / 2;
+    const imgY = 0;
+
+    pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+    
+    return pdf.output('datauristring').split(',')[1]; // Get base64 without data:application/pdf;base64, prefix
+  };
+
+  const handleEmail = async () => {
+    if (!quotation?.customer_email) {
       toast.error('No email address available for this customer');
+      return;
+    }
+
+    setIsEmailing(true);
+    try {
+      const pdfBase64 = await generatePDFBase64();
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
+      
+      const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">NCG Express</h2>
+          <p>Dear ${quotation.customer_name},</p>
+          <p>Please find your quotation details attached.</p>
+          <p>Thank you for choosing NCG Express.</p>
+          <br>
+          <p>Best regards,<br>NCG Express Team</p>
+        </div>
+      `;
+
+      const { error } = await supabase.functions.invoke('send-quotation-email', {
+        body: {
+          to: quotation.customer_email,
+          subject,
+          html,
+          attachment: {
+            filename,
+            contentBase64: pdfBase64,
+            contentType: 'application/pdf'
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(`Quotation emailed successfully to ${quotation.customer_email}`);
+    } catch (error: any) {
+      console.error('Error sending email:', error);
+      toast.error('Failed to send email: ' + (error.message || 'Unknown error'));
+    } finally {
+      setIsEmailing(false);
     }
   };
 
@@ -352,9 +419,13 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
           <DialogTitle className="flex items-center justify-between">
             <span>Quotation Preview - {quotation.quotation_no}</span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleEmail}>
-                <Mail className="h-4 w-4 mr-2" />
-                Email
+              <Button variant="outline" size="sm" onClick={handleEmail} disabled={isEmailing}>
+                {isEmailing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-2" />
+                )}
+                {isEmailing ? 'Sending...' : 'Email'}
               </Button>
               <Button variant="outline" size="sm" onClick={handlePrint}>
                 <Printer className="h-4 w-4 mr-2" />
