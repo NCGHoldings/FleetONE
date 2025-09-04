@@ -42,15 +42,24 @@ export const PaymentConfirmationModal = ({
   quotationData,
   loading = false 
 }: PaymentConfirmationModalProps) => {
+  // Calculate final total to match quotation preview
+  const calculateFinalTotal = () => {
+    return quotationData.gross_revenue + 
+           (quotationData.fuel_cost_fuel_only || 0) + 
+           (quotationData.commission_pass_through_amount || 0) - 
+           (quotationData.discount_amount_lkr || 0);
+  };
+
+  const finalTotal = calculateFinalTotal();
   const advancePaid = quotationData.advance_paid || 0;
-  const balanceDue = quotationData.balance_due || quotationData.gross_revenue;
+  const balanceDue = quotationData.balance_due || finalTotal;
   const isAdvanceAlreadyPaid = advancePaid > 0;
   
   const [paymentType, setPaymentType] = useState<'advance' | 'full' | 'final' | 'other'>(
     isAdvanceAlreadyPaid ? 'final' : 'advance'
   );
   const [amount, setAmount] = useState<number>(
-    isAdvanceAlreadyPaid ? balanceDue : quotationData.gross_revenue * 0.5
+    isAdvanceAlreadyPaid ? balanceDue : finalTotal * 0.5
   );
   const [method, setMethod] = useState<string>('cash');
   const [reference, setReference] = useState<string>('');
@@ -61,9 +70,9 @@ export const PaymentConfirmationModal = ({
   const handlePaymentTypeChange = (type: 'advance' | 'full' | 'final' | 'other') => {
     setPaymentType(type);
     if (type === 'advance' && !isAdvanceAlreadyPaid) {
-      setAmount(quotationData.gross_revenue * 0.5);
+      setAmount(finalTotal * 0.5);
     } else if (type === 'full') {
-      setAmount(quotationData.gross_revenue);
+      setAmount(finalTotal);
     } else if (type === 'final') {
       setAmount(balanceDue);
     }
@@ -103,12 +112,7 @@ export const PaymentConfirmationModal = ({
                 </div>
                 <div>
                   <p className="font-medium">Total Amount:</p>
-                  <p className="text-muted-foreground">LKR {(
-                    quotationData.gross_revenue + 
-                    (quotationData.fuel_cost_fuel_only || 0) + 
-                    (quotationData.commission_pass_through_amount || 0) - 
-                    (quotationData.discount_amount_lkr || 0)
-                  ).toLocaleString()}</p>
+                  <p className="text-muted-foreground">LKR {finalTotal.toLocaleString()}</p>
                 </div>
                 {isAdvanceAlreadyPaid && (
                   <>
@@ -171,7 +175,7 @@ export const PaymentConfirmationModal = ({
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
                   min="0"
-                  max={quotationData.gross_revenue}
+                  max={finalTotal}
                 />
               </div>
               <div className="space-y-2">
