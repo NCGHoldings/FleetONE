@@ -49,6 +49,9 @@ const formSchema = z.object({
   discountType: z.enum(['percentage', 'amount']).default('percentage'),
   discountPct: z.number().min(0, 'Discount percentage must be positive').max(100, 'Discount cannot exceed 100%').default(0),
   discountAmount: z.number().min(0, 'Discount amount must be positive').default(0),
+}).refine((data) => data.commissionPassThroughPct <= data.commissionPct, {
+  message: "Commission pass-through cannot exceed commission percentage",
+  path: ["commissionPassThroughPct"],
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -145,6 +148,27 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }
     }
   }, [isEditing, initialData]);
+
+  // Auto-clamp commission pass-through to not exceed commission percentage
+  useEffect(() => {
+    const subscription = form.watch((values, { name, type }) => {
+      if (name === 'commissionPct' || name === 'commissionPassThroughPct') {
+        const commissionPct = values.commissionPct || 0;
+        const passThroughPct = values.commissionPassThroughPct || 0;
+        
+        if (passThroughPct > commissionPct) {
+          form.setValue('commissionPassThroughPct', commissionPct, { shouldValidate: true });
+          toast({
+            title: "Commission Pass-through Adjusted",
+            description: `Pass-through percentage cannot exceed commission percentage (${commissionPct}%)`,
+            variant: "default"
+          });
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, toast]);
 
   const loadBusTypes = async () => {
     try {
@@ -324,7 +348,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       const baseCustomerTotal = grossRevenue + (fuelCost * data.numberOfBuses);
       
       // Commission pass-through (added to customer bill)
-      const commissionPassThroughAmount = baseCustomerTotal * (data.commissionPassThroughPct / 100);
+      // Ensure pass-through percentage never exceeds commission percentage
+      const safePassThroughPct = Math.min(data.commissionPassThroughPct, data.commissionPct);
+      const commissionPassThroughAmount = baseCustomerTotal * (safePassThroughPct / 100);
       
       // Discount (subtracted from customer bill)
       const discountAmount = data.discountType === 'percentage' 
@@ -508,7 +534,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         driver_charge: costs.driver_charge,
         other_expenses: costs.other_expenses,
         commission_pct: costs.commission_pct,
-        commission_pass_through_pct: costs.commission_pass_through_pct,
+        commission_pass_through_pct: Math.min(costs.commission_pass_through_pct, costs.commission_pct),
         commission_pass_through_amount: costs.commission_pass_through_amount,
         commission_amount: costs.commission_amount,
         discount_type: data.discountType,
