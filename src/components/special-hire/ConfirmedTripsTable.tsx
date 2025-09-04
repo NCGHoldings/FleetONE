@@ -36,6 +36,9 @@ interface ConfirmedTrip {
     number_of_passengers: number;
     bus_type_id: string;
     gross_revenue: number;
+    discount_type?: string;
+    discount_percentage?: number;
+    discount_amount_lkr?: number;
   };
   payments: Array<{
     id: string;
@@ -57,6 +60,19 @@ interface ConfirmedTrip {
     issued_at: string;
   }>;
 }
+
+// Helper function to calculate final customer amount after discounts
+const calculateFinalAmount = (quotation: ConfirmedTrip['quotation']): number => {
+  const { gross_revenue, discount_type, discount_percentage, discount_amount_lkr } = quotation;
+  
+  if (discount_type === 'percentage' && discount_percentage && discount_percentage > 0) {
+    return gross_revenue - (gross_revenue * (discount_percentage / 100));
+  } else if (discount_type === 'amount' && discount_amount_lkr && discount_amount_lkr > 0) {
+    return Math.max(0, gross_revenue - discount_amount_lkr);
+  }
+  
+  return gross_revenue;
+};
 
 export function ConfirmedTripsTable() {
   const [trips, setTrips] = useState<ConfirmedTrip[]>([]);
@@ -121,13 +137,15 @@ export function ConfirmedTripsTable() {
           });
         }
 
+        const finalAmount = calculateFinalAmount(q);
+        
         return {
           id: q.id,
           quotation_id: q.id,
           status: q.status,
-          total_amount: q.gross_revenue,
+          total_amount: finalAmount,
           advance_paid: advancePaid,
-          balance_due: q.gross_revenue - advancePaid,
+          balance_due: finalAmount - advancePaid,
           driver_name: undefined,
           conductor_name: undefined,
           bus_no: undefined,
@@ -154,7 +172,8 @@ export function ConfirmedTripsTable() {
     setLoading(true);
     try {
       // Determine invoice type based on payment type or if it's a full payment
-      const isFullPayment = paymentData.amount >= selectedTrip.quotation.gross_revenue;
+      const finalTotalAmount = calculateFinalAmount(selectedTrip.quotation);
+      const isFullPayment = paymentData.amount >= finalTotalAmount;
       const isFinalPayment = paymentData.paymentType === 'final' || paymentData.paymentType === 'full';
       const invoiceType: 'advance' | 'final' = isFinalPayment || isFullPayment ? 'final' : 'advance';
 
@@ -164,6 +183,7 @@ export function ConfirmedTripsTable() {
         paymentType: paymentData.paymentType,
         amount: paymentData.amount,
         grossRevenue: selectedTrip.quotation.gross_revenue,
+        finalTotalAmount,
         invoiceType
       });
 
@@ -190,9 +210,9 @@ export function ConfirmedTripsTable() {
         busType: 'Standard Bus', // Will need to fetch actual bus type name from bus_type_id
         numberOfBuses: selectedTrip.quotation.number_of_buses,
         numberOfPassengers: selectedTrip.quotation.number_of_passengers,
-        totalAmount: selectedTrip.quotation.gross_revenue,
+        totalAmount: finalTotalAmount,
         advanceAmount: advanceAmountForInvoice, // Use properly calculated advance amount
-        balanceAmount: selectedTrip.balance_due,
+        balanceAmount: finalTotalAmount - (selectedTrip.advance_paid || 0),
         paidAmount: paymentData.amount,
         companyLogo,
         // New fields for NCG template
@@ -315,7 +335,7 @@ export function ConfirmedTripsTable() {
       busType: busTypeName,
       numberOfBuses: trip.quotation.number_of_buses,
       numberOfPassengers: trip.quotation.number_of_passengers,
-      totalAmount: trip.quotation.gross_revenue,
+      totalAmount: calculateFinalAmount(trip.quotation),
       advanceAmount: trip.advance_paid,
       paidAmount: invoice.amount,
       companyLogo,

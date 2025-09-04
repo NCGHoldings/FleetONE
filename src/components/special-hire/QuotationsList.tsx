@@ -61,7 +61,22 @@ interface Quotation {
   audit_log?: any[];
   approval_status?: 'pending' | 'approved' | 'rejected';
   discount_percentage?: number;
+  discount_type?: string;
+  discount_amount_lkr?: number;
 }
+
+// Helper function to calculate final customer amount after discounts
+const calculateFinalAmount = (quotation: Quotation): number => {
+  const { gross_revenue, discount_type, discount_percentage, discount_amount_lkr } = quotation;
+  
+  if (discount_type === 'percentage' && discount_percentage && discount_percentage > 0) {
+    return gross_revenue - (gross_revenue * (discount_percentage / 100));
+  } else if (discount_type === 'amount' && discount_amount_lkr && discount_amount_lkr > 0) {
+    return Math.max(0, gross_revenue - discount_amount_lkr);
+  }
+  
+  return gross_revenue;
+};
 
 interface Props {
   onRefresh: () => void;
@@ -424,21 +439,38 @@ export function QuotationsList({ onRefresh }: Props) {
     {
       accessorKey: "gross_revenue",
       header: "Revenue",
-      cell: ({ row }) => (
-        <div className="text-right">
-          <div className="font-medium">LKR {row.original.gross_revenue.toLocaleString()}</div>
-          <div className="text-xs text-green-600">
-            Profit: LKR {row.original.net_profit.toLocaleString()}
+      cell: ({ row }) => {
+        const quotation = row.original;
+        const finalAmount = calculateFinalAmount(quotation);
+        const hasDiscount = finalAmount < quotation.gross_revenue;
+        
+        return (
+          <div className="text-right">
+            <div className="font-medium">LKR {finalAmount.toLocaleString()}</div>
+            {hasDiscount && (
+              <div className="text-xs text-muted-foreground">
+                Original: LKR {quotation.gross_revenue.toLocaleString()}
+                {quotation.discount_type === 'percentage' 
+                  ? ` (-${quotation.discount_percentage}%)`
+                  : ` (-LKR ${quotation.discount_amount_lkr?.toLocaleString()})`
+                }
+              </div>
+            )}
+            <div className="text-xs text-green-600">
+              Profit: LKR {quotation.net_profit.toLocaleString()}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
         const quotation = row.original;
-        const isDraft = quotation.approval_status === 'pending' && (quotation.discount_percentage || 0) > 0;
+        const hasDiscount = (quotation.discount_type === 'percentage' && (quotation.discount_percentage || 0) > 0) ||
+                           (quotation.discount_type === 'amount' && (quotation.discount_amount_lkr || 0) > 0);
+        const isDraft = quotation.approval_status === 'pending' && hasDiscount;
         
         return (
           <div className="flex flex-col gap-1">
