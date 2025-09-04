@@ -58,10 +58,11 @@ export function EnhancedCostCalculator() {
   // Trip execution data
   const [actualDistance, setActualDistance] = useState<number>(0);
   const [tripDays, setTripDays] = useState<number>(1);
+  const [commissionPct, setCommissionPct] = useState<number>(0);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([
     { id: '1', type: 'fuel', description: 'Fuel Cost', amount: 0, isEstimated: true },
     { id: '2', type: 'wages', description: 'Driver Wages', amount: 1500, isEstimated: true },
-    { id: '3', type: 'commission', description: 'Commission (5%)', amount: 0, isEstimated: true }
+    { id: '3', type: 'commission', description: 'Commission', amount: 0, isEstimated: true }
   ]);
 
   const { toast } = useToast();
@@ -124,10 +125,6 @@ export function EnhancedCostCalculator() {
       if (exp.type === 'fuel') {
         return { ...exp, amount: Math.round(actualFuelCost), isEstimated: false };
       }
-      if (exp.type === 'commission') {
-        const commissionAmount = quotation.gross_revenue * 0.05;
-        return { ...exp, amount: Math.round(commissionAmount), isEstimated: false };
-      }
       return exp;
     });
 
@@ -164,6 +161,15 @@ export function EnhancedCostCalculator() {
   const updateExpense = (id: string, field: keyof ExpenseItem, value: any) => {
     setExpenses(expenses.map(exp => 
       exp.id === id ? { ...exp, [field]: value } : exp
+    ));
+  };
+
+  const calculateCommissionFromPercentage = () => {
+    if (!selectedQuotation || commissionPct === 0) return;
+    
+    const commissionAmount = Math.round((selectedQuotation.gross_revenue * commissionPct) / 100);
+    setExpenses(expenses.map(exp => 
+      exp.type === 'commission' ? { ...exp, amount: commissionAmount, isEstimated: false } : exp
     ));
   };
 
@@ -342,7 +348,7 @@ export function EnhancedCostCalculator() {
               </div>
 
               {/* Trip Execution Data */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Actual Trip Distance (km)</Label>
                   <Input
@@ -359,6 +365,32 @@ export function EnhancedCostCalculator() {
                     value={tripDays}
                     onChange={(e) => setTripDays(parseInt(e.target.value) || 1)}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Commission (%) - Optional</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={commissionPct}
+                      onChange={(e) => setCommissionPct(parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={calculateCommissionFromPercentage}
+                      disabled={!selectedQuotation || commissionPct === 0}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enter percentage and click Apply to auto-calculate commission amount
+                  </p>
                 </div>
               </div>
 
@@ -406,7 +438,7 @@ export function EnhancedCostCalculator() {
                         placeholder="Amount"
                         value={expense.amount}
                         onChange={(e) => updateExpense(expense.id, 'amount', parseFloat(e.target.value) || 0)}
-                        disabled={expense.type === 'fuel' || expense.type === 'commission'}
+                        disabled={expense.type === 'fuel'}
                       />
                     </div>
                     <div className="col-span-1">
@@ -415,7 +447,7 @@ export function EnhancedCostCalculator() {
                       </Badge>
                     </div>
                     <div className="col-span-1">
-                      {expense.type !== 'fuel' && expense.type !== 'commission' && (
+                      {expense.type !== 'fuel' && (
                         <Button
                           onClick={() => removeExpense(expense.id)}
                           variant="ghost"
