@@ -52,7 +52,7 @@ export const PaymentConfirmationModal = ({
 
   const finalTotal = calculateFinalTotal();
   const advancePaid = quotationData.advance_paid || 0;
-  const balanceDue = quotationData.balance_due || finalTotal;
+  const balanceDue = finalTotal - advancePaid;
   const isAdvanceAlreadyPaid = advancePaid > 0;
   
   const [paymentType, setPaymentType] = useState<'advance' | 'full' | 'final' | 'other'>(
