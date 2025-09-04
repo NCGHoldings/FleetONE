@@ -110,7 +110,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       parkingLocationId: initialData.parking_location_id || '',
       commissionPct: initialData.commission_pct || 5,
       commissionPassThroughPct: initialData.commission_pass_through_pct || 0,
+      discountType: initialData.discount_type || 'percentage',
       discountPct: initialData.discount_percentage || 0,
+      discountAmount: initialData.discount_amount_lkr || 0,
     } : {
       hireType: 'Outside',
       numberOfBuses: 1,
@@ -120,7 +122,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       parkingLocationId: '',
       commissionPct: 5,
       commissionPassThroughPct: 0,
+      discountType: 'percentage',
       discountPct: 0,
+      discountAmount: 0,
     }
   });
 
@@ -323,7 +327,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       const commissionPassThroughAmount = baseCustomerTotal * (data.commissionPassThroughPct / 100);
       
       // Discount (subtracted from customer bill)
-      const discountAmount = baseCustomerTotal * (data.discountPct / 100);
+      const discountAmount = data.discountType === 'percentage' 
+        ? baseCustomerTotal * (data.discountPct / 100)
+        : data.discountAmount;
       
       // Final customer total
       const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount;
@@ -380,7 +386,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         customerTotalWithFuel: Math.round(finalCustomerTotal),
         commissionPassThroughPct: data.commissionPassThroughPct,
         commissionPassThroughAmount: Math.round(commissionPassThroughAmount),
-        discountPct: data.discountPct,
+        discountType: data.discountType,
+        discountPct: data.discountType === 'percentage' ? data.discountPct : 0,
         discountAmount: Math.round(discountAmount),
         driverCharge: costs.driver_charge,
         otherExpenses: costs.other_expenses,
@@ -396,9 +403,15 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         dropAddress: distanceData.dropAddress
       });
 
+      const discountText = data.discountType === 'percentage' && data.discountPct > 0 
+        ? `(${data.discountPct}% discount)` 
+        : data.discountType === 'amount' && data.discountAmount > 0 
+        ? `(LKR ${data.discountAmount} discount)` 
+        : '';
+      
       toast({
         title: "Cost Calculated",
-        description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()} ${data.discountPct > 0 ? `(${data.discountPct}% discount)` : ''}`
+        description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()} ${discountText}`
       });
 
       return { costs, distanceData };
@@ -417,7 +430,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     setLoading(true);
     try {
       // Check if discount requires admin approval
-      if (data.discountPct > 0) {
+      if ((data.discountType === 'percentage' && data.discountPct > 0) || 
+          (data.discountType === 'amount' && data.discountAmount > 0)) {
         const { data: userData } = await supabase.auth.getUser();
         const { data: userRoles } = await supabase
           .from('user_roles')
@@ -456,7 +470,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             pickup_location: data.pickupLocation !== initialData.pickup_location ? { from: initialData.pickup_location, to: data.pickupLocation } : undefined,
             drop_location: data.dropLocation !== initialData.drop_location ? { from: initialData.drop_location, to: data.dropLocation } : undefined,
             commission_pct: data.commissionPct !== (initialData.commission_pct || 5) ? { from: initialData.commission_pct || 5, to: data.commissionPct } : undefined,
+            discount_type: data.discountType !== (initialData.discount_type || 'percentage') ? { from: initialData.discount_type || 'percentage', to: data.discountType } : undefined,
             discount_percentage: data.discountPct !== (initialData.discount_percentage || 0) ? { from: initialData.discount_percentage || 0, to: data.discountPct } : undefined,
+            discount_amount_lkr: data.discountAmount !== (initialData.discount_amount_lkr || 0) ? { from: initialData.discount_amount_lkr || 0, to: data.discountAmount } : undefined,
           }
         };
       }
@@ -495,7 +511,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         commission_pass_through_pct: costs.commission_pass_through_pct,
         commission_pass_through_amount: costs.commission_pass_through_amount,
         commission_amount: costs.commission_amount,
+        discount_type: data.discountType,
         discount_percentage: costs.discount_percentage,
+        discount_amount_lkr: costs.discount_amount,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
         approval_status: ((data.discountType === 'percentage' && data.discountPct > 0) || 
@@ -970,7 +988,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   />
 
                 {/* Commission and Discount Settings */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <FormField
                     control={form.control}
                     name="commissionPct"
@@ -1023,30 +1041,85 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
                   <FormField
                     control={form.control}
-                    name="discountPct"
+                    name="discountType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Discount (%) 
-                          {field.value > 0 && <Badge variant="secondary" className="ml-2">Admin Approval Required</Badge>}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="100"
-                            placeholder="0"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                          />
-                        </FormControl>
+                        <FormLabel>Discount Type</FormLabel>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          // Reset discount values when type changes
+                          form.setValue('discountPct', 0);
+                          form.setValue('discountAmount', 0);
+                        }} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="percentage">Percentage (%)</SelectItem>
+                            <SelectItem value="amount">Fixed Amount (LKR)</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
-                        <div className="text-xs text-muted-foreground">
-                          Customer discount (requires admin approval)
-                        </div>
                       </FormItem>
                     )}
                   />
+
+                  {form.watch('discountType') === 'percentage' ? (
+                    <FormField
+                      control={form.control}
+                      name="discountPct"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Discount (%)
+                            {field.value > 0 && <Badge variant="secondary" className="ml-2">Admin Approval Required</Badge>}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              placeholder="0"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                          <div className="text-xs text-muted-foreground">
+                            Percentage discount (requires admin approval)
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="discountAmount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Discount (LKR)
+                            {field.value > 0 && <Badge variant="secondary" className="ml-2">Admin Approval Required</Badge>}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                          <div className="text-xs text-muted-foreground">
+                            Fixed amount discount (requires admin approval)
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
                 </div>
               </CardContent>
