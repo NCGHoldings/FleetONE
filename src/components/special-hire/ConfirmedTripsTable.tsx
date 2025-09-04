@@ -36,6 +36,8 @@ interface ConfirmedTrip {
     number_of_passengers: number;
     bus_type_id: string;
     gross_revenue: number;
+    fuel_cost_fuel_only?: number;
+    commission_pass_through_amount?: number;
     discount_type?: string;
     discount_percentage?: number;
     discount_amount_lkr?: number;
@@ -64,8 +66,8 @@ interface ConfirmedTrip {
 // Helper function to calculate total revenue to match quotation final total
 const calculateTotalRevenue = (quotation: ConfirmedTrip['quotation']): number => {
   const hireCharges = quotation.gross_revenue || 0;
-  const serviceCharges = (quotation as any).fuel_cost_fuel_only || 0;
-  const commission = (quotation as any).commission_pass_through_amount || 0;
+  const serviceCharges = quotation.fuel_cost_fuel_only || 0;
+  const commission = quotation.commission_pass_through_amount || 0;
   const discount = quotation.discount_amount_lkr || 0;
   
   return hireCharges + serviceCharges + commission - discount;
@@ -562,6 +564,9 @@ export function ConfirmedTripsTable() {
             quotation_no: selectedTrip.quotation.quotation_no,
             customer_name: selectedTrip.quotation.customer_name,
             gross_revenue: selectedTrip.quotation.gross_revenue,
+            fuel_cost_fuel_only: selectedTrip.quotation.fuel_cost_fuel_only,
+            commission_pass_through_amount: selectedTrip.quotation.commission_pass_through_amount,
+            discount_amount_lkr: selectedTrip.quotation.discount_amount_lkr,
             advance_paid: selectedTrip.advance_paid,
             balance_due: selectedTrip.balance_due
           }}
