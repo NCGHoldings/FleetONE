@@ -3,10 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Download, Upload, Receipt, Users, UserPlus, Bus } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Eye, Download, Upload, Receipt, Users, UserPlus, Bus, Settings, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PaymentConfirmationModal, type PaymentConfirmationData } from './PaymentConfirmationModal';
+import { TripStatusManagementModal, type TripStatusData } from './TripStatusManagementModal';
 import { InvoiceViewer } from './InvoiceViewer';
 import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { format } from 'date-fns';
@@ -15,6 +17,7 @@ interface ConfirmedTrip {
   id: string;
   quotation_id: string;
   status: string;
+  trip_status?: string;
   total_amount: number;
   advance_paid: number;
   balance_due: number;
@@ -22,6 +25,10 @@ interface ConfirmedTrip {
   conductor_name?: string;
   bus_no?: string;
   created_at: string;
+  cancellation_reason?: string;
+  refund_amount?: number;
+  refund_status?: string;
+  status_changed_at?: string;
   quotation: {
     quotation_no: string;
     customer_name: string;
@@ -41,6 +48,11 @@ interface ConfirmedTrip {
     discount_type?: string;
     discount_percentage?: number;
     discount_amount_lkr?: number;
+    trip_status?: string;
+    cancellation_reason?: string;
+    refund_amount?: number;
+    refund_status?: string;
+    status_changed_at?: string;
   };
   payments: Array<{
     id: string;
@@ -77,9 +89,11 @@ export function ConfirmedTripsTable() {
   const [trips, setTrips] = useState<ConfirmedTrip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<ConfirmedTrip | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [invoiceViewerOpen, setInvoiceViewerOpen] = useState(false);
   const [currentInvoiceData, setCurrentInvoiceData] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string>('');
 
   const { toast } = useToast();
@@ -95,7 +109,7 @@ export function ConfirmedTripsTable() {
   };
 
   const fetchConfirmedTrips = async () => {
-    // Fall back to existing quotations approach but enhance it
+    // Fetch all quotations with trip statuses including cancelled, on_hold, etc.
     const { data: quotations } = await supabase
       .from('special_hire_quotations')
       .select('*')
@@ -142,6 +156,7 @@ export function ConfirmedTripsTable() {
           id: q.id,
           quotation_id: q.id,
           status: q.status,
+          trip_status: q.trip_status || q.status,
           total_amount: finalAmount,
           advance_paid: advancePaid,
           balance_due: finalAmount - advancePaid,
@@ -149,6 +164,10 @@ export function ConfirmedTripsTable() {
           conductor_name: undefined,
           bus_no: undefined,
           created_at: q.created_at,
+          cancellation_reason: q.cancellation_reason,
+          refund_amount: q.refund_amount || 0,
+          refund_status: q.refund_status,
+          status_changed_at: q.status_changed_at,
           quotation: q,
           payments: [], // Will be populated if we have payment data
           invoices
@@ -371,6 +390,94 @@ export function ConfirmedTripsTable() {
     }
   };
 
+  const handleStatusChange = async (statusData: TripStatusData) => {
+    if (!selectedTrip) return;
+
+    setStatusLoading(true);
+    try {
+      const updateData: any = {
+        trip_status: statusData.status,
+        cancellation_reason: statusData.reason || null,
+        status_changed_by: (await supabase.auth.getUser()).data.user?.id,
+      };
+
+      // Handle refund data for cancellations
+      if (statusData.status === 'cancelled' && statusData.refundAmount) {
+        updateData.refund_amount = statusData.refundAmount;
+        updateData.refund_status = statusData.refundStatus || 'pending';
+      }
+
+      const { error } = await supabase
+        .from('special_hire_quotations')
+        .update(updateData)
+        .eq('id', selectedTrip.quotation_id);
+
+      if (error) throw error;
+
+      // Update local state
+      setTrips((prev) => prev.map((trip) => 
+        trip.id === selectedTrip.id 
+          ? {
+              ...trip,
+              trip_status: statusData.status,
+              cancellation_reason: statusData.reason,
+              refund_amount: statusData.refundAmount || 0,
+              refund_status: statusData.refundStatus,
+              status_changed_at: new Date().toISOString(),
+            }
+          : trip
+      ));
+
+      let statusMessage = 'Trip status updated successfully';
+      if (statusData.status === 'cancelled' && statusData.refundAmount) {
+        statusMessage += ` - Refund of LKR ${statusData.refundAmount.toLocaleString()} ${statusData.refundStatus}`;
+      }
+
+      toast({
+        title: 'Success',
+        description: statusMessage,
+      });
+
+      setStatusModalOpen(false);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update trip status',
+        variant: 'destructive',
+      });
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+  const getTripStatusBadge = (trip: ConfirmedTrip) => {
+    const status = trip.trip_status || trip.status;
+    const variants: Record<string, { variant: any; className?: string }> = {
+      confirmed: { variant: 'default', className: 'bg-blue-500' },
+      paid: { variant: 'default', className: 'bg-green-500' },
+      completed: { variant: 'default', className: 'bg-green-600' },
+      cancelled: { variant: 'destructive' },
+      on_hold: { variant: 'secondary', className: 'bg-yellow-500 text-yellow-900' },
+      no_bus_allocated: { variant: 'secondary', className: 'bg-orange-500 text-orange-900' },
+      other: { variant: 'outline' },
+    };
+
+    const config = variants[status] || { variant: 'outline' };
+    
+    return (
+      <div className="space-y-1">
+        <Badge variant={config.variant} className={config.className}>
+          {status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        </Badge>
+        {trip.refund_amount && trip.refund_amount > 0 && (
+          <div className="text-xs text-muted-foreground">
+            Refund: LKR {trip.refund_amount.toLocaleString()} ({trip.refund_status})
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const getPaymentStatusBadge = (trip: ConfirmedTrip) => {
     if (trip.status === 'completed' || trip.balance_due <= 0) {
       return <Badge variant="default" className="bg-green-500">Fully Paid</Badge>;
@@ -419,6 +526,7 @@ export function ConfirmedTripsTable() {
                 <TableHead>Route</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Assignment</TableHead>
+                <TableHead>Trip Status</TableHead>
                 <TableHead>Payment Status</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Actions</TableHead>
@@ -469,6 +577,7 @@ export function ConfirmedTripsTable() {
                       )}
                     </div>
                   </TableCell>
+                  <TableCell>{getTripStatusBadge(trip)}</TableCell>
                   <TableCell>{getPaymentStatusBadge(trip)}</TableCell>
                   <TableCell>
                     <div className="text-sm">
@@ -484,61 +593,64 @@ export function ConfirmedTripsTable() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1 flex-wrap">
-                      {/* Confirm Payment Button */}
-                      {trip.balance_due > 0 && (
-                        <Button
-                          onClick={() => {
-                            setSelectedTrip(trip);
-                            setPaymentModalOpen(true);
-                          }}
-                          size="sm"
-                          variant="default"
-                          className="h-8"
-                        >
-                          <Receipt className="w-3 h-3 mr-1" />
-                          {trip.advance_paid > 0 ? 'Final Payment' : 'Confirm Payment'}
-                        </Button>
-                      )}
+                    <div className="flex items-center gap-2">
+                      {/* Status Management Dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-xs">
+                            <Settings className="w-3 h-3 mr-1" />
+                            Manage
+                            <ChevronDown className="w-3 h-3 ml-1" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedTrip(trip);
+                              setStatusModalOpen(true);
+                            }}
+                          >
+                            <Settings className="w-3 h-3 mr-2" />
+                            Change Status
+                          </DropdownMenuItem>
+                          
+                          {/* Payment Actions */}
+                          {trip.status !== 'completed' && trip.balance_due > 0 && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedTrip(trip);
+                                setPaymentModalOpen(true);
+                              }}
+                            >
+                              <Upload className="w-3 h-3 mr-2" />
+                              Confirm Payment
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       
                       {/* Invoice Actions */}
-                      {trip.invoices.map((invoice) => (
-                        <div key={invoice.id} className="flex gap-1">
-                          <Button
-                            onClick={() => viewInvoice(trip, invoice.invoice_type as 'advance' | 'final')}
-                            size="sm"
-                            variant="outline"
-                            className="h-8"
-                          >
-                            <Eye className="w-3 h-3 mr-1" />
-                            View {invoice.invoice_type === 'advance' ? 'Advance' : 'Final'}
-                          </Button>
-                          <Button
-                            onClick={() => downloadInvoice(trip, invoice.invoice_type as 'advance' | 'final')}
-                            size="sm"
-                            variant="outline"
-                            className="h-8"
-                          >
-                            <Download className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      ))}
-                      
-                      {/* Payment Proof Actions */}
-                      {trip.payments
-                        .filter(p => p.payment_proof_url)
-                        .map((payment) => (
-                          <Button
-                            key={payment.id}
-                            onClick={() => openPaymentProof(trip, payment.id)}
-                            size="sm"
-                            variant="outline"
-                            className="h-8"
-                          >
-                            <Eye className="w-3 h-3 mr-1" />
-                            Proof
-                          </Button>
-                        ))}
+                      {trip.invoices.length > 0 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="text-xs">
+                              <Eye className="w-3 h-3 mr-1" />
+                              Invoices
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            {trip.invoices.map((invoice) => (
+                              <DropdownMenuItem
+                                key={invoice.id}
+                                onClick={() => viewInvoice(trip, invoice.invoice_type as 'advance' | 'final')}
+                              >
+                                <Receipt className="w-3 h-3 mr-2" />
+                                View {invoice.invoice_type} Invoice
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -574,7 +686,16 @@ export function ConfirmedTripsTable() {
         />
       )}
 
-      {/* Invoice Viewer */}
+      {/* Trip Status Management Modal */}
+      <TripStatusManagementModal
+        open={statusModalOpen}
+        onOpenChange={setStatusModalOpen}
+        trip={selectedTrip}
+        onStatusChange={handleStatusChange}
+        loading={statusLoading}
+      />
+
+      {/* Invoice Viewer Modal */}
       {currentInvoiceData && (
         <InvoiceViewer
           isOpen={invoiceViewerOpen}

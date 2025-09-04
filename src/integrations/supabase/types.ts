@@ -1679,6 +1679,7 @@ export type Database = {
           approved_by: string | null
           audit_log: Json | null
           bus_type_id: string | null
+          cancellation_reason: string | null
           commission_amount: number | null
           commission_pass_through_amount: number | null
           commission_pass_through_pct: number | null
@@ -1718,10 +1719,17 @@ export type Database = {
           pickup_lng: number | null
           pickup_location: string
           quotation_no: string
+          refund_amount: number | null
+          refund_processed_at: string | null
+          refund_processed_by: string | null
+          refund_status: string | null
           special_request: string | null
           status: string | null
+          status_changed_at: string | null
+          status_changed_by: string | null
           total_expenses: number | null
           trip_id: string | null
+          trip_status: string | null
           updated_at: string | null
           valid_until: string | null
         }
@@ -1734,6 +1742,7 @@ export type Database = {
           approved_by?: string | null
           audit_log?: Json | null
           bus_type_id?: string | null
+          cancellation_reason?: string | null
           commission_amount?: number | null
           commission_pass_through_amount?: number | null
           commission_pass_through_pct?: number | null
@@ -1773,10 +1782,17 @@ export type Database = {
           pickup_lng?: number | null
           pickup_location: string
           quotation_no?: string
+          refund_amount?: number | null
+          refund_processed_at?: string | null
+          refund_processed_by?: string | null
+          refund_status?: string | null
           special_request?: string | null
           status?: string | null
+          status_changed_at?: string | null
+          status_changed_by?: string | null
           total_expenses?: number | null
           trip_id?: string | null
+          trip_status?: string | null
           updated_at?: string | null
           valid_until?: string | null
         }
@@ -1789,6 +1805,7 @@ export type Database = {
           approved_by?: string | null
           audit_log?: Json | null
           bus_type_id?: string | null
+          cancellation_reason?: string | null
           commission_amount?: number | null
           commission_pass_through_amount?: number | null
           commission_pass_through_pct?: number | null
@@ -1828,10 +1845,17 @@ export type Database = {
           pickup_lng?: number | null
           pickup_location?: string
           quotation_no?: string
+          refund_amount?: number | null
+          refund_processed_at?: string | null
+          refund_processed_by?: string | null
+          refund_status?: string | null
           special_request?: string | null
           status?: string | null
+          status_changed_at?: string | null
+          status_changed_by?: string | null
           total_expenses?: number | null
           trip_id?: string | null
+          trip_status?: string | null
           updated_at?: string | null
           valid_until?: string | null
         }
