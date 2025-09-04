@@ -3,12 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Eye, Download, Upload, Receipt, Users, UserPlus, Bus, Settings, ChevronDown } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { 
+  Eye, Download, Upload, Receipt, Users, UserPlus, Bus, Settings, ChevronDown, 
+  Search, Filter, MoreHorizontal, MapPin, Calendar, DollarSign, TrendingUp,
+  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw
+} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PaymentConfirmationModal, type PaymentConfirmationData } from './PaymentConfirmationModal';
-import { TripStatusManagementModal, type TripStatusData } from './TripStatusManagementModal';
+import { EnhancedTripStatusManagementModal, type TripStatusData } from './EnhancedTripStatusManagementModal';
+import { TripDetailsModal } from './TripDetailsModal';
 import { InvoiceViewer } from './InvoiceViewer';
 import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { format } from 'date-fns';
@@ -87,14 +94,22 @@ const calculateTotalRevenue = (quotation: ConfirmedTrip['quotation']): number =>
 
 export function ConfirmedTripsTable() {
   const [trips, setTrips] = useState<ConfirmedTrip[]>([]);
+  const [filteredTrips, setFilteredTrips] = useState<ConfirmedTrip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<ConfirmedTrip | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [invoiceViewerOpen, setInvoiceViewerOpen] = useState(false);
   const [currentInvoiceData, setCurrentInvoiceData] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string>('');
+  
+  // Enhanced filtering and search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
 
   const { toast } = useToast();
 
@@ -102,6 +117,64 @@ export function ConfirmedTripsTable() {
     fetchConfirmedTrips();
     fetchCompanyLogo();
   }, []);
+
+  // Enhanced filtering and search functionality
+  useEffect(() => {
+    let filtered = trips;
+
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter(trip =>
+        trip.quotation.quotation_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        trip.quotation.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        trip.quotation.customer_phone.includes(searchQuery) ||
+        trip.quotation.pickup_location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        trip.quotation.drop_location.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(trip => (trip.trip_status || trip.status) === statusFilter);
+    }
+
+    // Payment filter
+    if (paymentFilter !== 'all') {
+      if (paymentFilter === 'pending') {
+        filtered = filtered.filter(trip => trip.advance_paid === 0);
+      } else if (paymentFilter === 'partial') {
+        filtered = filtered.filter(trip => trip.advance_paid > 0 && trip.balance_due > 0);
+      } else if (paymentFilter === 'paid') {
+        filtered = filtered.filter(trip => trip.balance_due <= 0);
+      }
+    }
+
+    // Date filter
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      filtered = filtered.filter(trip => {
+        const tripDate = new Date(trip.quotation.pickup_datetime);
+        const tripDateOnly = new Date(tripDate.getFullYear(), tripDate.getMonth(), tripDate.getDate());
+        
+        switch (dateFilter) {
+          case 'today':
+            return tripDateOnly.getTime() === today.getTime();
+          case 'week':
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return tripDateOnly >= weekAgo;
+          case 'month':
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+            return tripDateOnly >= monthAgo;
+          default:
+            return true;
+        }
+      });
+    }
+
+    setFilteredTrips(filtered);
+  }, [trips, searchQuery, statusFilter, paymentFilter, dateFilter]);
 
   const fetchCompanyLogo = async () => {
     // For now, we'll use a default empty logo
@@ -174,6 +247,7 @@ export function ConfirmedTripsTable() {
         };
       });
       setTrips(mappedTrips);
+      setFilteredTrips(mappedTrips);
     }
   };
 
@@ -513,156 +587,330 @@ export function ConfirmedTripsTable() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Confirmed Trips & Payment Management</CardTitle>
+      {/* Enhanced Header with Analytics */}
+      <Card className="professional-card">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div>
+              <CardTitle className="flex items-center space-x-2">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                <span>Trip Management Dashboard</span>
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage confirmed trips, payments, and status updates
+              </p>
+            </div>
+            
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-primary">{filteredTrips.length}</div>
+                <div className="text-xs text-muted-foreground">Total Trips</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-green-600">
+                  {filteredTrips.filter(t => t.balance_due <= 0).length}
+                </div>
+                <div className="text-xs text-muted-foreground">Fully Paid</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-orange-600">
+                  {filteredTrips.filter(t => t.advance_paid > 0 && t.balance_due > 0).length}
+                </div>
+                <div className="text-xs text-muted-foreground">Partial</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-red-600">
+                  {filteredTrips.filter(t => (t.trip_status || t.status) === 'cancelled').length}
+                </div>
+                <div className="text-xs text-muted-foreground">Cancelled</div>
+              </div>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Quotation</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Route</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Assignment</TableHead>
-                <TableHead>Trip Status</TableHead>
-                <TableHead>Payment Status</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {trips.map((trip) => (
-                <TableRow key={trip.id}>
-                  <TableCell className="font-medium">{trip.quotation.quotation_no}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{trip.quotation.customer_name}</div>
-                      {trip.quotation.company_name && (
-                        <div className="text-sm text-muted-foreground">{trip.quotation.company_name}</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-xs">
-                    <div className="truncate">
-                      {trip.quotation.pickup_location} → {trip.quotation.drop_location}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {format(new Date(trip.quotation.pickup_datetime), 'dd/MM/yyyy')}
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1 text-sm">
-                      {trip.driver_name && (
-                        <div className="flex items-center gap-1">
-                          <UserPlus className="w-3 h-3" />
-                          <span>{trip.driver_name}</span>
+        
+        {/* Enhanced Filters */}
+        <CardContent className="border-t">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Search trips..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="no_bus_allocated">No Bus</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Payment Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="partial">Partial Paid</SelectItem>
+                <SelectItem value="paid">Fully Paid</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Date Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Dates</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+                setPaymentFilter('all');
+                setDateFilter('all');
+              }}
+              className="flex items-center space-x-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Reset</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Enhanced Trip Table */}
+      <Card className="professional-card">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="font-semibold">Quotation</TableHead>
+                  <TableHead className="font-semibold">Customer Details</TableHead>
+                  <TableHead className="font-semibold">Trip Information</TableHead>
+                  <TableHead className="font-semibold">Vehicle Assignment</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">Payment</TableHead>
+                  <TableHead className="font-semibold">Financial</TableHead>
+                  <TableHead className="font-semibold text-center">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTrips.map((trip) => (
+                  <TableRow key={trip.id} className="table-row-hover">
+                    {/* Quotation Info */}
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="font-medium text-sm">{trip.quotation.quotation_no}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(trip.created_at), 'MMM dd, yyyy')}
                         </div>
-                      )}
-                      {trip.conductor_name && (
-                        <div className="flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          <span>{trip.conductor_name}</span>
-                        </div>
-                      )}
-                      {trip.bus_no && (
-                        <div className="flex items-center gap-1">
-                          <Bus className="w-3 h-3" />
-                          <span>{trip.bus_no}</span>
-                        </div>
-                      )}
-                      {!trip.driver_name && !trip.conductor_name && !trip.bus_no && (
-                        <span className="text-muted-foreground">Not assigned</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{getTripStatusBadge(trip)}</TableCell>
-                  <TableCell>{getPaymentStatusBadge(trip)}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>Total: LKR {trip.total_amount.toLocaleString()}</div>
-                      <div className="text-muted-foreground">
-                        Paid: LKR {(trip.invoices?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0).toLocaleString()}
                       </div>
-                      {trip.balance_due > 0 && (
-                        <div className="text-red-600">
-                          Balance: LKR {trip.balance_due.toLocaleString()}
+                    </TableCell>
+
+                    {/* Customer Details */}
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="font-medium text-sm">{trip.quotation.customer_name}</div>
+                        {trip.quotation.company_name && (
+                          <div className="text-xs text-muted-foreground flex items-center space-x-1">
+                            <Building className="w-3 h-3" />
+                            <span>{trip.quotation.company_name}</span>
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground flex items-center space-x-1">
+                          <Phone className="w-3 h-3" />
+                          <span>{trip.quotation.customer_phone}</span>
                         </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {/* Status Management Dropdown */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="text-xs">
-                            <Settings className="w-3 h-3 mr-1" />
-                            Manage
-                            <ChevronDown className="w-3 h-3 ml-1" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedTrip(trip);
-                              setStatusModalOpen(true);
-                            }}
-                          >
-                            <Settings className="w-3 h-3 mr-2" />
-                            Change Status
-                          </DropdownMenuItem>
-                          
-                          {/* Payment Actions */}
-                          {trip.status !== 'completed' && trip.balance_due > 0 && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedTrip(trip);
-                                setPaymentModalOpen(true);
-                              }}
-                            >
-                              <Upload className="w-3 h-3 mr-2" />
-                              Confirm Payment
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      
-                      {/* Invoice Actions */}
-                      {trip.invoices.length > 0 && (
+                      </div>
+                    </TableCell>
+
+                    {/* Trip Information */}
+                    <TableCell className="max-w-xs">
+                      <div className="space-y-2">
+                        <div className="flex items-start space-x-2 text-xs">
+                          <MapPin className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                          <div className="truncate">{trip.quotation.pickup_location}</div>
+                        </div>
+                        <div className="flex items-start space-x-2 text-xs">
+                          <MapPin className="w-3 h-3 text-red-500 mt-0.5 flex-shrink-0" />
+                          <div className="truncate">{trip.quotation.drop_location}</div>
+                        </div>
+                        <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                          <div className="flex items-center space-x-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{format(new Date(trip.quotation.pickup_datetime), 'MMM dd')}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Users className="w-3 h-3" />
+                            <span>{trip.quotation.number_of_passengers}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Bus className="w-3 h-3" />
+                            <span>{trip.quotation.number_of_buses}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    {/* Vehicle Assignment */}
+                    <TableCell>
+                      <div className="space-y-1 text-xs">
+                        {trip.driver_name && (
+                          <div className="flex items-center space-x-1">
+                            <UserPlus className="w-3 h-3 text-blue-500" />
+                            <span>{trip.driver_name}</span>
+                          </div>
+                        )}
+                        {trip.conductor_name && (
+                          <div className="flex items-center space-x-1">
+                            <Users className="w-3 h-3 text-green-500" />
+                            <span>{trip.conductor_name}</span>
+                          </div>
+                        )}
+                        {trip.bus_no && (
+                          <div className="flex items-center space-x-1">
+                            <Bus className="w-3 h-3 text-orange-500" />
+                            <span>{trip.bus_no}</span>
+                          </div>
+                        )}
+                        {!trip.driver_name && !trip.conductor_name && !trip.bus_no && (
+                          <Badge variant="outline" className="text-xs">Not Assigned</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell>{getTripStatusBadge(trip)}</TableCell>
+
+                    {/* Payment Status */}
+                    <TableCell>{getPaymentStatusBadge(trip)}</TableCell>
+
+                    {/* Financial Information */}
+                    <TableCell>
+                      <div className="space-y-1 text-xs">
+                        <div className="font-medium">LKR {trip.total_amount.toLocaleString()}</div>
+                        <div className="text-green-600">
+                          Paid: LKR {(trip.invoices?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0).toLocaleString()}
+                        </div>
+                        {trip.balance_due > 0 && (
+                          <div className="text-red-600">
+                            Due: LKR {trip.balance_due.toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell>
+                      <div className="flex items-center justify-center space-x-1">
+                        {/* View Details */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedTrip(trip);
+                            setDetailsModalOpen(true);
+                          }}
+                          className="text-xs"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </Button>
+
+                        {/* Quick Actions Dropdown */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm" className="text-xs">
-                              <Eye className="w-3 h-3 mr-1" />
-                              Invoices
+                              <MoreHorizontal className="w-3 h-3" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            {trip.invoices.map((invoice) => (
-                              <DropdownMenuItem
-                                key={invoice.id}
-                                onClick={() => viewInvoice(trip, invoice.invoice_type as 'advance' | 'final')}
-                              >
-                                <Receipt className="w-3 h-3 mr-2" />
-                                View {invoice.invoice_type} Invoice
-                              </DropdownMenuItem>
-                            ))}
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedTrip(trip);
+                                setStatusModalOpen(true);
+                              }}
+                            >
+                              <Settings className="w-3 h-3 mr-2" />
+                              Change Status
+                            </DropdownMenuItem>
+                            
+                            {trip.status !== 'completed' && trip.balance_due > 0 && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setSelectedTrip(trip);
+                                    setPaymentModalOpen(true);
+                                  }}
+                                >
+                                  <DollarSign className="w-3 h-3 mr-2" />
+                                  Confirm Payment
+                                </DropdownMenuItem>
+                              </>
+                            )}
+
+                            {trip.invoices.length > 0 && (
+                              <>
+                                <DropdownMenuSeparator />
+                                {trip.invoices.map((invoice) => (
+                                  <DropdownMenuItem
+                                    key={invoice.id}
+                                    onClick={() => viewInvoice(trip, invoice.invoice_type as 'advance' | 'final')}
+                                  >
+                                    <Receipt className="w-3 h-3 mr-2" />
+                                    View {invoice.invoice_type} Invoice
+                                  </DropdownMenuItem>
+                                ))}
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
 
-          {trips.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No confirmed trips found
-            </div>
-          )}
+            {filteredTrips.length === 0 && (
+              <div className="text-center py-12">
+                <div className="space-y-3">
+                  <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                    <Bus className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium">No trips found</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {searchQuery || statusFilter !== 'all' || paymentFilter !== 'all' || dateFilter !== 'all'
+                        ? 'Try adjusting your filters to see more results.'
+                        : 'No confirmed trips available at the moment.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -687,7 +935,7 @@ export function ConfirmedTripsTable() {
       )}
 
       {/* Trip Status Management Modal */}
-      <TripStatusManagementModal
+      <EnhancedTripStatusManagementModal
         open={statusModalOpen}
         onOpenChange={setStatusModalOpen}
         trip={selectedTrip}
@@ -695,7 +943,20 @@ export function ConfirmedTripsTable() {
         loading={statusLoading}
       />
 
-      {/* Invoice Viewer Modal */}
+      {/* Trip Details Modal */}
+      {selectedTrip && (
+        <TripDetailsModal
+          open={detailsModalOpen}
+          onOpenChange={setDetailsModalOpen}
+          trip={selectedTrip}
+          onViewInvoice={(type) => {
+            setDetailsModalOpen(false);
+            viewInvoice(selectedTrip, type);
+          }}
+          onDownloadInvoice={(type) => downloadInvoice(selectedTrip, type)}
+          onViewPaymentProof={(proofUrl) => window.open(proofUrl, '_blank')}
+        />
+      )}
       {currentInvoiceData && (
         <InvoiceViewer
           isOpen={invoiceViewerOpen}
