@@ -52,6 +52,7 @@ interface Quotation {
   hire_charge?: number;
   extra_charges?: number;
   commission_amount?: number;
+  commission_pass_through_amount?: number;
   intermediate_stops?: string;
   route_description?: string;
   status: string;
@@ -65,21 +66,14 @@ interface Quotation {
   discount_amount_lkr?: number;
 }
 
-// Helper function to calculate total revenue (Hire + Fuel + Extras + Commission - Discounts)
+// Helper function to calculate total revenue (matches Final Total from QuotationPreview)
 const calculateTotalRevenue = (quotation: Quotation): number => {
-  const baseRevenue = (quotation.hire_charge || 0) + 
-                     (quotation.fuel_cost_fuel_only || 0) + 
-                     (quotation.extra_charges || 0) + 
-                     (quotation.commission_amount || 0);
+  const hireCharges = quotation.gross_revenue || 0;
+  const serviceCharges = quotation.fuel_cost_fuel_only || 0;
+  const commission = quotation.commission_pass_through_amount || 0;
+  const discount = quotation.discount_amount_lkr || 0;
   
-  // Apply discounts
-  if (quotation.discount_type === 'percentage' && quotation.discount_percentage && quotation.discount_percentage > 0) {
-    return baseRevenue - (baseRevenue * (quotation.discount_percentage / 100));
-  } else if (quotation.discount_type === 'amount' && quotation.discount_amount_lkr && quotation.discount_amount_lkr > 0) {
-    return Math.max(0, baseRevenue - quotation.discount_amount_lkr);
-  }
-  
-  return baseRevenue;
+  return hireCharges + serviceCharges + commission - discount;
 };
 
 // Helper function to get revenue breakdown components
