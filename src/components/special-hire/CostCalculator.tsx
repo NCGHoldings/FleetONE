@@ -18,7 +18,7 @@ export function CostCalculator() {
     numberOfBuses: 1,
     driverCharge: 1500,
     // Commission handling (separated): total commission to pay and portion passed to customer
-    commissionPct: 5,
+    commissionPct: 0,
     commissionPassThroughPct: 0,
     // Discount handling (requires admin approval if > 0)
     discountType: 'percentage' as 'percentage' | 'amount',
@@ -480,7 +480,7 @@ export function CostCalculator() {
             </div>
 
             <div className="space-y-2">
-              <Label>Commission to pay (%)</Label>
+              <Label>Commission (%) - Optional</Label>
               <Input
                 type="number"
                 min="0"
@@ -488,6 +488,9 @@ export function CostCalculator() {
                 value={formData.commissionPct}
                 onChange={(e) => setFormData({...formData, commissionPct: parseFloat(e.target.value) || 0})}
               />
+              <p className="text-xs text-muted-foreground">
+                Leave at 0 if no commission applies. Enter percentage if commission is required.
+              </p>
             </div>
 
             <div className="space-y-2">
