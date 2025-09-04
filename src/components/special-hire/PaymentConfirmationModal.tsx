@@ -18,6 +18,9 @@ interface PaymentConfirmationModalProps {
     gross_revenue: number;
     advance_paid?: number;
     balance_due?: number;
+    fuel_cost_fuel_only?: number;
+    commission_pass_through_amount?: number;
+    discount_amount_lkr?: number;
   };
   loading?: boolean;
 }
@@ -100,7 +103,12 @@ export const PaymentConfirmationModal = ({
                 </div>
                 <div>
                   <p className="font-medium">Total Amount:</p>
-                  <p className="text-muted-foreground">LKR {quotationData.gross_revenue.toLocaleString()}</p>
+                  <p className="text-muted-foreground">LKR {(
+                    quotationData.gross_revenue + 
+                    (quotationData.fuel_cost_fuel_only || 0) + 
+                    (quotationData.commission_pass_through_amount || 0) - 
+                    (quotationData.discount_amount_lkr || 0)
+                  ).toLocaleString()}</p>
                 </div>
                 {isAdvanceAlreadyPaid && (
                   <>
