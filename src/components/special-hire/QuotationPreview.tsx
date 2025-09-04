@@ -26,6 +26,9 @@ interface QuotationData {
   hire_charge?: number;
   extra_charges?: number;
   commission_amount?: number;
+  commission_pass_through_amount?: number;
+  discount_amount_lkr?: number;
+  discount_type?: string;
   intermediate_stops?: string;
   route_description?: string;
   valid_until?: string;
@@ -46,6 +49,16 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
       date: format(date, 'yyyy-MM-dd'),
       time: format(date, 'HH:mm a')
     };
+  };
+
+  // Calculate the final customer total (what customer pays)
+  const calculateFinalCustomerTotal = (quotation: QuotationData): number => {
+    const hireCharges = quotation.gross_revenue || 0;
+    const serviceCharges = quotation.fuel_cost_fuel_only || 0;
+    const commission = quotation.commission_pass_through_amount || 0;
+    const discount = quotation.discount_amount_lkr || 0;
+    
+    return hireCharges + serviceCharges + commission - discount;
   };
 
   const pickup = formatDateTime(quotation.pickup_datetime);
@@ -211,9 +224,15 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-2">{quotation.route_description || routeDescription}</td>
               <td className="border border-gray-300 p-2">{totalDistance.toFixed(2)} Km</td>
               <td className="border border-gray-300 p-2">
-                <div>Hire Charges: LKR {quotation.gross_revenue.toLocaleString()}</div>
-                <div>Service Charge: LKR {quotation.fuel_cost_fuel_only?.toLocaleString() || '0'}</div>
-                <div className="font-semibold border-t pt-1 mt-1">Total: LKR {((quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0)).toLocaleString()}</div>
+                <div>Hire Charges: LKR {quotation.gross_revenue?.toLocaleString() || '0'}</div>
+                <div>Service Charge (Fuel): LKR {quotation.fuel_cost_fuel_only?.toLocaleString() || '0'}</div>
+                {(quotation.commission_pass_through_amount || 0) > 0 && (
+                  <div>Commission: LKR {quotation.commission_pass_through_amount?.toLocaleString()}</div>
+                )}
+                {(quotation.discount_amount_lkr || 0) > 0 && (
+                  <div className="text-red-600">Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}</div>
+                )}
+                <div className="font-bold border-t pt-1 mt-1 text-lg">Final Total: LKR {calculateFinalCustomerTotal(quotation).toLocaleString()}</div>
               </td>
             </tr>
           </tbody>
