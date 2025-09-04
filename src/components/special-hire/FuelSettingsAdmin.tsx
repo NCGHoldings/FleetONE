@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Save, Settings } from 'lucide-react';
+import { MapPin, Save, Settings, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 interface FuelSetting {
   id: string;
@@ -18,10 +19,23 @@ interface FuelSetting {
   is_default: boolean;
 }
 
+interface NewLocationData {
+  parking_location_name: string;
+  parking_lat: number;
+  parking_lng: number;
+}
+
 export function FuelSettingsAdmin() {
-  const [settings, setSettings] = useState<FuelSetting | null>(null);
+  const [settings, setSettings] = useState<FuelSetting[]>([]);
+  const [defaultSettings, setDefaultSettings] = useState<FuelSetting | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newLocation, setNewLocation] = useState<NewLocationData>({
+    parking_location_name: '',
+    parking_lat: 6.9271,
+    parking_lng: 79.8612
+  });
   const { toast } = useToast();
 
   const loadSettings = async () => {
@@ -29,13 +43,14 @@ export function FuelSettingsAdmin() {
       const { data, error } = await supabase
         .from('fuel_settings')
         .select('*')
-        .eq('is_default', true)
-        .single();
+        .order('parking_location_name');
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
       
-      if (data) {
+      if (data && data.length > 0) {
         setSettings(data);
+        const defaultSetting = data.find(s => s.is_default);
+        setDefaultSettings(defaultSetting || data[0]);
       } else {
         // Create default settings if none exist
         const defaultSettings = {
@@ -53,7 +68,8 @@ export function FuelSettingsAdmin() {
           .single();
 
         if (insertError) throw insertError;
-        setSettings(newSettings);
+        setSettings([newSettings]);
+        setDefaultSettings(newSettings);
       }
     } catch (error: any) {
       toast({
@@ -70,26 +86,23 @@ export function FuelSettingsAdmin() {
     loadSettings();
   }, []);
 
-  const handleSave = async () => {
-    if (!settings) return;
+  const handleSaveFuelPrice = async () => {
+    if (!defaultSettings) return;
 
     setSaving(true);
     try {
       const { error } = await supabase
         .from('fuel_settings')
         .update({
-          diesel_price_lkr_per_l: settings.diesel_price_lkr_per_l,
-          parking_location_name: settings.parking_location_name,
-          parking_lat: settings.parking_lat,
-          parking_lng: settings.parking_lng
+          diesel_price_lkr_per_l: defaultSettings.diesel_price_lkr_per_l
         })
-        .eq('id', settings.id);
+        .eq('id', defaultSettings.id);
 
       if (error) throw error;
       
       toast({
         title: "Success",
-        description: "Fuel settings updated successfully"
+        description: "Fuel price updated successfully"
       });
     } catch (error: any) {
       toast({
@@ -102,9 +115,130 @@ export function FuelSettingsAdmin() {
     }
   };
 
-  const updateSetting = (key: keyof FuelSetting, value: any) => {
-    if (!settings) return;
-    setSettings({ ...settings, [key]: value });
+  const handleAddLocation = async () => {
+    if (!newLocation.parking_location_name.trim()) {
+      toast({
+        title: "Error",
+        description: "Location name is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('fuel_settings')
+        .insert([{
+          ...newLocation,
+          diesel_price_lkr_per_l: defaultSettings?.diesel_price_lkr_per_l || 350.0,
+          is_default: false
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setSettings([...settings, data]);
+      setNewLocation({
+        parking_location_name: '',
+        parking_lat: 6.9271,
+        parking_lng: 79.8612
+      });
+      setShowAddForm(false);
+      
+      toast({
+        title: "Success",
+        description: "Parking location added successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSetDefault = async (locationId: string) => {
+    setSaving(true);
+    try {
+      // Remove default from all locations
+      await supabase
+        .from('fuel_settings')
+        .update({ is_default: false })
+        .neq('id', 'none');
+
+      // Set new default
+      const { error } = await supabase
+        .from('fuel_settings')
+        .update({ is_default: true })
+        .eq('id', locationId);
+
+      if (error) throw error;
+      
+      await loadSettings();
+      
+      toast({
+        title: "Success",
+        description: "Default parking location updated"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteLocation = async (locationId: string) => {
+    if (settings.length <= 1) {
+      toast({
+        title: "Error",
+        description: "Cannot delete the last parking location",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('fuel_settings')
+        .delete()
+        .eq('id', locationId);
+
+      if (error) throw error;
+      
+      await loadSettings();
+      
+      toast({
+        title: "Success",
+        description: "Parking location deleted successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateDefaultSetting = (key: keyof FuelSetting, value: any) => {
+    if (!defaultSettings) return;
+    setDefaultSettings({ ...defaultSettings, [key]: value });
+  };
+
+  const updateNewLocation = (key: keyof NewLocationData, value: any) => {
+    setNewLocation({ ...newLocation, [key]: value });
   };
 
   if (loading) {
@@ -117,7 +251,7 @@ export function FuelSettingsAdmin() {
     );
   }
 
-  if (!settings) {
+  if (!defaultSettings) {
     return (
       <Card>
         <CardContent className="p-6">
@@ -147,8 +281,8 @@ export function FuelSettingsAdmin() {
               type="number"
               step="0.01"
               min="0"
-              value={settings.diesel_price_lkr_per_l}
-              onChange={(e) => updateSetting('diesel_price_lkr_per_l', parseFloat(e.target.value) || 0)}
+              value={defaultSettings.diesel_price_lkr_per_l}
+              onChange={(e) => updateDefaultSetting('diesel_price_lkr_per_l', parseFloat(e.target.value) || 0)}
               className="w-full max-w-xs"
             />
             <p className="text-sm text-muted-foreground">
@@ -156,64 +290,124 @@ export function FuelSettingsAdmin() {
             </p>
           </div>
 
-          <Separator />
-
-          {/* Parking Location */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              <h3 className="text-lg font-medium">Default Parking Location</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="location-name">Location Name</Label>
-                <Input
-                  id="location-name"
-                  value={settings.parking_location_name}
-                  onChange={(e) => updateSetting('parking_location_name', e.target.value)}
-                  placeholder="e.g., Main Depot"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="latitude">Latitude</Label>
-                <Input
-                  id="latitude"
-                  type="number"
-                  step="0.000001"
-                  value={settings.parking_lat}
-                  onChange={(e) => updateSetting('parking_lat', parseFloat(e.target.value) || 0)}
-                  placeholder="6.9271"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="longitude">Longitude</Label>
-                <Input
-                  id="longitude"
-                  type="number"
-                  step="0.000001"
-                  value={settings.parking_lng}
-                  onChange={(e) => updateSetting('parking_lng', parseFloat(e.target.value) || 0)}
-                  placeholder="79.8612"
-                />
-              </div>
-            </div>
-
-            <p className="text-sm text-muted-foreground">
-              This location is used as the starting and ending point for calculating parking-to-pickup and drop-to-parking distances
-            </p>
-          </div>
-
-          <Separator />
-
-          {/* Actions */}
-          <div className="flex justify-end space-x-2">
-            <Button onClick={handleSave} disabled={saving}>
+          <div className="flex justify-end">
+            <Button onClick={handleSaveFuelPrice} disabled={saving} size="sm">
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : 'Save Settings'}
+              {saving ? 'Saving...' : 'Update Fuel Price'}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Parking Locations */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              Parking Locations
+            </CardTitle>
+            <Button onClick={() => setShowAddForm(!showAddForm)} variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Location
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add New Location Form */}
+          {showAddForm && (
+            <div className="border rounded-lg p-4 space-y-4 bg-muted/50">
+              <h4 className="font-medium">Add New Parking Location</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-location-name">Location Name</Label>
+                  <Input
+                    id="new-location-name"
+                    value={newLocation.parking_location_name}
+                    onChange={(e) => updateNewLocation('parking_location_name', e.target.value)}
+                    placeholder="e.g., Secondary Depot"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="new-latitude">Latitude</Label>
+                  <Input
+                    id="new-latitude"
+                    type="number"
+                    step="0.000001"
+                    value={newLocation.parking_lat}
+                    onChange={(e) => updateNewLocation('parking_lat', parseFloat(e.target.value) || 0)}
+                    placeholder="6.9271"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="new-longitude">Longitude</Label>
+                  <Input
+                    id="new-longitude"
+                    type="number"
+                    step="0.000001"
+                    value={newLocation.parking_lng}
+                    onChange={(e) => updateNewLocation('parking_lng', parseFloat(e.target.value) || 0)}
+                    placeholder="79.8612"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowAddForm(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddLocation} disabled={saving}>
+                  {saving ? 'Adding...' : 'Add Location'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Existing Locations List */}
+          <div className="space-y-3">
+            {settings.map((location) => (
+              <div
+                key={location.id}
+                className="flex items-center justify-between p-4 border rounded-lg bg-card"
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium">{location.parking_location_name}</h4>
+                    {location.is_default && (
+                      <Badge variant="default">Default</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Lat: {location.parking_lat}, Lng: {location.parking_lng}
+                  </p>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  {!location.is_default && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSetDefault(location.id)}
+                      disabled={saving}
+                    >
+                      Set as Default
+                    </Button>
+                  )}
+                  {settings.length > 1 && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteLocation(location.id)}
+                      disabled={saving}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

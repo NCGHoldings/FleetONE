@@ -39,6 +39,7 @@ const formSchema = z.object({
   numberOfPassengers: z.number().min(1, 'Number of passengers is required'),
   pickupDateTime: z.date(),
   dropDateTime: z.date(),
+  parkingLocationId: z.string().min(1, 'Parking location is required'),
   
   // Commission Settings (company expenses)
   commissionPct: z.number().min(0, 'Commission percentage must be positive').max(100, 'Commission cannot exceed 100%'),
@@ -60,6 +61,14 @@ interface BusType {
   features: string;
 }
 
+interface ParkingLocation {
+  id: string;
+  parking_location_name: string;
+  parking_lat: number;
+  parking_lng: number;
+  is_default: boolean;
+}
+
 interface IntermediateStop {
   id: string;
   location: string;
@@ -76,6 +85,7 @@ interface Props {
 
 export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = false }: Props) {
   const [busTypes, setBusTypes] = useState<BusType[]>([]);
+  const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>([]);
   const [intermediateStops, setIntermediateStops] = useState<IntermediateStop[]>([]);
   const [costData, setCostData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -97,6 +107,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       numberOfPassengers: initialData.number_of_passengers || 1,
       pickupDateTime: initialData.pickup_datetime ? new Date(initialData.pickup_datetime) : new Date(),
       dropDateTime: initialData.drop_datetime ? new Date(initialData.drop_datetime) : new Date(),
+      parkingLocationId: initialData.parking_location_id || '',
       commissionPct: initialData.commission_pct || 5,
       commissionPassThroughPct: initialData.commission_pass_through_pct || 0,
       discountPct: initialData.discount_percentage || 0,
@@ -106,6 +117,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       numberOfPassengers: 1,
       pickupDateTime: new Date(),
       dropDateTime: new Date(),
+      parkingLocationId: '',
       commissionPct: 5,
       commissionPassThroughPct: 0,
       discountPct: 0,
@@ -114,6 +126,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
   useEffect(() => {
     loadBusTypes();
+    loadParkingLocations();
     
     // If editing, set intermediate stops from initial data
     if (isEditing && initialData?.intermediate_stops) {
@@ -148,6 +161,32 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     }
   };
 
+  const loadParkingLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('fuel_settings')
+        .select('*')
+        .order('parking_location_name');
+
+      if (error) throw error;
+      setParkingLocations(data || []);
+      
+      // Set default parking location if not editing
+      if (!isEditing && data && data.length > 0) {
+        const defaultLocation = data.find(loc => loc.is_default) || data[0];
+        if (defaultLocation) {
+          form.setValue('parkingLocationId', defaultLocation.id);
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to load parking locations",
+        variant: "destructive"
+      });
+    }
+  };
+
   const addIntermediateStop = () => {
     const newStop: IntermediateStop = {
       id: Date.now().toString(),
@@ -168,15 +207,15 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
   const calculateCosts = async (data: FormData) => {
     try {
-      // Get fuel settings for parking location
+      // Get selected parking location
       const { data: fuelSettings } = await supabase
         .from('fuel_settings')
         .select('*')
-        .eq('is_default', true)
+        .eq('id', data.parkingLocationId)
         .single();
 
       if (!fuelSettings) {
-        throw new Error('Fuel settings not configured');
+        throw new Error('Selected parking location not found');
       }
 
       console.log('Calculating distance with real Mapbox API:', {
@@ -438,6 +477,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         number_of_passengers: data.numberOfPassengers,
         pickup_datetime: data.pickupDateTime.toISOString(),
         drop_datetime: data.dropDateTime.toISOString(),
+        parking_location_id: data.parkingLocationId,
         pickup_lat: distanceData?.pickupCoords?.[1] || null,
         pickup_lng: distanceData?.pickupCoords?.[0] || null,
         drop_lat: distanceData?.dropCoords?.[1] || null,
@@ -596,7 +636,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                 <CardTitle className="text-lg">Trip Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <FormField
                     control={form.control}
                     name="busTypeId"
@@ -637,6 +677,35 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                           <SelectContent>
                             <SelectItem value="Outside">Outside</SelectItem>
                             <SelectItem value="Lyceum">Lyceum</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="parkingLocationId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parking Location *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select parking location" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {parkingLocations.map((location) => (
+                              <SelectItem key={location.id} value={location.id}>
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-4 w-4" />
+                                  {location.parking_location_name}
+                                  {location.is_default && <Badge variant="secondary">Default</Badge>}
+                                </div>
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />

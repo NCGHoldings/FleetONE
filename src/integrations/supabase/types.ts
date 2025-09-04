@@ -1711,6 +1711,7 @@ export type Database = {
           number_of_buses: number
           number_of_passengers: number
           other_expenses: Json | null
+          parking_location_id: string | null
           percentage_adjustment: number | null
           pickup_datetime: string
           pickup_lat: number | null
@@ -1765,6 +1766,7 @@ export type Database = {
           number_of_buses?: number
           number_of_passengers: number
           other_expenses?: Json | null
+          parking_location_id?: string | null
           percentage_adjustment?: number | null
           pickup_datetime: string
           pickup_lat?: number | null
@@ -1819,6 +1821,7 @@ export type Database = {
           number_of_buses?: number
           number_of_passengers?: number
           other_expenses?: Json | null
+          parking_location_id?: string | null
           percentage_adjustment?: number | null
           pickup_datetime?: string
           pickup_lat?: number | null
@@ -1838,6 +1841,13 @@ export type Database = {
             columns: ["bus_type_id"]
             isOneToOne: false
             referencedRelation: "bus_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_quotations_parking_location_id_fkey"
+            columns: ["parking_location_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_settings"
             referencedColumns: ["id"]
           },
         ]
