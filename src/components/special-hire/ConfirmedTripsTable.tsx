@@ -61,28 +61,14 @@ interface ConfirmedTrip {
   }>;
 }
 
-// Helper function to calculate total revenue (Hire + Fuel + Extras + Commission - Discounts)
+// Helper function to calculate total revenue to match quotation final total
 const calculateTotalRevenue = (quotation: ConfirmedTrip['quotation']): number => {
-  // Since these fields might not be available in the interface, we'll use gross_revenue as fallback
-  // but check if individual components are available
-  const hireCharge = (quotation as any).hire_charge || 0;
-  const fuelCost = (quotation as any).fuel_cost_fuel_only || 0;
-  const extraCharges = (quotation as any).extra_charges || 0;
-  const commission = (quotation as any).commission_amount || 0;
+  const hireCharges = quotation.gross_revenue || 0;
+  const serviceCharges = (quotation as any).fuel_cost_fuel_only || 0;
+  const commission = (quotation as any).commission_pass_through_amount || 0;
+  const discount = quotation.discount_amount_lkr || 0;
   
-  const baseRevenue = hireCharge + fuelCost + extraCharges + commission;
-  
-  // If no components are available, fall back to gross_revenue
-  const finalBaseRevenue = baseRevenue > 0 ? baseRevenue : quotation.gross_revenue;
-  
-  // Apply discounts
-  if (quotation.discount_type === 'percentage' && quotation.discount_percentage && quotation.discount_percentage > 0) {
-    return finalBaseRevenue - (finalBaseRevenue * (quotation.discount_percentage / 100));
-  } else if (quotation.discount_type === 'amount' && quotation.discount_amount_lkr && quotation.discount_amount_lkr > 0) {
-    return Math.max(0, finalBaseRevenue - quotation.discount_amount_lkr);
-  }
-  
-  return finalBaseRevenue;
+  return hireCharges + serviceCharges + commission - discount;
 };
 
 export function ConfirmedTripsTable() {
