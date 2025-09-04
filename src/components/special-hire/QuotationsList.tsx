@@ -65,17 +65,34 @@ interface Quotation {
   discount_amount_lkr?: number;
 }
 
-// Helper function to calculate final customer amount after discounts
-const calculateFinalAmount = (quotation: Quotation): number => {
-  const { gross_revenue, discount_type, discount_percentage, discount_amount_lkr } = quotation;
+// Helper function to calculate total revenue (Hire + Fuel + Extras + Commission - Discounts)
+const calculateTotalRevenue = (quotation: Quotation): number => {
+  const baseRevenue = (quotation.hire_charge || 0) + 
+                     (quotation.fuel_cost_fuel_only || 0) + 
+                     (quotation.extra_charges || 0) + 
+                     (quotation.commission_amount || 0);
   
-  if (discount_type === 'percentage' && discount_percentage && discount_percentage > 0) {
-    return gross_revenue - (gross_revenue * (discount_percentage / 100));
-  } else if (discount_type === 'amount' && discount_amount_lkr && discount_amount_lkr > 0) {
-    return Math.max(0, gross_revenue - discount_amount_lkr);
+  // Apply discounts
+  if (quotation.discount_type === 'percentage' && quotation.discount_percentage && quotation.discount_percentage > 0) {
+    return baseRevenue - (baseRevenue * (quotation.discount_percentage / 100));
+  } else if (quotation.discount_type === 'amount' && quotation.discount_amount_lkr && quotation.discount_amount_lkr > 0) {
+    return Math.max(0, baseRevenue - quotation.discount_amount_lkr);
   }
   
-  return gross_revenue;
+  return baseRevenue;
+};
+
+// Helper function to get revenue breakdown components
+const getRevenueBreakdown = (quotation: Quotation) => {
+  return {
+    hire: quotation.hire_charge || 0,
+    fuel: quotation.fuel_cost_fuel_only || 0,
+    extras: quotation.extra_charges || 0,
+    commission: quotation.commission_amount || 0,
+    discountAmount: quotation.discount_type === 'percentage' && quotation.discount_percentage 
+      ? ((quotation.hire_charge || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.extra_charges || 0) + (quotation.commission_amount || 0)) * (quotation.discount_percentage / 100)
+      : quotation.discount_amount_lkr || 0
+  };
 };
 
 interface Props {
@@ -441,19 +458,32 @@ export function QuotationsList({ onRefresh }: Props) {
       header: "Revenue",
       cell: ({ row }) => {
         const quotation = row.original;
-        const finalAmount = calculateFinalAmount(quotation);
-        const hasDiscount = finalAmount < quotation.gross_revenue;
+        const totalRevenue = calculateTotalRevenue(quotation);
+        const breakdown = getRevenueBreakdown(quotation);
+        const hasDiscount = breakdown.discountAmount > 0;
+        const hasMultipleComponents = [breakdown.hire, breakdown.fuel, breakdown.extras, breakdown.commission].filter(x => x > 0).length > 1;
         
         return (
           <div className="text-right">
-            <div className="font-medium">LKR {finalAmount.toLocaleString()}</div>
-            {hasDiscount && (
-              <div className="text-xs text-muted-foreground">
-                Original: LKR {quotation.gross_revenue.toLocaleString()}
-                {quotation.discount_type === 'percentage' 
-                  ? ` (-${quotation.discount_percentage}%)`
-                  : ` (-LKR ${quotation.discount_amount_lkr?.toLocaleString()})`
-                }
+            <div className="font-medium">LKR {totalRevenue.toLocaleString()}</div>
+            {(hasDiscount || hasMultipleComponents) && (
+              <div className="text-xs text-muted-foreground space-y-1">
+                {hasMultipleComponents && (
+                  <div>
+                    {breakdown.hire > 0 && `Hire: ${breakdown.hire.toLocaleString()}`}
+                    {breakdown.fuel > 0 && ` + Fuel: ${breakdown.fuel.toLocaleString()}`}
+                    {breakdown.extras > 0 && ` + Extra: ${breakdown.extras.toLocaleString()}`}
+                    {breakdown.commission > 0 && ` + Comm: ${breakdown.commission.toLocaleString()}`}
+                  </div>
+                )}
+                {hasDiscount && (
+                  <div className="text-red-600">
+                    {quotation.discount_type === 'percentage' 
+                      ? `Discount: -${quotation.discount_percentage}% (LKR ${breakdown.discountAmount.toLocaleString()})`
+                      : `Discount: -LKR ${breakdown.discountAmount.toLocaleString()}`
+                    }
+                  </div>
+                )}
               </div>
             )}
             <div className="text-xs text-green-600">

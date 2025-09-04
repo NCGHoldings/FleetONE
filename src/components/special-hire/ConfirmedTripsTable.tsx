@@ -61,17 +61,28 @@ interface ConfirmedTrip {
   }>;
 }
 
-// Helper function to calculate final customer amount after discounts
-const calculateFinalAmount = (quotation: ConfirmedTrip['quotation']): number => {
-  const { gross_revenue, discount_type, discount_percentage, discount_amount_lkr } = quotation;
+// Helper function to calculate total revenue (Hire + Fuel + Extras + Commission - Discounts)
+const calculateTotalRevenue = (quotation: ConfirmedTrip['quotation']): number => {
+  // Since these fields might not be available in the interface, we'll use gross_revenue as fallback
+  // but check if individual components are available
+  const hireCharge = (quotation as any).hire_charge || 0;
+  const fuelCost = (quotation as any).fuel_cost_fuel_only || 0;
+  const extraCharges = (quotation as any).extra_charges || 0;
+  const commission = (quotation as any).commission_amount || 0;
   
-  if (discount_type === 'percentage' && discount_percentage && discount_percentage > 0) {
-    return gross_revenue - (gross_revenue * (discount_percentage / 100));
-  } else if (discount_type === 'amount' && discount_amount_lkr && discount_amount_lkr > 0) {
-    return Math.max(0, gross_revenue - discount_amount_lkr);
+  const baseRevenue = hireCharge + fuelCost + extraCharges + commission;
+  
+  // If no components are available, fall back to gross_revenue
+  const finalBaseRevenue = baseRevenue > 0 ? baseRevenue : quotation.gross_revenue;
+  
+  // Apply discounts
+  if (quotation.discount_type === 'percentage' && quotation.discount_percentage && quotation.discount_percentage > 0) {
+    return finalBaseRevenue - (finalBaseRevenue * (quotation.discount_percentage / 100));
+  } else if (quotation.discount_type === 'amount' && quotation.discount_amount_lkr && quotation.discount_amount_lkr > 0) {
+    return Math.max(0, finalBaseRevenue - quotation.discount_amount_lkr);
   }
   
-  return gross_revenue;
+  return finalBaseRevenue;
 };
 
 export function ConfirmedTripsTable() {
@@ -137,7 +148,7 @@ export function ConfirmedTripsTable() {
           });
         }
 
-        const finalAmount = calculateFinalAmount(q);
+        const finalAmount = calculateTotalRevenue(q);
         
         return {
           id: q.id,
@@ -172,7 +183,7 @@ export function ConfirmedTripsTable() {
     setLoading(true);
     try {
       // Determine invoice type based on payment type or if it's a full payment
-      const finalTotalAmount = calculateFinalAmount(selectedTrip.quotation);
+      const finalTotalAmount = calculateTotalRevenue(selectedTrip.quotation);
       const isFullPayment = paymentData.amount >= finalTotalAmount;
       const isFinalPayment = paymentData.paymentType === 'final' || paymentData.paymentType === 'full';
       const invoiceType: 'advance' | 'final' = isFinalPayment || isFullPayment ? 'final' : 'advance';
@@ -335,7 +346,7 @@ export function ConfirmedTripsTable() {
       busType: busTypeName,
       numberOfBuses: trip.quotation.number_of_buses,
       numberOfPassengers: trip.quotation.number_of_passengers,
-      totalAmount: calculateFinalAmount(trip.quotation),
+      totalAmount: calculateTotalRevenue(trip.quotation),
       advanceAmount: trip.advance_paid,
       paidAmount: invoice.amount,
       companyLogo,
