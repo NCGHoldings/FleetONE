@@ -51,14 +51,12 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     };
   };
 
-  // Calculate the final customer total (what customer pays)
+  // Calculate the final customer total (what customer pays) - use gross_revenue as the main revenue figure
   const calculateFinalCustomerTotal = (quotation: QuotationData): number => {
-    const hireCharges = quotation.gross_revenue || 0;
-    const serviceCharges = quotation.fuel_cost_fuel_only || 0;
-    const commission = quotation.commission_pass_through_amount || 0;
+    const grossRevenue = quotation.gross_revenue || 0;
     const discount = quotation.discount_amount_lkr || 0;
     
-    return hireCharges + serviceCharges + commission - discount;
+    return grossRevenue - discount;
   };
 
   const pickup = formatDateTime(quotation.pickup_datetime);
