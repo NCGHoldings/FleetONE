@@ -1014,194 +1014,169 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   />
 
                 {/* Commission and Discount Settings */}
-                <div className="space-y-6">
-                  <div className="text-lg font-semibold text-foreground border-b pb-2">
+                <div className="space-y-4">
+                  <div className="text-base font-semibold text-foreground">
                     Commission & Discount Settings
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Commission Section */}
-                    <Card className="p-4">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Commission Settings</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="commissionPct"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-sm font-semibold text-foreground">
-                                Total Commission Percentage (%)
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max="100"
-                                  placeholder="5.0"
-                                  className="h-11 text-base bg-background"
-                                  {...field}
-                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                              <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                                Total commission that the company will pay on this booking
-                              </div>
-                            </FormItem>
-                          )}
-                        />
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="commissionPct"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-foreground">
+                            Total Commission (%)
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              placeholder="5.0"
+                              className="h-10 text-base"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                          <div className="text-xs text-muted-foreground">
+                            Commission that company pays
+                          </div>
+                        </FormItem>
+                      )}
+                    />
 
-                        <FormField
-                          control={form.control}
-                          name="commissionPassThroughPct"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-sm font-semibold text-foreground">
-                                Pass to Customer (%)
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max={form.watch('commissionPct') || 100}
-                                  placeholder="0.0"
-                                  className="h-11 text-base bg-background"
-                                  {...field}
-                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                              <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                                Portion of commission that will be added to customer's bill (cannot exceed total commission %)
-                              </div>
-                              {form.watch('commissionPassThroughPct') > 0 && (
-                                <div className="text-xs text-green-600 font-medium">
-                                  Customer will pay additional {form.watch('commissionPassThroughPct')}% commission
-                                </div>
+                    <FormField
+                      control={form.control}
+                      name="commissionPassThroughPct"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-foreground">
+                            Pass to Customer (%)
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max={form.watch('commissionPct') || 100}
+                              placeholder="0.0"
+                              className="h-10 text-base"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                          <div className="text-xs text-muted-foreground">
+                            Commission added to customer bill (max: {form.watch('commissionPct') || 0}%)
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="discountType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-foreground">Discount Type</FormLabel>
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              form.setValue('discountPct', 0);
+                              form.setValue('discountAmount', 0);
+                            }} 
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-10 text-base">
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="percentage">Percentage (%)</SelectItem>
+                              <SelectItem value="amount">Fixed Amount (LKR)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {form.watch('discountType') === 'percentage' ? (
+                      <FormField
+                        control={form.control}
+                        name="discountPct"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-foreground">
+                              Discount Percentage (%)
+                              {field.value > 0 && (
+                                <Badge variant="outline" className="ml-2 text-xs text-orange-600 border-orange-300">
+                                  Admin Approval Required
+                                </Badge>
                               )}
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
-
-                    {/* Discount Section */}
-                    <Card className="p-4">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Discount Settings</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="discountType"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-sm font-semibold text-foreground">Discount Type</FormLabel>
-                              <Select 
-                                onValueChange={(value) => {
-                                  field.onChange(value);
-                                  form.setValue('discountPct', 0);
-                                  form.setValue('discountAmount', 0);
-                                }} 
-                                defaultValue={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger className="h-11 text-base bg-background">
-                                    <SelectValue placeholder="Select discount type" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="percentage">Percentage (%)</SelectItem>
-                                  <SelectItem value="amount">Fixed Amount (LKR)</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        {form.watch('discountType') === 'percentage' ? (
-                          <FormField
-                            control={form.control}
-                            name="discountPct"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-sm font-semibold text-foreground">
-                                  Discount Percentage (%)
-                                  {field.value > 0 && (
-                                    <Badge variant="outline" className="ml-2 text-xs border-orange-300 text-orange-700">
-                                      Admin Approval Required
-                                    </Badge>
-                                  )}
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    min="0"
-                                    max="100"
-                                    placeholder="0.0"
-                                    className="h-11 text-base bg-background"
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                                <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                                  Percentage discount that will be subtracted from the total bill
-                                </div>
-                                {field.value > 0 && (
-                                  <div className="text-xs text-orange-600 font-medium">
-                                    {field.value}% discount will be applied - Admin approval required
-                                  </div>
-                                )}
-                              </FormItem>
-                            )}
-                          />
-                        ) : (
-                          <FormField
-                            control={form.control}
-                            name="discountAmount"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-sm font-semibold text-foreground">
-                                  Discount Amount (LKR)
-                                  {field.value > 0 && (
-                                    <Badge variant="outline" className="ml-2 text-xs border-orange-300 text-orange-700">
-                                      Admin Approval Required
-                                    </Badge>
-                                  )}
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="0.00"
-                                    className="h-11 text-base bg-background"
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                                <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                                  Fixed amount discount that will be subtracted from the total bill
-                                </div>
-                                {field.value > 0 && (
-                                  <div className="text-xs text-orange-600 font-medium">
-                                    LKR {field.value.toLocaleString()} discount will be applied - Admin approval required
-                                  </div>
-                                )}
-                              </FormItem>
-                            )}
-                          />
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="100"
+                                placeholder="0.0"
+                                className="h-10 text-base"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                            <div className="text-xs text-muted-foreground">
+                              {field.value > 0 
+                                ? `${field.value}% discount will be applied (requires admin approval)`
+                                : 'Percentage discount to subtract from total'
+                              }
+                            </div>
+                          </FormItem>
                         )}
-                      </CardContent>
-                    </Card>
+                      />
+                    ) : (
+                      <FormField
+                        control={form.control}
+                        name="discountAmount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-foreground">
+                              Discount Amount (LKR)
+                              {field.value > 0 && (
+                                <Badge variant="outline" className="ml-2 text-xs text-orange-600 border-orange-300">
+                                  Admin Approval Required
+                                </Badge>
+                              )}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                className="h-10 text-base"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                            <div className="text-xs text-muted-foreground">
+                              {field.value > 0 
+                                ? `LKR ${field.value.toLocaleString()} discount will be applied (requires admin approval)`
+                                : 'Fixed amount discount to subtract from total'
+                              }
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
                 </div>
                 </div>
