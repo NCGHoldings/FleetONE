@@ -150,7 +150,6 @@ export default function SpecialHire() {
         <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-8' : 'grid-cols-7'}`}>
           <TabsTrigger value="quotations">Quotations</TabsTrigger>
           <TabsTrigger value="trip-calculator">Calculator</TabsTrigger>
-          <TabsTrigger value="confirmed-trips">Trips</TabsTrigger>
           {isAdmin && (
             <TabsTrigger value="approvals" className="relative">
               Approvals
@@ -161,6 +160,7 @@ export default function SpecialHire() {
               )}
             </TabsTrigger>
           )}
+          <TabsTrigger value="confirmed-trips">Trips</TabsTrigger>
           <TabsTrigger value="bus-types">Bus Types</TabsTrigger>
           <TabsTrigger value="rate-cards">Rates</TabsTrigger>
           <TabsTrigger value="fuel-settings">Fuel</TabsTrigger>
