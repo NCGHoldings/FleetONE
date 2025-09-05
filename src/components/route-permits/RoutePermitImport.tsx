@@ -72,111 +72,152 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     return new Date().toISOString().split('T')[0];
   };
 
-  // Helper function to normalize column names for flexible matching
+  // Enhanced column name normalization for fuzzy matching
   const normalizeColumnName = (name: string): string => {
     return name.toLowerCase()
-      .replace(/[^a-z0-9]/g, '')
+      .replace(/[^a-z0-9]/g, '') // Remove all non-alphanumeric
+      .replace(/\s+/g, '') // Remove spaces
       .trim();
   };
 
-  // Helper function to find column value with flexible matching
+  // Advanced fuzzy matching for column names
+  const fuzzyMatch = (target: string, candidate: string): boolean => {
+    const normalizedTarget = normalizeColumnName(target);
+    const normalizedCandidate = normalizeColumnName(candidate);
+    
+    // Exact match
+    if (normalizedTarget === normalizedCandidate) return true;
+    
+    // Contains match
+    if (normalizedCandidate.includes(normalizedTarget) || normalizedTarget.includes(normalizedCandidate)) return true;
+    
+    // Key word matching for common variations
+    const targetWords = normalizedTarget.split(/(?=[A-Z])|[^a-z0-9]/g).filter(w => w.length > 2);
+    const candidateWords = normalizedCandidate.split(/(?=[A-Z])|[^a-z0-9]/g).filter(w => w.length > 2);
+    
+    return targetWords.some(tw => candidateWords.some(cw => 
+      cw.includes(tw) || tw.includes(cw) || 
+      (tw.length > 3 && cw.length > 3 && (tw.substring(0, 3) === cw.substring(0, 3)))
+    ));
+  };
+
+  // Enhanced column value finder with extensive debugging
   const findColumnValue = (row: any, possibleNames: string[]): any => {
+    console.log(`Looking for columns: ${possibleNames.join(', ')}`);
+    console.log(`Available columns: ${Object.keys(row).join(', ')}`);
+    
     // First try exact matches
     for (const name of possibleNames) {
       if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+        console.log(`✓ Found exact match: "${name}" = "${row[name]}"`);
         return row[name];
       }
     }
     
-    // Then try normalized matches
-    const normalizedRow = Object.keys(row).reduce((acc, key) => {
-      acc[normalizeColumnName(key)] = row[key];
-      return acc;
-    }, {} as any);
-    
-    for (const name of possibleNames) {
-      const normalizedName = normalizeColumnName(name);
-      if (normalizedRow[normalizedName] !== undefined && normalizedRow[normalizedName] !== null && normalizedRow[normalizedName] !== '') {
-        return normalizedRow[normalizedName];
+    // Try fuzzy matching on all available columns
+    for (const [actualColumn, value] of Object.entries(row)) {
+      if (value !== undefined && value !== null && value !== '') {
+        for (const possibleName of possibleNames) {
+          if (fuzzyMatch(possibleName, actualColumn)) {
+            console.log(`✓ Found fuzzy match: "${actualColumn}" matches "${possibleName}" = "${value}"`);
+            return value;
+          }
+        }
       }
     }
     
+    console.log(`✗ No match found for: ${possibleNames.join(', ')}`);
     return null;
   };
 
   const mapExcelToDatabase = (row: any) => {
-    console.log('Mapping row:', Object.keys(row)); // Debug log to see actual column names
+    console.log('\n=== MAPPING ROW ===');
+    console.log('Available columns:', Object.keys(row));
+    console.log('Row data sample:', Object.entries(row).slice(0, 3));
     
     const ownerName = findColumnValue(row, [
-      'Name of the Owner', 'Owner Name', 'Permit Holder', 'Owner', 'Permit Holder Name'
-    ])?.toString().trim() || 'Unknown Owner';
+      'Name of the Owner', 'Owner Name', 'Permit Holder', 'Owner', 'Permit Holder Name',
+      'Holder Name', 'Company Name', 'Business Name', 'Operator Name', 'Licensee'
+    ])?.toString().trim() || '';
 
     const routeName = findColumnValue(row, [
-      'Permanent Route', 'Route Name', 'Route', 'Permanent Route Name', 'Main Route'
+      'Permanent Route', 'Route Name', 'Route', 'Permanent Route Name', 'Main Route',
+      'Service Route', 'Bus Route', 'Primary Route', 'Regular Route'
     ])?.toString() || '';
 
     const temporaryRouteName = findColumnValue(row, [
-      'Temporary Route Name', 'Temp Route', 'Alternative Route', 'Secondary Route'
+      'Temporary Route Name', 'Temp Route', 'Alternative Route', 'Secondary Route',
+      'Special Route', 'Extra Route', 'Additional Route'
     ])?.toString() || '';
 
     const via = findColumnValue(row, [
-      'Via', 'Via Locations', 'Through', 'Route Via', 'Passing Through'
+      'Via', 'Via Locations', 'Through', 'Route Via', 'Passing Through',
+      'Intermediate Stops', 'Stops', 'Via Points'
     ])?.toString() || '';
 
     const routeNumbersRaw = findColumnValue(row, [
-      'Route Number', 'Route Numbers', 'Route No', 'Service Numbers', 'Route Nos'
+      'Route Number', 'Route Numbers', 'Route No', 'Service Numbers', 'Route Nos',
+      'Service Number', 'Bus Number', 'Line Number', 'Service Code'
     ]);
     const routeNumbers = routeNumbersRaw
       ? routeNumbersRaw
           .toString()
-          .split(/[\s,\/]+/)
+          .split(/[\s,\/\-]+/)
           .map((s: string) => s.trim())
           .filter((s: string) => s.length > 0)
       : null;
 
     const ntcNumber = findColumnValue(row, [
-      'NTC Approved Service Type', 'NTC Number', 'NTC Service Type', 'Service Type', 'NTC Approval'
+      'NTC Approved Service Type', 'NTC Number', 'NTC Service Type', 'Service Type', 'NTC Approval',
+      'License Type', 'Permit Type', 'Service Category', 'Approval Type'
     ])?.toString() || '';
 
     const ownerAddress = findColumnValue(row, [
-      'Permit Holder Address', 'Owner Address', 'Address', 'Holder Address'
+      'Permit Holder Address', 'Owner Address', 'Address', 'Holder Address',
+      'Business Address', 'Company Address', 'Registered Address'
     ])?.toString() || '';
 
     const ownerNic = findColumnValue(row, [
-      'Permit Holder NIC', 'Owner NIC', 'NIC', 'National ID', 'ID Number'
+      'Permit Holder NIC', 'Owner NIC', 'NIC', 'National ID', 'ID Number',
+      'Identity Number', 'Identification Number', 'NIC Number'
     ])?.toString() || '';
 
     const seats = findColumnValue(row, [
-      'Approved Seating Capacity', 'Seating Capacity', 'Seats', 'Capacity', 'No of Seats'
+      'Approved Seating Capacity', 'Seating Capacity', 'Seats', 'Capacity', 'No of Seats',
+      'Passenger Capacity', 'Total Seats', 'Seat Count', 'Passengers'
     ]);
 
     const maxFare = findColumnValue(row, [
-      'Approved Maximum Fare', 'Maximum Fare', 'Max Fare', 'Fare', 'Maximum Price'
+      'Approved Maximum Fare', 'Maximum Fare', 'Max Fare', 'Fare', 'Maximum Price',
+      'Ticket Price', 'Maximum Charge', 'Fare Amount', 'Price'
     ]);
 
     const issueDate = findColumnValue(row, [
-      'Issue Date', 'Issued Date', 'Date Issued', 'Grant Date', 'Approval Date'
+      'Issue Date', 'Issued Date', 'Date Issued', 'Grant Date', 'Approval Date',
+      'License Date', 'Permit Date', 'Registration Date', 'Start Date'
     ]);
 
     const expiryDateRaw = findColumnValue(row, [
-      'Expirary Date', 'Expiry Date', 'Expiration Date', 'Valid Until', 'End Date'
+      'Expirary Date', 'Expiry Date', 'Expiration Date', 'Valid Until', 'End Date',
+      'Renewal Date', 'Validity Date', 'Due Date'
     ]);
 
     const annualFee = findColumnValue(row, [
-      'Annual Fee', 'Fee', 'License Fee', 'Permit Fee', 'Yearly Fee'
+      'Annual Fee', 'Fee', 'License Fee', 'Permit Fee', 'Yearly Fee',
+      'Registration Fee', 'Renewal Fee', 'Amount', 'Cost'
     ]);
 
     const activeInOperation = findColumnValue(row, [
-      'Active in Operation', 'Operation Status', 'Active', 'Operating', 'Status'
+      'Active in Operation', 'Operation Status', 'Active', 'Operating', 'Status',
+      'Current Status', 'Service Status', 'Operational'
     ]);
 
-    return {
+    const mappedRow = {
       route_name: routeName,
       temporary_route_name: temporaryRouteName,
       via: via,
       route_numbers: routeNumbers,
-      // permit_no will be assigned sequentially later
-      owner_name: ownerName,
+      owner_name: ownerName || 'Unknown Owner',
       owner_address: ownerAddress,
       owner_nic: ownerNic,
       ntc_number: ntcNumber,
@@ -192,8 +233,16 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
           activeInOperation?.toString().toLowerCase() === 'true')
           ? 'active'
           : 'inactive',
-      // omit permit_status to let DB default handle it safely
     } as any;
+
+    console.log('Mapped result:', {
+      owner_name: mappedRow.owner_name,
+      route_name: mappedRow.route_name,
+      seats: mappedRow.seats,
+      max_fare: mappedRow.max_fare
+    });
+    
+    return mappedRow;
   };
 
   const downloadTemplate = () => {
@@ -252,23 +301,52 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
             return;
           }
 
-          // Map Excel data to database format
-          const mappedData = (jsonData as any[]).map(mapExcelToDatabase);
+          // Map Excel data to database format with extensive debugging
+          console.log('\n=== STARTING IMPORT PROCESS ===');
+          console.log(`Total rows in Excel: ${jsonData.length}`);
           
-          // Validate mapped data
-          const validData = mappedData.filter(row => {
-            const hasOwnerName = row.owner_name && row.owner_name !== 'Unknown Owner';
-            const hasRouteName = row.route_name && row.route_name !== '';
-            return hasOwnerName || hasRouteName; // At least one should be present
+          const mappedData = (jsonData as any[]).map((row, index) => {
+            console.log(`\n--- Processing Row ${index + 1} ---`);
+            return mapExcelToDatabase(row);
+          });
+          
+          console.log('\n=== VALIDATION PHASE ===');
+          
+          // Much more permissive validation - accept row if it has ANY meaningful data
+          const validData = mappedData.filter((row, index) => {
+            const hasOwnerName = row.owner_name && row.owner_name !== 'Unknown Owner' && row.owner_name.trim() !== '';
+            const hasRouteName = row.route_name && row.route_name !== '' && row.route_name.trim() !== '';
+            const hasAnyData = hasOwnerName || hasRouteName || 
+              (row.seats && row.seats > 0) || 
+              (row.max_fare && row.max_fare > 0) ||
+              (row.route_numbers && row.route_numbers.length > 0) ||
+              (row.ntc_number && row.ntc_number !== '') ||
+              (row.owner_address && row.owner_address !== '') ||
+              (row.owner_nic && row.owner_nic !== '');
+            
+            console.log(`Row ${index + 1} validation:`, {
+              hasOwnerName,
+              hasRouteName,
+              hasSeats: row.seats && row.seats > 0,
+              hasFare: row.max_fare && row.max_fare > 0,
+              hasRouteNumbers: row.route_numbers && row.route_numbers.length > 0,
+              valid: hasAnyData
+            });
+            
+            return hasAnyData;
           });
 
+          console.log(`\nValidation complete: ${validData.length}/${mappedData.length} rows valid`);
+
           if (validData.length === 0) {
-            toast.error('No valid data found in Excel file. Please check column names and data.');
+            console.error('No valid data found - all rows failed validation');
+            toast.error('No valid data found in Excel file. Please check your data and try again.');
             return;
           }
 
           if (validData.length < mappedData.length) {
-            toast.warning(`${mappedData.length - validData.length} rows were skipped due to missing required data.`);
+            console.warn(`${mappedData.length - validData.length} rows were skipped`);
+            toast.warning(`${mappedData.length - validData.length} rows were skipped due to missing data.`);
           }
 
           // Assign sequential permit numbers PRM001, PRM002, ...
@@ -385,13 +463,14 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
             <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
             <div className="text-sm text-muted-foreground">
               <p className="font-medium mb-2">Import Instructions:</p>
-              <div className="space-y-1 text-xs">
-                <p>• Download the template above to get the correct Excel format</p>
-                <p>• The system will match column names flexibly (e.g., "Owner Name" = "Name of the Owner")</p>
-                <p>• At least one of "Route Name" or "Owner Name" must be filled for each row</p>
-                <p>• Empty rows or rows with missing critical data will be skipped</p>
-                <p>• Permit numbers will be auto-generated as PRM001, PRM002, etc.</p>
-              </div>
+               <div className="space-y-1 text-xs">
+                 <p>• Download the template above to get the correct Excel format</p>
+                 <p>• The system will match column names flexibly using fuzzy matching</p>
+                 <p>• Any row with meaningful data will be imported (owner name, route, seats, fare, etc.)</p>
+                 <p>• Completely empty rows will be skipped automatically</p>
+                 <p>• Permit numbers will be auto-generated as PRM001, PRM002, etc.</p>
+                 <p>• Check browser console for detailed import debugging information</p>
+               </div>
               <p className="font-medium mt-3 mb-2">Common Excel Column Names (flexible matching):</p>
               <div className="grid grid-cols-2 gap-1 text-xs">
                 <span>• Owner Name / Name of the Owner</span>
