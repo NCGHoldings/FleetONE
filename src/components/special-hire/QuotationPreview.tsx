@@ -174,22 +174,22 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
 
         {/* Customer Details */}
         <div className="mt-5">
-          <div className="grid grid-cols-2 gap-8 text-sm">
-            <div className="flex flex-col">
-              <span className="font-semibold text-blue-600 mb-1">Company Name</span>
-              <span className="text-gray-800">{quotation.company_name || 'NCG Express'}</span>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-blue-600 min-w-[120px]">Company Name:</span>
+              <span className="text-gray-800">{quotation.company_name || "NCG Express"}</span>
             </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-blue-600 mb-1">Contact Number</span>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-blue-600 min-w-[120px]">Contact Number:</span>
               <span className="text-gray-800">{quotation.customer_phone}</span>
             </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-blue-600 mb-1">Customer Name</span>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-blue-600 min-w-[120px]">Customer Name:</span>
               <span className="text-gray-800">{quotation.customer_name}</span>
             </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-blue-600 mb-1">Email Address</span>
-              <span className="text-gray-800">{quotation.customer_email || 'N/A'}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-blue-600 min-w-[120px]">Email Address:</span>
+              <span className="text-gray-800">{quotation.customer_email || "N/A"}</span>
             </div>
           </div>
         </div>
