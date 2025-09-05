@@ -26,27 +26,80 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
   } | null>(null);
   const { toast } = useToast();
 
-  // Exact column mapping from user's Excel to database
+  // Comprehensive column mapping handling ALL variations from user's Excel
   const EXCEL_COLUMN_MAPPING = {
+    // Route information
     "Permanent Route": "route_name",
     "Temporary Route Name": "temporary_route_name", 
     "Via": "via",
     "Route Number": "route_numbers",
+    "Route Numbers": "route_numbers",
+    
+    // Permit details
     "Permit Number": "permit_no",
+    "Permit No": "permit_no",
+    
+    // Bus allocation - handle quotes and variations
     "Allocated Bus Number": "allocated_bus_number",
-    "Name of the Owner/Operator": "owner_name",
-    "Name of the Owner,Operator": "owner_name", // Handle comma variant
+    '"Allocated Bus\n Number"': "allocated_bus_number", // Handle quoted with line break
+    '"Allocated Bus Number"': "allocated_bus_number", // Handle quoted
+    "Allocated Bus\n Number": "allocated_bus_number", // Handle line break
+    
+    // Owner information - handle all variations
+    "Name of the Owner/ Operator": "owner_name", // With forward slash and space
+    "Name of the Owner/Operator": "owner_name", // With forward slash
+    "Name of the Owner,Operator": "owner_name", // With comma
+    "Name of the Owner Operator": "owner_name", // No punctuation
+    "Owner Name": "owner_name",
+    
+    // Address and contact
     "Permit Holder Address": "owner_address",
+    "Owner Address": "owner_address",
+    "Address": "owner_address",
+    
     "Permit Holder NIC": "owner_nic",
+    "Owner NIC": "owner_nic",
+    "NIC": "owner_nic",
+    
+    // Service details
     "NTC Approved Service Type": "service_type",
+    "Service Type": "service_type",
+    "Type": "service_type",
+    
+    // Capacity and fare
     "Approved Seating Capacity": "seats",
+    "Seating Capacity": "seats",
+    "Seats": "seats",
+    "Capacity": "seats",
+    
     "Approved Maximum Fare": "approved_maximum_fare",
+    "Maximum Fare": "approved_maximum_fare",
+    "Max Fare": "approved_maximum_fare",
+    "Fare": "approved_maximum_fare",
+    
+    // Dates - handle typos
     "Issue Date": "issue_date",
+    "Issued Date": "issue_date",
+    "Date Issued": "issue_date",
+    
     "Expiry Date": "expiry_date",
-    "Expirary Date": "expiry_date", // Handle typo variant
+    "Expirary Date": "expiry_date", // Handle typo
+    "Expiration Date": "expiry_date",
+    "Expires": "expiry_date",
+    
+    // Financial
     "Annual Fee": "annual_fee",
+    "Fee": "annual_fee",
+    
+    // Status fields
     "Active in Operation": "operation_status",
-    "Permit Active or Inactive": "permit_active_inactive"
+    "Operation Status": "operation_status",
+    "Operating": "operation_status",
+    
+    "Permit Active or Inactive": "permit_active_inactive",
+    "Permit Status": "permit_active_inactive",
+    "Status": "permit_active_inactive",
+    "Active": "permit_active_inactive"
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,40 +110,111 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     }
   };
 
+  const findHeaderRow = (jsonData: any[]): number => {
+    // Look for header row in first 5 rows
+    for (let i = 0; i < Math.min(5, jsonData.length); i++) {
+      const row = jsonData[i];
+      if (Array.isArray(row) && row.length > 5) {
+        // Check if this row contains header-like strings
+        const hasHeaders = row.some((cell: any) => {
+          if (!cell) return false;
+          const str = cell.toString().toLowerCase();
+          return str.includes('permit') || str.includes('route') || str.includes('owner') || str.includes('number');
+        });
+        if (hasHeaders) return i;
+      }
+    }
+    return 0; // Default to first row
+  };
+
+  const normalizeHeader = (header: any): string => {
+    if (!header) return '';
+    return header.toString()
+      .trim()
+      .replace(/\n/g, ' ') // Replace line breaks with spaces
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .replace(/[""]/g, '"') // Normalize quotes
+      .trim();
+  };
+
   const previewFile = async (file: File) => {
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: "array" });
+      const workbook = XLSX.read(data, { 
+        type: "array",
+        cellStyles: true,
+        cellDates: true,
+        raw: false
+      });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1,
+        raw: false,
+        dateNF: 'yyyy-mm-dd'
+      });
       
-      console.log("Raw Excel Data:", jsonData);
+      console.log("Raw Excel Data (first 10 rows):", jsonData.slice(0, 10));
       
-      if (jsonData.length > 1) {
-        const headers = jsonData[0] as string[];
-        const rows = jsonData.slice(1, 6); // Show first 5 rows for preview
-        
-        const preview = rows.map((row: any[], index) => {
-          const mappedRow: any = { _rowIndex: index + 2 }; // +2 because we start from row 2 in Excel
-          headers.forEach((header, colIndex) => {
-            const trimmedHeader = header?.toString().trim();
-            const dbField = EXCEL_COLUMN_MAPPING[trimmedHeader as keyof typeof EXCEL_COLUMN_MAPPING];
-            if (dbField && row[colIndex] !== undefined && row[colIndex] !== null && row[colIndex] !== '') {
-              mappedRow[dbField] = row[colIndex];
-            }
-          });
-          return mappedRow;
-        });
-        
-        console.log("Preview data:", preview);
-        setPreviewData(preview);
+      if (jsonData.length === 0) {
+        throw new Error("Excel file appears to be empty");
       }
+
+      // Find the actual header row
+      const headerRowIndex = findHeaderRow(jsonData);
+      console.log("Header row found at index:", headerRowIndex);
+      
+      if (headerRowIndex >= jsonData.length - 1) {
+        throw new Error("No data rows found after header");
+      }
+
+      const rawHeaders = jsonData[headerRowIndex] as any[];
+      const headers = rawHeaders.map(normalizeHeader);
+      const dataStartRow = headerRowIndex + 1;
+      const rows = jsonData.slice(dataStartRow, dataStartRow + 5); // Show first 5 data rows
+      
+      console.log("Normalized headers:", headers);
+      console.log("Sample data rows:", rows);
+      
+      // Show mapping debug info
+      const mappingDebug: any = {};
+      headers.forEach((header, index) => {
+        const dbField = EXCEL_COLUMN_MAPPING[header as keyof typeof EXCEL_COLUMN_MAPPING];
+        mappingDebug[`${index}: "${header}"`] = dbField || 'NOT MAPPED';
+      });
+      console.log("Column mapping debug:", mappingDebug);
+      
+      const preview = rows.map((row: any[], index) => {
+        const mappedRow: any = { _rowIndex: dataStartRow + index + 1 }; // Excel row number
+        headers.forEach((header, colIndex) => {
+          const dbField = EXCEL_COLUMN_MAPPING[header as keyof typeof EXCEL_COLUMN_MAPPING];
+          const cellValue = row[colIndex];
+          if (dbField && cellValue !== undefined && cellValue !== null && cellValue !== '') {
+            mappedRow[dbField] = cellValue;
+          }
+        });
+        return mappedRow;
+      }).filter(row => {
+        // Only show rows with some actual data
+        return Object.keys(row).length > 1; // More than just _rowIndex
+      });
+      
+      console.log("Preview data after mapping:", preview);
+      setPreviewData(preview);
+      
+      if (preview.length === 0) {
+        toast({
+          title: "No Valid Data Found",
+          description: "No rows could be mapped from your Excel file. Please check the column headers match the expected format.",
+          variant: "destructive",
+        });
+      }
+      
     } catch (error) {
       console.error("Error previewing file:", error);
       toast({
         title: "Preview Error",
-        description: "Could not preview the Excel file. Please check the file format.",
+        description: error instanceof Error ? error.message : "Could not preview the Excel file",
         variant: "destructive",
       });
     }
@@ -134,50 +258,54 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     const mapped: any = {};
     
     headers.forEach((header, colIndex) => {
-      const trimmedHeader = header?.toString().trim();
-      const dbField = EXCEL_COLUMN_MAPPING[trimmedHeader as keyof typeof EXCEL_COLUMN_MAPPING];
+      const dbField = EXCEL_COLUMN_MAPPING[header as keyof typeof EXCEL_COLUMN_MAPPING];
       const cellValue = row[colIndex];
       
       if (dbField && cellValue !== undefined && cellValue !== null && cellValue !== '') {
+        const strValue = cellValue.toString().trim();
+        
         if (dbField === 'issue_date' || dbField === 'expiry_date') {
-          mapped[dbField] = formatExcelDate(cellValue);
+          const formattedDate = formatExcelDate(cellValue);
+          if (formattedDate) {
+            mapped[dbField] = formattedDate;
+          }
         } else if (dbField === 'seats' || dbField === 'annual_fee' || dbField === 'approved_maximum_fare') {
-          const numValue = parseFloat(cellValue.toString());
-          if (!isNaN(numValue)) {
+          const numValue = parseFloat(strValue.replace(/[^\d.-]/g, '')); // Remove non-numeric chars
+          if (!isNaN(numValue) && numValue > 0) {
             mapped[dbField] = numValue;
           }
         } else if (dbField === 'route_numbers') {
           // Handle route numbers as array
-          const routeStr = cellValue.toString().trim();
-          if (routeStr) {
-            mapped[dbField] = routeStr.split(',').map((r: string) => r.trim()).filter(Boolean);
+          if (strValue) {
+            mapped[dbField] = strValue.split(/[,\s]+/).filter(Boolean);
           }
         } else if (dbField === 'operation_status') {
           // Map operation status
-          const status = cellValue.toString().toLowerCase().trim();
-          if (status.includes('active') || status.includes('operation')) {
-            mapped[dbField] = 'active';
-          } else {
-            mapped[dbField] = 'inactive';
-          }
-        } else if (dbField === 'permit_active_inactive') {
-          // Map permit status
-          const status = cellValue.toString().toLowerCase().trim();
+          const status = strValue.toLowerCase();
           mapped[dbField] = status.includes('active') ? 'active' : 'inactive';
-        } else {
-          mapped[dbField] = cellValue.toString().trim();
+        } else if (dbField === 'permit_active_inactive') {
+          // Map permit status  
+          const status = strValue.toLowerCase();
+          mapped[dbField] = status.includes('active') ? 'active' : 'inactive';
+        } else if (strValue !== 'BUS TO BE ASSIGNED' && strValue !== 'BUS PENDING' && strValue !== '') {
+          // Only store meaningful values
+          mapped[dbField] = strValue;
         }
       }
     });
 
-    // Auto-generate permit number if not provided
-    if (!mapped.permit_no) {
-      mapped.permit_no = generatePermitNumber(rowIndex);
+    // Only create a record if we have meaningful data
+    const hasData = mapped.permit_no || mapped.route_name || mapped.temporary_route_name || mapped.owner_name;
+    if (!hasData) {
+      return null; // Skip empty rows
     }
 
-    // Set defaults for required fields
+    // Set defaults for required fields  
     if (!mapped.route_name && mapped.temporary_route_name) {
       mapped.route_name = mapped.temporary_route_name;
+    }
+    if (!mapped.route_name) {
+      mapped.route_name = 'Unknown Route';
     }
     if (!mapped.owner_name) {
       mapped.owner_name = 'Unknown Owner';
@@ -194,8 +322,16 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
 
     // Map additional fields to match database schema
     mapped.max_fare = mapped.approved_maximum_fare || null;
-    mapped.ntc_number = mapped.service_type || null;
-    mapped.permit_status = mapped.permit_active_inactive || 'valid';
+    mapped.ntc_number = mapped.permit_no || null; // Use permit number as NTC number
+    
+    // Set permit status based on permit_active_inactive or default to 'valid'
+    if (mapped.permit_active_inactive === 'active') {
+      mapped.permit_status = 'valid';
+    } else if (mapped.permit_active_inactive === 'inactive') {
+      mapped.permit_status = 'expired';
+    } else {
+      mapped.permit_status = 'valid';
+    }
 
     return mapped;
   };
@@ -269,20 +405,46 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
 
     try {
       const data = await selectedFile.arrayBuffer();
-      const workbook = XLSX.read(data, { type: "array" });
+      const workbook = XLSX.read(data, { 
+        type: "array",
+        cellStyles: true,
+        cellDates: true,
+        raw: false
+      });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1,
+        raw: false,
+        dateNF: 'yyyy-mm-dd'
+      });
 
-      if (jsonData.length < 2) {
-        throw new Error("Excel file must contain at least a header row and one data row");
+      if (jsonData.length === 0) {
+        throw new Error("Excel file appears to be empty");
       }
 
-      const headers = jsonData[0] as string[];
-      const dataRows = jsonData.slice(1);
+      // Find the actual header row
+      const headerRowIndex = findHeaderRow(jsonData);
+      console.log("Header row found at index:", headerRowIndex);
       
-      console.log("Headers found:", headers);
+      if (headerRowIndex >= jsonData.length - 1) {
+        throw new Error("No data rows found after header");
+      }
+
+      const rawHeaders = jsonData[headerRowIndex] as any[];
+      const headers = rawHeaders.map(normalizeHeader);
+      const dataStartRow = headerRowIndex + 1;
+      const dataRows = jsonData.slice(dataStartRow);
+      
+      console.log("Normalized headers:", headers);
       console.log("Total data rows:", dataRows.length);
+      
+      // Show detailed mapping info
+      const mappedColumns = headers.filter(h => EXCEL_COLUMN_MAPPING[h as keyof typeof EXCEL_COLUMN_MAPPING]);
+      const unmappedColumns = headers.filter(h => !EXCEL_COLUMN_MAPPING[h as keyof typeof EXCEL_COLUMN_MAPPING] && h);
+      
+      console.log("Successfully mapped columns:", mappedColumns);
+      console.log("Unmapped columns:", unmappedColumns);
 
       let successful = 0;
       let failed = 0;
@@ -301,8 +463,8 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
           const globalRowIndex = batchStart + rowIndex;
           return mapExcelToDatabase(row, headers, globalRowIndex);
         }).filter(item => {
-          // Only include rows with meaningful data
-          return item.permit_no || item.route_name || item.owner_name;
+          // Only include non-null items with meaningful data
+          return item !== null && (item.permit_no || item.route_name || item.owner_name);
         });
 
         if (batchData.length > 0) {
