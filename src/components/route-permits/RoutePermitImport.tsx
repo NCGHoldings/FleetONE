@@ -135,8 +135,13 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     console.log('Available columns:', Object.keys(row));
     console.log('Row data sample:', Object.entries(row).slice(0, 3));
     
+    // Handle permit number first - use from Excel if available
+    const permitNumber = findColumnValue(row, [
+      'Permit Number', 'Permit No', 'Permit', 'License Number', 'Registration Number'
+    ])?.toString().trim() || '';
+    
     const ownerName = findColumnValue(row, [
-      'Name of the Owner', 'Owner Name', 'Permit Holder', 'Owner', 'Permit Holder Name',
+      'Name of the Owner/Operator', 'Name of the Owner', 'Owner Name', 'Permit Holder', 'Owner', 'Permit Holder Name',
       'Holder Name', 'Company Name', 'Business Name', 'Operator Name', 'Licensee'
     ])?.toString().trim() || '';
 
@@ -183,8 +188,8 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     ])?.toString() || '';
 
     const seats = findColumnValue(row, [
-      'Approved Seating Capacity', 'Seating Capacity', 'Seats', 'Capacity', 'No of Seats',
-      'Passenger Capacity', 'Total Seats', 'Seat Count', 'Passengers'
+      'Seeal Seating Capacity', 'Approved Seating Capacity', 'Seating Capacity', 'Seats', 'Capacity', 'No of Seats',
+      'Passenger Capacity', 'Total Seats', 'Seat Count', 'Passengers', 'Maximum Issue Date'
     ]);
 
     const maxFare = findColumnValue(row, [
@@ -203,16 +208,22 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     ]);
 
     const annualFee = findColumnValue(row, [
-      'Annual Fee', 'Fee', 'License Fee', 'Permit Fee', 'Yearly Fee',
-      'Registration Fee', 'Renewal Fee', 'Amount', 'Cost'
+      'Temporary Total Amount', 'Annual Fee', 'Fee', 'License Fee', 'Permit Fee', 'Yearly Fee',
+      'Registration Fee', 'Renewal Fee', 'Amount', 'Cost', 'Total Amount'
     ]);
 
     const activeInOperation = findColumnValue(row, [
-      'Active in Operation', 'Operation Status', 'Active', 'Operating', 'Status',
-      'Current Status', 'Service Status', 'Operational'
+      'Existing in Operation/ Active or Inactive', 'Active in Operation', 'Operation Status', 'Active', 'Operating', 'Status',
+      'Current Status', 'Service Status', 'Operational', 'Existing in Operation'
     ]);
 
+    // Handle allocated bus number (optional field)
+    const allocatedBusNumber = findColumnValue(row, [
+      'Allocated Bus Number', 'Bus Number', 'Bus No', 'Vehicle Number', 'Fleet Number'
+    ])?.toString() || '';
+
     const mappedRow = {
+      permit_no: permitNumber || '', // Use from Excel if available, will auto-generate if empty
       route_name: routeName,
       temporary_route_name: temporaryRouteName,
       via: via,
@@ -233,13 +244,17 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
           activeInOperation?.toString().toLowerCase() === 'true')
           ? 'active'
           : 'inactive',
+      // Store allocated bus number in notes if provided
+      notes: allocatedBusNumber ? `Allocated Bus: ${allocatedBusNumber}` : null,
     } as any;
 
     console.log('Mapped result:', {
+      permit_no: mappedRow.permit_no,
       owner_name: mappedRow.owner_name,
       route_name: mappedRow.route_name,
       seats: mappedRow.seats,
-      max_fare: mappedRow.max_fare
+      max_fare: mappedRow.max_fare,
+      allocated_bus: allocatedBusNumber
     });
     
     return mappedRow;
@@ -248,20 +263,19 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
   const downloadTemplate = () => {
     const templateData = [
       {
-        'Name of the Owner': 'John Doe Transport',
         'Permanent Route': 'Colombo - Kandy',
         'Temporary Route Name': 'Express Route',
         'Via': 'Kadawatha, Gampaha',
         'Route Number': '101, 102',
-        'NTC Approved Service Type': 'Regular',
-        'Approved Seating Capacity': 49,
-        'Approved Maximum Fare': 300.00,
-        'Issue Date': '2024-01-01',
-        'Expiry Date': '2025-12-31',
-        'Annual Fee': 75000.00,
-        'Active in Operation': 'Yes',
+        'Permit Number': 'PRM001',
+        'Allocated Bus Number': 'BUS-001',
+        'Name of the Owner/Operator': 'John Doe Transport',
         'Permit Holder Address': '123 Main Street, Colombo',
-        'Permit Holder NIC': '751234567V'
+        'Permit Holder NIC': '751234567V',
+        'NTC Approved Service Type': 'Regular',
+        'Seeal Seating Capacity': 49,
+        'Temporary Total Amount': 75000.00,
+        'Existing in Operation/ Active or Inactive': 'Active'
       }
     ];
 
@@ -349,12 +363,18 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
             toast.warning(`${mappedData.length - validData.length} rows were skipped due to missing data.`);
           }
 
-          // Assign sequential permit numbers PRM001, PRM002, ...
-          const pad = (n: number) => n.toString().padStart(3, '0');
-          const assignedData = validData.map((row, idx) => ({
-            ...row,
-            permit_no: `PRM${pad(idx + 1)}`,
-          }));
+          // Assign permit numbers - use from Excel if available, otherwise auto-generate
+          const assignedData = validData.map((row, idx) => {
+            // If permit number exists in Excel data, use it; otherwise generate PRM001, PRM002, etc.
+            const finalPermitNo = row.permit_no && row.permit_no.trim() !== '' 
+              ? row.permit_no.trim()
+              : `PRM${(idx + 1).toString().padStart(3, '0')}`;
+            
+            return {
+              ...row,
+              permit_no: finalPermitNo,
+            };
+          });
 
           // Insert data in batches
           const batchSize = 100;
@@ -471,22 +491,21 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
                  <p>• Permit numbers will be auto-generated as PRM001, PRM002, etc.</p>
                  <p>• Check browser console for detailed import debugging information</p>
                </div>
-              <p className="font-medium mt-3 mb-2">Common Excel Column Names (flexible matching):</p>
+              <p className="font-medium mt-3 mb-2">Your Excel Column Names (will be auto-matched):</p>
               <div className="grid grid-cols-2 gap-1 text-xs">
-                <span>• Owner Name / Name of the Owner</span>
-                <span>• Route Name / Permanent Route</span>
+                <span>• Permanent Route</span>
                 <span>• Temporary Route Name</span>
-                <span>• Via / Via Locations</span>
-                <span>• Route Number / Route Numbers</span>
-                <span>• NTC Number / Service Type</span>
-                <span>• Seating Capacity / Seats</span>
-                <span>• Maximum Fare / Max Fare</span>
-                <span>• Issue Date / Date Issued</span>
-                <span>• Expiry Date / Valid Until</span>
-                <span>• Annual Fee / License Fee</span>
-                <span>• Active in Operation / Status</span>
-                <span>• Owner Address / Address</span>
-                <span>• Owner NIC / NIC Number</span>
+                <span>• Via</span>
+                <span>• Route Number</span>
+                <span>• Permit Number</span>
+                <span>• Allocated Bus Number</span>
+                <span>• Name of the Owner/Operator</span>
+                <span>• Permit Holder Address</span>
+                <span>• Permit Holder NIC</span>
+                <span>• NTC Approved Service Type</span>
+                <span>• Seeal Seating Capacity</span>
+                <span>• Temporary Total Amount</span>
+                <span>• Existing in Operation/ Active or Inactive</span>
               </div>
             </div>
           </div>
