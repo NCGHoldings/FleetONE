@@ -172,51 +172,50 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           </div>
         </div>
 
-        {/* Customer + Pickup Details */}
-        <div className="flex gap-5 mt-5">
-          <div className="flex-1">
-            <div className="space-y-3 text-sm">
-              <div className="flex flex-col">
-                <span className="font-semibold text-blue-600 mb-1">Company Name</span>
-                <span className="text-gray-800">{quotation.company_name || 'NCG Express'}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-blue-600 mb-1">Customer Name</span>
-                <span className="text-gray-800">{quotation.customer_name}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-blue-600 mb-1">Contact Number</span>
-                <span className="text-gray-800">{quotation.customer_phone}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-blue-600 mb-1">Email Address</span>
-                <span className="text-gray-800">{quotation.customer_email || 'N/A'}</span>
-              </div>
+        {/* Customer Details */}
+        <div className="mt-5">
+          <div className="grid grid-cols-2 gap-8 text-sm">
+            <div className="flex flex-col">
+              <span className="font-semibold text-blue-600 mb-1">Company Name</span>
+              <span className="text-gray-800">{quotation.company_name || 'NCG Express'}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-blue-600 mb-1">Contact Number</span>
+              <span className="text-gray-800">{quotation.customer_phone}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-blue-600 mb-1">Customer Name</span>
+              <span className="text-gray-800">{quotation.customer_name}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-blue-600 mb-1">Email Address</span>
+              <span className="text-gray-800">{quotation.customer_email || 'N/A'}</span>
             </div>
           </div>
-          
-          <div className="flex-1">
-            <table className="w-full border-collapse text-sm">
-              <tbody>
-                <tr>
-                  <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Pick-up Location</th>
-                  <td className="border border-gray-300 p-2">{quotation.pickup_location}</td>
-                </tr>
-                <tr>
-                  <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Pick-up Date Time</th>
-                  <td className="border border-gray-300 p-2">{pickup.date} {pickup.time}</td>
-                </tr>
-                <tr>
-                  <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Drop-off Location</th>
-                  <td className="border border-gray-300 p-2">{quotation.drop_location}</td>
-                </tr>
-                <tr>
-                  <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Drop-off Date Time</th>
-                  <td className="border border-gray-300 p-2">{dropoff ? `${dropoff.date} ${dropoff.time}` : 'TBD'}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        </div>
+
+        {/* Pickup Details */}
+        <div className="mt-5">
+          <table className="w-full border-collapse text-sm">
+            <tbody>
+              <tr>
+                <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Pick-up Location</th>
+                <td className="border border-gray-300 p-2">{quotation.pickup_location}</td>
+              </tr>
+              <tr>
+                <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Pick-up Date Time</th>
+                <td className="border border-gray-300 p-2">{pickup.date} {pickup.time}</td>
+              </tr>
+              <tr>
+                <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Drop-off Location</th>
+                <td className="border border-gray-300 p-2">{quotation.drop_location}</td>
+              </tr>
+              <tr>
+                <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Drop-off Date Time</th>
+                <td className="border border-gray-300 p-2">{dropoff ? `${dropoff.date} ${dropoff.time}` : 'TBD'}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         {/* Vehicle Details */}
