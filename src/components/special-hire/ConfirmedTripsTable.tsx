@@ -924,9 +924,10 @@ export function ConfirmedTripsTable() {
             id: selectedTrip.quotation_id,
             quotation_no: selectedTrip.quotation.quotation_no,
             customer_name: selectedTrip.quotation.customer_name,
-            hire_charge: selectedTrip.quotation.hire_charge || 0,
-            driver_charge: selectedTrip.quotation.driver_charge || 0,
-            extra_charges: selectedTrip.quotation.extra_charges || 0,
+            gross_revenue: selectedTrip.quotation.gross_revenue,
+            hire_charge: selectedTrip.quotation.gross_revenue || 0,
+            driver_charge: 0, // This field doesn't exist in current schema
+            extra_charges: 0, // This field doesn't exist in current schema
             fuel_cost_fuel_only: selectedTrip.quotation.fuel_cost_fuel_only,
             commission_pass_through_amount: selectedTrip.quotation.commission_pass_through_amount,
             discount_amount_lkr: selectedTrip.quotation.discount_amount_lkr,

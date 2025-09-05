@@ -457,8 +457,17 @@ export function QuotationsList({ onRefresh }: Props) {
           <TripStatusManagementModal
             open={statusModalOpen}
             onOpenChange={setStatusModalOpen}
-            onConfirm={handleStatusChange}
-            tripData={selectedTrip}
+            trip={selectedTrip ? {
+              id: selectedTrip.id,
+              quotation: {
+                quotation_no: selectedTrip.quotation_no,
+                customer_name: selectedTrip.customer_name,
+              },
+              total_amount: calculateTotalRevenue(selectedTrip),
+              advance_paid: selectedTrip.total_paid || 0,
+              status: selectedTrip.status || selectedTrip.trip_status || 'pending'
+            } : null}
+            onStatusChange={handleStatusChange}
           />
         </>
       )}
