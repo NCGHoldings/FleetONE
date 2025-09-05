@@ -399,7 +399,7 @@ export default function SpecialHire() {
       {/* Enhanced Form Modal */}
       {showForm && (
         <SpecialHireForm 
-          onClose={() => setShowForm(false)}
+          onCancel={() => setShowForm(false)}
           onSubmit={handleFormSubmit}
         />
       )}

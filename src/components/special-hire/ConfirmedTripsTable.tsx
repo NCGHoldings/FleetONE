@@ -778,9 +778,15 @@ export function ConfirmedTripsTable() {
               customer_name: selectedTrip.customer_name,
               pickup_location: selectedTrip.pickup_location,
               drop_location: selectedTrip.drop_location,
-            }
+              pickup_datetime: selectedTrip.pickup_datetime,
+              number_of_passengers: selectedTrip.number_of_passengers,
+            },
+            total_amount: calculateTotalAmount(selectedTrip),
+            advance_paid: selectedTrip.advance_paid || 0,
+            status: selectedTrip.status,
+            trip_status: selectedTrip.status, // Use status as trip_status for now
           }}
-          onStatusUpdate={(data) => {
+          onStatusChange={async (data) => {
             console.log('Status update:', data);
             refetch();
           }}
@@ -798,8 +804,28 @@ export function ConfirmedTripsTable() {
           trip={{
             ...selectedTrip,
             quotation_id: selectedTrip.id,
+            quotation: {
+              quotation_no: selectedTrip.quotation_no,
+              customer_name: selectedTrip.customer_name,
+              customer_phone: selectedTrip.customer_phone,
+              customer_email: selectedTrip.customer_email,
+              company_name: selectedTrip.company_name,
+              pickup_location: selectedTrip.pickup_location,
+              drop_location: selectedTrip.drop_location,
+              pickup_datetime: selectedTrip.pickup_datetime,
+              drop_datetime: selectedTrip.drop_datetime,
+              number_of_buses: selectedTrip.number_of_buses,
+              number_of_passengers: selectedTrip.number_of_passengers,
+              gross_revenue: calculateTotalAmount(selectedTrip),
+              fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,
+              commission_pass_through_amount: selectedTrip.commission_pass_through_amount,
+              discount_amount_lkr: selectedTrip.discount_amount_lkr,
+            },
             total_amount: calculateTotalAmount(selectedTrip),
           }}
+          onViewInvoice={() => viewInvoice(selectedTrip)}
+          onDownloadInvoice={handleDownloadInvoice}
+          onViewPaymentProof={(url) => window.open(url, '_blank')}
         />
       )}
 
