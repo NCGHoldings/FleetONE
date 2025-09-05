@@ -156,7 +156,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           
           {/* Right Block */}
           <div className="text-right max-w-lg">
-            <div className="bg-blue-600 text-white font-semibold text-base px-4 py-2 inline-block mb-3">
+            <div className="bg-blue-600 text-white font-bold text-xl px-8 py-4 inline-block mb-3 w-full">
               Quotation Special Hire
             </div>
             <div className="text-base leading-relaxed text-black">
