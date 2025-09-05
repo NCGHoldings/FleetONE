@@ -40,6 +40,9 @@ interface TripDetailsModalProps {
       number_of_buses: number;
       number_of_passengers: number;
       gross_revenue: number;
+      fuel_cost_fuel_only?: number;
+      commission_pass_through_amount?: number;
+      discount_amount_lkr?: number;
     };
     payments: any[];
     invoices: any[];
