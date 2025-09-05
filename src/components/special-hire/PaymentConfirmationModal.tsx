@@ -33,6 +33,8 @@ export interface PaymentConfirmationData {
   driverName?: string;
   conductorName?: string;
   busNo?: string;
+  paymentProofUrl?: string;
+  notes?: string;
 }
 
 export const PaymentConfirmationModal = ({ 
@@ -66,6 +68,8 @@ export const PaymentConfirmationModal = ({
   const [driverName, setDriverName] = useState<string>('');
   const [conductorName, setConductorName] = useState<string>('');
   const [busNo, setBusNo] = useState<string>('');
+  const [paymentProofUrl, setPaymentProofUrl] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
 
   const handlePaymentTypeChange = (type: 'advance' | 'full' | 'final' | 'other') => {
     setPaymentType(type);
@@ -87,6 +91,8 @@ export const PaymentConfirmationModal = ({
       driverName: driverName || undefined,
       conductorName: conductorName || undefined,
       busNo: busNo || undefined,
+      paymentProofUrl: paymentProofUrl || undefined,
+      notes: notes || undefined,
     });
   };
 
@@ -202,6 +208,28 @@ export const PaymentConfirmationModal = ({
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
                 placeholder="Payment reference number, cheque number, or additional notes..."
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="paymentProof">Payment Proof URL (Optional)</Label>
+              <Input
+                id="paymentProof"
+                type="url"
+                value={paymentProofUrl}
+                onChange={(e) => setPaymentProofUrl(e.target.value)}
+                placeholder="Upload payment proof URL or attachment link"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Additional Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any additional notes about the payment..."
                 rows={2}
               />
             </div>

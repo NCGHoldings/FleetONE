@@ -28,17 +28,43 @@ export interface InvoiceData {
   conductorName?: string;
   itemDetail?: string;
   discountAmount?: number;
+  // Enhanced fields for the multi-step workflow
+  invoice_status?: 'draft' | 'approved';
+  document_type?: 'sales_receipt' | 'invoice';
 }
 
 export const generateInvoiceHTML = (data: InvoiceData): string => {
   const isAdvanceInvoice = data.invoiceType === 'advance';
+  const isSalesReceipt = data.document_type === 'sales_receipt' || isAdvanceInvoice;
   const currentDate = format(new Date(), 'dd/MM/yyyy');
   const companyLogo = data.companyLogo || '/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png';
+  const isDraft = data.invoice_status === 'draft';
+  const documentTitle = isSalesReceipt ? 'SALES RECEIPT' : 'INVOICE';
 
-  if (isAdvanceInvoice) {
+  // Draft watermark styles
+  const draftWatermarkStyles = isDraft ? `
+    .draft-watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 150px;
+      color: rgba(255, 0, 0, 0.1);
+      font-weight: bold;
+      z-index: -1;
+      pointer-events: none;
+      user-select: none;
+    }
+  ` : '';
+
+  if (isAdvanceInvoice || isSalesReceipt) {
     // Use Sales Receipt format for advance payments with fixed padding
     return `
-      <div style="font-family: Arial, sans-serif; font-size: 14px; margin: 0; padding: 20px; width: 210mm; min-height: 297mm; background: white; color: black; box-sizing: border-box;">
+      <div style="font-family: Arial, sans-serif; font-size: 14px; margin: 0; padding: 20px; width: 210mm; min-height: 297mm; background: white; color: black; box-sizing: border-box; position: relative;">
+        ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
+        <style>
+          ${draftWatermarkStyles}
+        </style>
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <img src="${companyLogo}" alt="Company Logo" style="width: 150px;">
@@ -49,7 +75,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           </div>
         </div>
 
-        <h2 style="text-align: center; margin: 20px 0; text-decoration: underline;">SALES RECEIPT</h2>
+        <h2 style="text-align: center; margin: 20px 0; text-decoration: underline;">${documentTitle}${isDraft ? ' - DRAFT' : ''}</h2>
 
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 1px solid #000;">
           <tr>
@@ -301,9 +327,11 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                   padding: 20px;
                   margin-left: 20px;
               }
+              ${draftWatermarkStyles}
           </style>
       </head>
       <body>
+          ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
           <div class="invoice-container">
               <div class="header">
                   <div class="logo-section">
@@ -319,7 +347,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
                   </div>
               </div>
               
-              <div class="invoice-title">INVOICE</div>
+              <div class="invoice-title">${documentTitle}${isDraft ? ' - DRAFT' : ''}</div>
               
               <div class="customer-info">
                   <div class="left-column">

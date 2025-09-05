@@ -1082,6 +1082,57 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_notifications: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          notification_type: string
+          payment_id: string
+          quotation_id: string
+          target_role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          notification_type: string
+          payment_id: string
+          quotation_id: string
+          target_role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          notification_type?: string
+          payment_id?: string
+          quotation_id?: string
+          target_role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_notifications_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_notifications_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_adjustments: {
         Row: {
           adjusted_by: string | null
@@ -1577,6 +1628,8 @@ export type Database = {
       special_hire_invoices: {
         Row: {
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           generated_at: string
           generated_by: string | null
@@ -1584,10 +1637,13 @@ export type Database = {
           invoice_no: string
           invoice_type: string
           quotation_id: string
+          status: string | null
           updated_at: string
         }
         Insert: {
           amount: number
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           generated_at?: string
           generated_by?: string | null
@@ -1595,10 +1651,13 @@ export type Database = {
           invoice_no: string
           invoice_type: string
           quotation_id: string
+          status?: string | null
           updated_at?: string
         }
         Update: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           generated_at?: string
           generated_by?: string | null
@@ -1606,6 +1665,7 @@ export type Database = {
           invoice_no?: string
           invoice_type?: string
           quotation_id?: string
+          status?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1623,36 +1683,51 @@ export type Database = {
           amount: number
           created_at: string
           created_by: string | null
+          finance_approved_at: string | null
+          finance_approved_by: string | null
           id: string
+          notes: string | null
           paid_at: string
           payment_method: string
+          payment_proof_url: string | null
           payment_type: string
           quotation_id: string
           reference_no: string | null
+          status: Database["public"]["Enums"]["payment_status"] | null
           updated_at: string
         }
         Insert: {
           amount: number
           created_at?: string
           created_by?: string | null
+          finance_approved_at?: string | null
+          finance_approved_by?: string | null
           id?: string
+          notes?: string | null
           paid_at?: string
           payment_method: string
+          payment_proof_url?: string | null
           payment_type: string
           quotation_id: string
           reference_no?: string | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
           updated_at?: string
         }
         Update: {
           amount?: number
           created_at?: string
           created_by?: string | null
+          finance_approved_at?: string | null
+          finance_approved_by?: string | null
           id?: string
+          notes?: string | null
           paid_at?: string
           payment_method?: string
+          payment_proof_url?: string | null
           payment_type?: string
           quotation_id?: string
           reference_no?: string | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
           updated_at?: string
         }
         Relationships: [
@@ -2736,6 +2811,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"][]
       }
+      has_page_access: {
+        Args: { _page_identifier: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2753,9 +2832,15 @@ export type Database = {
         | "conductor"
         | "mechanic"
         | "staff"
+        | "finance"
       approval_status: "pending" | "approved" | "rejected"
       fleet_status: "active" | "maintenance" | "idle" | "retired"
       maintenance_status: "pending" | "in_progress" | "completed" | "cancelled"
+      payment_status:
+        | "pending_operations"
+        | "pending_finance"
+        | "approved"
+        | "rejected"
       permit_status: "valid" | "expired" | "suspended" | "cancelled"
       trip_status: "scheduled" | "ongoing" | "completed" | "cancelled"
       user_status: "active" | "inactive" | "suspended"
@@ -2894,10 +2979,17 @@ export const Constants = {
         "conductor",
         "mechanic",
         "staff",
+        "finance",
       ],
       approval_status: ["pending", "approved", "rejected"],
       fleet_status: ["active", "maintenance", "idle", "retired"],
       maintenance_status: ["pending", "in_progress", "completed", "cancelled"],
+      payment_status: [
+        "pending_operations",
+        "pending_finance",
+        "approved",
+        "rejected",
+      ],
       permit_status: ["valid", "expired", "suspended", "cancelled"],
       trip_status: ["scheduled", "ongoing", "completed", "cancelled"],
       user_status: ["active", "inactive", "suspended"],
