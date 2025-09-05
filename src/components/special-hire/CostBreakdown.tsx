@@ -39,6 +39,9 @@ interface CostData {
   discountAmount?: number;
   totalExpenses: number;
   netProfit: number;
+  // Additional charges
+  additionalCharges?: Array<{ type: string; amount: number; reason?: string }>;
+  totalAdditionalCharges?: number;
 }
 
 interface Props {
@@ -160,6 +163,33 @@ export function CostBreakdown({ data }: Props) {
                 </span>
                 <span>-LKR {safeData.discountAmount.toLocaleString()}</span>
               </div>
+            )}
+            {(data.additionalCharges && data.additionalCharges.length > 0) && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-orange-600">Additional Charges:</div>
+                  {data.additionalCharges.map((charge, index) => {
+                    const chargeTypeLabels = {
+                      permits: 'Permits Cost',
+                      highway: 'Highway Charges',
+                      additional_fuel: 'Additional Fuel Costs',
+                      driver_charges: 'Driver Charges',
+                      other: charge.reason || 'Other'
+                    };
+                    return (
+                      <div key={index} className="flex justify-between pl-4">
+                        <span>{chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}</span>
+                        <span>LKR {charge.amount.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex justify-between pl-4 font-medium text-orange-600">
+                    <span>Total Additional Charges</span>
+                    <span>LKR {(data.totalAdditionalCharges || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              </>
             )}
             <Separator />
             <div className="flex justify-between font-medium text-green-600">

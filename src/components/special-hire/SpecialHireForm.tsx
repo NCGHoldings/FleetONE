@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, MapPin, Plus, X } from 'lucide-react';
+import { CalendarIcon, MapPin, Plus, X, Trash2, Eye, Calculator } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +55,22 @@ const formSchema = z.object({
   path: ["commissionPassThroughPct"],
 });
 
+// Additional charge types
+const additionalChargeTypes = [
+  { value: 'permits', label: 'Permits Cost' },
+  { value: 'highway', label: 'Highway Charges' },
+  { value: 'additional_fuel', label: 'Additional Fuel Costs' },
+  { value: 'driver_charges', label: 'Driver Charges' },
+  { value: 'other', label: 'Other' }
+];
+
+interface AdditionalCharge {
+  id: string;
+  type: string;
+  amount: number;
+  reason?: string;
+}
+
 type FormData = z.infer<typeof formSchema>;
 
 interface BusType {
@@ -90,6 +107,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const [busTypes, setBusTypes] = useState<BusType[]>([]);
   const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>([]);
   const [intermediateStops, setIntermediateStops] = useState<IntermediateStop[]>([]);
+  const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([]);
   const [costData, setCostData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -233,6 +251,30 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     ));
   };
 
+  const addAdditionalCharge = () => {
+    const newCharge: AdditionalCharge = {
+      id: Date.now().toString(),
+      type: 'permits',
+      amount: 0,
+      reason: ''
+    };
+    setAdditionalCharges(charges => [...charges, newCharge]);
+  };
+
+  const updateAdditionalCharge = (id: string, field: keyof AdditionalCharge, value: any) => {
+    setAdditionalCharges(charges => 
+      charges.map(charge => 
+        charge.id === id 
+          ? { ...charge, [field]: value }
+          : charge
+      )
+    );
+  };
+
+  const removeAdditionalCharge = (id: string) => {
+    setAdditionalCharges(charges => charges.filter(charge => charge.id !== id));
+  };
+
   const calculateCosts = async (data: FormData) => {
     try {
       // Get selected parking location
@@ -357,8 +399,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         ? baseCustomerTotal * (data.discountPct / 100)
         : data.discountAmount;
       
-      // Final customer total
-      const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount;
+      // Final customer total with additional charges
+      const totalAdditionalCharges = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
+      const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount + (totalAdditionalCharges * data.numberOfBuses);
       
       // Company expenses
       const commissionExpense = baseCustomerTotal * (data.commissionPct / 100); // Total commission company pays
@@ -382,6 +425,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         driver_charge: driverCharge,
         other_expenses: [],
         commission_amount: Math.round(commissionExpense),
+        additional_charges: additionalCharges.map(charge => ({
+          type: charge.type,
+          amount: charge.amount,
+          reason: charge.reason || additionalChargeTypes.find(t => t.value === charge.type)?.label
+        })),
+        total_additional_charges: Math.round(totalAdditionalCharges),
         total_expenses: Math.round(totalExpenses),
         net_profit: Math.round(netProfit)
       };
@@ -1012,6 +1061,89 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       </FormItem>
                     )}
                   />
+
+                {/* Additional Charges */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-base font-semibold text-foreground">
+                      Additional Charges
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addAdditionalCharge}
+                      className="text-xs"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Charge
+                    </Button>
+                  </div>
+                  
+                  {additionalCharges.map((charge, index) => (
+                    <Card key={charge.id} className="p-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
+                        <div>
+                          <Label className="text-sm font-medium text-foreground">
+                            Charge Type
+                          </Label>
+                          <Select
+                            value={charge.type}
+                            onValueChange={(value) => updateAdditionalCharge(charge.id, 'type', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {additionalChargeTypes.map((type) => (
+                                <SelectItem key={type.value} value={type.value}>
+                                  {type.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-sm font-medium text-foreground">
+                            Amount (LKR)
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={charge.amount}
+                            onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        
+                        {charge.type === 'other' && (
+                          <div>
+                            <Label className="text-sm font-medium text-foreground">
+                              Reason
+                            </Label>
+                            <Input
+                              value={charge.reason || ''}
+                              onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
+                              placeholder="Enter reason"
+                            />
+                          </div>
+                        )}
+                        
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeAdditionalCharge(charge.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
 
                 {/* Commission and Discount Settings */}
                 <div className="space-y-4">
