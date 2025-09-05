@@ -489,6 +489,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         discountType: data.discountType,
         discountPct: data.discountType === 'percentage' ? data.discountPct : 0,
         discountAmount: Math.round(discountAmount),
+        additionalCharges: costs.additional_charges,
+        totalAdditionalCharges: costs.total_additional_charges,
         driverCharge: costs.driver_charge,
         otherExpenses: costs.other_expenses,
         commissionPct: costs.commission_pct,
