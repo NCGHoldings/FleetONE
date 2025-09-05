@@ -823,8 +823,8 @@ export function ConfirmedTripsTable() {
             },
             total_amount: calculateTotalAmount(selectedTrip),
           }}
-          onViewInvoice={() => viewInvoice(selectedTrip)}
-          onDownloadInvoice={handleDownloadInvoice}
+          onViewInvoice={(type) => viewInvoice(selectedTrip)}
+          onDownloadInvoice={(type) => handleDownloadInvoice()}
           onViewPaymentProof={(url) => window.open(url, '_blank')}
         />
       )}
