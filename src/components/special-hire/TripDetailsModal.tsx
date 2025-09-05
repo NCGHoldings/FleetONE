@@ -139,7 +139,7 @@ export function TripDetailsModal({
                       <div className="text-xs text-muted-foreground">Pickup Location</div>
                       <div className="font-medium text-sm">{trip.quotation.pickup_location}</div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(trip.quotation.pickup_datetime), 'MMM dd, yyyy HH:mm')}
+                        {trip.quotation.pickup_datetime ? format(new Date(trip.quotation.pickup_datetime), 'MMM dd, yyyy HH:mm') : 'Not specified'}
                       </div>
                     </div>
                   </div>
@@ -152,7 +152,7 @@ export function TripDetailsModal({
                       <div className="text-xs text-muted-foreground">Drop Location</div>
                       <div className="font-medium text-sm">{trip.quotation.drop_location}</div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(trip.quotation.drop_datetime), 'MMM dd, yyyy HH:mm')}
+                        {trip.quotation.drop_datetime ? format(new Date(trip.quotation.drop_datetime), 'MMM dd, yyyy HH:mm') : 'Same as pickup'}
                       </div>
                     </div>
                   </div>
