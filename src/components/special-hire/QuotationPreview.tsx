@@ -159,13 +159,13 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             <div className="bg-blue-600 text-white font-semibold text-base px-4 py-2 inline-block mb-3">
               Quotation Special Hire
             </div>
-            <div className="text-sm leading-relaxed text-black">
+            <div className="text-base leading-relaxed text-black">
               No. 157 Y, Kabellaowita, Weniwelkola,<br />
               Polgasowita.<br />
               074 289 3612<br />
               specialhire.ncgexpress@ncg.lk
             </div>
-            <div className="text-xs mt-2 text-gray-700">
+            <div className="text-sm mt-2 text-gray-700">
               Quotation Generated on {format(new Date(quotation.created_at), 'EEEE do MMMM yyyy, hh:mm:ss a')}<br />
               Quotation No: {quotation.quotation_no}
             </div>
