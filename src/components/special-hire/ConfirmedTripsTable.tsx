@@ -796,40 +796,40 @@ export function ConfirmedTripsTable() {
         />
       )}
 
-      {detailsModalOpen && selectedTrip && (
-        <TripDetailsModal
-          open={detailsModalOpen}
-          onOpenChange={() => {
+      <TripDetailsModal
+        open={detailsModalOpen && selectedTrip !== null}
+        onOpenChange={(open) => {
+          if (!open) {
             setDetailsModalOpen(false);
             setSelectedTrip(null);
-          }}
-          trip={{
-            ...selectedTrip,
-            quotation_id: selectedTrip.id,
-            quotation: {
-              quotation_no: selectedTrip.quotation_no,
-              customer_name: selectedTrip.customer_name,
-              customer_phone: selectedTrip.customer_phone,
-              customer_email: selectedTrip.customer_email,
-              company_name: selectedTrip.company_name,
-              pickup_location: selectedTrip.pickup_location,
-              drop_location: selectedTrip.drop_location,
-              pickup_datetime: selectedTrip.pickup_datetime,
-              drop_datetime: selectedTrip.drop_datetime,
-              number_of_buses: selectedTrip.number_of_buses,
-              number_of_passengers: selectedTrip.number_of_passengers,
-              gross_revenue: calculateTotalAmount(selectedTrip),
-              fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,
-              commission_pass_through_amount: selectedTrip.commission_pass_through_amount,
-              discount_amount_lkr: selectedTrip.discount_amount_lkr,
-            },
-            total_amount: calculateTotalAmount(selectedTrip),
-          }}
-          onViewInvoice={(type) => viewInvoice(selectedTrip)}
-          onDownloadInvoice={(type) => handleDownloadInvoice()}
-          onViewPaymentProof={(url) => window.open(url, '_blank')}
-        />
-      )}
+          }
+        }}
+        trip={selectedTrip ? {
+          ...selectedTrip,
+          quotation_id: selectedTrip.id,
+          quotation: {
+            quotation_no: selectedTrip.quotation_no,
+            customer_name: selectedTrip.customer_name,
+            customer_phone: selectedTrip.customer_phone,
+            customer_email: selectedTrip.customer_email,
+            company_name: selectedTrip.company_name,
+            pickup_location: selectedTrip.pickup_location,
+            drop_location: selectedTrip.drop_location,
+            pickup_datetime: selectedTrip.pickup_datetime,
+            drop_datetime: selectedTrip.drop_datetime,
+            number_of_buses: selectedTrip.number_of_buses,
+            number_of_passengers: selectedTrip.number_of_passengers,
+            gross_revenue: calculateTotalAmount(selectedTrip),
+            fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,
+            commission_pass_through_amount: selectedTrip.commission_pass_through_amount,
+            discount_amount_lkr: selectedTrip.discount_amount_lkr,
+          },
+          total_amount: calculateTotalAmount(selectedTrip),
+        } : null}
+        onViewInvoice={(type) => selectedTrip && viewInvoice(selectedTrip)}
+        onDownloadInvoice={(type) => handleDownloadInvoice()}
+        onViewPaymentProof={(url) => window.open(url, '_blank')}
+      />
 
       {invoiceViewerOpen && currentInvoiceData && (
         <InvoiceViewer
