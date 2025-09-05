@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,13 @@ import { useToast } from '@/hooks/use-toast';
 import { QuotationModal } from './QuotationModal';
 import { EditQuotationModal } from './EditQuotationModal';
 import { QuotationPreview } from './QuotationPreview';
+import { TripDetailsModal } from './TripDetailsModal';
+import { PaymentConfirmationModal } from './PaymentConfirmationModal';
+import { TripStatusManagementModal } from './TripStatusManagementModal';
+import { InvoiceViewer } from './InvoiceViewer';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { useRealtimeQuotations, QuotationWithPayments } from '@/hooks/useRealtimeQuotations';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,67 +31,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-interface Quotation {
-  id: string;
-  quotation_no: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_email?: string;
-  company_name?: string;
-  contact_number?: string;
-  hire_type: string;
-  number_of_buses: number;
-  bus_type: string;
-  seating_capacity?: number;
-  pickup_location: string;
-  drop_location: string;
-  pickup_datetime: string;
-  drop_datetime?: string;
-  km_parking_to_pickup?: number;
-  km_trip?: number;
-  km_drop_to_parking?: number;
-  total_distance_km?: number;
-  gross_revenue: number;
-  net_profit: number;
-  fuel_cost_fuel_only?: number;
-  hire_charge?: number;
-  extra_charges?: number;
-  commission_amount?: number;
-  commission_pass_through_amount?: number;
-  intermediate_stops?: string;
-  route_description?: string;
-  status: string;
-  valid_until: string;
-  created_at: string;
-  percentage_adjustment?: number;
-  audit_log?: any[];
-  approval_status?: 'pending' | 'approved' | 'rejected';
-  discount_percentage?: number;
-  discount_type?: string;
-  discount_amount_lkr?: number;
-}
-
 // Helper function to calculate total revenue (matches Final Total from QuotationPreview)
-const calculateTotalRevenue = (quotation: Quotation): number => {
-  const hireCharges = quotation.gross_revenue || 0;
-  const serviceCharges = quotation.fuel_cost_fuel_only || 0;
-  const commission = quotation.commission_pass_through_amount || 0;
+const calculateTotalRevenue = (quotation: QuotationWithPayments): number => {
+  const hireCharges = quotation.hire_charge || 0;
+  const fuelCharges = quotation.fuel_cost_fuel_only || 0;
+  const driverCharges = quotation.driver_charge || 0;
+  const extraCharges = quotation.extra_charges || 0;
   const discount = quotation.discount_amount_lkr || 0;
   
-  return hireCharges + serviceCharges + commission - discount;
-};
-
-// Helper function to get revenue breakdown components
-const getRevenueBreakdown = (quotation: Quotation) => {
-  return {
-    hire: quotation.hire_charge || 0,
-    fuel: quotation.fuel_cost_fuel_only || 0,
-    extras: quotation.extra_charges || 0,
-    commission: quotation.commission_amount || 0,
-    discountAmount: quotation.discount_type === 'percentage' && quotation.discount_percentage 
-      ? ((quotation.hire_charge || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.extra_charges || 0) + (quotation.commission_amount || 0)) * (quotation.discount_percentage / 100)
-      : quotation.discount_amount_lkr || 0
-  };
+  return hireCharges + fuelCharges + driverCharges + extraCharges - discount;
 };
 
 interface Props {
@@ -94,56 +47,20 @@ interface Props {
 }
 
 export function QuotationsList({ onRefresh }: Props) {
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { quotations, loading, refreshQuotations } = useRealtimeQuotations();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
+  const [selectedQuotation, setSelectedQuotation] = useState<QuotationWithPayments | null>(null);
+  const [selectedTrip, setSelectedTrip] = useState<QuotationWithPayments | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [invoiceViewerOpen, setInvoiceViewerOpen] = useState(false);
+  const [selectedInvoiceData, setSelectedInvoiceData] = useState<any>(null);
+  const [editingQuotation, setEditingQuotation] = useState<QuotationWithPayments | null>(null);
   const [emailingQuotationId, setEmailingQuotationId] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const loadQuotations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('special_hire_quotations')
-        .select(`
-          *,
-          bus_types!bus_type_id (
-            name,
-            capacity
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      // Transform the data to match our interface
-      const transformedData = data?.map(item => ({
-        ...item,
-        bus_type: item.bus_types?.name || 'Unknown',
-        seating_capacity: item.bus_types?.capacity || 54,
-        total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
-        intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
-        audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : [])
-      })) || [];
-      
-      setQuotations(transformedData);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to load quotations",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadQuotations();
-  }, []);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -175,12 +92,15 @@ export function QuotationsList({ onRefresh }: Props) {
     try {
       const { error } = await supabase
         .from('special_hire_quotations')
-        .update({ status: newStatus })
+        .update({ 
+          status: newStatus,
+          status_changed_at: new Date().toISOString()
+        })
         .eq('id', id);
 
       if (error) throw error;
 
-      await loadQuotations();
+      refreshQuotations();
       onRefresh();
       toast({
         title: "Success",
@@ -195,158 +115,100 @@ export function QuotationsList({ onRefresh }: Props) {
     }
   };
 
-  const handleViewQuotation = (quotation: Quotation) => {
+  const handleViewQuotation = (quotation: QuotationWithPayments) => {
     setSelectedQuotation(quotation);
     setShowModal(true);
   };
 
-  const handleDownloadQuotation = (quotation: Quotation) => {
-    setSelectedQuotation(quotation);
-    setShowModal(true);
+  const handleViewTrip = (quotation: QuotationWithPayments) => {
+    setSelectedTrip(quotation);
+    setDetailsModalOpen(true);
   };
 
-  const handleSendQuotation = async (quotation: Quotation) => {
-    await handleStatusUpdate(quotation.id, 'sent');
+  const handlePaymentConfirm = async (paymentData: any) => {
+    // Payment is now handled directly in PaymentConfirmationModal
+    // This callback is kept for any additional processing if needed
+    refreshQuotations();
+    onRefresh();
   };
 
-  const generatePDFBase64 = async (quotation: Quotation): Promise<string> => {
-    // Create a temporary div to render the quotation
-    const tempDiv = document.createElement('div');
-    tempDiv.style.position = 'absolute';
-    tempDiv.style.left = '-9999px';
-    tempDiv.style.top = '-9999px';
-    tempDiv.style.width = '210mm';
-    tempDiv.style.background = 'white';
-    document.body.appendChild(tempDiv);
-
-    // Import React and ReactDOM dynamically
-    const React = await import('react');
-    const ReactDOM = await import('react-dom/client');
+  const handleStatusChange = async (statusData: any) => {
+    if (!selectedTrip) return;
 
     try {
-      // Create React element and render it
-      const root = ReactDOM.createRoot(tempDiv);
-      const quotationElement = React.createElement(QuotationPreview, { quotation });
-      
-      await new Promise<void>((resolve) => {
-        root.render(quotationElement);
-        // Wait for render to complete
-        setTimeout(resolve, 1000);
-      });
-
-      const canvas = await html2canvas(tempDiv, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 0;
-
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-      
-      root.unmount();
-      return pdf.output('datauristring').split(',')[1];
-    } finally {
-      document.body.removeChild(tempDiv);
-    }
-  };
-
-  const handleEmailQuotation = async (quotation: Quotation) => {
-    if (!quotation.customer_email) {
-      toast({
-        title: "Error",
-        description: "No email address available for this customer",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setEmailingQuotationId(quotation.id);
-    try {
-      const pdfBase64 = await generatePDFBase64(quotation);
-      const date = new Date().toISOString().split('T')[0];
-      const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
-      
-      const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
-      const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #2563eb;">NCG Express</h2>
-          <p>Dear ${quotation.customer_name},</p>
-          <p>Please find your quotation details attached.</p>
-          <p>Thank you for choosing NCG Express.</p>
-          <br>
-          <p>Best regards,<br>NCG Express Team</p>
-        </div>
-      `;
-
-      const { error } = await supabase.functions.invoke('send-quotation-email', {
-        body: {
-          to: quotation.customer_email,
-          subject,
-          html,
-          attachment: {
-            filename,
-            contentBase64: pdfBase64,
-            contentType: 'application/pdf'
-          }
-        }
-      });
-
-      if (error) throw error;
-
-      // Update status to sent
-      await handleStatusUpdate(quotation.id, 'sent');
-      
-      toast({
-        title: "Success",
-        description: `Quotation emailed successfully to ${quotation.customer_email}`
-      });
-    } catch (error: any) {
-      console.error('Error sending email:', error);
-      toast({
-        title: "Error",
-        description: 'Failed to send email: ' + (error.message || 'Unknown error'),
-        variant: "destructive"
-      });
-    } finally {
-      setEmailingQuotationId(null);
-    }
-  };
-
-  const handleEditQuotation = (quotation: Quotation) => {
-    setEditingQuotation(quotation);
-    setShowEditModal(true);
-  };
-
-  const handleDeleteQuotation = async (quotation: Quotation) => {
-    try {
-      // Add audit log entry
-      const currentUser = await supabase.auth.getUser();
-      const auditEntry = {
-        action: 'DELETE',
-        timestamp: new Date().toISOString(),
-        user_id: currentUser.data.user?.id,
-        user_email: currentUser.data.user?.email,
-        changes: {
-          quotation_no: quotation.quotation_no,
-          customer_name: quotation.customer_name,
-          status: quotation.status
-        }
+      const updateData: any = {
+        trip_status: statusData.status,
+        status_changed_at: new Date().toISOString(),
       };
 
-      const existingAuditLog = quotation.audit_log || [];
-      
+      if (statusData.reason) {
+        updateData.cancellation_reason = statusData.reason;
+      }
+
+      if (statusData.refundAmount !== undefined) {
+        updateData.refund_amount = statusData.refundAmount;
+        updateData.refund_status = statusData.refundStatus || 'pending';
+      }
+
+      const { error } = await supabase
+        .from('special_hire_quotations')
+        .update(updateData)
+        .eq('id', selectedTrip.id);
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to update trip status",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: "Trip status updated successfully",
+      });
+
+      setStatusModalOpen(false);
+      refreshQuotations();
+      onRefresh();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update trip status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewInvoice = (quotation: QuotationWithPayments, invoiceType: 'advance' | 'final') => {
+    const invoice = quotation.invoices.find(inv => inv.invoice_type === invoiceType);
+    
+    setSelectedInvoiceData({
+      quotation,
+      invoiceType,
+      invoiceNo: invoice?.invoice_no || `INV-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      generatedDate: invoice?.generated_at || new Date().toISOString(),
+    });
+    setInvoiceViewerOpen(true);
+  };
+
+  const handleDownloadInvoice = (quotation: QuotationWithPayments, invoiceType: 'advance' | 'final') => {
+    const invoice = quotation.invoices.find(inv => inv.invoice_type === invoiceType);
+    
+    const invoiceData = {
+      quotation,
+      invoiceType,
+      invoiceNo: invoice?.invoice_no || `INV-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      generatedDate: invoice?.generated_at || new Date().toISOString(),
+    };
+    
+    console.log('Download invoice:', invoiceData);
+  };
+
+  const handleDeleteQuotation = async (quotation: QuotationWithPayments) => {
+    try {
       const { error } = await supabase
         .from('special_hire_quotations')
         .delete()
@@ -354,7 +216,7 @@ export function QuotationsList({ onRefresh }: Props) {
 
       if (error) throw error;
 
-      await loadQuotations();
+      refreshQuotations();
       onRefresh();
       toast({
         title: "Success",
@@ -369,14 +231,7 @@ export function QuotationsList({ onRefresh }: Props) {
     }
   };
 
-  const handleEditSubmit = async () => {
-    await loadQuotations();
-    onRefresh();
-    setShowEditModal(false);
-    setEditingQuotation(null);
-  };
-
-  const columns: ColumnDef<Quotation>[] = [
+  const columns: ColumnDef<QuotationWithPayments>[] = [
     {
       accessorKey: "quotation_no",
       header: "Quotation No",
@@ -405,35 +260,10 @@ export function QuotationsList({ onRefresh }: Props) {
       accessorKey: "pickup_location",
       header: "Route",
       cell: ({ row }) => {
-        // Parse intermediate stops for display
-        let intermediateStops = [];
-        try {
-          if (row.original.intermediate_stops) {
-            intermediateStops = JSON.parse(row.original.intermediate_stops);
-          }
-        } catch (e) {
-          console.warn('Failed to parse intermediate stops:', e);
-        }
-
-        // Build route description
-        let routeDescription = row.original.pickup_location;
-        if (intermediateStops.length > 0) {
-          intermediateStops.forEach((stop: any) => {
-            if (stop.location) {
-              routeDescription += ` → ${stop.location}`;
-            }
-          });
-        }
-        routeDescription += ` → ${row.original.drop_location}`;
-
+        const routeDescription = `${row.original.pickup_location} → ${row.original.drop_location}`;
         return (
           <div className="max-w-xs">
             <div className="text-sm font-medium">{routeDescription}</div>
-            {intermediateStops.length > 0 && (
-              <div className="text-xs text-muted-foreground">
-                {intermediateStops.length} intermediate stop{intermediateStops.length > 1 ? 's' : ''}
-              </div>
-            )}
           </div>
         );
       },
@@ -448,40 +278,19 @@ export function QuotationsList({ onRefresh }: Props) {
       ),
     },
     {
-      accessorKey: "gross_revenue",
-      header: "Revenue",
+      accessorKey: "final_total",
+      header: "Amount (LKR)",
       cell: ({ row }) => {
         const quotation = row.original;
-        const totalRevenue = calculateTotalRevenue(quotation);
-        const breakdown = getRevenueBreakdown(quotation);
-        const hasDiscount = breakdown.discountAmount > 0;
-        const hasMultipleComponents = [breakdown.hire, breakdown.fuel, breakdown.extras, breakdown.commission].filter(x => x > 0).length > 1;
-        
+        const finalTotal = calculateTotalRevenue(quotation);
         return (
-          <div className="text-right">
-            <div className="font-medium">LKR {totalRevenue.toLocaleString()}</div>
-            {(hasDiscount || hasMultipleComponents) && (
-              <div className="text-xs text-muted-foreground space-y-1">
-                {hasMultipleComponents && (
-                  <div>
-                    {breakdown.hire > 0 && `Hire: ${breakdown.hire.toLocaleString()}`}
-                    {breakdown.fuel > 0 && ` + Fuel: ${breakdown.fuel.toLocaleString()}`}
-                    {breakdown.extras > 0 && ` + Extra: ${breakdown.extras.toLocaleString()}`}
-                    {breakdown.commission > 0 && ` + Comm: ${breakdown.commission.toLocaleString()}`}
-                  </div>
-                )}
-                {hasDiscount && (
-                  <div className="text-red-600">
-                    {quotation.discount_type === 'percentage' 
-                      ? `Discount: -${quotation.discount_percentage}% (LKR ${breakdown.discountAmount.toLocaleString()})`
-                      : `Discount: -LKR ${breakdown.discountAmount.toLocaleString()}`
-                    }
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="text-xs text-green-600">
-              Profit: LKR {quotation.net_profit.toLocaleString()}
+          <div className="space-y-1">
+            <div className="font-medium">₹ {finalTotal.toLocaleString()}</div>
+            <div className="text-sm text-muted-foreground">
+              Paid: ₹ {quotation.total_paid.toLocaleString()}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Balance: ₹ {quotation.balance_due.toLocaleString()}
             </div>
           </div>
         );
@@ -490,23 +299,7 @@ export function QuotationsList({ onRefresh }: Props) {
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }) => {
-        const quotation = row.original;
-        const hasDiscount = (quotation.discount_type === 'percentage' && (quotation.discount_percentage || 0) > 0) ||
-                           (quotation.discount_type === 'amount' && (quotation.discount_amount_lkr || 0) > 0);
-        const isDraft = quotation.approval_status === 'pending' && hasDiscount;
-        
-        return (
-          <div className="flex flex-col gap-1">
-            {getStatusBadge(row.getValue("status"))}
-            {isDraft && (
-              <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
-                DRAFT
-              </Badge>
-            )}
-          </div>
-        );
-      },
+      cell: ({ row }) => getStatusBadge(row.getValue("status")),
     },
     {
       id: "actions",
@@ -514,109 +307,67 @@ export function QuotationsList({ onRefresh }: Props) {
       cell: ({ row }) => {
         const quotation = row.original;
         return (
-            <div className="flex space-x-1">
+          <div className="flex space-x-1">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleViewQuotation(quotation)}
+              title="View Quotation"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleViewTrip(quotation)}
+              title="View Trip Details"
+            >
+              <FileText className="h-4 w-4" />
+            </Button>
+            {quotation.status === 'confirmed' && (
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => handleViewQuotation(quotation)}
-                title="View Quotation"
+                onClick={() => {
+                  setSelectedTrip(quotation);
+                  setPaymentModalOpen(true);
+                }}
+                title="Add Payment"
               >
-                <Eye className="h-4 w-4" />
+                💰
               </Button>
-              {quotation.status === 'draft' && (
-                <>
+            )}
+            {quotation.status === 'draft' && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => handleEditQuotation(quotation)}
-                    title="Edit Quotation"
+                    title="Delete Quotation"
                   >
-                    <Edit className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        title="Delete Quotation"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Quotation</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete quotation {quotation.quotation_no}? This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDeleteQuotation(quotation)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </>
-              )}
-              {quotation.status === 'draft' && (
-                <Button 
-                  variant="default" 
-                  size="sm" 
-                  onClick={() => handleSendQuotation(quotation)}
-                  title="Send Quotation"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              )}
-              {quotation.status === 'sent' && (
-                <>
-                  <Button 
-                    variant="default"
-                    size="sm" 
-                    onClick={() => handleStatusUpdate(quotation.id, 'confirmed')}
-                    title="Confirm Quotation"
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    Confirm
-                  </Button>
-                  <Button 
-                    variant="destructive"
-                    size="sm" 
-                    onClick={() => handleStatusUpdate(quotation.id, 'declined')}
-                    title="Decline Quotation"
-                  >
-                    Decline
-                  </Button>
-                </>
-              )}
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleEmailQuotation(quotation)}
-                title="Email Quotation"
-                disabled={emailingQuotationId === quotation.id}
-              >
-                {emailingQuotationId === quotation.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Mail className="h-4 w-4" />
-                )}
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleDownloadQuotation(quotation)}
-                title="Download Quotation"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Quotation</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete quotation {quotation.quotation_no}? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleDeleteQuotation(quotation)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         );
       },
     },
@@ -657,19 +408,66 @@ export function QuotationsList({ onRefresh }: Props) {
       </Card>
 
       <QuotationModal 
-        quotation={selectedQuotation}
+        quotation={selectedQuotation ? {...selectedQuotation, bus_type: 'Standard'} : null}
         open={showModal}
         onOpenChange={setShowModal}
       />
 
-      {showEditModal && editingQuotation && (
-        <EditQuotationModal
-          quotation={editingQuotation}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditingQuotation(null);
-          }}
-          onUpdate={handleEditSubmit}
+      {selectedTrip && (
+        <>
+          <TripDetailsModal
+            open={detailsModalOpen}
+            onOpenChange={setDetailsModalOpen}
+            trip={{
+              ...selectedTrip,
+              quotation_id: selectedTrip.id,
+              total_amount: calculateTotalRevenue(selectedTrip),
+              advance_paid: selectedTrip.total_paid || 0,
+              balance_due: selectedTrip.balance_due || 0,
+              quotation: {
+                quotation_no: selectedTrip.quotation_no,
+                customer_name: selectedTrip.customer_name,
+                customer_phone: selectedTrip.customer_phone,
+                customer_email: selectedTrip.customer_email,
+                company_name: selectedTrip.company_name,
+                pickup_location: selectedTrip.pickup_location,
+                drop_location: selectedTrip.drop_location,
+                pickup_datetime: selectedTrip.pickup_datetime,
+                drop_datetime: selectedTrip.drop_datetime || selectedTrip.pickup_datetime,
+                number_of_buses: selectedTrip.number_of_buses,
+                number_of_passengers: selectedTrip.number_of_passengers,
+                gross_revenue: selectedTrip.gross_revenue
+              },
+              payments: selectedTrip.payments || [],
+              invoices: selectedTrip.invoices || []
+            }}
+            onViewInvoice={(type) => handleViewInvoice(selectedTrip, type)}
+            onDownloadInvoice={(type) => handleDownloadInvoice(selectedTrip, type)}
+            onViewPaymentProof={(proofUrl) => console.log('View proof:', proofUrl)}
+          />
+
+          <PaymentConfirmationModal
+            isOpen={paymentModalOpen}
+            onClose={() => setPaymentModalOpen(false)}
+            onConfirm={handlePaymentConfirm}
+            quotationData={selectedTrip}
+            loading={loading}
+          />
+
+          <TripStatusManagementModal
+            open={statusModalOpen}
+            onOpenChange={setStatusModalOpen}
+            onConfirm={handleStatusChange}
+            tripData={selectedTrip}
+          />
+        </>
+      )}
+
+      {selectedInvoiceData && (
+        <InvoiceViewer
+          isOpen={invoiceViewerOpen}
+          onClose={() => setInvoiceViewerOpen(false)}
+          invoiceData={selectedInvoiceData}
         />
       )}
     </>

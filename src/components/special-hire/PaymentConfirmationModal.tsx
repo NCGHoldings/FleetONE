@@ -7,12 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface PaymentConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (paymentData: PaymentConfirmationData) => void;
   quotationData: {
+    id: string;
     quotation_no: string;
     customer_name: string;
     gross_revenue: number;
@@ -21,6 +24,9 @@ interface PaymentConfirmationModalProps {
     fuel_cost_fuel_only?: number;
     commission_pass_through_amount?: number;
     discount_amount_lkr?: number;
+    hire_charge?: number;
+    driver_charge?: number;
+    extra_charges?: number;
   };
   loading?: boolean;
 }
@@ -42,11 +48,14 @@ export const PaymentConfirmationModal = ({
   quotationData,
   loading = false 
 }: PaymentConfirmationModalProps) => {
+  const [submitting, setSubmitting] = useState(false);
+  const { toast } = useToast();
   // Calculate final total to match quotation preview
   const calculateFinalTotal = () => {
-    return quotationData.gross_revenue + 
+    return (quotationData.hire_charge || 0) + 
            (quotationData.fuel_cost_fuel_only || 0) + 
-           (quotationData.commission_pass_through_amount || 0) - 
+           (quotationData.driver_charge || 0) + 
+           (quotationData.extra_charges || 0) - 
            (quotationData.discount_amount_lkr || 0);
   };
 
@@ -78,16 +87,92 @@ export const PaymentConfirmationModal = ({
     }
   };
 
-  const handleConfirm = () => {
-    onConfirm({
-      amount,
-      paymentType,
-      method,
-      reference: reference || undefined,
-      driverName: driverName || undefined,
-      conductorName: conductorName || undefined,
-      busNo: busNo || undefined,
-    });
+  const handleConfirm = async () => {
+    if (!quotationData) return;
+    
+    setSubmitting(true);
+    try {
+      // Insert payment record
+      const { error: paymentError } = await supabase
+        .from('special_hire_payments')
+        .insert({
+          quotation_id: quotationData.id,
+          payment_type: paymentType,
+          amount: amount,
+          payment_method: method,
+          reference_no: reference || null,
+        });
+
+      if (paymentError) {
+        throw paymentError;
+      }
+
+      // Update quotation status and trip details
+      const updateData: any = {
+        trip_status: 'confirmed',
+        status_changed_at: new Date().toISOString(),
+      };
+
+      if (driverName) updateData.driver_name = driverName;
+      if (conductorName) updateData.conductor_name = conductorName;
+      if (busNo) updateData.bus_no = busNo;
+
+      const { error: updateError } = await supabase
+        .from('special_hire_quotations')
+        .update(updateData)
+        .eq('id', quotationData.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Generate invoice if needed
+      if (paymentType === 'advance' || paymentType === 'full') {
+        const invoiceNo = `INV-${new Date().getFullYear()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        
+        const { error: invoiceError } = await supabase
+          .from('special_hire_invoices')
+          .insert({
+            quotation_id: quotationData.id,
+            invoice_type: paymentType === 'full' ? 'final' : 'advance',
+            invoice_no: invoiceNo,
+            amount: amount,
+          });
+
+        if (invoiceError) {
+          console.error('Invoice generation failed:', invoiceError);
+          // Don't fail the whole process if invoice generation fails
+        }
+      }
+
+      toast({
+        title: 'Payment Confirmed',
+        description: 'Payment has been recorded successfully',
+      });
+
+      // Call the original onConfirm for any additional processing
+      const paymentData: PaymentConfirmationData = {
+        amount,
+        paymentType,
+        method,
+        reference: reference || undefined,
+        driverName: driverName || undefined,
+        conductorName: conductorName || undefined,
+        busNo: busNo || undefined,
+      };
+      
+      onConfirm(paymentData);
+      onClose();
+    } catch (error) {
+      console.error('Payment confirmation error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to confirm payment. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -247,8 +332,8 @@ export const PaymentConfirmationModal = ({
             <Button variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm} disabled={loading || amount <= 0}>
-              {loading ? 'Processing...' : 'Confirm Payment'}
+            <Button onClick={handleConfirm} disabled={loading || submitting || amount <= 0}>
+              {submitting ? 'Processing...' : 'Confirm Payment'}
             </Button>
           </div>
         </div>
