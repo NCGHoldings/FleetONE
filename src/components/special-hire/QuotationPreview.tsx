@@ -35,6 +35,8 @@ interface QuotationData {
   created_at: string;
   approval_status?: 'pending' | 'approved' | 'rejected';
   discount_percentage?: number;
+  additional_charges?: Array<{ type: string; amount: number; reason?: string }> | string;
+  total_additional_charges?: number;
 }
 
 interface Props {
@@ -57,8 +59,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     const serviceCharges = quotation.fuel_cost_fuel_only || 0;
     const commission = quotation.commission_pass_through_amount || 0;
     const discount = quotation.discount_amount_lkr || 0;
+    const additionalCharges = quotation.total_additional_charges || 0;
     
-    return hireCharges + serviceCharges + commission - discount;
+    return hireCharges + serviceCharges + commission + additionalCharges - discount;
   };
 
   const pickup = formatDateTime(quotation.pickup_datetime);
@@ -77,6 +80,20 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     }
   } catch (e) {
     console.warn('Failed to parse intermediate stops:', e);
+  }
+
+  // Parse additional charges for display
+  let additionalCharges = [];
+  try {
+    if (quotation.additional_charges) {
+      if (typeof quotation.additional_charges === 'string') {
+        additionalCharges = JSON.parse(quotation.additional_charges);
+      } else {
+        additionalCharges = quotation.additional_charges;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse additional charges:', e);
   }
 
   // Build route description
@@ -226,6 +243,29 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-2">
                 <div>Hire Charges: LKR {quotation.gross_revenue?.toLocaleString() || '0'}</div>
                 <div>Service Charge: LKR {((quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0)).toLocaleString()}</div>
+                {additionalCharges.length > 0 && (
+                  <div>
+                    <div className="text-sm font-medium text-orange-600 mt-1">Additional Charges:</div>
+                    {additionalCharges.map((charge: any, index: number) => {
+                      const chargeTypeLabels: any = {
+                        permits: 'Permits Cost',
+                        highway: 'Highway Charges',
+                        additional_fuel: 'Additional Fuel Costs',
+                        driver_charges: 'Driver Charges',
+                        other: 'Other'
+                      };
+                      const displayName = chargeTypeLabels[charge.type] || charge.reason || charge.type;
+                      return (
+                        <div key={index} className="text-sm pl-2">
+                          {displayName}: LKR {charge.amount?.toLocaleString() || '0'}
+                        </div>
+                      );
+                    })}
+                    <div className="text-sm font-medium text-orange-600 pl-2">
+                      Total Additional: LKR {(quotation.total_additional_charges || 0).toLocaleString()}
+                    </div>
+                  </div>
+                )}
                 {(quotation.discount_amount_lkr || 0) > 0 && (
                   <div className="text-red-600">Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}</div>
                 )}

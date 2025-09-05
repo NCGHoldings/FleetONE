@@ -153,16 +153,41 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     loadBusTypes();
     loadParkingLocations();
     
-    // If editing, set intermediate stops from initial data
-    if (isEditing && initialData?.intermediate_stops) {
-      try {
-        const stops = Array.isArray(initialData.intermediate_stops) 
-          ? initialData.intermediate_stops 
-          : JSON.parse(initialData.intermediate_stops);
-        setIntermediateStops(stops || []);
-      } catch (e) {
-        console.warn('Failed to parse intermediate stops:', e);
-        setIntermediateStops([]);
+    // If editing, set intermediate stops and additional charges from initial data
+    if (isEditing && initialData) {
+      // Load intermediate stops
+      if (initialData.intermediate_stops) {
+        try {
+          const stops = Array.isArray(initialData.intermediate_stops) 
+            ? initialData.intermediate_stops 
+            : JSON.parse(initialData.intermediate_stops);
+          setIntermediateStops(stops || []);
+        } catch (e) {
+          console.warn('Failed to parse intermediate stops:', e);
+          setIntermediateStops([]);
+        }
+      }
+
+      // Load additional charges
+      if (initialData.additional_charges) {
+        try {
+          const charges = Array.isArray(initialData.additional_charges) 
+            ? initialData.additional_charges 
+            : JSON.parse(initialData.additional_charges);
+          
+          // Convert to internal format with IDs
+          const formattedCharges = charges.map((charge: any, index: number) => ({
+            id: `existing-${index}`,
+            type: charge.type || 'other',
+            amount: Number(charge.amount) || 0,
+            reason: charge.reason || ''
+          }));
+          
+          setAdditionalCharges(formattedCharges);
+        } catch (e) {
+          console.warn('Failed to parse additional charges:', e);
+          setAdditionalCharges([]);
+        }
       }
     }
   }, [isEditing, initialData]);
@@ -589,6 +614,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         discount_type: data.discountType,
         discount_percentage: costs.discount_percentage,
         discount_amount_lkr: costs.discount_amount,
+        additional_charges: JSON.stringify(costs.additional_charges),
+        total_additional_charges: costs.total_additional_charges,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
         approval_status: ((data.discountType === 'percentage' && data.discountPct > 0) || 

@@ -135,7 +135,8 @@ export function ConfirmedTripsTable() {
   const calculateTotalAmount = (quotation: QuotationWithPayments) => {
     return quotation.gross_revenue + 
            (quotation.fuel_cost_fuel_only || 0) + 
-           (quotation.commission_pass_through_amount || 0) - 
+           (quotation.commission_pass_through_amount || 0) + 
+           (quotation.total_additional_charges || 0) - 
            (quotation.discount_amount_lkr || 0);
   };
 
@@ -745,6 +746,7 @@ export function ConfirmedTripsTable() {
             fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,
             commission_pass_through_amount: selectedTrip.commission_pass_through_amount,
             discount_amount_lkr: selectedTrip.discount_amount_lkr,
+            total_additional_charges: selectedTrip.total_additional_charges,
           }}
           loading={loading}
         />

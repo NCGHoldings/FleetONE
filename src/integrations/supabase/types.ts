@@ -1848,6 +1848,7 @@ export type Database = {
       }
       special_hire_quotations: {
         Row: {
+          additional_charges: Json | null
           advance_paid: number | null
           approval_comments: string | null
           approval_date: string | null
@@ -1907,6 +1908,7 @@ export type Database = {
           status: string | null
           status_changed_at: string | null
           status_changed_by: string | null
+          total_additional_charges: number | null
           total_expenses: number | null
           total_paid: number | null
           trip_id: string | null
@@ -1915,6 +1917,7 @@ export type Database = {
           valid_until: string | null
         }
         Insert: {
+          additional_charges?: Json | null
           advance_paid?: number | null
           approval_comments?: string | null
           approval_date?: string | null
@@ -1976,6 +1979,7 @@ export type Database = {
           status?: string | null
           status_changed_at?: string | null
           status_changed_by?: string | null
+          total_additional_charges?: number | null
           total_expenses?: number | null
           total_paid?: number | null
           trip_id?: string | null
@@ -1984,6 +1988,7 @@ export type Database = {
           valid_until?: string | null
         }
         Update: {
+          additional_charges?: Json | null
           advance_paid?: number | null
           approval_comments?: string | null
           approval_date?: string | null
@@ -2045,6 +2050,7 @@ export type Database = {
           status?: string | null
           status_changed_at?: string | null
           status_changed_by?: string | null
+          total_additional_charges?: number | null
           total_expenses?: number | null
           total_paid?: number | null
           trip_id?: string | null

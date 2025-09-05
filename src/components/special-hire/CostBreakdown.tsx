@@ -192,8 +192,8 @@ export function CostBreakdown({ data }: Props) {
               </>
             )}
             <Separator />
-            <div className="flex justify-between font-medium text-green-600">
-              <span>Customer Total (incl. Fuel)</span>
+            <div className="flex justify-between font-bold text-lg text-green-600 bg-green-50 p-3 rounded-md border-2 border-green-200">
+              <span>FINAL TOTAL - Customer Pays</span>
               <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
             </div>
           </div>

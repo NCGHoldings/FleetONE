@@ -20,6 +20,8 @@ export interface QuotationWithPayments {
   fuel_cost_fuel_only?: number;
   commission_pass_through_amount?: number;
   discount_amount_lkr?: number;
+  additional_charges?: Array<{ type: string; amount: number; reason?: string }> | string;
+  total_additional_charges?: number;
   status: string;
   advance_paid: number;
   balance_due: number;
@@ -138,13 +140,18 @@ export function useRealtimeSpecialHire() {
         
         const finalTotal = (quotation.gross_revenue || 0) + 
                           (quotation.fuel_cost_fuel_only || 0) + 
-                          (quotation.commission_pass_through_amount || 0) - 
+                          (quotation.commission_pass_through_amount || 0) + 
+                          (quotation.total_additional_charges || 0) - 
                           (quotation.discount_amount_lkr || 0);
         const calculatedBalance = Math.max(finalTotal - calculatedTotalPaid, 0);
 
         return {
           ...quotation,
           bus_type: quotation.bus_types?.name || 'Unknown',
+          // Transform additional_charges to match interface
+          additional_charges: typeof quotation.additional_charges === 'string' 
+            ? quotation.additional_charges 
+            : JSON.stringify(quotation.additional_charges || []),
           // Use database values if available, fall back to calculated values
           total_paid: quotation.total_paid ?? calculatedTotalPaid,
           balance_due: quotation.balance_due ?? calculatedBalance,

@@ -21,6 +21,7 @@ interface PaymentConfirmationModalProps {
     fuel_cost_fuel_only?: number;
     commission_pass_through_amount?: number;
     discount_amount_lkr?: number;
+    total_additional_charges?: number;
   };
   loading?: boolean;
 }
@@ -48,7 +49,8 @@ export const PaymentConfirmationModal = ({
   const calculateFinalTotal = () => {
     return quotationData.gross_revenue + 
            (quotationData.fuel_cost_fuel_only || 0) + 
-           (quotationData.commission_pass_through_amount || 0) - 
+           (quotationData.commission_pass_through_amount || 0) + 
+           (quotationData.total_additional_charges || 0) - 
            (quotationData.discount_amount_lkr || 0);
   };
 

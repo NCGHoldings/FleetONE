@@ -64,6 +64,8 @@ interface Quotation {
   discount_percentage?: number;
   discount_type?: string;
   discount_amount_lkr?: number;
+  additional_charges?: Array<{ type: string; amount: number; reason?: string }> | string;
+  total_additional_charges?: number;
 }
 
 // Helper function to calculate total revenue (matches Final Total from QuotationPreview)
@@ -72,8 +74,9 @@ const calculateTotalRevenue = (quotation: Quotation): number => {
   const serviceCharges = quotation.fuel_cost_fuel_only || 0;
   const commission = quotation.commission_pass_through_amount || 0;
   const discount = quotation.discount_amount_lkr || 0;
+  const additionalCharges = quotation.total_additional_charges || 0;
   
-  return hireCharges + serviceCharges + commission - discount;
+  return hireCharges + serviceCharges + commission + additionalCharges - discount;
 };
 
 // Helper function to get revenue breakdown components
@@ -126,7 +129,8 @@ export function QuotationsList({ onRefresh }: Props) {
         seating_capacity: item.bus_types?.capacity || 54,
         total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
         intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
-        audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : [])
+        audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
+        additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || [])
       })) || [];
       
       setQuotations(transformedData);
