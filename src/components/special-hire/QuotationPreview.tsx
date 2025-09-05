@@ -175,26 +175,24 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         {/* Customer + Pickup Details */}
         <div className="flex gap-5 mt-5">
           <div className="flex-1">
-            <table className="w-full border-collapse text-sm">
-              <tbody>
-                <tr>
-                  <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Company Name</th>
-                  <td className="border border-gray-300 p-2">{quotation.company_name || 'NCG Express'}</td>
-                </tr>
-                <tr>
-                  <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Customer Name</th>
-                  <td className="border border-gray-300 p-2">{quotation.customer_name}</td>
-                </tr>
-                <tr>
-                  <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Contact Number</th>
-                  <td className="border border-gray-300 p-2">{quotation.customer_phone}</td>
-                </tr>
-                <tr>
-                  <th className="border border-gray-300 p-2 bg-blue-50 font-semibold text-blue-600 text-left">Email Address</th>
-                  <td className="border border-gray-300 p-2">{quotation.customer_email || 'N/A'}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="space-y-3 text-sm">
+              <div className="flex flex-col">
+                <span className="font-semibold text-blue-600 mb-1">Company Name</span>
+                <span className="text-gray-800">{quotation.company_name || 'NCG Express'}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-semibold text-blue-600 mb-1">Customer Name</span>
+                <span className="text-gray-800">{quotation.customer_name}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-semibold text-blue-600 mb-1">Contact Number</span>
+                <span className="text-gray-800">{quotation.customer_phone}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-semibold text-blue-600 mb-1">Email Address</span>
+                <span className="text-gray-800">{quotation.customer_email || 'N/A'}</span>
+              </div>
+            </div>
           </div>
           
           <div className="flex-1">
