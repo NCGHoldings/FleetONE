@@ -1108,67 +1108,79 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   </div>
                   
                   {additionalCharges.map((charge, index) => (
-                    <Card key={charge.id} className="p-4">
-                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
-                        <div>
-                          <Label className="text-sm font-medium text-foreground">
-                            Charge Type
-                          </Label>
-                          <Select
-                            value={charge.type}
-                            onValueChange={(value) => updateAdditionalCharge(charge.id, 'type', value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {additionalChargeTypes.map((type) => (
-                                <SelectItem key={type.value} value={type.value}>
-                                  {type.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div>
-                          <Label className="text-sm font-medium text-foreground">
-                            Amount (LKR)
-                          </Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={charge.amount}
-                            onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                          />
-                        </div>
-                        
-                        {charge.type === 'other' && (
-                          <div>
-                            <Label className="text-sm font-medium text-foreground">
-                              Reason
-                            </Label>
-                            <Input
-                              value={charge.reason || ''}
-                              onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
-                              placeholder="Enter reason"
-                            />
-                          </div>
-                        )}
-                        
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeAdditionalCharge(charge.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </Card>
+                     <Card key={charge.id} className="p-6 border-2 border-muted bg-card/50">
+                       <div className="space-y-4">
+                         <div className="flex items-center justify-between mb-4">
+                           <h4 className="text-lg font-medium text-foreground">Additional Charge #{index + 1}</h4>
+                           <Button
+                             type="button"
+                             variant="outline"
+                             size="sm"
+                             onClick={() => removeAdditionalCharge(charge.id)}
+                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                           >
+                             <Trash2 className="w-4 h-4 mr-2" />
+                             Remove
+                           </Button>
+                         </div>
+                         
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <div className="space-y-2">
+                             <Label className="text-base font-medium text-foreground">
+                               Charge Type *
+                             </Label>
+                             <Select
+                               value={charge.type}
+                               onValueChange={(value) => updateAdditionalCharge(charge.id, 'type', value)}
+                             >
+                               <SelectTrigger className="h-11">
+                                 <SelectValue placeholder="Select charge type" />
+                               </SelectTrigger>
+                               <SelectContent className="bg-popover border border-border z-50">
+                                 {additionalChargeTypes.map((type) => (
+                                   <SelectItem 
+                                     key={type.value} 
+                                     value={type.value}
+                                     className="cursor-pointer hover:bg-accent"
+                                   >
+                                     {type.label}
+                                   </SelectItem>
+                                 ))}
+                               </SelectContent>
+                             </Select>
+                           </div>
+                           
+                           <div className="space-y-2">
+                             <Label className="text-base font-medium text-foreground">
+                               Amount (LKR) *
+                             </Label>
+                             <Input
+                               type="number"
+                               min="0"
+                               step="0.01"
+                               value={charge.amount}
+                               onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
+                               placeholder="Enter amount (e.g., 5000.00)"
+                               className="h-11 text-base"
+                             />
+                           </div>
+                         </div>
+                         
+                         {charge.type === 'other' && (
+                           <div className="space-y-2">
+                             <Label className="text-base font-medium text-foreground">
+                               Reason / Description *
+                             </Label>
+                             <Input
+                               value={charge.reason || ''}
+                               onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
+                               placeholder="Please specify the reason for this charge"
+                               className="h-11 text-base"
+                             />
+                           </div>
+                         )}
+                       </div>
+                     </Card>
                   ))}
                 </div>
 
