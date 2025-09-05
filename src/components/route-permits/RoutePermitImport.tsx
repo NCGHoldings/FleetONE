@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
 
@@ -72,14 +72,60 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
     return new Date().toISOString().split('T')[0];
   };
 
+  // Helper function to normalize column names for flexible matching
+  const normalizeColumnName = (name: string): string => {
+    return name.toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+  };
+
+  // Helper function to find column value with flexible matching
+  const findColumnValue = (row: any, possibleNames: string[]): any => {
+    // First try exact matches
+    for (const name of possibleNames) {
+      if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+        return row[name];
+      }
+    }
+    
+    // Then try normalized matches
+    const normalizedRow = Object.keys(row).reduce((acc, key) => {
+      acc[normalizeColumnName(key)] = row[key];
+      return acc;
+    }, {} as any);
+    
+    for (const name of possibleNames) {
+      const normalizedName = normalizeColumnName(name);
+      if (normalizedRow[normalizedName] !== undefined && normalizedRow[normalizedName] !== null && normalizedRow[normalizedName] !== '') {
+        return normalizedRow[normalizedName];
+      }
+    }
+    
+    return null;
+  };
+
   const mapExcelToDatabase = (row: any) => {
-    const ownerName = row['Name of the Owner']?.toString().trim() || 'Unknown Owner';
+    console.log('Mapping row:', Object.keys(row)); // Debug log to see actual column names
+    
+    const ownerName = findColumnValue(row, [
+      'Name of the Owner', 'Owner Name', 'Permit Holder', 'Owner', 'Permit Holder Name'
+    ])?.toString().trim() || 'Unknown Owner';
 
-    const issueDate = row['Issue Date'] ? formatExcelDate(row['Issue Date']) : new Date().toISOString().split('T')[0];
-    const expiryDateRaw = row['Expirary Date'] ?? row['Expiry Date'];
-    const expiryDate = expiryDateRaw ? formatExcelDate(expiryDateRaw) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const routeName = findColumnValue(row, [
+      'Permanent Route', 'Route Name', 'Route', 'Permanent Route Name', 'Main Route'
+    ])?.toString() || '';
 
-    const routeNumbersRaw = row['Route Number'] ?? row['Route Numbers'];
+    const temporaryRouteName = findColumnValue(row, [
+      'Temporary Route Name', 'Temp Route', 'Alternative Route', 'Secondary Route'
+    ])?.toString() || '';
+
+    const via = findColumnValue(row, [
+      'Via', 'Via Locations', 'Through', 'Route Via', 'Passing Through'
+    ])?.toString() || '';
+
+    const routeNumbersRaw = findColumnValue(row, [
+      'Route Number', 'Route Numbers', 'Route No', 'Service Numbers', 'Route Nos'
+    ]);
     const routeNumbers = routeNumbersRaw
       ? routeNumbersRaw
           .toString()
@@ -88,29 +134,94 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
           .filter((s: string) => s.length > 0)
       : null;
 
+    const ntcNumber = findColumnValue(row, [
+      'NTC Approved Service Type', 'NTC Number', 'NTC Service Type', 'Service Type', 'NTC Approval'
+    ])?.toString() || '';
+
+    const ownerAddress = findColumnValue(row, [
+      'Permit Holder Address', 'Owner Address', 'Address', 'Holder Address'
+    ])?.toString() || '';
+
+    const ownerNic = findColumnValue(row, [
+      'Permit Holder NIC', 'Owner NIC', 'NIC', 'National ID', 'ID Number'
+    ])?.toString() || '';
+
+    const seats = findColumnValue(row, [
+      'Approved Seating Capacity', 'Seating Capacity', 'Seats', 'Capacity', 'No of Seats'
+    ]);
+
+    const maxFare = findColumnValue(row, [
+      'Approved Maximum Fare', 'Maximum Fare', 'Max Fare', 'Fare', 'Maximum Price'
+    ]);
+
+    const issueDate = findColumnValue(row, [
+      'Issue Date', 'Issued Date', 'Date Issued', 'Grant Date', 'Approval Date'
+    ]);
+
+    const expiryDateRaw = findColumnValue(row, [
+      'Expirary Date', 'Expiry Date', 'Expiration Date', 'Valid Until', 'End Date'
+    ]);
+
+    const annualFee = findColumnValue(row, [
+      'Annual Fee', 'Fee', 'License Fee', 'Permit Fee', 'Yearly Fee'
+    ]);
+
+    const activeInOperation = findColumnValue(row, [
+      'Active in Operation', 'Operation Status', 'Active', 'Operating', 'Status'
+    ]);
+
     return {
-      route_name: row['Permanent Route']?.toString() || row['Route Name']?.toString() || '',
-      temporary_route_name: row['Temporary Route Name']?.toString() || '',
-      via: row['Via']?.toString() || '',
+      route_name: routeName,
+      temporary_route_name: temporaryRouteName,
+      via: via,
       route_numbers: routeNumbers,
       // permit_no will be assigned sequentially later
       owner_name: ownerName,
-      owner_address: row['Permit Holder Address']?.toString() || '',
-      owner_nic: row['Permit Holder NIC']?.toString() || '',
-      ntc_number: row['NTC Approved Service Type']?.toString() || '',
-      service_type: row['NTC Approved Service Type']?.toString() || 'regular',
-      seats: row['Approved Seating Capacity'] ? parseInt(row['Approved Seating Capacity']) : null,
-      max_fare: row['Approved Maximum Fare'] ? parseFloat(row['Approved Maximum Fare']) : null,
-      issue_date: issueDate,
-      expiry_date: expiryDate,
-      annual_fee: row['Annual Fee'] ? parseFloat(row['Annual Fee']) : null,
+      owner_address: ownerAddress,
+      owner_nic: ownerNic,
+      ntc_number: ntcNumber,
+      service_type: ntcNumber || 'regular',
+      seats: seats ? parseInt(seats) : null,
+      max_fare: maxFare ? parseFloat(maxFare) : null,
+      issue_date: issueDate ? formatExcelDate(issueDate) : new Date().toISOString().split('T')[0],
+      expiry_date: expiryDateRaw ? formatExcelDate(expiryDateRaw) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      annual_fee: annualFee ? parseFloat(annualFee) : null,
       operation_status:
-        (row['Active in Operation']?.toString().toLowerCase() === 'yes' ||
-          row['Active in Operation']?.toString().toLowerCase() === 'active')
+        (activeInOperation?.toString().toLowerCase() === 'yes' ||
+          activeInOperation?.toString().toLowerCase() === 'active' ||
+          activeInOperation?.toString().toLowerCase() === 'true')
           ? 'active'
           : 'inactive',
       // omit permit_status to let DB default handle it safely
     } as any;
+  };
+
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        'Name of the Owner': 'John Doe Transport',
+        'Permanent Route': 'Colombo - Kandy',
+        'Temporary Route Name': 'Express Route',
+        'Via': 'Kadawatha, Gampaha',
+        'Route Number': '101, 102',
+        'NTC Approved Service Type': 'Regular',
+        'Approved Seating Capacity': 49,
+        'Approved Maximum Fare': 300.00,
+        'Issue Date': '2024-01-01',
+        'Expiry Date': '2025-12-31',
+        'Annual Fee': 75000.00,
+        'Active in Operation': 'Yes',
+        'Permit Holder Address': '123 Main Street, Colombo',
+        'Permit Holder NIC': '751234567V'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Route Permits Template');
+    
+    XLSX.writeFile(workbook, 'route_permits_template.xlsx');
+    toast.success('Template downloaded successfully');
   };
 
   const handleUpload = async () => {
@@ -143,10 +254,26 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
 
           // Map Excel data to database format
           const mappedData = (jsonData as any[]).map(mapExcelToDatabase);
+          
+          // Validate mapped data
+          const validData = mappedData.filter(row => {
+            const hasOwnerName = row.owner_name && row.owner_name !== 'Unknown Owner';
+            const hasRouteName = row.route_name && row.route_name !== '';
+            return hasOwnerName || hasRouteName; // At least one should be present
+          });
+
+          if (validData.length === 0) {
+            toast.error('No valid data found in Excel file. Please check column names and data.');
+            return;
+          }
+
+          if (validData.length < mappedData.length) {
+            toast.warning(`${mappedData.length - validData.length} rows were skipped due to missing required data.`);
+          }
 
           // Assign sequential permit numbers PRM001, PRM002, ...
           const pad = (n: number) => n.toString().padStart(3, '0');
-          const assignedData = mappedData.map((row, idx) => ({
+          const assignedData = validData.map((row, idx) => ({
             ...row,
             permit_no: `PRM${pad(idx + 1)}`,
           }));
@@ -170,6 +297,7 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
           }
 
           toast.success(`Successfully imported ${imported} route permits`);
+          console.log('Import completed successfully');
           onImportComplete();
           setFile(null);
           setPreviewData([]);
@@ -200,6 +328,20 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-muted-foreground">
+            Upload your Excel file with route permit data
+          </div>
+          <Button
+            variant="outline"
+            onClick={downloadTemplate}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download Template
+          </Button>
+        </div>
+        
         <div className="grid w-full max-w-sm items-center gap-1.5">
           <Input
             id="excel-file"
@@ -242,25 +384,30 @@ export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) 
           <div className="flex items-start gap-2">
             <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
             <div className="text-sm text-muted-foreground">
-              <p className="font-medium mb-2">Expected Excel Columns:</p>
+              <p className="font-medium mb-2">Import Instructions:</p>
+              <div className="space-y-1 text-xs">
+                <p>• Download the template above to get the correct Excel format</p>
+                <p>• The system will match column names flexibly (e.g., "Owner Name" = "Name of the Owner")</p>
+                <p>• At least one of "Route Name" or "Owner Name" must be filled for each row</p>
+                <p>• Empty rows or rows with missing critical data will be skipped</p>
+                <p>• Permit numbers will be auto-generated as PRM001, PRM002, etc.</p>
+              </div>
+              <p className="font-medium mt-3 mb-2">Common Excel Column Names (flexible matching):</p>
               <div className="grid grid-cols-2 gap-1 text-xs">
-                <span>• Permanent Route</span>
+                <span>• Owner Name / Name of the Owner</span>
+                <span>• Route Name / Permanent Route</span>
                 <span>• Temporary Route Name</span>
-                <span>• Via</span>
-                <span>• Route Number</span>
-                <span>• Permit Number (auto-generated: PRM001, PRM002, ...)</span>
-                <span>• Allocated Bus Number</span>
-                <span>• Name of the Owner</span>
-                <span>• Permit Holder Address</span>
-                <span>• Permit Holder NIC</span>
-                <span>• NTC Approved Service Type</span>
-                <span>• Approved Seating Capacity</span>
-                <span>• Approved Maximum Fare</span>
-                <span>• Issue Date</span>
-                <span>• Expirary Date</span>
-                <span>• Annual Fee</span>
-                <span>• Active in Operation</span>
-                <span>• Permit Active or Inactive</span>
+                <span>• Via / Via Locations</span>
+                <span>• Route Number / Route Numbers</span>
+                <span>• NTC Number / Service Type</span>
+                <span>• Seating Capacity / Seats</span>
+                <span>• Maximum Fare / Max Fare</span>
+                <span>• Issue Date / Date Issued</span>
+                <span>• Expiry Date / Valid Until</span>
+                <span>• Annual Fee / License Fee</span>
+                <span>• Active in Operation / Status</span>
+                <span>• Owner Address / Address</span>
+                <span>• Owner NIC / NIC Number</span>
               </div>
             </div>
           </div>

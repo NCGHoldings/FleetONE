@@ -773,7 +773,12 @@ export default function RoutePermits() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={permits} />
+          <DataTable 
+            columns={columns} 
+            data={permits} 
+            searchKey="permit_no"
+            searchKeys={["permit_no", "route_name", "owner_name"]}
+          />
         </CardContent>
       </Card>
 

@@ -129,9 +129,12 @@ export function DataTable<TData, TValue>({
               <Input
                 placeholder={`Search ${searchKey}...`}
                 value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-                onChange={(event) =>
-                  table.getColumn(searchKey)?.setFilterValue(event.target.value)
-                }
+                onChange={(event) => {
+                  const column = table.getColumn(searchKey);
+                  if (column) {
+                    column.setFilterValue(event.target.value);
+                  }
+                }}
                 className="pl-10"
               />
             </div>
