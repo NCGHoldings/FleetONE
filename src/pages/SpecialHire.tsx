@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AdminApprovalInterface } from '../components/special-hire/AdminApprovalInterface';
-import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Truck, MapPin, AlertTriangle, Shield } from 'lucide-react';
+import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield } from 'lucide-react';
 import { CostCalculator } from "@/components/special-hire/CostCalculator";
 import { EnhancedCostCalculator } from "@/components/special-hire/EnhancedCostCalculator";
 import { ConfirmedTripsTable } from "@/components/special-hire/ConfirmedTripsTable";
@@ -242,7 +242,7 @@ export default function SpecialHire() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Truck className="h-5 w-5 text-green-500" />
+              <Bus className="h-5 w-5 text-green-500" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Confirmed Trips</p>
                 <p className="text-2xl font-bold">{stats.confirmedTrips}</p>
@@ -302,7 +302,7 @@ export default function SpecialHire() {
           </TabsTrigger>
           
           <TabsTrigger value="confirmed-trips" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />
+            <Bus className="h-4 w-4" />
             <span className="hidden sm:inline">Trips</span>
           </TabsTrigger>
           
@@ -323,7 +323,7 @@ export default function SpecialHire() {
           {isOperationsUser && (
             <>
               <TabsTrigger value="bus-types" className="flex items-center gap-2">
-                <Truck className="h-4 w-4" />
+                <Bus className="h-4 w-4" />
                 <span className="hidden sm:inline">Bus Types</span>
               </TabsTrigger>
               
