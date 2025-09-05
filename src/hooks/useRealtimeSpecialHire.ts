@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export interface QuotationWithPayments {
   id: string;
@@ -34,27 +34,40 @@ export interface QuotationWithPayments {
     amount: number;
     payment_method: string;
     reference_no?: string;
+    payment_proof_url?: string;
+    notes?: string;
+    status: string;
+    finance_approved_by?: string;
+    finance_approved_at?: string;
     paid_at: string;
+    created_by?: string;
+    created_at: string;
+    quotation_id: string;
   }>;
   invoices: Array<{
     id: string;
     invoice_type: string;
     invoice_no: string;
     amount: number;
-    generated_at: string;
+    status?: string;
+    approved_by?: string;
+    approved_at?: string;
+    generated_by?: string;
+    generated_at?: string;
+    created_at: string;
+    quotation_id: string;
   }>;
 }
 
 export function useRealtimeSpecialHire() {
   const [quotations, setQuotations] = useState<QuotationWithPayments[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   const fetchQuotationsWithPayments = async () => {
     try {
       console.log('Fetching quotations with payments and invoices...');
       
-      // Fetch quotations with related payments and invoices
+      // Fetch quotations
       const { data: quotationsData, error: quotationsError } = await supabase
         .from('special_hire_quotations')
         .select(`
@@ -74,7 +87,22 @@ export function useRealtimeSpecialHire() {
       
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('special_hire_payments')
-        .select('*')
+        .select(`
+          id,
+          payment_type,
+          amount,
+          payment_method,
+          reference_no,
+          payment_proof_url,
+          notes,
+          status,
+          finance_approved_by,
+          finance_approved_at,
+          paid_at,
+          created_by,
+          created_at,
+          quotation_id
+        `)
         .in('quotation_id', quotationIds);
 
       if (paymentsError) throw paymentsError;
@@ -82,7 +110,19 @@ export function useRealtimeSpecialHire() {
       // Fetch all invoices for these quotations
       const { data: invoicesData, error: invoicesError } = await supabase
         .from('special_hire_invoices')
-        .select('*')
+        .select(`
+          id,
+          invoice_type,
+          invoice_no,
+          amount,
+          status,
+          approved_by,
+          approved_at,
+          generated_by,
+          generated_at,
+          created_at,
+          quotation_id
+        `)
         .in('quotation_id', quotationIds);
 
       if (invoicesError) throw invoicesError;
@@ -93,7 +133,9 @@ export function useRealtimeSpecialHire() {
         const quotationInvoices = invoicesData?.filter(i => i.quotation_id === quotation.id) || [];
 
         // Calculate total amounts from actual database records
-        const calculatedTotalPaid = quotationPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const approvedPayments = quotationPayments.filter(p => p.status === 'approved');
+        const calculatedTotalPaid = approvedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        
         const finalTotal = (quotation.gross_revenue || 0) + 
                           (quotation.fuel_cost_fuel_only || 0) + 
                           (quotation.commission_pass_through_amount || 0) - 
@@ -106,21 +148,35 @@ export function useRealtimeSpecialHire() {
           // Use database values if available, fall back to calculated values
           total_paid: quotation.total_paid ?? calculatedTotalPaid,
           balance_due: quotation.balance_due ?? calculatedBalance,
-          advance_paid: quotation.advance_paid ?? quotationPayments.filter(p => p.payment_type === 'advance').reduce((sum, p) => sum + (p.amount || 0), 0),
+          advance_paid: quotation.advance_paid ?? approvedPayments.filter(p => p.payment_type === 'advance').reduce((sum, p) => sum + (p.amount || 0), 0),
           payments: quotationPayments.map(p => ({
             id: p.id,
             payment_type: p.payment_type,
             amount: p.amount,
             payment_method: p.payment_method,
             reference_no: p.reference_no,
-            paid_at: p.paid_at
+            payment_proof_url: p.payment_proof_url,
+            notes: p.notes,
+            status: p.status || 'pending_operations',
+            finance_approved_by: p.finance_approved_by,
+            finance_approved_at: p.finance_approved_at,
+            paid_at: p.paid_at,
+            created_by: p.created_by,
+            created_at: p.created_at,
+            quotation_id: p.quotation_id
           })),
           invoices: quotationInvoices.map(i => ({
             id: i.id,
             invoice_type: i.invoice_type,
             invoice_no: i.invoice_no,
             amount: i.amount,
-            generated_at: i.generated_at
+            status: i.status,
+            approved_by: i.approved_by,
+            approved_at: i.approved_at,
+            generated_by: i.generated_by,
+            generated_at: i.generated_at,
+            created_at: i.created_at,
+            quotation_id: i.quotation_id
           }))
         };
       }) || [];
@@ -129,11 +185,7 @@ export function useRealtimeSpecialHire() {
       setQuotations(enrichedQuotations);
     } catch (error: any) {
       console.error('Error fetching quotations:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load special hire data",
-        variant: "destructive"
-      });
+      toast.error('Failed to load special hire data');
     } finally {
       setLoading(false);
     }

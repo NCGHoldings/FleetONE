@@ -1,83 +1,113 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { 
   Eye, Download, Upload, Receipt, Users, UserPlus, Bus, Settings, ChevronDown, 
   Search, Filter, MoreHorizontal, MapPin, Calendar, DollarSign, TrendingUp,
-  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw
+  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeSpecialHire, type QuotationWithPayments } from '@/hooks/useRealtimeSpecialHire';
+import { useFinanceApproval } from '@/hooks/useFinanceApproval';
 import { PaymentConfirmationModal, type PaymentConfirmationData } from './PaymentConfirmationModal';
-import { EnhancedTripStatusManagementModal, type TripStatusData } from './EnhancedTripStatusManagementModal';
+import { FinanceApprovalModal } from './FinanceApprovalModal';
+import { EnhancedTripStatusManagementModal } from './EnhancedTripStatusManagementModal';
 import { TripDetailsModal } from './TripDetailsModal';
 import { InvoiceViewer } from './InvoiceViewer';
-import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
-import { format } from 'date-fns';
+import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export function ConfirmedTripsTable() {
   const { quotations, loading: realtimeLoading, refetch } = useRealtimeSpecialHire();
-  const [filteredTrips, setFilteredTrips] = useState<QuotationWithPayments[]>([]);
+  const { user, hasRole } = useAuth();
+  const { approvePayment, rejectPayment, isLoading: financeLoading } = useFinanceApproval();
+  
+  // State for filtering and search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  
+  // Modal states
   const [selectedTrip, setSelectedTrip] = useState<QuotationWithPayments | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [invoiceViewerOpen, setInvoiceViewerOpen] = useState(false);
+  const [financeApprovalModalOpen, setFinanceApprovalModalOpen] = useState(false);
+  const [selectedFinancePayment, setSelectedFinancePayment] = useState<any>(null);
   const [currentInvoiceData, setCurrentInvoiceData] = useState<InvoiceData | null>(null);
+  
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string>('');
-  
-  // Enhanced filtering and search
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [paymentFilter, setPaymentFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
 
-  const { toast } = useToast();
+  // Check user roles
+  const isFinanceUser = hasRole('finance') || hasRole('admin') || hasRole('super_admin');
+  const isOperationsUser = hasRole('admin') || hasRole('super_admin') || hasRole('supervisor');
 
-  useEffect(() => {
-    fetchCompanyLogo();
-  }, []);
+  // Filter quotations based on search and filters
+  const filteredTrips = useMemo(() => {
+    let filtered = quotations.filter(quotation => quotation.status === 'confirmed');
 
-  // Enhanced filtering and search functionality
-  useEffect(() => {
-    let filtered = quotations;
-
-    // Search filter
+    // Apply search filter
     if (searchQuery) {
-      filtered = filtered.filter(trip =>
-        trip.quotation_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trip.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trip.customer_phone.includes(searchQuery) ||
-        trip.pickup_location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trip.drop_location.toLowerCase().includes(searchQuery.toLowerCase())
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(trip => 
+        trip.quotation_no.toLowerCase().includes(query) ||
+        trip.customer_name.toLowerCase().includes(query) ||
+        (trip.company_name && trip.company_name.toLowerCase().includes(query)) ||
+        trip.pickup_location.toLowerCase().includes(query) ||
+        trip.drop_location.toLowerCase().includes(query)
       );
     }
 
-    // Status filter
+    // Apply status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(trip => trip.status === statusFilter);
+      filtered = filtered.filter(trip => {
+        switch (statusFilter) {
+          case 'paid':
+            return trip.status === 'paid' || trip.status === 'completed';
+          case 'pending':
+            return trip.status === 'confirmed';
+          case 'completed':
+            return trip.status === 'completed';
+          default:
+            return true;
+        }
+      });
     }
 
-    // Payment filter
+    // Apply payment filter
     if (paymentFilter !== 'all') {
-      if (paymentFilter === 'pending') {
-        filtered = filtered.filter(trip => trip.total_paid === 0);
-      } else if (paymentFilter === 'partial') {
-        filtered = filtered.filter(trip => trip.total_paid > 0 && trip.balance_due > 0);
-      } else if (paymentFilter === 'paid') {
-        filtered = filtered.filter(trip => trip.balance_due <= 0);
-      }
+      filtered = filtered.filter(trip => {
+        const pendingFinancePayments = trip.payments?.filter(p => p.status === 'pending_finance') || [];
+        const approvedPayments = trip.payments?.filter(p => p.status === 'approved') || [];
+        const rejectedPayments = trip.payments?.filter(p => p.status === 'rejected') || [];
+        
+        switch (paymentFilter) {
+          case 'pending_finance':
+            return pendingFinancePayments.length > 0;
+          case 'approved':
+            return approvedPayments.length > 0 && pendingFinancePayments.length === 0;
+          case 'rejected':
+            return rejectedPayments.length > 0;
+          case 'no_payments':
+            return (trip.payments?.length || 0) === 0;
+          default:
+            return true;
+        }
+      });
     }
 
-    // Date filter
+    // Apply date filter
     if (dateFilter !== 'all') {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -89,126 +119,127 @@ export function ConfirmedTripsTable() {
         switch (dateFilter) {
           case 'today':
             return tripDateOnly.getTime() === today.getTime();
-          case 'week':
-            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-            return tripDateOnly >= weekAgo;
-          case 'month':
-            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-            return tripDateOnly >= monthAgo;
+          case 'upcoming':
+            return tripDateOnly > today;
+          case 'past':
+            return tripDateOnly < today;
           default:
             return true;
         }
       });
     }
 
-    setFilteredTrips(filtered);
+    return filtered;
   }, [quotations, searchQuery, statusFilter, paymentFilter, dateFilter]);
 
-  const fetchCompanyLogo = async () => {
-    // For now, we'll use a default empty logo
-    setCompanyLogo('');
+  const calculateTotalAmount = (quotation: QuotationWithPayments) => {
+    return quotation.gross_revenue + 
+           (quotation.fuel_cost_fuel_only || 0) + 
+           (quotation.commission_pass_through_amount || 0) - 
+           (quotation.discount_amount_lkr || 0);
+  };
+
+  const getTripStatusBadge = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800"><Clock className="w-3 h-3 mr-1" />Confirmed</Badge>;
+      case 'paid':
+        return <Badge variant="secondary" className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Paid</Badge>;
+      case 'completed':
+        return <Badge variant="secondary" className="bg-purple-100 text-purple-800"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
+      case 'cancelled':
+        return <Badge variant="secondary" className="bg-red-100 text-red-800"><XCircle className="w-3 h-3 mr-1" />Cancelled</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getPaymentStatusBadge = (quotation: QuotationWithPayments) => {
+    const pendingFinancePayments = quotation.payments?.filter(p => p.status === 'pending_finance') || [];
+    const approvedPayments = quotation.payments?.filter(p => p.status === 'approved') || [];
+    const rejectedPayments = quotation.payments?.filter(p => p.status === 'rejected') || [];
+    
+    if (rejectedPayments.length > 0) {
+      return <Badge variant="secondary" className="bg-red-100 text-red-800"><XCircle className="w-3 h-3 mr-1" />Payment Rejected</Badge>;
+    }
+    
+    if (pendingFinancePayments.length > 0) {
+      return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" />Pending Finance</Badge>;
+    }
+    
+    if (approvedPayments.length > 0) {
+      const totalApproved = approvedPayments.reduce((sum, p) => sum + p.amount, 0);
+      const totalDue = calculateTotalAmount(quotation);
+      
+      if (totalApproved >= totalDue) {
+        return <Badge variant="secondary" className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Fully Paid</Badge>;
+      } else {
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800"><DollarSign className="w-3 h-3 mr-1" />Partially Paid</Badge>;
+      }
+    }
+    
+    return <Badge variant="secondary" className="bg-gray-100 text-gray-800"><AlertCircle className="w-3 h-3 mr-1" />No Payments</Badge>;
   };
 
   const handlePaymentConfirmation = async (paymentData: PaymentConfirmationData) => {
     if (!selectedTrip) return;
 
-    console.log('Payment confirmation started:', {
-      paymentData,
-      selectedTrip,
-      advancePaid: selectedTrip.advance_paid,
-      balanceDue: selectedTrip.balance_due
-    });
-
-    setLoading(true);
     try {
-      const currentUser = await supabase.auth.getUser();
-      if (!currentUser.data.user) throw new Error('User not authenticated');
-
-      // Calculate final total amount
-      const finalTotalAmount = (selectedTrip.gross_revenue || 0) + 
-                              (selectedTrip.fuel_cost_fuel_only || 0) + 
-                              (selectedTrip.commission_pass_through_amount || 0) - 
-                              (selectedTrip.discount_amount_lkr || 0);
-
-      // Determine payment and invoice type
-      const isFullPayment = paymentData.amount >= finalTotalAmount;
-      const isFinalPayment = paymentData.paymentType === 'final' || paymentData.paymentType === 'full';
-      const invoiceType: 'advance' | 'final' = isFinalPayment || isFullPayment ? 'final' : 'advance';
-
-      // Generate invoice number
-      const invoiceNo = `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-
-      console.log('Saving payment to database:', {
-        quotation_id: selectedTrip.id,
-        payment_type: paymentData.paymentType,
-        amount: paymentData.amount,
-        payment_method: paymentData.method,
-        reference_no: paymentData.reference,
-        created_by: currentUser.data.user.id
-      });
-
-      // Save payment to database
-      const { error: paymentError } = await supabase
+      setLoading(true);
+      
+      // Create payment record with pending status
+      const { data: paymentResponse, error: paymentError } = await supabase
         .from('special_hire_payments')
         .insert({
           quotation_id: selectedTrip.id,
+          amount: paymentData.amount,
           payment_type: paymentData.paymentType,
-          amount: paymentData.amount,
           payment_method: paymentData.method,
-          reference_no: paymentData.reference || null,
-          created_by: currentUser.data.user.id
-        });
+          reference_no: paymentData.reference,
+          payment_proof_url: paymentData.paymentProofUrl,
+          notes: paymentData.notes,
+          status: 'pending_finance', // Operations confirms, now needs finance approval
+          created_by: user?.id,
+        })
+        .select()
+        .maybeSingle();
 
-      if (paymentError) {
-        console.error('Error saving payment:', paymentError);
-        throw paymentError;
-      }
+      if (paymentError) throw paymentError;
 
-      // Save invoice to database
-      const { error: invoiceError } = await supabase
-        .from('special_hire_invoices')
-        .insert({
-          quotation_id: selectedTrip.id,
-          invoice_type: invoiceType,
-          invoice_no: invoiceNo,
-          amount: paymentData.amount,
-          generated_by: currentUser.data.user.id
-        });
-
-      if (invoiceError) {
-        console.error('Error saving invoice:', invoiceError);
-        throw invoiceError;
-      }
-
-      // Update trip assignment if provided
-      const updateData: any = {};
-      if (paymentData.driverName) updateData.assigned_driver_name = paymentData.driverName;
-      if (paymentData.conductorName) updateData.assigned_conductor_name = paymentData.conductorName;
-      if (paymentData.busNo) updateData.assigned_bus_no = paymentData.busNo;
-
-      // Update status based on payment type
-      if (invoiceType === 'final') {
-        updateData.status = 'completed';
-      } else if (paymentData.paymentType === 'advance') {
-        updateData.status = 'paid';
-      }
-
-      if (Object.keys(updateData).length > 0) {
+      // Update quotation with trip assignment if provided
+      if (paymentData.driverName || paymentData.conductorName || paymentData.busNo) {
         const { error: updateError } = await supabase
           .from('special_hire_quotations')
-          .update(updateData)
+          .update({
+            assigned_driver_name: paymentData.driverName,
+            assigned_conductor_name: paymentData.conductorName,
+            assigned_bus_no: paymentData.busNo,
+          })
           .eq('id', selectedTrip.id);
 
-        if (updateError) {
-          console.error('Error updating quotation:', updateError);
-          throw updateError;
-        }
+        if (updateError) throw updateError;
       }
 
-      // Generate and download PDF
-      const invoiceData: InvoiceData = {
-        invoiceNo,
-        invoiceType,
+      // Create notification for finance team
+      if (paymentResponse) {
+        const { error: notificationError } = await supabase
+          .from('payment_notifications')
+          .insert({
+            payment_id: paymentResponse.id,
+            quotation_id: selectedTrip.id,
+            notification_type: 'finance_approval_required',
+            target_role: 'finance',
+            message: `Payment of LKR ${paymentData.amount.toLocaleString()} for quotation ${selectedTrip.quotation_no} requires finance approval.`,
+            created_by: user?.id,
+          });
+
+        if (notificationError) console.error('Notification error:', notificationError);
+      }
+
+      // Generate DRAFT documents
+      const invoiceData = {
+        invoiceNo: `${paymentData.paymentType.toUpperCase()}-${Date.now()}`,
+        invoiceType: paymentData.paymentType === 'advance' ? 'advance' as const : 'final' as const,
         quotationNo: selectedTrip.quotation_no,
         customerName: selectedTrip.customer_name,
         customerPhone: selectedTrip.customer_phone || '',
@@ -218,285 +249,241 @@ export function ConfirmedTripsTable() {
         dropLocation: selectedTrip.drop_location,
         pickupDate: new Date(selectedTrip.pickup_datetime),
         dropDate: new Date(selectedTrip.drop_datetime || selectedTrip.pickup_datetime),
-        busType: selectedTrip.bus_type,
+        busType: 'Standard Bus',
         numberOfBuses: selectedTrip.number_of_buses,
         numberOfPassengers: selectedTrip.number_of_passengers,
-        totalAmount: finalTotalAmount,
-        advanceAmount: invoiceType === 'final' ? selectedTrip.advance_paid : paymentData.amount,
-        balanceAmount: finalTotalAmount - (selectedTrip.advance_paid || 0),
+        totalAmount: calculateTotalAmount(selectedTrip),
+        advanceAmount: selectedTrip.advance_paid || 0,
         paidAmount: paymentData.amount,
-        companyLogo,
         vehicleNo: paymentData.busNo,
         driverName: paymentData.driverName,
         conductorName: paymentData.conductorName,
-        itemDetail: `${format(new Date(selectedTrip.pickup_datetime), 'dd/MM/yyyy')} ${selectedTrip.pickup_location} → ${selectedTrip.drop_location}; ${selectedTrip.number_of_passengers} Pax, ${selectedTrip.number_of_buses} bus(es), ${selectedTrip.bus_type}`,
+        // Enhanced fields for multi-step workflow
+        invoice_status: 'draft' as const,
+        document_type: paymentData.paymentType === 'advance' ? 'sales_receipt' as const : 'invoice' as const,
       };
 
-      console.log('Generated invoice data:', invoiceData);
-      
-      // Generate and auto-download PDF
-      const pdfBlob = await generateInvoicePDF(invoiceData);
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${invoiceNo}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // Store invoice record with DRAFT status
+      const { error: invoiceError } = await supabase
+        .from('special_hire_invoices')
+        .insert({
+          quotation_id: selectedTrip.id,
+          invoice_no: invoiceData.invoiceNo,
+          invoice_type: paymentData.paymentType === 'advance' ? 'advance' : 'final',
+          amount: paymentData.amount,
+          status: 'draft', // Mark as draft until finance approves
+          generated_by: user?.id,
+        });
 
-      toast({
-        title: 'Success!',
-        description: `${invoiceType === 'final' ? 'Final payment' : 'Advance payment'} confirmed and invoice PDF downloaded successfully. Real-time updates will sync across all users.`
-      });
+      if (invoiceError) throw invoiceError;
 
+      toast.success('Payment confirmed! Document generated as DRAFT - awaiting finance approval.');
       setPaymentModalOpen(false);
-      
-      // The real-time hook will automatically refresh the data
-    } catch (error: any) {
+      setSelectedTrip(null);
+      refetch();
+    } catch (error) {
       console.error('Error confirming payment:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to confirm payment',
-        variant: 'destructive'
-      });
+      toast.error('Failed to confirm payment. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const viewInvoice = async (trip: QuotationWithPayments, invoiceType: 'advance' | 'final') => {
-    const invoice = trip.invoices.find(inv => inv.invoice_type === invoiceType);
-    if (!invoice) return;
-
-    const finalTotalAmount = (trip.gross_revenue || 0) + 
-                            (trip.fuel_cost_fuel_only || 0) + 
-                            (trip.commission_pass_through_amount || 0) - 
-                            (trip.discount_amount_lkr || 0);
-
-    const invoiceData: InvoiceData = {
-      invoiceNo: invoice.invoice_no,
-      invoiceType: invoice.invoice_type as 'advance' | 'final',
-      quotationNo: trip.quotation_no,
-      customerName: trip.customer_name,
-      customerPhone: trip.customer_phone,
-      customerEmail: trip.customer_email,
-      companyName: trip.company_name,
-      pickupLocation: trip.pickup_location,
-      dropLocation: trip.drop_location,
-      pickupDate: new Date(trip.pickup_datetime),
-      dropDate: new Date(trip.drop_datetime || trip.pickup_datetime),
-      busType: trip.bus_type,
-      numberOfBuses: trip.number_of_buses,
-      numberOfPassengers: trip.number_of_passengers,
-      totalAmount: finalTotalAmount,
-      advanceAmount: trip.advance_paid,
-      paidAmount: invoice.amount,
-      companyLogo,
-      vehicleNo: trip.assigned_bus_no,
-      driverName: trip.assigned_driver_name,
-      conductorName: trip.assigned_conductor_name,
-      itemDetail: `${format(new Date(trip.pickup_datetime), 'dd/MM/yyyy')} ${trip.pickup_location} → ${trip.drop_location}; ${trip.number_of_passengers} Pax, ${trip.number_of_buses} bus(es), ${trip.bus_type}`,
-    };
-    setCurrentInvoiceData(invoiceData);
-    setInvoiceViewerOpen(true);
+  const handleFinanceApproval = async (paymentId: string, notes?: string) => {
+    const result = await approvePayment(paymentId, notes);
+    if (result.success) {
+      setFinanceApprovalModalOpen(false);
+      setSelectedFinancePayment(null);
+      refetch();
+    }
   };
 
-  const handleStatusChange = async (statusData: TripStatusData) => {
-    if (!selectedTrip) return;
+  const handleFinanceRejection = async (paymentId: string, reason: string) => {
+    const result = await rejectPayment(paymentId, reason);
+    if (result.success) {
+      setFinanceApprovalModalOpen(false);
+      setSelectedFinancePayment(null);
+      refetch();
+    }
+  };
 
-    setStatusLoading(true);
+  const viewInvoice = async (quotation: QuotationWithPayments) => {
     try {
-      const updateData: any = {
-        status: statusData.status,
-        // Add any additional status fields if they exist in the database
+      const invoiceData = {
+        invoiceNo: `INV-${Date.now()}`,
+        invoiceType: 'final' as const,
+        quotationNo: quotation.quotation_no,
+        customerName: quotation.customer_name,
+        customerPhone: quotation.customer_phone || '',
+        customerEmail: quotation.customer_email,
+        companyName: quotation.company_name,
+        pickupLocation: quotation.pickup_location,
+        dropLocation: quotation.drop_location,
+        pickupDate: new Date(quotation.pickup_datetime),
+        dropDate: new Date(quotation.drop_datetime || quotation.pickup_datetime),
+        busType: 'Standard Bus',
+        numberOfBuses: quotation.number_of_buses,
+        numberOfPassengers: quotation.number_of_passengers,
+        totalAmount: calculateTotalAmount(quotation),
+        advanceAmount: quotation.advance_paid || 0,
+        paidAmount: quotation.total_paid || 0,
+        companyLogo: companyLogo,
+        vehicleNo: quotation.assigned_bus_no,
+        driverName: quotation.assigned_driver_name,
+        conductorName: quotation.assigned_conductor_name,
       };
 
-      // Handle refund data for cancellations
-      if (statusData.status === 'cancelled' && statusData.refundAmount) {
-        updateData.refund_amount = statusData.refundAmount;
-        updateData.refund_status = statusData.refundStatus || 'pending';
-      }
-
-      if (statusData.reason) {
-        updateData.cancellation_reason = statusData.reason;
-      }
-
-      const { error } = await supabase
-        .from('special_hire_quotations')
-        .update(updateData)
-        .eq('id', selectedTrip.id);
-
-      if (error) throw error;
-
-      let statusMessage = 'Trip status updated successfully';
-      if (statusData.status === 'cancelled' && statusData.refundAmount) {
-        statusMessage += ` - Refund of LKR ${statusData.refundAmount.toLocaleString()} ${statusData.refundStatus}`;
-      }
-
-      toast({
-        title: 'Success',
-        description: statusMessage,
-      });
-
-      setStatusModalOpen(false);
-      // Real-time hook will update automatically
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to update trip status',
-        variant: 'destructive',
-      });
-    } finally {
-      setStatusLoading(false);
+      setCurrentInvoiceData(invoiceData);
+      setInvoiceViewerOpen(true);
+    } catch (error) {
+      console.error('Error generating invoice preview:', error);
+      toast.error('Failed to generate invoice preview');
     }
   };
 
-  const getTripStatusBadge = (trip: QuotationWithPayments) => {
-    const status = trip.status;
-    const variants: Record<string, { variant: any; className?: string }> = {
-      confirmed: { variant: 'default', className: 'bg-blue-500' },
-      paid: { variant: 'default', className: 'bg-green-500' },
-      completed: { variant: 'default', className: 'bg-green-600' },
-      cancelled: { variant: 'destructive' },
-      on_hold: { variant: 'secondary', className: 'bg-yellow-500 text-yellow-900' },
-      no_bus_allocated: { variant: 'secondary', className: 'bg-orange-500 text-orange-900' },
-      other: { variant: 'outline' },
-    };
-
-    const config = variants[status] || { variant: 'outline' };
+  const handleDownloadInvoice = async () => {
+    if (!currentInvoiceData) return;
     
-    return (
-      <Badge variant={config.variant} className={config.className}>
-        {status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-      </Badge>
-    );
-  };
-
-  const getPaymentStatusBadge = (trip: QuotationWithPayments) => {
-    if (trip.status === 'completed' || trip.balance_due <= 0) {
-      return <Badge variant="default" className="bg-green-500">Fully Paid</Badge>;
-    } else if (trip.advance_paid > 0) {
-      return <Badge variant="secondary">Advance Paid</Badge>;
-    } else {
-      return <Badge variant="outline">Payment Pending</Badge>;
+    try {
+      const pdfBlob = await generateInvoicePDF(currentInvoiceData);
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${currentInvoiceData.invoiceType}-${currentInvoiceData.quotationNo}-${Date.now()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Invoice downloaded successfully!');
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      toast.error('Failed to download invoice');
     }
   };
 
-  const calculateTotalAmount = (trip: QuotationWithPayments) => {
-    return (trip.gross_revenue || 0) + 
-           (trip.fuel_cost_fuel_only || 0) + 
-           (trip.commission_pass_through_amount || 0) - 
-           (trip.discount_amount_lkr || 0);
-  };
+  // Stats for dashboard
+  const stats = useMemo(() => {
+    const total = filteredTrips.length;
+    const pendingFinance = filteredTrips.filter(trip => 
+      trip.payments?.some(p => p.status === 'pending_finance')
+    ).length;
+    const approved = filteredTrips.filter(trip => 
+      trip.payments?.some(p => p.status === 'approved')
+    ).length;
+    const totalRevenue = filteredTrips.reduce((sum, trip) => {
+      const approvedPayments = trip.payments?.filter(p => p.status === 'approved') || [];
+      return sum + approvedPayments.reduce((pSum, payment) => pSum + payment.amount, 0);
+    }, 0);
+
+    return { total, pendingFinance, approved, totalRevenue };
+  }, [filteredTrips]);
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Header with Analytics */}
+      {/* Enhanced Dashboard Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="professional-card">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Receipt className="w-5 h-5 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Trips</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="professional-card">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Clock className="w-5 h-5 text-yellow-500" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Pending Finance</p>
+                <p className="text-2xl font-bold">{stats.pendingFinance}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="professional-card">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Approved Payments</p>
+                <p className="text-2xl font-bold">{stats.approved}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="professional-card">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <TrendingUp className="w-5 h-5 text-purple-500" />
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Approved Revenue</p>
+                <p className="text-xl font-bold">LKR {stats.totalRevenue.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Enhanced Filters and Search */}
       <Card className="professional-card">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                <span>Trip Management Dashboard</span>
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Manage confirmed trips, payments, and status updates with real-time synchronization
-              </p>
-            </div>
-            
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-              <div className="space-y-1">
-                <div className="text-2xl font-bold text-primary">{filteredTrips.length}</div>
-                <div className="text-xs text-muted-foreground">Total Trips</div>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search by quotation, customer, or location..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold text-green-600">
-                  {filteredTrips.filter(t => t.balance_due <= 0).length}
-                </div>
-                <div className="text-xs text-muted-foreground">Fully Paid</div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold text-orange-600">
-                  {filteredTrips.filter(t => t.advance_paid > 0 && t.balance_due > 0).length}
-                </div>
-                <div className="text-xs text-muted-foreground">Partial</div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold text-red-600">
-                  {filteredTrips.filter(t => t.status === 'cancelled').length}
-                </div>
-                <div className="text-xs text-muted-foreground">Cancelled</div>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        
-        {/* Enhanced Filters */}
-        <CardContent className="border-t">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search trips..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
             </div>
             
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Statuses" />
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
-                <SelectItem value="no_bus_allocated">No Bus</SelectItem>
               </SelectContent>
             </Select>
-            
+
             <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Payment Status" />
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by payment" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Payments</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="partial">Partial Paid</SelectItem>
-                <SelectItem value="paid">Fully Paid</SelectItem>
+                <SelectItem value="pending_finance">Pending Finance</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="no_payments">No Payments</SelectItem>
               </SelectContent>
             </Select>
-            
+
             <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Date Range" />
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by date" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Dates</SelectItem>
                 <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="upcoming">Upcoming</SelectItem>
+                <SelectItem value="past">Past</SelectItem>
               </SelectContent>
             </Select>
-            
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('all');
-                setPaymentFilter('all');
-                setDateFilter('all');
-              }}
-              className="flex items-center space-x-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Reset</span>
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -525,198 +512,214 @@ export function ConfirmedTripsTable() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTrips.map((trip) => (
-                    <TableRow key={trip.id} className="table-row-hover">
-                      {/* Quotation Info */}
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium text-sm">{trip.quotation_no}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {format(new Date(trip.created_at), 'MMM dd, yyyy')}
+                  {filteredTrips.map((trip) => {
+                    const pendingFinancePayments = trip.payments?.filter(p => p.status === 'pending_finance') || [];
+                    const totalAmount = calculateTotalAmount(trip);
+                    
+                    return (
+                      <TableRow key={trip.id} className="table-row-hover">
+                        {/* Quotation Info */}
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium text-sm">{trip.quotation_no}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(trip.created_at), 'MMM dd, yyyy')}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
+                        </TableCell>
 
-                      {/* Customer Details */}
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium text-sm">{trip.customer_name}</div>
-                          {trip.company_name && (
+                        {/* Customer Details */}
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium text-sm">{trip.customer_name}</div>
+                            {trip.company_name && (
+                              <div className="text-xs text-muted-foreground flex items-center space-x-1">
+                                <Building className="w-3 h-3" />
+                                <span>{trip.company_name}</span>
+                              </div>
+                            )}
                             <div className="text-xs text-muted-foreground flex items-center space-x-1">
-                              <Building className="w-3 h-3" />
-                              <span>{trip.company_name}</span>
-                            </div>
-                          )}
-                          <div className="text-xs text-muted-foreground flex items-center space-x-1">
-                            <Phone className="w-3 h-3" />
-                            <span>{trip.customer_phone}</span>
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      {/* Trip Information */}
-                      <TableCell className="max-w-xs">
-                        <div className="space-y-2">
-                          <div className="flex items-start space-x-2 text-xs">
-                            <MapPin className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                            <div className="truncate">{trip.pickup_location}</div>
-                          </div>
-                          <div className="flex items-start space-x-2 text-xs">
-                            <MapPin className="w-3 h-3 text-red-500 mt-0.5 flex-shrink-0" />
-                            <div className="truncate">{trip.drop_location}</div>
-                          </div>
-                          <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="w-3 h-3" />
-                              <span>{format(new Date(trip.pickup_datetime), 'MMM dd')}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Users className="w-3 h-3" />
-                              <span>{trip.number_of_passengers}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Bus className="w-3 h-3" />
-                              <span>{trip.number_of_buses}</span>
+                              <Phone className="w-3 h-3" />
+                              <span>{trip.customer_phone}</span>
                             </div>
                           </div>
-                        </div>
-                      </TableCell>
+                        </TableCell>
 
-                      {/* Vehicle Assignment */}
-                      <TableCell>
-                        <div className="space-y-1 text-xs">
-                          {trip.assigned_driver_name && (
-                            <div className="flex items-center space-x-1">
-                              <UserPlus className="w-3 h-3 text-blue-500" />
-                              <span>{trip.assigned_driver_name}</span>
+                        {/* Trip Information */}
+                        <TableCell className="max-w-xs">
+                          <div className="space-y-2">
+                            <div className="flex items-start space-x-2 text-xs">
+                              <MapPin className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                              <div className="truncate">{trip.pickup_location}</div>
                             </div>
-                          )}
-                          {trip.assigned_conductor_name && (
-                            <div className="flex items-center space-x-1">
-                              <Users className="w-3 h-3 text-green-500" />
-                              <span>{trip.assigned_conductor_name}</span>
+                            <div className="flex items-start space-x-2 text-xs">
+                              <MapPin className="w-3 h-3 text-red-500 mt-0.5 flex-shrink-0" />
+                              <div className="truncate">{trip.drop_location}</div>
                             </div>
-                          )}
-                          {trip.assigned_bus_no && (
-                            <div className="flex items-center space-x-1">
-                              <Bus className="w-3 h-3 text-orange-500" />
-                              <span>{trip.assigned_bus_no}</span>
+                            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="w-3 h-3" />
+                                <span>{format(new Date(trip.pickup_datetime), 'MMM dd')}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Users className="w-3 h-3" />
+                                <span>{trip.number_of_passengers}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Bus className="w-3 h-3" />
+                                <span>{trip.number_of_buses}</span>
+                              </div>
                             </div>
-                          )}
-                          {!trip.assigned_driver_name && !trip.assigned_conductor_name && !trip.assigned_bus_no && (
-                            <Badge variant="outline" className="text-xs">Not Assigned</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Status */}
-                      <TableCell>{getTripStatusBadge(trip)}</TableCell>
-
-                      {/* Payment Status */}
-                      <TableCell>{getPaymentStatusBadge(trip)}</TableCell>
-
-                      {/* Financial Information */}
-                      <TableCell>
-                        <div className="space-y-1 text-xs">
-                          <div className="font-medium">LKR {calculateTotalAmount(trip).toLocaleString()}</div>
-                          <div className="text-green-600">
-                            Paid: LKR {trip.total_paid.toLocaleString()}
                           </div>
-                          {trip.balance_due > 0 && (
-                            <div className="text-red-600">
-                              Due: LKR {trip.balance_due.toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
+                        </TableCell>
 
-                      {/* Actions */}
-                      <TableCell>
-                        <div className="flex items-center justify-center space-x-1">
-                          {/* View Details */}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedTrip(trip);
-                              setDetailsModalOpen(true);
-                            }}
-                            className="text-xs"
-                          >
-                            <Eye className="w-3 h-3" />
-                          </Button>
+                        {/* Vehicle Assignment */}
+                        <TableCell>
+                          <div className="space-y-1 text-xs">
+                            {trip.assigned_driver_name && (
+                              <div className="flex items-center space-x-1">
+                                <UserPlus className="w-3 h-3 text-blue-500" />
+                                <span>{trip.assigned_driver_name}</span>
+                              </div>
+                            )}
+                            {trip.assigned_conductor_name && (
+                              <div className="flex items-center space-x-1">
+                                <Users className="w-3 h-3 text-green-500" />
+                                <span>{trip.assigned_conductor_name}</span>
+                              </div>
+                            )}
+                            {trip.assigned_bus_no && (
+                              <div className="flex items-center space-x-1">
+                                <Bus className="w-3 h-3 text-purple-500" />
+                                <span>{trip.assigned_bus_no}</span>
+                              </div>
+                            )}
+                            {!trip.assigned_driver_name && !trip.assigned_conductor_name && !trip.assigned_bus_no && (
+                              <span className="text-muted-foreground">Not assigned</span>
+                            )}
+                          </div>
+                        </TableCell>
 
-                          {/* Quick Actions Dropdown */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm" className="text-xs">
-                                <MoreHorizontal className="w-3 h-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedTrip(trip);
-                                  setStatusModalOpen(true);
-                                }}
-                              >
-                                <Settings className="w-3 h-3 mr-2" />
-                                Change Status
-                              </DropdownMenuItem>
-                              
-                              {trip.status !== 'completed' && trip.balance_due > 0 && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setSelectedTrip(trip);
-                                      setPaymentModalOpen(true);
-                                    }}
-                                  >
-                                    <DollarSign className="w-3 h-3 mr-2" />
-                                    Confirm Payment
-                                  </DropdownMenuItem>
-                                </>
-                              )}
+                        {/* Status */}
+                        <TableCell>
+                          {getTripStatusBadge(trip.status)}
+                        </TableCell>
 
-                              {trip.invoices.length > 0 && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  {trip.invoices.map((invoice) => (
+                        {/* Payment Status */}
+                        <TableCell>
+                          <div className="space-y-1">
+                            {getPaymentStatusBadge(trip)}
+                            {pendingFinancePayments.length > 0 && isFinanceUser && (
+                              <div className="text-xs text-yellow-600 flex items-center space-x-1">
+                                <AlertCircle className="w-3 h-3" />
+                                <span>Requires approval</span>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        {/* Financial */}
+                        <TableCell>
+                          <div className="space-y-1 text-xs">
+                            <div className="font-medium">Total: LKR {totalAmount.toLocaleString()}</div>
+                            {(trip.total_paid || 0) > 0 && (
+                              <div className="text-green-600">Paid: LKR {(trip.total_paid || 0).toLocaleString()}</div>
+                            )}
+                            {(trip.balance_due || 0) > 0 && (
+                              <div className="text-red-600">Due: LKR {(trip.balance_due || 0).toLocaleString()}</div>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        {/* Actions */}
+                        <TableCell>
+                          <div className="flex items-center justify-center space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedTrip(trip);
+                                setDetailsModalOpen(true);
+                              }}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                {/* Operations actions */}
+                                {isOperationsUser && (
+                                  <>
                                     <DropdownMenuItem
-                                      key={invoice.id}
-                                      onClick={() => viewInvoice(trip, invoice.invoice_type as 'advance' | 'final')}
+                                      onClick={() => {
+                                        setSelectedTrip(trip);
+                                        setPaymentModalOpen(true);
+                                      }}
                                     >
-                                      <Receipt className="w-3 h-3 mr-2" />
-                                      View {invoice.invoice_type} Invoice
+                                      <CreditCard className="w-4 h-4 mr-2" />
+                                      Confirm Payment
                                     </DropdownMenuItem>
-                                  ))}
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                                    
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedTrip(trip);
+                                        setStatusModalOpen(true);
+                                      }}
+                                    >
+                                      <Settings className="w-4 h-4 mr-2" />
+                                      Update Status
+                                    </DropdownMenuItem>
+                                    
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
+
+                                {/* Finance actions */}
+                                {isFinanceUser && pendingFinancePayments.length > 0 && (
+                                  <>
+                                    {pendingFinancePayments.map((payment) => (
+                                      <DropdownMenuItem
+                                        key={payment.id}
+                                        onClick={() => {
+                                          setSelectedFinancePayment({
+                                            ...payment,
+                                            quotation: trip
+                                          });
+                                          setFinanceApprovalModalOpen(true);
+                                        }}
+                                      >
+                                        <FileCheck className="w-4 h-4 mr-2" />
+                                        Approve Payment (LKR {payment.amount.toLocaleString()})
+                                      </DropdownMenuItem>
+                                    ))}
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
+
+                                <DropdownMenuItem onClick={() => viewInvoice(trip)}>
+                                  <Receipt className="w-4 h-4 mr-2" />
+                                  View Invoice
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
 
               {filteredTrips.length === 0 && (
                 <div className="text-center py-12">
-                  <div className="space-y-3">
-                    <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                      <Bus className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">No trips found</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {searchQuery || statusFilter !== 'all' || paymentFilter !== 'all' || dateFilter !== 'all'
-                          ? 'Try adjusting your filters to see more results.'
-                          : 'No confirmed trips available at the moment.'}
-                      </p>
-                    </div>
-                  </div>
+                  <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-muted-foreground mb-2">No trips found</h3>
+                  <p className="text-muted-foreground">Try adjusting your filters or search criteria.</p>
                 </div>
               )}
             </div>
@@ -724,123 +727,88 @@ export function ConfirmedTripsTable() {
         </CardContent>
       </Card>
 
-      {/* Payment Confirmation Modal */}
-      {selectedTrip && (
+      {/* Modals */}
+      {paymentModalOpen && selectedTrip && (
         <PaymentConfirmationModal
           isOpen={paymentModalOpen}
-          onClose={() => setPaymentModalOpen(false)}
+          onClose={() => {
+            setPaymentModalOpen(false);
+            setSelectedTrip(null);
+          }}
           onConfirm={handlePaymentConfirmation}
           quotationData={{
             quotation_no: selectedTrip.quotation_no,
             customer_name: selectedTrip.customer_name,
             gross_revenue: selectedTrip.gross_revenue,
+            advance_paid: selectedTrip.advance_paid,
+            balance_due: selectedTrip.balance_due,
             fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,
             commission_pass_through_amount: selectedTrip.commission_pass_through_amount,
             discount_amount_lkr: selectedTrip.discount_amount_lkr,
-            advance_paid: selectedTrip.advance_paid,
-            balance_due: selectedTrip.balance_due
           }}
           loading={loading}
         />
       )}
 
-      {/* Trip Status Management Modal */}
-      <EnhancedTripStatusManagementModal
-        open={statusModalOpen}
-        onOpenChange={setStatusModalOpen}
-        trip={selectedTrip ? {
-          id: selectedTrip.id,
-          quotation: {
-            quotation_no: selectedTrip.quotation_no,
-            customer_name: selectedTrip.customer_name,
-            pickup_location: selectedTrip.pickup_location,
-            drop_location: selectedTrip.drop_location,
-            pickup_datetime: selectedTrip.pickup_datetime,
-            number_of_passengers: selectedTrip.number_of_passengers
-          },
-          total_amount: calculateTotalAmount(selectedTrip),
-          advance_paid: selectedTrip.advance_paid,
-          status: selectedTrip.status,
-        } : null}
-        onStatusChange={handleStatusChange}
-        loading={statusLoading}
-      />
+      {financeApprovalModalOpen && selectedFinancePayment && (
+        <FinanceApprovalModal
+          isOpen={financeApprovalModalOpen}
+          onClose={() => {
+            setFinanceApprovalModalOpen(false);
+            setSelectedFinancePayment(null);
+          }}
+          onApprove={(notes) => handleFinanceApproval(selectedFinancePayment.id, notes)}
+          onReject={(reason) => handleFinanceRejection(selectedFinancePayment.id, reason)}
+          paymentData={selectedFinancePayment}
+          loading={financeLoading}
+        />
+      )}
 
-      {/* Trip Details Modal */}
-      {selectedTrip && (
-        <TripDetailsModal
-          open={detailsModalOpen}
-          onOpenChange={setDetailsModalOpen}
+      {statusModalOpen && selectedTrip && (
+        <EnhancedTripStatusManagementModal
+          open={statusModalOpen}
+          onOpenChange={() => {
+            setStatusModalOpen(false);
+            setSelectedTrip(null);
+          }}
           trip={{
             id: selectedTrip.id,
-            quotation_id: selectedTrip.id,
-            status: selectedTrip.status,
-            total_amount: calculateTotalAmount(selectedTrip),
-            advance_paid: selectedTrip.advance_paid,
-            balance_due: selectedTrip.balance_due,
-            created_at: selectedTrip.created_at,
             quotation: {
               quotation_no: selectedTrip.quotation_no,
               customer_name: selectedTrip.customer_name,
-              customer_phone: selectedTrip.customer_phone,
-              customer_email: selectedTrip.customer_email,
-              company_name: selectedTrip.company_name,
               pickup_location: selectedTrip.pickup_location,
               drop_location: selectedTrip.drop_location,
-              pickup_datetime: selectedTrip.pickup_datetime,
-              drop_datetime: selectedTrip.drop_datetime || selectedTrip.pickup_datetime,
-              number_of_buses: selectedTrip.number_of_buses,
-              number_of_passengers: selectedTrip.number_of_passengers,
-              gross_revenue: selectedTrip.gross_revenue,
-              fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,
-              commission_pass_through_amount: selectedTrip.commission_pass_through_amount,
-              discount_amount_lkr: selectedTrip.discount_amount_lkr,
-            },
-            payments: selectedTrip.payments.map(p => ({
-              id: p.id,
-              amount: p.amount,
-              payment_type: p.payment_type,
-              payment_status: 'confirmed',
-              method: p.payment_method,
-              reference: p.reference_no,
-              paid_at: p.paid_at
-            })),
-            invoices: selectedTrip.invoices.map(i => ({
-              id: i.id,
-              invoice_no: i.invoice_no,
-              invoice_type: i.invoice_type,
-              amount: i.amount,
-              pdf_path: '',
-              issued_at: i.generated_at
-            }))
+            }
           }}
-          onViewInvoice={(type) => {
-            setDetailsModalOpen(false);
-            viewInvoice(selectedTrip, type);
+          onStatusUpdate={(data) => {
+            console.log('Status update:', data);
+            refetch();
           }}
-          onDownloadInvoice={(type) => {
-            // Download logic here if needed
-          }}
-          onViewPaymentProof={(proofUrl) => window.open(proofUrl, '_blank')}
+          loading={statusLoading}
         />
       )}
-      
-      {currentInvoiceData && (
+
+      {detailsModalOpen && selectedTrip && (
+        <TripDetailsModal
+          open={detailsModalOpen}
+          onOpenChange={() => {
+            setDetailsModalOpen(false);
+            setSelectedTrip(null);
+          }}
+          trip={{
+            ...selectedTrip,
+            quotation_id: selectedTrip.id,
+            total_amount: calculateTotalAmount(selectedTrip),
+          }}
+        />
+      )}
+
+      {invoiceViewerOpen && currentInvoiceData && (
         <InvoiceViewer
           isOpen={invoiceViewerOpen}
           onClose={() => setInvoiceViewerOpen(false)}
           invoiceData={currentInvoiceData}
-          onDownload={async () => {
-            if (currentInvoiceData) {
-              const pdfBlob = await generateInvoicePDF(currentInvoiceData);
-              const url = URL.createObjectURL(pdfBlob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `${currentInvoiceData.invoiceNo}.pdf`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }
-          }}
+          onDownload={handleDownloadInvoice}
         />
       )}
     </div>
