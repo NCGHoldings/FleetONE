@@ -66,7 +66,7 @@ export const useFinanceApproval = () => {
 
       const invoiceData: InvoiceData = {
         invoiceNo: `APPROVED-${paymentData.id}`,
-        invoiceType: paymentData.payment_type === 'advance' ? 'advance' : 'final',
+        invoiceType: paymentData.payment_type === 'advance' ? 'advance' : 'balance',
         quotationNo: paymentData.quotation.quotation_no,
         customerName: paymentData.quotation.customer_name,
         customerPhone: paymentData.quotation.customer_phone || '',

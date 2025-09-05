@@ -239,7 +239,7 @@ export function ConfirmedTripsTable() {
       // Generate DRAFT documents
       const invoiceData = {
         invoiceNo: `${paymentData.paymentType.toUpperCase()}-${Date.now()}`,
-        invoiceType: paymentData.paymentType === 'advance' ? 'advance' as const : 'final' as const,
+        invoiceType: paymentData.paymentType === 'advance' ? 'advance' as const : 'balance' as const,
         quotationNo: selectedTrip.quotation_no,
         customerName: selectedTrip.customer_name,
         customerPhone: selectedTrip.customer_phone || '',
@@ -269,7 +269,7 @@ export function ConfirmedTripsTable() {
         .insert({
           quotation_id: selectedTrip.id,
           invoice_no: invoiceData.invoiceNo,
-          invoice_type: paymentData.paymentType === 'advance' ? 'advance' : 'final',
+          invoice_type: paymentData.paymentType === 'advance' ? 'advance' : 'balance',
           amount: paymentData.amount,
           status: 'draft', // Mark as draft until finance approves
           generated_by: user?.id,
@@ -311,7 +311,7 @@ export function ConfirmedTripsTable() {
     try {
       const invoiceData = {
         invoiceNo: `INV-${Date.now()}`,
-        invoiceType: 'final' as const,
+        invoiceType: 'balance' as const,
         quotationNo: quotation.quotation_no,
         customerName: quotation.customer_name,
         customerPhone: quotation.customer_phone || '',

@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 
 export interface InvoiceData {
   invoiceNo: string;
-  invoiceType: 'advance' | 'final';
+  invoiceType: 'advance' | 'balance';
   quotationNo: string;
   customerName: string;
   customerPhone: string;

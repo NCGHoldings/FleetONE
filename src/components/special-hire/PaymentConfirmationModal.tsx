@@ -27,7 +27,7 @@ interface PaymentConfirmationModalProps {
 
 export interface PaymentConfirmationData {
   amount: number;
-  paymentType: 'advance' | 'full' | 'final' | 'other';
+  paymentType: 'advance' | 'balance' | 'full';
   method: string;
   reference?: string;
   driverName?: string;
@@ -57,8 +57,8 @@ export const PaymentConfirmationModal = ({
   const balanceDue = finalTotal - advancePaid;
   const isAdvanceAlreadyPaid = advancePaid > 0;
   
-  const [paymentType, setPaymentType] = useState<'advance' | 'full' | 'final' | 'other'>(
-    isAdvanceAlreadyPaid ? 'final' : 'advance'
+  const [paymentType, setPaymentType] = useState<'advance' | 'balance' | 'full'>(
+    isAdvanceAlreadyPaid ? 'balance' : 'advance'
   );
   const [amount, setAmount] = useState<number>(
     isAdvanceAlreadyPaid ? balanceDue : finalTotal * 0.5
@@ -71,13 +71,13 @@ export const PaymentConfirmationModal = ({
   const [paymentProofUrl, setPaymentProofUrl] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
-  const handlePaymentTypeChange = (type: 'advance' | 'full' | 'final' | 'other') => {
+  const handlePaymentTypeChange = (type: 'advance' | 'balance' | 'full') => {
     setPaymentType(type);
     if (type === 'advance' && !isAdvanceAlreadyPaid) {
       setAmount(finalTotal * 0.5);
     } else if (type === 'full') {
       setAmount(finalTotal);
-    } else if (type === 'final') {
+    } else if (type === 'balance') {
       setAmount(balanceDue);
     }
   };
@@ -144,7 +144,7 @@ export const PaymentConfirmationModal = ({
               <Label>Payment Type</Label>
               <RadioGroup 
                 value={paymentType} 
-                onValueChange={(value) => handlePaymentTypeChange(value as 'advance' | 'full' | 'final' | 'other')}
+                onValueChange={(value) => handlePaymentTypeChange(value as 'advance' | 'balance' | 'full')}
                 className="grid grid-cols-2 gap-4"
               >
                 {!isAdvanceAlreadyPaid && (
@@ -161,14 +161,10 @@ export const PaymentConfirmationModal = ({
                 )}
                 {isAdvanceAlreadyPaid && (
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="final" id="final" />
-                    <Label htmlFor="final">Final Payment (Balance)</Label>
+                    <RadioGroupItem value="balance" id="balance" />
+                    <Label htmlFor="balance">Balance Payment</Label>
                   </div>
                 )}
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="other" id="other" />
-                  <Label htmlFor="other">Custom Amount</Label>
-                </div>
               </RadioGroup>
             </div>
 
