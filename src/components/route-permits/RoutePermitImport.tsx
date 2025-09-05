@@ -1,524 +1,483 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, AlertCircle, Download } from "lucide-react";
-import { toast } from "sonner";
-import * as XLSX from 'xlsx';
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
+import { Upload, Download, FileSpreadsheet, CheckCircle, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import * as XLSX from "xlsx";
 
 interface RoutePermitImportProps {
   onImportComplete: () => void;
 }
 
 export function RoutePermitImport({ onImportComplete }: RoutePermitImportProps) {
-  const [file, setFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<any[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [importResults, setImportResults] = useState<{
+    successful: number;
+    failed: number;
+    errors: string[];
+  } | null>(null);
+  const { toast } = useToast();
+
+  // Exact column mapping from user's Excel to database
+  const EXCEL_COLUMN_MAPPING = {
+    "Permanent Route": "route_name",
+    "Temporary Route Name": "temporary_route_name", 
+    "Via": "via",
+    "Route Number": "route_numbers",
+    "Permit Number": "permit_no",
+    "Allocated Bus Number": "allocated_bus_number",
+    "Name of the Owner/Operator": "owner_name",
+    "Name of the Owner,Operator": "owner_name", // Handle comma variant
+    "Permit Holder Address": "owner_address",
+    "Permit Holder NIC": "owner_nic",
+    "NTC Approved Service Type": "service_type",
+    "Approved Seating Capacity": "seats",
+    "Approved Maximum Fare": "approved_maximum_fare",
+    "Issue Date": "issue_date",
+    "Expiry Date": "expiry_date",
+    "Expirary Date": "expiry_date", // Handle typo variant
+    "Annual Fee": "annual_fee",
+    "Active in Operation": "operation_status",
+    "Permit Active or Inactive": "permit_active_inactive"
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      previewFile(selectedFile);
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      previewFile(file);
     }
   };
 
-  const previewFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        
-        // Show first 5 rows for preview
-        setPreviewData(jsonData.slice(0, 5));
-      } catch (error) {
-        console.error('Error reading file:', error);
-        toast.error('Error reading file. Please ensure it\'s a valid Excel or CSV file.');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  // Helper to safely convert Excel cell values (string/date/number) to YYYY-MM-DD
-  const formatExcelDate = (value: any) => {
-    if (!value) return new Date().toISOString().split('T')[0];
+  const previewFile = async (file: File) => {
     try {
-      // If already a Date instance (when cellDates: true)
-      if (value instanceof Date) {
-        return new Date(value.getTime() - value.getTimezoneOffset() * 60000)
-          .toISOString()
-          .split('T')[0];
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      
+      console.log("Raw Excel Data:", jsonData);
+      
+      if (jsonData.length > 1) {
+        const headers = jsonData[0] as string[];
+        const rows = jsonData.slice(1, 6); // Show first 5 rows for preview
+        
+        const preview = rows.map((row: any[], index) => {
+          const mappedRow: any = { _rowIndex: index + 2 }; // +2 because we start from row 2 in Excel
+          headers.forEach((header, colIndex) => {
+            const trimmedHeader = header?.toString().trim();
+            const dbField = EXCEL_COLUMN_MAPPING[trimmedHeader as keyof typeof EXCEL_COLUMN_MAPPING];
+            if (dbField && row[colIndex] !== undefined && row[colIndex] !== null && row[colIndex] !== '') {
+              mappedRow[dbField] = row[colIndex];
+            }
+          });
+          return mappedRow;
+        });
+        
+        console.log("Preview data:", preview);
+        setPreviewData(preview);
       }
-      // If number (Excel serial), approximate by treating as days since 1899-12-30
-      if (typeof value === 'number') {
-        const epoch = new Date(Date.UTC(1899, 11, 30));
-        const d = new Date(epoch.getTime() + value * 24 * 60 * 60 * 1000);
-        return d.toISOString().split('T')[0];
-      }
-      // Fallback: parse as string
-      const d = new Date(value);
-      if (!isNaN(d.getTime())) {
-        return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-          .toISOString()
-          .split('T')[0];
-      }
-    } catch {}
-    return new Date().toISOString().split('T')[0];
-  };
-
-  // Enhanced column name normalization for fuzzy matching
-  const normalizeColumnName = (name: string): string => {
-    return name.toLowerCase()
-      .replace(/[^a-z0-9]/g, '') // Remove all non-alphanumeric
-      .replace(/\s+/g, '') // Remove spaces
-      .trim();
-  };
-
-  // Advanced fuzzy matching for column names
-  const fuzzyMatch = (target: string, candidate: string): boolean => {
-    const normalizedTarget = normalizeColumnName(target);
-    const normalizedCandidate = normalizeColumnName(candidate);
-    
-    // Exact match
-    if (normalizedTarget === normalizedCandidate) return true;
-    
-    // Contains match
-    if (normalizedCandidate.includes(normalizedTarget) || normalizedTarget.includes(normalizedCandidate)) return true;
-    
-    // Key word matching for common variations
-    const targetWords = normalizedTarget.split(/(?=[A-Z])|[^a-z0-9]/g).filter(w => w.length > 2);
-    const candidateWords = normalizedCandidate.split(/(?=[A-Z])|[^a-z0-9]/g).filter(w => w.length > 2);
-    
-    return targetWords.some(tw => candidateWords.some(cw => 
-      cw.includes(tw) || tw.includes(cw) || 
-      (tw.length > 3 && cw.length > 3 && (tw.substring(0, 3) === cw.substring(0, 3)))
-    ));
-  };
-
-  // Enhanced column value finder with extensive debugging
-  const findColumnValue = (row: any, possibleNames: string[]): any => {
-    console.log(`Looking for columns: ${possibleNames.join(', ')}`);
-    console.log(`Available columns: ${Object.keys(row).join(', ')}`);
-    
-    // First try exact matches
-    for (const name of possibleNames) {
-      if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
-        console.log(`✓ Found exact match: "${name}" = "${row[name]}"`);
-        return row[name];
-      }
+    } catch (error) {
+      console.error("Error previewing file:", error);
+      toast({
+        title: "Preview Error",
+        description: "Could not preview the Excel file. Please check the file format.",
+        variant: "destructive",
+      });
     }
+  };
+
+  const formatExcelDate = (value: any): string | null => {
+    if (!value) return null;
     
-    // Try fuzzy matching on all available columns
-    for (const [actualColumn, value] of Object.entries(row)) {
-      if (value !== undefined && value !== null && value !== '') {
-        for (const possibleName of possibleNames) {
-          if (fuzzyMatch(possibleName, actualColumn)) {
-            console.log(`✓ Found fuzzy match: "${actualColumn}" matches "${possibleName}" = "${value}"`);
-            return value;
-          }
+    try {
+      // If it's already a string in YYYY-MM-DD format
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+      }
+      
+      // If it's an Excel serial number
+      if (typeof value === 'number' && value > 1) {
+        const date = XLSX.SSF.parse_date_code(value);
+        if (date) {
+          return `${date.y}-${date.m.toString().padStart(2, '0')}-${date.d.toString().padStart(2, '0')}`;
         }
       }
+      
+      // Try to parse as date string
+      const parsedDate = new Date(value);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.toISOString().split('T')[0];
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Date parsing error:", error, "for value:", value);
+      return null;
     }
-    
-    console.log(`✗ No match found for: ${possibleNames.join(', ')}`);
-    return null;
   };
 
-  const mapExcelToDatabase = (row: any) => {
-    console.log('\n=== MAPPING ROW ===');
-    console.log('Available columns:', Object.keys(row));
-    console.log('Row data sample:', Object.entries(row).slice(0, 3));
+  const generatePermitNumber = (index: number): string => {
+    return `PRM${(index + 1).toString().padStart(4, '0')}`;
+  };
+
+  const mapExcelToDatabase = (row: any[], headers: string[], rowIndex: number): any => {
+    const mapped: any = {};
     
-    // Handle permit number first - use from Excel if available
-    const permitNumber = findColumnValue(row, [
-      'Permit Number', 'Permit No', 'Permit', 'License Number', 'Registration Number'
-    ])?.toString().trim() || '';
-    
-    const ownerName = findColumnValue(row, [
-      'Name of the Owner/Operator', 'Name of the Owner', 'Owner Name', 'Permit Holder', 'Owner', 'Permit Holder Name',
-      'Holder Name', 'Company Name', 'Business Name', 'Operator Name', 'Licensee'
-    ])?.toString().trim() || '';
-
-    const routeName = findColumnValue(row, [
-      'Permanent Route', 'Route Name', 'Route', 'Permanent Route Name', 'Main Route',
-      'Service Route', 'Bus Route', 'Primary Route', 'Regular Route'
-    ])?.toString() || '';
-
-    const temporaryRouteName = findColumnValue(row, [
-      'Temporary Route Name', 'Temp Route', 'Alternative Route', 'Secondary Route',
-      'Special Route', 'Extra Route', 'Additional Route'
-    ])?.toString() || '';
-
-    const via = findColumnValue(row, [
-      'Via', 'Via Locations', 'Through', 'Route Via', 'Passing Through',
-      'Intermediate Stops', 'Stops', 'Via Points'
-    ])?.toString() || '';
-
-    const routeNumbersRaw = findColumnValue(row, [
-      'Route Number', 'Route Numbers', 'Route No', 'Service Numbers', 'Route Nos',
-      'Service Number', 'Bus Number', 'Line Number', 'Service Code'
-    ]);
-    const routeNumbers = routeNumbersRaw
-      ? routeNumbersRaw
-          .toString()
-          .split(/[\s,\/\-]+/)
-          .map((s: string) => s.trim())
-          .filter((s: string) => s.length > 0)
-      : null;
-
-    const ntcNumber = findColumnValue(row, [
-      'NTC Approved Service Type', 'NTC Number', 'NTC Service Type', 'Service Type', 'NTC Approval',
-      'License Type', 'Permit Type', 'Service Category', 'Approval Type'
-    ])?.toString() || '';
-
-    const ownerAddress = findColumnValue(row, [
-      'Permit Holder Address', 'Owner Address', 'Address', 'Holder Address',
-      'Business Address', 'Company Address', 'Registered Address'
-    ])?.toString() || '';
-
-    const ownerNic = findColumnValue(row, [
-      'Permit Holder NIC', 'Owner NIC', 'NIC', 'National ID', 'ID Number',
-      'Identity Number', 'Identification Number', 'NIC Number'
-    ])?.toString() || '';
-
-    const seats = findColumnValue(row, [
-      'Seeal Seating Capacity', 'Approved Seating Capacity', 'Seating Capacity', 'Seats', 'Capacity', 'No of Seats',
-      'Passenger Capacity', 'Total Seats', 'Seat Count', 'Passengers', 'Maximum Issue Date'
-    ]);
-
-    const maxFare = findColumnValue(row, [
-      'Approved Maximum Fare', 'Maximum Fare', 'Max Fare', 'Fare', 'Maximum Price',
-      'Ticket Price', 'Maximum Charge', 'Fare Amount', 'Price'
-    ]);
-
-    const issueDate = findColumnValue(row, [
-      'Issue Date', 'Issued Date', 'Date Issued', 'Grant Date', 'Approval Date',
-      'License Date', 'Permit Date', 'Registration Date', 'Start Date'
-    ]);
-
-    const expiryDateRaw = findColumnValue(row, [
-      'Expirary Date', 'Expiry Date', 'Expiration Date', 'Valid Until', 'End Date',
-      'Renewal Date', 'Validity Date', 'Due Date'
-    ]);
-
-    const annualFee = findColumnValue(row, [
-      'Temporary Total Amount', 'Annual Fee', 'Fee', 'License Fee', 'Permit Fee', 'Yearly Fee',
-      'Registration Fee', 'Renewal Fee', 'Amount', 'Cost', 'Total Amount'
-    ]);
-
-    const activeInOperation = findColumnValue(row, [
-      'Existing in Operation/ Active or Inactive', 'Active in Operation', 'Operation Status', 'Active', 'Operating', 'Status',
-      'Current Status', 'Service Status', 'Operational', 'Existing in Operation'
-    ]);
-
-    // Handle allocated bus number (optional field)
-    const allocatedBusNumber = findColumnValue(row, [
-      'Allocated Bus Number', 'Bus Number', 'Bus No', 'Vehicle Number', 'Fleet Number'
-    ])?.toString() || '';
-
-    const mappedRow = {
-      permit_no: permitNumber || '', // Use from Excel if available, will auto-generate if empty
-      route_name: routeName,
-      temporary_route_name: temporaryRouteName,
-      via: via,
-      route_numbers: routeNumbers,
-      owner_name: ownerName || 'Unknown Owner',
-      owner_address: ownerAddress,
-      owner_nic: ownerNic,
-      ntc_number: ntcNumber,
-      service_type: ntcNumber || 'regular',
-      seats: seats ? parseInt(seats) : null,
-      max_fare: maxFare ? parseFloat(maxFare) : null,
-      issue_date: issueDate ? formatExcelDate(issueDate) : new Date().toISOString().split('T')[0],
-      expiry_date: expiryDateRaw ? formatExcelDate(expiryDateRaw) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      annual_fee: annualFee ? parseFloat(annualFee) : null,
-      operation_status:
-        (activeInOperation?.toString().toLowerCase() === 'yes' ||
-          activeInOperation?.toString().toLowerCase() === 'active' ||
-          activeInOperation?.toString().toLowerCase() === 'true')
-          ? 'active'
-          : 'inactive',
-      // Store allocated bus number in notes if provided
-      notes: allocatedBusNumber ? `Allocated Bus: ${allocatedBusNumber}` : null,
-    } as any;
-
-    console.log('Mapped result:', {
-      permit_no: mappedRow.permit_no,
-      owner_name: mappedRow.owner_name,
-      route_name: mappedRow.route_name,
-      seats: mappedRow.seats,
-      max_fare: mappedRow.max_fare,
-      allocated_bus: allocatedBusNumber
+    headers.forEach((header, colIndex) => {
+      const trimmedHeader = header?.toString().trim();
+      const dbField = EXCEL_COLUMN_MAPPING[trimmedHeader as keyof typeof EXCEL_COLUMN_MAPPING];
+      const cellValue = row[colIndex];
+      
+      if (dbField && cellValue !== undefined && cellValue !== null && cellValue !== '') {
+        if (dbField === 'issue_date' || dbField === 'expiry_date') {
+          mapped[dbField] = formatExcelDate(cellValue);
+        } else if (dbField === 'seats' || dbField === 'annual_fee' || dbField === 'approved_maximum_fare') {
+          const numValue = parseFloat(cellValue.toString());
+          if (!isNaN(numValue)) {
+            mapped[dbField] = numValue;
+          }
+        } else if (dbField === 'route_numbers') {
+          // Handle route numbers as array
+          const routeStr = cellValue.toString().trim();
+          if (routeStr) {
+            mapped[dbField] = routeStr.split(',').map((r: string) => r.trim()).filter(Boolean);
+          }
+        } else if (dbField === 'operation_status') {
+          // Map operation status
+          const status = cellValue.toString().toLowerCase().trim();
+          if (status.includes('active') || status.includes('operation')) {
+            mapped[dbField] = 'active';
+          } else {
+            mapped[dbField] = 'inactive';
+          }
+        } else if (dbField === 'permit_active_inactive') {
+          // Map permit status
+          const status = cellValue.toString().toLowerCase().trim();
+          mapped[dbField] = status.includes('active') ? 'active' : 'inactive';
+        } else {
+          mapped[dbField] = cellValue.toString().trim();
+        }
+      }
     });
-    
-    return mappedRow;
+
+    // Auto-generate permit number if not provided
+    if (!mapped.permit_no) {
+      mapped.permit_no = generatePermitNumber(rowIndex);
+    }
+
+    // Set defaults for required fields
+    if (!mapped.route_name && mapped.temporary_route_name) {
+      mapped.route_name = mapped.temporary_route_name;
+    }
+    if (!mapped.owner_name) {
+      mapped.owner_name = 'Unknown Owner';
+    }
+    if (!mapped.issue_date) {
+      mapped.issue_date = new Date().toISOString().split('T')[0];
+    }
+    if (!mapped.expiry_date) {
+      // Default to 1 year from issue date
+      const issueDate = new Date(mapped.issue_date);
+      issueDate.setFullYear(issueDate.getFullYear() + 1);
+      mapped.expiry_date = issueDate.toISOString().split('T')[0];
+    }
+
+    // Map additional fields to match database schema
+    mapped.max_fare = mapped.approved_maximum_fare || null;
+    mapped.ntc_number = mapped.service_type || null;
+    mapped.permit_status = mapped.permit_active_inactive || 'valid';
+
+    return mapped;
   };
 
   const downloadTemplate = () => {
     const templateData = [
-      {
-        'Permanent Route': 'Colombo - Kandy',
-        'Temporary Route Name': 'Express Route',
-        'Via': 'Kadawatha, Gampaha',
-        'Route Number': '101, 102',
-        'Permit Number': 'PRM001',
-        'Allocated Bus Number': 'BUS-001',
-        'Name of the Owner/Operator': 'John Doe Transport',
-        'Permit Holder Address': '123 Main Street, Colombo',
-        'Permit Holder NIC': '751234567V',
-        'NTC Approved Service Type': 'Regular',
-        'Seeal Seating Capacity': 49,
-        'Temporary Total Amount': 75000.00,
-        'Existing in Operation/ Active or Inactive': 'Active'
-      }
+      [
+        "Permanent Route",
+        "Temporary Route Name", 
+        "Via",
+        "Route Number",
+        "Permit Number",
+        "Allocated Bus Number",
+        "Name of the Owner/Operator",
+        "Permit Holder Address",
+        "Permit Holder NIC",
+        "NTC Approved Service Type",
+        "Approved Seating Capacity",
+        "Approved Maximum Fare",
+        "Issue Date",
+        "Expiry Date",
+        "Annual Fee",
+        "Active in Operation",
+        "Permit Active or Inactive"
+      ],
+      [
+        "Colombo - Kandy",
+        "Express Service",
+        "Kegalle, Mawanella",
+        "1, 2, 3",
+        "PRM0001",
+        "NB-1234",
+        "John Doe Transport",
+        "123 Main St, Colombo",
+        "123456789V",
+        "Regular",
+        "45",
+        "150.00",
+        "2024-01-01",
+        "2024-12-31",
+        "50000.00",
+        "Active",
+        "Active"
+      ]
     ];
 
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Route Permits Template');
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Route Permits Template");
+    XLSX.writeFile(wb, "route_permits_template.xlsx");
     
-    XLSX.writeFile(workbook, 'route_permits_template.xlsx');
-    toast.success('Template downloaded successfully');
+    toast({
+      title: "Template Downloaded",
+      description: "Excel template downloaded successfully",
+    });
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      toast.error('Please select a file first');
+    if (!selectedFile) {
+      toast({
+        title: "No File Selected",
+        description: "Please select an Excel file to import.",
+        variant: "destructive",
+      });
       return;
     }
 
-    setUploading(true);
+    setIsUploading(true);
+    setUploadProgress(0);
+    setImportResults(null);
+
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      const data = await selectedFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-          // Clear existing data first as requested
-          const { error: clearError } = await supabase
-            .from('route_permits')
-            .delete()
-            .gt('created_at', '1900-01-01');
-          if (clearError) {
-            console.error('Failed to clear existing permits:', clearError);
-            toast.error(`Failed to clear existing permits: ${clearError.message}`);
-            return;
-          }
+      if (jsonData.length < 2) {
+        throw new Error("Excel file must contain at least a header row and one data row");
+      }
 
-          // Map Excel data to database format with extensive debugging
-          console.log('\n=== STARTING IMPORT PROCESS ===');
-          console.log(`Total rows in Excel: ${jsonData.length}`);
-          
-          const mappedData = (jsonData as any[]).map((row, index) => {
-            console.log(`\n--- Processing Row ${index + 1} ---`);
-            return mapExcelToDatabase(row);
-          });
-          
-          console.log('\n=== VALIDATION PHASE ===');
-          
-          // Much more permissive validation - accept row if it has ANY meaningful data
-          const validData = mappedData.filter((row, index) => {
-            const hasOwnerName = row.owner_name && row.owner_name !== 'Unknown Owner' && row.owner_name.trim() !== '';
-            const hasRouteName = row.route_name && row.route_name !== '' && row.route_name.trim() !== '';
-            const hasAnyData = hasOwnerName || hasRouteName || 
-              (row.seats && row.seats > 0) || 
-              (row.max_fare && row.max_fare > 0) ||
-              (row.route_numbers && row.route_numbers.length > 0) ||
-              (row.ntc_number && row.ntc_number !== '') ||
-              (row.owner_address && row.owner_address !== '') ||
-              (row.owner_nic && row.owner_nic !== '');
-            
-            console.log(`Row ${index + 1} validation:`, {
-              hasOwnerName,
-              hasRouteName,
-              hasSeats: row.seats && row.seats > 0,
-              hasFare: row.max_fare && row.max_fare > 0,
-              hasRouteNumbers: row.route_numbers && row.route_numbers.length > 0,
-              valid: hasAnyData
-            });
-            
-            return hasAnyData;
-          });
+      const headers = jsonData[0] as string[];
+      const dataRows = jsonData.slice(1);
+      
+      console.log("Headers found:", headers);
+      console.log("Total data rows:", dataRows.length);
 
-          console.log(`\nValidation complete: ${validData.length}/${mappedData.length} rows valid`);
+      let successful = 0;
+      let failed = 0;
+      const errors: string[] = [];
 
-          if (validData.length === 0) {
-            console.error('No valid data found - all rows failed validation');
-            toast.error('No valid data found in Excel file. Please check your data and try again.');
-            return;
-          }
+      // Process in batches
+      const batchSize = 10;
+      const totalBatches = Math.ceil(dataRows.length / batchSize);
 
-          if (validData.length < mappedData.length) {
-            console.warn(`${mappedData.length - validData.length} rows were skipped`);
-            toast.warning(`${mappedData.length - validData.length} rows were skipped due to missing data.`);
-          }
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const batchStart = batchIndex * batchSize;
+        const batchEnd = Math.min(batchStart + batchSize, dataRows.length);
+        const batch = dataRows.slice(batchStart, batchEnd);
 
-          // Assign permit numbers - use from Excel if available, otherwise auto-generate
-          const assignedData = validData.map((row, idx) => {
-            // If permit number exists in Excel data, use it; otherwise generate PRM001, PRM002, etc.
-            const finalPermitNo = row.permit_no && row.permit_no.trim() !== '' 
-              ? row.permit_no.trim()
-              : `PRM${(idx + 1).toString().padStart(3, '0')}`;
-            
-            return {
-              ...row,
-              permit_no: finalPermitNo,
-            };
-          });
+        const batchData = batch.map((row: any[], rowIndex) => {
+          const globalRowIndex = batchStart + rowIndex;
+          return mapExcelToDatabase(row, headers, globalRowIndex);
+        }).filter(item => {
+          // Only include rows with meaningful data
+          return item.permit_no || item.route_name || item.owner_name;
+        });
 
-          // Insert data in batches
-          const batchSize = 100;
-          let imported = 0;
-
-          for (let i = 0; i < assignedData.length; i += batchSize) {
-            const batch = assignedData.slice(i, i + batchSize);
-            const { error } = await supabase
+        if (batchData.length > 0) {
+          try {
+            const { data: insertData, error } = await supabase
               .from('route_permits')
-              .insert(batch);
+              .insert(batchData)
+              .select();
 
             if (error) {
-              console.error('Batch insert error:', error);
-              toast.error(`Error importing batch starting at row ${i + 1}: ${error.message}`);
-              continue;
+              console.error("Batch insert error:", error);
+              errors.push(`Batch ${batchIndex + 1}: ${error.message}`);
+              failed += batchData.length;
+            } else {
+              successful += batchData.length;
+              console.log(`Batch ${batchIndex + 1} inserted successfully:`, insertData?.length);
             }
-            imported += batch.length;
+          } catch (batchError) {
+            console.error("Batch processing error:", batchError);
+            errors.push(`Batch ${batchIndex + 1}: ${batchError}`);
+            failed += batchData.length;
           }
-
-          toast.success(`Successfully imported ${imported} route permits`);
-          console.log('Import completed successfully');
-          onImportComplete();
-          setFile(null);
-          setPreviewData([]);
-        } catch (error) {
-          console.error('Upload error:', error);
-          toast.error('Failed to process and upload data');
-        } finally {
-          setUploading(false);
         }
-      };
-      reader.readAsArrayBuffer(file);
+
+        setUploadProgress(((batchIndex + 1) / totalBatches) * 100);
+      }
+
+      setImportResults({ successful, failed, errors });
+
+      if (successful > 0) {
+        toast({
+          title: "Import Completed",
+          description: `Successfully imported ${successful} route permits${failed > 0 ? ` (${failed} failed)` : ''}`,
+        });
+        onImportComplete();
+      } else {
+        toast({
+          title: "Import Failed",
+          description: "No data was successfully imported. Please check your Excel file format.",
+          variant: "destructive",
+        });
+      }
+
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload file');
-      setUploading(false);
+      console.error("Import error:", error);
+      toast({
+        title: "Import Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
     }
   };
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5" />
+          <FileSpreadsheet className="w-5 h-5" />
           Import Route Permits from Excel
         </CardTitle>
         <CardDescription>
-          Upload an Excel or CSV file with route permit data to bulk import records.
+          Upload your Excel file with route permit data. The system will auto-generate permit numbers in PRM0001 format.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-sm text-muted-foreground">
-            Upload your Excel file with route permit data
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="file-upload">Select Excel File</Label>
+            <div className="mt-2">
+              <Input
+                id="file-upload"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileSelect}
+                disabled={isUploading}
+              />
+            </div>
           </div>
+
+          {previewData.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="font-medium">Preview (First 5 rows):</h4>
+              <div className="border rounded-lg overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="p-2 text-left">Permit No</th>
+                      <th className="p-2 text-left">Route Name</th>
+                      <th className="p-2 text-left">Owner Name</th>
+                      <th className="p-2 text-left">Bus Number</th>
+                      <th className="p-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.map((row, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="p-2">{row.permit_no || `PRM${(index + 1).toString().padStart(4, '0')}`}</td>
+                        <td className="p-2">{row.route_name || row.temporary_route_name || '-'}</td>
+                        <td className="p-2">{row.owner_name || '-'}</td>
+                        <td className="p-2">{row.allocated_bus_number || '-'}</td>
+                        <td className="p-2">{row.operation_status || 'Unknown'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {isUploading && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Importing route permits...</span>
+                <span>{Math.round(uploadProgress)}%</span>
+              </div>
+              <Progress value={uploadProgress} className="w-full" />
+            </div>
+          )}
+
+          {importResults && (
+            <div className="space-y-2">
+              <Alert className={importResults.successful > 0 ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+                <div className="flex items-center gap-2">
+                  {importResults.successful > 0 ? 
+                    <CheckCircle className="w-4 h-4 text-green-600" /> : 
+                    <AlertCircle className="w-4 h-4 text-red-600" />
+                  }
+                  <AlertDescription>
+                    <strong>Import Results:</strong><br />
+                    Successfully imported: {importResults.successful}<br />
+                    Failed: {importResults.failed}
+                    {importResults.errors.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer">Show errors</summary>
+                        <ul className="mt-1 ml-4 list-disc">
+                          {importResults.errors.map((error, index) => (
+                            <li key={index} className="text-xs">{error}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </AlertDescription>
+                </div>
+              </Alert>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            onClick={handleUpload}
+            disabled={!selectedFile || isUploading}
+            className="flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            {isUploading ? "Importing..." : "Import Data"}
+          </Button>
+          
           <Button
             variant="outline"
             onClick={downloadTemplate}
-            className="gap-2"
+            className="flex items-center gap-2"
           >
-            <Download className="h-4 w-4" />
+            <Download className="w-4 h-4" />
             Download Template
           </Button>
         </div>
-        
-        <div className="grid w-full max-w-sm items-center gap-1.5">
-          <Input
-            id="excel-file"
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileSelect}
-            disabled={uploading}
-          />
+
+        <div className="text-sm text-muted-foreground space-y-1">
+          <p><strong>Expected Excel Columns:</strong></p>
+          <p>Permanent Route, Temporary Route Name, Via, Route Number, Permit Number, Allocated Bus Number, Name of the Owner/Operator, Permit Holder Address, Permit Holder NIC, NTC Approved Service Type, Approved Seating Capacity, Approved Maximum Fare, Issue Date, Expiry Date, Annual Fee, Active in Operation, Permit Active or Inactive</p>
+          <p><strong>Notes:</strong> Empty cells will be ignored. Permit numbers will be auto-generated in PRM0001 format if not provided.</p>
         </div>
-
-        {previewData.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Preview (First 5 rows)</h4>
-            <div className="border rounded-md overflow-x-auto max-h-60">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {Object.keys(previewData[0] || {}).slice(0, 6).map((key) => (
-                      <TableHead key={key} className="text-xs">{key}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {previewData.map((row, index) => (
-                    <TableRow key={index}>
-                      {Object.values(row).slice(0, 6).map((value: any, cellIndex) => (
-                        <TableCell key={cellIndex} className="text-xs">
-                          {String(value || '').substring(0, 30)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        )}
-
-        <div className="bg-muted/50 p-4 rounded-lg">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium mb-2">Import Instructions:</p>
-               <div className="space-y-1 text-xs">
-                 <p>• Download the template above to get the correct Excel format</p>
-                 <p>• The system will match column names flexibly using fuzzy matching</p>
-                 <p>• Any row with meaningful data will be imported (owner name, route, seats, fare, etc.)</p>
-                 <p>• Completely empty rows will be skipped automatically</p>
-                 <p>• Permit numbers will be auto-generated as PRM001, PRM002, etc.</p>
-                 <p>• Check browser console for detailed import debugging information</p>
-               </div>
-              <p className="font-medium mt-3 mb-2">Your Excel Column Names (will be auto-matched):</p>
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                <span>• Permanent Route</span>
-                <span>• Temporary Route Name</span>
-                <span>• Via</span>
-                <span>• Route Number</span>
-                <span>• Permit Number</span>
-                <span>• Allocated Bus Number</span>
-                <span>• Name of the Owner/Operator</span>
-                <span>• Permit Holder Address</span>
-                <span>• Permit Holder NIC</span>
-                <span>• NTC Approved Service Type</span>
-                <span>• Seeal Seating Capacity</span>
-                <span>• Temporary Total Amount</span>
-                <span>• Existing in Operation/ Active or Inactive</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <Button 
-          onClick={handleUpload} 
-          disabled={!file || uploading}
-          className="w-full"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          {uploading ? 'Importing...' : 'Import Route Permits'}
-        </Button>
       </CardContent>
     </Card>
   );

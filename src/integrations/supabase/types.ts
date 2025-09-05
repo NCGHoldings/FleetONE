@@ -1420,7 +1420,9 @@ export type Database = {
       }
       route_permits: {
         Row: {
+          allocated_bus_number: string | null
           annual_fee: number | null
+          approved_maximum_fare: number | null
           bus_id: string | null
           created_at: string
           expiry_date: string
@@ -1432,6 +1434,7 @@ export type Database = {
           owner_address: string | null
           owner_name: string
           owner_nic: string | null
+          permit_active_inactive: string | null
           permit_no: string
           permit_status: Database["public"]["Enums"]["permit_status"] | null
           route_id: string | null
@@ -1444,7 +1447,9 @@ export type Database = {
           via: string | null
         }
         Insert: {
+          allocated_bus_number?: string | null
           annual_fee?: number | null
+          approved_maximum_fare?: number | null
           bus_id?: string | null
           created_at?: string
           expiry_date: string
@@ -1456,6 +1461,7 @@ export type Database = {
           owner_address?: string | null
           owner_name: string
           owner_nic?: string | null
+          permit_active_inactive?: string | null
           permit_no: string
           permit_status?: Database["public"]["Enums"]["permit_status"] | null
           route_id?: string | null
@@ -1468,7 +1474,9 @@ export type Database = {
           via?: string | null
         }
         Update: {
+          allocated_bus_number?: string | null
           annual_fee?: number | null
+          approved_maximum_fare?: number | null
           bus_id?: string | null
           created_at?: string
           expiry_date?: string
@@ -1480,6 +1488,7 @@ export type Database = {
           owner_address?: string | null
           owner_name?: string
           owner_nic?: string | null
+          permit_active_inactive?: string | null
           permit_no?: string
           permit_status?: Database["public"]["Enums"]["permit_status"] | null
           route_id?: string | null

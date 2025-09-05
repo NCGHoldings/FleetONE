@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
   FileText, MapPin, User, Calendar, DollarSign, 
-  Truck, Route, Shield, AlertTriangle, CheckCircle 
+  Truck, Route, Shield, AlertTriangle, CheckCircle, Bus
 } from "lucide-react";
 import { format, parseISO, differenceInDays } from "date-fns";
 
@@ -22,10 +22,13 @@ interface RoutePermit {
   service_type?: string;
   seats?: number;
   max_fare?: number;
+  approved_maximum_fare?: number;
+  allocated_bus_number?: string;
   issue_date: string;
   expiry_date: string;
   annual_fee?: number;
   permit_status: string;
+  permit_active_inactive?: string;
   operation_status: string;
   bus_id?: string;
   route_id?: string;
@@ -96,7 +99,7 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -105,22 +108,22 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
         </DialogHeader>
 
         <div className="grid gap-6">
-          {/* Basic Information */}
+          {/* Basic Route Information */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Route className="h-4 w-4" />
-                Basic Information
+                Route Information
               </CardTitle>
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Permit Number</span>
                   <p className="font-mono text-sm">{permit.permit_no}</p>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-muted-foreground">Route Name</span>
+                  <span className="text-sm font-medium text-muted-foreground">Permanent Route</span>
                   <p className="text-sm">{permit.route_name || '-'}</p>
                 </div>
                 <div>
@@ -132,7 +135,7 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
                   <p className="text-sm">{permit.via || '-'}</p>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Route Numbers</span>
                   <p className="text-sm">
@@ -140,13 +143,13 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
                   </p>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-muted-foreground">NTC Number</span>
-                  <p className="text-sm">{permit.ntc_number || '-'}</p>
+                  <span className="text-sm font-medium text-muted-foreground">NTC Approved Service Type</span>
+                  <p className="text-sm">{permit.service_type || permit.ntc_number || '-'}</p>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-muted-foreground">Allocated Bus</span>
+                  <span className="text-sm font-medium text-muted-foreground">Allocated Bus Number</span>
                   <p className="text-sm font-mono">
-                    {permit.buses?.bus_no || '-'}
+                    {permit.allocated_bus_number || permit.buses?.bus_no || '-'}
                     {permit.buses?.registration_number && (
                       <span className="text-muted-foreground ml-2">
                         ({permit.buses.registration_number})
@@ -155,87 +158,88 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
                   </p>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-muted-foreground">Linked Route</span>
+                  <span className="text-sm font-medium text-muted-foreground">Linked System Route</span>
                   <p className="text-sm">
-                    {permit.routes?.route_no} - {permit.routes?.route_name || '-'}
+                    {permit.routes ? `${permit.routes.route_no} - ${permit.routes.route_name}` : '-'}
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Owner Details */}
+          {/* Owner/Operator Details */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Owner Details
+                Owner/Operator Details
               </CardTitle>
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div>
-                  <span className="text-sm font-medium text-muted-foreground">Owner Name</span>
-                  <p className="text-sm">{permit.owner_name}</p>
+                  <span className="text-sm font-medium text-muted-foreground">Name of the Owner/Operator</span>
+                  <p className="text-sm font-medium">{permit.owner_name}</p>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-muted-foreground">Owner NIC</span>
+                  <span className="text-sm font-medium text-muted-foreground">Permit Holder NIC</span>
                   <p className="text-sm font-mono">{permit.owner_nic || '-'}</p>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div>
-                  <span className="text-sm font-medium text-muted-foreground">Owner Address</span>
+                  <span className="text-sm font-medium text-muted-foreground">Permit Holder Address</span>
                   <p className="text-sm">{permit.owner_address || '-'}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Service Details */}
+          {/* Service & Capacity Details */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Truck className="h-4 w-4" />
-                Service Details
+                <Bus className="h-4 w-4" />
+                Service & Capacity Details
               </CardTitle>
             </CardHeader>
             <CardContent className="grid md:grid-cols-3 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3">
+                <div>
+                  <span className="text-sm font-medium text-muted-foreground">Approved Seating Capacity</span>
+                  <p className="text-sm font-medium">{permit.seats || '-'} seats</p>
+                </div>
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Service Type</span>
                   <Badge variant="outline" className="mt-1">
-                    {permit.service_type || 'regular'}
+                    {permit.service_type || permit.ntc_number || 'Regular'}
                   </Badge>
                 </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Approved Seating Capacity</span>
-                  <p className="text-sm">{permit.seats || '-'}</p>
-                </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Approved Maximum Fare</span>
-                  <p className="text-sm">
-                    {permit.max_fare ? `LKR ${permit.max_fare}` : '-'}
+                  <p className="text-sm font-medium">
+                    {permit.approved_maximum_fare || permit.max_fare ? 
+                      `LKR ${permit.approved_maximum_fare || permit.max_fare}` : '-'}
                   </p>
                 </div>
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Annual Fee</span>
                   <p className="text-sm">
-                    {permit.annual_fee ? `LKR ${permit.annual_fee}` : '-'}
+                    {permit.annual_fee ? `LKR ${permit.annual_fee.toLocaleString()}` : '-'}
                   </p>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Permit Status</span>
                   <div className="mt-1">
-                    {getStatusBadge(permit.permit_status, 'permit')}
+                    {getStatusBadge(permit.permit_active_inactive || permit.permit_status, 'permit')}
                   </div>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-muted-foreground">Operation Status</span>
+                  <span className="text-sm font-medium text-muted-foreground">Active in Operation</span>
                   <div className="mt-1">
                     {getStatusBadge(permit.operation_status, 'operation')}
                   </div>
@@ -244,25 +248,29 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
             </CardContent>
           </Card>
 
-          {/* Compliance Details */}
+          {/* Compliance & Legal Details */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-4 w-4" />
-                Compliance & Dates
+                Compliance & Legal Information
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <CardContent className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-3">
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Issue Date</span>
-                  <p className="text-sm">
-                    {permit.issue_date ? format(parseISO(permit.issue_date), 'MMM dd, yyyy') : '-'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm">
+                      {permit.issue_date ? format(parseISO(permit.issue_date), 'MMM dd, yyyy') : '-'}
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Expiry Date</span>
                   <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     <p className="text-sm">
                       {permit.expiry_date ? format(parseISO(permit.expiry_date), 'MMM dd, yyyy') : '-'}
                     </p>
@@ -279,21 +287,61 @@ export function RoutePermitDetailsModal({ permit, open, onOpenChange }: RoutePer
                   </div>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div>
                   <span className="text-sm font-medium text-muted-foreground">Days Until Expiry</span>
                   <p className="text-sm">
                     {permit.expiry_date ? (
                       (() => {
                         const days = differenceInDays(parseISO(permit.expiry_date), new Date());
-                        return days < 0 ? `Expired ${Math.abs(days)} days ago` : `${days} days remaining`;
+                        return days < 0 ? 
+                          <span className="text-red-600 font-medium">Expired {Math.abs(days)} days ago</span> :
+                          <span className={days <= 30 ? "text-yellow-600 font-medium" : "text-green-600"}>{days} days remaining</span>;
                       })()
+                    ) : '-'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-muted-foreground">Validity Period</span>
+                  <p className="text-sm">
+                    {permit.issue_date && permit.expiry_date ? (
+                      `${format(parseISO(permit.issue_date), 'MMM yyyy')} - ${format(parseISO(permit.expiry_date), 'MMM yyyy')}`
                     ) : '-'}
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Financial Information */}
+          {permit.annual_fee && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Financial Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-sm font-medium text-muted-foreground">Annual Fee</span>
+                    <p className="text-lg font-semibold text-primary">
+                      LKR {permit.annual_fee.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-sm font-medium text-muted-foreground">Maximum Fare</span>
+                    <p className="text-lg font-semibold">
+                      LKR {(permit.approved_maximum_fare || permit.max_fare || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DialogContent>
     </Dialog>

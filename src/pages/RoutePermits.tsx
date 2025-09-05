@@ -35,6 +35,9 @@ interface RoutePermit {
   service_type?: string;
   seats?: number;
   max_fare?: number;
+  approved_maximum_fare?: number;
+  allocated_bus_number?: string;
+  permit_active_inactive?: string;
   issue_date: string;
   expiry_date: string;
   annual_fee?: number;
@@ -348,38 +351,63 @@ export default function RoutePermits() {
     {
       accessorKey: "route_name",
       header: "Route Name",
+      cell: ({ row }) => (
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{row.original.route_name || '-'}</p>
+          {row.original.temporary_route_name && (
+            <p className="text-xs text-muted-foreground truncate">
+              Temp: {row.original.temporary_route_name}
+            </p>
+          )}
+        </div>
+      ),
     },
     {
-      accessorKey: "buses.bus_no",
+      accessorKey: "allocated_bus_number",
       header: "Bus No",
       cell: ({ row }) => (
-        <span className="font-mono">
-          {row.original.buses?.bus_no || '-'}
+        <span className="font-mono text-sm">
+          {row.original.allocated_bus_number || row.original.buses?.bus_no || '-'}
         </span>
       ),
     },
     {
       accessorKey: "owner_name",
       header: "Owner",
+      cell: ({ row }) => (
+        <div className="min-w-0">
+          <p className="text-sm truncate">{row.original.owner_name}</p>
+          {row.original.owner_nic && (
+            <p className="text-xs text-muted-foreground font-mono">
+              {row.original.owner_nic}
+            </p>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: "service_type",
       header: "Service Type",
       cell: ({ row }) => (
         <Badge variant="outline">
-          {row.getValue("service_type")}
+          {row.original.service_type || row.original.ntc_number || 'Regular'}
         </Badge>
       ),
     },
     {
       accessorKey: "seats",
       header: "Seats",
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.seats || '-'}
+        </span>
+      ),
     },
     {
-      accessorKey: "max_fare",
+      accessorKey: "approved_maximum_fare",
       header: "Max Fare",
       cell: ({ row }) => {
-        const fare = row.getValue("max_fare") as number;
+        const fare = row.original.approved_maximum_fare || row.original.max_fare;
         return fare ? `LKR ${fare}` : '-';
       },
     },
