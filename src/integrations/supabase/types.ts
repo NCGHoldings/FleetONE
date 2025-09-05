@@ -1764,11 +1764,16 @@ export type Database = {
       }
       special_hire_quotations: {
         Row: {
+          advance_paid: number | null
           approval_comments: string | null
           approval_date: string | null
           approval_status: Database["public"]["Enums"]["approval_status"] | null
           approved_by: string | null
+          assigned_bus_no: string | null
+          assigned_conductor_name: string | null
+          assigned_driver_name: string | null
           audit_log: Json | null
+          balance_due: number | null
           bus_type_id: string | null
           cancellation_reason: string | null
           commission_amount: number | null
@@ -1819,19 +1824,25 @@ export type Database = {
           status_changed_at: string | null
           status_changed_by: string | null
           total_expenses: number | null
+          total_paid: number | null
           trip_id: string | null
           trip_status: string | null
           updated_at: string | null
           valid_until: string | null
         }
         Insert: {
+          advance_paid?: number | null
           approval_comments?: string | null
           approval_date?: string | null
           approval_status?:
             | Database["public"]["Enums"]["approval_status"]
             | null
           approved_by?: string | null
+          assigned_bus_no?: string | null
+          assigned_conductor_name?: string | null
+          assigned_driver_name?: string | null
           audit_log?: Json | null
+          balance_due?: number | null
           bus_type_id?: string | null
           cancellation_reason?: string | null
           commission_amount?: number | null
@@ -1882,19 +1893,25 @@ export type Database = {
           status_changed_at?: string | null
           status_changed_by?: string | null
           total_expenses?: number | null
+          total_paid?: number | null
           trip_id?: string | null
           trip_status?: string | null
           updated_at?: string | null
           valid_until?: string | null
         }
         Update: {
+          advance_paid?: number | null
           approval_comments?: string | null
           approval_date?: string | null
           approval_status?:
             | Database["public"]["Enums"]["approval_status"]
             | null
           approved_by?: string | null
+          assigned_bus_no?: string | null
+          assigned_conductor_name?: string | null
+          assigned_driver_name?: string | null
           audit_log?: Json | null
+          balance_due?: number | null
           bus_type_id?: string | null
           cancellation_reason?: string | null
           commission_amount?: number | null
@@ -1945,6 +1962,7 @@ export type Database = {
           status_changed_at?: string | null
           status_changed_by?: string | null
           total_expenses?: number | null
+          total_paid?: number | null
           trip_id?: string | null
           trip_status?: string | null
           updated_at?: string | null

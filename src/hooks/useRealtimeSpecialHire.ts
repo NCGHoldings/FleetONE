@@ -1,0 +1,213 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+export interface QuotationWithPayments {
+  id: string;
+  quotation_no: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string;
+  company_name?: string;
+  pickup_location: string;
+  drop_location: string;
+  pickup_datetime: string;
+  drop_datetime?: string;
+  number_of_buses: number;
+  number_of_passengers: number;
+  bus_type: string;
+  gross_revenue: number;
+  fuel_cost_fuel_only?: number;
+  commission_pass_through_amount?: number;
+  discount_amount_lkr?: number;
+  status: string;
+  advance_paid: number;
+  balance_due: number;
+  total_paid: number;
+  assigned_driver_name?: string;
+  assigned_conductor_name?: string;
+  assigned_bus_no?: string;
+  created_at: string;
+  payments: Array<{
+    id: string;
+    payment_type: string;
+    amount: number;
+    payment_method: string;
+    reference_no?: string;
+    paid_at: string;
+  }>;
+  invoices: Array<{
+    id: string;
+    invoice_type: string;
+    invoice_no: string;
+    amount: number;
+    generated_at: string;
+  }>;
+}
+
+export function useRealtimeSpecialHire() {
+  const [quotations, setQuotations] = useState<QuotationWithPayments[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchQuotationsWithPayments = async () => {
+    try {
+      console.log('Fetching quotations with payments and invoices...');
+      
+      // Fetch quotations with related payments and invoices
+      const { data: quotationsData, error: quotationsError } = await supabase
+        .from('special_hire_quotations')
+        .select(`
+          *,
+          bus_types!bus_type_id (
+            name,
+            capacity
+          )
+        `)
+        .eq('status', 'confirmed')
+        .order('created_at', { ascending: false });
+
+      if (quotationsError) throw quotationsError;
+
+      // Fetch all payments for these quotations
+      const quotationIds = quotationsData?.map(q => q.id) || [];
+      
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('special_hire_payments')
+        .select('*')
+        .in('quotation_id', quotationIds);
+
+      if (paymentsError) throw paymentsError;
+
+      // Fetch all invoices for these quotations
+      const { data: invoicesData, error: invoicesError } = await supabase
+        .from('special_hire_invoices')
+        .select('*')
+        .in('quotation_id', quotationIds);
+
+      if (invoicesError) throw invoicesError;
+
+      // Combine the data
+      const enrichedQuotations: QuotationWithPayments[] = quotationsData?.map(quotation => {
+        const quotationPayments = paymentsData?.filter(p => p.quotation_id === quotation.id) || [];
+        const quotationInvoices = invoicesData?.filter(i => i.quotation_id === quotation.id) || [];
+
+        // Calculate total amounts from actual database records
+        const calculatedTotalPaid = quotationPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const finalTotal = (quotation.gross_revenue || 0) + 
+                          (quotation.fuel_cost_fuel_only || 0) + 
+                          (quotation.commission_pass_through_amount || 0) - 
+                          (quotation.discount_amount_lkr || 0);
+        const calculatedBalance = Math.max(finalTotal - calculatedTotalPaid, 0);
+
+        return {
+          ...quotation,
+          bus_type: quotation.bus_types?.name || 'Unknown',
+          // Use database values if available, fall back to calculated values
+          total_paid: quotation.total_paid ?? calculatedTotalPaid,
+          balance_due: quotation.balance_due ?? calculatedBalance,
+          advance_paid: quotation.advance_paid ?? quotationPayments.filter(p => p.payment_type === 'advance').reduce((sum, p) => sum + (p.amount || 0), 0),
+          payments: quotationPayments.map(p => ({
+            id: p.id,
+            payment_type: p.payment_type,
+            amount: p.amount,
+            payment_method: p.payment_method,
+            reference_no: p.reference_no,
+            paid_at: p.paid_at
+          })),
+          invoices: quotationInvoices.map(i => ({
+            id: i.id,
+            invoice_type: i.invoice_type,
+            invoice_no: i.invoice_no,
+            amount: i.amount,
+            generated_at: i.generated_at
+          }))
+        };
+      }) || [];
+
+      console.log('Fetched quotations:', enrichedQuotations.length);
+      setQuotations(enrichedQuotations);
+    } catch (error: any) {
+      console.error('Error fetching quotations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load special hire data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQuotationsWithPayments();
+  }, []);
+
+  useEffect(() => {
+    console.log('Setting up real-time subscriptions...');
+    
+    // Subscribe to quotations changes
+    const quotationsChannel = supabase
+      .channel('quotations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'special_hire_quotations'
+        },
+        (payload) => {
+          console.log('Quotation change detected:', payload);
+          fetchQuotationsWithPayments();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to payments changes
+    const paymentsChannel = supabase
+      .channel('payments-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'special_hire_payments'
+        },
+        (payload) => {
+          console.log('Payment change detected:', payload);
+          fetchQuotationsWithPayments();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to invoices changes
+    const invoicesChannel = supabase
+      .channel('invoices-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'special_hire_invoices'
+        },
+        (payload) => {
+          console.log('Invoice change detected:', payload);
+          fetchQuotationsWithPayments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('Cleaning up real-time subscriptions...');
+      supabase.removeChannel(quotationsChannel);
+      supabase.removeChannel(paymentsChannel);
+      supabase.removeChannel(invoicesChannel);
+    };
+  }, []);
+
+  return {
+    quotations,
+    loading,
+    refetch: fetchQuotationsWithPayments
+  };
+}
