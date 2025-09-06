@@ -1,7 +1,13 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { Printer, Download, Mail } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { YutongQuotationPreview } from './YutongQuotationPreview';
+import { useToast } from '@/hooks/use-toast';
 
 interface YutongQuotation {
   id: string;
@@ -31,6 +37,10 @@ interface YutongQuotationViewModalProps {
 }
 
 export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuotationViewModalProps) {
+  const [loading, setLoading] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
   if (!quotation) return null;
 
   const getStatusBadge = (status: string) => {
@@ -48,117 +58,164 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
     );
   };
 
+  const handlePrint = () => {
+    if (printRef.current) {
+      const printWindow = window.open('', '', 'height=600,width=800');
+      if (printWindow) {
+        printWindow.document.write('<html><head><title>Yutong Quotation</title></head><body>');
+        printWindow.document.write(printRef.current.outerHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+      }
+    }
+  };
+
+  const generatePDFBase64 = async (): Promise<string> => {
+    if (!printRef.current) throw new Error('Print reference not found');
+
+    const canvas = await html2canvas(printRef.current, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff'
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    const imgWidth = 210;
+    const pageHeight = 295;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft >= 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    return pdf.output('datauristring').split(',')[1];
+  };
+
+  const handleDownload = async () => {
+    try {
+      setLoading(true);
+      const pdfBase64 = await generatePDFBase64();
+      
+      // Convert base64 to blob and download
+      const byteCharacters = atob(pdfBase64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Yutong-Quotation-${quotation.quotation_no}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: "Quotation PDF downloaded successfully"
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmail = async () => {
+    try {
+      setLoading(true);
+      const pdfBase64 = await generatePDFBase64();
+      
+      // Call Supabase function to send email
+      const response = await fetch('/functions/v1/send-quotation-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: quotation.customer_email,
+          subject: `Yutong Bus Quotation - ${quotation.quotation_no}`,
+          html: `
+            <p>Dear ${quotation.customer_name},</p>
+            <p>Please find attached your Yutong bus quotation for ${quotation.bus_model}.</p>
+            <p>If you have any questions, please don't hesitate to contact us.</p>
+            <p>Best regards,<br/>NCG Express Sales Team</p>
+          `,
+          attachment: {
+            filename: `Yutong-Quotation-${quotation.quotation_no}.pdf`,
+            contentBase64: pdfBase64,
+            contentType: 'application/pdf'
+          }
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to send email');
+      
+      toast({
+        title: "Success",
+        description: `Quotation emailed to ${quotation.customer_email}`
+      });
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send email. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Quotation Details - {quotation.quotation_no}</DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-6">
-          {/* Header Section */}
-          <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-            <div>
-              <h3 className="font-semibold text-lg">{quotation.quotation_no}</h3>
-              <p className="text-sm text-muted-foreground">
-                Created: {format(new Date(quotation.created_at), 'MMM dd, yyyy')}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Valid Until: {format(new Date(quotation.valid_until), 'MMM dd, yyyy')}
-              </p>
-            </div>
-            <div className="text-right">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <DialogTitle>Quotation - {quotation.quotation_no}</DialogTitle>
               {getStatusBadge(quotation.status)}
             </div>
-          </div>
-
-          {/* Customer Information */}
-          <div className="space-y-4">
-            <h4 className="font-semibold text-base border-b pb-2">Customer Information</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Customer Name</label>
-                <p className="font-medium">{quotation.customer_name}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Company Name</label>
-                <p className="font-medium">{quotation.company_name || 'N/A'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Phone</label>
-                <p className="font-medium">{quotation.customer_phone}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Email</label>
-                <p className="font-medium">{quotation.customer_email}</p>
-              </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleEmail} disabled={loading}>
+                <Mail className="h-4 w-4 mr-2" />
+                Email
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePrint}>
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownload} disabled={loading}>
+                <Download className="h-4 w-4 mr-2" />
+                {loading ? 'Generating...' : 'PDF'}
+              </Button>
             </div>
           </div>
-
-          {/* Product Information */}
-          <div className="space-y-4">
-            <h4 className="font-semibold text-base border-b pb-2">Product Information</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Bus Model</label>
-                <p className="font-medium">{quotation.bus_model}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Quantity</label>
-                <p className="font-medium">{quotation.quantity}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Unit Price</label>
-                <p className="font-medium">LKR {quotation.unit_price.toLocaleString()}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">Discount</label>
-                <p className="font-medium">{quotation.discount_percentage || 0}%</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Pricing */}
-          <div className="space-y-4">
-            <h4 className="font-semibold text-base border-b pb-2">Pricing</h4>
-            <div className="bg-muted/30 p-4 rounded-lg">
-              <div className="flex justify-between items-center text-lg font-semibold">
-                <span>Total Price:</span>
-                <span className="text-primary">LKR {quotation.total_price.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Additional Information */}
-          <div className="space-y-4">
-            <h4 className="font-semibold text-base border-b pb-2">Additional Information</h4>
-            <div className="grid grid-cols-1 gap-4">
-              {quotation.special_features && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Special Features</label>
-                  <p className="font-medium">{quotation.special_features}</p>
-                </div>
-              )}
-              {quotation.delivery_timeline && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Delivery Timeline</label>
-                  <p className="font-medium">{quotation.delivery_timeline}</p>
-                </div>
-              )}
-              {quotation.payment_terms && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Payment Terms</label>
-                  <p className="font-medium">{quotation.payment_terms}</p>
-                </div>
-              )}
-              {quotation.warranty_terms && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Warranty Terms</label>
-                  <p className="font-medium">{quotation.warranty_terms}</p>
-                </div>
-              )}
-            </div>
-          </div>
+        </DialogHeader>
+        
+        <div className="mt-4">
+          <YutongQuotationPreview ref={printRef} quotation={quotation} />
         </div>
       </DialogContent>
     </Dialog>
