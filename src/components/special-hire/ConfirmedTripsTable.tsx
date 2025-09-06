@@ -148,7 +148,10 @@ export function ConfirmedTripsTable() {
   };
 
   const getTripStatusBadge = (status: string) => {
-    switch (status) {
+    // Use trip_status if available, fallback to status
+    const displayStatus = status || 'confirmed';
+    
+    switch (displayStatus) {
       case 'confirmed':
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800"><Clock className="w-3 h-3 mr-1" />Confirmed</Badge>;
       case 'paid':
@@ -157,8 +160,12 @@ export function ConfirmedTripsTable() {
         return <Badge variant="secondary" className="bg-purple-100 text-purple-800"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
       case 'cancelled':
         return <Badge variant="secondary" className="bg-red-100 text-red-800"><XCircle className="w-3 h-3 mr-1" />Cancelled</Badge>;
+      case 'on_hold':
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" />On Hold</Badge>;
+      case 'no_bus_allocated':
+        return <Badge variant="secondary" className="bg-orange-100 text-orange-800"><AlertCircle className="w-3 h-3 mr-1" />No Bus Available</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline" className="capitalize">{displayStatus}</Badge>;
     }
   };
 
@@ -284,6 +291,53 @@ export function ConfirmedTripsTable() {
       toast.error('Failed to confirm payment. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle trip status changes
+  const handleStatusChange = async (data: any) => {
+    if (!selectedTrip) return;
+
+    try {
+      setStatusLoading(true);
+      
+      // Update trip status in database
+      const updateData: any = {
+        trip_status: data.status,
+        status_changed_at: new Date().toISOString(),
+        status_changed_by: user?.id,
+      };
+
+      // If status is cancelled and refund data is provided
+      if (data.status === 'cancelled' && data.refundAmount) {
+        updateData.refund_status = data.refundStatus;
+        updateData.refund_amount = data.refundAmount;
+        updateData.refund_reason = data.reason;
+      }
+
+      // Add reason for status changes that require one
+      if (data.reason) {
+        updateData.status_change_reason = data.reason;
+      }
+
+      const { error } = await supabase
+        .from('special_hire_quotations')
+        .update(updateData)
+        .eq('id', selectedTrip.id);
+
+      if (error) throw error;
+
+      toast.success(`Trip status updated to ${data.status}${data.status === 'cancelled' && data.refundAmount ? ` with refund of LKR ${data.refundAmount.toLocaleString()}` : ''}`);
+      
+      // Close modal and refresh data
+      setStatusModalOpen(false);
+      setSelectedTrip(null);
+      refetch();
+    } catch (error) {
+      console.error('Error updating trip status:', error);
+      toast.error('Failed to update trip status. Please try again.');
+    } finally {
+      setStatusLoading(false);
     }
   };
 
@@ -634,10 +688,10 @@ export function ConfirmedTripsTable() {
                           </div>
                         </TableCell>
 
-                        {/* Status */}
-                        <TableCell>
-                          {getTripStatusBadge(trip.status)}
-                        </TableCell>
+                         {/* Status */}
+                         <TableCell>
+                           {getTripStatusBadge(trip.trip_status || trip.status)}
+                         </TableCell>
 
                         {/* Payment Status */}
                         <TableCell>
@@ -874,12 +928,9 @@ export function ConfirmedTripsTable() {
             total_amount: calculateTotalAmount(selectedTrip),
             advance_paid: selectedTrip.advance_paid || 0,
             status: selectedTrip.status,
-            trip_status: selectedTrip.status, // Use status as trip_status for now
+            trip_status: selectedTrip.trip_status || selectedTrip.status,
           }}
-          onStatusChange={async (data) => {
-            console.log('Status update:', data);
-            refetch();
-          }}
+          onStatusChange={handleStatusChange}
           loading={statusLoading}
         />
       )}

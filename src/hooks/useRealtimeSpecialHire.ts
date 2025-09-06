@@ -23,6 +23,13 @@ export interface QuotationWithPayments {
   additional_charges?: Array<{ type: string; amount: number; reason?: string }> | string;
   total_additional_charges?: number;
   status: string;
+  trip_status?: string;
+  status_changed_at?: string;
+  status_changed_by?: string;
+  refund_status?: string;
+  refund_amount?: number;
+  refund_reason?: string;
+  status_change_reason?: string;
   advance_paid: number;
   balance_due: number;
   total_paid: number;
