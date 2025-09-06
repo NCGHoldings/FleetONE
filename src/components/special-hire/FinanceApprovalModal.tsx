@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, ExternalLink, FileText, Download, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useDocumentManagement } from '@/hooks/useDocumentManagement';
+import { DocumentViewer } from './DocumentViewer';
+import { format } from 'date-fns';
 
 interface FinanceApprovalModalProps {
   isOpen: boolean;
@@ -43,6 +46,54 @@ export const FinanceApprovalModal = ({
   const [notes, setNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [action, setAction] = useState<'approve' | 'reject' | null>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  
+  const { getDocumentsByQuotation, approveDocument } = useDocumentManagement();
+
+  // Load documents when modal opens
+  useEffect(() => {
+    if (isOpen && paymentData) {
+      loadDocuments();
+    }
+  }, [isOpen, paymentData]);
+
+  const loadDocuments = async () => {
+    if (!paymentData) return;
+    
+    setDocumentsLoading(true);
+    try {
+      // Get documents by quotation ID (we need to find the quotation ID from the payment)
+      const { data: paymentDetails, error } = await supabase
+        .from('special_hire_payments')
+        .select('quotation_id')
+        .eq('id', paymentData.id)
+        .single();
+      
+      if (error) throw error;
+      
+      const result = await getDocumentsByQuotation(paymentDetails.quotation_id);
+      if (result.success) {
+        // Filter documents related to this payment
+        const paymentDocuments = result.documents?.filter(doc => doc.payment_id === paymentData.id) || [];
+        setDocuments(paymentDocuments);
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  const handleApproveDocument = async (documentId: string) => {
+    const result = await approveDocument(documentId);
+    if (result.success) {
+      await loadDocuments(); // Reload documents to show updated status
+    }
+    return result;
+  };
 
   const handleApprove = () => {
     setAction('approve');
@@ -154,6 +205,74 @@ export const FinanceApprovalModal = ({
             </Card>
           )}
 
+          {/* Draft Documents Section */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <Label className="font-medium">Generated Documents</Label>
+                
+                {documentsLoading ? (
+                  <div className="text-center py-4">
+                    <p className="text-muted-foreground">Loading documents...</p>
+                  </div>
+                ) : documents.length > 0 ? (
+                  <div className="space-y-3">
+                    {documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-5 h-5 text-muted-foreground" />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">
+                                {doc.document_type === 'sales_receipt' ? 'Sales Receipt' : 'Invoice'}
+                              </span>
+                              <Badge variant={doc.document_status === 'draft' ? 'secondary' : 'default'}>
+                                {doc.document_status === 'draft' ? 'DRAFT' : 'APPROVED'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Generated: {format(new Date(doc.generated_at), 'MMM dd, yyyy HH:mm')}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedDocument(doc);
+                              setDocumentViewerOpen(true);
+                            }}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                          
+                          {doc.document_status === 'draft' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleApproveDocument(doc.id)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Approve Document
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-muted-foreground">No documents found for this payment.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Finance Review */}
           <div className="space-y-4">
             <Label className="text-base font-medium">Finance Review</Label>
@@ -202,6 +321,18 @@ export const FinanceApprovalModal = ({
           </Button>
         </DialogFooter>
       </DialogContent>
+      
+      {/* Document Viewer */}
+      {documentViewerOpen && selectedDocument && (
+        <DocumentViewer
+          isOpen={documentViewerOpen}
+          onClose={() => {
+            setDocumentViewerOpen(false);
+            setSelectedDocument(null);
+          }}
+          document={selectedDocument}
+        />
+      )}
     </Dialog>
   );
 };

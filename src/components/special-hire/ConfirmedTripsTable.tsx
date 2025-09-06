@@ -29,7 +29,7 @@ export function ConfirmedTripsTable() {
   const { quotations, loading: realtimeLoading, refetch } = useRealtimeSpecialHire();
   const { user, hasRole } = useAuth();
   const { approvePayment, rejectPayment, generateApprovedInvoice, isLoading: financeLoading } = useFinanceApproval();
-  const { generateAndStoreDraftDocument, getDocumentsByQuotation, regenerateDocument } = useDocumentManagement();
+  const { generateAndStoreDraftDocument, getDocumentsByQuotation, regenerateDocument, approveDocument } = useDocumentManagement();
   
   // State for filtering and search
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,6 +53,7 @@ export function ConfirmedTripsTable() {
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
   const [companyLogo, setCompanyLogo] = useState<string>('');
+  const [documentsLoading, setDocumentsLoading] = useState(false);
 
   // Check user roles
   const isFinanceUser = hasRole('finance') || hasRole('admin') || hasRole('super_admin');
@@ -285,6 +286,28 @@ export function ConfirmedTripsTable() {
     }
   };
 
+  // Load documents for a quotation
+  const loadDocuments = async (quotationId: string) => {
+    setDocumentsLoading(true);
+    try {
+      const result = await getDocumentsByQuotation(quotationId);
+      if (result.success) {
+        setQuotationDocuments(result.documents || []);
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  // View document
+  const handleViewDocument = async (document: any) => {
+    setCurrentDocument(document);
+    setDocumentViewerOpen(true);
+  };
+
+  // Handle finance approval with document approval
   const handleFinanceApproval = async (paymentId: string, notes?: string) => {
     const result = await approvePayment(paymentId, notes);
     if (result.success) {
@@ -515,6 +538,7 @@ export function ConfirmedTripsTable() {
                     <TableHead className="font-semibold">Vehicle Assignment</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold">Payment</TableHead>
+                    <TableHead className="font-semibold">Documents</TableHead>
                     <TableHead className="font-semibold">Financial</TableHead>
                     <TableHead className="font-semibold text-center">Actions</TableHead>
                   </TableRow>
@@ -627,6 +651,25 @@ export function ConfirmedTripsTable() {
                           </div>
                         </TableCell>
 
+                        {/* Documents Status */}
+                        <TableCell>
+                          <div className="space-y-1 text-xs">
+                            {approvedPayments.length > 0 ? (
+                              <div className="flex items-center space-x-1">
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                <span className="text-green-600">Available</span>
+                              </div>
+                            ) : pendingFinancePayments.length > 0 ? (
+                              <div className="flex items-center space-x-1">
+                                <Clock className="w-3 h-3 text-yellow-500" />
+                                <span className="text-yellow-600">Draft</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">None</span>
+                            )}
+                          </div>
+                        </TableCell>
+
                         {/* Financial */}
                         <TableCell>
                           <div className="space-y-1 text-xs">
@@ -735,6 +778,16 @@ export function ConfirmedTripsTable() {
                                   </>
                                 )}
 
+                                <DropdownMenuItem
+                                  onClick={async () => {
+                                    await loadDocuments(trip.id);
+                                    setSelectedTrip(trip);
+                                  }}
+                                >
+                                  <FileCheck className="w-4 h-4 mr-2" />
+                                  View Documents
+                                </DropdownMenuItem>
+                                
                                 <DropdownMenuItem onClick={() => viewInvoice(trip)}>
                                   <Receipt className="w-4 h-4 mr-2" />
                                   View Invoice
@@ -864,10 +917,97 @@ export function ConfirmedTripsTable() {
         onViewPaymentProof={(url) => window.open(url, '_blank')}
       />
 
+      {/* Document Management Modal */}
+      {selectedTrip && quotationDocuments.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <CardHeader>
+              <CardTitle>Documents - {selectedTrip.quotation_no}</CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setSelectedTrip(null);
+                  setQuotationDocuments([]);
+                }}
+                className="absolute top-4 right-4"
+              >
+                ✕
+              </Button>
+            </CardHeader>
+            <CardContent className="overflow-y-auto max-h-[70vh]">
+              <div className="grid gap-4">
+                {quotationDocuments.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={doc.document_status === 'draft' ? 'secondary' : 'default'}>
+                          {doc.document_status === 'draft' ? 'DRAFT' : 'APPROVED'}
+                        </Badge>
+                        <span className="font-medium">
+                          {doc.document_type === 'sales_receipt' ? 'Sales Receipt' : 'Invoice'}
+                        </span>
+                        <span className="text-muted-foreground">({doc.payment_type})</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Generated: {format(new Date(doc.generated_at), 'MMM dd, yyyy HH:mm')}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewDocument(doc)}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
+                      {isFinanceUser && doc.document_status === 'draft' && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={async () => {
+                            const result = await approveDocument(doc.id);
+                            if (result.success) {
+                              await loadDocuments(selectedTrip.id);
+                              toast.success('Document approved successfully!');
+                            }
+                          }}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Approve
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const result = await regenerateDocument(doc.id);
+                          if (result.success) {
+                            await loadDocuments(selectedTrip.id);
+                          }
+                        }}
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1" />
+                        Regenerate
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {documentViewerOpen && currentDocument && (
         <DocumentViewer
           isOpen={documentViewerOpen}
-          onClose={() => setDocumentViewerOpen(false)}
+          onClose={() => {
+            setDocumentViewerOpen(false);
+            setCurrentDocument(null);
+          }}
           document={currentDocument}
           onDownload={async () => {
             // Download handled within DocumentViewer
