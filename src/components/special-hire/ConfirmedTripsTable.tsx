@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { 
   Eye, Download, Upload, Receipt, Users, UserPlus, Bus, Settings, ChevronDown, 
   Search, Filter, MoreHorizontal, MapPin, Calendar, DollarSign, TrendingUp,
-  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck
+  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 export function ConfirmedTripsTable() {
   const { quotations, loading: realtimeLoading, refetch } = useRealtimeSpecialHire();
   const { user, hasRole } = useAuth();
-  const { approvePayment, rejectPayment, isLoading: financeLoading } = useFinanceApproval();
+  const { approvePayment, rejectPayment, generateApprovedInvoice, isLoading: financeLoading } = useFinanceApproval();
   
   // State for filtering and search
   const [searchQuery, setSearchQuery] = useState('');
@@ -515,6 +515,7 @@ export function ConfirmedTripsTable() {
                 <TableBody>
                   {filteredTrips.map((trip) => {
                     const pendingFinancePayments = trip.payments?.filter(p => p.status === 'pending_finance') || [];
+                    const approvedPayments = trip.payments?.filter(p => p.status === 'approved') || [];
                     const totalAmount = calculateTotalAmount(trip);
                     
                     return (
@@ -698,6 +699,31 @@ export function ConfirmedTripsTable() {
                                         Approve Payment (LKR {payment.amount.toLocaleString()})
                                       </DropdownMenuItem>
                                     ))}
+                                    <DropdownMenuSeparator />
+                                  </>
+                                )}
+
+                                {/* Re-generate receipts/invoices for approved payments */}
+                                {approvedPayments.length > 0 && (
+                                  <>
+                                    {approvedPayments.some(p => p.payment_type === 'advance') && (
+                                      <DropdownMenuItem
+                                        onClick={() => generateApprovedInvoice(trip, 'advance')}
+                                        disabled={financeLoading}
+                                      >
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                        Re-generate Sales Receipt
+                                      </DropdownMenuItem>
+                                    )}
+                                    {approvedPayments.some(p => p.payment_type === 'balance' || p.payment_type === 'full') && (
+                                      <DropdownMenuItem
+                                        onClick={() => generateApprovedInvoice(trip, 'balance')}
+                                        disabled={financeLoading}
+                                      >
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                        Re-generate Final Invoice
+                                      </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuSeparator />
                                   </>
                                 )}

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface FinanceApprovalModalProps {
   isOpen: boolean;
@@ -131,17 +132,21 @@ export const FinanceApprovalModal = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      asChild
+                      onClick={async () => {
+                        try {
+                          const { data: signedUrl } = await supabase.storage
+                            .from('payment-proofs')
+                            .createSignedUrl(paymentData.payment_proof_url!, 300);
+                          if (signedUrl?.signedUrl) {
+                            window.open(signedUrl.signedUrl, '_blank');
+                          }
+                        } catch (e) {
+                          window.open(paymentData.payment_proof_url!, '_blank');
+                        }
+                      }}
                     >
-                      <a 
-                        href={paymentData.payment_proof_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center"
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        View Payment Proof
-                      </a>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View Payment Proof
                     </Button>
                   </div>
                 </div>

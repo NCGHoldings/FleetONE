@@ -186,24 +186,24 @@ export const PaymentConfirmationModal = ({
               <RadioGroup 
                 value={paymentType} 
                 onValueChange={(value) => handlePaymentTypeChange(value as 'advance' | 'balance' | 'full')}
-                className="grid grid-cols-2 gap-4"
+                className={`grid gap-4 ${isAdvanceAlreadyPaid ? 'grid-cols-1' : 'grid-cols-2'}`}
               >
                 {!isAdvanceAlreadyPaid && (
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="advance" id="advance" />
-                    <Label htmlFor="advance">Advance Payment (50%)</Label>
-                  </div>
-                )}
-                {!isAdvanceAlreadyPaid && (
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="full" id="full" />
-                    <Label htmlFor="full">Full Payment (100%)</Label>
-                  </div>
+                  <>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="advance" id="advance" />
+                      <Label htmlFor="advance">Advance Payment (50%)</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="full" id="full" />
+                      <Label htmlFor="full">Full Payment (100%)</Label>
+                    </div>
+                  </>
                 )}
                 {isAdvanceAlreadyPaid && (
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="balance" id="balance" />
-                    <Label htmlFor="balance">Balance Payment</Label>
+                    <Label htmlFor="balance">Balance Payment (LKR {balanceDue.toLocaleString()})</Label>
                   </div>
                 )}
               </RadioGroup>
@@ -271,7 +271,6 @@ export const PaymentConfirmationModal = ({
                   <Button variant="ghost" size="sm" onClick={handleRemoveProof}>Remove</Button>
                 </div>
               )}
-              />
             </div>
 
             <div className="space-y-2">
