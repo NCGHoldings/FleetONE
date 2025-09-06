@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface PaymentConfirmationModalProps {
   isOpen: boolean;
@@ -45,6 +47,7 @@ export const PaymentConfirmationModal = ({
   quotationData,
   loading = false 
 }: PaymentConfirmationModalProps) => {
+  const { user } = useAuth();
   // Calculate final total to match quotation preview
   const calculateFinalTotal = () => {
     return quotationData.gross_revenue + 
@@ -71,6 +74,8 @@ export const PaymentConfirmationModal = ({
   const [conductorName, setConductorName] = useState<string>('');
   const [busNo, setBusNo] = useState<string>('');
   const [paymentProofUrl, setPaymentProofUrl] = useState<string>('');
+  const [proofPreviewUrl, setProofPreviewUrl] = useState<string>('');
+  const [isUploadingProof, setIsUploadingProof] = useState<boolean>(false);
   const [notes, setNotes] = useState<string>('');
 
   const handlePaymentTypeChange = (type: 'advance' | 'balance' | 'full') => {
@@ -81,6 +86,40 @@ export const PaymentConfirmationModal = ({
       setAmount(finalTotal);
     } else if (type === 'balance') {
       setAmount(balanceDue);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    try {
+      setIsUploadingProof(true);
+      const userId = user?.id || 'anonymous';
+      const key = `payment-proofs/${userId}/${quotationData.quotation_no || 'quotation'}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('payment-proofs')
+        .upload(key, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      setPaymentProofUrl(key);
+      const { data: signed } = await supabase.storage
+        .from('payment-proofs')
+        .createSignedUrl(key, 60 * 10);
+      if (signed?.signedUrl) setProofPreviewUrl(signed.signedUrl);
+    } catch (e) {
+      console.error('Upload failed:', e);
+    } finally {
+      setIsUploadingProof(false);
+    }
+  };
+
+  const handleRemoveProof = async () => {
+    try {
+      if (paymentProofUrl && paymentProofUrl.startsWith('payment-proofs/')) {
+        await supabase.storage.from('payment-proofs').remove([paymentProofUrl]);
+      }
+    } catch (e) {
+      console.error('Remove proof error:', e);
+    } finally {
+      setPaymentProofUrl('');
+      setProofPreviewUrl('');
     }
   };
 
@@ -211,13 +250,27 @@ export const PaymentConfirmationModal = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paymentProof">Payment Proof URL (Optional)</Label>
+              <Label htmlFor="paymentProof">Payment Proof (image/PDF, optional)</Label>
               <Input
                 id="paymentProof"
-                type="url"
-                value={paymentProofUrl}
-                onChange={(e) => setPaymentProofUrl(e.target.value)}
-                placeholder="Upload payment proof URL or attachment link"
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file);
+                }}
+                disabled={isUploadingProof}
+              />
+              {paymentProofUrl && (
+                <div className="flex items-center gap-2">
+                  {proofPreviewUrl && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={proofPreviewUrl} target="_blank" rel="noopener noreferrer">Preview</a>
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={handleRemoveProof}>Remove</Button>
+                </div>
+              )}
               />
             </div>
 
