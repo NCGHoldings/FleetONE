@@ -21,6 +21,7 @@ import { EnhancedTripStatusManagementModal } from './EnhancedTripStatusManagemen
 import { TripDetailsModal } from './TripDetailsModal';
 import { useDocumentManagement } from '@/hooks/useDocumentManagement';
 import { DocumentViewer } from './DocumentViewer';
+import { InvoiceViewer } from './InvoiceViewer';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -778,15 +779,16 @@ export function ConfirmedTripsTable() {
                                   </>
                                 )}
 
-                                <DropdownMenuItem
-                                  onClick={async () => {
-                                    await loadDocuments(trip.id);
-                                    setSelectedTrip(trip);
-                                  }}
-                                >
-                                  <FileCheck className="w-4 h-4 mr-2" />
-                                  View Documents
-                                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    await loadDocuments(trip.id);
+                    setSelectedTrip(trip);
+                    // Always show documents modal, even if no documents found
+                  }}
+                >
+                  <FileCheck className="w-4 h-4 mr-2" />
+                  View Documents
+                </DropdownMenuItem>
                                 
                                 <DropdownMenuItem onClick={() => viewInvoice(trip)}>
                                   <Receipt className="w-4 h-4 mr-2" />
@@ -918,7 +920,7 @@ export function ConfirmedTripsTable() {
       />
 
       {/* Document Management Modal */}
-      {selectedTrip && quotationDocuments.length > 0 && (
+      {selectedTrip && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
             <CardHeader>
@@ -936,8 +938,14 @@ export function ConfirmedTripsTable() {
               </Button>
             </CardHeader>
             <CardContent className="overflow-y-auto max-h-[70vh]">
-              <div className="grid gap-4">
-                {quotationDocuments.map((doc) => (
+              {documentsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                  <span>Loading documents...</span>
+                </div>
+              ) : quotationDocuments.length > 0 ? (
+                <div className="grid gap-4">
+                  {quotationDocuments.map((doc) => (
                   <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <div className="flex items-center gap-2">
@@ -994,8 +1002,27 @@ export function ConfirmedTripsTable() {
                       </Button>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-muted-foreground mb-2">No Documents Found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    No documents have been generated for this quotation yet.
+                  </p>
+                  <div className="flex gap-2 justify-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => viewInvoice(selectedTrip)}
+                    >
+                      <Receipt className="w-4 h-4 mr-2" />
+                      Generate Invoice
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -1012,6 +1039,18 @@ export function ConfirmedTripsTable() {
           onDownload={async () => {
             // Download handled within DocumentViewer
           }}
+        />
+      )}
+
+      {invoiceViewerOpen && currentInvoiceData && (
+        <InvoiceViewer
+          isOpen={invoiceViewerOpen}
+          onClose={() => {
+            setInvoiceViewerOpen(false);
+            setCurrentInvoiceData(null);
+          }}
+          invoiceData={currentInvoiceData}
+          onDownload={handleDownloadInvoice}
         />
       )}
     </div>
