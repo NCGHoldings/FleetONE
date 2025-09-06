@@ -19,7 +19,8 @@ import { PaymentConfirmationModal, type PaymentConfirmationData } from './Paymen
 import { FinanceApprovalModal } from './FinanceApprovalModal';
 import { EnhancedTripStatusManagementModal } from './EnhancedTripStatusManagementModal';
 import { TripDetailsModal } from './TripDetailsModal';
-import { InvoiceViewer } from './InvoiceViewer';
+import { useDocumentManagement } from '@/hooks/useDocumentManagement';
+import { DocumentViewer } from './DocumentViewer';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -28,6 +29,7 @@ export function ConfirmedTripsTable() {
   const { quotations, loading: realtimeLoading, refetch } = useRealtimeSpecialHire();
   const { user, hasRole } = useAuth();
   const { approvePayment, rejectPayment, generateApprovedInvoice, isLoading: financeLoading } = useFinanceApproval();
+  const { generateAndStoreDraftDocument, getDocumentsByQuotation, regenerateDocument } = useDocumentManagement();
   
   // State for filtering and search
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,9 +43,12 @@ export function ConfirmedTripsTable() {
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [invoiceViewerOpen, setInvoiceViewerOpen] = useState(false);
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
   const [financeApprovalModalOpen, setFinanceApprovalModalOpen] = useState(false);
   const [selectedFinancePayment, setSelectedFinancePayment] = useState<any>(null);
   const [currentInvoiceData, setCurrentInvoiceData] = useState<InvoiceData | null>(null);
+  const [currentDocument, setCurrentDocument] = useState<any>(null);
+  const [quotationDocuments, setQuotationDocuments] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -237,48 +242,38 @@ export function ConfirmedTripsTable() {
         if (notificationError) console.error('Notification error:', notificationError);
       }
 
-      // Generate DRAFT documents
-      const invoiceData = {
-        invoiceNo: `${paymentData.paymentType.toUpperCase()}-${Date.now()}`,
-        invoiceType: paymentData.paymentType === 'advance' ? 'advance' as const : 'balance' as const,
-        quotationNo: selectedTrip.quotation_no,
-        customerName: selectedTrip.customer_name,
-        customerPhone: selectedTrip.customer_phone || '',
-        customerEmail: selectedTrip.customer_email,
-        companyName: selectedTrip.company_name,
-        pickupLocation: selectedTrip.pickup_location,
-        dropLocation: selectedTrip.drop_location,
-        pickupDate: new Date(selectedTrip.pickup_datetime),
-        dropDate: new Date(selectedTrip.drop_datetime || selectedTrip.pickup_datetime),
-        busType: 'Standard Bus',
-        numberOfBuses: selectedTrip.number_of_buses,
-        numberOfPassengers: selectedTrip.number_of_passengers,
-        totalAmount: calculateTotalAmount(selectedTrip),
-        advanceAmount: selectedTrip.advance_paid || 0,
-        paidAmount: paymentData.amount,
-        vehicleNo: paymentData.busNo,
-        driverName: paymentData.driverName,
-        conductorName: paymentData.conductorName,
-        // Enhanced fields for multi-step workflow
-        invoice_status: 'draft' as const,
-        document_type: paymentData.paymentType === 'advance' ? 'sales_receipt' as const : 'invoice' as const,
-      };
+      // Generate and store DRAFT documents using the new document management system
+      if (paymentResponse) {
+        const draftInvoiceData: InvoiceData = {
+          invoiceNo: `DRAFT-${paymentResponse.id}`,
+          invoiceType: paymentData.paymentType as 'advance' | 'balance',
+          quotationNo: selectedTrip.quotation_no,
+          customerName: selectedTrip.customer_name,
+          customerPhone: selectedTrip.customer_phone || '',
+          customerEmail: selectedTrip.customer_email,
+          companyName: selectedTrip.company_name,
+          pickupLocation: selectedTrip.pickup_location,
+          dropLocation: selectedTrip.drop_location,
+          pickupDate: new Date(selectedTrip.pickup_datetime),
+          dropDate: new Date(selectedTrip.drop_datetime || selectedTrip.pickup_datetime),
+          busType: 'Standard Bus',
+          numberOfBuses: selectedTrip.number_of_buses,
+          numberOfPassengers: selectedTrip.number_of_passengers,
+          totalAmount: calculateTotalAmount(selectedTrip),
+          advanceAmount: selectedTrip.advance_paid || 0,
+          paidAmount: paymentData.amount,
+          vehicleNo: paymentData.busNo || selectedTrip.assigned_bus_no,
+          driverName: paymentData.driverName || selectedTrip.assigned_driver_name,
+          conductorName: paymentData.conductorName || selectedTrip.assigned_conductor_name,
+          invoice_status: 'draft' as const,
+          document_type: paymentData.paymentType === 'advance' ? 'sales_receipt' as const : 'invoice' as const,
+        };
 
-      // Store invoice record with DRAFT status
-      const { error: invoiceError } = await supabase
-        .from('special_hire_invoices')
-        .insert({
-          quotation_id: selectedTrip.id,
-          invoice_no: invoiceData.invoiceNo,
-          invoice_type: paymentData.paymentType === 'advance' ? 'advance' : 'balance',
-          amount: paymentData.amount,
-          status: 'draft', // Mark as draft until finance approves
-          generated_by: user?.id,
-        });
+        // Store draft document in the new document storage system
+        await generateAndStoreDraftDocument(draftInvoiceData, selectedTrip.id, paymentResponse.id);
+      }
 
-      if (invoiceError) throw invoiceError;
-
-      toast.success('Payment confirmed! Document generated as DRAFT - awaiting finance approval.');
+      toast.success('Payment confirmed! Draft document generated and stored - awaiting finance approval.');
       setPaymentModalOpen(false);
       setSelectedTrip(null);
       refetch();
@@ -310,6 +305,18 @@ export function ConfirmedTripsTable() {
 
   const viewInvoice = async (quotation: QuotationWithPayments) => {
     try {
+      // Check if there are stored documents for this quotation
+      const { success, documents } = await getDocumentsByQuotation(quotation.id);
+      
+      if (success && documents && documents.length > 0) {
+        // Show the most recent document
+        const latestDocument = documents[0];
+        setCurrentDocument(latestDocument);
+        setDocumentViewerOpen(true);
+        return;
+      }
+
+      // Fallback to old invoice generation if no stored documents
       const invoiceData = {
         invoiceNo: `INV-${Date.now()}`,
         invoiceType: 'balance' as const,
@@ -337,8 +344,8 @@ export function ConfirmedTripsTable() {
       setCurrentInvoiceData(invoiceData);
       setInvoiceViewerOpen(true);
     } catch (error) {
-      console.error('Error generating invoice preview:', error);
-      toast.error('Failed to generate invoice preview');
+      console.error('Error viewing documents:', error);
+      toast.error('Failed to load documents');
     }
   };
 
@@ -857,12 +864,14 @@ export function ConfirmedTripsTable() {
         onViewPaymentProof={(url) => window.open(url, '_blank')}
       />
 
-      {invoiceViewerOpen && currentInvoiceData && (
-        <InvoiceViewer
-          isOpen={invoiceViewerOpen}
-          onClose={() => setInvoiceViewerOpen(false)}
-          invoiceData={currentInvoiceData}
-          onDownload={handleDownloadInvoice}
+      {documentViewerOpen && currentDocument && (
+        <DocumentViewer
+          isOpen={documentViewerOpen}
+          onClose={() => setDocumentViewerOpen(false)}
+          document={currentDocument}
+          onDownload={async () => {
+            // Download handled within DocumentViewer
+          }}
         />
       )}
     </div>

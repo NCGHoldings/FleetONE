@@ -1,0 +1,299 @@
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+
+export interface StoredDocument {
+  id: string;
+  quotation_id: string;
+  payment_id: string;
+  document_type: 'sales_receipt' | 'invoice';
+  payment_type: 'advance' | 'balance' | 'full';
+  document_status: 'draft' | 'approved';
+  document_data: string; // base64 encoded PDF
+  file_name: string;
+  file_size: number;
+  generated_by: string;
+  generated_at: string;
+  approved_by?: string;
+  approved_at?: string;
+}
+
+export const useDocumentManagement = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+
+  const generateAndStoreDraftDocument = async (
+    invoiceData: InvoiceData, 
+    quotationId: string,
+    paymentId: string
+  ) => {
+    try {
+      setIsLoading(true);
+
+      // Generate PDF with DRAFT status
+      const draftInvoiceData = {
+        ...invoiceData,
+        invoice_status: 'draft' as const,
+      };
+
+      const pdfBlob = await generateInvoicePDF(draftInvoiceData);
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Convert to base64
+      let base64String = '';
+      const chunkSize = 1024;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        base64String += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      const base64Data = btoa(base64String);
+
+      // Store in database
+      const fileName = `DRAFT-${invoiceData.document_type}-${invoiceData.quotationNo}-${Date.now()}.pdf`;
+      
+      const { data, error } = await supabase
+        .from('document_storage')
+        .insert({
+          quotation_id: quotationId,
+          payment_id: paymentId,
+          document_type: (invoiceData.document_type || 'sales_receipt') as 'sales_receipt' | 'invoice',
+          payment_type: invoiceData.invoiceType as 'advance' | 'balance' | 'full',
+          document_status: 'draft',
+          document_data: base64Data,
+          file_name: fileName,
+          file_size: uint8Array.length,
+          generated_by: user?.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success(`Draft ${invoiceData.document_type === 'sales_receipt' ? 'sales receipt' : 'invoice'} generated and stored.`);
+      return { success: true, document: data };
+    } catch (error) {
+      console.error('Error generating draft document:', error);
+      toast.error('Failed to generate draft document.');
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const approveDocument = async (documentId: string) => {
+    try {
+      setIsLoading(true);
+
+      // Get the draft document
+      const { data: draftDoc, error: fetchError } = await supabase
+        .from('document_storage')
+        .select('*')
+        .eq('id', documentId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Regenerate PDF without DRAFT watermark
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('special_hire_payments')
+        .select(`
+          *,
+          quotation:special_hire_quotations(*)
+        `)
+        .eq('id', draftDoc.payment_id)
+        .single();
+
+      if (paymentError) throw paymentError;
+
+      const calculateTotalAmount = (quotation: any) => {
+        return quotation.gross_revenue + 
+               (quotation.fuel_cost_fuel_only || 0) + 
+               (quotation.commission_pass_through_amount || 0) - 
+               (quotation.discount_amount_lkr || 0);
+      };
+
+      const approvedInvoiceData: InvoiceData = {
+        invoiceNo: `APPROVED-${paymentData.id}`,
+        invoiceType: draftDoc.payment_type as 'advance' | 'balance',
+        quotationNo: paymentData.quotation.quotation_no,
+        customerName: paymentData.quotation.customer_name,
+        customerPhone: paymentData.quotation.customer_phone || '',
+        customerEmail: paymentData.quotation.customer_email,
+        companyName: paymentData.quotation.company_name,
+        pickupLocation: paymentData.quotation.pickup_location,
+        dropLocation: paymentData.quotation.drop_location,
+        pickupDate: new Date(paymentData.quotation.pickup_datetime),
+        dropDate: new Date(paymentData.quotation.drop_datetime || paymentData.quotation.pickup_datetime),
+        busType: 'Standard Bus',
+        numberOfBuses: paymentData.quotation.number_of_buses,
+        numberOfPassengers: paymentData.quotation.number_of_passengers,
+        totalAmount: calculateTotalAmount(paymentData.quotation),
+        advanceAmount: paymentData.quotation.advance_paid || 0,
+        paidAmount: paymentData.amount,
+        vehicleNo: paymentData.quotation.assigned_bus_no,
+        driverName: paymentData.quotation.assigned_driver_name,
+        conductorName: paymentData.quotation.assigned_conductor_name,
+        invoice_status: 'approved',
+        document_type: draftDoc.document_type as 'sales_receipt' | 'invoice',
+      };
+
+      // Generate approved PDF
+      const pdfBlob = await generateInvoicePDF(approvedInvoiceData);
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      let base64String = '';
+      const chunkSize = 1024;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        base64String += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      const base64Data = btoa(base64String);
+
+      // Update document status and data
+      const { error: updateError } = await supabase
+        .from('document_storage')
+        .update({
+          document_status: 'approved',
+          document_data: base64Data,
+          file_name: draftDoc.file_name.replace('DRAFT-', 'APPROVED-'),
+          file_size: uint8Array.length,
+          approved_by: user?.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', documentId);
+
+      if (updateError) throw updateError;
+
+      toast.success('Document approved successfully!');
+      return { success: true };
+    } catch (error) {
+      console.error('Error approving document:', error);
+      toast.error('Failed to approve document.');
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getDocumentsByQuotation = async (quotationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('document_storage')
+        .select('*')
+        .eq('quotation_id', quotationId)
+        .order('generated_at', { ascending: false });
+
+      if (error) throw error;
+      return { success: true, documents: data };
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      return { success: false, error, documents: [] };
+    }
+  };
+
+  const regenerateDocument = async (documentId: string) => {
+    try {
+      setIsLoading(true);
+
+      // Get the existing document
+      const { data: existingDoc, error: fetchError } = await supabase
+        .from('document_storage')
+        .select('*')
+        .eq('id', documentId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Get payment and quotation data
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('special_hire_payments')
+        .select(`
+          *,
+          quotation:special_hire_quotations(*)
+        `)
+        .eq('id', existingDoc.payment_id)
+        .single();
+
+      if (paymentError) throw paymentError;
+
+      const calculateTotalAmount = (quotation: any) => {
+        return quotation.gross_revenue + 
+               (quotation.fuel_cost_fuel_only || 0) + 
+               (quotation.commission_pass_through_amount || 0) - 
+               (quotation.discount_amount_lkr || 0);
+      };
+
+      const invoiceData: InvoiceData = {
+        invoiceNo: `REGEN-${existingDoc.payment_type.toUpperCase()}-${Date.now()}`,
+        invoiceType: existingDoc.payment_type as 'advance' | 'balance',
+        quotationNo: paymentData.quotation.quotation_no,
+        customerName: paymentData.quotation.customer_name,
+        customerPhone: paymentData.quotation.customer_phone || '',
+        customerEmail: paymentData.quotation.customer_email,
+        companyName: paymentData.quotation.company_name,
+        pickupLocation: paymentData.quotation.pickup_location,
+        dropLocation: paymentData.quotation.drop_location,
+        pickupDate: new Date(paymentData.quotation.pickup_datetime),
+        dropDate: new Date(paymentData.quotation.drop_datetime || paymentData.quotation.pickup_datetime),
+        busType: 'Standard Bus',
+        numberOfBuses: paymentData.quotation.number_of_buses,
+        numberOfPassengers: paymentData.quotation.number_of_passengers,
+        totalAmount: calculateTotalAmount(paymentData.quotation),
+        advanceAmount: paymentData.quotation.advance_paid || 0,
+        paidAmount: paymentData.amount,
+        vehicleNo: paymentData.quotation.assigned_bus_no,
+        driverName: paymentData.quotation.assigned_driver_name,
+        conductorName: paymentData.quotation.assigned_conductor_name,
+        invoice_status: existingDoc.document_status as 'draft' | 'approved',
+        document_type: existingDoc.document_type as 'sales_receipt' | 'invoice',
+      };
+
+      // Generate new PDF
+      const pdfBlob = await generateInvoicePDF(invoiceData);
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      let base64String = '';
+      const chunkSize = 1024;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        base64String += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      const base64Data = btoa(base64String);
+
+      // Update document
+      const { error: updateError } = await supabase
+        .from('document_storage')
+        .update({
+          document_data: base64Data,
+          file_name: `REGENERATED-${existingDoc.document_type}-${paymentData.quotation.quotation_no}-${Date.now()}.pdf`,
+          file_size: uint8Array.length,
+          generated_at: new Date().toISOString(),
+        })
+        .eq('id', documentId);
+
+      if (updateError) throw updateError;
+
+      toast.success('Document regenerated successfully!');
+      return { success: true };
+    } catch (error) {
+      console.error('Error regenerating document:', error);
+      toast.error('Failed to regenerate document.');
+      return { success: false, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return {
+    generateAndStoreDraftDocument,
+    approveDocument,
+    getDocumentsByQuotation,
+    regenerateDocument,
+    isLoading,
+  };
+};

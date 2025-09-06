@@ -256,6 +256,68 @@ export type Database = {
           },
         ]
       }
+      document_storage: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          document_data: string
+          document_status: string
+          document_type: string
+          file_name: string
+          file_size: number | null
+          generated_at: string
+          generated_by: string | null
+          id: string
+          payment_id: string | null
+          payment_type: string
+          quotation_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          document_data: string
+          document_status?: string
+          document_type: string
+          file_name: string
+          file_size?: number | null
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          payment_id?: string | null
+          payment_type: string
+          quotation_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          document_data?: string
+          document_status?: string
+          document_type?: string
+          file_name?: string
+          file_size?: number | null
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          payment_id?: string | null
+          payment_type?: string
+          quotation_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_storage_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           description: string | null

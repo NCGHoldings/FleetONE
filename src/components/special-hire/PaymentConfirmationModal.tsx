@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -124,6 +125,12 @@ export const PaymentConfirmationModal = ({
   };
 
   const handleConfirm = () => {
+    // Validate required fields for balance payment
+    if (paymentType === 'balance' && (!paymentProofUrl || !driverName || !busNo)) {
+      toast.error('For balance payments, payment proof, driver name, and bus number are required.');
+      return;
+    }
+
     onConfirm({
       amount,
       paymentType,
