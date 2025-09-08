@@ -79,13 +79,20 @@ export function ConfirmedTripsTable() {
     // Apply status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(trip => {
+        const currentStatus = trip.trip_status || trip.status; // Use trip_status as primary, fallback to status
         switch (statusFilter) {
           case 'paid':
-            return trip.status === 'paid' || trip.status === 'completed';
+            return currentStatus === 'paid' || currentStatus === 'completed';
           case 'pending':
-            return trip.status === 'confirmed';
+            return currentStatus === 'confirmed';
           case 'completed':
-            return trip.status === 'completed';
+            return currentStatus === 'completed';
+          case 'cancelled':
+            return currentStatus === 'cancelled';
+          case 'on_hold':
+            return currentStatus === 'on_hold';
+          case 'no_bus_allocated':
+            return currentStatus === 'no_bus_allocated';
           default:
             return true;
         }
@@ -294,48 +301,59 @@ export function ConfirmedTripsTable() {
     }
   };
 
-  // Handle trip status changes
+  // Handle trip status changes with comprehensive financial adjustments
   const handleStatusChange = async (data: any) => {
     if (!selectedTrip) return;
 
     try {
       setStatusLoading(true);
       
-      // Update trip status in database
-      const updateData: any = {
-        trip_status: data.status,
-        status_changed_at: new Date().toISOString(),
-        status_changed_by: user?.id,
-      };
+      // Call the database function that handles status changes and financial adjustments
+      const { data: result, error } = await supabase.rpc('update_trip_status_with_adjustments', {
+        p_quotation_id: selectedTrip.id,
+        p_new_status: data.status,
+        p_reason: data.reason || null,
+        p_refund_amount: data.refundAmount || null,
+        p_refund_status: data.refundStatus || null,
+        p_changed_by: user?.id || null
+      });
 
-      // If status is cancelled and refund data is provided
+      if (error) {
+        console.error('Database function error:', error);
+        throw error;
+      }
+
+      // Type cast the result to get proper access to properties
+      const functionResult = result as any;
+
+      if (!functionResult?.success) {
+        throw new Error(functionResult?.error || 'Failed to update trip status');
+      }
+
+      // Enhanced success message with financial impact details
+      let message = `Trip status updated to ${data.status}`;
+      
       if (data.status === 'cancelled' && data.refundAmount) {
-        updateData.refund_status = data.refundStatus;
-        updateData.refund_amount = data.refundAmount;
-        updateData.refund_reason = data.reason;
+        message += ` with refund of LKR ${data.refundAmount.toLocaleString()}`;
+        
+        // Show financial impact if available
+        const financial = functionResult.financial_impact;
+        if (financial && financial.old_total_paid !== financial.new_total_paid) {
+          message += `. Total paid adjusted from LKR ${financial.old_total_paid?.toLocaleString() || '0'} to LKR ${financial.new_total_paid?.toLocaleString() || '0'}`;
+        }
       }
-
-      // Add reason for status changes that require one
-      if (data.reason) {
-        updateData.status_change_reason = data.reason;
-      }
-
-      const { error } = await supabase
-        .from('special_hire_quotations')
-        .update(updateData)
-        .eq('id', selectedTrip.id);
-
-      if (error) throw error;
-
-      toast.success(`Trip status updated to ${data.status}${data.status === 'cancelled' && data.refundAmount ? ` with refund of LKR ${data.refundAmount.toLocaleString()}` : ''}`);
+      
+      toast.success(message);
       
       // Close modal and refresh data
       setStatusModalOpen(false);
       setSelectedTrip(null);
       refetch();
+      
     } catch (error) {
       console.error('Error updating trip status:', error);
-      toast.error('Failed to update trip status. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update trip status. Please try again.';
+      toast.error(errorMessage);
     } finally {
       setStatusLoading(false);
     }
@@ -543,6 +561,9 @@ export function ConfirmedTripsTable() {
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="no_bus_allocated">No Bus Available</SelectItem>
               </SelectContent>
             </Select>
 
