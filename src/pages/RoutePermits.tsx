@@ -478,7 +478,14 @@ export default function RoutePermits() {
           >
             <Eye className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="outline">
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={() => {
+              // TODO: Implement document upload for permit
+              toast.info('Document upload functionality coming soon');
+            }}
+          >
             <Upload className="h-4 w-4" />
           </Button>
         </div>
