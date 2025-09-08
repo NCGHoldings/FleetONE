@@ -37,14 +37,13 @@ export const DocumentViewer = ({
         setIsLoading(false);
       }
     } else {
-      // Default download behavior
-      const byteCharacters = atob(document.document_data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      // Default download behavior (robust decoding)
+      const arr = toUint8FromAny(document.document_data);
+      if (!arr) {
+        console.error('Unable to decode document for download');
+        return;
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      const blob = new Blob([arr], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const link = window.document.createElement('a');
       link.href = url;
@@ -56,30 +55,68 @@ export const DocumentViewer = ({
     }
   };
 
-  const isValidBase64 = (str: string) => {
+  const normalizeBase64 = (str: string) => {
+    let s = (str || '').trim().replace(/\s/g, '');
+    if (s.startsWith('data:')) s = s.substring(s.indexOf(',') + 1);
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = s.length % 4;
+    if (pad) s += '='.repeat(4 - pad);
+    return s;
+  };
+
+  const isHexString = (str: string) => /^\\x?[0-9a-fA-F]+$/.test((str || '').trim());
+
+  const hexToUint8Array = (hex: string) => {
+    let h = (hex || '').trim();
+    if (h.startsWith('\\x')) h = h.slice(2);
+    if (h.length % 2 !== 0) return new Uint8Array();
+    const arr = new Uint8Array(h.length / 2);
+    for (let i = 0; i < h.length; i += 2) arr[i / 2] = parseInt(h.substring(i, i + 2), 16);
+    return arr;
+  };
+
+  const bufferJsonToUint8 = (str: string): Uint8Array | null => {
     try {
-      const cleaned = str.replace(/\s/g, '');
-      // Check if it's a valid base64 string
-      return btoa(atob(cleaned)) === cleaned;
+      const obj = JSON.parse(str);
+      if (obj && obj.type === 'Buffer' && Array.isArray(obj.data)) return new Uint8Array(obj.data);
+    } catch {}
+    return null;
+  };
+
+  const toUint8FromAny = (raw: string): Uint8Array | null => {
+    if (!raw) return null;
+    // JSON Buffer format
+    const jsonArr = bufferJsonToUint8(raw);
+    if (jsonArr) return jsonArr;
+    // Hex format (e.g. "\\x25504446...")
+    if (isHexString(raw)) return hexToUint8Array(raw);
+    // Base64 (normalize first)
+    try {
+      const b64 = normalizeBase64(raw);
+      const byteStr = atob(b64);
+      const nums = new Array(byteStr.length);
+      for (let i = 0; i < byteStr.length; i++) nums[i] = byteStr.charCodeAt(i);
+      return new Uint8Array(nums);
     } catch (err) {
-      return false;
+      console.error('Failed to decode document data', err);
+      return null;
     }
+  };
+
+  const createPdfBlobUrl = (arr: Uint8Array) => {
+    const blob = new Blob([arr], { type: 'application/pdf' });
+    return URL.createObjectURL(blob);
   };
 
   const getPdfDataUrl = () => {
     try {
       if (!document.document_data) return '';
-      
-      const cleanBase64 = document.document_data.replace(/\s/g, '');
-      
-      if (!isValidBase64(cleanBase64)) {
-        console.error('Invalid base64 data');
-        return '';
-      }
-      
-      return `data:application/pdf;base64,${cleanBase64}`;
+      const arr = toUint8FromAny(document.document_data);
+      if (!arr) return '';
+      // Prefer blob URL for consistent rendering
+      return createPdfBlobUrl(arr);
     } catch (error) {
-      console.error('Error creating PDF data URL:', error);
+      console.error('Error creating PDF URL:', error);
       return '';
     }
   };
@@ -87,24 +124,11 @@ export const DocumentViewer = ({
   const getPdfBlob = () => {
     try {
       if (!document.document_data) return '';
-      
-      const cleanBase64 = document.document_data.replace(/\s/g, '');
-      
-      if (!isValidBase64(cleanBase64)) {
-        console.error('Invalid base64 data for blob creation');
-        return '';
-      }
-      
-      const byteCharacters = atob(cleanBase64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/pdf' });
-      return URL.createObjectURL(blob);
+      const arr = toUint8FromAny(document.document_data);
+      if (!arr) return '';
+      return createPdfBlobUrl(arr);
     } catch (error) {
-      console.error('Error creating PDF blob:', error);
+      console.error('Error creating PDF blob URL:', error);
       return '';
     }
   };
