@@ -56,10 +56,27 @@ export const DocumentViewer = ({
     }
   };
 
+  const isValidBase64 = (str: string) => {
+    try {
+      const cleaned = str.replace(/\s/g, '');
+      // Check if it's a valid base64 string
+      return btoa(atob(cleaned)) === cleaned;
+    } catch (err) {
+      return false;
+    }
+  };
+
   const getPdfDataUrl = () => {
     try {
-      // Clean the base64 data
+      if (!document.document_data) return '';
+      
       const cleanBase64 = document.document_data.replace(/\s/g, '');
+      
+      if (!isValidBase64(cleanBase64)) {
+        console.error('Invalid base64 data');
+        return '';
+      }
+      
       return `data:application/pdf;base64,${cleanBase64}`;
     } catch (error) {
       console.error('Error creating PDF data URL:', error);
@@ -69,7 +86,15 @@ export const DocumentViewer = ({
 
   const getPdfBlob = () => {
     try {
+      if (!document.document_data) return '';
+      
       const cleanBase64 = document.document_data.replace(/\s/g, '');
+      
+      if (!isValidBase64(cleanBase64)) {
+        console.error('Invalid base64 data for blob creation');
+        return '';
+      }
+      
       const byteCharacters = atob(cleanBase64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -123,23 +148,51 @@ export const DocumentViewer = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden border rounded-lg bg-gray-50">
-          {document.document_data ? (
-            <iframe
-              src={getPdfBlob()}
-              className="w-full h-[70vh]"
-              title={`${document.document_type} Preview`}
-              onError={() => {
-                console.error('Failed to load PDF in iframe');
-              }}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
-              <div className="text-center">
-                <p>Document data not available</p>
-                <p className="text-sm">Please try regenerating the document</p>
-              </div>
-            </div>
-          )}
+          {(() => {
+            if (!document.document_data) {
+              return (
+                <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+                  <div className="text-center">
+                    <p>Document data not available</p>
+                    <p className="text-sm">Please try regenerating the document</p>
+                  </div>
+                </div>
+              );
+            }
+
+            const pdfUrl = getPdfDataUrl();
+            const blobUrl = getPdfBlob();
+            
+            if (!pdfUrl && !blobUrl) {
+              return (
+                <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+                  <div className="text-center">
+                    <p>Unable to display document</p>
+                    <p className="text-sm">The document data appears to be corrupted</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-4"
+                      onClick={handleDownload}
+                    >
+                      Try Download Instead
+                    </Button>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <iframe
+                src={blobUrl || pdfUrl}
+                className="w-full h-[70vh]"
+                title={`${document.document_type} Preview`}
+                onError={() => {
+                  console.error('Failed to load PDF in iframe');
+                }}
+              />
+            );
+          })()}
         </div>
 
         <div className="text-xs text-muted-foreground pt-2">
