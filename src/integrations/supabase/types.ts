@@ -1965,9 +1965,11 @@ export type Database = {
           refund_amount: number | null
           refund_processed_at: string | null
           refund_processed_by: string | null
+          refund_reason: string | null
           refund_status: string | null
           special_request: string | null
           status: string | null
+          status_change_reason: string | null
           status_changed_at: string | null
           status_changed_by: string | null
           total_additional_charges: number | null
@@ -2036,9 +2038,11 @@ export type Database = {
           refund_amount?: number | null
           refund_processed_at?: string | null
           refund_processed_by?: string | null
+          refund_reason?: string | null
           refund_status?: string | null
           special_request?: string | null
           status?: string | null
+          status_change_reason?: string | null
           status_changed_at?: string | null
           status_changed_by?: string | null
           total_additional_charges?: number | null
@@ -2107,9 +2111,11 @@ export type Database = {
           refund_amount?: number | null
           refund_processed_at?: string | null
           refund_processed_by?: string | null
+          refund_reason?: string | null
           refund_status?: string | null
           special_request?: string | null
           status?: string | null
+          status_change_reason?: string | null
           status_changed_at?: string | null
           status_changed_by?: string | null
           total_additional_charges?: number | null
