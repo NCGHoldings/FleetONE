@@ -219,7 +219,9 @@ export default function RoutePermits() {
         max_fare: formData.max_fare ? parseFloat(formData.max_fare) : null,
         annual_fee: formData.annual_fee ? parseFloat(formData.annual_fee) : null,
         permit_status: formData.permit_status as any,
-        operation_status: formData.operation_status
+        operation_status: formData.operation_status,
+        bus_id: formData.bus_id || null,
+        route_id: formData.route_id || null
       };
 
       if (editingPermit) {
