@@ -6,9 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Plus, FileText, Calculator, Truck } from 'lucide-react';
 import { YutongQuotationsList } from "@/components/yutong/YutongQuotationsList";
-import { YutongQuotationForm } from "@/components/yutong/YutongQuotationForm";
+import { YutongQuotationForm } from "@/components/yutong/YutongQuotationFormUpdated";
 import { YutongBusModelsAdmin } from "@/components/yutong/YutongBusModelsAdmin";
 import { YutongAddOnsAdmin } from "@/components/yutong/YutongAddOnsAdmin";
+import YutongCustomersAdmin from "@/components/yutong/YutongCustomersAdmin";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -131,8 +132,9 @@ export default function YutongQuotations() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="quotations">Quotations</TabsTrigger>
+          <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="bus-models">Bus Models</TabsTrigger>
           <TabsTrigger value="addons">Add-ons</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -140,6 +142,10 @@ export default function YutongQuotations() {
 
         <TabsContent value="quotations" className="space-y-4">
           <YutongQuotationsList onRefresh={loadStats} />
+        </TabsContent>
+
+        <TabsContent value="customers" className="space-y-4">
+          <YutongCustomersAdmin />
         </TabsContent>
 
         <TabsContent value="bus-models" className="space-y-4">
