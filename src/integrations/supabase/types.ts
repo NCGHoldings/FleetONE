@@ -2736,6 +2736,117 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_customer_purchases: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          purchase_date: string
+          quotation_id: string
+          status: string | null
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          purchase_date?: string
+          quotation_id: string
+          status?: string | null
+          total_amount?: number
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          purchase_date?: string
+          quotation_id?: string
+          status?: string | null
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_customer_purchases_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_customer_purchases_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_customers: {
+        Row: {
+          address: string | null
+          business_registration_no: string | null
+          city: string | null
+          company_name: string
+          contact_person: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          credit_limit: number | null
+          customer_code: string
+          customer_type: string | null
+          email: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          payment_terms: number | null
+          phone: string
+          tax_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          business_registration_no?: string | null
+          city?: string | null
+          company_name: string
+          contact_person?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_limit?: number | null
+          customer_code: string
+          customer_type?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          payment_terms?: number | null
+          phone: string
+          tax_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          business_registration_no?: string | null
+          city?: string | null
+          company_name?: string
+          contact_person?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_limit?: number | null
+          customer_code?: string
+          customer_type?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          payment_terms?: number | null
+          phone?: string
+          tax_number?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       yutong_quotation_addons: {
         Row: {
           addon_id: string
@@ -2795,6 +2906,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_email: string
+          customer_id: string | null
           customer_name: string
           customer_phone: string
           delivery_timeline: string | null
@@ -2819,6 +2931,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_email: string
+          customer_id?: string | null
           customer_name: string
           customer_phone: string
           delivery_timeline?: string | null
@@ -2843,6 +2956,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_email?: string
+          customer_id?: string | null
           customer_name?: string
           customer_phone?: string
           delivery_timeline?: string | null
@@ -2868,6 +2982,13 @@ export type Database = {
             referencedRelation: "yutong_bus_models"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "yutong_quotations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_customers"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -2878,6 +2999,10 @@ export type Database = {
       create_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      generate_customer_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       generate_employee_id: {
         Args: Record<PropertyKey, never>
