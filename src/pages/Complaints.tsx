@@ -37,6 +37,14 @@ export default function Complaints() {
   const [loading, setLoading] = useState(true);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: '',
+    priority: 'medium',
+    type: 'complaint',
+    staff_group: ''
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -91,6 +99,65 @@ export default function Complaints() {
     if (hoursDiff > 48) return 'Overdue';
     if (hoursDiff > 24) return 'Due Soon';
     return `${48 - hoursDiff}h remaining`;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.title || !formData.description || !formData.category) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from('feedback_complaints')
+        .insert({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          priority: formData.priority,
+          type: formData.type,
+          staff_group: formData.staff_group || null,
+          status: 'new',
+          reported_by: user?.id,
+          escalation_level: 1
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Complaint created successfully",
+      });
+
+      // Reset form and close dialog
+      setFormData({
+        title: '',
+        description: '',
+        category: '',
+        priority: 'medium',
+        type: 'complaint',
+        staff_group: ''
+      });
+      setShowAddDialog(false);
+      
+      // Refresh the complaints list
+      fetchComplaints();
+    } catch (error) {
+      console.error('Error creating complaint:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create complaint",
+        variant: "destructive",
+      });
+    }
   };
 
   const columns: ColumnDef<Complaint>[] = [
@@ -282,6 +349,96 @@ export default function Complaints() {
         searchKey="title"
         title="Complaints"
       />
+
+      {/* Add Complaint Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add New Complaint</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="title">Title *</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Brief description of the complaint"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="category">Category *</Label>
+              <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="service">Service Quality</SelectItem>
+                  <SelectItem value="driver">Driver Behavior</SelectItem>
+                  <SelectItem value="vehicle">Vehicle Condition</SelectItem>
+                  <SelectItem value="scheduling">Scheduling</SelectItem>
+                  <SelectItem value="safety">Safety Concerns</SelectItem>
+                  <SelectItem value="billing">Billing Issues</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="priority">Priority</Label>
+              <Select value={formData.priority} onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="staff_group">Related Staff Group</Label>
+              <Select value={formData.staff_group} onValueChange={(value) => setFormData(prev => ({ ...prev, staff_group: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select staff group (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="drivers">Drivers</SelectItem>
+                  <SelectItem value="conductors">Conductors</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="customer_service">Customer Service</SelectItem>
+                  <SelectItem value="administration">Administration</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Description *</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Detailed description of the complaint"
+                rows={4}
+                required
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Create Complaint
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* View Complaint Dialog */}
       {selectedComplaint && (
