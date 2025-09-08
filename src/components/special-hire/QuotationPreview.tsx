@@ -238,31 +238,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-2">{quotation.route_description || routeDescription}</td>
               <td className="border border-gray-300 p-2">{totalDistance.toFixed(2)} Km</td>
               <td className="border border-gray-300 p-2">
-                <div>Hire Charges: LKR {quotation.gross_revenue?.toLocaleString() || '0'}</div>
+                <div>Hire Charges: LKR {((quotation.gross_revenue || 0) + (quotation.total_additional_charges || 0)).toLocaleString()}</div>
                 <div>Service Charge: LKR {((quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0)).toLocaleString()}</div>
-                {additionalCharges.length > 0 && (
-                  <div>
-                    <div className="text-sm font-medium text-orange-600 mt-1">Additional Charges:</div>
-                    {additionalCharges.map((charge: any, index: number) => {
-                      const chargeTypeLabels: any = {
-                        permits: 'Permits Cost',
-                        highway: 'Highway Charges',
-                        additional_fuel: 'Additional Fuel Costs',
-                        driver_charges: 'Driver Charges',
-                        other: 'Other'
-                      };
-                      const displayName = chargeTypeLabels[charge.type] || charge.reason || charge.type;
-                      return (
-                        <div key={index} className="text-sm pl-2">
-                          {displayName}: LKR {charge.amount?.toLocaleString() || '0'}
-                        </div>
-                      );
-                    })}
-                    <div className="text-sm font-medium text-orange-600 pl-2">
-                      Total Additional: LKR {(quotation.total_additional_charges || 0).toLocaleString()}
-                    </div>
-                  </div>
-                )}
                 {(quotation.discount_amount_lkr || 0) > 0 && (
                   <div className="text-red-600">Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}</div>
                 )}
