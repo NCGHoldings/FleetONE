@@ -172,50 +172,87 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border/50 bg-card">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-border/50">
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id} className="font-semibold">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
+      <div className="rounded-lg border border-border/50 bg-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table className="w-full">
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="border-border/50 bg-muted/50">
+                  {headerGroup.headers.map((header) => {
+                    const canSort = header.column.getCanSort();
+                    return (
+                      <TableHead 
+                        key={header.id} 
+                        className={`
+                          font-semibold text-foreground/90 px-4 py-3 text-left
+                          ${canSort ? 'cursor-pointer hover:bg-muted/70 transition-colors select-none' : ''}
+                          ${header.column.getIsSorted() ? 'bg-muted/80' : ''}
+                          whitespace-nowrap
+                        `}
+                        onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                        style={{
+                          width: header.getSize() !== 150 ? header.getSize() : 'auto',
+                          minWidth: '120px'
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                          {canSort && (
+                            <span className="text-xs text-muted-foreground">
+                              {header.column.getIsSorted() === 'asc' ? '↑' : 
+                               header.column.getIsSorted() === 'desc' ? '↓' : '↕'}
+                            </span>
                           )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className="table-row-hover border-border/50"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+                        </div>
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  No results found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    className="border-border/50 hover:bg-muted/30 transition-colors"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell 
+                        key={cell.id} 
+                        className="px-4 py-3 text-sm"
+                        style={{
+                          width: cell.column.getSize() !== 150 ? cell.column.getSize() : 'auto',
+                          minWidth: '120px'
+                        }}
+                      >
+                        <div className="truncate" title={typeof cell.getValue() === 'string' ? String(cell.getValue()) : undefined}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-32 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="text-4xl">📄</div>
+                      <div>No results found</div>
+                      <div className="text-xs">Try adjusting your search or filter criteria</div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Pagination */}
