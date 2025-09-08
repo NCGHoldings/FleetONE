@@ -2899,6 +2899,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      update_trip_status_with_adjustments: {
+        Args: {
+          p_changed_by?: string
+          p_new_status: string
+          p_quotation_id: string
+          p_reason?: string
+          p_refund_amount?: number
+          p_refund_status?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role:
