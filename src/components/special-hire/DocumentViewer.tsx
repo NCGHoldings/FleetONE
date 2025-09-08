@@ -57,7 +57,31 @@ export const DocumentViewer = ({
   };
 
   const getPdfDataUrl = () => {
-    return `data:application/pdf;base64,${document.document_data}`;
+    try {
+      // Clean the base64 data
+      const cleanBase64 = document.document_data.replace(/\s/g, '');
+      return `data:application/pdf;base64,${cleanBase64}`;
+    } catch (error) {
+      console.error('Error creating PDF data URL:', error);
+      return '';
+    }
+  };
+
+  const getPdfBlob = () => {
+    try {
+      const cleanBase64 = document.document_data.replace(/\s/g, '');
+      const byteCharacters = atob(cleanBase64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('Error creating PDF blob:', error);
+      return '';
+    }
   };
 
   const getDocumentTitle = () => {
@@ -99,11 +123,23 @@ export const DocumentViewer = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden border rounded-lg bg-gray-50">
-          <iframe
-            src={getPdfDataUrl()}
-            className="w-full h-[70vh]"
-            title={`${document.document_type} Preview`}
-          />
+          {document.document_data ? (
+            <iframe
+              src={getPdfBlob()}
+              className="w-full h-[70vh]"
+              title={`${document.document_type} Preview`}
+              onError={() => {
+                console.error('Failed to load PDF in iframe');
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+              <div className="text-center">
+                <p>Document data not available</p>
+                <p className="text-sm">Please try regenerating the document</p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="text-xs text-muted-foreground pt-2">
