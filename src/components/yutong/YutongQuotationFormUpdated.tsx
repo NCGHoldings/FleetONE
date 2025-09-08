@@ -191,13 +191,13 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         delivery_timeline: data.delivery_timeline,
         payment_terms: data.payment_terms,
         warranty_terms: data.warranty_terms,
-        valid_until: new Date(Date.now() + (data.valid_days * 24 * 60 * 60 * 1000)),
+        valid_until: new Date(Date.now() + (data.valid_days * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
         status: 'draft',
       };
 
       const { data: quotation, error } = await supabase
         .from('yutong_quotations')
-        .insert(quotationData)
+        .insert([quotationData])
         .select()
         .single();
 

@@ -20,7 +20,7 @@ const customerSchema = z.object({
   company_name: z.string().min(1, 'Company name is required'),
   contact_person: z.string().optional(),
   phone: z.string().min(1, 'Phone number is required'),
-  email: z.string().email('Valid email is required').optional(),
+  email: z.string().email('Valid email is required').optional().or(z.literal('')),
   address: z.string().optional(),
   city: z.string().optional(),
   country: z.string().default('Sri Lanka'),
@@ -109,10 +109,28 @@ export default function YutongCustomersAdmin() {
 
   const handleSubmit = async (data: CustomerFormData) => {
     try {
+      // Ensure all required fields are present
+      const insertData = {
+        company_name: data.company_name,
+        phone: data.phone,
+        contact_person: data.contact_person || '',
+        email: data.email || '',
+        address: data.address || '',
+        city: data.city || '',
+        country: data.country,
+        customer_type: data.customer_type,
+        credit_limit: data.credit_limit,
+        payment_terms: data.payment_terms,
+        tax_number: data.tax_number || '',
+        business_registration_no: data.business_registration_no || '',
+        notes: data.notes || '',
+        customer_code: `TEMP-${Date.now()}` // Will be overridden by trigger
+      };
+
       if (editingCustomer) {
         const { error } = await supabase
           .from('yutong_customers')
-          .update(data)
+          .update(insertData)
           .eq('id', editingCustomer.id);
 
         if (error) throw error;
@@ -123,7 +141,7 @@ export default function YutongCustomersAdmin() {
       } else {
         const { error } = await supabase
           .from('yutong_customers')
-          .insert(data);
+          .insert([insertData]);
 
         if (error) throw error;
         toast({
