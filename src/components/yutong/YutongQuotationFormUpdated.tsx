@@ -56,10 +56,13 @@ interface Customer {
 
 interface TempAddOn {
   id: string;
-  name: string;
-  price: number;
+  addon_id: string;
+  addon_name: string;
+  category: string;
   quantity: number;
-  total: number;
+  unit_price: number;
+  total_price: number;
+  notes?: string;
 }
 
 export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormProps) {
@@ -162,7 +165,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     
     const subtotal = quantity * unitPrice;
     const discountAmount = subtotal * (discountPercentage / 100);
-    const addOnsTotal = tempAddOns.reduce((sum, addon) => sum + addon.total, 0);
+    const addOnsTotal = tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0);
     
     return subtotal - discountAmount + addOnsTotal;
   };
@@ -184,7 +187,6 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         quantity: data.quantity,
         unit_price: data.unit_price,
         discount_percentage: data.discount_percentage || 0,
-        discount_amount: ((data.quantity * data.unit_price) * (data.discount_percentage || 0)) / 100,
         subtotal: data.quantity * data.unit_price,
         total_price: totalPrice,
         special_features: data.special_features,
@@ -209,10 +211,11 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       if (tempAddOns.length > 0) {
         const addOnInserts = tempAddOns.map(addon => ({
           quotation_id: quotation.id,
-          addon_id: addon.id,
+          addon_id: addon.addon_id,
           quantity: addon.quantity,
-          unit_price: addon.price,
-          total_price: addon.total,
+          unit_price: addon.unit_price,
+          total_price: addon.total_price,
+          notes: addon.notes,
         }));
 
         const { error: addOnError } = await supabase
@@ -240,9 +243,22 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     }
   };
 
-  const handleFinalSubmit = () => {
-    // Additional logic for completing quotation process
-    onSubmit();
+  const handleFinalSubmit = async () => {
+    // Trigger form submission from the basic info tab
+    const formData = form.getValues();
+    
+    // Validate required fields
+    if (!formData.customer_name || !formData.customer_phone || !formData.customer_email || !formData.bus_model_id) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields in the Basic Information tab",
+        variant: "destructive",
+      });
+      setActiveTab('basic');
+      return;
+    }
+
+    await handleFormSubmit(formData);
   };
 
   return (
@@ -533,7 +549,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                     </div>
                     <div className="flex justify-between">
                       <span>Add-ons:</span>
-                      <span>LKR {tempAddOns.reduce((sum, addon) => sum + addon.total, 0).toLocaleString()}</span>
+                      <span>LKR {tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between font-semibold text-lg">
                       <span>Total:</span>
@@ -555,12 +571,16 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
           </TabsContent>
 
           <TabsContent value="addons" className="space-y-4">
-            <div className="p-4 text-center text-muted-foreground">
-              Add-ons management will be available here
-            </div>
-            <div className="flex justify-end space-x-2">
+            <InlineAddOnsSection 
+              addOns={tempAddOns} 
+              onAddOnsChange={setTempAddOns} 
+            />
+            <div className="flex justify-end space-x-2 pt-4">
               <Button type="button" variant="outline" onClick={onCancel}>
                 Cancel
+              </Button>
+              <Button onClick={() => setActiveTab('basic')}>
+                Back to Basic Info
               </Button>
               <Button onClick={handleFinalSubmit}>
                 Complete Quotation
