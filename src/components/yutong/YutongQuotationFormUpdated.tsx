@@ -187,7 +187,6 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         quantity: data.quantity,
         unit_price: data.unit_price,
         discount_percentage: data.discount_percentage || 0,
-        subtotal: data.quantity * data.unit_price,
         total_price: totalPrice,
         special_features: data.special_features,
         delivery_timeline: data.delivery_timeline,
