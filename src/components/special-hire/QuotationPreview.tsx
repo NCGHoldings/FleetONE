@@ -240,7 +240,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             <tbody>
               <tr>
                 <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left" style={{ width: '25%' }}>Pick-up Location</th>
-                <td className="border border-gray-300 p-1">{quotation.pickup_location}</td>
+                <td className="border border-gray-300 p-1" colSpan={3}>{quotation.pickup_location}</td>
               </tr>
               <tr>
                 <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left" style={{ width: '12.5%' }}>Pick-up Date</th>
@@ -254,7 +254,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               </tr>
               <tr>
                 <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left">Drop-off Location</th>
-                <td className="border border-gray-300 p-1">{quotation.drop_location}</td>
+                <td className="border border-gray-300 p-1" colSpan={3}>{quotation.drop_location}</td>
               </tr>
               <tr>
                 <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left" style={{ width: '12.5%' }}>Drop-off Date</th>
