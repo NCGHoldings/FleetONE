@@ -277,23 +277,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-1">{quotation.seating_capacity || 54}</td>
               <td className="border border-gray-300 p-1">
                 <div className="space-y-0.5">
-                  <div className="flex items-center text-xs">
-                    <span className="text-green-600 font-medium">Pickup:</span>
-                    <span className="ml-1 text-xs">{quotation.pickup_location}</span>
-                  </div>
-                  {intermediateStops.length > 0 && (
-                    <div className="flex items-start text-xs">
-                      <span className="text-blue-600 font-medium">Stops:</span>
-                      <div className="ml-1 flex flex-col">
-                        {intermediateStops.map((stop: any, index: number) => (
-                          <span key={index} className="text-xs text-gray-600">• {stop.location}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center text-xs">
-                    <span className="text-red-600 font-medium">Drop:</span>
-                    <span className="ml-1 text-xs">{quotation.drop_location}</span>
+                  <div className="text-xs text-gray-700">
+                    {routeDescription}
                   </div>
                 </div>
               </td>
@@ -308,6 +293,34 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             </tr>
           </tbody>
         </table>
+
+        {/* Route Information */}
+        {intermediateStops.length > 0 && (
+          <div className="mt-3 mb-3">
+            <div className="text-sm font-semibold text-blue-600 mb-2">Route Details</div>
+            <div className="bg-gray-50 p-3 rounded border">
+              <div className="flex items-center gap-2 text-sm mb-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="font-medium text-green-700">Start:</span>
+                <span className="text-gray-800">{quotation.pickup_location}</span>
+              </div>
+              
+              {intermediateStops.map((stop: any, index: number) => (
+                <div key={index} className="flex items-center gap-2 text-sm mb-2 ml-4">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  <span className="font-medium text-blue-600">Stop {index + 1}:</span>
+                  <span className="text-gray-800">{stop.location}</span>
+                </div>
+              ))}
+              
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <span className="font-medium text-red-700">End:</span>
+                <span className="text-gray-800">{quotation.drop_location}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Extra Charges */}
         <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra Charges and Route Info</div>
