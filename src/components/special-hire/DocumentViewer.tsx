@@ -148,7 +148,7 @@ export const DocumentViewer = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-hidden">
         <DialogHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
             <FileText className="w-5 h-5" />
@@ -175,7 +175,7 @@ export const DocumentViewer = ({
           {(() => {
             if (!document.document_data) {
               return (
-                <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+                <div className="flex items-center justify-center h-[85vh] text-muted-foreground">
                   <div className="text-center">
                     <p>Document data not available</p>
                     <p className="text-sm">Please try regenerating the document</p>
@@ -189,7 +189,7 @@ export const DocumentViewer = ({
             
             if (!pdfUrl && !blobUrl) {
               return (
-                <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+                <div className="flex items-center justify-center h-[85vh] text-muted-foreground">
                   <div className="text-center">
                     <p>Unable to display document</p>
                     <p className="text-sm">The document data appears to be corrupted</p>
@@ -209,7 +209,7 @@ export const DocumentViewer = ({
             return (
               <iframe
                 src={blobUrl || pdfUrl}
-                className="w-full h-[70vh]"
+                className="w-full h-[85vh]"
                 title={`${document.document_type} Preview`}
                 onError={() => {
                   console.error('Failed to load PDF in iframe');
