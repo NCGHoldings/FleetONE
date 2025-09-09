@@ -52,7 +52,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         .from('yutong_quotations')
         .select(`
           *,
-          profiles:created_by (
+          creator:profiles!created_by (
             first_name,
             last_name
           )
@@ -64,16 +64,17 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
       // Transform data to include creator name
       const transformedData = (data || []).map((quotation: any) => ({
         ...quotation,
-        creator_name: quotation.profiles 
-          ? `${quotation.profiles.first_name} ${quotation.profiles.last_name}`.trim()
-          : 'Unknown'
+        creator_name: quotation.creator 
+          ? `${quotation.creator.first_name || ''} ${quotation.creator.last_name || ''}`.trim()
+          : 'Unknown User'
       }));
       
       setQuotations(transformedData);
     } catch (error: any) {
+      console.error('Error loading quotations:', error);
       toast({
         title: "Error",
-        description: "Failed to load quotations",
+        description: "Failed to load quotations: " + error.message,
         variant: "destructive"
       });
     } finally {
