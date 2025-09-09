@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Search, Eye, Edit, Trash2 } from 'lucide-react';
 import { ColumnDef } from '@tanstack/react-table';
+import CustomerProfileModal from './CustomerProfileModal';
 
 const customerSchema = z.object({
   company_name: z.string().min(1, 'Company name is required'),
@@ -61,6 +62,8 @@ export default function YutongCustomersAdmin() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<CustomerFormData>({
@@ -209,6 +212,11 @@ export default function YutongCustomersAdmin() {
     }
   };
 
+  const handleViewProfile = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setShowProfile(true);
+  };
+
   const columns: ColumnDef<Customer>[] = [
     {
       accessorKey: 'customer_code',
@@ -270,6 +278,14 @@ export default function YutongCustomersAdmin() {
       id: 'actions',
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleViewProfile(row.original)}
+            title="View customer profile and history"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -527,6 +543,12 @@ export default function YutongCustomersAdmin() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <CustomerProfileModal
+        customer={selectedCustomer}
+        open={showProfile}
+        onOpenChange={setShowProfile}
+      />
     </div>
   );
 }
