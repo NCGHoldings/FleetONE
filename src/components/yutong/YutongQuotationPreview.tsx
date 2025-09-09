@@ -1,5 +1,6 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useEffect, useState } from 'react';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface YutongQuotation {
   id: string;
@@ -23,12 +24,27 @@ interface YutongQuotation {
   discount_percentage?: number;
 }
 
+interface QuotationAddOn {
+  id: string;
+  addon_id: string;
+  quantity: number;
+  unit_price: number;
+  notes?: string;
+  yutong_addons?: {
+    addon_name: string;
+    category: string;
+  };
+}
+
 interface YutongQuotationPreviewProps {
   quotation: YutongQuotation;
 }
 
 export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotationPreviewProps>(
   ({ quotation }, ref) => {
+    const [addOns, setAddOns] = useState<QuotationAddOn[]>([]);
+    const [loading, setLoading] = useState(true);
+
     // Parse bus model details - you might need to adjust this based on your data structure
     const getBusModelDetails = (model: string) => {
       // Default values - these could be fetched from a bus models table
@@ -43,6 +59,40 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
 
     const busDetails = getBusModelDetails(quotation.bus_model);
     const formattedDate = format(new Date(quotation.created_at), 'dd/MM/yyyy');
+
+    // Fetch add-ons for this quotation
+    useEffect(() => {
+      const fetchAddOns = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('yutong_quotation_addons')
+            .select(`
+              *,
+              yutong_addons (
+                addon_name,
+                category
+              )
+            `)
+            .eq('quotation_id', quotation.id);
+
+          if (error) {
+            console.error('Error fetching add-ons:', error);
+          } else {
+            setAddOns(data || []);
+          }
+        } catch (error) {
+          console.error('Error fetching add-ons:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchAddOns();
+    }, [quotation.id]);
+
+    // Calculate totals
+    const addOnsTotal = addOns.reduce((sum, addon) => sum + (addon.quantity * addon.unit_price), 0);
+    const grandTotal = quotation.total_price + addOnsTotal;
 
     return (
       <div ref={ref} style={{ fontFamily: 'Arial, sans-serif', margin: 0, padding: '20px', background: '#f9f9f9', color: '#000' }}>
@@ -84,6 +134,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
               </tr>
             </thead>
             <tbody>
+              {/* Main Bus Product */}
               <tr>
                 <td style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
                   <b>BUS MODEL:</b> YUTONG - {busDetails.model}<br/>
@@ -107,12 +158,67 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                   {quotation.total_price.toLocaleString()}
                 </td>
               </tr>
+              
+              {/* Subtotal for Bus */}
               <tr>
-                <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                  Total
+                <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
+                  Bus Subtotal
                 </td>
-                <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
                   {quotation.total_price.toLocaleString()}
+                </td>
+              </tr>
+
+              {/* Add-ons Section */}
+              {!loading && addOns.length > 0 && (
+                <>
+                  <tr>
+                    <td colSpan={4} style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#003366', color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                      ADD-ONS
+                    </td>
+                  </tr>
+                  {addOns.map((addon, index) => (
+                    <tr key={index}>
+                      <td style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                        <b>ADD-ON:</b> {addon.yutong_addons?.addon_name || 'N/A'}<br/>
+                        <b>CATEGORY:</b> {addon.yutong_addons?.category || 'N/A'}
+                        {addon.notes && (
+                          <>
+                            <br/><b>NOTES:</b> {addon.notes}
+                          </>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                        {addon.unit_price.toLocaleString()}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                        {addon.quantity}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                        {(addon.quantity * addon.unit_price).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                  
+                  {/* Add-ons Subtotal */}
+                  <tr>
+                    <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
+                      Add-ons Subtotal
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
+                      {addOnsTotal.toLocaleString()}
+                    </td>
+                  </tr>
+                </>
+              )}
+
+              {/* Grand Total */}
+              <tr>
+                <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '12px 8px', fontSize: '16px', border: '2px solid #003366', background: '#003366', color: 'white' }}>
+                  GRAND TOTAL
+                </td>
+                <td style={{ textAlign: 'center', padding: '12px 8px', fontSize: '16px', border: '2px solid #003366', background: '#003366', color: 'white', fontWeight: 'bold' }}>
+                  {grandTotal.toLocaleString()}
                 </td>
               </tr>
             </tbody>
