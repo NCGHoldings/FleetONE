@@ -128,6 +128,9 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
 
       // Generate quotation number
       const quotationNo = `YTQ-${Date.now()}`;
+      
+      console.log('Creating quotation with user:', user);
+      console.log('User ID:', user?.id);
 
       const quotationData = {
         quotation_no: quotationNo,
@@ -156,6 +159,9 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         .insert([quotationData])
         .select()
         .single();
+
+      console.log('Inserted data:', insertedData);
+      console.log('Insert error:', error);
 
       if (error) throw error;
 
