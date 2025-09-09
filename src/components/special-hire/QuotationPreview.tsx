@@ -239,34 +239,34 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           <table className="w-full border-collapse text-xs">
             <tbody>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '25%' }}>Pick-up Location</th>
-                <td className="border border-gray-300 p-1 align-middle" colSpan={3}>{quotation.pickup_location}</td>
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '25%', verticalAlign: 'middle' }}>Pick-up Location</th>
+                <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }} colSpan={3}>{quotation.pickup_location}</td>
               </tr>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%' }}>Pick-up Date</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%' }}>
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>Pick-up Date</th>
+                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>
                   <span className="font-medium">{pickup.date}</span>
                 </td>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%' }}>Pick-up Time</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%' }}>
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>Pick-up Time</th>
+                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>
                   <span className="text-gray-600">{pickup.time}</span>
                 </td>
               </tr>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle">Drop-off Location</th>
-                <td className="border border-gray-300 p-1 align-middle" colSpan={3}>{quotation.drop_location}</td>
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ verticalAlign: 'middle' }}>Drop-off Location</th>
+                <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }} colSpan={3}>{quotation.drop_location}</td>
               </tr>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%' }}>Drop-off Date</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%' }}>
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>Drop-off Date</th>
+                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>
                   {dropoff ? (
                     <span className="font-medium">{dropoff.date}</span>
                   ) : (
                     <span className="text-gray-500">TBD</span>
                   )}
                 </td>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%' }}>Drop-off Time</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%' }}>
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>Drop-off Time</th>
+                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>
                   {dropoff ? (
                     <span className="text-gray-600">{dropoff.time}</span>
                   ) : (
@@ -282,28 +282,28 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         <table className="w-full border-collapse text-xs mt-3">
           <thead>
             <tr>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12%' }}>Model</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '8%' }}>Vehicles</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '8%' }}>Capacity</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '35%' }}>Description</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '10%' }}>Mileage</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '27%' }}>Total Cost</th>
+              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12%', verticalAlign: 'middle' }}>Model</th>
+              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '8%', verticalAlign: 'middle' }}>Vehicles</th>
+              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '8%', verticalAlign: 'middle' }}>Capacity</th>
+              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '35%', verticalAlign: 'middle' }}>Description</th>
+              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '10%', verticalAlign: 'middle' }}>Mileage</th>
+              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '27%', verticalAlign: 'middle' }}>Total Cost</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td className="border border-gray-300 p-1 text-center align-middle">{quotation.bus_type}</td>
-              <td className="border border-gray-300 p-1 text-center align-middle">{quotation.number_of_buses.toString().padStart(2, '0')}</td>
-              <td className="border border-gray-300 p-1 text-center align-middle">{quotation.seating_capacity || 54}</td>
-              <td className="border border-gray-300 p-1 align-middle">
+              <td className="border border-gray-300 p-1 text-center align-middle" style={{ verticalAlign: 'middle' }}>{quotation.bus_type}</td>
+              <td className="border border-gray-300 p-1 text-center align-middle" style={{ verticalAlign: 'middle' }}>{quotation.number_of_buses.toString().padStart(2, '0')}</td>
+              <td className="border border-gray-300 p-1 text-center align-middle" style={{ verticalAlign: 'middle' }}>{quotation.seating_capacity || 54}</td>
+              <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }}>
                 <div className="space-y-0.5">
                 <div className="text-xs text-gray-700">
                   Route Details
                 </div>
                 </div>
               </td>
-              <td className="border border-gray-300 p-1 align-middle">{customerDistance.toFixed(2)} Km</td>
-              <td className="border border-gray-300 p-1 align-middle">
+              <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }}>{customerDistance.toFixed(2)} Km</td>
+              <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }}>
                 <div className="text-xs">Hire Charges: LKR {((quotation.gross_revenue || 0) + (quotation.total_additional_charges || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0)).toLocaleString()}</div>
                 {(quotation.discount_amount_lkr || 0) > 0 && (
                   <div className="text-red-600 text-xs">Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}</div>
