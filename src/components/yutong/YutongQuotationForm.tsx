@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { QuotationAddOnsSection } from './QuotationAddOnsSection';
 import { InlineAddOnsSection } from './InlineAddOnsSection';
 
@@ -64,6 +65,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const [activeTab, setActiveTab] = useState("basic");
   const [tempAddOns, setTempAddOns] = useState<TempAddOn[]>([]);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -134,15 +136,19 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         customer_email: data.customer_email,
         company_name: data.company_name || '',
         bus_model: selectedModel ? `${selectedModel.bus_name} ${selectedModel.model_name}` : '',
+        bus_model_id: data.bus_model_id,
         quantity: data.quantity,
         unit_price: data.unit_price,
+        discount_percentage: data.discount_percentage || 0,
         total_price: grandTotal,
         valid_until: validUntil.toISOString().split('T')[0],
+        valid_days: data.valid_days,
         status: 'draft',
         special_features: data.special_features || '',
         delivery_timeline: data.delivery_timeline || '',
         payment_terms: data.payment_terms || '',
-        warranty_terms: data.warranty_terms || ''
+        warranty_terms: data.warranty_terms || '',
+        created_by: user?.id
       };
 
       const { data: insertedData, error } = await supabase
