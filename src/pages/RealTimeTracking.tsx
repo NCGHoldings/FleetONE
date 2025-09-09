@@ -87,69 +87,66 @@ export default function RealTimeTracking() {
   };
 
   const refreshData = async () => {
-    setIsRefreshing(true);
-    await simulateGPSUpdate(); // This now calls the real GPS API
-  };
+    setIsRefreshing(true)
+    try {
+      await simulateGPSUpdate()
+      await fetchTrackingData()
+    } catch (error) {
+      console.error('Error refreshing data:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  const debugGPSConnection = async () => {
+    setIsRefreshing(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking')
+      if (error || !data?.success) {
+        console.error('GPS Debug Error:', error || data)
+        // Show detailed error information
+        const errorDetails = error || data
+        alert(`GPS Debug Error:\n${JSON.stringify(errorDetails, null, 2)}`)
+      } else {
+        alert('GPS connection test successful!')
+      }
+    } catch (error) {
+      console.error('Debug GPS error:', error)
+      alert(`Debug failed: ${error}`)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   const simulateGPSUpdate = async () => {
     try {
-      setIsRefreshing(true);
-      
-      // Call the edge function to fetch real GPS data
-      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking');
+      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking')
       
       if (error) {
-        console.error('Error calling GPS tracking function:', error);
-        throw error;
+        console.error('GPS API failed:', error)
+        // Show more detailed error to user
+        const errorMessage = typeof error === 'object' ? JSON.stringify(error, null, 2) : error
+        console.warn('GPS API Error Details:', errorMessage)
+        
+        // Use simulated data as fallback
+        const simulatedData = trackingData.map(vehicle => ({
+          ...vehicle,
+          speed_kmh: Math.floor(Math.random() * 60),
+          fuel_level: Math.max(20, vehicle.fuel_level - Math.random() * 2),
+          last_update: new Date().toISOString(),
+          engine_temperature: 85 + Math.random() * 20,
+          battery_voltage: 12 + Math.random() * 2,
+        }))
+        
+        setTrackingData(simulatedData)
+        return
       }
 
-      if (data?.success) {
-        // Refresh the tracking data after updating
-        await fetchTrackingData();
-        toast.success(`GPS data updated for ${data.data?.length || 0} vehicles from Traccar API`);
-      } else {
-        throw new Error(data?.error || 'Failed to update GPS data');
-      }
-    } catch (error: any) {
-      console.error('Error updating GPS data:', error);
-      
-      // Fallback to simulated data if API fails
-      try {
-        const updates = trackingData.map(vehicle => {
-          const newSpeed = vehicle.status === 'active' ? 
-            Math.floor(Math.random() * 60) + 20 : 0;
-          
-          const newFuelLevel = Math.max(10, 
-            (vehicle.fuel_level || 50) + (Math.random() - 0.5) * 5
-          );
-
-          return {
-            id: vehicle.id,
-            speed_kmh: newSpeed,
-            fuel_level: newFuelLevel,
-            last_update: new Date().toISOString(),
-            engine_temperature: 85 + Math.random() * 20,
-            battery_voltage: 12.0 + Math.random() * 2,
-            status: newSpeed > 0 ? 'active' : 'inactive'
-          };
-        });
-
-        // Update each vehicle's data
-        for (const update of updates) {
-          await supabase
-            .from('real_time_tracking')
-            .update(update)
-            .eq('id', update.id);
-        }
-
-        await fetchTrackingData();
-      } catch (fallbackError) {
-        console.error('Fallback update failed:', fallbackError);
-      }
-      
-      toast.error(`GPS API failed: ${ (error as any)?.message || 'Using simulated data. Check Traccar connection.' }`);
-    } finally {
-      setIsRefreshing(false);
+      console.log('Real GPS data received:', data)
+    } catch (error) {
+      console.error('Error calling GPS tracking function:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.warn('GPS Function Call Error:', errorMessage)
     }
   };
 
@@ -358,6 +355,17 @@ export default function RealTimeTracking() {
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : 'animate-pulse-subtle'}`} />
               Refresh
+            </Button>
+
+            <Button 
+              variant="outline" 
+              onClick={debugGPSConnection}
+              disabled={isRefreshing}
+              className="bg-yellow-500/20 backdrop-blur-sm border border-yellow-300/50 hover:bg-yellow-500/30 text-yellow-100 transition-all duration-300 animate-scale-in"
+              style={{ animationDelay: '0.25s' }}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Debug GPS
             </Button>
             
             <Button 

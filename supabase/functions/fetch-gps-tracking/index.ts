@@ -8,61 +8,126 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-// Traccar config and multiple auth options
+// Traccar config
 const traccarBaseUrl = (Deno.env.get('TRACCAR_BASE_URL') || 'https://track.schoolride.lk').replace(/\/$/, '')
 const traccarApiToken = Deno.env.get('TRACCAR_API_TOKEN') || ''
 const traccarUsername = Deno.env.get('TRACCAR_USERNAME') || ''
 const traccarPassword = Deno.env.get('TRACCAR_PASSWORD') || ''
 
-function buildAuthHeaderCandidates() {
-  const headers: Array<Record<string, string>> = []
+let traccarSessionId: string | null = null
 
-  // 1) X-Api-Key header (supported by newer Traccar versions)
-  if (traccarApiToken) {
-    headers.push({ 'X-Api-Key': traccarApiToken, 'Content-Type': 'application/json' })
+// Session-based authentication
+async function authenticateWithSession(): Promise<string | null> {
+  if (!traccarUsername || !traccarPassword) {
+    console.log('No username/password provided for session auth')
+    return null
   }
-  // 2) Basic Auth with username:password
+
+  try {
+    console.log(`Attempting session login to ${traccarBaseUrl}/api/session`)
+    const response = await fetch(`${traccarBaseUrl}/api/session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: new URLSearchParams({
+        email: traccarUsername,
+        password: traccarPassword
+      })
+    })
+
+    if (response.ok) {
+      const setCookieHeader = response.headers.get('set-cookie')
+      if (setCookieHeader) {
+        const sessionMatch = setCookieHeader.match(/JSESSIONID=([^;]+)/)
+        if (sessionMatch) {
+          traccarSessionId = sessionMatch[1]
+          console.log('Session authentication successful')
+          return traccarSessionId
+        }
+      }
+      console.log('Session created but no session ID found in cookies')
+    } else {
+      const errorText = await response.text()
+      console.error(`Session login failed: ${response.status} ${response.statusText} - ${errorText}`)
+    }
+  } catch (e) {
+    console.error('Session authentication error:', e)
+  }
+  
+  return null
+}
+
+// Build authentication headers for API requests
+function buildAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+
+  // 1) Session cookie (if available)
+  if (traccarSessionId) {
+    headers['Cookie'] = `JSESSIONID=${traccarSessionId}`
+    return headers
+  }
+
+  // 2) X-Api-Key header
+  if (traccarApiToken) {
+    headers['X-Api-Key'] = traccarApiToken
+    return headers
+  }
+
+  // 3) Basic Auth
   if (traccarUsername && traccarPassword) {
     const basic = btoa(`${traccarUsername}:${traccarPassword}`)
-    headers.push({ 'Authorization': `Basic ${basic}`, 'Content-Type': 'application/json' })
-  }
-  // 3) Bearer token (some setups use user tokens)
-  if (traccarApiToken) {
-    headers.push({ 'Authorization': `Bearer ${traccarApiToken}`, 'Content-Type': 'application/json' })
-  }
-  // 4) Basic with token as username (rare but seen in some installs)
-  if (traccarApiToken) {
-    const basicToken = btoa(`${traccarApiToken}:`)
-    headers.push({ 'Authorization': `Basic ${basicToken}`, 'Content-Type': 'application/json' })
+    headers['Authorization'] = `Basic ${basic}`
+    return headers
   }
 
   return headers
 }
 
-async function tryFetchWithAuth(path: string) {
-  const candidates = buildAuthHeaderCandidates()
+async function traccarRequest(path: string): Promise<Response> {
   const url = `${traccarBaseUrl}${path}`
-  let lastErrDetail = ''
-
-  for (let i = 0; i < candidates.length; i++) {
-    const hdrs = candidates[i]
-    try {
-      const res = await fetch(url, { headers: hdrs })
-      if (res.ok) {
-        console.log(`Traccar request success with auth method #${i + 1} for ${path}`)
-        return res
-      } else {
-        const text = await res.text()
-        console.error(`Traccar request failed (auth #${i + 1}) ${res.status} ${res.statusText} => ${text?.slice(0, 300)}`)
-        lastErrDetail = `${res.status} ${res.statusText} ${text?.slice(0, 300)}`
-      }
-    } catch (e) {
-      console.error(`Traccar request error (auth #${i + 1}):`, e)
-      lastErrDetail = String(e)
-    }
+  
+  // Try session auth first if we don't have a session yet
+  if (!traccarSessionId && traccarUsername && traccarPassword) {
+    await authenticateWithSession()
   }
 
-  throw new Error(`Traccar request failed for ${path}. Tried ${candidates.length} auth method(s). Last error: ${lastErrDetail}`)
+  const headers = buildAuthHeaders()
+  console.log(`Making request to ${url} with auth method: ${traccarSessionId ? 'session' : traccarApiToken ? 'api-key' : 'basic'}`)
+
+  try {
+    const response = await fetch(url, { headers })
+    
+    if (response.ok) {
+      return response
+    }
+
+    // If session auth failed with 401, try to re-authenticate
+    if (response.status === 401 && traccarSessionId) {
+      console.log('Session expired, attempting re-authentication')
+      traccarSessionId = null
+      await authenticateWithSession()
+      
+      if (traccarSessionId) {
+        const newHeaders = buildAuthHeaders()
+        const retryResponse = await fetch(url, { headers: newHeaders })
+        if (retryResponse.ok) {
+          return retryResponse
+        }
+      }
+    }
+
+    const errorText = await response.text()
+    throw new Error(`${response.status} ${response.statusText}: ${errorText}`)
+    
+  } catch (e) {
+    console.error(`Request to ${url} failed:`, e)
+    throw e
+  }
 }
 
 Deno.serve(async (req) => {
@@ -77,10 +142,10 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Fetch devices and positions from Traccar API using robust auth strategy
+    // Fetch devices and positions from Traccar API
     const [devicesResponse, positionsResponse] = await Promise.all([
-      tryFetchWithAuth('/api/devices'),
-      tryFetchWithAuth('/api/positions'),
+      traccarRequest('/api/devices'),
+      traccarRequest('/api/positions'),
     ])
 
     const devices = await devicesResponse.json()
@@ -186,11 +251,31 @@ Deno.serve(async (req) => {
     )
   } catch (error: any) {
     console.error('Error in fetch-gps-tracking function:', error)
+    
+    // Provide more detailed error information
+    const errorMessage = error?.message || 'Unknown error'
+    const errorDetails = {
+      success: false,
+      error: errorMessage,
+      traccar_config: {
+        base_url: traccarBaseUrl,
+        has_username: !!traccarUsername,
+        has_password: !!traccarPassword,
+        has_api_token: !!traccarApiToken,
+        session_available: !!traccarSessionId
+      },
+      debug_info: {
+        timestamp: new Date().toISOString(),
+        attempted_auth_methods: [
+          traccarSessionId ? 'session' : null,
+          traccarApiToken ? 'api-key' : null,
+          (traccarUsername && traccarPassword) ? 'basic-auth' : null
+        ].filter(Boolean)
+      }
+    }
+    
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error?.message || 'Unknown error',
-      }),
+      JSON.stringify(errorDetails),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
