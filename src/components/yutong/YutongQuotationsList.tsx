@@ -52,12 +52,11 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         .from('yutong_quotations')
         .select(`
           *,
-          profiles!inner(
+          profiles!created_by(
             first_name,
             last_name
           )
         `)
-        .eq('profiles.user_id', 'yutong_quotations.created_by')
         .order('created_at', { ascending: false });
 
       if (error) {
