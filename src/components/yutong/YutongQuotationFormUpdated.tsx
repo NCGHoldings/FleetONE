@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -72,7 +72,6 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const [selectedModel, setSelectedModel] = useState<BusModel | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [createdQuotationId, setCreatedQuotationId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('basic');
   const [tempAddOns, setTempAddOns] = useState<TempAddOn[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -254,23 +253,6 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     }
   };
 
-  const handleFinalSubmit = async () => {
-    // Trigger form submission from the basic info tab
-    const formData = form.getValues();
-    
-    // Validate required fields
-    if (!formData.customer_name || !formData.customer_phone || !formData.customer_email || !formData.bus_model_id) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields in the Basic Information tab",
-        variant: "destructive",
-      });
-      setActiveTab('basic');
-      return;
-    }
-
-    await handleFormSubmit(formData);
-  };
 
   return (
     <Dialog open={true} onOpenChange={onCancel}>
@@ -279,326 +261,308 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
           <DialogTitle>Create Yutong Bus Quotation</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="basic">Basic Information</TabsTrigger>
-            <TabsTrigger value="addons">Add-ons</TabsTrigger>
-          </TabsList>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+            {/* Customer Selection */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Customer Information</h3>
+              
+              <FormField
+                name="existing_customer"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Select Existing Customer (Optional)</FormLabel>
+                    <Select onValueChange={handleCustomerChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select existing customer or create new" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {customers.map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id}>
+                            {customer.company_name} ({customer.customer_code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
 
-          <TabsContent value="basic" className="space-y-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-                {/* Customer Selection */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Customer Information</h3>
-                  
-                  <FormField
-                    name="existing_customer"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Select Existing Customer (Optional)</FormLabel>
-                        <Select onValueChange={handleCustomerChange}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select existing customer or create new" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {customers.map((customer) => (
-                              <SelectItem key={customer.id} value={customer.id}>
-                                {customer.company_name} ({customer.customer_code})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="company_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="customer_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Person *</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="company_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Company Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="customer_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Person *</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="customer_phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number *</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="customer_phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number *</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <FormField
+                  control={form.control}
+                  name="customer_email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email *</FormLabel>
+                      <FormControl>
+                        <Input type="email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
 
-                    <FormField
-                      control={form.control}
-                      name="customer_email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email *</FormLabel>
-                          <FormControl>
-                            <Input type="email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+            {/* Bus Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Bus Information</h3>
+              
+              <FormField
+                control={form.control}
+                name="bus_model_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bus Model *</FormLabel>
+                    <Select onValueChange={(value) => {
+                      field.onChange(value);
+                      handleModelChange(value);
+                    }}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select bus model" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {busModels.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.bus_name} {model.model_name} - {model.capacity} seats
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantity *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => field.onChange(Number(e.target.value))} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="unit_price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Unit Price (LKR) *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => field.onChange(Number(e.target.value))} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="discount_percentage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Discount (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => field.onChange(Number(e.target.value))} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Add-ons Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Add-ons</h3>
+              <InlineAddOnsSection 
+                addOns={tempAddOns} 
+                onAddOnsChange={setTempAddOns} 
+              />
+            </div>
+
+            {/* Additional Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Additional Information</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="delivery_timeline"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Delivery Timeline</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g., 3-4 months" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="valid_days"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Valid Days</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => field.onChange(Number(e.target.value))} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="special_features"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Special Features</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="payment_terms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Terms</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="warranty_terms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Warranty Terms</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Price Summary */}
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold mb-3">Price Summary</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>LKR {((form.watch('quantity') || 0) * (form.watch('unit_price') || 0)).toLocaleString()}</span>
                 </div>
-
-                {/* Bus Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Bus Information</h3>
-                  
-                  <FormField
-                    control={form.control}
-                    name="bus_model_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Bus Model *</FormLabel>
-                        <Select onValueChange={(value) => {
-                          field.onChange(value);
-                          handleModelChange(value);
-                        }}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select bus model" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {busModels.map((model) => (
-                              <SelectItem key={model.id} value={model.id}>
-                                {model.bus_name} {model.model_name} - {model.capacity} seats
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="quantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Quantity *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field} 
-                              onChange={(e) => field.onChange(Number(e.target.value))} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="unit_price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Unit Price (LKR) *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field} 
-                              onChange={(e) => field.onChange(Number(e.target.value))} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="discount_percentage"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Discount (%)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field} 
-                              onChange={(e) => field.onChange(Number(e.target.value))} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                <div className="flex justify-between">
+                  <span>Discount ({form.watch('discount_percentage') || 0}%):</span>
+                  <span>-LKR {(((form.watch('quantity') || 0) * (form.watch('unit_price') || 0)) * ((form.watch('discount_percentage') || 0) / 100)).toLocaleString()}</span>
                 </div>
-
-                {/* Additional Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Additional Information</h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="delivery_timeline"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Delivery Timeline</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="e.g., 3-4 months" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="valid_days"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Valid Days</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              {...field} 
-                              onChange={(e) => field.onChange(Number(e.target.value))} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="special_features"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Special Features</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="payment_terms"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Payment Terms</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="warranty_terms"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Warranty Terms</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="flex justify-between">
+                  <span>Add-ons:</span>
+                  <span>LKR {tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0).toLocaleString()}</span>
                 </div>
-
-                {/* Price Summary */}
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-3">Price Summary</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>LKR {((form.watch('quantity') || 0) * (form.watch('unit_price') || 0)).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Discount ({form.watch('discount_percentage') || 0}%):</span>
-                      <span>-LKR {(((form.watch('quantity') || 0) * (form.watch('unit_price') || 0)) * ((form.watch('discount_percentage') || 0) / 100)).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Add-ons:</span>
-                      <span>LKR {tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold text-lg">
-                      <span>Total:</span>
-                      <span>LKR {calculateTotalPrice().toLocaleString()}</span>
-                    </div>
-                  </div>
+                <div className="flex justify-between font-semibold text-lg">
+                  <span>Total:</span>
+                  <span>LKR {calculateTotalPrice().toLocaleString()}</span>
                 </div>
+              </div>
+            </div>
 
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={onCancel}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">
-                    Create Quotation
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </TabsContent>
-
-          <TabsContent value="addons" className="space-y-4">
-            <InlineAddOnsSection 
-              addOns={tempAddOns} 
-              onAddOnsChange={setTempAddOns} 
-            />
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={onCancel}>
                 Cancel
               </Button>
-              <Button onClick={() => setActiveTab('basic')}>
-                Back to Basic Info
-              </Button>
-              <Button onClick={handleFinalSubmit}>
-                Complete Quotation
+              <Button type="submit">
+                Create Quotation
               </Button>
             </div>
-          </TabsContent>
-        </Tabs>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
