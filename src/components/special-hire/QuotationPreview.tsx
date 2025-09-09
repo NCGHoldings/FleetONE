@@ -293,8 +293,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           <tbody>
             <tr>
               <td className="border border-gray-300 p-1 text-center">{quotation.bus_type}</td>
-              <td className="border border-gray-300 p-1">{quotation.number_of_buses.toString().padStart(2, '0')}</td>
-              <td className="border border-gray-300 p-1">{quotation.seating_capacity || 54}</td>
+              <td className="border border-gray-300 p-1 text-center">{quotation.number_of_buses.toString().padStart(2, '0')}</td>
+              <td className="border border-gray-300 p-1 text-center">{quotation.seating_capacity || 54}</td>
               <td className="border border-gray-300 p-1">
                 <div className="space-y-0.5">
                 <div className="text-xs text-gray-700">
