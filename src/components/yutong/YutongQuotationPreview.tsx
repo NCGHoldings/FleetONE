@@ -98,15 +98,12 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
       <div ref={ref} style={{ fontFamily: 'Arial, sans-serif', margin: 0, padding: '20px', background: '#f9f9f9', color: '#000' }}>
         <div style={{ background: '#fff', padding: '20px', border: '2px solid #003366', maxWidth: '900px', margin: 'auto' }}>
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #003366', paddingBottom: '10px', marginBottom: '20px' }}>
-            <h1 style={{ color: '#003366', margin: 0, fontSize: '28px' }}>QUOTATION</h1>
-            <div>
-              <img 
-                src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Yutong_Logo.png/425px-Yutong_Logo.png"
-                alt="Yutong Logo"
-                style={{ height: '60px', width: 'auto' }}
-              />
-            </div>
+          <div style={{ marginBottom: '20px' }}>
+            <img 
+              src="/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png"
+              alt="Quotation Header - NCG Holdings & Yutong"
+              style={{ width: '100%', height: 'auto', display: 'block' }}
+            />
           </div>
 
           {/* Customer Info */}
