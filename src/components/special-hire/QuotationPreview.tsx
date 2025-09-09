@@ -235,7 +235,28 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-2">{quotation.bus_type}</td>
               <td className="border border-gray-300 p-2">{quotation.number_of_buses.toString().padStart(2, '0')}</td>
               <td className="border border-gray-300 p-2">{quotation.seating_capacity || 54}</td>
-              <td className="border border-gray-300 p-2">{quotation.route_description || routeDescription}</td>
+              <td className="border border-gray-300 p-2">
+                <div className="space-y-1">
+                  <div className="flex items-center text-sm">
+                    <span className="text-green-600 font-medium">Pickup:</span>
+                    <span className="ml-2">{quotation.pickup_location}</span>
+                  </div>
+                  {intermediateStops.length > 0 && (
+                    <div className="flex items-start text-sm">
+                      <span className="text-blue-600 font-medium">Stops:</span>
+                      <div className="ml-2 flex flex-col">
+                        {intermediateStops.map((stop: any, index: number) => (
+                          <span key={index} className="text-xs text-gray-600">• {stop.location}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center text-sm">
+                    <span className="text-red-600 font-medium">Drop:</span>
+                    <span className="ml-2">{quotation.drop_location}</span>
+                  </div>
+                </div>
+              </td>
               <td className="border border-gray-300 p-2">{totalDistance.toFixed(2)} Km</td>
               <td className="border border-gray-300 p-2">
                 <div>Hire Charges: LKR {((quotation.gross_revenue || 0) + (quotation.total_additional_charges || 0)).toLocaleString()}</div>
