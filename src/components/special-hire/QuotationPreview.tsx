@@ -243,10 +243,13 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                 <td className="border border-gray-300 p-1">{quotation.pickup_location}</td>
               </tr>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left">Pick-up Date Time</th>
-                <td className="border border-gray-300 p-1">
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left" style={{ width: '12.5%' }}>Pick-up Date</th>
+                <td className="border border-gray-300 p-1" style={{ width: '12.5%' }}>
                   <span className="font-medium">{pickup.date}</span>
-                  <span className="ml-6 text-gray-600">{pickup.time}</span>
+                </td>
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left" style={{ width: '12.5%' }}>Pick-up Time</th>
+                <td className="border border-gray-300 p-1" style={{ width: '12.5%' }}>
+                  <span className="text-gray-600">{pickup.time}</span>
                 </td>
               </tr>
               <tr>
@@ -254,13 +257,18 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                 <td className="border border-gray-300 p-1">{quotation.drop_location}</td>
               </tr>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left">Drop-off Date Time</th>
-                <td className="border border-gray-300 p-1">
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left" style={{ width: '12.5%' }}>Drop-off Date</th>
+                <td className="border border-gray-300 p-1" style={{ width: '12.5%' }}>
                   {dropoff ? (
-                    <>
-                      <span className="font-medium">{dropoff.date}</span>
-                      <span className="ml-6 text-gray-600">{dropoff.time}</span>
-                    </>
+                    <span className="font-medium">{dropoff.date}</span>
+                  ) : (
+                    <span className="text-gray-500">TBD</span>
+                  )}
+                </td>
+                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left" style={{ width: '12.5%' }}>Drop-off Time</th>
+                <td className="border border-gray-300 p-1" style={{ width: '12.5%' }}>
+                  {dropoff ? (
+                    <span className="text-gray-600">{dropoff.time}</span>
                   ) : (
                     <span className="text-gray-500">TBD</span>
                   )}
