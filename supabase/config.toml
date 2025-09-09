@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.send-quotation-email]
 verify_jwt = false
+
+[functions.fetch-gps-tracking]
+verify_jwt = false

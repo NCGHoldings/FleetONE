@@ -59,8 +59,8 @@ export default function RealTimeTracking() {
   const [isMapView, setIsMapView] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [gpsSettings, setGpsSettings] = useState<GPSSettings>({
-    apiEndpoint: 'https://api.gps-tracking.com/v1',
-    apiKey: '',
+    apiEndpoint: 'https://track.schoolride.lk',
+    apiKey: 'Connected via Supabase Edge Function',
     refreshInterval: 30
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -88,43 +88,68 @@ export default function RealTimeTracking() {
 
   const refreshData = async () => {
     setIsRefreshing(true);
-    await fetchTrackingData();
+    await simulateGPSUpdate(); // This now calls the real GPS API
   };
 
   const simulateGPSUpdate = async () => {
-    // Simulate GPS data updates for demo purposes
     try {
-      const updates = trackingData.map(vehicle => {
-        const newSpeed = vehicle.status === 'active' ? 
-          Math.floor(Math.random() * 60) + 20 : 0;
-        
-        const newFuelLevel = Math.max(10, 
-          (vehicle.fuel_level || 50) + (Math.random() - 0.5) * 5
-        );
-
-        return {
-          id: vehicle.id,
-          speed_kmh: newSpeed,
-          fuel_level: newFuelLevel,
-          last_update: new Date().toISOString(),
-          engine_temperature: 85 + Math.random() * 20,
-          battery_voltage: 12.0 + Math.random() * 2,
-          status: newSpeed > 0 ? 'active' : 'inactive'
-        };
-      });
-
-      // Update each vehicle's data
-      for (const update of updates) {
-        await supabase
-          .from('real_time_tracking')
-          .update(update)
-          .eq('id', update.id);
+      setIsRefreshing(true);
+      
+      // Call the edge function to fetch real GPS data
+      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking');
+      
+      if (error) {
+        console.error('Error calling GPS tracking function:', error);
+        throw error;
       }
 
-      await fetchTrackingData();
-      
-    } catch (error) {
+      if (data?.success) {
+        // Refresh the tracking data after updating
+        await fetchTrackingData();
+        toast.success(`GPS data updated for ${data.data?.length || 0} vehicles from Traccar API`);
+      } else {
+        throw new Error(data?.error || 'Failed to update GPS data');
+      }
+    } catch (error: any) {
       console.error('Error updating GPS data:', error);
+      
+      // Fallback to simulated data if API fails
+      try {
+        const updates = trackingData.map(vehicle => {
+          const newSpeed = vehicle.status === 'active' ? 
+            Math.floor(Math.random() * 60) + 20 : 0;
+          
+          const newFuelLevel = Math.max(10, 
+            (vehicle.fuel_level || 50) + (Math.random() - 0.5) * 5
+          );
+
+          return {
+            id: vehicle.id,
+            speed_kmh: newSpeed,
+            fuel_level: newFuelLevel,
+            last_update: new Date().toISOString(),
+            engine_temperature: 85 + Math.random() * 20,
+            battery_voltage: 12.0 + Math.random() * 2,
+            status: newSpeed > 0 ? 'active' : 'inactive'
+          };
+        });
+
+        // Update each vehicle's data
+        for (const update of updates) {
+          await supabase
+            .from('real_time_tracking')
+            .update(update)
+            .eq('id', update.id);
+        }
+
+        await fetchTrackingData();
+      } catch (fallbackError) {
+        console.error('Fallback update failed:', fallbackError);
+      }
+      
+      toast.error("GPS API failed. Using simulated data. Check Traccar connection.");
+    } finally {
+      setIsRefreshing(false);
     }
   };
 

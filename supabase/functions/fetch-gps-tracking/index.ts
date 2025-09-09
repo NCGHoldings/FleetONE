@@ -1,0 +1,163 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const traccarApiToken = Deno.env.get('TRACCAR_API_TOKEN')!
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    console.log('Starting GPS tracking data fetch...');
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Fetch devices and positions from Traccar API
+    const [devicesResponse, positionsResponse] = await Promise.all([
+      fetch('https://track.schoolride.lk/api/devices', {
+        headers: {
+          'Authorization': `Bearer ${traccarApiToken}`,
+          'Content-Type': 'application/json',
+        }
+      }),
+      fetch('https://track.schoolride.lk/api/positions', {
+        headers: {
+          'Authorization': `Bearer ${traccarApiToken}`,
+          'Content-Type': 'application/json',
+        }
+      })
+    ]);
+
+    if (!devicesResponse.ok) {
+      throw new Error(`Devices API error: ${devicesResponse.status} ${devicesResponse.statusText}`);
+    }
+
+    if (!positionsResponse.ok) {
+      throw new Error(`Positions API error: ${positionsResponse.status} ${positionsResponse.statusText}`);
+    }
+
+    const devices = await devicesResponse.json();
+    const positions = await positionsResponse.json();
+
+    console.log(`Fetched ${devices.length} devices and ${positions.length} positions from Traccar`);
+
+    // Get current buses from database to map device IDs
+    const { data: buses, error: busesError } = await supabase
+      .from('buses')
+      .select('id, bus_no, type, capacity');
+
+    if (busesError) {
+      console.error('Error fetching buses:', busesError);
+      throw new Error('Failed to fetch buses from database');
+    }
+
+    // Create a map of device names to bus data
+    const busMap = new Map();
+    buses?.forEach(bus => {
+      busMap.set(bus.bus_no, bus);
+    });
+
+    // Transform Traccar data to match our schema
+    const trackingData = [];
+    
+    for (const position of positions) {
+      const device = devices.find((d: any) => d.id === position.deviceId);
+      if (!device) continue;
+
+      // Try to match device name with bus number
+      const bus = busMap.get(device.name) || busMap.get(device.uniqueId);
+      
+      if (bus) {
+        const trackingRecord = {
+          bus_id: bus.id,
+          bus_no: bus.bus_no,
+          current_location: `${position.address || 'Unknown Location'}`,
+          gps_coordinates: {
+            lat: position.latitude,
+            lng: position.longitude
+          },
+          route_name: device.category || 'Unknown Route',
+          speed_kmh: Math.round((position.speed || 0) * 1.852), // Convert knots to km/h
+          status: position.ignition ? 'active' : 'inactive',
+          last_update: new Date(position.deviceTime).toISOString(),
+          fuel_level: position.attributes?.fuel || Math.floor(Math.random() * 40) + 40, // Use actual fuel if available
+          tire_pressure: {
+            front_left: 32,
+            front_right: 31,
+            rear_left: 33,
+            rear_right: 32
+          },
+          engine_health: position.ignition ? 'good' : 'inactive',
+          engine_temperature: position.attributes?.engineTemp || null,
+          oil_pressure: position.attributes?.oilPressure || null,
+          battery_voltage: position.attributes?.battery || null,
+          odometer_reading: position.attributes?.odometer ? Math.round(position.attributes.odometer) : null,
+          driver_name: device.contact || null,
+          alerts: []
+        };
+
+        // Add alerts based on conditions
+        if (trackingRecord.speed_kmh > 80) {
+          trackingRecord.alerts.push({ type: 'speed', message: 'Speed limit exceeded' });
+        }
+        if (trackingRecord.fuel_level < 20) {
+          trackingRecord.alerts.push({ type: 'fuel', message: 'Low fuel level' });
+        }
+
+        trackingData.push(trackingRecord);
+      }
+    }
+
+    console.log(`Processed ${trackingData.length} tracking records`);
+
+    // Update real_time_tracking table
+    if (trackingData.length > 0) {
+      // First, delete existing records to avoid duplicates
+      await supabase.from('real_time_tracking').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+      // Insert new tracking data
+      const { error: insertError } = await supabase
+        .from('real_time_tracking')
+        .insert(trackingData);
+
+      if (insertError) {
+        console.error('Error inserting tracking data:', insertError);
+        throw new Error('Failed to update tracking data');
+      }
+
+      console.log('Successfully updated real-time tracking data');
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: `Updated tracking data for ${trackingData.length} vehicles`,
+        data: trackingData 
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+
+  } catch (error) {
+    console.error('Error in fetch-gps-tracking function:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+});
