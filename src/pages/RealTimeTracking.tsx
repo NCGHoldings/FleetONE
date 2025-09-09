@@ -147,7 +147,7 @@ export default function RealTimeTracking() {
         console.error('Fallback update failed:', fallbackError);
       }
       
-      toast.error("GPS API failed. Using simulated data. Check Traccar connection.");
+      toast.error(`GPS API failed: ${ (error as any)?.message || 'Using simulated data. Check Traccar connection.' }`);
     } finally {
       setIsRefreshing(false);
     }
