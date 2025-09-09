@@ -67,10 +67,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
   const pickup = formatDateTime(quotation.pickup_datetime);
   const dropoff = quotation.drop_datetime ? formatDateTime(quotation.drop_datetime) : null;
   
-  // Calculate total distance from individual components
-  const totalDistance = (quotation.km_parking_to_pickup || 0) + 
-                       (quotation.km_trip || 0) + 
-                       (quotation.km_drop_to_parking || 0);
+  // Calculate customer pickup to drop distance only (excluding parking distances)
+  const customerDistance = quotation.km_trip || 0;
 
   // Parse intermediate stops for display
   let intermediateStops = [];
@@ -257,7 +255,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   </div>
                 </div>
               </td>
-              <td className="border border-gray-300 p-2">{totalDistance.toFixed(2)} Km</td>
+              <td className="border border-gray-300 p-2">{customerDistance.toFixed(2)} Km</td>
               <td className="border border-gray-300 p-2">
                 <div>Hire Charges: LKR {((quotation.gross_revenue || 0) + (quotation.total_additional_charges || 0)).toLocaleString()}</div>
                 <div>Service Charge: LKR {((quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0)).toLocaleString()}</div>
