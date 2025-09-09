@@ -58,10 +58,21 @@ export default function RealTimeTracking() {
   const [loading, setLoading] = useState(true);
   const [isMapView, setIsMapView] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [gpsSettings, setGpsSettings] = useState<GPSSettings>({
-    apiEndpoint: 'https://track.schoolride.lk',
-    apiKey: 'Connected via Supabase Edge Function',
-    refreshInterval: 30
+  const [gpsSettings, setGpsSettings] = useState<GPSSettings>(() => {
+    // Load settings from localStorage if available
+    const savedSettings = localStorage.getItem('gpsSettings');
+    if (savedSettings) {
+      try {
+        return JSON.parse(savedSettings);
+      } catch (e) {
+        console.warn('Invalid saved GPS settings');
+      }
+    }
+    return {
+      apiEndpoint: 'https://track.schoolride.lk',
+      apiKey: '',
+      refreshInterval: 30
+    };
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
@@ -101,18 +112,33 @@ export default function RealTimeTracking() {
   const debugGPSConnection = async () => {
     setIsRefreshing(true)
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking')
-      if (error || !data?.success) {
-        console.error('GPS Debug Error:', error || data)
-        // Show detailed error information
-        const errorDetails = error || data
-        alert(`GPS Debug Error:\n${JSON.stringify(errorDetails, null, 2)}`)
-      } else {
-        alert('GPS connection test successful!')
+      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking', {
+        body: {
+          apiEndpoint: gpsSettings.apiEndpoint,
+          apiKey: gpsSettings.apiKey
+        }
+      })
+      
+      if (error) {
+        console.error('GPS Debug Error:', error)
+        toast.error(`GPS Connection Error: ${error.message || 'Unknown error'}`)
+        return
       }
+
+      if (!data?.success) {
+        console.error('GPS Debug Failed:', data)
+        toast.error(`GPS Debug Failed: ${data?.error || 'API returned error'}`)
+        // Show detailed debug info in console
+        console.log('Debug Info:', data?.debug_info)
+        console.log('Traccar Config:', data?.traccar_config)
+        return
+      }
+
+      console.log('GPS Debug Success:', data)
+      toast.success(`GPS connection successful! Found ${data.data?.length || 0} vehicles`)
     } catch (error) {
       console.error('Debug GPS error:', error)
-      alert(`Debug failed: ${error}`)
+      toast.error(`Debug failed: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       setIsRefreshing(false)
     }
@@ -120,33 +146,38 @@ export default function RealTimeTracking() {
 
   const simulateGPSUpdate = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking')
+      // Pass GPS settings to the edge function
+      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking', {
+        body: {
+          apiEndpoint: gpsSettings.apiEndpoint,
+          apiKey: gpsSettings.apiKey
+        }
+      })
       
       if (error) {
         console.error('GPS API failed:', error)
-        // Show more detailed error to user
-        const errorMessage = typeof error === 'object' ? JSON.stringify(error, null, 2) : error
-        console.warn('GPS API Error Details:', errorMessage)
-        
-        // Use simulated data as fallback
-        const simulatedData = trackingData.map(vehicle => ({
-          ...vehicle,
-          speed_kmh: Math.floor(Math.random() * 60),
-          fuel_level: Math.max(20, vehicle.fuel_level - Math.random() * 2),
-          last_update: new Date().toISOString(),
-          engine_temperature: 85 + Math.random() * 20,
-          battery_voltage: 12 + Math.random() * 2,
-        }))
-        
-        setTrackingData(simulatedData)
+        toast.error(`GPS API Error: ${error.message || 'Unknown error'}`)
+        return
+      }
+
+      if (!data?.success) {
+        console.error('GPS API returned error:', data)
+        toast.error(`GPS Error: ${data?.error || 'API call failed'}`)
         return
       }
 
       console.log('Real GPS data received:', data)
+      
+      // If we got real data, update the table immediately
+      if (data.data && data.data.length > 0) {
+        await fetchTrackingData() // Refresh the table with new data
+        toast.success(`Updated tracking data for ${data.data.length} vehicles`)
+      } else {
+        toast.info('No vehicles found in GPS system')
+      }
     } catch (error) {
       console.error('Error calling GPS tracking function:', error)
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      console.warn('GPS Function Call Error:', errorMessage)
+      toast.error(`GPS Function Error: ${error instanceof Error ? error.message : String(error)}`)
     }
   };
 
@@ -437,15 +468,21 @@ export default function RealTimeTracking() {
                     />
                   </div>
                   
-                  <Button 
-                    onClick={() => {
-                      setIsSettingsOpen(false);
-                      toast.success('GPS settings saved');
-                    }}
-                    className="w-full"
-                  >
-                    Save Settings
-                  </Button>
+                   <Button 
+                     onClick={() => {
+                       setIsSettingsOpen(false);
+                       // Save to localStorage for persistence
+                       localStorage.setItem('gpsSettings', JSON.stringify(gpsSettings));
+                       toast.success('GPS settings saved');
+                       // Trigger a test connection
+                       setTimeout(() => {
+                         debugGPSConnection();
+                       }, 500);
+                     }}
+                     className="w-full"
+                   >
+                     Save & Test Settings
+                   </Button>
                 </div>
               </DialogContent>
             </Dialog>

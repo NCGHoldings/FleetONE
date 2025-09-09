@@ -137,15 +137,65 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get settings from request body if provided
+    let requestBody: any = {}
+    try {
+      const requestText = await req.text()
+      if (requestText) {
+        requestBody = JSON.parse(requestText)
+      }
+    } catch (e) {
+      // If no body or invalid JSON, use defaults
+    }
+
+    // Use settings from request or fall back to environment variables
+    const apiEndpoint = requestBody.apiEndpoint || traccarBaseUrl
+    const apiKey = requestBody.apiKey || traccarApiToken
+    
+    console.log('GPS Tracking Config:')
+    console.log('- API Endpoint:', apiEndpoint)
+    console.log('- Has API Key:', !!apiKey)
+    console.log('- Has Username/Password:', !!(traccarUsername && traccarPassword))
+
+    // Update the traccar config for this request
+    const currentTraccarBaseUrl = apiEndpoint.replace(/\/$/, '')
+    const currentTraccarApiToken = apiKey || traccarApiToken
     console.log('Starting GPS tracking data fetch...')
-    console.log(`Traccar base URL: ${traccarBaseUrl}`)
+    console.log(`Using Traccar base URL: ${currentTraccarBaseUrl}`)
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Create modified traccarRequest function for this specific request
+    const makeTraccarRequest = async (path: string): Promise<Response> => {
+      const url = `${currentTraccarBaseUrl}${path}`
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+
+      // Use API key if provided
+      if (currentTraccarApiToken) {
+        headers['X-Api-Key'] = currentTraccarApiToken
+      } else if (traccarUsername && traccarPassword) {
+        const basic = btoa(`${traccarUsername}:${traccarPassword}`)
+        headers['Authorization'] = `Basic ${basic}`
+      }
+
+      console.log(`Making request to ${url}`)
+      
+      const response = await fetch(url, { headers })
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`${response.status} ${response.statusText}: ${errorText}`)
+      }
+      return response
+    }
+
     // Fetch devices and positions from Traccar API
     const [devicesResponse, positionsResponse] = await Promise.all([
-      traccarRequest('/api/devices'),
-      traccarRequest('/api/positions'),
+      makeTraccarRequest('/api/devices'),
+      makeTraccarRequest('/api/positions'),
     ])
 
     const devices = await devicesResponse.json()
