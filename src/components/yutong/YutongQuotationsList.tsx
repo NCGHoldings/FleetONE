@@ -52,20 +52,56 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         .from('yutong_quotations')
         .select(`
           *,
-          creator:profiles!created_by (
+          profiles!inner(
             first_name,
             last_name
           )
         `)
+        .eq('profiles.user_id', 'yutong_quotations.created_by')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        // If the join fails, try a simpler approach
+        const { data: simpleData, error: simpleError } = await (supabase as any)
+          .from('yutong_quotations')
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        if (simpleError) throw simpleError;
+        
+        // Get creator names separately
+        const quotationsWithCreators = await Promise.all(
+          (simpleData || []).map(async (quotation: any) => {
+            if (quotation.created_by) {
+              const { data: profile } = await (supabase as any)
+                .from('profiles')
+                .select('first_name, last_name')
+                .eq('user_id', quotation.created_by)
+                .single();
+                
+              return {
+                ...quotation,
+                creator_name: profile 
+                  ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+                  : 'Unknown User'
+              };
+            }
+            return {
+              ...quotation,
+              creator_name: 'Unknown User'
+            };
+          })
+        );
+        
+        setQuotations(quotationsWithCreators);
+        return;
+      }
       
       // Transform data to include creator name
       const transformedData = (data || []).map((quotation: any) => ({
         ...quotation,
-        creator_name: quotation.creator 
-          ? `${quotation.creator.first_name || ''} ${quotation.creator.last_name || ''}`.trim()
+        creator_name: quotation.profiles 
+          ? `${quotation.profiles.first_name || ''} ${quotation.profiles.last_name || ''}`.trim()
           : 'Unknown User'
       }));
       
