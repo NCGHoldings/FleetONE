@@ -277,9 +277,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <td className="border border-gray-300 p-1">{quotation.seating_capacity || 54}</td>
               <td className="border border-gray-300 p-1">
                 <div className="space-y-0.5">
-                  <div className="text-xs text-gray-700">
-                    {routeDescription}
-                  </div>
+                <div className="text-xs text-gray-700">
+                  Route Details
+                </div>
                 </div>
               </td>
               <td className="border border-gray-300 p-1">{customerDistance.toFixed(2)} Km</td>
