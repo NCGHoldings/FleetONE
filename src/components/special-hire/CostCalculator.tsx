@@ -160,7 +160,7 @@ export function CostCalculator() {
         setSelectedRateCard(rateCard);
 
         const fixedRate = rateCard.flat_fee_lkr || 0;
-        const baseCoverageKm = 100;
+        const baseCoverageKm = rateCard.exceeding_km_threshold || 100;
         const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
         const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
 
@@ -293,7 +293,7 @@ export function CostCalculator() {
       setSelectedRateCard(rateCard);
 
       const fixedRate = rateCard.flat_fee_lkr || 0;
-      const baseCoverageKm = 100;
+      const baseCoverageKm = rateCard.exceeding_km_threshold || 100;
       const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
       const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
 

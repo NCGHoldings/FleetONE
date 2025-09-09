@@ -21,6 +21,7 @@ const outsideHireSchema = z.object({
   bus_type_id: z.string().min(1, 'Bus type is required'),
   flat_fee_lkr: z.number().min(0, 'Flat fee must be positive'),
   exceeding_km_rate_lkr: z.number().min(0, 'Exceeding KM rate must be positive'),
+  exceeding_km_threshold: z.number().min(100, 'Threshold must be at least 100km'),
   standard_hours: z.number().min(0, 'Standard hours must be positive'),
   overtime_rate_lkr_per_hour: z.number().min(0, 'Overtime rate must be positive'),
   overnight_charge_lkr_per_day: z.number().min(0, 'Overnight charge must be 0 or positive'),
@@ -35,6 +36,7 @@ const otherHireSchema = z.object({
   bus_type_id: z.string().min(1, 'Bus type is required'),
   flat_fee_lkr: z.number().min(0, 'Flat fee must be positive'),
   exceeding_km_rate_lkr: z.number().min(0, 'Exceeding KM rate must be positive'),
+  exceeding_km_threshold: z.number().min(100, 'Threshold must be at least 100km'),
   standard_hours: z.number().min(0, 'Standard hours must be positive'),
   overtime_rate_lkr_per_hour: z.number().min(0, 'Overtime rate must be positive'),
   overnight_charge_lkr_per_day: z.number().min(0, 'Overnight charge must be 0 or positive'),
@@ -90,6 +92,7 @@ export function RateCardsAdmin() {
     defaultValues: {
       flat_fee_lkr: 30000,
       exceeding_km_rate_lkr: 175,
+      exceeding_km_threshold: 100,
       standard_hours: 8,
       overtime_rate_lkr_per_hour: 500,
       overnight_charge_lkr_per_day: 0,
@@ -104,6 +107,7 @@ export function RateCardsAdmin() {
       hire_type: 'Lyceum',
       flat_fee_lkr: 30000,
       exceeding_km_rate_lkr: 175,
+      exceeding_km_threshold: 100,
       standard_hours: 8,
       overtime_rate_lkr_per_hour: 500,
       overnight_charge_lkr_per_day: 0,
@@ -175,6 +179,11 @@ export function RateCardsAdmin() {
       cell: ({ row }) => `LKR ${row.getValue("exceeding_km_rate_lkr")}/km`,
     },
     {
+      accessorKey: "exceeding_km_threshold", 
+      header: "Exceeding Threshold",
+      cell: ({ row }) => `Beyond ${row.getValue("exceeding_km_threshold")}km`,
+    },
+    {
       accessorKey: "standard_hours",
       header: "Standard Hours",
       cell: ({ row }) => `${row.getValue("standard_hours")} hrs`,
@@ -227,6 +236,11 @@ export function RateCardsAdmin() {
       accessorKey: "exceeding_km_rate_lkr", 
       header: "Exceeding Rate (/km)",
       cell: ({ row }) => `LKR ${row.getValue("exceeding_km_rate_lkr")}/km`,
+    },
+    {
+      accessorKey: "exceeding_km_threshold", 
+      header: "Exceeding Threshold",
+      cell: ({ row }) => `Beyond ${row.getValue("exceeding_km_threshold")}km`,
     },
     {
       accessorKey: "standard_hours",
@@ -484,7 +498,7 @@ export function RateCardsAdmin() {
                             name="exceeding_km_rate_lkr"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Exceeding Rate (Beyond 100km)</FormLabel>
+                                <FormLabel>Exceeding Rate (Beyond {outsideForm.watch('exceeding_km_threshold') || 100}km)</FormLabel>
                                 <FormControl>
                                   <Input
                                     type="number"
@@ -495,6 +509,31 @@ export function RateCardsAdmin() {
                                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                                   />
                                 </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={outsideForm.control}
+                            name="exceeding_km_threshold"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Exceeding Threshold</FormLabel>
+                                <Select 
+                                  onValueChange={(value) => field.onChange(parseInt(value))} 
+                                  value={field.value?.toString()}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select threshold" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="100">Beyond 100km</SelectItem>
+                                    <SelectItem value="200">Beyond 200km</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -740,7 +779,7 @@ export function RateCardsAdmin() {
                             name="exceeding_km_rate_lkr"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Exceeding Rate (Beyond 100km)</FormLabel>
+                                <FormLabel>Exceeding Rate (Beyond {otherForm.watch('exceeding_km_threshold') || 100}km)</FormLabel>
                                 <FormControl>
                                   <Input
                                     type="number"
@@ -751,6 +790,31 @@ export function RateCardsAdmin() {
                                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                                   />
                                 </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={otherForm.control}
+                            name="exceeding_km_threshold"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Exceeding Threshold</FormLabel>
+                                <Select 
+                                  onValueChange={(value) => field.onChange(parseInt(value))} 
+                                  value={field.value?.toString()}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select threshold" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="100">Beyond 100km</SelectItem>
+                                    <SelectItem value="200">Beyond 200km</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}

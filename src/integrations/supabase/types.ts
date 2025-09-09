@@ -700,6 +700,7 @@ export type Database = {
           effective_from: string
           effective_to: string | null
           exceeding_km_rate_lkr: number | null
+          exceeding_km_threshold: number | null
           flat_fee_lkr: number | null
           free_exceeding_km: number | null
           from_km: number
@@ -719,6 +720,7 @@ export type Database = {
           effective_from?: string
           effective_to?: string | null
           exceeding_km_rate_lkr?: number | null
+          exceeding_km_threshold?: number | null
           flat_fee_lkr?: number | null
           free_exceeding_km?: number | null
           from_km?: number
@@ -738,6 +740,7 @@ export type Database = {
           effective_from?: string
           effective_to?: string | null
           exceeding_km_rate_lkr?: number | null
+          exceeding_km_threshold?: number | null
           flat_fee_lkr?: number | null
           free_exceeding_km?: number | null
           from_km?: number

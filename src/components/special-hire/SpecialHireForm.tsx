@@ -373,10 +373,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         throw new Error(`No rate card found for ${data.hireType} hire type. Please configure flat fee and exceeding km rate.`);
       }
 
-      // Apply unified 100km flat fee + exceeding rate formula
+      // Apply unified flat fee + exceeding rate formula with dynamic threshold
       const tripDistance = distanceData.kmTrip || 0;
       const fixedRate = rateCard.flat_fee_lkr || 0;
-      const baseCoverageKm = 100;
+      const baseCoverageKm = rateCard.exceeding_km_threshold || 100;
       const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
       const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
       
