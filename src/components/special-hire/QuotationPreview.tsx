@@ -244,7 +244,12 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               </tr>
               <tr>
                 <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left">Pick-up Date Time</th>
-                <td className="border border-gray-300 p-1">{pickup.date} {pickup.time}</td>
+                <td className="border border-gray-300 p-1">
+                  <div className="flex flex-col">
+                    <span className="font-medium">{pickup.date}</span>
+                    <span className="text-gray-600 text-xs">{pickup.time}</span>
+                  </div>
+                </td>
               </tr>
               <tr>
                 <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left">Drop-off Location</th>
@@ -252,7 +257,16 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               </tr>
               <tr>
                 <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left">Drop-off Date Time</th>
-                <td className="border border-gray-300 p-1">{dropoff ? `${dropoff.date} ${dropoff.time}` : 'TBD'}</td>
+                <td className="border border-gray-300 p-1">
+                  {dropoff ? (
+                    <div className="flex flex-col">
+                      <span className="font-medium">{dropoff.date}</span>
+                      <span className="text-gray-600 text-xs">{dropoff.time}</span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-500">TBD</span>
+                  )}
+                </td>
               </tr>
             </tbody>
           </table>
