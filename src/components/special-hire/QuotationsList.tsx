@@ -124,35 +124,49 @@ export function QuotationsList({ onRefresh }: Props) {
 
       if (error) throw error;
 
-      // Get unique creator IDs
+      // Get unique creator IDs that are not null
       const creatorIds = [...new Set(quotationsData?.map(q => q.created_by).filter(Boolean))] as string[];
       
-      // Fetch creator names
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('user_id, first_name')
-        .in('user_id', creatorIds);
+      let creatorMap = new Map();
+      
+      // Only fetch profiles if we have creator IDs
+      if (creatorIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, first_name')
+          .in('user_id', creatorIds);
 
-      // Create a map of user_id to first_name
-      const creatorMap = new Map();
-      profilesData?.forEach(profile => {
-        creatorMap.set(profile.user_id, profile.first_name);
-      });
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+        }
+
+        // Create a map of user_id to first_name
+        profilesData?.forEach(profile => {
+          creatorMap.set(profile.user_id, profile.first_name || 'Unknown User');
+        });
+      }
       
       // Transform the data to match our interface
       const transformedData = quotationsData?.map(item => ({
         ...item,
         bus_type: item.bus_types?.name || 'Unknown',
         seating_capacity: item.bus_types?.capacity || 54,
-        created_by_name: creatorMap.get(item.created_by) || 'Unknown',
+        created_by_name: item.created_by ? (creatorMap.get(item.created_by) || 'Unknown User') : 'System',
         total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
         intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
         audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
         additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || [])
       })) || [];
       
+      console.log('Transformed quotations with creators:', transformedData.map(q => ({ 
+        quotation_no: q.quotation_no, 
+        created_by: q.created_by, 
+        created_by_name: q.created_by_name 
+      })));
+      
       setQuotations(transformedData);
     } catch (error: any) {
+      console.error('Error in loadQuotations:', error);
       toast({
         title: "Error",
         description: "Failed to load quotations",
