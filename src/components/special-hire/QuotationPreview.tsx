@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface QuotationData {
   id: string;
@@ -45,6 +46,41 @@ interface Props {
 }
 
 export function QuotationPreview({ quotation, className = "" }: Props) {
+  const [rateCard, setRateCard] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchRateCard = async () => {
+      try {
+        // First get the bus type ID from bus_types table
+        const { data: busTypes } = await supabase
+          .from('bus_types')
+          .select('id')
+          .eq('name', quotation.bus_type)
+          .single();
+
+        if (busTypes) {
+          // Then fetch the rate card for this bus type
+          const { data: rateData } = await supabase
+            .from('hire_rate_cards')
+            .select('*')
+            .eq('bus_type_id', busTypes.id)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (rateData) {
+            setRateCard(rateData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching rate card:', error);
+      }
+    };
+
+    fetchRateCard();
+  }, [quotation.bus_type]);
+
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return {
@@ -271,9 +307,22 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         {/* Extra Charges */}
         <div className="text-base mt-6 mb-2 font-semibold text-blue-600">Extra Charges and Route Info</div>
         <div className="text-sm leading-relaxed text-gray-800">
-          Exceeding Per Kilometer will be charged Rs 300.00<br />
-          Exceeding per hour will be charged Rs 1500.00<br />
-          Route - Normal Way
+          {rateCard ? (
+            <>
+              Exceeding Per Kilometer will be charged Rs {rateCard.exceeding_km_rate_lkr?.toLocaleString() || '300.00'}<br />
+              Exceeding per hour will be charged Rs {rateCard.overtime_rate_lkr_per_hour?.toLocaleString() || '1500.00'}<br />
+              {rateCard.overnight_charge_lkr_per_day > 0 && (
+                <>Overnight charge per day: Rs {rateCard.overnight_charge_lkr_per_day.toLocaleString()}<br /></>
+              )}
+              Route - Normal Way
+            </>
+          ) : (
+            <>
+              Exceeding Per Kilometer will be charged Rs 300.00<br />
+              Exceeding per hour will be charged Rs 1500.00<br />
+              Route - Normal Way
+            </>
+          )}
         </div>
 
         {/* Payment Info */}
