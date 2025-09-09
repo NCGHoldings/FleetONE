@@ -52,16 +52,20 @@ export function PaymentTimeline({
   const isFullyPaid = balanceDue <= 0;
 
   const getPaymentStatusBadge = (status: string) => {
+    // Handle undefined or null status
+    const safeStatus = status || 'pending';
+    
     const variants = {
       pending: { variant: 'secondary' as const, className: 'bg-yellow-100 text-yellow-800' },
       confirmed: { variant: 'default' as const, className: 'bg-green-100 text-green-800' },
       completed: { variant: 'default' as const, className: 'bg-green-500 text-white' },
+      approved: { variant: 'default' as const, className: 'bg-green-500 text-white' },
     };
     
-    const config = variants[status as keyof typeof variants] || variants.pending;
+    const config = variants[safeStatus as keyof typeof variants] || variants.pending;
     return (
       <Badge variant={config.variant} className={config.className}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {safeStatus.charAt(0).toUpperCase() + safeStatus.slice(1)}
       </Badge>
     );
   };
