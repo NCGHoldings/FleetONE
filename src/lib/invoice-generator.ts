@@ -150,191 +150,111 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const mileage = data.numberOfBuses * 100; // Placeholder mileage calculation
 
     return `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>Invoice</title>
+      <div style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #fff; color: #000; width: 210mm; min-height: 297mm; box-sizing: border-box; position: relative;">
+        ${isDraft ? '<div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 150px; color: rgba(255, 0, 0, 0.1); font-weight: bold; z-index: -1; pointer-events: none; user-select: none;">DRAFT</div>' : ''}
         <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: #fff;
-            color: #000;
-          }
-          .invoice-box {
-            width: 900px;
-            margin: auto;
-            border: 1px solid #ddd;
-            padding: 20px;
-          }
-          .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 20px;
-          }
-          .header img {
-            height: 70px;
-          }
-          .header .company {
-            text-align: right;
-            font-size: 14px;
-          }
-          h2 {
-            text-align: center;
-            text-decoration: underline;
-            margin-bottom: 20px;
-          }
-          .details {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            font-size: 14px;
-          }
-          .details td {
-            padding: 5px;
-            vertical-align: top;
-          }
-          .details td:nth-child(1) {
-            width: 20%;
-            font-weight: bold;
-          }
-          .summary {
-            width: 300px;
-            float: right;
-            border-collapse: collapse;
-            margin-top: 20px;
-            font-size: 14px;
-          }
-          .summary td {
-            border: 1px solid #ddd;
-            padding: 8px;
-          }
-          .summary tr td:first-child {
-            font-weight: bold;
-          }
-          .items {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            font-size: 14px;
-          }
-          .items th, .items td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: center;
-          }
-          .items th {
-            background: #f1f1f1;
-          }
-          .footer {
-            margin-top: 40px;
-            font-size: 13px;
-          }
-          .sign {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 50px;
-            font-size: 14px;
-          }
-          .sign div {
-            text-align: center;
-          }
-          .note {
-            margin-top: 30px;
-            font-size: 12px;
-            text-align: center;
-            color: #555;
-            font-style: italic;
-          }
           ${draftWatermarkStyles}
         </style>
-      </head>
-      <body>
-        ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
-        <div class="invoice-box">
+        
+        <div style="width: 900px; margin: auto; border: 1px solid #ddd; padding: 20px;">
           <!-- Header -->
-          <div class="header">
-            <img src="${companyLogo}" alt="NCG Express Logo">
-            <div class="company">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <img src="${companyLogo}" alt="NCG Express Logo" style="height: 70px;">
+            <div style="text-align: right; font-size: 14px;">
               <strong>NCG EXPRESS (PRIVATE) LIMITED</strong><br>
               157, Kebellawovita, Wenivelkola, Polgasovita<br>
               0777556322
             </div>
           </div>
 
-          <h2>${documentTitle}${isDraft ? ' - DRAFT' : ''}</h2>
+          <h2 style="text-align: center; text-decoration: underline; margin-bottom: 20px;">${documentTitle}${isDraft ? ' - DRAFT' : ''}</h2>
 
           <!-- Invoice Info -->
-          <table class="details">
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
             <tr>
-              <td>Customer Code</td><td>LOC-${data.invoiceNo.split('-').pop() || '0001'}</td>
-              <td>Invoice No</td><td>${data.invoiceNo}</td>
+              <td style="padding: 5px; vertical-align: top; width: 20%; font-weight: bold;">Customer Code</td>
+              <td style="padding: 5px; vertical-align: top;">LOC-${data.invoiceNo.split('-').pop() || '0001'}</td>
+              <td style="padding: 5px; vertical-align: top; width: 20%; font-weight: bold;">Invoice No</td>
+              <td style="padding: 5px; vertical-align: top;">${data.invoiceNo}</td>
             </tr>
             <tr>
-              <td>Customer Name</td><td>${data.companyName || data.customerName}</td>
-              <td>Invoice Date</td><td>${currentDate}</td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Customer Name</td>
+              <td style="padding: 5px; vertical-align: top;">${data.companyName || data.customerName}</td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Invoice Date</td>
+              <td style="padding: 5px; vertical-align: top;">${currentDate}</td>
             </tr>
             <tr>
-              <td>Branch</td><td>SHS</td>
-              <td>Ref No</td><td></td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Branch</td>
+              <td style="padding: 5px; vertical-align: top;">SHS</td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Ref No</td>
+              <td style="padding: 5px; vertical-align: top;"></td>
             </tr>
             <tr>
-              <td>Contact Person</td><td>${data.customerName}</td>
-              <td>Dates of Hire</td><td>${format(data.pickupDate, 'dd/MM/yyyy HH:mm:ss')}AM</td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Contact Person</td>
+              <td style="padding: 5px; vertical-align: top;">${data.customerName}</td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Dates of Hire</td>
+              <td style="padding: 5px; vertical-align: top;">${format(data.pickupDate, 'dd/MM/yyyy HH:mm:ss')}AM</td>
             </tr>
             <tr>
-              <td>Contact Number</td><td>${data.customerPhone}</td>
-              <td>Quote No</td><td>${data.quotationNo}</td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Contact Number</td>
+              <td style="padding: 5px; vertical-align: top;">${data.customerPhone}</td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Quote No</td>
+              <td style="padding: 5px; vertical-align: top;">${data.quotationNo}</td>
             </tr>
             <tr>
-              <td>Address</td><td></td>
-              <td>Bus Type</td><td>${data.busType}</td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Address</td>
+              <td style="padding: 5px; vertical-align: top;"></td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Bus Type</td>
+              <td style="padding: 5px; vertical-align: top;">${data.busType}</td>
             </tr>
             <tr>
-              <td>Mileage</td><td>${mileage}</td>
+              <td style="padding: 5px; vertical-align: top; font-weight: bold;">Mileage</td>
+              <td style="padding: 5px; vertical-align: top;">${mileage}</td>
             </tr>
           </table>
 
           <!-- Item Table -->
-          <table class="items">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px;">
             <tr>
-              <th>Description</th>
-              <th>Item Detail</th>
-              <th>Vehicle No</th>
-              <th>Amount</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: center; background: #f1f1f1;">Description</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: center; background: #f1f1f1;">Item Detail</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: center; background: #f1f1f1;">Vehicle No</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: center; background: #f1f1f1;">Amount</th>
             </tr>
             <tr>
-              <td>${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
-              <td>${itemDetail}<br><br>Remark: ${data.vehicleNo || 'NE 2157'} ${data.driverName ? `(D) ${data.driverName}` : '(D) Tharindu'} ${data.conductorName ? `(A) ${data.conductorName}` : '(A) Kalpa'}</td>
-              <td>${data.vehicleNo || 'NE 2157'}</td>
-              <td>${subTotal.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${itemDetail}<br><br>Remark: ${data.vehicleNo || 'NE 2157'} ${data.driverName ? `(D) ${data.driverName}` : '(D) Tharindu'} ${data.conductorName ? `(A) ${data.conductorName}` : '(A) Kalpa'}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${data.vehicleNo || 'NE 2157'}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${subTotal.toLocaleString()}.00</td>
             </tr>
           </table>
 
           <!-- Summary -->
-          <table class="summary">
+          <table style="width: 300px; float: right; border-collapse: collapse; margin-top: 20px; font-size: 14px;">
             <tr>
-              <td>Sub-Total</td><td>${subTotal.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Sub-Total</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${subTotal.toLocaleString()}.00</td>
             </tr>
             <tr>
-              <td>Discount</td><td>${discount.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Discount</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${discount.toLocaleString()}.00</td>
             </tr>
             <tr>
-              <td>Price After Discount</td><td>${priceAfterDiscount.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Price After Discount</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${priceAfterDiscount.toLocaleString()}.00</td>
             </tr>
             <tr>
-              <td>Advance Payment</td><td>${previousAdvance.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Advance Payment</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${previousAdvance.toLocaleString()}.00</td>
             </tr>
             <tr>
-              <td>Balance Payment</td><td>${balancePayment.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Balance Payment</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${balancePayment.toLocaleString()}.00</td>
             </tr>
           </table>
 
           <!-- Payment Info -->
-          <div class="footer">
+          <div style="margin-top: 40px; font-size: 13px; clear: both;">
             <strong>Payment Info</strong><br>
             Account No: <b>193414017578</b><br>
             Account Name: <b>NCG Express (Pvt) Limited</b><br>
@@ -344,15 +264,15 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           </div>
 
           <!-- Signatures -->
-          <div class="sign">
-            <div>
-              <hr style="width:200px;">
+          <div style="display: flex; justify-content: space-between; margin-top: 50px; font-size: 14px;">
+            <div style="text-align: center;">
+              <hr style="width: 200px;">
               Darshini Pallewela<br>
               Prepared By<br>
               ${currentDate}
             </div>
-            <div>
-              <hr style="width:200px;">
+            <div style="text-align: center;">
+              <hr style="width: 200px;">
               Sithara Thennakoon<br>
               Approved By<br>
               ${format(new Date(Date.now() - 24 * 60 * 60 * 1000), 'dd/MM/yyyy')}
@@ -360,12 +280,11 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           </div>
 
           <!-- Note -->
-          <div class="note">
+          <div style="margin-top: 30px; font-size: 12px; text-align: center; color: #555; font-style: italic;">
             "This is a computer-generated invoice and does not require a physical signature."
           </div>
         </div>
-      </body>
-      </html>
+      </div>
     `;
   }
 };
