@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { QuotationAddOnsSection } from './QuotationAddOnsSection';
 import { InlineAddOnsSection } from './InlineAddOnsSection';
 
@@ -74,6 +75,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const [activeTab, setActiveTab] = useState('basic');
   const [tempAddOns, setTempAddOns] = useState<TempAddOn[]>([]);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -172,6 +174,15 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
 
   const handleFormSubmit = async (data: FormData) => {
     try {
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to create quotations",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const totalPrice = calculateTotalPrice();
       const quotationNo = `YTQ-${Date.now()}`;
 
@@ -194,6 +205,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         warranty_terms: data.warranty_terms,
         valid_until: new Date(Date.now() + (data.valid_days * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
         status: 'draft',
+        created_by: user.id,
       };
 
       const { data: quotation, error } = await supabase
