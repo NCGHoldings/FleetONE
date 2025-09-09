@@ -26,6 +26,8 @@ interface YutongQuotation {
   status: string;
   valid_until: string;
   created_at: string;
+  created_by: string;
+  creator_name?: string;
   special_features?: string;
   delivery_timeline?: string;
   payment_terms?: string;
@@ -48,11 +50,26 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
     try {
       const { data, error } = await (supabase as any)
         .from('yutong_quotations')
-        .select('*')
+        .select(`
+          *,
+          profiles:created_by (
+            first_name,
+            last_name
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setQuotations(data || []);
+      
+      // Transform data to include creator name
+      const transformedData = (data || []).map((quotation: any) => ({
+        ...quotation,
+        creator_name: quotation.profiles 
+          ? `${quotation.profiles.first_name} ${quotation.profiles.last_name}`.trim()
+          : 'Unknown'
+      }));
+      
+      setQuotations(transformedData);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -196,6 +213,15 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         const date = row.getValue("valid_until");
         return date ? format(new Date(date as string), 'MMM dd, yyyy') : '-';
       },
+    },
+    {
+      accessorKey: "creator_name",
+      header: "Created By",
+      cell: ({ row }) => (
+        <div className="text-sm">
+          {row.original.creator_name || 'Unknown'}
+        </div>
+      ),
     },
     {
       id: "actions",
