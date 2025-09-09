@@ -27,7 +27,7 @@ export const InvoiceViewer = ({ isOpen, onClose, invoiceData, onDownload }: Invo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-hidden">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle>Invoice Preview</DialogTitle>
           <div className="flex gap-2">
@@ -48,10 +48,14 @@ export const InvoiceViewer = ({ isOpen, onClose, invoiceData, onDownload }: Invo
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto border rounded-lg bg-white">
+        <div className="flex-1 overflow-auto border rounded-lg bg-white">
           <div 
-            className="p-4 text-black"
-            style={{ minHeight: '800px' }}
+            className="text-black"
+            style={{ 
+              minHeight: '800px',
+              width: '100%',
+              overflow: 'visible'
+            }}
             dangerouslySetInnerHTML={{ 
               __html: generateInvoiceHTML(invoiceData) 
             }}

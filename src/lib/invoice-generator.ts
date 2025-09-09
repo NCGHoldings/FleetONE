@@ -150,13 +150,16 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const mileage = data.numberOfBuses * 100; // Placeholder mileage calculation
 
     return `
-      <div style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #fff; color: #000; width: 210mm; min-height: 297mm; box-sizing: border-box; position: relative;">
+      <div style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #fff; color: #000; width: 100%; max-width: 210mm; min-height: 297mm; box-sizing: border-box; position: relative;">
         ${isDraft ? '<div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 150px; color: rgba(255, 0, 0, 0.1); font-weight: bold; z-index: -1; pointer-events: none; user-select: none;">DRAFT</div>' : ''}
         <style>
           ${draftWatermarkStyles}
+          @media print {
+            .invoice-container { width: 210mm !important; max-width: none !important; }
+          }
         </style>
         
-        <div style="width: 900px; margin: auto; border: 1px solid #ddd; padding: 20px;">
+        <div class="invoice-container" style="width: 100%; max-width: 800px; margin: auto; border: 1px solid #ddd; padding: 15px; box-sizing: border-box;">
           <!-- Header -->
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
             <img src="${companyLogo}" alt="NCG Express Logo" style="height: 70px;">
@@ -214,23 +217,23 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           </table>
 
           <!-- Item Table -->
-          <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px;">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px;">
             <tr>
-              <th style="border: 1px solid #ddd; padding: 8px; text-align: center; background: #f1f1f1;">Description</th>
-              <th style="border: 1px solid #ddd; padding: 8px; text-align: center; background: #f1f1f1;">Item Detail</th>
-              <th style="border: 1px solid #ddd; padding: 8px; text-align: center; background: #f1f1f1;">Vehicle No</th>
-              <th style="border: 1px solid #ddd; padding: 8px; text-align: center; background: #f1f1f1;">Amount</th>
+              <th style="border: 1px solid #ddd; padding: 6px; text-align: center; background: #f1f1f1; width: 25%;">Description</th>
+              <th style="border: 1px solid #ddd; padding: 6px; text-align: center; background: #f1f1f1; width: 40%;">Item Detail</th>
+              <th style="border: 1px solid #ddd; padding: 6px; text-align: center; background: #f1f1f1; width: 15%;">Vehicle No</th>
+              <th style="border: 1px solid #ddd; padding: 6px; text-align: center; background: #f1f1f1; width: 20%;">Amount</th>
             </tr>
             <tr>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${itemDetail}<br><br>Remark: ${data.vehicleNo || 'NE 2157'} ${data.driverName ? `(D) ${data.driverName}` : '(D) Tharindu'} ${data.conductorName ? `(A) ${data.conductorName}` : '(A) Kalpa'}</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${data.vehicleNo || 'NE 2157'}</td>
-              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${subTotal.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${data.busType.toUpperCase()} - Fixed Rate for 1km - 100km<br>- External</td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-size: 12px;">${itemDetail}<br><br>Remark: ${data.vehicleNo || 'NE 2157'} ${data.driverName ? `(D) ${data.driverName}` : '(D) Tharindu'} ${data.conductorName ? `(A) ${data.conductorName}` : '(A) Kalpa'}</td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${data.vehicleNo || 'NE 2157'}</td>
+              <td style="border: 1px solid #ddd; padding: 6px; text-align: center; font-weight: bold;">${subTotal.toLocaleString()}.00</td>
             </tr>
           </table>
 
           <!-- Summary -->
-          <table style="width: 300px; float: right; border-collapse: collapse; margin-top: 20px; font-size: 14px;">
+          <table style="width: 100%; max-width: 300px; float: right; border-collapse: collapse; margin-top: 20px; font-size: 14px;">
             <tr>
               <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Sub-Total</td>
               <td style="border: 1px solid #ddd; padding: 8px;">${subTotal.toLocaleString()}.00</td>
