@@ -235,42 +235,130 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Pickup Details */}
-        <div className="mt-3">
-          <table className="w-full border-collapse text-xs">
+        <div style={{ marginTop: '12px' }}>
+          <table style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse', 
+            fontSize: '11px',
+            fontFamily: '"Segoe UI", Arial, sans-serif'
+          }}>
             <tbody>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '25%', verticalAlign: 'middle' }}>Pick-up Location</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }} colSpan={3}>{quotation.pickup_location}</td>
+                <th style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  backgroundColor: '#eff6ff', 
+                  fontWeight: '600', 
+                  color: '#2563eb', 
+                  textAlign: 'left', 
+                  verticalAlign: 'middle',
+                  width: '25%'
+                }}>Pick-up Location</th>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  verticalAlign: 'middle',
+                  color: '#374151'
+                }} colSpan={3}>{quotation.pickup_location}</td>
               </tr>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>Pick-up Date</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>
-                  <span className="font-medium">{pickup.date}</span>
+                <th style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  backgroundColor: '#eff6ff', 
+                  fontWeight: '600', 
+                  color: '#2563eb', 
+                  textAlign: 'left', 
+                  verticalAlign: 'middle',
+                  width: '12.5%'
+                }}>Pick-up Date</th>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  verticalAlign: 'middle',
+                  width: '12.5%'
+                }}>
+                  <span style={{ fontWeight: '500', color: '#374151' }}>{pickup.date}</span>
                 </td>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>Pick-up Time</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>
-                  <span className="text-gray-600">{pickup.time}</span>
+                <th style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  backgroundColor: '#eff6ff', 
+                  fontWeight: '600', 
+                  color: '#2563eb', 
+                  textAlign: 'left', 
+                  verticalAlign: 'middle',
+                  width: '12.5%'
+                }}>Pick-up Time</th>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  verticalAlign: 'middle',
+                  width: '12.5%'
+                }}>
+                  <span style={{ color: '#6b7280' }}>{pickup.time}</span>
                 </td>
               </tr>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ verticalAlign: 'middle' }}>Drop-off Location</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }} colSpan={3}>{quotation.drop_location}</td>
+                <th style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  backgroundColor: '#eff6ff', 
+                  fontWeight: '600', 
+                  color: '#2563eb', 
+                  textAlign: 'left', 
+                  verticalAlign: 'middle'
+                }}>Drop-off Location</th>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  verticalAlign: 'middle',
+                  color: '#374151'
+                }} colSpan={3}>{quotation.drop_location}</td>
               </tr>
               <tr>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>Drop-off Date</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>
+                <th style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  backgroundColor: '#eff6ff', 
+                  fontWeight: '600', 
+                  color: '#2563eb', 
+                  textAlign: 'left', 
+                  verticalAlign: 'middle',
+                  width: '12.5%'
+                }}>Drop-off Date</th>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  verticalAlign: 'middle',
+                  width: '12.5%'
+                }}>
                   {dropoff ? (
-                    <span className="font-medium">{dropoff.date}</span>
+                    <span style={{ fontWeight: '500', color: '#374151' }}>{dropoff.date}</span>
                   ) : (
-                    <span className="text-gray-500">TBD</span>
+                    <span style={{ color: '#9ca3af' }}>TBD</span>
                   )}
                 </td>
-                <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>Drop-off Time</th>
-                <td className="border border-gray-300 p-1 align-middle" style={{ width: '12.5%', verticalAlign: 'middle' }}>
+                <th style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  backgroundColor: '#eff6ff', 
+                  fontWeight: '600', 
+                  color: '#2563eb', 
+                  textAlign: 'left', 
+                  verticalAlign: 'middle',
+                  width: '12.5%'
+                }}>Drop-off Time</th>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  verticalAlign: 'middle',
+                  width: '12.5%'
+                }}>
                   {dropoff ? (
-                    <span className="text-gray-600">{dropoff.time}</span>
+                    <span style={{ color: '#6b7280' }}>{dropoff.time}</span>
                   ) : (
-                    <span className="text-gray-500">TBD</span>
+                    <span style={{ color: '#9ca3af' }}>TBD</span>
                   )}
                 </td>
               </tr>
@@ -279,36 +367,138 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Vehicle Details */}
-        <table className="w-full border-collapse text-xs mt-3">
+        <table style={{ 
+          width: '100%', 
+          borderCollapse: 'collapse', 
+          fontSize: '11px',
+          marginTop: '12px',
+          fontFamily: '"Segoe UI", Arial, sans-serif'
+        }}>
           <thead>
             <tr>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '12%', verticalAlign: 'middle' }}>Model</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '8%', verticalAlign: 'middle' }}>Vehicles</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '8%', verticalAlign: 'middle' }}>Capacity</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '35%', verticalAlign: 'middle' }}>Description</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '10%', verticalAlign: 'middle' }}>Mileage</th>
-              <th className="border border-gray-300 p-1 bg-blue-50 font-semibold text-blue-600 text-left align-middle" style={{ width: '27%', verticalAlign: 'middle' }}>Total Cost</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '12%'
+              }}>Model</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '8%'
+              }}>Vehicles</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '8%'
+              }}>Capacity</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '35%'
+              }}>Description</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '10%'
+              }}>Mileage</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '27%'
+              }}>Total Cost</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td className="border border-gray-300 p-1 text-center align-middle" style={{ verticalAlign: 'middle' }}>{quotation.bus_type}</td>
-              <td className="border border-gray-300 p-1 text-center align-middle" style={{ verticalAlign: 'middle' }}>{quotation.number_of_buses.toString().padStart(2, '0')}</td>
-              <td className="border border-gray-300 p-1 text-center align-middle" style={{ verticalAlign: 'middle' }}>{quotation.seating_capacity || 54}</td>
-              <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }}>
-                <div className="space-y-0.5">
-                <div className="text-xs text-gray-700">
+              <td style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                textAlign: 'center', 
+                verticalAlign: 'middle',
+                color: '#374151'
+              }}>{quotation.bus_type}</td>
+              <td style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                textAlign: 'center', 
+                verticalAlign: 'middle',
+                color: '#374151'
+              }}>{quotation.number_of_buses.toString().padStart(2, '0')}</td>
+              <td style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                textAlign: 'center', 
+                verticalAlign: 'middle',
+                color: '#374151'
+              }}>{quotation.seating_capacity || 54}</td>
+              <td style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                verticalAlign: 'middle'
+              }}>
+                <div style={{ fontSize: '11px', color: '#374151' }}>
                   Route Details
                 </div>
-                </div>
               </td>
-              <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }}>{customerDistance.toFixed(2)} Km</td>
-              <td className="border border-gray-300 p-1 align-middle" style={{ verticalAlign: 'middle' }}>
-                <div className="text-xs">Hire Charges: LKR {((quotation.gross_revenue || 0) + (quotation.total_additional_charges || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0)).toLocaleString()}</div>
+              <td style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                verticalAlign: 'middle',
+                color: '#374151'
+              }}>{customerDistance.toFixed(2)} Km</td>
+              <td style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                verticalAlign: 'middle'
+              }}>
+                <div style={{ fontSize: '11px', color: '#374151', marginBottom: '4px' }}>
+                  Hire Charges: LKR {((quotation.gross_revenue || 0) + (quotation.total_additional_charges || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0)).toLocaleString()}
+                </div>
                 {(quotation.discount_amount_lkr || 0) > 0 && (
-                  <div className="text-red-600 text-xs">Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}</div>
+                  <div style={{ color: '#dc2626', fontSize: '11px', marginBottom: '4px' }}>
+                    Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}
+                  </div>
                 )}
-                <div className="font-bold border-t pt-0.5 mt-0.5 text-sm">Final Total: LKR {calculateFinalCustomerTotal(quotation).toLocaleString()}</div>
+                <div style={{ 
+                  fontWeight: 'bold', 
+                  borderTop: '1px solid #d1d5db', 
+                  paddingTop: '4px', 
+                  marginTop: '4px', 
+                  fontSize: '12px',
+                  color: '#374151'
+                }}>
+                  Final Total: LKR {calculateFinalCustomerTotal(quotation).toLocaleString()}
+                </div>
               </td>
             </tr>
           </tbody>
