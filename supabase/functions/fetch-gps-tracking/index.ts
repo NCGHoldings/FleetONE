@@ -169,27 +169,56 @@ Deno.serve(async (req) => {
     const makeTraccarRequest = async (path: string): Promise<Response> => {
       const url = `${currentTraccarBaseUrl}${path}`
       
-      const headers: Record<string, string> = {
+      const baseHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       }
 
-      // Use API key if provided
+      // Build auth attempts in order of preference
+      const attempts: Array<{ name: string; headers: Record<string, string> }> = []
+
       if (currentTraccarApiToken) {
-        headers['X-Api-Key'] = currentTraccarApiToken
-      } else if (traccarUsername && traccarPassword) {
-        const basic = btoa(`${traccarUsername}:${traccarPassword}`)
-        headers['Authorization'] = `Basic ${basic}`
+        // 1) Bearer token (preferred in newer Traccar versions)
+        attempts.push({
+          name: 'bearer',
+          headers: { ...baseHeaders, Authorization: `Bearer ${currentTraccarApiToken}` }
+        })
+        // 2) X-Api-Key (fallback for some setups)
+        attempts.push({
+          name: 'x-api-key',
+          headers: { ...baseHeaders, 'X-Api-Key': currentTraccarApiToken }
+        })
       }
 
-      console.log(`Making request to ${url}`)
-      
-      const response = await fetch(url, { headers })
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`${response.status} ${response.statusText}: ${errorText}`)
+      if (traccarUsername && traccarPassword) {
+        // 3) Basic auth (fallback)
+        const basic = btoa(`${traccarUsername}:${traccarPassword}`)
+        attempts.push({
+          name: 'basic',
+          headers: { ...baseHeaders, Authorization: `Basic ${basic}` }
+        })
       }
-      return response
+
+      // If no auth configured, still attempt without auth
+      if (attempts.length === 0) {
+        attempts.push({ name: 'no-auth', headers: baseHeaders })
+      }
+
+      let lastStatus = 0
+      let lastText = ''
+
+      for (const attempt of attempts) {
+        console.log(`Making request to ${url} using ${attempt.name} auth`)
+        const response = await fetch(url, { headers: attempt.headers })
+        if (response.ok) {
+          return response
+        }
+        lastStatus = response.status
+        lastText = await response.text()
+        console.warn(`Attempt with ${attempt.name} failed: ${response.status} ${response.statusText} - ${lastText}`)
+      }
+
+      throw new Error(`${lastStatus} Unauthorized/Failed: ${lastText}`)
     }
 
     // Fetch devices and positions from Traccar API
