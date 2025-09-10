@@ -156,7 +156,7 @@ export default function SchoolBusService() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => navigate("/school-bus/students/import")}>
+          <Button onClick={() => navigate("/school-bus/import")}>
             Import Students
           </Button>
           <Button onClick={() => navigate("/school-bus/payments")}>
