@@ -65,13 +65,23 @@ export const useFinanceApproval = () => {
 
       if (docsError) throw docsError;
 
+      // Compute total approved payments for this quotation to show accurate Balance Due
+      const { data: approvedPaymentsList, error: approvedPaymentsError } = await supabase
+        .from('special_hire_payments')
+        .select('amount')
+        .eq('quotation_id', paymentData.quotation.id)
+        .eq('status', 'approved');
+      if (approvedPaymentsError) throw approvedPaymentsError;
+      const totalApprovedPaid = (approvedPaymentsList || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
       // Update draft documents to approved status
       for (const doc of draftDocuments || []) {
         // Generate final approved document without DRAFT watermark
         const calculateTotalAmount = (quotation: any) => {
           return quotation.gross_revenue + 
                  (quotation.fuel_cost_fuel_only || 0) + 
-                 (quotation.commission_pass_through_amount || 0) - 
+                 (quotation.commission_pass_through_amount || 0) +
+                 (quotation.total_additional_charges || 0) - 
                  (quotation.discount_amount_lkr || 0);
         };
 
@@ -92,7 +102,7 @@ export const useFinanceApproval = () => {
           numberOfPassengers: paymentData.quotation.number_of_passengers,
           totalAmount: calculateTotalAmount(paymentData.quotation),
           advanceAmount: paymentData.quotation.advance_paid || 0,
-          paidAmount: paymentData.amount,
+          paidAmount: (doc.document_type === 'sales_receipt' || doc.payment_type === 'advance') ? paymentData.amount : totalApprovedPaid,
           vehicleNo: paymentData.quotation.assigned_bus_no,
           driverName: paymentData.quotation.assigned_driver_name,
           conductorName: paymentData.quotation.assigned_conductor_name,
@@ -220,7 +230,8 @@ export const useFinanceApproval = () => {
           numberOfPassengers: quotation.number_of_passengers,
           totalAmount: quotation.gross_revenue + 
                        (quotation.fuel_cost_fuel_only || 0) + 
-                       (quotation.commission_pass_through_amount || 0) - 
+                       (quotation.commission_pass_through_amount || 0) +
+                       (quotation.total_additional_charges || 0) - 
                        (quotation.discount_amount_lkr || 0),
           advanceAmount: quotation.advance_paid || 0,
           paidAmount: paymentType === 'advance' ? (quotation.advance_paid || 0) : (quotation.total_paid || 0),

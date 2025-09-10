@@ -111,9 +111,20 @@ export const useDocumentManagement = () => {
       const calculateTotalAmount = (quotation: any) => {
         return quotation.gross_revenue + 
                (quotation.fuel_cost_fuel_only || 0) + 
-               (quotation.commission_pass_through_amount || 0) - 
+               (quotation.commission_pass_through_amount || 0) +
+               (quotation.total_additional_charges || 0) - 
                (quotation.discount_amount_lkr || 0);
       };
+
+      // Compute total approved payments for accurate Balance Due
+      const { data: approvedPaymentsList, error: approvedPaymentsError } = await supabase
+        .from('special_hire_payments')
+        .select('amount')
+        .eq('quotation_id', paymentData.quotation.id)
+        .eq('status', 'approved');
+      if (approvedPaymentsError) throw approvedPaymentsError;
+      const totalApprovedPaid = (approvedPaymentsList || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
 
       const approvedInvoiceData: InvoiceData = {
         invoiceNo: `APPROVED-${paymentData.id}`,
@@ -132,7 +143,7 @@ export const useDocumentManagement = () => {
         numberOfPassengers: paymentData.quotation.number_of_passengers,
         totalAmount: calculateTotalAmount(paymentData.quotation),
         advanceAmount: paymentData.quotation.advance_paid || 0,
-        paidAmount: paymentData.amount,
+        paidAmount: totalApprovedPaid,
         vehicleNo: paymentData.quotation.assigned_bus_no,
         driverName: paymentData.quotation.assigned_driver_name,
         conductorName: paymentData.quotation.assigned_conductor_name,
@@ -223,9 +234,19 @@ export const useDocumentManagement = () => {
       const calculateTotalAmount = (quotation: any) => {
         return quotation.gross_revenue + 
                (quotation.fuel_cost_fuel_only || 0) + 
-               (quotation.commission_pass_through_amount || 0) - 
+               (quotation.commission_pass_through_amount || 0) +
+               (quotation.total_additional_charges || 0) - 
                (quotation.discount_amount_lkr || 0);
       };
+
+      // Compute total approved payments for accurate Balance Due
+      const { data: approvedPaymentsList2, error: approvedPaymentsError2 } = await supabase
+        .from('special_hire_payments')
+        .select('amount')
+        .eq('quotation_id', paymentData.quotation.id)
+        .eq('status', 'approved');
+      if (approvedPaymentsError2) throw approvedPaymentsError2;
+      const totalApprovedPaid2 = (approvedPaymentsList2 || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
       const invoiceData: InvoiceData = {
         invoiceNo: `REGEN-${existingDoc.payment_type.toUpperCase()}-${Date.now()}`,
@@ -244,7 +265,7 @@ export const useDocumentManagement = () => {
         numberOfPassengers: paymentData.quotation.number_of_passengers,
         totalAmount: calculateTotalAmount(paymentData.quotation),
         advanceAmount: paymentData.quotation.advance_paid || 0,
-        paidAmount: paymentData.amount,
+        paidAmount: totalApprovedPaid2,
         vehicleNo: paymentData.quotation.assigned_bus_no,
         driverName: paymentData.quotation.assigned_driver_name,
         conductorName: paymentData.quotation.assigned_conductor_name,

@@ -144,8 +144,9 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const discount = data.discountAmount || 0;
     const subTotal = data.totalAmount;
     const priceAfterDiscount = subTotal - discount;
-    const previousAdvance = data.advanceAmount || 0;
-    const balancePayment = priceAfterDiscount - previousAdvance;
+    const previousAdvance = data.advanceAmount || 0; // kept for reference
+    const totalPaid = data.paidAmount || 0;
+    const balanceDue = priceAfterDiscount - totalPaid;
     const itemDetail = data.itemDetail || `${data.pickupLocation} to ${data.dropLocation}`;
     const mileage = data.numberOfBuses * 100; // Placeholder mileage calculation
 
@@ -247,12 +248,12 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
               <td style="border: 1px solid #ddd; padding: 8px;">${priceAfterDiscount.toLocaleString()}.00</td>
             </tr>
             <tr>
-              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Advance Payment</td>
-              <td style="border: 1px solid #ddd; padding: 8px;">${previousAdvance.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Total Paid</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${totalPaid.toLocaleString()}.00</td>
             </tr>
             <tr>
-              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Balance Payment</td>
-              <td style="border: 1px solid #ddd; padding: 8px;">${balancePayment.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Balance Due</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${balanceDue.toLocaleString()}.00</td>
             </tr>
           </table>
 
