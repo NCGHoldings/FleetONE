@@ -116,6 +116,31 @@ export default function Complaints() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "User not authenticated",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get the user's profile ID (not auth user ID)
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !profile) {
+        toast({
+          title: "Error",
+          description: "User profile not found",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const { error } = await supabase
         .from('feedback_complaints')
         .insert({
@@ -126,7 +151,7 @@ export default function Complaints() {
           type: formData.type,
           staff_group: formData.staff_group || null,
           status: 'new',
-          reported_by: user?.id,
+          reported_by: profile.id,
           escalation_level: 1
         });
 
