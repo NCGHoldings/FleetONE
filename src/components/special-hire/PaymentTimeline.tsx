@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { DollarSign, Receipt, Download, Eye, CreditCard, CheckCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 
 interface PaymentInfo {
   id: string;
@@ -38,18 +38,25 @@ interface PaymentTimelineProps {
 }
 
 export function PaymentTimeline({ 
-  totalAmount, 
-  advancePaid, 
-  balanceDue, 
-  payments, 
-  invoices,
+  totalAmount = 0, 
+  advancePaid = 0, 
+  balanceDue = 0, 
+  payments = [], 
+  invoices = [],
   onViewInvoice,
   onDownloadInvoice,
   onViewPaymentProof,
   showActions = true
 }: PaymentTimelineProps) {
-  const paymentProgress = totalAmount > 0 ? (advancePaid / totalAmount) * 100 : 0;
-  const isFullyPaid = balanceDue <= 0;
+  // Ensure safe calculations
+  const safeTotal = totalAmount || 0;
+  const safeAdvance = advancePaid || 0;
+  const safeBalance = balanceDue || 0;
+  const safePayments = payments || [];
+  const safeInvoices = invoices || [];
+  
+  const paymentProgress = safeTotal > 0 ? Math.min((safeAdvance / safeTotal) * 100, 100) : 0;
+  const isFullyPaid = safeBalance <= 0;
 
   const getPaymentStatusBadge = (status: string) => {
     // Handle undefined or null status
@@ -70,8 +77,8 @@ export function PaymentTimeline({
     );
   };
 
-  const hasAdvanceInvoice = invoices.some(inv => inv.invoice_type === 'advance');
-  const hasFinalInvoice = invoices.some(inv => inv.invoice_type === 'final');
+  const hasAdvanceInvoice = safeInvoices.some(inv => inv.invoice_type === 'advance');
+  const hasFinalInvoice = safeInvoices.some(inv => inv.invoice_type === 'final');
 
   return (
     <Card className="professional-card">
@@ -99,16 +106,16 @@ export function PaymentTimeline({
         <div className="grid grid-cols-3 gap-3 text-center">
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Total</div>
-            <div className="font-semibold text-sm">LKR {totalAmount.toLocaleString()}</div>
+            <div className="font-semibold text-sm">LKR {safeTotal.toLocaleString()}</div>
           </div>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Paid</div>
-            <div className="font-semibold text-sm text-green-600">LKR {advancePaid.toLocaleString()}</div>
+            <div className="font-semibold text-sm text-green-600">LKR {safeAdvance.toLocaleString()}</div>
           </div>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Balance</div>
-            <div className={`font-semibold text-sm ${balanceDue > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-              LKR {balanceDue.toLocaleString()}
+            <div className={`font-semibold text-sm ${safeBalance > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+              LKR {safeBalance.toLocaleString()}
             </div>
           </div>
         </div>
@@ -120,7 +127,7 @@ export function PaymentTimeline({
               <CheckCircle className="w-4 h-4 text-green-500" />
               <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
             </>
-          ) : advancePaid > 0 ? (
+          ) : safeAdvance > 0 ? (
             <>
               <DollarSign className="w-4 h-4 text-orange-500" />
               <Badge variant="secondary" className="bg-orange-100 text-orange-800">Partially Paid</Badge>
@@ -134,27 +141,32 @@ export function PaymentTimeline({
         </div>
 
         {/* Payment History */}
-        {payments.length > 0 && (
+        {safePayments.length > 0 && (
           <div className="space-y-2">
             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Payment History
             </div>
-            {payments.map((payment, index) => (
-              <div key={payment.id} className="flex items-center justify-between p-2 bg-muted/50 rounded text-xs">
-                <div className="space-y-1">
-                  <div className="font-medium">LKR {payment.amount.toLocaleString()}</div>
-                  <div className="text-muted-foreground">
-                    {format(new Date(payment.paid_at), 'MMM dd, yyyy')}
+            {safePayments.map((payment, index) => {
+              const paymentDate = payment.paid_at ? parseISO(payment.paid_at) : new Date();
+              const formattedDate = isValid(paymentDate) ? format(paymentDate, 'MMM dd, yyyy') : 'Invalid Date';
+              
+              return (
+                <div key={payment.id || index} className="flex items-center justify-between p-2 bg-muted/50 rounded text-xs">
+                  <div className="space-y-1">
+                    <div className="font-medium">LKR {(payment.amount || 0).toLocaleString()}</div>
+                    <div className="text-muted-foreground">
+                      {formattedDate}
+                    </div>
+                  </div>
+                  <div className="text-right space-y-1">
+                    {getPaymentStatusBadge(payment.payment_status)}
+                    {payment.method && (
+                      <div className="text-muted-foreground capitalize">{payment.method}</div>
+                    )}
                   </div>
                 </div>
-                <div className="text-right space-y-1">
-                  {getPaymentStatusBadge(payment.payment_status)}
-                  {payment.method && (
-                    <div className="text-muted-foreground capitalize">{payment.method}</div>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
