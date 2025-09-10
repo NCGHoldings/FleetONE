@@ -317,7 +317,7 @@ export default function SchoolBusService() {
         </Card>
       )}
 
-      {/* Enhanced Branch Cards */}
+      {/* Branch Cards - Clean Interface */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {regularBranches.map((branch) => {
           const stats = branchStats[branch.id] || {
@@ -329,101 +329,70 @@ export default function SchoolBusService() {
           };
 
           const paymentRate = stats.totalStudents > 0 ? (stats.paidStudents / stats.totalStudents) * 100 : 0;
-          const statusColor = paymentRate >= 80 ? "text-green-600" : paymentRate >= 60 ? "text-yellow-600" : "text-red-600";
 
           return (
-            <Card key={branch.id} className="hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border-2 hover:border-primary/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <School className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <div className="font-bold">{branch.branch_name}</div>
-                      <div className="text-xs text-muted-foreground">{branch.manager_name}</div>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="font-mono text-xs">{branch.branch_code}</Badge>
-                </CardTitle>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <MapPin className="h-3 w-3" />
-                  <span>{branch.address}</span>
+            <Card key={branch.id} className="p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-100">
+              {/* Branch Header */}
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <School className="h-5 w-5 text-white" />
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-3 rounded-lg border-l-2 border-blue-500">
-                    <div className="text-xs font-medium text-blue-700">Total Students</div>
-                    <div className="text-xl font-bold text-blue-900">{stats.totalStudents}</div>
-                  </div>
-                  <div className="bg-gradient-to-r from-green-50 to-green-100 p-3 rounded-lg border-l-2 border-green-500">
-                    <div className="text-xs font-medium text-green-700">Revenue (LKR)</div>
-                    <div className="text-xl font-bold text-green-900">{stats.totalRevenue.toLocaleString()}</div>
-                  </div>
-                </div>
-
-                {/* Payment Rate Progress */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="font-medium">Payment Rate</span>
-                    <span className={`font-bold ${statusColor}`}>{paymentRate.toFixed(1)}%</span>
-                  </div>
-                  <Progress value={paymentRate} className="h-2" />
-                </div>
-                
-                <div className="flex gap-2 flex-wrap">
-                  <Badge variant="default" className="bg-emerald-100 text-emerald-800 border-emerald-200">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full mr-1"></div>
-                    {stats.paidStudents} Paid
-                  </Badge>
-                  <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
-                    <div className="w-2 h-2 bg-amber-500 rounded-full mr-1"></div>
-                    {stats.pendingStudents} Pending
-                  </Badge>
-                  {stats.overduePayments > 0 && (
-                    <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
-                      {stats.overduePayments} Overdue
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900">{branch.branch_name}</h3>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Badge variant="outline" className="text-xs font-medium text-gray-600 bg-gray-50">
+                      {branch.branch_code}
                     </Badge>
-                  )}
+                  </div>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    onClick={() => handleBranchClick(branch)}
-                    size="sm"
-                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                  >
-                    <Bus className="h-3 w-3 mr-1" />
-                    Manage
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => navigate(`/school-bus/branch/${branch.id}/reports`)}
-                  >
-                    <BarChart3 className="h-3 w-3 mr-1" />
-                    Reports
-                  </Button>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-blue-50 rounded-xl p-4 border-l-4 border-blue-500">
+                  <p className="text-sm font-medium text-blue-700 mb-2">Total Students</p>
+                  <p className="text-3xl font-bold text-blue-900">{stats.totalStudents}</p>
                 </div>
+                <div className="bg-green-50 rounded-xl p-4 border-l-4 border-green-500">
+                  <p className="text-sm font-medium text-green-700 mb-2">Revenue (LKR)</p>
+                  <p className="text-3xl font-bold text-green-900">{stats.totalRevenue.toLocaleString()}</p>
+                </div>
+              </div>
 
-                {/* Quick Actions */}
-                <div className="flex justify-between text-xs">
-                  <Button variant="ghost" size="sm" className="p-1 h-auto">
-                    <Phone className="h-3 w-3 text-green-600" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="p-1 h-auto">
-                    <Mail className="h-3 w-3 text-blue-600" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="p-1 h-auto">
-                    <Bell className="h-3 w-3 text-orange-600" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="p-1 h-auto">
-                    <Download className="h-3 w-3 text-purple-600" />
-                  </Button>
+              {/* Payment Rate */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-sm font-medium text-gray-600">Payment Rate</span>
+                  <span className="text-lg font-bold text-red-500">{paymentRate.toFixed(1)}%</span>
                 </div>
-              </CardContent>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${paymentRate}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Status Badges */}
+              <div className="flex gap-3 mb-6">
+                <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-green-700">{stats.paidStudents} Paid</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 bg-orange-100 rounded-full">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-orange-700">{stats.pendingStudents} Pending</span>
+                </div>
+              </div>
+
+              {/* Manage Button */}
+              <Button 
+                onClick={() => handleBranchClick(branch)}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold transition-colors"
+              >
+                <Bus className="h-4 w-4 mr-2" />
+                Manage
+              </Button>
             </Card>
           );
         })}
