@@ -1627,6 +1627,393 @@ export type Database = {
         }
         Relationships: []
       }
+      school_branches: {
+        Row: {
+          address: string | null
+          branch_code: string
+          branch_name: string
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          is_active: boolean | null
+          is_total_branch: boolean | null
+          manager_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          branch_code: string
+          branch_name: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_total_branch?: boolean | null
+          manager_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          branch_code?: string
+          branch_name?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          is_total_branch?: boolean | null
+          manager_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      school_payment_months: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          month_date: string
+          month_year: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          month_date: string
+          month_year: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          month_date?: string
+          month_year?: string
+        }
+        Relationships: []
+      }
+      school_payments: {
+        Row: {
+          amount: number
+          branch_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          payment_date: string | null
+          payment_method: string | null
+          payment_month_id: string | null
+          reference_no: string | null
+          status: string | null
+          student_id: string | null
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          amount: number
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_month_id?: string | null
+          reference_no?: string | null
+          status?: string | null
+          student_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          amount?: number
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_month_id?: string | null
+          reference_no?: string | null
+          status?: string | null
+          student_id?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_payments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_payments_payment_month_id_fkey"
+            columns: ["payment_month_id"]
+            isOneToOne: false
+            referencedRelation: "school_payment_months"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "school_students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_receipts: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          payment_id: string | null
+          receipt_url: string
+          rejection_reason: string | null
+          student_id: string | null
+          updated_at: string
+          upload_source: string | null
+          uploaded_by: string | null
+          verification_status: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          payment_id?: string | null
+          receipt_url: string
+          rejection_reason?: string | null
+          student_id?: string | null
+          updated_at?: string
+          upload_source?: string | null
+          uploaded_by?: string | null
+          verification_status?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          payment_id?: string | null
+          receipt_url?: string
+          rejection_reason?: string | null
+          student_id?: string | null
+          updated_at?: string
+          upload_source?: string | null
+          uploaded_by?: string | null
+          verification_status?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_receipts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "school_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_receipts_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "school_students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_routes: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          end_location: string | null
+          estimated_duration_minutes: number | null
+          id: string
+          is_active: boolean | null
+          pickup_points: Json | null
+          route_code: string
+          route_name: string
+          start_location: string | null
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          end_location?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          pickup_points?: Json | null
+          route_code: string
+          route_name: string
+          start_location?: string | null
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          end_location?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          pickup_points?: Json | null
+          route_code?: string
+          route_name?: string
+          start_location?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_routes_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_students: {
+        Row: {
+          address: string | null
+          admission_no: string | null
+          branch_id: string | null
+          bus_reg_no: string | null
+          care_taker_contact_no: string | null
+          care_taker_name: string | null
+          created_at: string
+          created_by: string | null
+          driver_contact_no: string | null
+          driver_name: string | null
+          dropoff_point: string | null
+          email_id: string | null
+          father_contact_no: string | null
+          grade: string | null
+          id: string
+          is_active: boolean | null
+          last_payment_date: string | null
+          mother_contact_no: string | null
+          parent_name: string | null
+          payment_amount: number | null
+          payment_date: string | null
+          payment_status: string | null
+          pickup_point: string | null
+          pickup_point_cord: string | null
+          pickup_point_definition: string | null
+          route: string | null
+          sbs_cord: string | null
+          school_location: string | null
+          service_type: string | null
+          student_name: string
+          update_new: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          address?: string | null
+          admission_no?: string | null
+          branch_id?: string | null
+          bus_reg_no?: string | null
+          care_taker_contact_no?: string | null
+          care_taker_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_contact_no?: string | null
+          driver_name?: string | null
+          dropoff_point?: string | null
+          email_id?: string | null
+          father_contact_no?: string | null
+          grade?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_payment_date?: string | null
+          mother_contact_no?: string | null
+          parent_name?: string | null
+          payment_amount?: number | null
+          payment_date?: string | null
+          payment_status?: string | null
+          pickup_point?: string | null
+          pickup_point_cord?: string | null
+          pickup_point_definition?: string | null
+          route?: string | null
+          sbs_cord?: string | null
+          school_location?: string | null
+          service_type?: string | null
+          student_name: string
+          update_new?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          address?: string | null
+          admission_no?: string | null
+          branch_id?: string | null
+          bus_reg_no?: string | null
+          care_taker_contact_no?: string | null
+          care_taker_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_contact_no?: string | null
+          driver_name?: string | null
+          dropoff_point?: string | null
+          email_id?: string | null
+          father_contact_no?: string | null
+          grade?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_payment_date?: string | null
+          mother_contact_no?: string | null
+          parent_name?: string | null
+          payment_amount?: number | null
+          payment_date?: string | null
+          payment_status?: string | null
+          pickup_point?: string | null
+          pickup_point_cord?: string | null
+          pickup_point_definition?: string | null
+          route?: string | null
+          sbs_cord?: string | null
+          school_location?: string | null
+          service_type?: string | null
+          student_name?: string
+          update_new?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_students_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_master: {
         Row: {
           base_role: string | null

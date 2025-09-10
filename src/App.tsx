@@ -24,6 +24,9 @@ import DriverAllocation from "./pages/DriverAllocation";
 import StaffAttendancePayroll from "./pages/StaffAttendancePayroll";
 import DocumentManager from "./pages/DocumentManager";
 import SpecialHire from "./pages/SpecialHire";
+import SchoolBusService from "./pages/SchoolBusService";
+import BranchDashboard from "./pages/BranchDashboard";
+import SchoolStudentDatabase from "./pages/SchoolStudentDatabase";
 import YutongQuotations from "./pages/YutongQuotations";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
@@ -158,16 +161,46 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/special-hire" 
-              element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <SpecialHire />
-                  </AppLayout>
-                </ProtectedRoute>
-              } 
-            />
+        <Route 
+          path="/special-hire" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SpecialHire />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus-service" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SchoolBusService />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <BranchDashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId/students" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SchoolStudentDatabase />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
             <Route 
               path="/business" 
               element={
