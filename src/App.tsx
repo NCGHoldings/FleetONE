@@ -27,6 +27,9 @@ import SpecialHire from "./pages/SpecialHire";
 import SchoolBusService from "./pages/SchoolBusService";
 import BranchDashboard from "./pages/BranchDashboard";
 import SchoolStudentDatabase from "./pages/SchoolStudentDatabase";
+import SchoolPayments from "./pages/SchoolPayments";
+import ReceiptUpload from "./pages/ReceiptUpload";
+import SchoolReports from "./pages/SchoolReports";
 import YutongQuotations from "./pages/YutongQuotations";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
@@ -197,6 +200,36 @@ const App = () => (
             <ProtectedRoute>
               <AppLayout>
                 <SchoolStudentDatabase />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId/payments" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SchoolPayments />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/receipts/upload" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ReceiptUpload />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/reports" 
+          element={
+            <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
+              <AppLayout>
+                <SchoolReports />
               </AppLayout>
             </ProtectedRoute>
           } 

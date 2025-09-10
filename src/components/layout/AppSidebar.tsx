@@ -18,7 +18,8 @@ import {
   TrendingUp,
   AlertTriangle,
   Package,
-  Settings2
+  Settings2,
+  GraduationCap
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -56,6 +57,7 @@ const operationsItems = [
   { id: "real_time_tracking", title: "Real-Time Tracking", url: "/tracking", icon: MapPin },
   { id: "driver_allocation", title: "Driver Allocation", url: "/allocation", icon: UserCheck },
   { id: "staff_attendance", title: "Staff Attendance", url: "/attendance", icon: Calendar },
+  { id: "school_bus_service", title: "School Bus Service", url: "/school-bus-service", icon: GraduationCap },
   { id: "complaints", title: "Complaints", url: "/complaints", icon: AlertTriangle },
 ];
 

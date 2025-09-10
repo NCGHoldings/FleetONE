@@ -30,11 +30,11 @@ export const PAGES: PageCategories = {
     { id: "real_time_tracking", title: "Real-Time Tracking", url: "/tracking" },
     { id: "driver_allocation", title: "Driver Allocation", url: "/allocation" },
     { id: "staff_attendance", title: "Staff Attendance", url: "/attendance" },
+    { id: "school_bus_service", title: "School Bus Service", url: "/school-bus-service" },
     { id: "complaints", title: "Complaints", url: "/complaints" },
   ],
   business: [
     { id: "special_hire", title: "Special Hire", url: "/special-hire" },
-    { id: "school_bus_service", title: "School Bus Service", url: "/school-bus-service" },
     { id: "business_ideas", title: "Business Ideas", url: "/business" },
     { id: "document_manager", title: "Document Manager", url: "/documents" },
     { id: "feedback", title: "Feedback", url: "/feedback" },
