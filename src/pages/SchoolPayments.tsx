@@ -163,7 +163,7 @@ export default function SchoolPayments() {
         const status = row.getValue("payment_status") as string;
         return (
           <Badge variant={
-            status === 'paid' ? 'success' : 
+            status === 'paid' ? 'default' : 
             status === 'overdue' ? 'destructive' : 'secondary'
           }>
             {status === 'paid' ? <CheckCircle className="w-3 h-3 mr-1" /> :
@@ -219,7 +219,7 @@ export default function SchoolPayments() {
             Mark Paid (LKR {suggestedAmount.toLocaleString()})
           </Button>
         ) : (
-          <Badge variant="success">Paid</Badge>
+          <Badge variant="default">Paid</Badge>
         );
       },
     },

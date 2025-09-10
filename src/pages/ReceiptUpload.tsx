@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { Upload, FileImage, AlertCircle, CheckCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export default function ReceiptUpload() {
   const [students, setStudents] = useState<any[]>([]);
 
   // Load branches on component mount
-  useState(() => {
+  useEffect(() => {
     fetchBranches();
   }, []);
 
@@ -324,10 +324,10 @@ export default function ReceiptUpload() {
 
                     <div className="flex items-center gap-2">
                       {fileItem.uploaded ? (
-                        <Badge variant="success" className="flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" />
-                          Uploaded
-                        </Badge>
+                <Badge variant="default" className="flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  Uploaded
+                </Badge>
                       ) : fileItem.uploading ? (
                         <Badge variant="secondary">Uploading...</Badge>
                       ) : fileItem.error ? (
