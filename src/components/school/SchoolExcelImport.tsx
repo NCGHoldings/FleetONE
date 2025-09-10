@@ -164,10 +164,15 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
   };
 
   const handleColumnMapping = (dbColumn: string, excelColumn: string) => {
-    setColumnMapping(prev => ({
-      ...prev,
-      [dbColumn]: excelColumn
-    }));
+    setColumnMapping(prev => {
+      const newMapping = { ...prev };
+      if (excelColumn === "skip") {
+        delete newMapping[dbColumn];
+      } else {
+        newMapping[dbColumn] = excelColumn;
+      }
+      return newMapping;
+    });
   };
 
   const generatePreview = () => {
@@ -233,7 +238,7 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
         };
 
         Object.entries(columnMapping).forEach(([dbCol, excelCol]) => {
-          if (!dbCol.startsWith("payment_") && row[excelCol] !== undefined) {
+          if (!dbCol.startsWith("payment_") && excelCol !== "skip" && row[excelCol] !== undefined) {
             studentData[dbCol] = row[excelCol];
           }
         });
@@ -405,14 +410,14 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
                     {column.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
                   </Label>
                   <Select
-                    value={columnMapping[column.dbColumn] || ""}
+                    value={columnMapping[column.dbColumn] || "skip"}
                     onValueChange={(value) => handleColumnMapping(column.dbColumn, value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select Excel column" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">-- Skip this field --</SelectItem>
+                      <SelectItem value="skip">-- Skip this field --</SelectItem>
                       {excelColumns.map(col => (
                         <SelectItem key={col} value={col}>{col}</SelectItem>
                       ))}
