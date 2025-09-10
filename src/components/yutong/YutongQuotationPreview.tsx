@@ -101,6 +101,8 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           min-height: 100vh;
           display: flex;
           flex-direction: column;
+          margin: 0;
+          padding: 0;
         }
         .page:last-child {
           page-break-after: avoid;
@@ -114,6 +116,16 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
         }
         .page-content {
           flex: 1;
+          padding: 20px;
+        }
+        .quotation-main {
+          max-height: calc(100vh - 200px);
+          overflow: visible;
+        }
+        .terms-page {
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
         }
       }
       .page {
@@ -124,17 +136,31 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
         border: 2px solid #003366;
         margin-bottom: 20px;
         position: relative;
+        box-sizing: border-box;
       }
       .page-header {
         margin-bottom: 20px;
+        flex-shrink: 0;
       }
       .page-footer {
         margin-top: auto;
         padding-top: 20px;
+        flex-shrink: 0;
       }
       .page-content {
         flex: 1;
         padding: 20px;
+        overflow: visible;
+      }
+      .quotation-main {
+        height: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .terms-page {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
       }
       .signatures {
         display: flex;
@@ -168,7 +194,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
         <style dangerouslySetInnerHTML={{ __html: pageHeaderFooterStyles }} />
         
         {/* Page 1 - Main Quotation */}
-        <div className="page" style={{ maxWidth: '900px', margin: '0 auto 20px auto' }}>
+        <div className="page quotation-main" style={{ maxWidth: '900px', margin: '0 auto 20px auto' }}>
           <div className="page-content">
             {/* Header */}
             <div className="page-header">
@@ -179,131 +205,134 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
               />
             </div>
 
-            {/* Customer Info */}
-            <div style={{ marginBottom: '20px' }}>
-              <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CUSTOMER :</b> {quotation.customer_name}</p>
-              <p style={{ margin: '4px 0', fontSize: '14px' }}><b>COMPANY :</b> {quotation.company_name || ''}</p>
-              <p style={{ margin: '4px 0', fontSize: '14px' }}><b>ADDRESS :</b> {quotation.customer_address || ''}</p>
-              <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CONTACT :</b> {quotation.customer_phone} / {quotation.customer_email}</p>
-              <p style={{ margin: '4px 0', fontSize: '14px' }}><b>DATE :</b> {formattedDate}</p>
-            </div>
+            {/* Main Quotation Content */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              {/* Customer Info */}
+              <div style={{ marginBottom: '20px' }}>
+                <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CUSTOMER :</b> {quotation.customer_name}</p>
+                <p style={{ margin: '4px 0', fontSize: '14px' }}><b>COMPANY :</b> {quotation.company_name || ''}</p>
+                <p style={{ margin: '4px 0', fontSize: '14px' }}><b>ADDRESS :</b> {quotation.customer_address || ''}</p>
+                <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CONTACT :</b> {quotation.customer_phone} / {quotation.customer_email}</p>
+                <p style={{ margin: '4px 0', fontSize: '14px' }}><b>DATE :</b> {formattedDate}</p>
+              </div>
 
-            {/* Quotation No */}
-            <div style={{ textAlign: 'right', fontWeight: 'bold', marginBottom: '10px' }}>
-              QUOTATION NO : {quotation.quotation_no}
-            </div>
+              {/* Quotation No */}
+              <div style={{ textAlign: 'right', fontWeight: 'bold', marginBottom: '10px' }}>
+                QUOTATION NO : {quotation.quotation_no}
+              </div>
 
-            {/* Quotation Table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', border: '1px solid #003366' }}>
-              <thead>
-                <tr>
-                  <th style={{ background: '#003366', color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #003366' }}>PRODUCT</th>
-                  <th style={{ background: '#003366', color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #003366' }}>UNIT PRICE</th>
-                  <th style={{ background: '#003366', color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #003366' }}>QTY</th>
-                  <th style={{ background: '#003366', color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #003366' }}>TOTAL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Main Bus Product */}
-                <tr>
-                  <td style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                    <b>BUS MODEL:</b> YUTONG - {busDetails.model}<br/>
-                    <b>SEATING CAPACITY:</b> {busDetails.seating}<br/>
-                    <b>ENGINE:</b> {busDetails.engine}<br/>
-                    <b>YEAR:</b> {busDetails.year}<br/>
-                    <b>CONDITION:</b> {busDetails.condition}
-                    {quotation.special_features && (
-                      <>
-                        <br/><b>SPECIAL FEATURES:</b> {quotation.special_features}
-                      </>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                    {quotation.unit_price.toLocaleString()}
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                    {quotation.quantity}
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                    {quotation.total_price.toLocaleString()}
-                  </td>
-                </tr>
-                
-                {/* Subtotal for Bus */}
-                <tr>
-                  <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
-                    Bus Subtotal
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
-                    {quotation.total_price.toLocaleString()}
-                  </td>
-                </tr>
+              {/* Quotation Table */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', border: '1px solid #003366' }}>
+                <thead>
+                  <tr>
+                    <th style={{ background: '#003366', color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #003366' }}>PRODUCT</th>
+                    <th style={{ background: '#003366', color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #003366' }}>UNIT PRICE</th>
+                    <th style={{ background: '#003366', color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #003366' }}>QTY</th>
+                    <th style={{ background: '#003366', color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #003366' }}>TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Main Bus Product */}
+                  <tr>
+                    <td style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                      <b>BUS MODEL:</b> YUTONG - {busDetails.model}<br/>
+                      <b>SEATING CAPACITY:</b> {busDetails.seating}<br/>
+                      <b>ENGINE:</b> {busDetails.engine}<br/>
+                      <b>YEAR:</b> {busDetails.year}<br/>
+                      <b>CONDITION:</b> {busDetails.condition}
+                      {quotation.special_features && (
+                        <>
+                          <br/><b>SPECIAL FEATURES:</b> {quotation.special_features}
+                        </>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                      {quotation.unit_price.toLocaleString()}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                      {quotation.quantity}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                      {quotation.total_price.toLocaleString()}
+                    </td>
+                  </tr>
+                  
+                  {/* Subtotal for Bus */}
+                  <tr>
+                    <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
+                      Bus Subtotal
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
+                      {quotation.total_price.toLocaleString()}
+                    </td>
+                  </tr>
 
-                {/* Add-ons Section */}
-                {!loading && addOns.length > 0 && (
-                  <>
-                    <tr>
-                      <td colSpan={4} style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#003366', color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
-                        ADD-ONS
-                      </td>
-                    </tr>
-                    {addOns.map((addon, index) => (
-                      <tr key={index}>
-                        <td style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                          <b>ADD-ON:</b> {addon.yutong_addons?.addon_name || 'N/A'}<br/>
-                          <b>CATEGORY:</b> {addon.yutong_addons?.category || 'N/A'}
-                          {addon.notes && (
-                            <>
-                              <br/><b>NOTES:</b> {addon.notes}
-                            </>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                          {addon.unit_price.toLocaleString()}
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                          {addon.quantity}
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                          {(addon.quantity * addon.unit_price).toLocaleString()}
+                  {/* Add-ons Section */}
+                  {!loading && addOns.length > 0 && (
+                    <>
+                      <tr>
+                        <td colSpan={4} style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#003366', color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                          ADD-ONS
                         </td>
                       </tr>
-                    ))}
-                    
-                    {/* Add-ons Subtotal */}
-                    <tr>
-                      <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
-                        Add-ons Subtotal
-                      </td>
-                      <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
-                        {addOnsTotal.toLocaleString()}
-                      </td>
-                    </tr>
-                  </>
-                )}
+                      {addOns.map((addon, index) => (
+                        <tr key={index}>
+                          <td style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                            <b>ADD-ON:</b> {addon.yutong_addons?.addon_name || 'N/A'}<br/>
+                            <b>CATEGORY:</b> {addon.yutong_addons?.category || 'N/A'}
+                            {addon.notes && (
+                              <>
+                                <br/><b>NOTES:</b> {addon.notes}
+                              </>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                            {addon.unit_price.toLocaleString()}
+                          </td>
+                          <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                            {addon.quantity}
+                          </td>
+                          <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
+                            {(addon.quantity * addon.unit_price).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                      
+                      {/* Add-ons Subtotal */}
+                      <tr>
+                        <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
+                          Add-ons Subtotal
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
+                          {addOnsTotal.toLocaleString()}
+                        </td>
+                      </tr>
+                    </>
+                  )}
 
-                {/* Grand Total */}
-                <tr>
-                  <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '12px 8px', fontSize: '16px', border: '2px solid #003366', background: '#003366', color: 'white' }}>
-                    GRAND TOTAL
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '12px 8px', fontSize: '16px', border: '2px solid #003366', background: '#003366', color: 'white', fontWeight: 'bold' }}>
-                    {grandTotal.toLocaleString()}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  {/* Grand Total */}
+                  <tr>
+                    <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '12px 8px', fontSize: '16px', border: '2px solid #003366', background: '#003366', color: 'white' }}>
+                      GRAND TOTAL
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '12px 8px', fontSize: '16px', border: '2px solid #003366', background: '#003366', color: 'white', fontWeight: 'bold' }}>
+                      {grandTotal.toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
 
-            {/* Payment Details */}
-            <div style={{ fontSize: '14px', marginTop: '10px' }}>
-              <p style={{ margin: '3px 0' }}><b>Payment Terms :</b> {quotation.payment_terms || 'Payment method – by Cheque or bank transfer'}</p>
-              <p style={{ margin: '3px 0' }}><b>Account Name :</b> NCG HOLDINGS (PRIVATE) LIMITED</p>
-              <p style={{ margin: '3px 0' }}><b>Account Number :</b> 2000511791</p>
-              <p style={{ margin: '3px 0' }}><b>Bank Name :</b> Commercial Bank of Ceylon PLC</p>
-              <p style={{ margin: '3px 0' }}><b>Bank Code :</b> 7056</p>
-              <p style={{ margin: '3px 0' }}><b>Branch :</b> Nugegoda Branch</p>
-              <p style={{ margin: '3px 0' }}><b>Branch Code :</b> 020</p>
-              <p style={{ margin: '3px 0' }}><b>Swift Code :</b> CCEYLKLX</p>
+              {/* Payment Details */}
+              <div style={{ fontSize: '14px', marginTop: '10px', marginBottom: 'auto' }}>
+                <p style={{ margin: '3px 0' }}><b>Payment Terms :</b> {quotation.payment_terms || 'Payment method – by Cheque or bank transfer'}</p>
+                <p style={{ margin: '3px 0' }}><b>Account Name :</b> NCG HOLDINGS (PRIVATE) LIMITED</p>
+                <p style={{ margin: '3px 0' }}><b>Account Number :</b> 2000511791</p>
+                <p style={{ margin: '3px 0' }}><b>Bank Name :</b> Commercial Bank of Ceylon PLC</p>
+                <p style={{ margin: '3px 0' }}><b>Bank Code :</b> 7056</p>
+                <p style={{ margin: '3px 0' }}><b>Branch :</b> Nugegoda Branch</p>
+                <p style={{ margin: '3px 0' }}><b>Branch Code :</b> 020</p>
+                <p style={{ margin: '3px 0' }}><b>Swift Code :</b> CCEYLKLX</p>
+              </div>
             </div>
           </div>
 
@@ -330,7 +359,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
         </div>
 
         {/* Page 2 - Terms & Conditions */}
-        <div className="page" style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div className="page terms-page" style={{ maxWidth: '900px', margin: '0 auto' }}>
           <div className="page-content">
             {/* Header */}
             <div className="page-header">
@@ -344,8 +373,8 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
               </div>
             </div>
 
-            {/* Terms & Conditions */}
-            <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#003366' }}>
+            {/* Terms & Conditions Content */}
+            <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#003366', flex: 1, overflowY: 'visible' }}>
               <h3 style={{ color: '#003366', borderBottom: '2px solid #003366', paddingBottom: '5px', marginBottom: '15px' }}>
                 Terms & Conditions
               </h3>
