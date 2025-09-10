@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -13,7 +14,19 @@ import {
   TrendingUp,
   School,
   Bus,
-  Receipt
+  Receipt,
+  Download,
+  Upload,
+  MessageSquare,
+  BarChart3,
+  Calendar,
+  Phone,
+  Mail,
+  Bell,
+  Settings,
+  Filter,
+  Search,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -21,6 +34,9 @@ interface Branch {
   id: string;
   branch_name: string;
   branch_code: string;
+  address?: string;
+  contact_phone?: string;
+  manager_name?: string;
   is_total_branch: boolean;
   is_active: boolean;
 }
@@ -165,38 +181,97 @@ export default function SchoolBusService() {
         </div>
       </div>
 
-      {/* Overall KPIs */}
+      {/* Advanced KPI Dashboard */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <KPICard
           title="Total Students"
           value={overallStats.totalStudents.toString()}
           description="Across all branches"
-          icon={<Users className="h-4 w-4" />}
+          icon={<Users className="h-4 w-4 text-blue-500" />}
         />
         <KPICard
           title="Revenue (LKR)"
           value={overallStats.totalRevenue.toLocaleString()}
-          description="Total collected"
-          icon={<CreditCard className="h-4 w-4" />}
+          description="Total collected this month"
+          icon={<CreditCard className="h-4 w-4 text-green-500" />}
         />
         <KPICard
-          title="Paid Students"
-          value={overallStats.paidStudents.toString()}
-          description={`${((overallStats.paidStudents / overallStats.totalStudents) * 100).toFixed(1)}% payment rate`}
-          icon={<TrendingUp className="h-4 w-4" />}
+          title="Payment Rate"
+          value={`${overallStats.totalStudents > 0 ? ((overallStats.paidStudents / overallStats.totalStudents) * 100).toFixed(1) : 0}%`}
+          description={`${overallStats.paidStudents} students paid`}
+          icon={<TrendingUp className="h-4 w-4 text-emerald-500" />}
         />
         <KPICard
-          title="Pending Payments"
+          title="Pending Collection"
           value={overallStats.pendingStudents.toString()}
-          description="Need collection"
-          icon={<Receipt className="h-4 w-4" />}
+          description="Need immediate attention"
+          icon={<Receipt className="h-4 w-4 text-amber-500" />}
         />
         <KPICard
-          title="Overdue"
+          title="Urgent Follow-up"
           value={overallStats.overduePayments.toString()}
-          description="Require attention"
-          icon={<AlertCircle className="h-4 w-4" />}
+          description="Overdue payments"
+          icon={<AlertCircle className="h-4 w-4 text-red-500" />}
         />
+      </div>
+
+      {/* Action Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-l-4 border-l-blue-500">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                <Upload className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <div className="font-semibold text-sm">Bulk Import</div>
+                <div className="text-xs text-muted-foreground">Upload student data from Excel</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-l-4 border-l-green-500">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                <MessageSquare className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <div className="font-semibold text-sm">Send Reminders</div>
+                <div className="text-xs text-muted-foreground">SMS & Email notifications</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-l-4 border-l-purple-500">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                <BarChart3 className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <div className="font-semibold text-sm">Analytics</div>
+                <div className="text-xs text-muted-foreground">Revenue & performance reports</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-l-4 border-l-orange-500">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
+                <Settings className="h-6 w-6 text-orange-600" />
+              </div>
+              <div>
+                <div className="font-semibold text-sm">System Settings</div>
+                <div className="text-xs text-muted-foreground">Configure routes & pricing</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Total Dashboard Card */}
@@ -242,7 +317,7 @@ export default function SchoolBusService() {
         </Card>
       )}
 
-      {/* Branch Cards */}
+      {/* Enhanced Branch Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {regularBranches.map((branch) => {
           const stats = branchStats[branch.id] || {
@@ -253,56 +328,99 @@ export default function SchoolBusService() {
             overduePayments: 0,
           };
 
+          const paymentRate = stats.totalStudents > 0 ? (stats.paidStudents / stats.totalStudents) * 100 : 0;
+          const statusColor = paymentRate >= 80 ? "text-green-600" : paymentRate >= 60 ? "text-yellow-600" : "text-red-600";
+
           return (
-            <Card key={branch.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
+            <Card key={branch.id} className="hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 border-2 hover:border-primary/20">
+              <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    {branch.branch_name}
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <School className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-bold">{branch.branch_name}</div>
+                      <div className="text-xs text-muted-foreground">{branch.manager_name}</div>
+                    </div>
                   </div>
-                  <Badge variant="secondary">{branch.branch_code}</Badge>
+                  <Badge variant="outline" className="font-mono text-xs">{branch.branch_code}</Badge>
                 </CardTitle>
-                <CardDescription>
-                  Branch operations and student management
-                </CardDescription>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <MapPin className="h-3 w-3" />
+                  <span>{branch.address}</span>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="font-medium">Students</div>
-                      <div className="text-2xl font-bold">{stats.totalStudents}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">Revenue</div>
-                      <div className="text-2xl font-bold text-green-600">
-                        {stats.totalRevenue.toLocaleString()}
-                      </div>
-                    </div>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-3 rounded-lg border-l-2 border-blue-500">
+                    <div className="text-xs font-medium text-blue-700">Total Students</div>
+                    <div className="text-xl font-bold text-blue-900">{stats.totalStudents}</div>
                   </div>
-                  
-                  <div className="flex gap-2 text-sm">
-                    <Badge variant="default" className="bg-green-100 text-green-800">
-                      {stats.paidStudents} Paid
-                    </Badge>
-                    <Badge variant="secondary">
-                      {stats.pendingStudents} Pending
-                    </Badge>
-                    {stats.overduePayments > 0 && (
-                      <Badge variant="destructive">
-                        {stats.overduePayments} Overdue
-                      </Badge>
-                    )}
+                  <div className="bg-gradient-to-r from-green-50 to-green-100 p-3 rounded-lg border-l-2 border-green-500">
+                    <div className="text-xs font-medium text-green-700">Revenue (LKR)</div>
+                    <div className="text-xl font-bold text-green-900">{stats.totalRevenue.toLocaleString()}</div>
                   </div>
+                </div>
 
+                {/* Payment Rate Progress */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-medium">Payment Rate</span>
+                    <span className={`font-bold ${statusColor}`}>{paymentRate.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={paymentRate} className="h-2" />
+                </div>
+                
+                <div className="flex gap-2 flex-wrap">
+                  <Badge variant="default" className="bg-emerald-100 text-emerald-800 border-emerald-200">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full mr-1"></div>
+                    {stats.paidStudents} Paid
+                  </Badge>
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full mr-1"></div>
+                    {stats.pendingStudents} Pending
+                  </Badge>
+                  {stats.overduePayments > 0 && (
+                    <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
+                      <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+                      {stats.overduePayments} Overdue
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <Button 
                     onClick={() => handleBranchClick(branch)}
-                    className="w-full mt-4"
-                    variant="outline"
+                    size="sm"
+                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                   >
-                    <Bus className="h-4 w-4 mr-2" />
-                    Manage Branch
+                    <Bus className="h-3 w-3 mr-1" />
+                    Manage
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => navigate(`/school-bus/branch/${branch.id}/reports`)}
+                  >
+                    <BarChart3 className="h-3 w-3 mr-1" />
+                    Reports
+                  </Button>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="flex justify-between text-xs">
+                  <Button variant="ghost" size="sm" className="p-1 h-auto">
+                    <Phone className="h-3 w-3 text-green-600" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="p-1 h-auto">
+                    <Mail className="h-3 w-3 text-blue-600" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="p-1 h-auto">
+                    <Bell className="h-3 w-3 text-orange-600" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="p-1 h-auto">
+                    <Download className="h-3 w-3 text-purple-600" />
                   </Button>
                 </div>
               </CardContent>

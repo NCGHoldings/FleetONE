@@ -40,6 +40,7 @@ import SchoolReceiptManagement from "./pages/SchoolReceiptManagement";
 import SchoolBranchReports from "./pages/SchoolBranchReports";
 import GlobalSchoolImport from "./pages/GlobalSchoolImport";
 import GlobalSchoolPayments from "./pages/GlobalSchoolPayments";
+import TotalDashboard from "./pages/TotalDashboard";
 
 const queryClient = new QueryClient();
 
@@ -307,6 +308,16 @@ const App = () => (
             <ProtectedRoute>
               <AppLayout>
                 <GlobalSchoolPayments />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/total-dashboard" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <TotalDashboard />
               </AppLayout>
             </ProtectedRoute>
           } 
