@@ -215,64 +215,6 @@ export default function SchoolBusService() {
         />
       </div>
 
-      {/* Action Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-l-4 border-l-blue-500">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
-                <Upload className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">Bulk Import</div>
-                <div className="text-xs text-muted-foreground">Upload student data from Excel</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-l-4 border-l-green-500">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                <MessageSquare className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">Send Reminders</div>
-                <div className="text-xs text-muted-foreground">SMS & Email notifications</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-l-4 border-l-purple-500">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
-                <BarChart3 className="h-6 w-6 text-purple-600" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">Analytics</div>
-                <div className="text-xs text-muted-foreground">Revenue & performance reports</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-l-4 border-l-orange-500">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
-                <Settings className="h-6 w-6 text-orange-600" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">System Settings</div>
-                <div className="text-xs text-muted-foreground">Configure routes & pricing</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Total Dashboard Card */}
       {totalBranch && (
