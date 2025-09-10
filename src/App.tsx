@@ -33,6 +33,11 @@ import SchoolReports from "./pages/SchoolReports";
 import YutongQuotations from "./pages/YutongQuotations";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
+import SchoolImportPage from "./pages/SchoolImportPage";
+import AddStudentForm from "./pages/AddStudentForm";
+import SchoolRouteManagement from "./pages/SchoolRouteManagement";
+import SchoolReceiptManagement from "./pages/SchoolReceiptManagement";
+import SchoolBranchReports from "./pages/SchoolBranchReports";
 
 const queryClient = new QueryClient();
 
@@ -200,6 +205,56 @@ const App = () => (
             <ProtectedRoute>
               <AppLayout>
                 <SchoolStudentDatabase />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId/import" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SchoolImportPage />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId/students/add" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <AddStudentForm />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId/routes" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SchoolRouteManagement />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId/receipts" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SchoolReceiptManagement />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId/reports" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SchoolBranchReports />
               </AppLayout>
             </ProtectedRoute>
           } 

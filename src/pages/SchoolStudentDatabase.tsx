@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +64,7 @@ interface Branch {
 
 export default function SchoolStudentDatabase() {
   const { branchId } = useParams<{ branchId: string }>();
+  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [branch, setBranch] = useState<Branch | null>(null);
@@ -315,7 +316,10 @@ export default function SchoolStudentDatabase() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button 
+            variant="outline"
+            onClick={() => navigate(`/school-bus/branch/${branchId}/import`)}
+          >
             <Upload className="h-4 w-4 mr-2" />
             Import Excel
           </Button>
@@ -323,7 +327,7 @@ export default function SchoolStudentDatabase() {
             <Download className="h-4 w-4 mr-2" />
             Export Data
           </Button>
-          <Button>
+          <Button onClick={() => navigate(`/school-bus/branch/${branchId}/students/add`)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Student
           </Button>
