@@ -78,15 +78,74 @@ export default function DriverTraining() {
 
   const fetchDrivers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_id, first_name, last_name, employee_id')
-        .order('first_name');
+      // Fetch driver allocations to get staff names from performance data
+      const { data: allocations, error: allocationsError } = await supabase
+        .from('driver_allocations')
+        .select('notes, trip_id')
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setDrivers(data || []);
+      if (allocationsError) throw allocationsError;
+
+      // Extract unique staff names from allocations notes
+      const staffMap = new Map<string, {
+        name: string;
+        roles: Set<string>;
+        phone?: string;
+      }>();
+
+      allocations?.forEach(allocation => {
+        try {
+          const notes = allocation.notes ? (typeof allocation.notes === 'string' ? JSON.parse(allocation.notes) : allocation.notes) : {};
+          
+          // Extract driver from notes
+          if (notes.driver && notes.driver.trim()) {
+            const driverName = notes.driver.trim();
+            if (!staffMap.has(driverName)) {
+              staffMap.set(driverName, {
+                name: driverName,
+                phone: notes.whatsapp,
+                roles: new Set(['driver'])
+              });
+            } else {
+              const existing = staffMap.get(driverName)!;
+              existing.roles.add('driver');
+            }
+          }
+
+          // Extract conductor from notes
+          if (notes.conductor && notes.conductor.trim()) {
+            const conductorName = notes.conductor.trim();
+            if (!staffMap.has(conductorName)) {
+              staffMap.set(conductorName, {
+                name: conductorName,
+                phone: notes.whatsapp,
+                roles: new Set(['conductor'])
+              });
+            } else {
+              const existing = staffMap.get(conductorName)!;
+              existing.roles.add('conductor');
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing allocation notes:', e);
+        }
+      });
+
+      // Convert staff map to array and sort by name
+      const staffArray = Array.from(staffMap.values())
+        .map((staff, index) => ({
+          user_id: `staff_${index}`, // Generate unique ID
+          first_name: staff.name,
+          last_name: '',
+          employee_id: Array.from(staff.roles).join(', '),
+          full_name: staff.name,
+          phone: staff.phone
+        }))
+        .sort((a, b) => a.first_name.localeCompare(b.first_name));
+
+      setDrivers(staffArray);
     } catch (error) {
-      console.error('Error fetching drivers:', error);
+      console.error('Error fetching drivers from performance data:', error);
     } finally {
       setLoading(false);
     }
@@ -357,14 +416,14 @@ export default function DriverTraining() {
                       setFormData(prev => ({
                         ...prev, 
                         driver_id: e.target.value,
-                        driver_name: selectedDriver ? `${selectedDriver.first_name} ${selectedDriver.last_name}` : ''
+                        driver_name: selectedDriver ? (selectedDriver.full_name || selectedDriver.first_name) : ''
                       }));
                     }}
                   >
                     <option value="">Select Driver</option>
                     {drivers.map(driver => (
                       <option key={driver.user_id} value={driver.user_id}>
-                        {driver.first_name} {driver.last_name} ({driver.employee_id})
+                        {driver.full_name || driver.first_name} ({driver.employee_id})
                       </option>
                     ))}
                   </select>
