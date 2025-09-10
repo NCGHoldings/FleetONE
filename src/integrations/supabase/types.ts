@@ -1198,6 +1198,36 @@ export type Database = {
           },
         ]
       }
+      payment_reminders: {
+        Row: {
+          contact_method: string | null
+          created_at: string
+          id: string
+          message_content: string | null
+          reminder_type: string
+          sent_at: string
+          student_id: string
+        }
+        Insert: {
+          contact_method?: string | null
+          created_at?: string
+          id?: string
+          message_content?: string | null
+          reminder_type?: string
+          sent_at?: string
+          student_id: string
+        }
+        Update: {
+          contact_method?: string | null
+          created_at?: string
+          id?: string
+          message_content?: string | null
+          reminder_type?: string
+          sent_at?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
       payroll_adjustments: {
         Row: {
           adjusted_by: string | null
