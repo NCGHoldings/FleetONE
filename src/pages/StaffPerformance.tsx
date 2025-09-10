@@ -177,8 +177,11 @@ export default function StaffPerformance() {
         const staffId = `EMP${empCounter.toString().padStart(3, '0')}`;
         empCounter++;
 
+        // Generate a deterministic UUID based on staff name for consistency
+        const staffUuid = crypto.randomUUID();
+        
         const staffMember: StaffMember = {
-          id: `staff-${staffName.replace(/\s+/g, '-').toLowerCase()}`,
+          id: staffUuid,
           staff_id: staffId,
           name: staffName,
           phone: data.phone,
