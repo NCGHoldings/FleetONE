@@ -55,8 +55,14 @@ export function PaymentTimeline({
   const safePayments = payments || [];
   const safeInvoices = invoices || [];
   
-  const paymentProgress = safeTotal > 0 ? Math.min((safeAdvance / safeTotal) * 100, 100) : 0;
-  const isFullyPaid = safeBalance <= 0;
+  // Calculate total paid amount from all approved payments
+  const totalPaidAmount = safePayments
+    .filter(payment => payment.payment_status === 'approved' || payment.payment_status === 'confirmed')
+    .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+  
+  // Use total paid amount for progress calculation, not just advance
+  const paymentProgress = safeTotal > 0 ? Math.min((totalPaidAmount / safeTotal) * 100, 100) : 0;
+  const isFullyPaid = safeBalance <= 0 && totalPaidAmount >= safeTotal;
 
   const getPaymentStatusBadge = (status: string) => {
     // Handle undefined or null status
@@ -110,12 +116,12 @@ export function PaymentTimeline({
           </div>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Paid</div>
-            <div className="font-semibold text-sm text-green-600">LKR {safeAdvance.toLocaleString()}</div>
+            <div className="font-semibold text-sm text-green-600">LKR {totalPaidAmount.toLocaleString()}</div>
           </div>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Balance</div>
             <div className={`font-semibold text-sm ${safeBalance > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-              LKR {safeBalance.toLocaleString()}
+              LKR {Math.max(0, safeBalance).toLocaleString()}
             </div>
           </div>
         </div>
@@ -125,9 +131,9 @@ export function PaymentTimeline({
           {isFullyPaid ? (
             <>
               <CheckCircle className="w-4 h-4 text-green-500" />
-              <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
+              <Badge variant="default" className="bg-green-500 text-white">Fully Paid</Badge>
             </>
-          ) : safeAdvance > 0 ? (
+          ) : totalPaidAmount > 0 ? (
             <>
               <DollarSign className="w-4 h-4 text-orange-500" />
               <Badge variant="secondary" className="bg-orange-100 text-orange-800">Partially Paid</Badge>
