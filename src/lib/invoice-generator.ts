@@ -41,18 +41,31 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
   const isDraft = data.invoice_status === 'draft';
   const documentTitle = isSalesReceipt ? 'SALES RECEIPT' : 'INVOICE';
 
-  // Draft watermark styles
+  // Enhanced draft watermark styles matching quotation design
   const draftWatermarkStyles = isDraft ? `
     .draft-watermark {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(-45deg);
-      font-size: 150px;
-      color: rgba(255, 0, 0, 0.1);
-      font-weight: bold;
-      z-index: -1;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       pointer-events: none;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.05);
+    }
+    
+    .draft-text {
+      font-size: 120px;
+      transform: rotate(-45deg);
+      opacity: 0.3;
+      letter-spacing: 20px;
+      text-shadow: 0 0 10px rgba(0,0,0,0.1);
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+      color: #9ca3af;
       user-select: none;
     }
   ` : '';
@@ -61,7 +74,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     // Use Sales Receipt format for advance payments with fixed padding
     return `
       <div style="font-family: Arial, sans-serif; font-size: 14px; margin: 0; padding: 20px; width: 210mm; min-height: 297mm; background: white; color: black; box-sizing: border-box; position: relative;">
-        ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
+        ${isDraft ? '<div class="draft-watermark"><div class="draft-text">DRAFT</div></div>' : ''}
         <style>
           ${draftWatermarkStyles}
         </style>
@@ -152,7 +165,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 
     return `
       <div style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #fff; color: #000; width: 100%; max-width: 210mm; min-height: 297mm; box-sizing: border-box; position: relative;">
-        ${isDraft ? '<div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 150px; color: rgba(255, 0, 0, 0.1); font-weight: bold; z-index: -1; pointer-events: none; user-select: none;">DRAFT</div>' : ''}
+        ${isDraft ? '<div class="draft-watermark"><div class="draft-text">DRAFT</div></div>' : ''}
         <style>
           ${draftWatermarkStyles}
           @media print {
