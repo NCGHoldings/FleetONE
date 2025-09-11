@@ -119,7 +119,55 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
 
   useEffect(() => {
     loadQuotations();
-  }, []);
+
+    // Set up real-time subscription for new quotations
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'yutong_quotations'
+        },
+        (payload) => {
+          console.log('New Yutong quotation created:', payload);
+          loadQuotations(); // Refresh the list when a new quotation is created
+          onRefresh(); // Also trigger parent refresh
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'yutong_quotations'
+        },
+        (payload) => {
+          console.log('Yutong quotation updated:', payload);
+          loadQuotations(); // Refresh the list when a quotation is updated
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'yutong_quotations'
+        },
+        (payload) => {
+          console.log('Yutong quotation deleted:', payload);
+          loadQuotations(); // Refresh the list when a quotation is deleted
+          onRefresh(); // Also trigger parent refresh
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [onRefresh]);
 
   const getStatusBadge = (status: string) => {
     const variants = {
