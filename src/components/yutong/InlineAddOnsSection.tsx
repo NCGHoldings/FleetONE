@@ -176,7 +176,11 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
                 <DialogTitle>Add Add-on to Quotation</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  form.handleSubmit(handleSubmit)(e);
+                }} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="addon_id"
