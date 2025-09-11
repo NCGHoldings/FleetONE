@@ -211,13 +211,13 @@ export function CostCalculator() {
 
         // Revenue and commission split calculations
         const grossRevenue = hireCharge * formData.numberOfBuses;
-        const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses);
+        const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses) + (maintenanceCost * formData.numberOfBuses);
         
         const commissionExpenseAmount = customerSubtotal * (formData.commissionPct / 100);
         const commissionPassThroughAmount = customerSubtotal * (formData.commissionPassThroughPct / 100);
         const discountAmount = customerSubtotal * (formData.discountPct / 100);
 
-        // Customer total calculation: base + commission passthrough + fuel - discount + percentage adjustment
+        // Customer total calculation: base + commission passthrough + fuel + maintenance - discount + percentage adjustment
         const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount - discountAmount;
         const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
         const finalCustomerTotal = customerTotalBeforeAdjustment + adjustmentAmount;
@@ -321,13 +321,13 @@ export function CostCalculator() {
 
       // Revenue and commission split calculations
       const grossRevenue = hireCharge * formData.numberOfBuses;
-      const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses);
+      const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses) + (maintenanceCost * formData.numberOfBuses);
       
       const commissionExpenseAmount = customerSubtotal * (formData.commissionPct / 100);
       const commissionPassThroughAmount = customerSubtotal * (formData.commissionPassThroughPct / 100);
       const discountAmount = customerSubtotal * (formData.discountPct / 100);
 
-      // Customer total calculation: base + commission passthrough - discount + percentage adjustment
+      // Customer total calculation: base + commission passthrough + fuel + maintenance - discount + percentage adjustment
       const customerTotalBeforeAdjustment = customerSubtotal + commissionPassThroughAmount - discountAmount;
       const adjustmentAmount = customerTotalBeforeAdjustment * (formData.percentageAdjustment / 100);
       const finalCustomerTotal = customerTotalBeforeAdjustment + adjustmentAmount;
