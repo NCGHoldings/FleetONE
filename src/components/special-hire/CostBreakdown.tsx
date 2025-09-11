@@ -88,11 +88,11 @@ export function CostBreakdown({ data }: Props) {
     numberOfBuses: data.numberOfBuses || 1
   };
 
-  // Calculate fuel cost based on total distance, efficiency, and fuel price
-  const calculatedFuelCost = (safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter;
+  // Calculate fuel cost based on total distance, efficiency, and fuel price (for all buses)
+  const calculatedFuelCost = ((safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
   
-  // Calculate maintenance cost
-  const calculatedMaintenanceCost = safeData.totalTripDistance * safeData.maintenanceRatePerKm;
+  // Calculate maintenance cost (for all buses)  
+  const calculatedMaintenanceCost = (safeData.totalTripDistance * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   
   // Calculate additional charges total
   const additionalChargesTotal = (data.additionalCharges || []).reduce((sum, charge) => sum + charge.amount, 0);
@@ -182,8 +182,8 @@ export function CostBreakdown({ data }: Props) {
               <span>LKR {safeData.grossRevenue.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>Fuel Cost</span>
-              <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
+              <span>Fuel Cost (Total for {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
+              <span>LKR {calculatedFuelCost.toLocaleString()}</span>
             </div>
             {safeData.commissionPassThroughAmount > 0 && (
               <div className="flex justify-between">
@@ -269,12 +269,12 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Deductions</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Fuel Cost (Pickup to Drop) - {safeData.totalTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter}</span>
+              <span>Fuel Cost (Pickup to Drop) - {safeData.totalTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''}</span>
               <span>LKR {calculatedFuelCost.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR {safeData.maintenanceRatePerKm})</span>
-              <span>LKR {(safeData.totalTripDistance * safeData.maintenanceRatePerKm).toLocaleString()}</span>
+              <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR {safeData.maintenanceRatePerKm} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
+              <span>LKR {calculatedMaintenanceCost.toLocaleString()}</span>
             </div>
             {(data.additionalCharges && data.additionalCharges.length > 0) && (
               <>
