@@ -115,8 +115,8 @@ export function CostBreakdown({ data }: Props) {
   // Calculate other expenses total
   const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   
-  // Calculate correct total expenses (using customer fuel cost for customer billing)
-  const correctTotalExpenses = customerFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
+  // Calculate correct total expenses (align with deductions section - use total trip fuel cost)
+  const correctTotalExpenses = calculatedFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
   
   // Calculate correct net profit (Final Total - Customer Pays minus Total Expenses)
   const correctNetProfit = safeData.customerTotalWithFuel - correctTotalExpenses;
