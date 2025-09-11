@@ -290,8 +290,8 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Deductions</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Fuel Cost (Customer Billing - {customerFuelDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
-              <span>LKR {customerFuelCost.toLocaleString()}</span>
+              <span>Fuel Cost (Total Trip - {safeData.totalTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
+              <span>LKR {calculatedFuelCost.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR {safeData.maintenanceRatePerKm} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
