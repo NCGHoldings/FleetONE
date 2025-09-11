@@ -39,6 +39,7 @@ interface ExpenseItem {
 interface TripCalculation {
   totalDistance: number;
   actualFuelCost: number;
+  maintenanceCost: number;
   quotedAmount: number;
   totalExpenses: number;
   netProfit: number;
@@ -120,13 +121,30 @@ export function EnhancedCostCalculator() {
     const fuelLiters = totalDistance / (busType.avg_km_per_l || 8);
     const actualFuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
-    // Update fuel cost in expenses
+    // Calculate maintenance cost based on total distance
+    const maintenanceCost = totalDistance * (fuelSettings.maintenance_rate_lkr_per_km || 20);
+
+    // Update fuel cost and maintenance cost in expenses
     const updatedExpenses = expenses.map(exp => {
       if (exp.type === 'fuel') {
         return { ...exp, amount: Math.round(actualFuelCost), isEstimated: false };
       }
+      if (exp.type === 'maintenance') {
+        return { ...exp, amount: Math.round(maintenanceCost), isEstimated: false };
+      }
       return exp;
     });
+
+    // Add maintenance expense if it doesn't exist
+    if (!updatedExpenses.find(exp => exp.type === 'maintenance')) {
+      updatedExpenses.push({
+        id: 'maintenance-auto',
+        type: 'maintenance',
+        description: `Maintenance (${totalDistance.toFixed(1)} km)`,
+        amount: Math.round(maintenanceCost),
+        isEstimated: false
+      });
+    }
 
     setExpenses(updatedExpenses);
 
@@ -138,6 +156,7 @@ export function EnhancedCostCalculator() {
     setCalculation({
       totalDistance,
       actualFuelCost: Math.round(actualFuelCost),
+      maintenanceCost: Math.round(maintenanceCost),
       quotedAmount: quotation.gross_revenue,
       totalExpenses,
       netProfit,

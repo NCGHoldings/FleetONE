@@ -205,6 +205,10 @@ export function CostCalculator() {
         const fuelLiters = (emptyRunKm / (selectedBusType.avg_km_per_l || 8));
         const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
+        // Maintenance cost on total distance (parking→pickup + trip + drop→parking)
+        const totalTripDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
+        const maintenanceCost = totalTripDistance * (fuelSettings.maintenance_rate_lkr_per_km || 20);
+
         // Revenue and commission split calculations
         const grossRevenue = hireCharge * formData.numberOfBuses;
         const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses);
@@ -228,14 +232,16 @@ export function CostCalculator() {
           finalCustomerTotal
         });
 
-        const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + commissionExpenseAmount;
+        const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + (maintenanceCost * formData.numberOfBuses) + commissionExpenseAmount;
         const netProfit = finalCustomerTotal - totalExpenses;
 
         const result = {
           ...distanceData,
           totalDistance: (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0),
+          totalTripDistance,
           fuelLiters: Math.round(fuelLiters * 10) / 10,
           fuelCostFuelOnly: Math.round(fuelCost),
+          maintenanceCost: Math.round(maintenanceCost),
           hireCharge: Math.round(hireCharge),
           fixedRate: Math.round(fixedRate),
           overtimeCharge: Math.round(overtimeCharge),
@@ -277,7 +283,7 @@ export function CostCalculator() {
         setCostData(result);
         toast({ 
           title: "Cost Calculated (Outside)", 
-          description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()} | Commission: ${formData.commissionPct}% | Discount: ${formData.discountPct}%`
+          description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()} | Commission: ${formData.commissionPct}% | Discount: ${formData.discountPct}% | Maintenance: LKR ${Math.round(maintenanceCost).toLocaleString()}`
         });
 
         return;
@@ -310,6 +316,9 @@ export function CostCalculator() {
       const fuelLiters = (emptyRunKm / (selectedBusType.avg_km_per_l || 8));
       const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
 
+      // Maintenance cost on total distance (parking→pickup + trip + drop→parking)
+      const maintenanceCost = totalDistance * (fuelSettings.maintenance_rate_lkr_per_km || 20);
+
       // Revenue and commission split calculations
       const grossRevenue = hireCharge * formData.numberOfBuses;
       const customerSubtotal = grossRevenue + (fuelCost * formData.numberOfBuses);
@@ -334,14 +343,16 @@ export function CostCalculator() {
           finalCustomerTotal
         });
 
-      const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + commissionExpenseAmount;
+      const totalExpenses = (formData.driverCharge * formData.numberOfBuses) + (fuelCost * formData.numberOfBuses) + (maintenanceCost * formData.numberOfBuses) + commissionExpenseAmount;
       const netProfit = finalCustomerTotal - totalExpenses;
 
       const result = {
         ...distanceData,
         totalDistance,
+        totalTripDistance: totalDistance,
         fuelLiters: Math.round(fuelLiters * 10) / 10,
         fuelCostFuelOnly: Math.round(fuelCost),
+        maintenanceCost: Math.round(maintenanceCost),
         hireCharge: Math.round(hireCharge),
         fixedRate: Math.round(fixedRate),
         overtimeCharge: Math.round(overtimeCharge),
@@ -382,7 +393,7 @@ export function CostCalculator() {
       setCostData(result);
       toast({ 
         title: "Cost Calculated Successfully", 
-        description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()} | Commission: ${formData.commissionPct}% | Discount: ${formData.discountPct}%`
+        description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()} | Commission: ${formData.commissionPct}% | Discount: ${formData.discountPct}% | Maintenance: LKR ${Math.round(maintenanceCost).toLocaleString()}`
       });
     } catch (error: any) {
       console.error('Error calculating costs:', error);

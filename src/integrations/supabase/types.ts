@@ -666,6 +666,7 @@ export type Database = {
           diesel_price_lkr_per_l: number
           id: string
           is_default: boolean | null
+          maintenance_rate_lkr_per_km: number | null
           parking_lat: number | null
           parking_lng: number | null
           parking_location_name: string | null
@@ -676,6 +677,7 @@ export type Database = {
           diesel_price_lkr_per_l?: number
           id?: string
           is_default?: boolean | null
+          maintenance_rate_lkr_per_km?: number | null
           parking_lat?: number | null
           parking_lng?: number | null
           parking_location_name?: string | null
@@ -686,6 +688,7 @@ export type Database = {
           diesel_price_lkr_per_l?: number
           id?: string
           is_default?: boolean | null
+          maintenance_rate_lkr_per_km?: number | null
           parking_lat?: number | null
           parking_lng?: number | null
           parking_location_name?: string | null

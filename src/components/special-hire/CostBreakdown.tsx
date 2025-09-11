@@ -14,6 +14,8 @@ interface CostData {
   overtimeCharge: number;
   overnightCharge: number;
   exceedingDistanceCharge: number;
+  maintenanceCost?: number;
+  totalTripDistance?: number;
   rateCardDetails?: {
     standardHours: number;
     actualHours: number;
@@ -60,6 +62,8 @@ export function CostBreakdown({ data }: Props) {
     overtimeCharge: data.overtimeCharge || 0,
     overnightCharge: data.overnightCharge || 0,
     exceedingDistanceCharge: data.exceedingDistanceCharge || 0,
+    maintenanceCost: data.maintenanceCost || 0,
+    totalTripDistance: data.totalTripDistance || 0,
     grossRevenue: data.grossRevenue || 0,
     customerTotalWithFuel: data.customerTotalWithFuel || 0,
     driverCharge: data.driverCharge || 0,
@@ -90,7 +94,7 @@ export function CostBreakdown({ data }: Props) {
         {/* Distance Breakdown */}
         <div>
           <h4 className="font-medium mb-2">Distance Analysis</h4>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-4 gap-4 text-sm">
             <div className="text-center">
               <div className="font-medium text-blue-600">{safeData.kmParkingToPickup} km</div>
               <div className="text-muted-foreground">Parking → Pickup</div>
@@ -102,6 +106,10 @@ export function CostBreakdown({ data }: Props) {
             <div className="text-center">
               <div className="font-medium text-blue-600">{safeData.kmDropToParking} km</div>
               <div className="text-muted-foreground">Drop → Parking</div>
+            </div>
+            <div className="text-center">
+              <div className="font-medium text-orange-600">{safeData.totalTripDistance} km</div>
+              <div className="text-muted-foreground">Total Distance</div>
             </div>
           </div>
         </div>
@@ -147,6 +155,10 @@ export function CostBreakdown({ data }: Props) {
             <div className="flex justify-between">
               <span>Fuel Cost</span>
               <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Maintenance Cost ({safeData.totalTripDistance} km)</span>
+              <span>LKR {safeData.maintenanceCost.toLocaleString()}</span>
             </div>
             {safeData.commissionPassThroughAmount > 0 && (
               <div className="flex justify-between">
@@ -238,6 +250,10 @@ export function CostBreakdown({ data }: Props) {
             <div className="flex justify-between">
               <span>Fuel Cost (Internal)</span>
               <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Maintenance Cost (Internal)</span>
+              <span>LKR {safeData.maintenanceCost.toLocaleString()}</span>
             </div>
             {safeData.otherExpenses.map((expense, index) => (
               <div key={index} className="flex justify-between">

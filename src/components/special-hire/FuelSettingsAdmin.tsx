@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 interface FuelSetting {
   id: string;
   diesel_price_lkr_per_l: number;
+  maintenance_rate_lkr_per_km: number;
   parking_location_name: string;
   parking_lat: number;
   parking_lng: number;
@@ -55,6 +56,7 @@ export function FuelSettingsAdmin() {
         // Create default settings if none exist
         const defaultSettings = {
           diesel_price_lkr_per_l: 350.0,
+          maintenance_rate_lkr_per_km: 20.0,
           parking_location_name: 'Main Depot',
           parking_lat: 6.9271,
           parking_lng: 79.8612,
@@ -94,7 +96,8 @@ export function FuelSettingsAdmin() {
       const { error } = await supabase
         .from('fuel_settings')
         .update({
-          diesel_price_lkr_per_l: defaultSettings.diesel_price_lkr_per_l
+          diesel_price_lkr_per_l: defaultSettings.diesel_price_lkr_per_l,
+          maintenance_rate_lkr_per_km: defaultSettings.maintenance_rate_lkr_per_km
         })
         .eq('id', defaultSettings.id);
 
@@ -132,6 +135,7 @@ export function FuelSettingsAdmin() {
         .insert([{
           ...newLocation,
           diesel_price_lkr_per_l: defaultSettings?.diesel_price_lkr_per_l || 350.0,
+          maintenance_rate_lkr_per_km: defaultSettings?.maintenance_rate_lkr_per_km || 20.0,
           is_default: false
         }])
         .select()
@@ -290,10 +294,29 @@ export function FuelSettingsAdmin() {
             </p>
           </div>
 
+          <Separator />
+
+          {/* Maintenance Rate */}
+          <div className="space-y-2">
+            <Label htmlFor="maintenance-rate">Maintenance Rate (LKR per Kilometer)</Label>
+            <Input
+              id="maintenance-rate"
+              type="number"
+              step="0.01"
+              min="0"
+              value={defaultSettings.maintenance_rate_lkr_per_km}
+              onChange={(e) => updateDefaultSetting('maintenance_rate_lkr_per_km', parseFloat(e.target.value) || 0)}
+              className="w-full max-w-xs"
+            />
+            <p className="text-sm text-muted-foreground">
+              Applied to total trip distance (Parking → Pickup → Drop → Parking)
+            </p>
+          </div>
+
           <div className="flex justify-end">
             <Button onClick={handleSaveFuelPrice} disabled={saving} size="sm">
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Saving...' : 'Update Fuel Price'}
+              {saving ? 'Saving...' : 'Update Settings'}
             </Button>
           </div>
         </CardContent>
@@ -432,6 +455,7 @@ export function FuelSettingsAdmin() {
               <h4 className="font-medium mb-2">Cost Components</h4>
               <ul className="text-sm space-y-1 text-muted-foreground">
                 <li>• Fuel cost = Distance ÷ Bus efficiency × Diesel price</li>
+                <li>• Maintenance cost = Total distance × Maintenance rate</li>
                 <li>• Hire charge = Trip distance × Rate per km</li>
                 <li>• Total multiplied by number of buses</li>
               </ul>
