@@ -156,10 +156,6 @@ export function CostBreakdown({ data }: Props) {
               <span>Fuel Cost</span>
               <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Maintenance Cost ({safeData.totalTripDistance.toFixed(1)} km × LKR 20)</span>
-              <span>LKR {(safeData.totalTripDistance * 20).toLocaleString()}</span>
-            </div>
             {safeData.commissionPassThroughAmount > 0 && (
               <div className="flex justify-between">
                 <span>Commission passed to customer ({safeData.commissionPassThroughPct}%)</span>
@@ -206,7 +202,7 @@ export function CostBreakdown({ data }: Props) {
             <Separator />
             <div className="flex justify-between font-bold text-lg text-green-600 bg-green-50 p-3 rounded-md border-2 border-green-200">
               <span>FINAL TOTAL - Customer Pays</span>
-              <span>LKR {(safeData.customerTotalWithFuel + (safeData.totalTripDistance * 20)).toLocaleString()}</span>
+              <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
             </div>
           </div>
         </div>
