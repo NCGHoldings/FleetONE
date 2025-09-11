@@ -244,13 +244,32 @@ export function CostBreakdown({ data }: Props) {
               <span>LKR {safeData.driverCharge.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>Fuel Cost (Internal)</span>
+              <span>Fuel Cost (Pickup to Drop)</span>
               <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR 20)</span>
               <span>LKR {(safeData.totalTripDistance * 20).toLocaleString()}</span>
             </div>
+            {(data.additionalCharges && data.additionalCharges.length > 0) && (
+              <>
+                {data.additionalCharges.map((charge, index) => {
+                  const chargeTypeLabels = {
+                    permits: 'Permits Cost',
+                    highway: 'Highway Charges',
+                    additional_fuel: 'Additional Fuel Costs',
+                    driver_charges: 'Driver Charges',
+                    other: charge.reason || 'Other'
+                  };
+                  return (
+                    <div key={index} className="flex justify-between">
+                      <span>{chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}</span>
+                      <span>LKR {charge.amount.toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
             {safeData.otherExpenses.map((expense, index) => (
               <div key={index} className="flex justify-between">
                 <span>{expense.label}</span>
