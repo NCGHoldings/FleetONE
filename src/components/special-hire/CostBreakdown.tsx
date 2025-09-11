@@ -104,11 +104,16 @@ export function CostBreakdown({ data }: Props) {
   // Calculate other expenses total
   const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   
+  // Recalculate FINAL TOTAL - Customer Pays from visible items to avoid double counting
+  const commissionPassThrough = safeData.commissionPassThroughAmount || 0;
+  const discount = safeData.discountAmount || 0;
+  const finalTotalCustomerPays = safeData.hireCharge + customerFuelCost + commissionPassThrough + additionalChargesTotal - discount;
+  
   // Calculate correct total expenses (using customer fuel cost for customer billing)
   const correctTotalExpenses = customerFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
   
   // Calculate correct net profit (Final Total - Customer Pays minus Total Expenses)
-  const correctNetProfit = safeData.customerTotalWithFuel - correctTotalExpenses;
+  const correctNetProfit = finalTotalCustomerPays - correctTotalExpenses;
   
   // Calculate net profit per bus
   const netProfitPerBus = correctNetProfit / safeData.numberOfBuses;
@@ -231,7 +236,7 @@ export function CostBreakdown({ data }: Props) {
             <Separator />
             <div className="flex justify-between font-bold text-lg text-green-600 bg-green-50 p-3 rounded-md border-2 border-green-200">
               <span>FINAL TOTAL - Customer Pays</span>
-              <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
+              <span>LKR {finalTotalCustomerPays.toLocaleString()}</span>
             </div>
           </div>
         </div>
