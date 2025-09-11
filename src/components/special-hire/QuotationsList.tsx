@@ -72,26 +72,30 @@ interface Quotation {
 
 // Helper function to calculate total revenue (matches Final Total from QuotationPreview)
 const calculateTotalRevenue = (quotation: Quotation): number => {
-  const hireCharges = quotation.gross_revenue || 0;
-  const serviceCharges = quotation.fuel_cost_fuel_only || 0;
-  const commission = quotation.commission_pass_through_amount || 0;
+  const hireChargesAll = quotation.gross_revenue || 0; // includes all buses
+  const fuelAll = (quotation.fuel_cost_fuel_only || 0) * (quotation.number_of_buses || 1);
+  const commissionPassThrough = quotation.commission_pass_through_amount || 0;
+  const additional = quotation.total_additional_charges || 0;
   const discount = quotation.discount_amount_lkr || 0;
-  const additionalCharges = quotation.total_additional_charges || 0;
-  
-  return hireCharges + serviceCharges + commission + additionalCharges - discount;
+
+  const base = hireChargesAll + fuelAll + commissionPassThrough + additional - discount;
+  const adjustmentPct = quotation.percentage_adjustment || 0;
+  const adjustmentAmount = base * (adjustmentPct / 100);
+  return Math.round(base + adjustmentAmount);
 };
 
-// Helper function to get revenue breakdown components
+// Helper function to get revenue breakdown components (ALL buses)
 const getRevenueBreakdown = (quotation: Quotation) => {
-  return {
-    hire: quotation.hire_charge || 0,
-    fuel: quotation.fuel_cost_fuel_only || 0,
-    extras: quotation.extra_charges || 0,
-    commission: quotation.commission_amount || 0,
-    discountAmount: quotation.discount_type === 'percentage' && quotation.discount_percentage 
-      ? ((quotation.hire_charge || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.extra_charges || 0) + (quotation.commission_amount || 0)) * (quotation.discount_percentage / 100)
-      : quotation.discount_amount_lkr || 0
-  };
+  const hire = quotation.gross_revenue || 0;
+  const fuel = (quotation.fuel_cost_fuel_only || 0) * (quotation.number_of_buses || 1);
+  const commission = quotation.commission_pass_through_amount || 0;
+  const additional = quotation.total_additional_charges || 0;
+  const discountAmount = quotation.discount_amount_lkr || 0;
+  const base = hire + fuel + commission + additional - discountAmount;
+  const adjustmentAmount = base * ((quotation.percentage_adjustment || 0) / 100);
+  
+  // extras are already included in hire
+  return { hire, fuel, extras: 0, additional, commission, discountAmount, adjustmentAmount };
 };
 
 interface Props {
@@ -491,7 +495,9 @@ export function QuotationsList({ onRefresh }: Props) {
         const totalRevenue = calculateTotalRevenue(quotation);
         const breakdown = getRevenueBreakdown(quotation);
         const hasDiscount = breakdown.discountAmount > 0;
-        const hasMultipleComponents = [breakdown.hire, breakdown.fuel, breakdown.extras, breakdown.commission].filter(x => x > 0).length > 1;
+        const hasAdjustment = Math.abs(breakdown.adjustmentAmount || 0) > 0;
+        const hasMultipleComponents = [breakdown.hire, breakdown.fuel, breakdown.additional, breakdown.commission]
+          .filter(x => x > 0).length > 1 || hasAdjustment;
         
         return (
           <div className="text-right">
@@ -502,8 +508,9 @@ export function QuotationsList({ onRefresh }: Props) {
                   <div>
                     {breakdown.hire > 0 && `Hire: ${breakdown.hire.toLocaleString()}`}
                     {breakdown.fuel > 0 && ` + Fuel: ${breakdown.fuel.toLocaleString()}`}
-                    {breakdown.extras > 0 && ` + Extra: ${breakdown.extras.toLocaleString()}`}
+                    {breakdown.additional > 0 && ` + Addl: ${breakdown.additional.toLocaleString()}`}
                     {breakdown.commission > 0 && ` + Comm: ${breakdown.commission.toLocaleString()}`}
+                    {hasAdjustment && ` + Adj: ${(breakdown.adjustmentAmount > 0 ? '+' : '') + Math.round(breakdown.adjustmentAmount).toLocaleString()}`}
                   </div>
                 )}
                 {hasDiscount && (
