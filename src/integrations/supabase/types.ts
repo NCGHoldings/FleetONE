@@ -1389,6 +1389,66 @@ export type Database = {
         }
         Relationships: []
       }
+      quotation_bus_details: {
+        Row: {
+          bus_number: number
+          created_at: string
+          fuel_cost: number | null
+          id: string
+          km_drop_to_parking: number | null
+          km_parking_to_pickup: number | null
+          parking_lat: number | null
+          parking_lng: number | null
+          parking_location_id: string | null
+          parking_location_name: string | null
+          quotation_id: string
+          updated_at: string
+        }
+        Insert: {
+          bus_number: number
+          created_at?: string
+          fuel_cost?: number | null
+          id?: string
+          km_drop_to_parking?: number | null
+          km_parking_to_pickup?: number | null
+          parking_lat?: number | null
+          parking_lng?: number | null
+          parking_location_id?: string | null
+          parking_location_name?: string | null
+          quotation_id: string
+          updated_at?: string
+        }
+        Update: {
+          bus_number?: number
+          created_at?: string
+          fuel_cost?: number | null
+          id?: string
+          km_drop_to_parking?: number | null
+          km_parking_to_pickup?: number | null
+          parking_lat?: number | null
+          parking_lng?: number | null
+          parking_location_id?: string | null
+          parking_location_name?: string | null
+          quotation_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_bus_details_parking_location_id_fkey"
+            columns: ["parking_location_id"]
+            isOneToOne: false
+            referencedRelation: "fuel_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_bus_details_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       real_time_tracking: {
         Row: {
           alerts: Json | null
@@ -2401,6 +2461,7 @@ export type Database = {
           trip_id: string | null
           trip_status: string | null
           updated_at: string | null
+          uses_multi_parking: boolean | null
           valid_until: string | null
         }
         Insert: {
@@ -2474,6 +2535,7 @@ export type Database = {
           trip_id?: string | null
           trip_status?: string | null
           updated_at?: string | null
+          uses_multi_parking?: boolean | null
           valid_until?: string | null
         }
         Update: {
@@ -2547,6 +2609,7 @@ export type Database = {
           trip_id?: string | null
           trip_status?: string | null
           updated_at?: string | null
+          uses_multi_parking?: boolean | null
           valid_until?: string | null
         }
         Relationships: [

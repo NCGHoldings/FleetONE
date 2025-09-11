@@ -19,6 +19,8 @@ serve(async (req) => {
       parkingLng,
       pickupCoords: pickupCoordsInput,
       dropCoords: dropCoordsInput,
+      busDetails = null, // New: array of bus parking locations for multi-parking
+      numberOfBuses = 1,
     } = await req.json()
 
     console.log('Distance calculation request:', {
@@ -29,6 +31,8 @@ serve(async (req) => {
       parkingLng,
       pickupCoordsInput,
       dropCoordsInput,
+      busDetails,
+      numberOfBuses,
     });
 
     const GOOGLE_API_KEY = Deno.env.get('GOOGLE_PLACES_API_KEY');
@@ -93,7 +97,125 @@ serve(async (req) => {
       drop: dropPoint,
       intermediate: intermediatePoints,
       parking: { lat: parkingLat, lng: parkingLng },
+      busDetails,
     });
+
+    // Multi-parking calculation logic
+    if (busDetails && busDetails.length > 0) {
+      console.log('Using multi-parking calculation for', busDetails.length, 'buses');
+      
+      const busCalculations = [];
+      
+      for (let i = 0; i < busDetails.length; i++) {
+        const bus = busDetails[i];
+        const busParking = { lat: bus.parkingLat, lng: bus.parkingLng };
+        
+        // Calculate parking -> pickup distance
+        const parkingToPickupUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${busParking.lat},${busParking.lng}&destination=${pickupPoint.lat},${pickupPoint.lng}&mode=driving&key=${GOOGLE_API_KEY}`;
+        const parkingToPickupResp = await fetch(parkingToPickupUrl);
+        
+        if (!parkingToPickupResp.ok) {
+          throw new Error(`Failed to calculate parking-to-pickup distance for bus ${i + 1}`);
+        }
+        
+        const parkingToPickupData = await parkingToPickupResp.json();
+        if (parkingToPickupData.status !== 'OK' || !parkingToPickupData.routes?.length) {
+          throw new Error(`No route found from parking to pickup for bus ${i + 1}`);
+        }
+        
+        const kmParkingToPickup = roundKm(parkingToPickupData.routes[0].legs[0].distance.value);
+        
+        // Calculate drop -> parking distance
+        const dropToParkingUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${dropPoint.lat},${dropPoint.lng}&destination=${busParking.lat},${busParking.lng}&mode=driving&key=${GOOGLE_API_KEY}`;
+        const dropToParkingResp = await fetch(dropToParkingUrl);
+        
+        if (!dropToParkingResp.ok) {
+          throw new Error(`Failed to calculate drop-to-parking distance for bus ${i + 1}`);
+        }
+        
+        const dropToParkingData = await dropToParkingResp.json();
+        if (dropToParkingData.status !== 'OK' || !dropToParkingData.routes?.length) {
+          throw new Error(`No route found from drop to parking for bus ${i + 1}`);
+        }
+        
+        const kmDropToParking = roundKm(dropToParkingData.routes[0].legs[0].distance.value);
+        
+        busCalculations.push({
+          busNumber: i + 1,
+          parkingLocationName: bus.parkingLocationName || `Bus ${i + 1} Parking`,
+          kmParkingToPickup,
+          kmDropToParking,
+        });
+      }
+      
+      // Calculate trip distance (same for all buses)
+      const tripPoints = [pickupPoint, ...intermediatePoints, dropPoint];
+      let kmTrip = 0;
+      
+      if (tripPoints.length > 1) {
+        for (let i = 0; i < tripPoints.length - 1; i++) {
+          const origin = tripPoints[i];
+          const destination = tripPoints[i + 1];
+          
+          const tripSegmentUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&mode=driving&key=${GOOGLE_API_KEY}`;
+          const tripSegmentResp = await fetch(tripSegmentUrl);
+          
+          if (tripSegmentResp.ok) {
+            const tripSegmentData = await tripSegmentResp.json();
+            if (tripSegmentData.status === 'OK' && tripSegmentData.routes?.length) {
+              kmTrip += roundKm(tripSegmentData.routes[0].legs[0].distance.value);
+            }
+          }
+        }
+      }
+      
+      // Calculate totals
+      const totalKmParkingToPickup = busCalculations.reduce((sum, bus) => sum + bus.kmParkingToPickup, 0);
+      const totalKmDropToParking = busCalculations.reduce((sum, bus) => sum + bus.kmDropToParking, 0);
+      const totalDistance = totalKmParkingToPickup + kmTrip + totalKmDropToParking;
+      
+      const pickupCoords: [number, number] = [pickupPoint.lng, pickupPoint.lat];
+      const dropCoords: [number, number] = [dropPoint.lng, dropPoint.lat];
+      const intermediateCoords: [number, number][] = intermediatePoints.map(p => [p.lng, p.lat]);
+      
+      let routeDescription = `${pickupLocation}`;
+      for (const stop of intermediateStops) {
+        if (stop && stop.location && String(stop.location).trim()) {
+          routeDescription += ` → ${stop.location}`;
+        }
+      }
+      routeDescription += ` → ${dropLocation}`;
+      
+      const result = {
+        kmParkingToPickup: totalKmParkingToPickup,
+        kmTrip,
+        kmDropToParking: totalKmDropToParking,
+        totalDistance,
+        pickupCoords,
+        dropCoords,
+        intermediateCoords,
+        pickupAddress: pickupPoint.formatted_address || pickupLocation,
+        dropAddress: dropPoint.formatted_address || dropLocation,
+        routeDescription,
+        intermediateStops: intermediateStops.filter((s: any) => s?.location && String(s.location).trim()),
+        busCalculations, // Individual bus calculations for multi-parking
+        isMultiParking: true,
+      };
+      
+      console.log('Final multi-parking calculation result:', result);
+      
+      return new Response(
+        JSON.stringify(result),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      );
+    }
+
+    // Original single-parking calculation (fallback)
+    console.log('Using single-parking calculation');
+    
 
     // Build the full route: Parking -> Pickup -> ...intermediate... -> Drop -> Parking
     const allPoints = [

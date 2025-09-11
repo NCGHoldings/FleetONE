@@ -113,6 +113,14 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([]);
   const [costData, setCostData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [useMultiParking, setUseMultiParking] = useState(false);
+  const [busDetails, setBusDetails] = useState<Array<{
+    busNumber: number;
+    parkingLocationId: string;
+    parkingLocationName: string;
+    parkingLat: number;
+    parkingLng: number;
+  }>>([]);
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -226,6 +234,75 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     return () => subscription.unsubscribe();
   }, [form, toast]);
 
+  // Manage bus details when number of buses changes
+  useEffect(() => {
+    if (useMultiParking && watchedNumberOfBuses) {
+      const currentBusCount = busDetails.length;
+      if (currentBusCount < watchedNumberOfBuses) {
+        // Add new bus details
+        const newBuses = [];
+        for (let i = currentBusCount; i < watchedNumberOfBuses; i++) {
+          const defaultLocation = parkingLocations.find(loc => loc.is_default) || parkingLocations[0];
+          if (defaultLocation) {
+            newBuses.push({
+              busNumber: i + 1,
+              parkingLocationId: defaultLocation.id,
+              parkingLocationName: defaultLocation.parking_location_name,
+              parkingLat: defaultLocation.parking_lat,
+              parkingLng: defaultLocation.parking_lng,
+            });
+          }
+        }
+        setBusDetails([...busDetails, ...newBuses]);
+      } else if (currentBusCount > watchedNumberOfBuses) {
+        // Remove excess bus details
+        setBusDetails(busDetails.slice(0, watchedNumberOfBuses));
+      }
+    }
+  }, [watchedNumberOfBuses, useMultiParking, busDetails.length, parkingLocations]);
+
+  const handleMultiParkingToggle = (enabled: boolean) => {
+    setUseMultiParking(enabled);
+    if (enabled) {
+      // Initialize bus details for current number of buses
+      const buses = [];
+      const defaultLocation = parkingLocations.find(loc => loc.is_default) || parkingLocations[0];
+      
+      for (let i = 0; i < watchedNumberOfBuses; i++) {
+        if (defaultLocation) {
+          buses.push({
+            busNumber: i + 1,
+            parkingLocationId: defaultLocation.id,
+            parkingLocationName: defaultLocation.parking_location_name,
+            parkingLat: defaultLocation.parking_lat,
+            parkingLng: defaultLocation.parking_lng,
+          });
+        }
+      }
+      setBusDetails(buses);
+    } else {
+      setBusDetails([]);
+      // Reset to single parking mode - user can select parking location manually
+    }
+  };
+
+  const updateBusParking = (busNumber: number, parkingLocationId: string) => {
+    const location = parkingLocations.find(loc => loc.id === parkingLocationId);
+    if (location) {
+      setBusDetails(prev => prev.map(bus => 
+        bus.busNumber === busNumber 
+          ? {
+              ...bus,
+              parkingLocationId: location.id,
+              parkingLocationName: location.parking_location_name,
+              parkingLat: location.parking_lat,
+              parkingLng: location.parking_lng,
+            }
+          : bus
+      ));
+    }
+  };
+
   const loadBusTypes = async () => {
     try {
       const { data, error } = await supabase
@@ -337,15 +414,31 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       // Filter out empty intermediate stops
       const validIntermediateStops = intermediateStops.filter(stop => stop.location && stop.location.trim());
 
-      // Call edge function to calculate real distances using Mapbox API
+      // Prepare distance calculation parameters
+      let distanceCalculationBody: any = {
+        pickupLocation: data.pickupLocation,
+        dropLocation: data.dropLocation,
+        intermediateStops: validIntermediateStops,
+        numberOfBuses: data.numberOfBuses,
+      };
+
+      if (useMultiParking && busDetails.length > 0) {
+        // Multi-parking mode: send bus details with individual parking locations
+        distanceCalculationBody.busDetails = busDetails.map(bus => ({
+          busNumber: bus.busNumber,
+          parkingLocationName: bus.parkingLocationName,
+          parkingLat: bus.parkingLat,
+          parkingLng: bus.parkingLng,
+        }));
+      } else {
+        // Single parking mode: use selected parking location for all buses
+        distanceCalculationBody.parkingLat = fuelSettings.parking_lat;
+        distanceCalculationBody.parkingLng = fuelSettings.parking_lng;
+      }
+
+      // Call edge function to calculate real distances
       const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
-        body: {
-          pickupLocation: data.pickupLocation,
-          dropLocation: data.dropLocation,
-          intermediateStops: validIntermediateStops,
-          parkingLat: fuelSettings.parking_lat,
-          parkingLng: fuelSettings.parking_lng
-        }
+        body: distanceCalculationBody
       });
 
       if (error) {
@@ -420,14 +513,29 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       
       const hireCharge = fixedRate + exceedingDistanceCharge + totalExtraTimeCharge;
 
-      // Fuel cost on empty running only (parking→pickup + drop→parking)
-      const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
-      const fuelLiters = (emptyRunKm / (busTypeData.avg_km_per_l || 8));
-      const fuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
+      // Fuel cost calculation - different for single vs multi-parking
+      let totalFuelCost = 0;
+      let fuelLiters = 0;
+
+      if (useMultiParking && distanceData.isMultiParking && distanceData.busCalculations) {
+        // Multi-parking: calculate fuel cost per bus based on individual distances
+        for (const busCalc of distanceData.busCalculations) {
+          const busEmptyRunKm = busCalc.kmParkingToPickup + busCalc.kmDropToParking;
+          const busFuelLiters = busEmptyRunKm / (busTypeData.avg_km_per_l || 8);
+          const busFuelCost = busFuelLiters * fuelSettings.diesel_price_lkr_per_l;
+          totalFuelCost += busFuelCost;
+          fuelLiters += busFuelLiters;
+        }
+      } else {
+        // Single parking: calculate fuel cost for all buses using same empty run distance
+        const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
+        fuelLiters = (emptyRunKm / (busTypeData.avg_km_per_l || 8)) * data.numberOfBuses;
+        totalFuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
+      }
 
       const grossRevenue = hireCharge * data.numberOfBuses;
       // Commission and discount calculations
-      const baseCustomerTotal = grossRevenue + (fuelCost * data.numberOfBuses);
+      const baseCustomerTotal = grossRevenue + totalFuelCost;
       
       // Commission pass-through (added to customer bill)
       // Ensure pass-through percentage never exceeds commission percentage
@@ -448,14 +556,14 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       // Company expenses
       const commissionExpense = baseCustomerTotal * (data.commissionPct / 100); // Total commission company pays
       const driverCharge = 1500; // Default driver charge
-      const totalExpenses = (driverCharge * data.numberOfBuses) + commissionExpense + (fuelCost * data.numberOfBuses);
+      const totalExpenses = (driverCharge * data.numberOfBuses) + commissionExpense + totalFuelCost;
       const netProfit = finalCustomerTotal - totalExpenses;
 
       const costs = {
         km_parking_to_pickup: Math.round((distanceData.kmParkingToPickup || 0) * 10) / 10,
         km_trip: Math.round((distanceData.kmTrip || 0) * 10) / 10,
         km_drop_to_parking: Math.round((distanceData.kmDropToParking || 0) * 10) / 10,
-        fuel_cost_fuel_only: Math.round(fuelCost),
+        fuel_cost_fuel_only: Math.round(totalFuelCost),
         hire_charge: Math.round(hireCharge),
         extra_charges: Math.round(totalExtraTimeCharge),
         gross_revenue: Math.round(grossRevenue), // Base hire charges
@@ -619,6 +727,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         pickup_datetime: data.pickupDateTime.toISOString(),
         drop_datetime: data.dropDateTime.toISOString(),
         parking_location_id: data.parkingLocationId,
+        uses_multi_parking: useMultiParking,
         pickup_lat: distanceData?.pickupCoords?.[1] || null,
         pickup_lng: distanceData?.pickupCoords?.[0] || null,
         drop_lat: distanceData?.dropCoords?.[1] || null,
@@ -833,9 +942,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     control={form.control}
                     name="parkingLocationId"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Parking Location *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormItem className={useMultiParking ? "opacity-50 pointer-events-none" : ""}>
+                        <FormLabel>Parking Location * {useMultiParking && "(Disabled - Using multi-parking)"}</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={useMultiParking}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select parking location" />
@@ -857,6 +966,21 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       </FormItem>
                     )}
                   />
+
+                  {/* Multi-parking toggle */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Different parking locations per bus</Label>
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        checked={useMultiParking} 
+                        onCheckedChange={handleMultiParkingToggle}
+                        disabled={watchedNumberOfBuses === 1}
+                      />
+                      <Label className="text-sm text-muted-foreground">
+                        {watchedNumberOfBuses === 1 ? "Single bus - multi-parking not needed" : "Enable for multiple bus locations"}
+                      </Label>
+                    </div>
+                  </div>
 
                   <FormField
                     control={form.control}
@@ -943,7 +1067,49 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                        </Button>
                      </div>
                    ))}
-                </div>
+                 </div>
+
+                {/* Multi-parking bus details */}
+                {useMultiParking && busDetails.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-medium">Bus Parking Locations</h4>
+                      <Badge variant="outline">{busDetails.length} buses</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {busDetails.map((bus) => (
+                        <Card key={bus.busNumber} className="p-4">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">Bus {bus.busNumber}</span>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Parking Location</Label>
+                              <Select 
+                                value={bus.parkingLocationId} 
+                                onValueChange={(value) => updateBusParking(bus.busNumber, value)}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {parkingLocations.map((location) => (
+                                    <SelectItem key={location.id} value={location.id}>
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="h-3 w-3" />
+                                        {location.parking_location_name}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormField
