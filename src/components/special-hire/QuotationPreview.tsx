@@ -38,6 +38,7 @@ interface QuotationData {
   discount_percentage?: number;
   additional_charges?: Array<{ type: string; amount: number; reason?: string }> | string;
   total_additional_charges?: number;
+  percentage_adjustment?: number;
 }
 
 interface Props {
@@ -89,16 +90,23 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     };
   };
 
-  // Calculate the final customer total (what customer pays) - matches CostBreakdown calculation
+  // Calculate the final customer total (what customer pays) - matches CostCalculator logic exactly
   const calculateFinalCustomerTotal = (quotation: QuotationData): number => {
     const grossRevenue = quotation.gross_revenue || 0;
     const fuelCost = quotation.fuel_cost_fuel_only || 0;
     const commissionPassThrough = quotation.commission_pass_through_amount || 0;
     const additionalCharges = quotation.total_additional_charges || 0;
     const discount = quotation.discount_amount_lkr || 0;
+    const percentageAdjustment = quotation.percentage_adjustment || 0;
     
-    // This matches the calculation: Gross Revenue + Fuel + Commission Pass-through + Additional Charges - Discount
-    return grossRevenue + fuelCost + commissionPassThrough + additionalCharges - discount;
+    // Base calculation: Gross Revenue + Fuel + Commission Pass-through + Additional Charges - Discount
+    const customerTotalBeforeAdjustment = grossRevenue + fuelCost + commissionPassThrough + additionalCharges - discount;
+    
+    // Apply percentage adjustment (matches CostCalculator logic)
+    const adjustmentAmount = customerTotalBeforeAdjustment * (percentageAdjustment / 100);
+    const finalCustomerTotal = customerTotalBeforeAdjustment + adjustmentAmount;
+    
+    return Math.round(finalCustomerTotal);
   };
 
   const pickup = formatDateTime(quotation.pickup_datetime);
