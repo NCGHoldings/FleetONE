@@ -496,9 +496,6 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                 padding: '8px', 
                 verticalAlign: 'middle'
               }}>
-                <div style={{ fontSize: '11px', color: '#374151', marginBottom: '4px' }}>
-                  Hire Charges: LKR {((quotation.gross_revenue || 0) + (quotation.total_additional_charges || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0)).toLocaleString()}
-                </div>
                 {(quotation.discount_amount_lkr || 0) > 0 && (
                   <div style={{ color: '#dc2626', fontSize: '11px', marginBottom: '4px' }}>
                     Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}
