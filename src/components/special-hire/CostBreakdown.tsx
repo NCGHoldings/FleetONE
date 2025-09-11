@@ -101,8 +101,8 @@ export function CostBreakdown({ data }: Props) {
   // Calculate correct total expenses
   const correctTotalExpenses = safeData.driverCharge + calculatedFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
   
-  // Calculate correct net profit
-  const correctNetProfit = safeData.grossRevenue - correctTotalExpenses;
+  // Calculate correct net profit (Final Total - Customer Pays minus Total Expenses)
+  const correctNetProfit = safeData.customerTotalWithFuel - correctTotalExpenses;
 
   return (
     <Card>
