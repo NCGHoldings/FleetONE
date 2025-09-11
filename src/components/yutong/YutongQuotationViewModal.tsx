@@ -74,30 +74,58 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
   const generatePDFBase64 = async (): Promise<string> => {
     if (!printRef.current) throw new Error('Print reference not found');
 
-    const canvas = await html2canvas(printRef.current, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff'
-    });
+    // Find individual pages within the quotation preview
+    const pages = printRef.current.querySelectorAll('.page');
+    
+    if (pages.length === 0) {
+      throw new Error('No pages found in quotation preview');
+    }
 
-    const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
     
-    const imgWidth = 210;
-    const pageHeight = 295;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
+    // A4 dimensions in mm
+    const pageWidth = 210;
+    const pageHeight = 297;
+    
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i] as HTMLElement;
+      
+      // Create canvas for each page individually
+      const canvas = await html2canvas(page, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        width: page.offsetWidth,
+        height: page.offsetHeight,
+        scrollX: 0,
+        scrollY: 0,
+        foreignObjectRendering: false,
+        removeContainer: true,
+        logging: false
+      });
 
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft >= 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Add new page if not the first page
+      if (i > 0) {
+        pdf.addPage();
+      }
+      
+      // Calculate dimensions to fit A4 while maintaining aspect ratio
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+      
+      // If image height exceeds page height, scale it down
+      if (imgHeight > pageHeight) {
+        const scaledHeight = pageHeight;
+        const scaledWidth = (canvas.width * pageHeight) / canvas.height;
+        pdf.addImage(imgData, 'PNG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
+      } else {
+        // Center the image vertically if it's smaller than page height
+        const yOffset = (pageHeight - imgHeight) / 2;
+        pdf.addImage(imgData, 'PNG', 0, yOffset, imgWidth, imgHeight);
+      }
     }
 
     return pdf.output('datauristring').split(',')[1];
