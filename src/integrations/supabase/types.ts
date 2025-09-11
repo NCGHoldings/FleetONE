@@ -3431,6 +3431,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_yutong_quotation_no: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_page_permissions: {
         Args: { _user_id: string }
         Returns: {
