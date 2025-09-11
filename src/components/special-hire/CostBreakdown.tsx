@@ -88,6 +88,21 @@ export function CostBreakdown({ data }: Props) {
 
   // Calculate fuel cost based on total distance, efficiency, and fuel price
   const calculatedFuelCost = (safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter;
+  
+  // Calculate maintenance cost
+  const calculatedMaintenanceCost = safeData.totalTripDistance * safeData.maintenanceRatePerKm;
+  
+  // Calculate additional charges total
+  const additionalChargesTotal = (data.additionalCharges || []).reduce((sum, charge) => sum + charge.amount, 0);
+  
+  // Calculate other expenses total
+  const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  
+  // Calculate correct total expenses
+  const correctTotalExpenses = safeData.driverCharge + calculatedFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
+  
+  // Calculate correct net profit
+  const correctNetProfit = safeData.grossRevenue - correctTotalExpenses;
 
   return (
     <Card>
@@ -292,7 +307,7 @@ export function CostBreakdown({ data }: Props) {
             <Separator />
             <div className="flex justify-between font-medium text-red-600">
               <span>Total Expenses</span>
-              <span>LKR {safeData.totalExpenses.toLocaleString()}</span>
+              <span>LKR {correctTotalExpenses.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -302,8 +317,8 @@ export function CostBreakdown({ data }: Props) {
         {/* Net Profit */}
         <div className="flex justify-between items-center text-lg font-bold">
           <span>Net Profit</span>
-          <span className={safeData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
-            LKR {safeData.netProfit.toLocaleString()}
+          <span className={correctNetProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
+            LKR {correctNetProfit.toLocaleString()}
           </span>
         </div>
       </CardContent>
