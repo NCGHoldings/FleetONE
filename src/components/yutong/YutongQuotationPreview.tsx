@@ -238,15 +238,44 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                   </td>
                 </tr>
                 
-                {/* Subtotal for Bus */}
-                <tr>
-                  <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
-                    Bus Subtotal
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
-                    {busSubtotal.toLocaleString()}
-                  </td>
-                </tr>
+                {/* Show discount breakdown if applicable */}
+                {quotation.discount_percentage > 0 ? (
+                  <>
+                    <tr>
+                      <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
+                        Subtotal (before discount)
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
+                        {busSubtotalBeforeDiscount.toLocaleString()}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', color: '#d32f2f' }}>
+                        Discount ({quotation.discount_percentage}%)
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', color: '#d32f2f', fontWeight: 'bold' }}>
+                        -{discountAmount.toLocaleString()}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
+                        Net Bus Subtotal
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
+                        {busSubtotal.toLocaleString()}
+                      </td>
+                    </tr>
+                  </>
+                ) : (
+                  <tr>
+                    <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5' }}>
+                      Bus Subtotal
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
+                      {busSubtotal.toLocaleString()}
+                    </td>
+                  </tr>
+                )}
 
                 {/* Add-ons Section */}
                 {!loading && addOns.length > 0 && (
