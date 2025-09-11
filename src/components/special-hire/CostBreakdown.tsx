@@ -16,6 +16,8 @@ interface CostData {
   exceedingDistanceCharge: number;
   maintenanceCost?: number;
   totalTripDistance?: number;
+  busTypeEfficiency?: number;
+  fuelPricePerLiter?: number;
   rateCardDetails?: {
     standardHours: number;
     actualHours: number;
@@ -64,6 +66,8 @@ export function CostBreakdown({ data }: Props) {
     exceedingDistanceCharge: data.exceedingDistanceCharge || 0,
     maintenanceCost: data.maintenanceCost || 0,
     totalTripDistance: (data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0),
+    busTypeEfficiency: data.busTypeEfficiency || 8, // Default 8 km/l
+    fuelPricePerLiter: data.fuelPricePerLiter || 350, // Default LKR 350/l
     grossRevenue: data.grossRevenue || 0,
     customerTotalWithFuel: data.customerTotalWithFuel || 0,
     driverCharge: data.driverCharge || 0,
@@ -79,6 +83,9 @@ export function CostBreakdown({ data }: Props) {
     otherExpenses: data.otherExpenses || [],
     rateCardDetails: data.rateCardDetails
   };
+
+  // Calculate fuel cost based on total distance, efficiency, and fuel price
+  const calculatedFuelCost = (safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter;
 
   return (
     <Card>
@@ -244,8 +251,8 @@ export function CostBreakdown({ data }: Props) {
               <span>LKR {safeData.driverCharge.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>Fuel Cost (Pickup to Drop)</span>
-              <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
+              <span>Fuel Cost (Pickup to Drop) - {safeData.totalTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter}</span>
+              <span>LKR {calculatedFuelCost.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR 20)</span>
