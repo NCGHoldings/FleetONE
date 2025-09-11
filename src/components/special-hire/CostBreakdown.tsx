@@ -47,6 +47,7 @@ interface CostData {
   // Additional charges
   additionalCharges?: Array<{ type: string; amount: number; reason?: string }>;
   totalAdditionalCharges?: number;
+  numberOfBuses?: number;
 }
 
 interface Props {
@@ -83,7 +84,8 @@ export function CostBreakdown({ data }: Props) {
     totalExpenses: data.totalExpenses || 0,
     netProfit: data.netProfit || 0,
     otherExpenses: data.otherExpenses || [],
-    rateCardDetails: data.rateCardDetails
+    rateCardDetails: data.rateCardDetails,
+    numberOfBuses: data.numberOfBuses || 1
   };
 
   // Calculate fuel cost based on total distance, efficiency, and fuel price
@@ -103,6 +105,9 @@ export function CostBreakdown({ data }: Props) {
   
   // Calculate correct net profit (Final Total - Customer Pays minus Total Expenses)
   const correctNetProfit = safeData.customerTotalWithFuel - correctTotalExpenses;
+  
+  // Calculate net profit per bus
+  const netProfitPerBus = correctNetProfit / safeData.numberOfBuses;
 
   return (
     <Card>
@@ -312,11 +317,19 @@ export function CostBreakdown({ data }: Props) {
 
         {/* Net Profit */}
         <div className="flex justify-between items-center text-lg font-bold">
-          <span>Net Profit</span>
-          <span className={correctNetProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
-            LKR {correctNetProfit.toLocaleString()}
+          <span>Net Profit{safeData.numberOfBuses > 1 ? ' (per bus)' : ''}</span>
+          <span className={netProfitPerBus >= 0 ? 'text-green-600' : 'text-red-600'}>
+            LKR {netProfitPerBus.toLocaleString()}
           </span>
         </div>
+        {safeData.numberOfBuses > 1 && (
+          <div className="flex justify-between items-center text-sm text-muted-foreground mt-1">
+            <span>Total Net Profit ({safeData.numberOfBuses} buses)</span>
+            <span className={correctNetProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
+              LKR {correctNetProfit.toLocaleString()}
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
