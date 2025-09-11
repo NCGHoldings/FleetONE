@@ -38,6 +38,9 @@ import AddStudentForm from "./pages/AddStudentForm";
 import SchoolRouteManagement from "./pages/SchoolRouteManagement";
 import SchoolReceiptManagement from "./pages/SchoolReceiptManagement";
 import SchoolBranchReports from "./pages/SchoolBranchReports";
+import GlobalSchoolImport from "./pages/GlobalSchoolImport";
+import GlobalSchoolPayments from "./pages/GlobalSchoolPayments";
+import TotalDashboard from "./pages/TotalDashboard";
 
 const queryClient = new QueryClient();
 
@@ -285,6 +288,36 @@ const App = () => (
             <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
               <AppLayout>
                 <SchoolReports />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/import" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <GlobalSchoolImport />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/payments" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <GlobalSchoolPayments />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/total-dashboard" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <TotalDashboard />
               </AppLayout>
             </ProtectedRoute>
           } 
