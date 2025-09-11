@@ -54,6 +54,14 @@ interface CostData {
   }>;
   totalAdditionalCharges?: number;
   numberOfBuses?: number;
+  // Multi-parking support
+  busCalculations?: Array<{
+    busNumber: number;
+    parkingLocationName: string;
+    kmParkingToPickup: number;
+    kmDropToParking: number;
+  }>;
+  isMultiParking?: boolean;
 }
 
 interface Props {
@@ -96,10 +104,15 @@ export function CostBreakdown({ data }: Props) {
 
   // Calculate customer fuel cost (only parking to pickup + drop to parking - for customer billing)
   const customerFuelDistance = safeData.kmParkingToPickup + safeData.kmDropToParking;
-  const customerFuelCost = ((customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
+  const isMultiParking = data.isMultiParking || (data.busCalculations && data.busCalculations.length > 0);
+  const customerFuelCost = isMultiParking 
+    ? (customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter
+    : ((customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
   
   // Calculate total fuel cost for internal tracking (all distances)
-  const calculatedFuelCost = ((safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
+  const calculatedFuelCost = isMultiParking
+    ? ((safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter)
+    : ((safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
   
   // Calculate maintenance cost (for all buses)  
   const calculatedMaintenanceCost = (safeData.totalTripDistance * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
@@ -197,7 +210,7 @@ export function CostBreakdown({ data }: Props) {
               <span>LKR {safeData.grossRevenue.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>Fuel Cost (Parking to Pickup + Drop to Parking - {customerFuelDistance.toFixed(1)} km × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
+              <span>Fuel Cost (Parking to Pickup + Drop to Parking - {customerFuelDistance.toFixed(1)} km{isMultiParking ? ' (calculated per bus)' : ` × ${safeData.numberOfBuses} bus${safeData.numberOfBuses > 1 ? 'es' : ''}`})</span>
               <span>LKR {customerFuelCost.toLocaleString()}</span>
             </div>
             {safeData.commissionPassThroughAmount > 0 && (
@@ -290,7 +303,7 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Deductions</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Fuel Cost (Total Trip - {safeData.totalTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
+              <span>Fuel Cost (Total Trip - {safeData.totalTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter}{isMultiParking ? ' (calculated per bus)' : ` × ${safeData.numberOfBuses} bus${safeData.numberOfBuses > 1 ? 'es' : ''}`})</span>
               <span>LKR {calculatedFuelCost.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
