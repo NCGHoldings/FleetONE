@@ -225,10 +225,6 @@ export function CostBreakdown({ data }: Props) {
                       </div>
                     );
                   })}
-                  <div className="flex justify-between pl-4 font-medium text-orange-600">
-                    <span>Total Additional Charges</span>
-                    <span>LKR {(data.totalAdditionalCharges || 0).toLocaleString()}</span>
-                  </div>
                 </div>
               </>
             )}
