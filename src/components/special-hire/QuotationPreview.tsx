@@ -39,6 +39,8 @@ interface QuotationData {
   additional_charges?: Array<{ type: string; amount: number; reason?: string }> | string;
   total_additional_charges?: number;
   percentage_adjustment?: number;
+  // Add the field that CostBreakdown uses
+  customerTotalWithFuel?: number;
 }
 
 interface Props {
@@ -90,8 +92,14 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     };
   };
 
-  // Calculate the final customer total (what customer pays) - matches CostCalculator logic exactly
+  // Use the exact same value that CostBreakdown displays - customerTotalWithFuel
   const calculateFinalCustomerTotal = (quotation: QuotationData): number => {
+    // If customerTotalWithFuel is available (from cost calculator), use it directly
+    if (quotation.customerTotalWithFuel !== undefined && quotation.customerTotalWithFuel !== null) {
+      return Math.round(quotation.customerTotalWithFuel);
+    }
+    
+    // Fallback: Calculate using the exact same formula as CostCalculator
     const grossRevenue = quotation.gross_revenue || 0;
     const fuelCost = quotation.fuel_cost_fuel_only || 0;
     const commissionPassThrough = quotation.commission_pass_through_amount || 0;
@@ -99,10 +107,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     const discount = quotation.discount_amount_lkr || 0;
     const percentageAdjustment = quotation.percentage_adjustment || 0;
     
-    // Base calculation: Gross Revenue + Fuel + Commission Pass-through + Additional Charges - Discount
+    // This matches CostCalculator logic exactly
     const customerTotalBeforeAdjustment = grossRevenue + fuelCost + commissionPassThrough + additionalCharges - discount;
-    
-    // Apply percentage adjustment (matches CostCalculator logic)
     const adjustmentAmount = customerTotalBeforeAdjustment * (percentageAdjustment / 100);
     const finalCustomerTotal = customerTotalBeforeAdjustment + adjustmentAmount;
     
