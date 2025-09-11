@@ -500,6 +500,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         totalDistance: (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0),
         fuelLiters: Math.round(fuelLiters * 10) / 10,
         busTypeName: busTypeData.name,
+        busTypeEfficiency: busTypeData.avg_km_per_l || 8,
+        fuelPricePerLiter: fuelSettings.diesel_price_lkr_per_l,
+        maintenanceRatePerKm: fuelSettings.maintenance_rate_lkr_per_km || 20,
         fuelPrice: fuelSettings.diesel_price_lkr_per_l,
         pickupAddress: distanceData.pickupAddress,
         dropAddress: distanceData.dropAddress

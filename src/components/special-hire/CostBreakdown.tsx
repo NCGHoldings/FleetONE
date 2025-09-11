@@ -18,6 +18,7 @@ interface CostData {
   totalTripDistance?: number;
   busTypeEfficiency?: number;
   fuelPricePerLiter?: number;
+  maintenanceRatePerKm?: number;
   rateCardDetails?: {
     standardHours: number;
     actualHours: number;
@@ -68,6 +69,7 @@ export function CostBreakdown({ data }: Props) {
     totalTripDistance: (data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0),
     busTypeEfficiency: data.busTypeEfficiency || 8,
     fuelPricePerLiter: data.fuelPricePerLiter || 350,
+    maintenanceRatePerKm: data.maintenanceRatePerKm || 20,
     grossRevenue: data.grossRevenue || 0,
     customerTotalWithFuel: data.customerTotalWithFuel || 0,
     driverCharge: data.driverCharge || 0,
@@ -255,8 +257,8 @@ export function CostBreakdown({ data }: Props) {
               <span>LKR {calculatedFuelCost.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR 20)</span>
-              <span>LKR {(safeData.totalTripDistance * 20).toLocaleString()}</span>
+              <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR {safeData.maintenanceRatePerKm})</span>
+              <span>LKR {(safeData.totalTripDistance * safeData.maintenanceRatePerKm).toLocaleString()}</span>
             </div>
             {(data.additionalCharges && data.additionalCharges.length > 0) && (
               <>
