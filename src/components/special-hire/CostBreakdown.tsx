@@ -99,7 +99,7 @@ export function CostBreakdown({ data }: Props) {
   const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   
   // Calculate correct total expenses
-  const correctTotalExpenses = safeData.driverCharge + calculatedFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
+  const correctTotalExpenses = calculatedFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
   
   // Calculate correct net profit (Final Total - Customer Pays minus Total Expenses)
   const correctNetProfit = safeData.customerTotalWithFuel - correctTotalExpenses;
@@ -263,10 +263,6 @@ export function CostBreakdown({ data }: Props) {
         <div>
           <h4 className="font-medium mb-2">Deductions</h4>
           <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>Driver Charge</span>
-              <span>LKR {safeData.driverCharge.toLocaleString()}</span>
-            </div>
             <div className="flex justify-between">
               <span>Fuel Cost (Pickup to Drop) - {safeData.totalTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter}</span>
               <span>LKR {calculatedFuelCost.toLocaleString()}</span>
