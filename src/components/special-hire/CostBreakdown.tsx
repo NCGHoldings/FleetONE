@@ -206,7 +206,7 @@ export function CostBreakdown({ data }: Props) {
             <Separator />
             <div className="flex justify-between font-bold text-lg text-green-600 bg-green-50 p-3 rounded-md border-2 border-green-200">
               <span>FINAL TOTAL - Customer Pays</span>
-              <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
+              <span>LKR {(safeData.customerTotalWithFuel + (safeData.totalTripDistance * 20)).toLocaleString()}</span>
             </div>
           </div>
         </div>
