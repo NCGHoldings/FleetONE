@@ -45,7 +45,7 @@ interface CostData {
   totalExpenses: number;
   netProfit: number;
   // Additional charges
-  additionalCharges?: Array<{ type: string; amount: number; reason?: string; applyPerBus?: boolean }>;
+  additionalCharges?: Array<{ type: string; amount: number; reason?: string }>;
   totalAdditionalCharges?: number;
   numberOfBuses?: number;
 }
@@ -98,22 +98,17 @@ export function CostBreakdown({ data }: Props) {
   // Calculate maintenance cost (for all buses)  
   const calculatedMaintenanceCost = (safeData.totalTripDistance * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   
-  // Calculate additional charges total (respect per-bus flag)
-  const additionalChargesTotal = (data.additionalCharges || []).reduce((sum, charge) => sum + (charge.amount || 0) * (charge.applyPerBus ? (safeData.numberOfBuses || 1) : 1), 0);
+  // Calculate additional charges total
+  const additionalChargesTotal = (data.additionalCharges || []).reduce((sum, charge) => sum + charge.amount, 0);
   
   // Calculate other expenses total
   const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-  
-  // Recalculate FINAL TOTAL - Customer Pays from visible items to avoid double counting
-  const commissionPassThrough = safeData.commissionPassThroughAmount || 0;
-  const discount = safeData.discountAmount || 0;
-  const finalTotalCustomerPays = safeData.hireCharge + customerFuelCost + commissionPassThrough + additionalChargesTotal - discount;
   
   // Calculate correct total expenses (using customer fuel cost for customer billing)
   const correctTotalExpenses = customerFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
   
   // Calculate correct net profit (Final Total - Customer Pays minus Total Expenses)
-  const correctNetProfit = finalTotalCustomerPays - correctTotalExpenses;
+  const correctNetProfit = safeData.customerTotalWithFuel - correctTotalExpenses;
   
   // Calculate net profit per bus
   const netProfitPerBus = correctNetProfit / safeData.numberOfBuses;
@@ -223,14 +218,10 @@ export function CostBreakdown({ data }: Props) {
                       driver_charges: 'Driver Charges',
                       other: charge.reason || 'Other'
                     };
-                    const effectiveAmount = (charge.amount || 0) * (charge.applyPerBus ? safeData.numberOfBuses : 1);
                     return (
                       <div key={index} className="flex justify-between pl-4">
-                        <span>
-                          {chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}
-                          {charge.applyPerBus ? ` (× ${safeData.numberOfBuses} ${safeData.numberOfBuses > 1 ? 'buses' : 'bus'})` : ''}
-                        </span>
-                        <span>LKR {effectiveAmount.toLocaleString()}</span>
+                        <span>{chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}</span>
+                        <span>LKR {charge.amount.toLocaleString()}</span>
                       </div>
                     );
                   })}
@@ -240,7 +231,7 @@ export function CostBreakdown({ data }: Props) {
             <Separator />
             <div className="flex justify-between font-bold text-lg text-green-600 bg-green-50 p-3 rounded-md border-2 border-green-200">
               <span>FINAL TOTAL - Customer Pays</span>
-              <span>LKR {finalTotalCustomerPays.toLocaleString()}</span>
+              <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -295,14 +286,10 @@ export function CostBreakdown({ data }: Props) {
                     driver_charges: 'Driver Charges',
                     other: charge.reason || 'Other'
                   };
-                  const effectiveAmount = (charge.amount || 0) * (charge.applyPerBus ? safeData.numberOfBuses : 1);
                   return (
                     <div key={index} className="flex justify-between">
-                      <span>
-                        {chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}
-                        {charge.applyPerBus ? ` (× ${safeData.numberOfBuses} ${safeData.numberOfBuses > 1 ? 'buses' : 'bus'})` : ''}
-                      </span>
-                      <span>LKR {effectiveAmount.toLocaleString()}</span>
+                      <span>{chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}</span>
+                      <span>LKR {charge.amount.toLocaleString()}</span>
                     </div>
                   );
                 })}
