@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { 
@@ -15,9 +16,9 @@ import {
   CheckCircle, 
   AlertCircle, 
   X,
-  MapPin,
-  Download,
-  Eye
+  Eye,
+  RefreshCw,
+  Database
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -29,11 +30,13 @@ interface ExcelColumn {
 }
 
 interface ImportResult {
+  success: boolean;
   total: number;
-  success: number;
-  errors: number;
-  duplicates: number;
-  newMonths: string[];
+  inserted: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+  message?: string;
 }
 
 const REQUIRED_COLUMNS = [
@@ -65,9 +68,9 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
   const [excelData, setExcelData] = useState<any[]>([]);
   const [excelColumns, setExcelColumns] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+  const [importMode, setImportMode] = useState<'replace_all' | 'upsert'>('replace_all');
   const [isMapping, setIsMapping] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -152,13 +155,7 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
       }
     });
 
-    // Detect monthly payment columns (e.g., "Jan 2025", "Feb 2025")
-    const monthPattern = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s*\d{4}$/i;
-    headers.forEach(header => {
-      if (monthPattern.test(header.trim())) {
-        mapping[`payment_${header.replace(/\s+/g, "_").toLowerCase()}`] = header;
-      }
-    });
+    // Skip monthly payment columns for now - focusing on student data only
 
     setColumnMapping(mapping);
   };
@@ -191,140 +188,49 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
     if (!branchId || excelData.length === 0) return;
 
     setIsImporting(true);
-    setImportProgress(0);
 
     try {
-      let successCount = 0;
-      let errorCount = 0;
-      let duplicateCount = 0;
-      const newMonths: string[] = [];
-
-      // Process monthly payment columns
-      const monthlyColumns = Object.keys(columnMapping).filter(key => 
-        key.startsWith("payment_") && key !== "payment_amount"
-      );
-
-      // Create payment months if they don't exist
-      for (const monthKey of monthlyColumns) {
-        const monthName = monthKey.replace("payment_", "").replace(/_/g, " ");
-        const formattedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-        
-        const { data: existingMonth } = await supabase
-          .from("school_payment_months")
-          .select("id")
-          .eq("month_year", formattedMonth)
-          .single();
-
-        if (!existingMonth) {
-          const monthDate = new Date(`${formattedMonth} 01, ${new Date().getFullYear()}`);
-          await supabase
-            .from("school_payment_months")
-            .insert({
-              month_year: formattedMonth,
-              month_date: monthDate.toISOString().split('T')[0]
-            });
-          newMonths.push(formattedMonth);
-        }
-      }
-
-      // Process students
-      for (let i = 0; i < excelData.length; i++) {
-        const row = excelData[i];
-        
-        // Map data according to column mapping
-        const studentData: any = {
-          branch_id: branchId,
-          is_active: true,
-        };
-
+      // Prepare mapped data for Edge Function
+      const mappedData = excelData.map(row => {
+        const mappedRow: any = {};
         Object.entries(columnMapping).forEach(([dbCol, excelCol]) => {
-          if (!dbCol.startsWith("payment_") && excelCol !== "skip" && row[excelCol] !== undefined) {
-            studentData[dbCol] = row[excelCol];
+          if (excelCol !== "skip" && row[excelCol] !== undefined) {
+            mappedRow[dbCol] = row[excelCol];
           }
         });
+        return mappedRow;
+      });
 
-        // Check for duplicates
-        const { data: existing } = await supabase
-          .from("school_students")
-          .select("id")
-          .eq("branch_id", branchId)
-          .eq("student_name", studentData.student_name)
-          .eq("admission_no", studentData.admission_no || "")
-          .eq("is_active", true)
-          .single();
-
-        if (existing) {
-          duplicateCount++;
-        } else {
-          // Insert student
-          const { data: insertedStudent, error } = await supabase
-            .from("school_students")
-            .insert(studentData)
-            .select()
-            .single();
-
-          if (error) {
-            console.error("Error inserting student:", error);
-            errorCount++;
-          } else {
-            successCount++;
-            
-            // Insert monthly payments if available
-            for (const monthKey of monthlyColumns) {
-              const excelCol = columnMapping[monthKey];
-              const paymentAmount = row[excelCol];
-              
-              if (paymentAmount && !isNaN(paymentAmount)) {
-                const monthName = monthKey.replace("payment_", "").replace(/_/g, " ");
-                const formattedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-                
-                const { data: paymentMonth } = await supabase
-                  .from("school_payment_months")
-                  .select("id")
-                  .eq("month_year", formattedMonth)
-                  .single();
-
-                if (paymentMonth) {
-                  await supabase
-                    .from("school_payments")
-                    .insert({
-                      student_id: insertedStudent.id,
-                      branch_id: branchId,
-                      payment_month_id: paymentMonth.id,
-                      amount: parseFloat(paymentAmount),
-                      status: "paid",
-                      payment_date: new Date().toISOString().split('T')[0]
-                    });
-                }
-              }
-            }
-          }
+      // Call Edge Function for bulk processing
+      const { data: result, error } = await supabase.functions.invoke('process-school-excel', {
+        body: {
+          data: mappedData,
+          branch_id: branchId,
+          mode: importMode
         }
+      });
 
-        setImportProgress(Math.round(((i + 1) / excelData.length) * 100));
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(error.message || "Failed to process import");
       }
 
-      setImportResult({
-        total: excelData.length,
-        success: successCount,
-        errors: errorCount,
-        duplicates: duplicateCount,
-        newMonths
-      });
+      setImportResult(result);
 
       toast({
-        title: "Import Complete",
-        description: `Successfully imported ${successCount} students`,
+        title: result.success ? "Import Complete" : "Import Failed",
+        description: result.message || `Processed ${result.total} records`,
+        variant: result.success ? "default" : "destructive",
       });
 
-      if (onImportComplete) {
+      if (result.success && onImportComplete) {
         onImportComplete();
       }
     } catch (error) {
       console.error("Import error:", error);
       toast({
         title: "Import Failed",
-        description: "An error occurred during import",
+        description: error.message || "An error occurred during import",
         variant: "destructive",
       });
     } finally {
@@ -337,9 +243,9 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
     setExcelData([]);
     setExcelColumns([]);
     setColumnMapping({});
+    setImportMode('replace_all');
     setIsMapping(false);
     setIsImporting(false);
-    setImportProgress(0);
     setImportResult(null);
     setPreviewData([]);
     if (fileInputRef.current) {
@@ -427,26 +333,47 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
               ))}
             </div>
 
-            {/* Show detected monthly columns */}
-            {Object.keys(columnMapping).filter(k => k.startsWith("payment_")).length > 0 && (
-              <Alert>
-                <CheckCircle className="h-4 w-4" />
-                <AlertTitle>Monthly Payment Columns Detected</AlertTitle>
-                <AlertDescription>
-                  Found {Object.keys(columnMapping).filter(k => k.startsWith("payment_")).length} monthly payment columns that will be automatically processed.
-                </AlertDescription>
-              </Alert>
-            )}
+            {/* Import Mode Selection */}
+            <div className="space-y-3">
+              <Label className="text-base font-medium">Import Mode</Label>
+              <RadioGroup value={importMode} onValueChange={(value: 'replace_all' | 'upsert') => setImportMode(value)}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="replace_all" id="replace_all" />
+                  <Label htmlFor="replace_all" className="cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      <span className="font-medium">Replace All</span>
+                      <Badge variant="secondary">Recommended</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Clear existing students and import all Excel rows. Guarantees Excel count = Database count.
+                    </p>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="upsert" id="upsert" />
+                  <Label htmlFor="upsert" className="cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      <span className="font-medium">Update/Insert</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Update existing students (by admission no) and insert new ones.
+                    </p>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
 
             <div className="flex gap-2">
               <Button onClick={generatePreview} variant="outline">
                 <Eye className="h-4 w-4 mr-2" />
                 Preview Data
               </Button>
-              <Button onClick={startImport} disabled={!columnMapping.student_name}>
-                Start Import
+              <Button onClick={startImport} disabled={!columnMapping.student_name || isImporting}>
+                {isImporting ? "Processing..." : "Start Import"}
               </Button>
-              <Button onClick={resetImport} variant="outline">
+              <Button onClick={resetImport} variant="outline" disabled={isImporting}>
                 <X className="h-4 w-4 mr-2" />
                 Reset
               </Button>
@@ -458,16 +385,16 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
       {isImporting && (
         <Card>
           <CardHeader>
-            <CardTitle>Importing Data</CardTitle>
+            <CardTitle>Processing Import</CardTitle>
             <CardDescription>
-              Processing {excelData.length} records...
+              Processing {excelData.length} records using server-side batch processing...
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Progress value={importProgress} className="w-full" />
-            <p className="text-sm text-muted-foreground mt-2">
-              {importProgress}% complete
-            </p>
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span>Processing in {importMode === 'replace_all' ? 'Replace All' : 'Update/Insert'} mode</span>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -476,7 +403,11 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+              {importResult.success ? (
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              ) : (
+                <AlertCircle className="h-5 w-5 text-red-500" />
+              )}
               Import Results
             </CardTitle>
           </CardHeader>
@@ -487,12 +418,12 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
                 <div className="text-sm text-muted-foreground">Total Records</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{importResult.success}</div>
-                <div className="text-sm text-muted-foreground">Successful</div>
+                <div className="text-2xl font-bold text-green-600">{importResult.inserted}</div>
+                <div className="text-sm text-muted-foreground">Inserted</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{importResult.duplicates}</div>
-                <div className="text-sm text-muted-foreground">Duplicates Skipped</div>
+                <div className="text-2xl font-bold text-blue-600">{importResult.updated}</div>
+                <div className="text-sm text-muted-foreground">Updated</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-red-600">{importResult.errors}</div>
@@ -500,15 +431,6 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
               </div>
             </div>
 
-            {importResult.newMonths.length > 0 && (
-              <Alert className="mt-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>New Payment Months Created</AlertTitle>
-                <AlertDescription>
-                  Created {importResult.newMonths.length} new payment months: {importResult.newMonths.join(", ")}
-                </AlertDescription>
-              </Alert>
-            )}
 
             <Button onClick={resetImport} className="mt-4">
               Import Another File
