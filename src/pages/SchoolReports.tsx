@@ -338,7 +338,7 @@ export default function SchoolReports() {
                   cy="50%"
                   outerRadius={100}
                   dataKey="value"
-                  label={(entry: any) => `${entry.name} ${(entry.percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 >
                   {COLORS.map((color, index) => (
                     <Cell key={`cell-${index}`} fill={color} />

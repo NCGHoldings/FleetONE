@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -14,19 +13,7 @@ import {
   TrendingUp,
   School,
   Bus,
-  Receipt,
-  Download,
-  Upload,
-  MessageSquare,
-  BarChart3,
-  Calendar,
-  Phone,
-  Mail,
-  Bell,
-  Settings,
-  Filter,
-  Search,
-  RefreshCw
+  Receipt
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -34,9 +21,6 @@ interface Branch {
   id: string;
   branch_name: string;
   branch_code: string;
-  address?: string;
-  contact_phone?: string;
-  manager_name?: string;
   is_total_branch: boolean;
   is_active: boolean;
 }
@@ -172,7 +156,7 @@ export default function SchoolBusService() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => navigate("/school-bus/import")}>
+          <Button onClick={() => navigate("/school-bus/students/import")}>
             Import Students
           </Button>
           <Button onClick={() => navigate("/school-bus/payments")}>
@@ -181,40 +165,39 @@ export default function SchoolBusService() {
         </div>
       </div>
 
-      {/* Advanced KPI Dashboard */}
+      {/* Overall KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <KPICard
           title="Total Students"
           value={overallStats.totalStudents.toString()}
           description="Across all branches"
-          icon={<Users className="h-4 w-4 text-blue-500" />}
+          icon={<Users className="h-4 w-4" />}
         />
         <KPICard
           title="Revenue (LKR)"
           value={overallStats.totalRevenue.toLocaleString()}
-          description="Total collected this month"
-          icon={<CreditCard className="h-4 w-4 text-green-500" />}
+          description="Total collected"
+          icon={<CreditCard className="h-4 w-4" />}
         />
         <KPICard
-          title="Payment Rate"
-          value={`${overallStats.totalStudents > 0 ? ((overallStats.paidStudents / overallStats.totalStudents) * 100).toFixed(1) : 0}%`}
-          description={`${overallStats.paidStudents} students paid`}
-          icon={<TrendingUp className="h-4 w-4 text-emerald-500" />}
+          title="Paid Students"
+          value={overallStats.paidStudents.toString()}
+          description={`${((overallStats.paidStudents / overallStats.totalStudents) * 100).toFixed(1)}% payment rate`}
+          icon={<TrendingUp className="h-4 w-4" />}
         />
         <KPICard
-          title="Pending Collection"
+          title="Pending Payments"
           value={overallStats.pendingStudents.toString()}
-          description="Need immediate attention"
-          icon={<Receipt className="h-4 w-4 text-amber-500" />}
+          description="Need collection"
+          icon={<Receipt className="h-4 w-4" />}
         />
         <KPICard
-          title="Urgent Follow-up"
+          title="Overdue"
           value={overallStats.overduePayments.toString()}
-          description="Overdue payments"
-          icon={<AlertCircle className="h-4 w-4 text-red-500" />}
+          description="Require attention"
+          icon={<AlertCircle className="h-4 w-4" />}
         />
       </div>
-
 
       {/* Total Dashboard Card */}
       {totalBranch && (
@@ -259,7 +242,7 @@ export default function SchoolBusService() {
         </Card>
       )}
 
-      {/* Branch Cards - Clean Interface */}
+      {/* Branch Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {regularBranches.map((branch) => {
           const stats = branchStats[branch.id] || {
@@ -270,71 +253,59 @@ export default function SchoolBusService() {
             overduePayments: 0,
           };
 
-          const paymentRate = stats.totalStudents > 0 ? (stats.paidStudents / stats.totalStudents) * 100 : 0;
-
           return (
-            <Card key={branch.id} className="p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-100">
-              {/* Branch Header */}
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <School className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">{branch.branch_name}</h3>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Badge variant="outline" className="text-xs font-medium text-gray-600 bg-gray-50">
-                      {branch.branch_code}
-                    </Badge>
+            <Card key={branch.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5" />
+                    {branch.branch_name}
                   </div>
-                </div>
-              </div>
+                  <Badge variant="secondary">{branch.branch_code}</Badge>
+                </CardTitle>
+                <CardDescription>
+                  Branch operations and student management
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <div className="font-medium">Students</div>
+                      <div className="text-2xl font-bold">{stats.totalStudents}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium">Revenue</div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {stats.totalRevenue.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2 text-sm">
+                    <Badge variant="default" className="bg-green-100 text-green-800">
+                      {stats.paidStudents} Paid
+                    </Badge>
+                    <Badge variant="secondary">
+                      {stats.pendingStudents} Pending
+                    </Badge>
+                    {stats.overduePayments > 0 && (
+                      <Badge variant="destructive">
+                        {stats.overduePayments} Overdue
+                      </Badge>
+                    )}
+                  </div>
 
-              {/* Stats Cards */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-blue-50 rounded-xl p-4 border-l-4 border-blue-500">
-                  <p className="text-sm font-medium text-blue-700 mb-2">Total Students</p>
-                  <p className="text-3xl font-bold text-blue-900">{stats.totalStudents}</p>
+                  <Button 
+                    onClick={() => handleBranchClick(branch)}
+                    className="w-full mt-4"
+                    variant="outline"
+                  >
+                    <Bus className="h-4 w-4 mr-2" />
+                    Manage Branch
+                  </Button>
                 </div>
-                <div className="bg-green-50 rounded-xl p-4 border-l-4 border-green-500">
-                  <p className="text-sm font-medium text-green-700 mb-2">Revenue (LKR)</p>
-                  <p className="text-3xl font-bold text-green-900">{stats.totalRevenue.toLocaleString()}</p>
-                </div>
-              </div>
-
-              {/* Payment Rate */}
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium text-gray-600">Payment Rate</span>
-                  <span className="text-lg font-bold text-red-500">{paymentRate.toFixed(1)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300" 
-                    style={{ width: `${paymentRate}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Status Badges */}
-              <div className="flex gap-3 mb-6">
-                <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-green-700">{stats.paidStudents} Paid</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-orange-100 rounded-full">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-orange-700">{stats.pendingStudents} Pending</span>
-                </div>
-              </div>
-
-              {/* Manage Button */}
-              <Button 
-                onClick={() => handleBranchClick(branch)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold transition-colors"
-              >
-                <Bus className="h-4 w-4 mr-2" />
-                Manage
-              </Button>
+              </CardContent>
             </Card>
           );
         })}
