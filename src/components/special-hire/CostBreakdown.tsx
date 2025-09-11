@@ -44,8 +44,14 @@ interface CostData {
   discountAmount?: number;
   totalExpenses: number;
   netProfit: number;
-  // Additional charges
-  additionalCharges?: Array<{ type: string; amount: number; reason?: string }>;
+  // Additional charges with per-bus support
+  additionalCharges?: Array<{ 
+    type: string; 
+    amount: number; 
+    reason?: string;
+    applyPerBus?: boolean;
+    busesCount?: number;
+  }>;
   totalAdditionalCharges?: number;
   numberOfBuses?: number;
 }
@@ -98,8 +104,13 @@ export function CostBreakdown({ data }: Props) {
   // Calculate maintenance cost (for all buses)  
   const calculatedMaintenanceCost = (safeData.totalTripDistance * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   
-  // Calculate additional charges total
-  const additionalChargesTotal = (data.additionalCharges || []).reduce((sum, charge) => sum + charge.amount, 0);
+  // Calculate additional charges total with per-bus support
+  const additionalChargesTotal = (data.additionalCharges || []).reduce((sum, charge) => {
+    const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
+      ? charge.amount * charge.busesCount 
+      : charge.amount;
+    return sum + effectiveAmount;
+  }, 0);
   
   // Calculate other expenses total
   const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -210,21 +221,31 @@ export function CostBreakdown({ data }: Props) {
                 <Separator />
                 <div className="space-y-2">
                   <div className="text-sm font-medium text-orange-600">Additional Charges:</div>
-                  {data.additionalCharges.map((charge, index) => {
-                    const chargeTypeLabels = {
-                      permits: 'Permits Cost',
-                      highway: 'Highway Charges',
-                      additional_fuel: 'Additional Fuel Costs',
-                      driver_charges: 'Driver Charges',
-                      other: charge.reason || 'Other'
-                    };
-                    return (
-                      <div key={index} className="flex justify-between pl-4">
-                        <span>{chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}</span>
-                        <span>LKR {charge.amount.toLocaleString()}</span>
-                      </div>
-                    );
-                  })}
+                   {data.additionalCharges.map((charge, index) => {
+                     const chargeTypeLabels = {
+                       permits: 'Permits Cost',
+                       highway: 'Highway Charges',
+                       additional_fuel: 'Additional Fuel Costs',
+                       driver_charges: 'Driver Charges',
+                       other: charge.reason || 'Other'
+                     };
+                     
+                     const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
+                       ? charge.amount * charge.busesCount 
+                       : charge.amount;
+                     
+                     const displayLabel = chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type;
+                     const busInfo = (charge.applyPerBus && charge.busesCount) 
+                       ? ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`
+                       : '';
+                     
+                     return (
+                       <div key={index} className="flex justify-between pl-4">
+                         <span>{displayLabel}{busInfo}</span>
+                         <span>LKR {effectiveAmount.toLocaleString()}</span>
+                       </div>
+                     );
+                   })}
                 </div>
               </>
             )}
@@ -286,10 +307,20 @@ export function CostBreakdown({ data }: Props) {
                     driver_charges: 'Driver Charges',
                     other: charge.reason || 'Other'
                   };
+                  
+                  const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
+                    ? charge.amount * charge.busesCount 
+                    : charge.amount;
+                    
+                  const displayLabel = chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type;
+                  const busInfo = (charge.applyPerBus && charge.busesCount) 
+                    ? ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`
+                    : '';
+                  
                   return (
                     <div key={index} className="flex justify-between">
-                      <span>{chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}</span>
-                      <span>LKR {charge.amount.toLocaleString()}</span>
+                      <span>{displayLabel}{busInfo}</span>
+                      <span>LKR {effectiveAmount.toLocaleString()}</span>
                     </div>
                   );
                 })}

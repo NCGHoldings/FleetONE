@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,6 +70,8 @@ interface AdditionalCharge {
   type: string;
   amount: number;
   reason?: string;
+  applyPerBus: boolean;
+  busesCount: number;
 }
 
 type FormData = z.infer<typeof formSchema>;
@@ -126,28 +129,38 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       pickupLocation: initialData.pickup_location || '',
       dropLocation: initialData.drop_location || '',
       numberOfPassengers: initialData.number_of_passengers || 1,
-      pickupDateTime: initialData.pickup_datetime ? new Date(initialData.pickup_datetime) : new Date(),
-      dropDateTime: initialData.drop_datetime ? new Date(initialData.drop_datetime) : new Date(),
+      pickupDateTime: initialData.pickup_date_time ? new Date(initialData.pickup_date_time) : new Date(),
+      dropDateTime: initialData.drop_date_time ? new Date(initialData.drop_date_time) : new Date(),
       parkingLocationId: initialData.parking_location_id || '',
-      commissionPct: initialData.commission_pct || 5,
+      commissionPct: initialData.commission_pct || 20,
       commissionPassThroughPct: initialData.commission_pass_through_pct || 0,
-      discountType: initialData.discount_type || 'percentage',
+      discountType: (initialData.discount_percentage && initialData.discount_percentage > 0) ? 'percentage' : 'amount',
       discountPct: initialData.discount_percentage || 0,
-      discountAmount: initialData.discount_amount_lkr || 0,
+      discountAmount: initialData.discount_amount || 0,
     } : {
+      companyName: '',
+      customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      specialRequest: '',
+      busTypeId: '',
       hireType: 'Outside',
       numberOfBuses: 1,
+      pickupLocation: '',
+      dropLocation: '',
       numberOfPassengers: 1,
       pickupDateTime: new Date(),
       dropDateTime: new Date(),
       parkingLocationId: '',
-      commissionPct: 5,
+      commissionPct: 20,
       commissionPassThroughPct: 0,
       discountType: 'percentage',
       discountPct: 0,
       discountAmount: 0,
     }
   });
+
+  const watchedNumberOfBuses = form.watch('numberOfBuses');
 
   useEffect(() => {
     loadBusTypes();
@@ -279,9 +292,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const addAdditionalCharge = () => {
     const newCharge: AdditionalCharge = {
       id: Date.now().toString(),
-      type: 'permits',
+      type: 'permits',   
       amount: 0,
-      reason: ''
+      reason: '',
+      applyPerBus: false,
+      busesCount: 1
     };
     setAdditionalCharges(charges => [...charges, newCharge]);
   };
@@ -425,8 +440,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         : data.discountAmount;
       
       // Final customer total with additional charges
-      const totalAdditionalCharges = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
-      const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount + (totalAdditionalCharges * data.numberOfBuses);
+      const totalAdditionalCharges = additionalCharges.reduce((sum, charge) => {
+        return sum + (charge.applyPerBus ? charge.amount * charge.busesCount : charge.amount);
+      }, 0);
+      const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount + totalAdditionalCharges;
       
       // Company expenses
       const commissionExpense = baseCustomerTotal * (data.commissionPct / 100); // Total commission company pays
@@ -453,7 +470,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         additional_charges: additionalCharges.map(charge => ({
           type: charge.type,
           amount: charge.amount,
-          reason: charge.reason || additionalChargeTypes.find(t => t.value === charge.type)?.label
+          reason: charge.reason || additionalChargeTypes.find(t => t.value === charge.type)?.label,
+          applyPerBus: charge.applyPerBus,
+          busesCount: charge.busesCount
         })),
         total_additional_charges: Math.round(totalAdditionalCharges),
         total_expenses: Math.round(totalExpenses),
@@ -1172,19 +1191,57 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                            </div>
                          </div>
                          
-                         {charge.type === 'other' && (
-                           <div className="space-y-2">
-                             <Label className="text-base font-medium text-foreground">
-                               Reason / Description *
-                             </Label>
-                             <Input
-                               value={charge.reason || ''}
-                               onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
-                               placeholder="Please specify the reason for this charge"
-                               className="h-11 text-base"
-                             />
-                           </div>
-                         )}
+                          {charge.type === 'other' && (
+                            <div className="space-y-2">
+                              <Label className="text-base font-medium text-foreground">
+                                Reason / Description *
+                              </Label>
+                              <Input
+                                value={charge.reason || ''}
+                                onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
+                                placeholder="Please specify the reason for this charge"
+                                className="h-11 text-base"
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Per Bus Application Settings */}
+                          <div className="border-t pt-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-1">
+                                <Label className="text-base font-medium text-foreground">
+                                  Apply to Multiple Buses
+                                </Label>
+                                <p className="text-sm text-muted-foreground">
+                                  Enable this if the charge should be applied per bus
+                                </p>
+                              </div>
+                              <Switch
+                                checked={charge.applyPerBus}
+                                onCheckedChange={(checked) => updateAdditionalCharge(charge.id, 'applyPerBus', checked)}
+                              />
+                            </div>
+                            
+                            {charge.applyPerBus && (
+                              <div className="space-y-2">
+                                <Label className="text-base font-medium text-foreground">
+                                  Number of Buses *
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max={watchedNumberOfBuses}
+                                  value={charge.busesCount}
+                                  onChange={(e) => updateAdditionalCharge(charge.id, 'busesCount', parseInt(e.target.value) || 1)}
+                                  placeholder="Enter number of buses"
+                                  className="h-11 text-base w-32"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Maximum: {watchedNumberOfBuses} buses (total buses for this trip)
+                                </p>
+                              </div>
+                            )}
+                          </div>
                        </div>
                      </Card>
                   ))}
