@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -69,6 +70,7 @@ interface AdditionalCharge {
   type: string;
   amount: number;
   reason?: string;
+  applyPerBus?: boolean;
 }
 
 type FormData = z.infer<typeof formSchema>;
@@ -180,7 +182,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             id: `existing-${index}`,
             type: charge.type || 'other',
             amount: Number(charge.amount) || 0,
-            reason: charge.reason || ''
+            reason: charge.reason || '',
+            applyPerBus: charge.apply_per_bus ?? charge.applyPerBus ?? false
           }));
           
           setAdditionalCharges(formattedCharges);
@@ -281,7 +284,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       id: Date.now().toString(),
       type: 'permits',
       amount: 0,
-      reason: ''
+      reason: '',
+      applyPerBus: false
     };
     setAdditionalCharges(charges => [...charges, newCharge]);
   };
@@ -424,9 +428,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         ? baseCustomerTotal * (data.discountPct / 100)
         : data.discountAmount;
       
-      // Final customer total with additional charges
-      const totalAdditionalCharges = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
-      const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount + (totalAdditionalCharges * data.numberOfBuses);
+      // Final customer total with additional charges (respect per-bus flag)
+      const totalAdditionalCharges = additionalCharges.reduce((sum, charge) => sum + (charge.amount || 0), 0);
+      const totalAdditionalChargesEffective = additionalCharges.reduce((sum, charge) => sum + (charge.amount || 0) * (charge.applyPerBus ? data.numberOfBuses : 1), 0);
+      const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount + totalAdditionalChargesEffective;
       
       // Company expenses
       const commissionExpense = baseCustomerTotal * (data.commissionPct / 100); // Total commission company pays
@@ -453,9 +458,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         additional_charges: additionalCharges.map(charge => ({
           type: charge.type,
           amount: charge.amount,
-          reason: charge.reason || additionalChargeTypes.find(t => t.value === charge.type)?.label
+          reason: charge.reason || additionalChargeTypes.find(t => t.value === charge.type)?.label,
+          apply_per_bus: !!charge.applyPerBus
         })),
-        total_additional_charges: Math.round(totalAdditionalCharges),
+        total_additional_charges: Math.round(totalAdditionalChargesEffective),
         total_expenses: Math.round(totalExpenses),
         net_profit: Math.round(netProfit)
       };
@@ -489,7 +495,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         discountType: data.discountType,
         discountPct: data.discountType === 'percentage' ? data.discountPct : 0,
         discountAmount: Math.round(discountAmount),
-        additionalCharges: costs.additional_charges,
+        additionalCharges: (costs.additional_charges || []).map((c: any) => ({ type: c.type, amount: c.amount, reason: c.reason, applyPerBus: c.apply_per_bus })),
         totalAdditionalCharges: costs.total_additional_charges,
         driverCharge: costs.driver_charge,
         otherExpenses: costs.other_expenses,
@@ -1169,6 +1175,16 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                placeholder="Enter amount (e.g., 5000.00)"
                                className="h-11 text-base"
                              />
+                             <div className="flex items-center gap-3 pt-2">
+                               <Switch
+                                 checked={!!charge.applyPerBus}
+                                 onCheckedChange={(checked) => updateAdditionalCharge(charge.id, 'applyPerBus', checked)}
+                                 id={`apply-per-bus-${charge.id}`}
+                               />
+                               <Label htmlFor={`apply-per-bus-${charge.id}`} className="text-sm text-muted-foreground">
+                                 Apply to each bus (× {form.getValues('numberOfBuses') || 1})
+                               </Label>
+                             </div>
                            </div>
                          </div>
                          

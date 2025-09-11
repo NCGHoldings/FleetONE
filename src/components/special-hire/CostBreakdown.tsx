@@ -45,7 +45,7 @@ interface CostData {
   totalExpenses: number;
   netProfit: number;
   // Additional charges
-  additionalCharges?: Array<{ type: string; amount: number; reason?: string }>;
+  additionalCharges?: Array<{ type: string; amount: number; reason?: string; applyPerBus?: boolean }>;
   totalAdditionalCharges?: number;
   numberOfBuses?: number;
 }
@@ -98,8 +98,8 @@ export function CostBreakdown({ data }: Props) {
   // Calculate maintenance cost (for all buses)  
   const calculatedMaintenanceCost = (safeData.totalTripDistance * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   
-  // Calculate additional charges total
-  const additionalChargesTotal = (data.additionalCharges || []).reduce((sum, charge) => sum + charge.amount, 0);
+  // Calculate additional charges total (respect per-bus flag)
+  const additionalChargesTotal = (data.additionalCharges || []).reduce((sum, charge) => sum + (charge.amount || 0) * (charge.applyPerBus ? (safeData.numberOfBuses || 1) : 1), 0);
   
   // Calculate other expenses total
   const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -223,10 +223,14 @@ export function CostBreakdown({ data }: Props) {
                       driver_charges: 'Driver Charges',
                       other: charge.reason || 'Other'
                     };
+                    const effectiveAmount = (charge.amount || 0) * (charge.applyPerBus ? safeData.numberOfBuses : 1);
                     return (
                       <div key={index} className="flex justify-between pl-4">
-                        <span>{chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}</span>
-                        <span>LKR {charge.amount.toLocaleString()}</span>
+                        <span>
+                          {chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}
+                          {charge.applyPerBus ? ` (× ${safeData.numberOfBuses} ${safeData.numberOfBuses > 1 ? 'buses' : 'bus'})` : ''}
+                        </span>
+                        <span>LKR {effectiveAmount.toLocaleString()}</span>
                       </div>
                     );
                   })}
@@ -291,10 +295,14 @@ export function CostBreakdown({ data }: Props) {
                     driver_charges: 'Driver Charges',
                     other: charge.reason || 'Other'
                   };
+                  const effectiveAmount = (charge.amount || 0) * (charge.applyPerBus ? safeData.numberOfBuses : 1);
                   return (
                     <div key={index} className="flex justify-between">
-                      <span>{chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}</span>
-                      <span>LKR {charge.amount.toLocaleString()}</span>
+                      <span>
+                        {chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type}
+                        {charge.applyPerBus ? ` (× ${safeData.numberOfBuses} ${safeData.numberOfBuses > 1 ? 'buses' : 'bus'})` : ''}
+                      </span>
+                      <span>LKR {effectiveAmount.toLocaleString()}</span>
                     </div>
                   );
                 })}
