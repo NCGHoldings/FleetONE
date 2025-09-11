@@ -276,7 +276,8 @@ export function CostCalculator() {
           totalExpenses: Math.round(totalExpenses),
           netProfit: Math.round(netProfit),
           busTypeName: selectedBusType.name,
-          fuelPrice: fuelSettings.diesel_price_lkr_per_l
+          busTypeEfficiency: selectedBusType.avg_km_per_l || 8,
+          fuelPricePerLiter: fuelSettings.diesel_price_lkr_per_l
         };
 
         console.log('Final cost calculation result (Outside):', result);
@@ -386,7 +387,8 @@ export function CostCalculator() {
         totalExpenses: Math.round(totalExpenses),
         netProfit: Math.round(netProfit),
         busTypeName: selectedBusType.name,
-        fuelPrice: fuelSettings.diesel_price_lkr_per_l
+        busTypeEfficiency: selectedBusType.avg_km_per_l || 8,
+        fuelPricePerLiter: fuelSettings.diesel_price_lkr_per_l
       };
 
       console.log('Final cost calculation result:', result);

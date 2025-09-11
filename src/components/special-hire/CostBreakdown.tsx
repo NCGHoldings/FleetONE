@@ -66,8 +66,8 @@ export function CostBreakdown({ data }: Props) {
     exceedingDistanceCharge: data.exceedingDistanceCharge || 0,
     maintenanceCost: data.maintenanceCost || 0,
     totalTripDistance: (data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0),
-    busTypeEfficiency: data.busTypeEfficiency || 8, // Default 8 km/l
-    fuelPricePerLiter: data.fuelPricePerLiter || 350, // Default LKR 350/l
+    busTypeEfficiency: data.busTypeEfficiency || 8,
+    fuelPricePerLiter: data.fuelPricePerLiter || 350,
     grossRevenue: data.grossRevenue || 0,
     customerTotalWithFuel: data.customerTotalWithFuel || 0,
     driverCharge: data.driverCharge || 0,
