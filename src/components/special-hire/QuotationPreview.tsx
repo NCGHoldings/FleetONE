@@ -89,15 +89,16 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     };
   };
 
-  // Calculate the final customer total (what customer pays)
+  // Calculate the final customer total (what customer pays) - matches CostBreakdown calculation
   const calculateFinalCustomerTotal = (quotation: QuotationData): number => {
-    const hireCharges = quotation.gross_revenue || 0;
-    const serviceCharges = quotation.fuel_cost_fuel_only || 0;
-    const commission = quotation.commission_pass_through_amount || 0;
-    const discount = quotation.discount_amount_lkr || 0;
+    const grossRevenue = quotation.gross_revenue || 0;
+    const fuelCost = quotation.fuel_cost_fuel_only || 0;
+    const commissionPassThrough = quotation.commission_pass_through_amount || 0;
     const additionalCharges = quotation.total_additional_charges || 0;
+    const discount = quotation.discount_amount_lkr || 0;
     
-    return hireCharges + serviceCharges + commission + additionalCharges - discount;
+    // This matches the calculation: Gross Revenue + Fuel + Commission Pass-through + Additional Charges - Discount
+    return grossRevenue + fuelCost + commissionPassThrough + additionalCharges - discount;
   };
 
   const pickup = formatDateTime(quotation.pickup_datetime);
