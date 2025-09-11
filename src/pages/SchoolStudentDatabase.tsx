@@ -8,7 +8,6 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -23,8 +22,7 @@ import {
   Trash2,
   Phone,
   Mail,
-  MapPin,
-  Loader2
+  MapPin
 } from "lucide-react";
 
 interface Student {
@@ -77,7 +75,6 @@ export default function SchoolStudentDatabase() {
   const [routeFilter, setRouteFilter] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     fetchBranchData();
@@ -187,33 +184,6 @@ export default function SchoolStudentDatabase() {
         description: "Failed to delete student",
         variant: "destructive",
       });
-    }
-  };
-
-  const clearBranchStudents = async () => {
-    if (!branchId) return;
-    setClearing(true);
-    try {
-      const { error } = await supabase
-        .from("school_students")
-        .update({ is_active: false })
-        .eq("branch_id", branchId)
-        .eq("is_active", true);
-      if (error) throw error;
-      toast({
-        title: "Cleared",
-        description: "All active students in this branch were archived.",
-      });
-      await fetchStudents();
-    } catch (error) {
-      console.error("Error clearing students:", error);
-      toast({
-        title: "Error",
-        description: "Failed to clear students for this branch",
-        variant: "destructive",
-      });
-    } finally {
-      setClearing(false);
     }
   };
 
@@ -361,37 +331,6 @@ export default function SchoolStudentDatabase() {
             <Plus className="h-4 w-4 mr-2" />
             Add Student
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" disabled={clearing}>
-                {clearing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Clearing...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Clear Branch Students
-                  </>
-                )}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Clear all students for {branch?.branch_name}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will archive all active students in this branch (set as inactive). You can re-import afterwards.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={clearBranchStudents}>
-                  Confirm
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 
@@ -400,7 +339,7 @@ export default function SchoolStudentDatabase() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" />
+              <Users className="h-4 w-4 text-blue-500" />
               <div>
                 <div className="text-2xl font-bold">{students.length}</div>
                 <div className="text-sm text-muted-foreground">Total Students</div>
