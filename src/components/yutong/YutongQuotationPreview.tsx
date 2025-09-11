@@ -101,6 +101,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           min-height: 100vh;
           display: flex;
           flex-direction: column;
+          border: none !important;
         }
         .page:last-child {
           page-break-after: avoid;
