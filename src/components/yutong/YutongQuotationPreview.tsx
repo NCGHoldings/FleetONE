@@ -96,11 +96,18 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
 
     const pageHeaderFooterStyles = `
       @media print {
+        @page {
+          size: A4;
+          margin: 0;
+        }
         .page {
           page-break-after: always;
-          min-height: 100vh;
+          width: 210mm;
+          height: 297mm;
           display: flex;
           flex-direction: column;
+          margin: 0;
+          padding: 0;
         }
         .page:last-child {
           page-break-after: avoid;
@@ -117,13 +124,15 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
         }
       }
       .page {
-        min-height: 100vh;
+        width: 210mm;
+        height: 297mm;
         display: flex;
         flex-direction: column;
         background: white;
         border: 2px solid #003366;
-        margin-bottom: 20px;
+        margin: 0 auto 20px auto;
         position: relative;
+        box-sizing: border-box;
       }
       .page-header {
         margin-bottom: 20px;
@@ -168,7 +177,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
         <style dangerouslySetInnerHTML={{ __html: pageHeaderFooterStyles }} />
         
         {/* Page 1 - Main Quotation */}
-        <div className="page" style={{ maxWidth: '900px', margin: '0 auto 20px auto' }}>
+        <div className="page">
           <div className="page-content">
             {/* Header */}
             <div className="page-header">
@@ -330,7 +339,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
         </div>
 
         {/* Page 2 - Terms & Conditions */}
-        <div className="page" style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div className="page">
           <div className="page-content">
             {/* Header */}
             <div className="page-header">
