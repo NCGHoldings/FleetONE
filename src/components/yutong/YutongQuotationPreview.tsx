@@ -174,7 +174,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             {/* Header */}
             <div className="page-header">
               <img 
-                src="/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png"
+                src="/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png"
                 alt="Quotation Header - NCG Holdings & Yutong"
                 style={{ width: '100%', height: 'auto', display: 'block' }}
               />
@@ -336,7 +336,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             {/* Header */}
             <div className="page-header">
               <img 
-                src="/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png"
+                src="/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png"
                 alt="Quotation Header - NCG Holdings & Yutong"
                 style={{ width: '100%', height: 'auto', display: 'block' }}
               />
