@@ -107,16 +107,8 @@ export function CostBreakdown({ data }: Props) {
   // Calculate correct total expenses (using customer fuel cost for customer billing)
   const correctTotalExpenses = customerFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
   
-  // Recompute final total the customer pays from visible breakdown items
-  const computedCustomerFinalTotal =
-    safeData.hireCharge +
-    customerFuelCost +
-    (safeData.commissionPassThroughAmount || 0) +
-    additionalChargesTotal -
-    (safeData.discountAmount || 0);
-  
   // Calculate correct net profit (Final Total - Customer Pays minus Total Expenses)
-  const correctNetProfit = computedCustomerFinalTotal - correctTotalExpenses;
+  const correctNetProfit = safeData.customerTotalWithFuel - correctTotalExpenses;
   
   // Calculate net profit per bus
   const netProfitPerBus = correctNetProfit / safeData.numberOfBuses;
@@ -235,7 +227,7 @@ export function CostBreakdown({ data }: Props) {
                   })}
                   <div className="flex justify-between pl-4 font-medium text-orange-600">
                     <span>Total Additional Charges</span>
-                    <span>LKR {additionalChargesTotal.toLocaleString()}</span>
+                    <span>LKR {(data.totalAdditionalCharges || 0).toLocaleString()}</span>
                   </div>
                 </div>
               </>
@@ -243,7 +235,7 @@ export function CostBreakdown({ data }: Props) {
             <Separator />
             <div className="flex justify-between font-bold text-lg text-green-600 bg-green-50 p-3 rounded-md border-2 border-green-200">
               <span>FINAL TOTAL - Customer Pays</span>
-              <span>LKR {computedCustomerFinalTotal.toLocaleString()}</span>
+              <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
             </div>
           </div>
         </div>
