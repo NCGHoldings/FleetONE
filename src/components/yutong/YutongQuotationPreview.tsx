@@ -90,9 +90,17 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
       fetchAddOns();
     }, [quotation.id]);
 
-    // Calculate totals
+    // Calculate totals correctly to avoid double-counting
     const addOnsTotal = addOns.reduce((sum, addon) => sum + (addon.quantity * addon.unit_price), 0);
-    const grandTotal = quotation.total_price + addOnsTotal;
+    
+    // Calculate bus subtotal (quantity * unit_price with discount applied)
+    const busSubtotalBeforeDiscount = quotation.quantity * quotation.unit_price;
+    const discountAmount = quotation.discount_percentage ? 
+      (busSubtotalBeforeDiscount * quotation.discount_percentage / 100) : 0;
+    const busSubtotal = busSubtotalBeforeDiscount - discountAmount;
+    
+    // Grand total should be bus subtotal + add-ons (not quotation.total_price which already includes add-ons)
+    const grandTotal = busSubtotal + addOnsTotal;
 
     const pageHeaderFooterStyles = `
       @media print {
@@ -226,7 +234,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                     {quotation.quantity}
                   </td>
                   <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                    {quotation.total_price.toLocaleString()}
+                    {busSubtotal.toLocaleString()}
                   </td>
                 </tr>
                 
@@ -236,7 +244,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                     Bus Subtotal
                   </td>
                   <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', background: '#f5f5f5', fontWeight: 'bold' }}>
-                    {quotation.total_price.toLocaleString()}
+                    {busSubtotal.toLocaleString()}
                   </td>
                 </tr>
 
