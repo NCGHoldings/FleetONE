@@ -100,9 +100,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
       return quotation.customerTotalWithFuel;
     }
     
-    // Fallback (should rarely be used): This is the total for ALL buses, not per bus
-    const grossRevenue = quotation.gross_revenue || 0; // Already multiplied by numberOfBuses
-    const fuelCostTotal = (quotation.fuel_cost_fuel_only || 0) * (quotation.number_of_buses || 1);
+    // Fallback (total for ALL buses). Note: fuel_cost_fuel_only is already total across buses
+    const grossRevenue = quotation.gross_revenue || 0; // Already for all buses
+    const fuelCostTotal = quotation.fuel_cost_fuel_only || 0; // Do NOT multiply by buses
     const commissionPassThrough = quotation.commission_pass_through_amount || 0;
     const additionalCharges = quotation.total_additional_charges || 0;
     const discount = quotation.discount_amount_lkr || 0;

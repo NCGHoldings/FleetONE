@@ -73,7 +73,7 @@ interface Quotation {
 // Helper function to calculate total revenue (matches Final Total from QuotationPreview)
 const calculateTotalRevenue = (quotation: Quotation): number => {
   const hireChargesAll = quotation.gross_revenue || 0; // includes all buses
-  const fuelAll = (quotation.fuel_cost_fuel_only || 0) * (quotation.number_of_buses || 1);
+  const fuelAll = quotation.fuel_cost_fuel_only || 0; // already total across buses
   const commissionPassThrough = quotation.commission_pass_through_amount || 0;
   const additional = quotation.total_additional_charges || 0;
   const discount = quotation.discount_amount_lkr || 0;
@@ -87,7 +87,7 @@ const calculateTotalRevenue = (quotation: Quotation): number => {
 // Helper function to get revenue breakdown components (ALL buses)
 const getRevenueBreakdown = (quotation: Quotation) => {
   const hire = quotation.gross_revenue || 0;
-  const fuel = (quotation.fuel_cost_fuel_only || 0) * (quotation.number_of_buses || 1);
+  const fuel = quotation.fuel_cost_fuel_only || 0; // already total across buses
   const commission = quotation.commission_pass_through_amount || 0;
   const additional = quotation.total_additional_charges || 0;
   const discountAmount = quotation.discount_amount_lkr || 0;

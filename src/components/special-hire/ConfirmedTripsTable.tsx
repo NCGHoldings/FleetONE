@@ -148,7 +148,7 @@ export function ConfirmedTripsTable() {
 
   const calculateTotalAmount = (quotation: QuotationWithPayments) => {
     const hireAll = quotation.gross_revenue || 0;
-    const fuelAll = (quotation.fuel_cost_fuel_only || 0) * (quotation.number_of_buses || 1);
+    const fuelAll = quotation.fuel_cost_fuel_only || 0; // already total across buses
     const commission = quotation.commission_pass_through_amount || 0;
     const additional = quotation.total_additional_charges || 0;
     const discount = quotation.discount_amount_lkr || 0;

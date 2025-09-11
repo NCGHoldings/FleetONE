@@ -54,7 +54,7 @@ export const PaymentConfirmationModal = ({
   // Calculate final total to match quotation preview
   const calculateFinalTotal = () => {
     const hireAll = quotationData.gross_revenue || 0;
-    const fuelAll = (quotationData.fuel_cost_fuel_only || 0) * (quotationData.number_of_buses || 1);
+    const fuelAll = quotationData.fuel_cost_fuel_only || 0; // already total across buses
     const commission = quotationData.commission_pass_through_amount || 0;
     const additional = quotationData.total_additional_charges || 0;
     const discount = quotationData.discount_amount_lkr || 0;
