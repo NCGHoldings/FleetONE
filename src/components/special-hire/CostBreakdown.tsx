@@ -158,7 +158,7 @@ export function CostBreakdown({ data }: Props) {
             </div>
             <div className="flex justify-between">
               <span>Maintenance Cost ({safeData.totalTripDistance.toFixed(1)} km × LKR 20)</span>
-              <span>LKR {safeData.maintenanceCost.toLocaleString()}</span>
+              <span>LKR {(safeData.totalTripDistance * 20).toLocaleString()}</span>
             </div>
             {safeData.commissionPassThroughAmount > 0 && (
               <div className="flex justify-between">
@@ -253,7 +253,7 @@ export function CostBreakdown({ data }: Props) {
             </div>
             <div className="flex justify-between">
               <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR 20)</span>
-              <span>LKR {safeData.maintenanceCost.toLocaleString()}</span>
+              <span>LKR {(safeData.totalTripDistance * 20).toLocaleString()}</span>
             </div>
             {safeData.otherExpenses.map((expense, index) => (
               <div key={index} className="flex justify-between">
