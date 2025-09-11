@@ -633,7 +633,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         maintenanceRatePerKm: fuelSettings.maintenance_rate_lkr_per_km || 20,
         fuelPrice: fuelSettings.diesel_price_lkr_per_l,
         pickupAddress: distanceData.pickupAddress,
-        dropAddress: distanceData.dropAddress
+        dropAddress: distanceData.dropAddress,
+        // Multi-parking metadata for correct fuel calculation display
+        busCalculations: distanceData.busCalculations,
+        isMultiParking: !!distanceData.isMultiParking,
       });
 
       const discountText = data.discountType === 'percentage' && data.discountPct > 0 
