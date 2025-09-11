@@ -147,11 +147,15 @@ export function ConfirmedTripsTable() {
   }, [quotations, searchQuery, statusFilter, paymentFilter, dateFilter]);
 
   const calculateTotalAmount = (quotation: QuotationWithPayments) => {
-    return quotation.gross_revenue + 
-           (quotation.fuel_cost_fuel_only || 0) + 
-           (quotation.commission_pass_through_amount || 0) + 
-           (quotation.total_additional_charges || 0) - 
-           (quotation.discount_amount_lkr || 0);
+    const hireAll = quotation.gross_revenue || 0;
+    const fuelAll = (quotation.fuel_cost_fuel_only || 0) * (quotation.number_of_buses || 1);
+    const commission = quotation.commission_pass_through_amount || 0;
+    const additional = quotation.total_additional_charges || 0;
+    const discount = quotation.discount_amount_lkr || 0;
+    const base = hireAll + fuelAll + commission + additional - discount;
+    const adjustmentPct = (quotation as any).percentage_adjustment || 0;
+    const adjustmentAmount = base * (adjustmentPct / 100);
+    return Math.round(base + adjustmentAmount);
   };
 
   const getTripStatusBadge = (status: string) => {
@@ -904,6 +908,8 @@ export function ConfirmedTripsTable() {
             quotation_no: selectedTrip.quotation_no,
             customer_name: selectedTrip.customer_name,
             gross_revenue: selectedTrip.gross_revenue,
+            number_of_buses: selectedTrip.number_of_buses,
+            percentage_adjustment: (selectedTrip as any).percentage_adjustment,
             advance_paid: selectedTrip.advance_paid,
             balance_due: selectedTrip.balance_due,
             fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,

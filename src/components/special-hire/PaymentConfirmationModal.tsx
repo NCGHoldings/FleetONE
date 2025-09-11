@@ -19,6 +19,8 @@ interface PaymentConfirmationModalProps {
     quotation_no: string;
     customer_name: string;
     gross_revenue: number;
+    number_of_buses?: number;
+    percentage_adjustment?: number;
     advance_paid?: number;
     balance_due?: number;
     fuel_cost_fuel_only?: number;
@@ -51,11 +53,15 @@ export const PaymentConfirmationModal = ({
   const { user } = useAuth();
   // Calculate final total to match quotation preview
   const calculateFinalTotal = () => {
-    return quotationData.gross_revenue + 
-           (quotationData.fuel_cost_fuel_only || 0) + 
-           (quotationData.commission_pass_through_amount || 0) + 
-           (quotationData.total_additional_charges || 0) - 
-           (quotationData.discount_amount_lkr || 0);
+    const hireAll = quotationData.gross_revenue || 0;
+    const fuelAll = (quotationData.fuel_cost_fuel_only || 0) * (quotationData.number_of_buses || 1);
+    const commission = quotationData.commission_pass_through_amount || 0;
+    const additional = quotationData.total_additional_charges || 0;
+    const discount = quotationData.discount_amount_lkr || 0;
+    const base = hireAll + fuelAll + commission + additional - discount;
+    const adjustmentPct = quotationData.percentage_adjustment || 0;
+    const adjustmentAmount = base * (adjustmentPct / 100);
+    return Math.round(base + adjustmentAmount);
   };
 
   const finalTotal = calculateFinalTotal();
