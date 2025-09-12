@@ -510,6 +510,16 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   color: '#374151'
                 }}>
                   Final Total: LKR {calculateFinalCustomerTotal(quotation).toLocaleString()}
+                  {quotation.number_of_buses > 1 && (
+                    <div style={{ 
+                      fontSize: '10px', 
+                      color: '#6b7280', 
+                      fontWeight: 'normal',
+                      marginTop: '2px'
+                    }}>
+                      Per Bus: LKR {(calculateFinalCustomerTotal(quotation) / quotation.number_of_buses).toLocaleString()}
+                    </div>
+                  )}
                 </div>
               </td>
             </tr>
