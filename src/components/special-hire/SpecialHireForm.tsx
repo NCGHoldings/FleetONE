@@ -1079,28 +1079,6 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                    />
                  </div>
 
-                 {/* Route Type */}
-                 <FormField
-                   control={form.control}
-                   name="routeType"
-                   render={({ field }) => (
-                     <FormItem>
-                       <FormLabel>Route Type</FormLabel>
-                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                         <FormControl>
-                           <SelectTrigger>
-                             <SelectValue placeholder="Select route type" />
-                           </SelectTrigger>
-                         </FormControl>
-                         <SelectContent>
-                           <SelectItem value="Normal Way">Normal Way</SelectItem>
-                           <SelectItem value="Highway">Highway</SelectItem>
-                         </SelectContent>
-                       </Select>
-                       <FormMessage />
-                     </FormItem>
-                   )}
-                 />
 
                  {/* Intermediate Stops */}
                 <div className="space-y-4">
