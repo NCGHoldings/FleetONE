@@ -21,7 +21,28 @@ const formSchema = z.object({
   manufactured_year: z.number().min(1900, 'Valid year required').max(new Date().getFullYear() + 1),
   condition: z.string().min(1, 'Condition is required'),
   unit_price: z.number().min(1, 'Unit price is required'),
-  is_active: z.boolean().default(true)
+  is_active: z.boolean().default(true),
+  // New detailed specification fields
+  overall_dimension_mm: z.string().optional(),
+  wheel_base_mm: z.string().optional(),
+  minimum_turning_diameter_m: z.string().optional(),
+  emission: z.string().optional(),
+  transmission: z.string().optional(),
+  clutch: z.string().optional(),
+  retarder: z.string().optional(),
+  axle: z.string().optional(),
+  maintenance_free_wheel_edge: z.string().optional(),
+  brake_system: z.string().optional(),
+  suspension_system: z.string().optional(),
+  tire: z.string().optional(),
+  fuel_tank_capacity_l: z.string().optional(),
+  cool_box: z.string().optional(),
+  rearview_mirror: z.string().optional(),
+  interior_lights: z.string().optional(),
+  audiovisual_system: z.string().optional(),
+  middle: z.string().optional(),
+  front_windshield: z.string().optional(),
+  luggage_capacity: z.string().optional()
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -38,6 +59,27 @@ interface BusModel {
   is_active: boolean;
   created_at: string;
   image_url?: string;
+  // New detailed specification fields
+  overall_dimension_mm?: string;
+  wheel_base_mm?: string;
+  minimum_turning_diameter_m?: string;
+  emission?: string;
+  transmission?: string;
+  clutch?: string;
+  retarder?: string;
+  axle?: string;
+  maintenance_free_wheel_edge?: string;
+  brake_system?: string;
+  suspension_system?: string;
+  tire?: string;
+  fuel_tank_capacity_l?: string;
+  cool_box?: string;
+  rearview_mirror?: string;
+  interior_lights?: string;
+  audiovisual_system?: string;
+  middle?: string;
+  front_windshield?: string;
+  luggage_capacity?: string;
 }
 
 export function YutongBusModelsAdmin() {
@@ -134,7 +176,28 @@ export function YutongBusModelsAdmin() {
         manufactured_year: data.manufactured_year,
         condition: data.condition,
         base_price: data.unit_price,
-        is_active: data.is_active
+        is_active: data.is_active,
+        // New detailed specification fields
+        overall_dimension_mm: data.overall_dimension_mm || null,
+        wheel_base_mm: data.wheel_base_mm || null,
+        minimum_turning_diameter_m: data.minimum_turning_diameter_m || null,
+        emission: data.emission || null,
+        transmission: data.transmission || null,
+        clutch: data.clutch || null,
+        retarder: data.retarder || null,
+        axle: data.axle || null,
+        maintenance_free_wheel_edge: data.maintenance_free_wheel_edge || null,
+        brake_system: data.brake_system || null,
+        suspension_system: data.suspension_system || null,
+        tire: data.tire || null,
+        fuel_tank_capacity_l: data.fuel_tank_capacity_l || null,
+        cool_box: data.cool_box || null,
+        rearview_mirror: data.rearview_mirror || null,
+        interior_lights: data.interior_lights || null,
+        audiovisual_system: data.audiovisual_system || null,
+        middle: data.middle || null,
+        front_windshield: data.front_windshield || null,
+        luggage_capacity: data.luggage_capacity || null
       };
 
       if (editingModel) {
@@ -178,7 +241,28 @@ export function YutongBusModelsAdmin() {
       manufactured_year: model.manufactured_year,
       condition: model.condition,
       unit_price: model.base_price,
-      is_active: model.is_active
+      is_active: model.is_active,
+      // New detailed specification fields
+      overall_dimension_mm: model.overall_dimension_mm || '',
+      wheel_base_mm: model.wheel_base_mm || '',
+      minimum_turning_diameter_m: model.minimum_turning_diameter_m || '',
+      emission: model.emission || '',
+      transmission: model.transmission || '',
+      clutch: model.clutch || '',
+      retarder: model.retarder || '',
+      axle: model.axle || '',
+      maintenance_free_wheel_edge: model.maintenance_free_wheel_edge || '',
+      brake_system: model.brake_system || '',
+      suspension_system: model.suspension_system || '',
+      tire: model.tire || '',
+      fuel_tank_capacity_l: model.fuel_tank_capacity_l || '',
+      cool_box: model.cool_box || '',
+      rearview_mirror: model.rearview_mirror || '',
+      interior_lights: model.interior_lights || '',
+      audiovisual_system: model.audiovisual_system || '',
+      middle: model.middle || '',
+      front_windshield: model.front_windshield || '',
+      luggage_capacity: model.luggage_capacity || ''
     });
     setShowDialog(true);
   };
@@ -234,131 +318,421 @@ export function YutongBusModelsAdmin() {
                 Add Bus Model
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingModel ? 'Edit Bus Model' : 'Add New Bus Model'}
                 </DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="bus_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bus Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., Yutong ZK6129H" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                  {/* Basic Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Basic Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="bus_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bus Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Yutong ZK6129H" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="model"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Model</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., ZK6129H" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="model"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Model</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., ZK6129H" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="seating_capacity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Seating Capacity</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="1"
-                              placeholder="e.g., 49"
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="seating_capacity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Seating Capacity</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="1"
+                                placeholder="e.g., 49"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="engine"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Engine</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., YC6L280-30" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="engine"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Engine</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., YC6L280-30" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="manufactured_year"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Manufactured Year</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="1900"
-                              max={new Date().getFullYear() + 1}
-                              placeholder="e.g., 2024"
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="manufactured_year"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Manufactured Year</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="1900"
+                                max={new Date().getFullYear() + 1}
+                                placeholder="e.g., 2024"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="condition"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Condition</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., New, Used, Refurbished" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="condition"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Condition</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., New, Used, Refurbished" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="unit_price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Unit Price (LKR)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="e.g., 12500000"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <FormField
+                        control={form.control}
+                        name="unit_price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Unit Price (LKR)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="e.g., 12500000"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Detailed Specifications */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Detailed Specifications</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="overall_dimension_mm"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Overall Dimension (mm)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 12000x2550x3200" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="wheel_base_mm"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Wheel Base (mm)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 6150" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="minimum_turning_diameter_m"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Minimum Turning Diameter (m)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 22" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="emission"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Emission</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Euro VI" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="transmission"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Transmission</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Manual/Automatic" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="clutch"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Clutch</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Single plate dry clutch" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="retarder"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Retarder</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Engine brake" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="axle"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Axle</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Front/Rear axle specifications" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="maintenance_free_wheel_edge"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Maintenance-free Wheel Edge</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Yes/No" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="brake_system"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Brake System</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Air brake system" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="suspension_system"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Suspension System</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Air suspension" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="tire"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tire</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 295/80R22.5" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="fuel_tank_capacity_l"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Fuel Tank Capacity (L)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 300" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="cool_box"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cool Box</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Available/Not available" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="rearview_mirror"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Rearview Mirror</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Electric adjustable" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="interior_lights"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Interior Lights</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., LED lights" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="audiovisual_system"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Audiovisual System</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Entertainment system specifications" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="middle"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Middle</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Middle section specifications" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="front_windshield"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Front Windshield</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Laminated safety glass" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="luggage_capacity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Luggage Capacity</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 8.5 cubic meters" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
 
                   <FormField

@@ -3229,67 +3229,127 @@ export type Database = {
       }
       yutong_bus_models: {
         Row: {
+          audiovisual_system: string | null
+          axle: string | null
           base_price: number
+          brake_system: string | null
           bus_name: string | null
           capacity: number
+          clutch: string | null
           condition: string | null
+          cool_box: string | null
           created_at: string
           dimensions: string | null
+          emission: string | null
           engine: string | null
           engine_type: string | null
           features: string | null
+          front_windshield: string | null
+          fuel_tank_capacity_l: string | null
           fuel_type: string | null
           id: string
           image_url: string | null
+          interior_lights: string | null
           is_active: boolean | null
+          luggage_capacity: string | null
+          maintenance_free_wheel_edge: string | null
           manufactured_year: number | null
+          middle: string | null
+          minimum_turning_diameter_m: string | null
           model: string | null
           model_name: string
+          overall_dimension_mm: string | null
+          rearview_mirror: string | null
+          retarder: string | null
           seating_capacity: number | null
+          suspension_system: string | null
+          tire: string | null
+          transmission: string | null
           unit_price: number | null
           updated_at: string
+          wheel_base_mm: string | null
         }
         Insert: {
+          audiovisual_system?: string | null
+          axle?: string | null
           base_price: number
+          brake_system?: string | null
           bus_name?: string | null
           capacity: number
+          clutch?: string | null
           condition?: string | null
+          cool_box?: string | null
           created_at?: string
           dimensions?: string | null
+          emission?: string | null
           engine?: string | null
           engine_type?: string | null
           features?: string | null
+          front_windshield?: string | null
+          fuel_tank_capacity_l?: string | null
           fuel_type?: string | null
           id?: string
           image_url?: string | null
+          interior_lights?: string | null
           is_active?: boolean | null
+          luggage_capacity?: string | null
+          maintenance_free_wheel_edge?: string | null
           manufactured_year?: number | null
+          middle?: string | null
+          minimum_turning_diameter_m?: string | null
           model?: string | null
           model_name: string
+          overall_dimension_mm?: string | null
+          rearview_mirror?: string | null
+          retarder?: string | null
           seating_capacity?: number | null
+          suspension_system?: string | null
+          tire?: string | null
+          transmission?: string | null
           unit_price?: number | null
           updated_at?: string
+          wheel_base_mm?: string | null
         }
         Update: {
+          audiovisual_system?: string | null
+          axle?: string | null
           base_price?: number
+          brake_system?: string | null
           bus_name?: string | null
           capacity?: number
+          clutch?: string | null
           condition?: string | null
+          cool_box?: string | null
           created_at?: string
           dimensions?: string | null
+          emission?: string | null
           engine?: string | null
           engine_type?: string | null
           features?: string | null
+          front_windshield?: string | null
+          fuel_tank_capacity_l?: string | null
           fuel_type?: string | null
           id?: string
           image_url?: string | null
+          interior_lights?: string | null
           is_active?: boolean | null
+          luggage_capacity?: string | null
+          maintenance_free_wheel_edge?: string | null
           manufactured_year?: number | null
+          middle?: string | null
+          minimum_turning_diameter_m?: string | null
           model?: string | null
           model_name?: string
+          overall_dimension_mm?: string | null
+          rearview_mirror?: string | null
+          retarder?: string | null
           seating_capacity?: number | null
+          suspension_system?: string | null
+          tire?: string | null
+          transmission?: string | null
           unit_price?: number | null
           updated_at?: string
+          wheel_base_mm?: string | null
         }
         Relationships: []
       }

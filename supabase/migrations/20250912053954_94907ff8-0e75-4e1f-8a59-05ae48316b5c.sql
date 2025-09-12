@@ -1,0 +1,22 @@
+-- Add new detailed specification fields to yutong_bus_models table
+ALTER TABLE public.yutong_bus_models 
+ADD COLUMN overall_dimension_mm TEXT,
+ADD COLUMN wheel_base_mm TEXT,
+ADD COLUMN minimum_turning_diameter_m TEXT,
+ADD COLUMN emission TEXT,
+ADD COLUMN transmission TEXT,
+ADD COLUMN clutch TEXT,
+ADD COLUMN retarder TEXT,
+ADD COLUMN axle TEXT,
+ADD COLUMN maintenance_free_wheel_edge TEXT,
+ADD COLUMN brake_system TEXT,
+ADD COLUMN suspension_system TEXT,
+ADD COLUMN tire TEXT,
+ADD COLUMN fuel_tank_capacity_l TEXT,
+ADD COLUMN cool_box TEXT,
+ADD COLUMN rearview_mirror TEXT,
+ADD COLUMN interior_lights TEXT,
+ADD COLUMN audiovisual_system TEXT,
+ADD COLUMN middle TEXT,
+ADD COLUMN front_windshield TEXT,
+ADD COLUMN luggage_capacity TEXT;
