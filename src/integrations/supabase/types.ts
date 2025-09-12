@@ -3464,6 +3464,51 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_invoices: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          generated_at: string
+          generated_by: string | null
+          id: string
+          invoice_no: string
+          invoice_type: string
+          quotation_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          invoice_no?: string
+          invoice_type?: string
+          quotation_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          invoice_no?: string
+          invoice_type?: string
+          quotation_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       yutong_quotation_addons: {
         Row: {
           addon_id: string

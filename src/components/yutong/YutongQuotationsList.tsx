@@ -44,6 +44,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
   const [loading, setLoading] = useState(true);
   const [selectedQuotation, setSelectedQuotation] = useState<YutongQuotation | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [invoiceGeneratorOpen, setInvoiceGeneratorOpen] = useState(false);
   const { toast } = useToast();
 
   const loadQuotations = async () => {
@@ -246,6 +247,11 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
   const handleViewQuotation = (quotation: YutongQuotation) => {
     setSelectedQuotation(quotation);
     setViewModalOpen(true);
+  };
+
+  const handleGenerateInvoice = (quotation: YutongQuotation) => {
+    setSelectedQuotation(quotation);
+    setInvoiceGeneratorOpen(true);
   };
 
   const columns: ColumnDef<YutongQuotation>[] = [
