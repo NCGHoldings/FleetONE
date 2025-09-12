@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Eye, Download, X, FileText } from 'lucide-react';
+import { Eye, Download, X, FileText, Settings } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DocumentSignatureManager } from './DocumentSignatureManager';
 
 interface DocumentViewerProps {
   isOpen: boolean;
@@ -18,13 +20,15 @@ interface DocumentViewerProps {
     document_data: string; // base64 encoded PDF
   };
   onDownload?: () => void;
+  onSignatureUpdated?: () => void;
 }
 
 export const DocumentViewer = ({ 
   isOpen, 
   onClose, 
   document, 
-  onDownload 
+  onDownload,
+  onSignatureUpdated
 }: DocumentViewerProps) => {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -171,52 +175,71 @@ export const DocumentViewer = ({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden border rounded-lg bg-gray-50">
-          {(() => {
-            if (!document.document_data) {
-              return (
-                <div className="flex items-center justify-center h-[85vh] text-muted-foreground">
-                  <div className="text-center">
-                    <p>Document data not available</p>
-                    <p className="text-sm">Please try regenerating the document</p>
-                  </div>
-                </div>
-              );
-            }
-
-            const pdfUrl = getPdfDataUrl();
-            const blobUrl = getPdfBlob();
+        <div className="flex-1 overflow-hidden">
+          <Tabs defaultValue="preview" className="h-full flex flex-col">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="preview">Document Preview</TabsTrigger>
+              <TabsTrigger value="signatures">Signatures & Approval</TabsTrigger>
+            </TabsList>
             
-            if (!pdfUrl && !blobUrl) {
-              return (
-                <div className="flex items-center justify-center h-[85vh] text-muted-foreground">
-                  <div className="text-center">
-                    <p>Unable to display document</p>
-                    <p className="text-sm">The document data appears to be corrupted</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-4"
-                      onClick={handleDownload}
-                    >
-                      Try Download Instead
-                    </Button>
-                  </div>
-                </div>
-              );
-            }
+            <TabsContent value="preview" className="flex-1 overflow-hidden border rounded-lg bg-gray-50 mt-2">
+              {(() => {
+                if (!document.document_data) {
+                  return (
+                    <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+                      <div className="text-center">
+                        <p>Document data not available</p>
+                        <p className="text-sm">Please try regenerating the document</p>
+                      </div>
+                    </div>
+                  );
+                }
 
-            return (
-              <iframe
-                src={blobUrl || pdfUrl}
-                className="w-full h-[85vh]"
-                title={`${document.document_type} Preview`}
-                onError={() => {
-                  console.error('Failed to load PDF in iframe');
-                }}
-              />
-            );
-          })()}
+                const pdfUrl = getPdfDataUrl();
+                const blobUrl = getPdfBlob();
+                
+                if (!pdfUrl && !blobUrl) {
+                  return (
+                    <div className="flex items-center justify-center h-[70vh] text-muted-foreground">
+                      <div className="text-center">
+                        <p>Unable to display document</p>
+                        <p className="text-sm">The document data appears to be corrupted</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-4"
+                          onClick={handleDownload}
+                        >
+                          Try Download Instead
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <iframe
+                    src={blobUrl || pdfUrl}
+                    className="w-full h-[70vh]"
+                    title={`${document.document_type} Preview`}
+                    onError={() => {
+                      console.error('Failed to load PDF in iframe');
+                    }}
+                  />
+                );
+              })()}
+            </TabsContent>
+            
+            <TabsContent value="signatures" className="flex-1 mt-2">
+              <div className="h-[70vh] overflow-y-auto p-4">
+                <DocumentSignatureManager
+                  documentId={document.id}
+                  documentStatus={document.document_status}
+                  onSignatureUpdated={onSignatureUpdated}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
 
         <div className="text-xs text-muted-foreground pt-2">

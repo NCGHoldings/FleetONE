@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { generateInvoicePDF, type InvoiceData, type ApprovalSignature } from '@/lib/invoice-generator';
 
 export const useFinanceApproval = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
-  const approvePayment = async (paymentId: string, notes?: string) => {
+  const approvePayment = async (paymentId: string, notes?: string, approverSignature?: ApprovalSignature) => {
     try {
       setIsLoading(true);
 
@@ -76,6 +76,18 @@ export const useFinanceApproval = () => {
 
       // Update draft documents to approved status
       for (const doc of draftDocuments || []) {
+        // Get document approvals for this document
+        const { data: existingApprovals } = await supabase
+          .from('document_approvals')
+          .select('*')
+          .eq('document_id', doc.id);
+
+        const approvals = existingApprovals || [];
+        
+        // Build signature data for invoice generation
+        const preparedBy = approvals.find(a => a.approval_type === 'prepared_by');
+        const receivedBy = approvals.find(a => a.approval_type === 'received_by');
+        
         // Generate final approved document without DRAFT watermark
         const calculateTotalAmount = (quotation: any) => {
           return quotation.gross_revenue + 
@@ -108,6 +120,18 @@ export const useFinanceApproval = () => {
           conductorName: paymentData.quotation.assigned_conductor_name,
           invoice_status: 'approved',
           document_type: doc.document_type as 'sales_receipt' | 'invoice',
+          // Include approval signatures
+          preparedBy: preparedBy ? {
+            approver_name: preparedBy.approver_name,
+            signature_data: preparedBy.signature_data || undefined,
+            approval_date: preparedBy.approval_date,
+          } : undefined,
+          approvedBy: approverSignature,
+          receivedBy: receivedBy ? {
+            approver_name: receivedBy.approver_name,
+            signature_data: receivedBy.signature_data || undefined,
+            approval_date: receivedBy.approval_date,
+          } : undefined,
         };
 
         // Generate approved PDF
@@ -135,6 +159,25 @@ export const useFinanceApproval = () => {
             approved_at: new Date().toISOString(),
           })
           .eq('id', doc.id);
+
+        // Save approver signature if provided
+        if (approverSignature) {
+          await supabase
+            .from('document_approvals')
+            .upsert({
+              document_id: doc.id,
+              approval_type: 'approved_by',
+              approver_name: approverSignature.approver_name,
+              signature_data: approverSignature.signature_data,
+              approval_date: approverSignature.approval_date,
+              user_id: user?.id,
+            });
+
+          // Increment name usage for suggestions
+          await supabase.rpc('increment_name_suggestion', {
+            p_name: approverSignature.approver_name
+          });
+        }
       }
 
       // Auto-delete payment proof file after approval

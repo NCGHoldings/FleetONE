@@ -2,6 +2,12 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { format } from 'date-fns';
 
+export interface ApprovalSignature {
+  approver_name: string;
+  signature_data?: string;
+  approval_date: string;
+}
+
 export interface InvoiceData {
   invoiceNo: string;
   invoiceType: 'advance' | 'balance';
@@ -31,6 +37,10 @@ export interface InvoiceData {
   // Enhanced fields for the multi-step workflow
   invoice_status?: 'draft' | 'approved';
   document_type?: 'sales_receipt' | 'invoice';
+  // Approval signatures
+  preparedBy?: ApprovalSignature;
+  approvedBy?: ApprovalSignature;
+  receivedBy?: ApprovalSignature;
 }
 
 export const generateInvoiceHTML = (data: InvoiceData): string => {
@@ -133,15 +143,21 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         <div style="margin-top: 30px; display: flex; justify-content: space-between;">
           <div style="width: 45%;">
             <b>Prepared by :</b><br>
-            <p style="margin: 5px 0;">Name: ...............................</p>
-            <p style="margin: 5px 0;">Signature: ......................................</p>
-            <p style="margin: 5px 0;">Date: ......${currentDate}.............</p>
+            <p style="margin: 5px 0;">Name: ${data.preparedBy?.approver_name || '.................................'}</p>
+            ${data.preparedBy?.signature_data 
+              ? `<p style="margin: 5px 0;"><img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; border: 1px solid #ddd;"></p>` 
+              : '<p style="margin: 5px 0;">Signature: ......................................</p>'
+            }
+            <p style="margin: 5px 0;">Date: ${data.preparedBy?.approval_date || currentDate}</p>
           </div>
           <div style="width: 45%;">
             <b>Received by :</b><br>
-            <p style="margin: 5px 0;">Name: ......................................</p>
-            <p style="margin: 5px 0;">Signature: ......................................</p>
-            <p style="margin: 5px 0;">Date: ......................................</p>
+            <p style="margin: 5px 0;">Name: ${data.receivedBy?.approver_name || '....................................'}</p>
+            ${data.receivedBy?.signature_data 
+              ? `<p style="margin: 5px 0;"><img src="${data.receivedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; border: 1px solid #ddd;"></p>` 
+              : '<p style="margin: 5px 0;">Signature: ......................................</p>'
+            }
+            <p style="margin: 5px 0;">Date: ${data.receivedBy?.approval_date || '....................................'}</p>
           </div>
         </div>
 
@@ -283,16 +299,22 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           <!-- Signatures -->
           <div style="display: flex; justify-content: space-between; margin-top: 50px; font-size: 14px;">
             <div style="text-align: center;">
-              <hr style="width: 200px;">
-              Darshini Pallewela<br>
+              ${data.preparedBy?.signature_data 
+                ? `<img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 200px; max-height: 60px; margin-bottom: 10px; border: 1px solid #ddd;">` 
+                : '<hr style="width: 200px;">'
+              }
+              ${data.preparedBy?.approver_name || 'Darshini Pallewela'}<br>
               Prepared By<br>
-              ${currentDate}
+              ${data.preparedBy?.approval_date || currentDate}
             </div>
             <div style="text-align: center;">
-              <hr style="width: 200px;">
-              Sithara Thennakoon<br>
+              ${data.approvedBy?.signature_data 
+                ? `<img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 200px; max-height: 60px; margin-bottom: 10px; border: 1px solid #ddd;">` 
+                : '<hr style="width: 200px;">'
+              }
+              ${data.approvedBy?.approver_name || 'Sithara Thennakoon'}<br>
               Approved By<br>
-              ${format(new Date(Date.now() - 24 * 60 * 60 * 1000), 'dd/MM/yyyy')}
+              ${data.approvedBy?.approval_date || format(new Date(Date.now() - 24 * 60 * 60 * 1000), 'dd/MM/yyyy')}
             </div>
           </div>
 

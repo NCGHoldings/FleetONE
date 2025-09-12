@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      approval_name_suggestions: {
+        Row: {
+          created_at: string
+          id: string
+          last_used_at: string
+          name: string
+          usage_count: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_used_at?: string
+          name: string
+          usage_count?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_used_at?: string
+          name?: string
+          usage_count?: number
+        }
+        Relationships: []
+      }
       bus_types: {
         Row: {
           avg_km_per_l: number | null
@@ -252,6 +276,50 @@ export type Database = {
             columns: ["route_id"]
             isOneToOne: false
             referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_approvals: {
+        Row: {
+          approval_date: string
+          approval_type: string
+          approver_name: string
+          created_at: string
+          document_id: string | null
+          id: string
+          signature_data: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          approval_date?: string
+          approval_type: string
+          approver_name: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          signature_data?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          approval_date?: string
+          approval_type?: string
+          approver_name?: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          signature_data?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_approvals_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "document_storage"
             referencedColumns: ["id"]
           },
         ]
@@ -3522,6 +3590,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_name_suggestion: {
+        Args: { p_name: string }
+        Returns: undefined
       }
       update_trip_status_with_adjustments: {
         Args: {
