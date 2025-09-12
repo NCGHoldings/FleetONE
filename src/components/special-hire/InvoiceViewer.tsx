@@ -1,27 +1,93 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Eye, Download, X } from 'lucide-react';
-import { generateInvoiceHTML, type InvoiceData } from '@/lib/invoice-generator';
+import { Download, X } from 'lucide-react';
+import { generateInvoiceHTML, generateInvoicePDF, type ApprovalSignature, type InvoiceData } from '@/lib/invoice-generator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { SignatureCanvas, SignatureCanvasRef } from '@/components/ui/signature-canvas';
 
 interface InvoiceViewerProps {
   isOpen: boolean;
   onClose: () => void;
   invoiceData: InvoiceData;
-  onDownload?: () => void;
+  onDownload?: () => void; // kept for backward compatibility (not used)
 }
 
-export const InvoiceViewer = ({ isOpen, onClose, invoiceData, onDownload }: InvoiceViewerProps) => {
+const todayInputValue = () => {
+  const d = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+export const InvoiceViewer = ({ isOpen, onClose, invoiceData }: InvoiceViewerProps) => {
   const [isLoading, setIsLoading] = useState(false);
 
+  // Local signature/name/date state
+  const [preparedBy, setPreparedBy] = useState<ApprovalSignature>({ approver_name: '', approval_date: todayInputValue() });
+  const [approvedBy, setApprovedBy] = useState<ApprovalSignature>({ approver_name: '', approval_date: todayInputValue() });
+  const [receivedBy, setReceivedBy] = useState<ApprovalSignature>({ approver_name: '', approval_date: todayInputValue() });
+
+  const preparedRef = useRef<SignatureCanvasRef>(null);
+  const approvedRef = useRef<SignatureCanvasRef>(null);
+  const receivedRef = useRef<SignatureCanvasRef>(null);
+
+  // Data used for preview and download
+  const displayData: InvoiceData = useMemo(() => ({
+    ...invoiceData,
+    preparedBy,
+    approvedBy,
+    receivedBy,
+  }), [invoiceData, preparedBy, approvedBy, receivedBy]);
+
+  useEffect(() => {
+    // Reset signatures when a new invoice is opened
+    if (!isOpen) return;
+    setPreparedBy({ approver_name: '', approval_date: todayInputValue() });
+    setApprovedBy({ approver_name: '', approval_date: todayInputValue() });
+    setReceivedBy({ approver_name: '', approval_date: todayInputValue() });
+    preparedRef.current?.clear();
+    approvedRef.current?.clear();
+    receivedRef.current?.clear();
+  }, [isOpen, invoiceData.invoiceNo]);
+
+  const captureSignatures = () => {
+    const nextPrepared: ApprovalSignature = { ...preparedBy };
+    const nextApproved: ApprovalSignature = { ...approvedBy };
+    const nextReceived: ApprovalSignature = { ...receivedBy };
+
+    if (preparedRef.current && !preparedRef.current.isEmpty()) {
+      nextPrepared.signature_data = preparedRef.current.toDataURL('image/png');
+    }
+    if (approvedRef.current && !approvedRef.current.isEmpty()) {
+      nextApproved.signature_data = approvedRef.current.toDataURL('image/png');
+    }
+    if (receivedRef.current && !receivedRef.current.isEmpty()) {
+      nextReceived.signature_data = receivedRef.current.toDataURL('image/png');
+    }
+
+    setPreparedBy(nextPrepared);
+    setApprovedBy(nextApproved);
+    setReceivedBy(nextReceived);
+  };
+
   const handleDownload = async () => {
-    if (onDownload) {
-      setIsLoading(true);
-      try {
-        await onDownload();
-      } finally {
-        setIsLoading(false);
-      }
+    setIsLoading(true);
+    try {
+      // Ensure latest drawn signatures are captured before download
+      captureSignatures();
+      const pdfBlob = await generateInvoicePDF(displayData);
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${displayData.document_type === 'sales_receipt' ? 'receipt' : 'invoice'}-${displayData.quotationNo}-${Date.now()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -29,38 +95,121 @@ export const InvoiceViewer = ({ isOpen, onClose, invoiceData, onDownload }: Invo
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-hidden">
         <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle>Invoice Preview</DialogTitle>
+          <DialogTitle>
+            {invoiceData.document_type === 'sales_receipt' || invoiceData.invoiceType === 'advance' ? 'Sales Receipt' : 'Invoice'} Preview
+          </DialogTitle>
           <div className="flex gap-2">
-            {onDownload && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownload}
-                disabled={isLoading}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                {isLoading ? 'Generating...' : 'Download PDF'}
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownload}
+              disabled={isLoading}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {isLoading ? 'Generating...' : 'Download PDF'}
+            </Button>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="w-4 h-4" />
             </Button>
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto border rounded-lg bg-white">
-          <div 
-            className="text-black"
-            style={{ 
-              minHeight: '800px',
-              width: '100%',
-              overflow: 'visible'
-            }}
-            dangerouslySetInnerHTML={{ 
-              __html: generateInvoiceHTML(invoiceData) 
-            }}
-          />
-        </div>
+        <Tabs defaultValue="preview" className="h-full flex flex-col">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="preview">Preview</TabsTrigger>
+            <TabsTrigger value="signatures">Signatures</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="preview" className="flex-1 overflow-auto border rounded-lg bg-background mt-2">
+            <div 
+              className="text-foreground"
+              style={{ minHeight: '800px', width: '100%', overflow: 'visible' }}
+              dangerouslySetInnerHTML={{ __html: generateInvoiceHTML(displayData) }}
+            />
+          </TabsContent>
+
+          <TabsContent value="signatures" className="flex-1 mt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Prepared By */}
+              <div className="border border-border rounded-lg p-4 space-y-3">
+                <h4 className="font-medium text-sm">Prepared By</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="prepared-name">Name</Label>
+                    <Input id="prepared-name" value={preparedBy.approver_name}
+                      onChange={(e) => setPreparedBy(p => ({ ...p, approver_name: e.target.value }))}
+                      placeholder="Enter name" />
+                  </div>
+                  <div>
+                    <Label htmlFor="prepared-date">Date</Label>
+                    <Input id="prepared-date" type="date" value={preparedBy.approval_date}
+                      onChange={(e) => setPreparedBy(p => ({ ...p, approval_date: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Signature (optional)</Label>
+                  <SignatureCanvas ref={preparedRef} className="h-28 w-full border rounded-md" />
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => preparedRef.current?.clear()}>Clear</Button>
+                    <Button type="button" size="sm" onClick={captureSignatures}>Apply to Preview</Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Approved By */}
+              <div className="border border-border rounded-lg p-4 space-y-3">
+                <h4 className="font-medium text-sm">Approved By</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="approved-name">Name</Label>
+                    <Input id="approved-name" value={approvedBy.approver_name}
+                      onChange={(e) => setApprovedBy(p => ({ ...p, approver_name: e.target.value }))}
+                      placeholder="Enter name" />
+                  </div>
+                  <div>
+                    <Label htmlFor="approved-date">Date</Label>
+                    <Input id="approved-date" type="date" value={approvedBy.approval_date}
+                      onChange={(e) => setApprovedBy(p => ({ ...p, approval_date: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Signature (optional)</Label>
+                  <SignatureCanvas ref={approvedRef} className="h-28 w-full border rounded-md" />
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => approvedRef.current?.clear()}>Clear</Button>
+                    <Button type="button" size="sm" onClick={captureSignatures}>Apply to Preview</Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Received By */}
+              <div className="border border-border rounded-lg p-4 space-y-3 md:col-span-2">
+                <h4 className="font-medium text-sm">Received By</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="received-name">Name</Label>
+                    <Input id="received-name" value={receivedBy.approver_name}
+                      onChange={(e) => setReceivedBy(p => ({ ...p, approver_name: e.target.value }))}
+                      placeholder="Enter name" />
+                  </div>
+                  <div>
+                    <Label htmlFor="received-date">Date</Label>
+                    <Input id="received-date" type="date" value={receivedBy.approval_date}
+                      onChange={(e) => setReceivedBy(p => ({ ...p, approval_date: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Signature (optional)</Label>
+                  <SignatureCanvas ref={receivedRef} className="h-28 w-full border rounded-md" />
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => receivedRef.current?.clear()}>Clear</Button>
+                    <Button type="button" size="sm" onClick={captureSignatures}>Apply to Preview</Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
