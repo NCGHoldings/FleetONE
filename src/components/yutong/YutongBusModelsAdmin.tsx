@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 const formSchema = z.object({
   bus_name: z.string().min(1, 'Bus name is required'),
   model: z.string().min(1, 'Model is required'),
-  seating_capacity: z.number().min(1, 'Seating capacity must be at least 1'),
+  seating_capacity: z.string().min(1, 'Seating capacity is required'),
   engine: z.string().min(1, 'Engine is required'),
   manufactured_year: z.number().min(1900, 'Valid year required').max(new Date().getFullYear() + 1),
   condition: z.string().min(1, 'Condition is required'),
@@ -51,7 +51,7 @@ interface BusModel {
   id: string;
   bus_name: string;
   model_name: string; // This maps to 'model' in our form
-  capacity: number; // This maps to 'seating_capacity' in our form
+  capacity: string; // This maps to 'seating_capacity' in our form - changed to string
   engine: string;
   manufactured_year: number;
   condition: string;
@@ -236,7 +236,7 @@ export function YutongBusModelsAdmin() {
     form.reset({
       bus_name: model.bus_name,
       model: model.model_name,
-      seating_capacity: model.capacity,
+      seating_capacity: model.capacity?.toString() || '',
       engine: model.engine,
       manufactured_year: model.manufactured_year,
       condition: model.condition,
@@ -366,11 +366,8 @@ export function YutongBusModelsAdmin() {
                             <FormLabel>Seating Capacity</FormLabel>
                             <FormControl>
                               <Input
-                                type="number"
-                                min="1"
-                                placeholder="e.g., 49"
+                                placeholder="e.g., 49 seats"
                                 {...field}
-                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                               />
                             </FormControl>
                             <FormMessage />
@@ -818,7 +815,7 @@ export function YutongBusModelsAdmin() {
                   
                   <div className="text-sm text-muted-foreground space-y-1">
                     <p><span className="font-medium">Model:</span> {model.model_name}</p>
-                    <p><span className="font-medium">Capacity:</span> {model.capacity} seats</p>
+                    <p><span className="font-medium">Capacity:</span> {model.capacity}</p>
                     <p><span className="font-medium">Year:</span> {model.manufactured_year}</p>
                     <p><span className="font-medium">Condition:</span> {model.condition}</p>
                     <p><span className="font-medium">Engine:</span> {model.engine}</p>
