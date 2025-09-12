@@ -374,7 +374,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           <div className="page-footer">
             <div className="signatures">
               <div className="signature-field">
-                <div className="signature-line">Customer</div>
+                <div className="signature-line">Approved By</div>
               </div>
               <div className="signature-field">
                 <div className="signature-line">Sales Manager</div>
@@ -453,7 +453,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           <div className="page-footer">
             <div className="signatures">
               <div className="signature-field">
-                <div className="signature-line">Customer</div>
+                <div className="signature-line">Approved By</div>
               </div>
               <div className="signature-field">
                 <div className="signature-line">Sales Manager</div>
