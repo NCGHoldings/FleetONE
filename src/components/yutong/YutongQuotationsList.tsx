@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ColumnDef } from '@tanstack/react-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { YutongQuotationViewModal } from './YutongQuotationViewModal';
+import { YutongInvoiceGenerator } from './YutongInvoiceGenerator';
 
 interface YutongQuotation {
   id: string;
@@ -327,6 +328,16 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
             >
               <Eye className="h-4 w-4" />
             </Button>
+            {quotation.status === 'confirmed' && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => handleGenerateInvoice(quotation)}
+                title="Generate Invoice"
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="outline" size="sm">
               <Edit className="h-4 w-4" />
             </Button>
@@ -377,6 +388,14 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         open={viewModalOpen}
         onClose={() => setViewModalOpen(false)}
       />
+
+      {selectedQuotation && (
+        <YutongInvoiceGenerator
+          quotation={selectedQuotation}
+          isOpen={invoiceGeneratorOpen}
+          onClose={() => setInvoiceGeneratorOpen(false)}
+        />
+      )}
     </>
   );
 }
