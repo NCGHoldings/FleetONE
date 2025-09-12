@@ -9,9 +9,10 @@ import { Switch } from '@/components/ui/switch';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Edit, Trash2, Upload, Image } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Image, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { YutongBusModelProfile } from './YutongBusModelProfile';
 
 const formSchema = z.object({
   bus_name: z.string().min(1, 'Bus name is required'),
@@ -88,6 +89,8 @@ export function YutongBusModelsAdmin() {
   const [editingModel, setEditingModel] = useState<BusModel | null>(null);
   const [showDialog, setShowDialog] = useState(false);
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<BusModel | null>(null);
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -268,6 +271,11 @@ export function YutongBusModelsAdmin() {
       luggage_capacity: model.luggage_capacity || ''
     });
     setShowDialog(true);
+  };
+
+  const handleViewProfile = (model: BusModel) => {
+    setSelectedModel(model);
+    setIsProfileModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -830,6 +838,15 @@ export function YutongBusModelsAdmin() {
                   
                   <div className="flex space-x-2 pt-2">
                     <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={() => handleViewProfile(model)}
+                      className="flex-1"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                    <Button 
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleEdit(model)}
@@ -862,6 +879,15 @@ export function YutongBusModelsAdmin() {
           </div>
         )}
       </CardContent>
+      
+      <YutongBusModelProfile
+        busModel={selectedModel}
+        isOpen={isProfileModalOpen}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setSelectedModel(null);
+        }}
+      />
     </Card>
   );
 }
