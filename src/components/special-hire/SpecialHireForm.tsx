@@ -598,6 +598,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         exceedingDistanceCharge: Math.round(exceedingDistanceCharge),
         overtimeCharge: Math.round(overtimeCharge),
         overnightCharge: Math.round(overnightCharge),
+        pickupDateTime: data.pickupDateTime.toISOString(),
+        dropDateTime: data.dropDateTime.toISOString(),
         rateCardDetails: {
           standardHours: rateCard.standard_hours || 8,
           actualHours: data.hireType === 'Outside' ? Math.round(((new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60)) * 100) / 100 : 8,

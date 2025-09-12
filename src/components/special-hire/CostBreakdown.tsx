@@ -19,6 +19,8 @@ interface CostData {
   busTypeEfficiency?: number;
   fuelPricePerLiter?: number;
   maintenanceRatePerKm?: number;
+  pickupDateTime?: string;
+  dropDateTime?: string;
   rateCardDetails?: {
     standardHours: number;
     actualHours: number;
@@ -377,6 +379,40 @@ export function CostBreakdown({ data }: Props) {
             </span>
           </div>
         )}
+
+        {/* Net Profit per Day - show only if trip is more than 1 day */}
+        {(() => {
+          if (!data.pickupDateTime || !data.dropDateTime) return null;
+          
+          const pickupDate = new Date(data.pickupDateTime);
+          const dropDate = new Date(data.dropDateTime);
+          const tripDurationMs = dropDate.getTime() - pickupDate.getTime();
+          const tripDurationDays = Math.ceil(tripDurationMs / (1000 * 60 * 60 * 24));
+          
+          if (tripDurationDays <= 1) return null;
+          
+          const netProfitPerDay = correctNetProfit / tripDurationDays;
+          const netProfitPerBusPerDay = netProfitPerBus / tripDurationDays;
+          
+          return (
+            <>
+              <div className="flex justify-between items-center text-sm text-muted-foreground mt-2 pt-2 border-t">
+                <span>Net Profit per Day{safeData.numberOfBuses > 1 ? ' (per bus)' : ''} ({tripDurationDays} days)</span>
+                <span className={netProfitPerBusPerDay >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  LKR {netProfitPerBusPerDay.toLocaleString()}
+                </span>
+              </div>
+              {safeData.numberOfBuses > 1 && (
+                <div className="flex justify-between items-center text-xs text-muted-foreground mt-1">
+                  <span>Total Net Profit per Day ({safeData.numberOfBuses} buses)</span>
+                  <span className={netProfitPerDay >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    LKR {netProfitPerDay.toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </CardContent>
     </Card>
   );
