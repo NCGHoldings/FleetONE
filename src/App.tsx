@@ -33,6 +33,7 @@ import SchoolReports from "./pages/SchoolReports";
 import YutongQuotations from "./pages/YutongQuotations";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
+import PublicComplaint from "./pages/PublicComplaint";
 import SchoolImportPage from "./pages/SchoolImportPage";
 import CustomerManagement from "./pages/CustomerManagement";
 import AddStudentForm from "./pages/AddStudentForm";
@@ -53,8 +54,9 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Public auth route */}
+            {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
+            <Route path="/public/complaint" element={<PublicComplaint />} />
             
             {/* Protected routes wrapped in AppLayout */}
             <Route 

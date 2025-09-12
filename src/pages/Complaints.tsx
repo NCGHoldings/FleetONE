@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentUpload } from "@/components/documents/DocumentUpload";
 import { useToast } from "@/hooks/use-toast";
+import ComplaintQRGenerator from "@/components/complaints/ComplaintQRGenerator";
 import { Clock, FileText, AlertTriangle, CheckCircle, XCircle, User, Phone, Bus, MapPin, Flag, Calendar, Plus } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 
@@ -24,6 +25,7 @@ interface Complaint {
   priority: string;
   status: string;
   type: string;
+  reported_by?: string;
   current_handler?: string;
   staff_group?: string;
   resolution?: string;
@@ -190,7 +192,14 @@ export default function Complaints() {
       accessorKey: "feedback_id",
       header: "Complaint ID",
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("feedback_id") || `CMP-${row.original.id.slice(-6)}`}</div>
+        <div className="flex items-center gap-2">
+          <div className="font-medium">{row.getValue("feedback_id") || `CMP-${row.original.id.slice(-6)}`}</div>
+          {!row.original.reported_by && (
+            <Badge variant="outline" className="text-xs">
+              Anonymous
+            </Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -366,6 +375,11 @@ export default function Complaints() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* QR Code Generator Section */}
+      <div className="animate-fade-in" style={{ animationDelay: '0.5s' }}>
+        <ComplaintQRGenerator />
       </div>
 
       <DataTable
