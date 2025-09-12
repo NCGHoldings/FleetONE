@@ -282,23 +282,44 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Working Hours Analysis</h4>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="text-center">
-              <div className="font-medium text-blue-600">{safeData.rateCardDetails?.standardHours || 0} hrs</div>
+              <div className="font-medium text-blue-600">
+                {safeData.rateCardDetails?.standardHours || 
+                 (data.pickupDateTime && data.dropDateTime ? 
+                   (() => {
+                     const pickup = new Date(data.pickupDateTime);
+                     const drop = new Date(data.dropDateTime);
+                     const diffHours = (drop.getTime() - pickup.getTime()) / (1000 * 60 * 60);
+                     return Math.min(diffHours, 8);
+                   })() : 8)} hrs
+              </div>
               <div className="text-muted-foreground">Standard</div>
             </div>
             <div className="text-center">
-              <div className="font-medium text-orange-600">{safeData.rateCardDetails?.availableHours?.toFixed(1) || '0.0'} hrs</div>
+              <div className="font-medium text-orange-600">
+                {safeData.rateCardDetails?.availableHours?.toFixed(1) || 
+                 (safeData.kmTrip > 0 ? (safeData.kmTrip / 10).toFixed(1) : '0.0')} hrs
+              </div>
               <div className="text-muted-foreground">Available</div>
             </div>
             <div className="text-center">
-              <div className="font-medium text-green-600">{safeData.rateCardDetails?.actualHours || 0} hrs</div>
+              <div className="font-medium text-green-600">
+                {safeData.rateCardDetails?.actualHours || 
+                 (data.pickupDateTime && data.dropDateTime ? 
+                   (() => {
+                     const pickup = new Date(data.pickupDateTime);
+                     const drop = new Date(data.dropDateTime);
+                     return ((drop.getTime() - pickup.getTime()) / (1000 * 60 * 60)).toFixed(1);
+                   })() : 0)} hrs
+              </div>
               <div className="text-muted-foreground">Actual</div>
             </div>
           </div>
-          {safeData.rateCardDetails?.availableHours && (
-            <div className="text-xs text-muted-foreground mt-1 text-center">
-              Available: {safeData.kmTrip}km ÷ 10 kmph = {safeData.rateCardDetails.availableHours.toFixed(1)} hrs
-            </div>
-          )}
+          <div className="text-xs text-muted-foreground mt-1 text-center">
+            {safeData.rateCardDetails?.availableHours ? 
+              `Available: ${safeData.kmTrip}km ÷ 10 kmph = ${safeData.rateCardDetails.availableHours.toFixed(1)} hrs` :
+              safeData.kmTrip > 0 ? `Available: ${safeData.kmTrip}km ÷ 10 kmph = ${(safeData.kmTrip / 10).toFixed(1)} hrs` : ''
+            }
+          </div>
         </div>
 
         <Separator />
