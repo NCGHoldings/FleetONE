@@ -340,6 +340,7 @@ export default function YutongCustomersAdmin() {
           <DataTable
             columns={columns}
             data={filteredCustomers}
+            searchKey="company_name"
           />
         </CardContent>
       </Card>

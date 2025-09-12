@@ -409,11 +409,143 @@ export function useCustomerProfile(customerId: string) {
     const fetchCustomerProfile = async () => {
       try {
         setLoading(true);
-        // This would fetch detailed customer profile
-        // For now, we'll use the same logic as above but for a single customer
-        // Implementation would be similar but focused on one customer's detailed data
+        setError(null);
+
+        // Fetch customer data from all sources
+        const [yutongCustomers, yutongQuotations, specialHireQuotations, buses] = await Promise.all([
+          supabase.from('yutong_customers').select('*').eq('id', customerId),
+          supabase.from('yutong_quotations').select('*'),
+          supabase.from('special_hire_quotations').select('*'),
+          supabase.from('buses').select('*')
+        ]);
+
+        if (yutongCustomers.error) throw yutongCustomers.error;
+        if (yutongQuotations.error) throw yutongQuotations.error;
+        if (specialHireQuotations.error) throw specialHireQuotations.error;
+        if (buses.error) throw buses.error;
+
+        const yutongCustomer = yutongCustomers.data?.[0];
+        
+        if (!yutongCustomer) {
+          setError("Customer not found");
+          return;
+        }
+
+        // Create customer profile with analytics
+        const customerProfile: CustomerData = {
+          id: yutongCustomer.id,
+          name: yutongCustomer.contact_person || yutongCustomer.company_name,
+          company_name: yutongCustomer.company_name,
+          phone: yutongCustomer.phone,
+          email: yutongCustomer.email,
+          address: yutongCustomer.address,
+          city: yutongCustomer.city,
+          source: 'yutong',
+          customer_type: yutongCustomer.company_name ? 'corporate' : 'individual',
+          created_at: yutongCustomer.created_at,
+          analytics: {
+            total_lifetime_value: 0,
+            yutong_revenue: 0,
+            special_hire_revenue: 0,
+            maintenance_revenue: 0,
+            outstanding_balance: 0,
+            total_transactions: 0,
+            yutong_purchases: 0,
+            special_hire_bookings: 0,
+            owned_buses: 0,
+            avg_booking_value: 0,
+            first_interaction: yutongCustomer.created_at,
+            last_interaction: yutongCustomer.updated_at || yutongCustomer.created_at,
+            months_active: 0,
+            booking_frequency: 0,
+            preferred_bus_types: [],
+            common_routes: [],
+            payment_methods: [],
+            recent_transactions: [],
+            monthly_revenue_trend: []
+          }
+        };
+
+        // Calculate Yutong analytics
+        const customerYutongQuotations = yutongQuotations.data?.filter(q => 
+          q.customer_id === customerId ||
+          q.customer_phone === customerProfile.phone || 
+          q.customer_email === customerProfile.email ||
+          q.customer_name === customerProfile.name
+        ) || [];
+
+        customerProfile.analytics.yutong_purchases = customerYutongQuotations.length;
+        customerProfile.analytics.yutong_revenue = customerYutongQuotations
+          .filter(q => q.status === 'confirmed' || q.status === 'delivered')
+          .reduce((sum, q) => sum + (Number(q.total_price) || 0), 0);
+
+        // Calculate Special Hire analytics
+        const customerSpecialHireQuotations = specialHireQuotations.data?.filter(q =>
+          q.customer_phone === customerProfile.phone ||
+          q.customer_email === customerProfile.email ||
+          q.customer_name === customerProfile.name
+        ) || [];
+
+        customerProfile.analytics.special_hire_bookings = customerSpecialHireQuotations.length;
+        customerProfile.analytics.special_hire_revenue = customerSpecialHireQuotations
+          .filter(q => q.trip_status === 'completed')
+          .reduce((sum, q) => sum + (Number(q.gross_revenue) || 0), 0);
+
+        // Calculate totals
+        customerProfile.analytics.total_lifetime_value = 
+          customerProfile.analytics.yutong_revenue + 
+          customerProfile.analytics.special_hire_revenue;
+
+        customerProfile.analytics.total_transactions = 
+          customerProfile.analytics.yutong_purchases + 
+          customerProfile.analytics.special_hire_bookings;
+
+        customerProfile.analytics.avg_booking_value = customerProfile.analytics.total_transactions > 0 
+          ? customerProfile.analytics.total_lifetime_value / customerProfile.analytics.total_transactions 
+          : 0;
+
+        // Calculate time metrics
+        const firstDate = new Date(customerProfile.analytics.first_interaction);
+        const lastDate = new Date(customerProfile.analytics.last_interaction);
+        const monthsDiff = (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+        customerProfile.analytics.months_active = Math.max(1, Math.round(monthsDiff));
+        customerProfile.analytics.booking_frequency = customerProfile.analytics.total_transactions / customerProfile.analytics.months_active;
+
+        // Get preferred bus types
+        const busTypes = customerYutongQuotations.map(q => q.bus_model).filter(Boolean);
+        customerProfile.analytics.preferred_bus_types = [...new Set(busTypes)];
+
+        // Get recent transactions
+        const recentTransactions = [
+          ...customerYutongQuotations.slice(-5).map(q => ({
+            id: q.id,
+            type: 'yutong_quotation' as const,
+            description: `${q.bus_model} - ${q.quantity} units`,
+            amount: Number(q.total_price) || 0,
+            date: q.created_at,
+            status: q.status || 'draft'
+          })),
+          ...customerSpecialHireQuotations.slice(-5).map(q => ({
+            id: q.id,
+            type: 'special_hire' as const,
+            description: `${q.pickup_location} to ${q.drop_location}`,
+            amount: Number(q.gross_revenue) || 0,
+            date: q.created_at,
+            status: q.trip_status || 'quotation'
+          }))
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
+
+        customerProfile.analytics.recent_transactions = recentTransactions;
+
+        setCustomer(customerProfile);
       } catch (err: any) {
+        console.error("Error fetching customer profile:", err);
         setError(err.message);
+        toast({
+          title: "Error",
+          description: "Failed to load customer profile",
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
