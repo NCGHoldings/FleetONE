@@ -41,7 +41,6 @@ interface QuotationAddOn {
   notes?: string;
   yutong_addons?: {
     addon_name: string;
-    category: string;
   };
 }
 
@@ -105,8 +104,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             .select(`
               *,
               yutong_addons (
-                addon_name,
-                category
+                addon_name
               )
             `)
             .eq('quotation_id', quotation.id);
@@ -316,8 +314,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                     {addOns.map((addon, index) => (
                       <tr key={index}>
                         <td style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                          <b>ADD-ON:</b> {addon.yutong_addons?.addon_name || 'N/A'}<br/>
-                          <b>CATEGORY:</b> {addon.yutong_addons?.category || 'N/A'}
+                          <b>ADD-ON:</b> {addon.yutong_addons?.addon_name || 'N/A'}
                           {addon.notes && (
                             <>
                               <br/><b>NOTES:</b> {addon.notes}
