@@ -556,7 +556,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         )}
 
         {/* Extra Charges */}
-        <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra Charges and Route Info</div>
+        <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Extra Charges</div>
         <div className="text-xs leading-tight text-gray-800">
           {rateCard ? (
             <>
@@ -565,15 +565,12 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               {rateCard.overnight_charge_lkr_per_day > 0 && (
                 <>Overnight charge per day: Rs {rateCard.overnight_charge_lkr_per_day.toLocaleString()}<br /></>
               )}
-              {quotation.route_type && (
-                <>Route - {quotation.route_type}<br /></>
-              )}
             </>
           ) : (
             <>
               Exceeding Per Kilometer will be charged Rs 300.00<br />
               Exceeding per hour will be charged Rs 1500.00<br />
-              Route - Normal Way
+              
             </>
           )}
         </div>

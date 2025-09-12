@@ -38,7 +38,7 @@ const formSchema = z.object({
   numberOfBuses: z.number().min(1, 'At least 1 bus is required'),
   pickupLocation: z.string().min(1, 'Pickup location is required'),
   dropLocation: z.string().min(1, 'Drop location is required'),
-  routeType: z.enum(['Normal Way', 'Highway']).optional(),
+  
   numberOfPassengers: z.number().min(1, 'Number of passengers is required'),
   pickupDateTime: z.date(),
   dropDateTime: z.date(),
@@ -144,7 +144,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       numberOfBuses: initialData.number_of_buses || 1,
       pickupLocation: initialData.pickup_location || '',
       dropLocation: initialData.drop_location || '',
-      routeType: initialData.route_type || 'Normal Way',
+      
       numberOfPassengers: initialData.number_of_passengers || 1,
       pickupDateTime: initialData.pickup_date_time ? new Date(initialData.pickup_date_time) : new Date(),
       dropDateTime: initialData.drop_date_time ? new Date(initialData.drop_date_time) : new Date(),
@@ -739,7 +739,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             customer_name: data.customerName !== initialData.customer_name ? { from: initialData.customer_name, to: data.customerName } : undefined,
             pickup_location: data.pickupLocation !== initialData.pickup_location ? { from: initialData.pickup_location, to: data.pickupLocation } : undefined,
             drop_location: data.dropLocation !== initialData.drop_location ? { from: initialData.drop_location, to: data.dropLocation } : undefined,
-            route_type: data.routeType !== initialData.route_type ? { from: initialData.route_type, to: data.routeType } : undefined,
+            
             commission_pct: data.commissionPct !== (initialData.commission_pct || 5) ? { from: initialData.commission_pct || 5, to: data.commissionPct } : undefined,
             discount_type: data.discountType !== (initialData.discount_type || 'percentage') ? { from: initialData.discount_type || 'percentage', to: data.discountType } : undefined,
             discount_percentage: data.discountPct !== (initialData.discount_percentage || 0) ? { from: initialData.discount_percentage || 0, to: data.discountPct } : undefined,
@@ -760,7 +760,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         number_of_buses: data.numberOfBuses,
         pickup_location: data.pickupLocation,
         drop_location: data.dropLocation,
-        route_type: data.routeType || null,
+        
         intermediate_stops: JSON.stringify(validIntermediateStops),
         number_of_passengers: data.numberOfPassengers,
         pickup_datetime: data.pickupDateTime.toISOString(),
