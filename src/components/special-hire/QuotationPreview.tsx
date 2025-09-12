@@ -586,15 +586,25 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         {/* Terms & Conditions */}
         <div className="text-sm mt-3 mb-1 font-semibold text-blue-600">Terms and Conditions</div>
         <div className="text-xs leading-tight text-gray-800">
-          This quotation is valid for 7 days. The booking must be confirmed within 3 working days in order to avoid any inconvenience.<br /><br />
+          This quotation is valid for 7 days from the date of issue. Bookings must be confirmed within 3 working days to avoid inconvenience.<br /><br />
           
-          Once we receive confirmation of the hire, kindly arrange 50% payment in advance. The balance payment should be arranged before the hire date.<br /><br />
+          <strong>Upon confirmation of hire:</strong> 50% advance payment of the total hire cost must be made. The balance payment must be settled before the hire date.<br /><br />
           
-          Any cancellations are compel to hold 10% from the advance payment. No extra charges will be incurred for the first 5 Km exceeding the due destination. There will be an additional charge from the 6th Km onwards.<br /><br />
+          <strong>Cancellation Policy:</strong><br />
+          • If cancelled 14 days or more before the hire date: 10% cancellation fee (based on the full hire rate) will be charged. The balance of any advance payment will be refunded.<br />
+          • If cancelled within 14 days of the hire date: 20% cancellation fee (based on the full hire rate) will be charged. The balance of any advance payment will be refunded.<br /><br />
           
-          Any changes in the destination may require written permission from a higher official of NCG EXPRESS (PRIVATE) LIMITED.<br /><br />
+          <strong>Excess Mileage:</strong> A flat charge applies for the first 5 km exceeding the agreed destination. From the 6th km onwards, an additional per-km charge will be applied.<br /><br />
           
-          Note: If the hire is more than a day, we request that you provide food and accommodation to the driver. Please do not hesitate to contact us on 074 289 3612 for further information.
+          Any change in destination must be approved in writing by a higher official of NCG Express (Private) Limited.<br /><br />
+          
+          <strong>Garbage Penalty (per bus):</strong><br />
+          • Rs. 5,000 for Leyland and D7 models.<br />
+          • Rs. 10,000 for Super Luxury models.<br /><br />
+          
+          <strong>Damage Policy:</strong> If the bus is damaged, the customer will be charged twice the actual repair cost required to restore it to original condition.<br /><br />
+          
+          For hires of more than one day, customers must provide food and accommodation for the driver. For further information, please contact us at 074 289 3612.
         </div>
 
         {/* Footer */}
