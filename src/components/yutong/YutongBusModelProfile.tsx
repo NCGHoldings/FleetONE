@@ -14,6 +14,7 @@ interface BusModel {
   engine: string;
   manufactured_year: number;
   condition: string;
+  image_url?: string;
   overall_dimension_mm?: string;
   wheel_base_mm?: string;
   minimum_turning_diameter_m?: string;
@@ -94,8 +95,8 @@ export function YutongBusModelProfile({ busModel, isOpen, onClose }: YutongBusMo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="pb-6">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0 pb-6">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-full bg-primary/10">
               <Bus className="h-6 w-6 text-primary" />
@@ -109,7 +110,24 @@ export function YutongBusModelProfile({ busModel, isOpen, onClose }: YutongBusMo
           </div>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto space-y-6">
+          {/* Hero Image */}
+          <div className="relative aspect-video bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg overflow-hidden border">
+            {busModel.image_url ? (
+              <img
+                src={busModel.image_url}
+                alt={busModel.bus_name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Bus className="h-16 w-16 text-primary/50 mx-auto mb-2" />
+                  <p className="text-muted-foreground text-sm">No image available</p>
+                </div>
+              </div>
+            )}
+          </div>
           {/* Header Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="text-center">

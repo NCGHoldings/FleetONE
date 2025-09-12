@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Edit, Trash2, Upload, Image, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Image, Eye, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { YutongBusModelProfile } from './YutongBusModelProfile';
@@ -276,6 +276,55 @@ export function YutongBusModelsAdmin() {
   const handleViewProfile = (model: BusModel) => {
     setSelectedModel(model);
     setIsProfileModalOpen(true);
+  };
+
+  const handleDuplicate = async (model: BusModel) => {
+    try {
+      const dbData = {
+        bus_name: `${model.bus_name} (Copy)`,
+        model_name: model.model_name,
+        capacity: model.capacity,
+        engine: model.engine,
+        manufactured_year: model.manufactured_year,
+        condition: model.condition,
+        base_price: model.base_price,
+        is_active: model.is_active,
+        overall_dimension_mm: model.overall_dimension_mm || null,
+        wheel_base_mm: model.wheel_base_mm || null,
+        minimum_turning_diameter_m: model.minimum_turning_diameter_m || null,
+        emission: model.emission || null,
+        transmission: model.transmission || null,
+        clutch: model.clutch || null,
+        retarder: model.retarder || null,
+        axle: model.axle || null,
+        maintenance_free_wheel_edge: model.maintenance_free_wheel_edge || null,
+        brake_system: model.brake_system || null,
+        suspension_system: model.suspension_system || null,
+        tire: model.tire || null,
+        fuel_tank_capacity_l: model.fuel_tank_capacity_l || null,
+        cool_box: model.cool_box || null,
+        rearview_mirror: model.rearview_mirror || null,
+        interior_lights: model.interior_lights || null,
+        audiovisual_system: model.audiovisual_system || null,
+        middle: model.middle || null,
+        front_windshield: model.front_windshield || null,
+        luggage_capacity: model.luggage_capacity || null
+      };
+
+      const { error } = await supabase
+        .from('yutong_bus_models')
+        .insert([dbData]);
+
+      if (error) throw error;
+      toast({ title: "Success", description: "Bus model duplicated successfully" });
+      loadBusModels();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -836,12 +885,11 @@ export function YutongBusModelsAdmin() {
                     LKR {model.base_price.toLocaleString()}
                   </div>
                   
-                  <div className="flex space-x-2 pt-2">
+                  <div className="grid grid-cols-2 gap-2 pt-2">
                     <Button 
                       variant="secondary" 
                       size="sm"
                       onClick={() => handleViewProfile(model)}
-                      className="flex-1"
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View
@@ -850,7 +898,6 @@ export function YutongBusModelsAdmin() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleEdit(model)}
-                      className="flex-1"
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
@@ -858,8 +905,15 @@ export function YutongBusModelsAdmin() {
                     <Button 
                       variant="outline" 
                       size="sm" 
+                      onClick={() => handleDuplicate(model)}
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      Duplicate
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
                       onClick={() => handleDelete(model.id)}
-                      className="flex-1"
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
