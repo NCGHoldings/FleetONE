@@ -33,7 +33,7 @@ interface YutongQuotation {
 interface YutongInvoiceGeneratorProps {
   isOpen: boolean;
   onClose: () => void;
-  quotation: YutongQuotation;
+  quotation: YutongQuotation | null;
   onSuccess?: () => void;
 }
 
@@ -53,6 +53,11 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
   const [selectedDocument, setSelectedDocument] = useState<YutongStoredDocument | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
+
+  // Early return if quotation is null
+  if (!quotation) {
+    return null;
+  }
 
   useEffect(() => {
     if (isOpen && quotation) {
