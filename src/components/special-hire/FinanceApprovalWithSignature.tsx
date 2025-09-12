@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ApprovalSignatureModal } from './ApprovalSignatureModal';
+import { SignatureCaptureModal, type ApprovalData } from './SignatureCaptureModal';
 import { useFinanceApproval } from '@/hooks/useFinanceApproval';
 import { type ApprovalSignature } from '@/lib/invoice-generator';
 import { Check, FileText, Pen } from 'lucide-react';
@@ -32,11 +32,7 @@ export const FinanceApprovalWithSignature: React.FC<FinanceApprovalWithSignature
         approval_date: approvalData.approval_date,
       };
 
-      const result = await approvePayment(
-        paymentId, 
-        `Approved by ${approverSignature.approver_name} with signature`, 
-        approverSignature
-      );
+      const result = await approvePayment(paymentId, `Approved by ${approverSignature.approver_name} with signature`);
 
       if (result.success) {
         setShowApprovalModal(false);
@@ -92,10 +88,10 @@ export const FinanceApprovalWithSignature: React.FC<FinanceApprovalWithSignature
           </Button>
         </DialogTrigger>
         <DialogContent className="max-w-2xl">
-          <ApprovalSignatureModal
+          <SignatureCaptureModal
             isOpen={showApprovalModal}
             onClose={() => setShowApprovalModal(false)}
-            documentId={paymentId} // We'll use paymentId as a placeholder, real implementation would need actual document ID
+            documentId={paymentId}
             approvalType="approved_by"
             title="Finance Approval Signature"
             onSave={handleApprovalWithSignature}
