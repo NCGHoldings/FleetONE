@@ -34,6 +34,7 @@ import YutongQuotations from "./pages/YutongQuotations";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
 import SchoolImportPage from "./pages/SchoolImportPage";
+import CustomerManagement from "./pages/CustomerManagement";
 import AddStudentForm from "./pages/AddStudentForm";
 import SchoolRouteManagement from "./pages/SchoolRouteManagement";
 import SchoolReceiptManagement from "./pages/SchoolReceiptManagement";
@@ -62,6 +63,16 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <Dashboard />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/customers" 
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <CustomerManagement />
                   </AppLayout>
                 </ProtectedRoute>
               } 

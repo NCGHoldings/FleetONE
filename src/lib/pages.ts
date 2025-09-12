@@ -17,6 +17,7 @@ export type PageCategories = {
 export const PAGES: PageCategories = {
   main: [
     { id: "dashboard", title: "Dashboard", url: "/" },
+    { id: "customers", title: "Customers", url: "/customers" },
     { id: "daily_trips", title: "Daily Trips", url: "/trips" },
     { id: "fleet_management", title: "Fleet Management", url: "/fleet" },
     { id: "maintenance", title: "Maintenance", url: "/maintenance" },
