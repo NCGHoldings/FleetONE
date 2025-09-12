@@ -5,9 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calculator, MapPin, Plus, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Calculator, MapPin, Plus, Trash2, CheckCircle, XCircle, TrendingUp, DollarSign } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { CostBreakdown } from './CostBreakdown';
 
 interface QuotationData {
   id: string;
@@ -46,6 +47,7 @@ interface TripCalculation {
   dailyProfit?: number;
   profitMargin: number;
   expenses: ExpenseItem[];
+  costBreakdownData?: any;
 }
 
 export function EnhancedCostCalculator() {
@@ -153,6 +155,41 @@ export function EnhancedCostCalculator() {
     const dailyProfit = tripDays > 1 ? netProfit / tripDays : undefined;
     const profitMargin = quotation.gross_revenue > 0 ? (netProfit / quotation.gross_revenue) * 100 : 0;
 
+    // Calculate customer fuel cost (parking distances only)
+    const customerFuelDistance = quotation.km_parking_to_pickup + quotation.km_drop_to_parking;
+    const customerFuelCost = (customerFuelDistance / (busType.avg_km_per_l || 8)) * fuelSettings.diesel_price_lkr_per_l * quotation.number_of_buses;
+    const customerTotal = quotation.gross_revenue + customerFuelCost;
+
+    // Prepare data for CostBreakdown component
+    const costBreakdownData = {
+      kmParkingToPickup: quotation.km_parking_to_pickup,
+      kmTrip: actualDistance,
+      kmDropToParking: quotation.km_drop_to_parking,
+      fuelCostFuelOnly: customerFuelCost,
+      hireCharge: quotation.gross_revenue,
+      fixedRate: quotation.gross_revenue,
+      overtimeCharge: 0,
+      overnightCharge: 0,
+      exceedingDistanceCharge: 0,
+      grossRevenue: quotation.gross_revenue,
+      customerTotalWithFuel: customerTotal,
+      driverCharge: updatedExpenses.find(e => e.type === 'wages')?.amount || 0,
+      commissionPct: commissionPct,
+      commissionAmount: updatedExpenses.find(e => e.type === 'commission')?.amount || 0,
+      totalExpenses,
+      netProfit,
+      otherExpenses: updatedExpenses.filter(e => !['fuel', 'wages', 'commission', 'maintenance'].includes(e.type)).map(e => ({
+        label: e.description,
+        amount: e.amount
+      })),
+      busTypeEfficiency: busType.avg_km_per_l || 8,
+      fuelPricePerLiter: fuelSettings.diesel_price_lkr_per_l,
+      maintenanceRatePerKm: fuelSettings.maintenance_rate_lkr_per_km || 20,
+      numberOfBuses: quotation.number_of_buses,
+      pickupDateTime: quotation.pickup_datetime,
+      dropDateTime: quotation.drop_datetime
+    };
+
     setCalculation({
       totalDistance,
       actualFuelCost: Math.round(actualFuelCost),
@@ -162,7 +199,8 @@ export function EnhancedCostCalculator() {
       netProfit,
       dailyProfit,
       profitMargin,
-      expenses: updatedExpenses
+      expenses: updatedExpenses,
+      costBreakdownData
     });
   };
 
@@ -178,22 +216,38 @@ export function EnhancedCostCalculator() {
   };
 
   const updateExpense = (id: string, field: keyof ExpenseItem, value: any) => {
-    setExpenses(expenses.map(exp => 
+    const updatedExpenses = expenses.map(exp => 
       exp.id === id ? { ...exp, [field]: value } : exp
-    ));
+    );
+    setExpenses(updatedExpenses);
+    
+    // Recalculate costs when expenses change
+    if (selectedQuotation) {
+      setTimeout(() => calculateCosts(selectedQuotation), 100);
+    }
   };
 
   const calculateCommissionFromPercentage = () => {
     if (!selectedQuotation || commissionPct === 0) return;
     
     const commissionAmount = Math.round((selectedQuotation.gross_revenue * commissionPct) / 100);
-    setExpenses(expenses.map(exp => 
+    const updatedExpenses = expenses.map(exp => 
       exp.type === 'commission' ? { ...exp, amount: commissionAmount, isEstimated: false } : exp
-    ));
+    );
+    setExpenses(updatedExpenses);
+    
+    // Recalculate costs
+    setTimeout(() => calculateCosts(selectedQuotation), 100);
   };
 
   const removeExpense = (id: string) => {
-    setExpenses(expenses.filter(exp => exp.id !== id));
+    const updatedExpenses = expenses.filter(exp => exp.id !== id);
+    setExpenses(updatedExpenses);
+    
+    // Recalculate costs when expenses are removed
+    if (selectedQuotation) {
+      setTimeout(() => calculateCosts(selectedQuotation), 100);
+    }
   };
 
   const confirmTrip = async () => {
@@ -322,10 +376,10 @@ export function EnhancedCostCalculator() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5" />
-            Enhanced Cost Calculator
+            Trip Cost Calculator & Analysis
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {/* Quotation Selection */}
           <div className="space-y-2">
             <Label>Select Quotation</Label>
@@ -480,76 +534,72 @@ export function EnhancedCostCalculator() {
                 ))}
               </div>
 
-              {/* Calculation Results */}
+              {/* Summary Cards */}
               {calculation && (
-                <div className="space-y-4 p-4 bg-muted rounded-lg">
-                  <h3 className="text-lg font-semibold">Financial Summary</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <Label className="text-sm">Total Distance</Label>
-                      <p className="text-2xl font-bold">{calculation.totalDistance} km</p>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card className="p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <MapPin className="h-5 w-5 text-blue-600" />
                     </div>
-                    <div className="text-center">
-                      <Label className="text-sm">Total Revenue</Label>
-                      <p className="text-2xl font-bold text-green-600">LKR {calculation.quotedAmount.toLocaleString()}</p>
+                    <div className="text-2xl font-bold text-blue-600">{calculation.totalDistance.toFixed(1)} km</div>
+                    <div className="text-sm text-muted-foreground">Total Distance</div>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <DollarSign className="h-5 w-5 text-green-600" />
                     </div>
-                    <div className="text-center">
-                      <Label className="text-sm">Total Expenses</Label>
-                      <p className="text-2xl font-bold text-red-600">LKR {calculation.totalExpenses.toLocaleString()}</p>
+                    <div className="text-2xl font-bold text-green-600">LKR {calculation.quotedAmount.toLocaleString()}</div>
+                    <div className="text-sm text-muted-foreground">Revenue</div>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <TrendingUp className="h-5 w-5 text-red-600" />
                     </div>
-                    <div className="text-center">
-                      <Label className="text-sm">Net Profit</Label>
-                      <p className={`text-2xl font-bold ${calculation.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        LKR {calculation.netProfit.toLocaleString()}
-                      </p>
+                    <div className="text-2xl font-bold text-red-600">LKR {calculation.totalExpenses.toLocaleString()}</div>
+                    <div className="text-sm text-muted-foreground">Total Expenses</div>
+                  </Card>
+                  <Card className="p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
+                      <TrendingUp className={`h-5 w-5 ${calculation.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`} />
                     </div>
-                  </div>
+                    <div className={`text-2xl font-bold ${calculation.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      LKR {calculation.netProfit.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Net Profit ({calculation.profitMargin.toFixed(1)}%)</div>
+                  </Card>
+                </div>
+              )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {calculation.dailyProfit && (
-                      <div className="text-center">
-                        <Label className="text-sm">Daily Profit</Label>
-                        <p className="text-xl font-semibold">LKR {Math.round(calculation.dailyProfit).toLocaleString()}</p>
-                      </div>
-                    )}
-                    <div className="text-center">
-                      <Label className="text-sm">Profit Margin</Label>
-                      <p className={`text-xl font-semibold ${calculation.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {calculation.profitMargin.toFixed(1)}%
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <Label className="text-sm">Fuel Cost</Label>
-                      <p className="text-xl font-semibold">LKR {calculation.actualFuelCost.toLocaleString()}</p>
-                    </div>
-                  </div>
-
-                  {/* Trip Confirmation Buttons */}
-                  <div className="flex gap-4 justify-center pt-4">
-                    <Button 
-                      onClick={confirmTrip} 
-                      disabled={loading}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Confirm Trip
-                    </Button>
-                    <Button 
-                      onClick={declineTrip} 
-                      variant="destructive"
-                      disabled={loading}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Decline Trip
-                    </Button>
-                  </div>
+              {/* Trip Actions */}
+              {calculation && (
+                <div className="flex gap-2 justify-center">
+                  <Button 
+                    onClick={confirmTrip}
+                    disabled={loading}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {loading ? 'Confirming...' : 'Confirm Trip'}
+                  </Button>
+                  <Button 
+                    onClick={declineTrip}
+                    variant="outline"
+                    className="border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Decline Trip
+                  </Button>
                 </div>
               )}
             </>
           )}
         </CardContent>
       </Card>
+
+      {/* Detailed Cost Breakdown */}
+      {calculation?.costBreakdownData && (
+        <CostBreakdown data={calculation.costBreakdownData} />
+      )}
     </div>
   );
 }
