@@ -109,7 +109,10 @@ export function YutongBusModelsAdmin() {
       console.log('Bus models query result:', { data, error });
 
       if (error) throw error;
-      setBusModels(data || []);
+      setBusModels((data || []).map(model => ({
+        ...model,
+        capacity: model.capacity?.toString() || ''
+      })));
       console.log('Bus models loaded successfully:', data?.length || 0, 'records');
     } catch (error: any) {
       console.error('Error loading bus models:', error);
@@ -236,7 +239,7 @@ export function YutongBusModelsAdmin() {
     form.reset({
       bus_name: model.bus_name,
       model: model.model_name,
-      seating_capacity: model.capacity?.toString() || '',
+      seating_capacity: model.capacity || '',
       engine: model.engine,
       manufactured_year: model.manufactured_year,
       condition: model.condition,

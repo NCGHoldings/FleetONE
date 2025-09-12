@@ -43,7 +43,7 @@ interface BusModel {
   id: string;
   bus_name: string;
   model_name: string;
-  capacity: number;
+  capacity: string;
   base_price: number;
 }
 

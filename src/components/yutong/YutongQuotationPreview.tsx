@@ -27,7 +27,7 @@ interface YutongQuotation {
 
 interface BusModelDetails {
   model_name: string;
-  capacity: number;
+  capacity: string;
   engine: string;
   manufactured_year: number;
   condition: string;

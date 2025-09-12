@@ -3234,7 +3234,7 @@ export type Database = {
           base_price: number
           brake_system: string | null
           bus_name: string | null
-          capacity: number
+          capacity: string
           clutch: string | null
           condition: string | null
           cool_box: string | null
@@ -3275,7 +3275,7 @@ export type Database = {
           base_price: number
           brake_system?: string | null
           bus_name?: string | null
-          capacity: number
+          capacity: string
           clutch?: string | null
           condition?: string | null
           cool_box?: string | null
@@ -3316,7 +3316,7 @@ export type Database = {
           base_price?: number
           brake_system?: string | null
           bus_name?: string | null
-          capacity?: number
+          capacity?: string
           clutch?: string | null
           condition?: string | null
           cool_box?: string | null
