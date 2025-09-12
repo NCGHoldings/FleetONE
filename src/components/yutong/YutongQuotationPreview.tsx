@@ -11,6 +11,7 @@ interface YutongQuotation {
   company_name?: string;
   customer_address?: string;
   bus_model: string;
+  bus_model_id?: string;
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -22,6 +23,14 @@ interface YutongQuotation {
   payment_terms?: string;
   warranty_terms?: string;
   discount_percentage?: number;
+}
+
+interface BusModelDetails {
+  model_name: string;
+  capacity: number;
+  engine: string;
+  manufactured_year: number;
+  condition: string;
 }
 
 interface QuotationAddOn {
@@ -43,13 +52,24 @@ interface YutongQuotationPreviewProps {
 export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotationPreviewProps>(
   ({ quotation }, ref) => {
     const [addOns, setAddOns] = useState<QuotationAddOn[]>([]);
+    const [busModelDetails, setBusModelDetails] = useState<BusModelDetails | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Parse bus model details - you might need to adjust this based on your data structure
-    const getBusModelDetails = (model: string) => {
-      // Default values - these could be fetched from a bus models table
+    // Get bus model details with fallback values
+    const getBusModelDetails = () => {
+      if (busModelDetails) {
+        return {
+          model: busModelDetails.model_name || quotation.bus_model,
+          seating: busModelDetails.capacity ? `${busModelDetails.capacity}` : '37+1+1',
+          engine: busModelDetails.engine || 'YUCHAI-YC6A270-50 (Euro V)',
+          year: busModelDetails.manufactured_year?.toString() || '2025',
+          condition: busModelDetails.condition || 'BRAND NEW'
+        };
+      }
+      
+      // Fallback values when bus model details are not available
       return {
-        model: model || 'ZK6907H',
+        model: quotation.bus_model || 'ZK6907H',
         seating: '37+1+1',
         engine: 'YUCHAI-YC6A270-50 (Euro V)',
         year: '2025',
@@ -57,14 +77,30 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
       };
     };
 
-    const busDetails = getBusModelDetails(quotation.bus_model);
+    const busDetails = getBusModelDetails();
     const formattedDate = format(new Date(quotation.created_at), 'dd/MM/yyyy');
 
-    // Fetch add-ons for this quotation
+    // Fetch bus model details and add-ons for this quotation
     useEffect(() => {
-      const fetchAddOns = async () => {
+      const fetchData = async () => {
         try {
-          const { data, error } = await supabase
+          // Fetch bus model details if bus_model_id is available
+          if (quotation.bus_model_id) {
+            const { data: busData, error: busError } = await supabase
+              .from('yutong_bus_models')
+              .select('model_name, capacity, engine, manufactured_year, condition')
+              .eq('id', quotation.bus_model_id)
+              .maybeSingle();
+
+            if (busError) {
+              console.error('Error fetching bus model details:', busError);
+            } else if (busData) {
+              setBusModelDetails(busData);
+            }
+          }
+
+          // Fetch add-ons
+          const { data: addOnData, error: addOnError } = await supabase
             .from('yutong_quotation_addons')
             .select(`
               *,
@@ -75,20 +111,20 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             `)
             .eq('quotation_id', quotation.id);
 
-          if (error) {
-            console.error('Error fetching add-ons:', error);
+          if (addOnError) {
+            console.error('Error fetching add-ons:', addOnError);
           } else {
-            setAddOns(data || []);
+            setAddOns(addOnData || []);
           }
         } catch (error) {
-          console.error('Error fetching add-ons:', error);
+          console.error('Error fetching quotation data:', error);
         } finally {
           setLoading(false);
         }
       };
 
-      fetchAddOns();
-    }, [quotation.id]);
+      fetchData();
+    }, [quotation.id, quotation.bus_model_id]);
 
     // Calculate totals correctly to avoid double-counting
     const addOnsTotal = addOns.reduce((sum, addon) => sum + (addon.quantity * addon.unit_price), 0);
