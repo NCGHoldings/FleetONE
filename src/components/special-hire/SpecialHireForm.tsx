@@ -74,6 +74,12 @@ interface AdditionalCharge {
   busesCount: number;
 }
 
+interface OtherExpense {
+  id: string;
+  label: string;
+  amount: number;
+}
+
 type FormData = z.infer<typeof formSchema>;
 
 interface BusType {
@@ -111,6 +117,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>([]);
   const [intermediateStops, setIntermediateStops] = useState<IntermediateStop[]>([]);
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([]);
+  const [otherExpenses, setOtherExpenses] = useState<OtherExpense[]>([]);
   const [costData, setCostData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [useMultiParking, setUseMultiParking] = useState(false);
@@ -390,6 +397,29 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
   const removeAdditionalCharge = (id: string) => {
     setAdditionalCharges(charges => charges.filter(charge => charge.id !== id));
+  };
+
+  const addOtherExpense = () => {
+    const newExpense: OtherExpense = {
+      id: Date.now().toString(),
+      label: '',
+      amount: 0
+    };
+    setOtherExpenses(expenses => [...expenses, newExpense]);
+  };
+
+  const updateOtherExpense = (id: string, field: keyof OtherExpense, value: any) => {
+    setOtherExpenses(expenses => 
+      expenses.map(expense => 
+        expense.id === id 
+          ? { ...expense, [field]: value }
+          : expense
+      )
+    );
+  };
+
+  const removeOtherExpense = (id: string) => {
+    setOtherExpenses(expenses => expenses.filter(expense => expense.id !== id));
   };
 
   const calculateCosts = async (data: FormData) => {
@@ -1415,6 +1445,128 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                           </div>
                        </div>
                      </Card>
+                  ))}
+                 </div>
+
+                {/* Other Expenses (Internal Costs) */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="text-base font-semibold text-foreground">
+                        Other Expenses (Internal Costs)
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Internal expenses that will be deducted from profit (not charged to customer)
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addOtherExpense}
+                      className="text-xs"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Expense
+                    </Button>
+                  </div>
+                  
+                  {otherExpenses.map((expense, index) => (
+                    <Card key={expense.id} className="p-4 border border-muted bg-muted/20">
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-foreground">Expense Description</Label>
+                          <Input
+                            value={expense.label}
+                            onChange={(e) => updateOtherExpense(expense.id, 'label', e.target.value)}
+                            placeholder="e.g., Office Expenses, Staff Costs, etc."
+                            className="mt-1"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <Label className="text-sm font-medium text-foreground">Amount (LKR)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={expense.amount}
+                            onChange={(e) => updateOtherExpense(expense.id, 'amount', parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                            className="mt-1"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeOtherExpense(expense.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 mt-6"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                 </div>
+
+                {/* Other Expenses (Internal Costs) */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="text-base font-semibold text-foreground">
+                        Other Expenses (Internal Costs)
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Internal expenses that will be deducted from profit (not charged to customer)
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addOtherExpense}
+                      className="text-xs"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Expense
+                    </Button>
+                  </div>
+                  
+                  {otherExpenses.map((expense, index) => (
+                    <Card key={expense.id} className="p-4 border border-muted bg-muted/20">
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-foreground">Expense Description</Label>
+                          <Input
+                            value={expense.label}
+                            onChange={(e) => updateOtherExpense(expense.id, 'label', e.target.value)}
+                            placeholder="e.g., Office Expenses, Staff Costs, etc."
+                            className="mt-1"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <Label className="text-sm font-medium text-foreground">Amount (LKR)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={expense.amount}
+                            onChange={(e) => updateOtherExpense(expense.id, 'amount', parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                            className="mt-1"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeOtherExpense(expense.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 mt-6"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </Card>
                   ))}
                 </div>
 
