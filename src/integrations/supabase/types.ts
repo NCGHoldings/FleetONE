@@ -3172,6 +3172,7 @@ export type Database = {
           features: string | null
           fuel_type: string | null
           id: string
+          image_url: string | null
           is_active: boolean | null
           manufactured_year: number | null
           model: string | null
@@ -3192,6 +3193,7 @@ export type Database = {
           features?: string | null
           fuel_type?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
           manufactured_year?: number | null
           model?: string | null
@@ -3212,6 +3214,7 @@ export type Database = {
           features?: string | null
           fuel_type?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
           manufactured_year?: number | null
           model?: string | null

@@ -2,16 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { DataTable } from '@/components/ui/data-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { ColumnDef } from '@tanstack/react-table';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Image } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -39,6 +37,7 @@ interface BusModel {
   base_price: number; // This maps to 'unit_price' in our form
   is_active: boolean;
   created_at: string;
+  image_url?: string;
 }
 
 export function YutongBusModelsAdmin() {
@@ -46,6 +45,7 @@ export function YutongBusModelsAdmin() {
   const [loading, setLoading] = useState(true);
   const [editingModel, setEditingModel] = useState<BusModel | null>(null);
   const [showDialog, setShowDialog] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -84,6 +84,44 @@ export function YutongBusModelsAdmin() {
   useEffect(() => {
     loadBusModels();
   }, []);
+
+  const handleImageUpload = async (file: File, modelId: string) => {
+    try {
+      setUploadingImage(modelId);
+      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${modelId}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('yutong-bus-models')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('yutong-bus-models')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('yutong_bus_models')
+        .update({ image_url: publicUrl })
+        .eq('id', modelId);
+
+      if (updateError) throw updateError;
+
+      toast({ title: "Success", description: "Image uploaded successfully" });
+      loadBusModels();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingImage(null);
+    }
+  };
 
   const handleSubmit = async (data: FormData) => {
     try {
@@ -166,57 +204,20 @@ export function YutongBusModelsAdmin() {
     }
   };
 
-  const columns: ColumnDef<BusModel>[] = [
-    {
-      accessorKey: "bus_name",
-      header: "Bus Name",
-    },
-    {
-      accessorKey: "model_name",
-      header: "Model",
-    },
-    {
-      accessorKey: "capacity",
-      header: "Capacity",
-      cell: ({ row }) => `${row.getValue("capacity")} seats`,
-    },
-    {
-      accessorKey: "manufactured_year",
-      header: "Year",
-    },
-    {
-      accessorKey: "condition",
-      header: "Condition",
-    },
-    {
-      accessorKey: "base_price",
-      header: "Unit Price",
-      cell: ({ row }) => `LKR ${row.getValue<number>("base_price").toLocaleString()}`,
-    },
-    {
-      accessorKey: "is_active",
-      header: "Status",
-      cell: ({ row }) => (
-        <span className={row.getValue("is_active") ? "text-green-600" : "text-red-600"}>
-          {row.getValue("is_active") ? "Active" : "Inactive"}
-        </span>
-      ),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex space-x-2">
-          <Button variant="outline" size="sm" onClick={() => handleEdit(row.original)}>
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handleDelete(row.original.id)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Yutong Bus Models</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-48">
+            <div className="text-muted-foreground">Loading bus models...</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -391,7 +392,101 @@ export function YutongBusModelsAdmin() {
         </div>
       </CardHeader>
       <CardContent>
-        <DataTable columns={columns} data={busModels} searchKey="bus_name" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {busModels.map((model) => (
+            <Card key={model.id} className="overflow-hidden">
+              <div className="relative aspect-video bg-muted">
+                {model.image_url ? (
+                  <img
+                    src={model.image_url}
+                    alt={model.bus_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <Image className="h-12 w-12 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="absolute top-2 right-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, model.id);
+                    }}
+                    className="hidden"
+                    id={`upload-${model.id}`}
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => document.getElementById(`upload-${model.id}`)?.click()}
+                    disabled={uploadingImage === model.id}
+                  >
+                    <Upload className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-lg">{model.bus_name}</h3>
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      model.is_active 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {model.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p><span className="font-medium">Model:</span> {model.model_name}</p>
+                    <p><span className="font-medium">Capacity:</span> {model.capacity} seats</p>
+                    <p><span className="font-medium">Year:</span> {model.manufactured_year}</p>
+                    <p><span className="font-medium">Condition:</span> {model.condition}</p>
+                    <p><span className="font-medium">Engine:</span> {model.engine}</p>
+                  </div>
+                  
+                  <div className="text-lg font-bold text-primary">
+                    LKR {model.base_price.toLocaleString()}
+                  </div>
+                  
+                  <div className="flex space-x-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleEdit(model)}
+                      className="flex-1"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleDelete(model.id)}
+                      className="flex-1"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        
+        {busModels.length === 0 && (
+          <div className="text-center py-12">
+            <Image className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium">No bus models found</h3>
+            <p className="text-muted-foreground">Get started by adding your first bus model.</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
