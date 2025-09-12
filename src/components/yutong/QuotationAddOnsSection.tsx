@@ -215,15 +215,6 @@ export function QuotationAddOnsSection({ quotationId, onAddOnsChange }: Quotatio
       cell: ({ row }) => row.original.yutong_addons?.addon_name || 'N/A',
     },
     {
-      accessorKey: 'yutong_addons.category',
-      header: 'Category',
-      cell: ({ row }) => (
-        <Badge variant="outline">
-          {row.original.yutong_addons?.category || 'N/A'}
-        </Badge>
-      ),
-    },
-    {
       accessorKey: 'quantity',
       header: 'Quantity',
     },

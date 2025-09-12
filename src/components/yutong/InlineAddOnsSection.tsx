@@ -318,7 +318,6 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-medium">{addon.addon_name}</h4>
-                    <Badge variant="outline">{addon.category}</Badge>
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Quantity: {addon.quantity} × LKR {addon.unit_price.toLocaleString()} = 
