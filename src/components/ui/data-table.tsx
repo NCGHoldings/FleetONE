@@ -258,8 +258,16 @@ export function DataTable<TData, TValue>({
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
+          {(() => {
+            const totalRows = table.getFilteredRowModel().rows.length;
+            if (totalRows === 0) return "0 results";
+            
+            const { pageIndex, pageSize } = table.getState().pagination;
+            const startIndex = pageIndex * pageSize + 1;
+            const endIndex = Math.min(startIndex + pageSize - 1, totalRows);
+            
+            return `${startIndex}-${endIndex} of ${totalRows} results`;
+          })()}
         </div>
         <div className="flex items-center space-x-2">
           <Button
