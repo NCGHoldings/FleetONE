@@ -32,6 +32,7 @@ interface QuotationData {
   discount_type?: string;
   intermediate_stops?: string;
   route_description?: string;
+  route_type?: string;
   valid_until?: string;
   created_at: string;
   approval_status?: 'pending' | 'approved' | 'rejected';
@@ -564,7 +565,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               {rateCard.overnight_charge_lkr_per_day > 0 && (
                 <>Overnight charge per day: Rs {rateCard.overnight_charge_lkr_per_day.toLocaleString()}<br /></>
               )}
-              Route - Normal Way
+              {quotation.route_type && (
+                <>Route - {quotation.route_type}<br /></>
+              )}
             </>
           ) : (
             <>
