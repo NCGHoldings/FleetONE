@@ -81,6 +81,10 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
   };
 
   const handleGenerateInvoice = async () => {
+    if (!quotation) {
+      toast.error('No quotation selected');
+      return;
+    }
     if (quotation.status !== 'confirmed') {
       toast.error('Only confirmed quotations can generate invoices');
       return;
@@ -121,21 +125,21 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
   const getInvoiceDataFromDocument = (document: YutongStoredDocument): YutongInvoiceData => {
     return {
       invoiceNo: document.id, // Temporary, will be replaced with actual invoice number
-      quotationNo: quotation.quotation_no,
-      customerName: quotation.customer_name,
-      customerPhone: quotation.customer_phone,
-      customerEmail: quotation.customer_email,
-      companyName: quotation.company_name,
-      busModel: quotation.bus_model,
-      quantity: quotation.quantity,
-      unitPrice: quotation.unit_price,
-      discountPercentage: quotation.discount_percentage,
-      totalPrice: quotation.total_price,
-      paymentTerms: quotation.payment_terms,
-      deliveryTimeline: quotation.delivery_timeline,
-      warrantyTerms: quotation.warranty_terms,
-      specialFeatures: quotation.special_features,
-      validUntil: new Date(quotation.valid_until),
+      quotationNo: quotation?.quotation_no || '',
+      customerName: quotation?.customer_name || '',
+      customerPhone: quotation?.customer_phone || '',
+      customerEmail: quotation?.customer_email,
+      companyName: quotation?.company_name,
+      busModel: quotation?.bus_model || '',
+      quantity: quotation?.quantity ?? 0,
+      unitPrice: quotation?.unit_price ?? 0,
+      discountPercentage: quotation?.discount_percentage,
+      totalPrice: quotation?.total_price ?? 0,
+      paymentTerms: quotation?.payment_terms,
+      deliveryTimeline: quotation?.delivery_timeline,
+      warrantyTerms: quotation?.warranty_terms,
+      specialFeatures: quotation?.special_features,
+      validUntil: new Date(quotation ? quotation.valid_until : Date.now()),
       invoice_status: document.document_status as 'draft' | 'approved',
     };
   };
@@ -157,7 +161,7 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">
-              Invoice Management - {quotation.quotation_no}
+              Invoice Management - {quotation?.quotation_no || ''}
             </DialogTitle>
           </DialogHeader>
 
@@ -169,10 +173,10 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><strong>Customer:</strong> {quotation.customer_name}</div>
-                  <div><strong>Bus Model:</strong> {quotation.bus_model}</div>
-                  <div><strong>Quantity:</strong> {quotation.quantity}</div>
-                  <div><strong>Total Amount:</strong> LKR {quotation.total_price.toLocaleString()}</div>
+                  <div><strong>Customer:</strong> {quotation?.customer_name || ''}</div>
+                  <div><strong>Bus Model:</strong> {quotation?.bus_model || ''}</div>
+                  <div><strong>Quantity:</strong> {quotation?.quantity ?? 0}</div>
+                  <div><strong>Total Amount:</strong> LKR {(quotation?.total_price != null ? quotation.total_price : 0).toLocaleString()}</div>
                 </div>
               </CardContent>
             </Card>
@@ -186,7 +190,7 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {quotation.status !== 'confirmed' ? (
+                {quotation?.status !== 'confirmed' ? (
                   <div className="flex items-center gap-2 text-amber-600 mb-4">
                     <AlertCircle className="h-4 w-4" />
                     <span className="text-sm">
@@ -204,7 +208,7 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
                 
                 <Button 
                   onClick={handleGenerateInvoice}
-                  disabled={isLoading || quotation.status !== 'confirmed'}
+                  disabled={isLoading || quotation?.status !== 'confirmed'}
                   className="w-full"
                 >
                   {isLoading ? (
