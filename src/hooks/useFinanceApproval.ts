@@ -34,7 +34,7 @@ export const useFinanceApproval = () => {
     }
   };
 
-  const approvePayment = async (paymentId: string, notes?: string) => {
+  const approvePayment = async (paymentId: string, notes?: string, signatures?: any) => {
     try {
       setIsLoading(true);
 
@@ -102,8 +102,13 @@ export const useFinanceApproval = () => {
 
       // Update draft documents to approved status
       for (const doc of draftDocuments || []) {
-        // Get existing approvals for this document
-        const docApprovals = await getDocumentApprovals(doc.id);
+        // Get existing approvals for this document, but use passed signatures if available
+        let docApprovals = await getDocumentApprovals(doc.id);
+        
+        // If signatures were passed from the approval modal, use those instead
+        if (signatures) {
+          docApprovals = { ...docApprovals, ...signatures };
+        }
 
         // Generate final approved document without DRAFT watermark
         const calculateTotalAmount = (quotation: any) => {
