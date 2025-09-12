@@ -28,12 +28,17 @@ import {
 import { formatDistanceToNow, format } from "date-fns";
 
 interface CustomerProfileProps {
-  customerId: string;
+  selectedCustomer: {
+    id: string;
+    name: string;
+    phone?: string;
+    email?: string;
+  };
   onBack: () => void;
 }
 
-export function CustomerProfile({ customerId, onBack }: CustomerProfileProps) {
-  const { customer, loading } = useCustomerProfile(customerId);
+export function CustomerProfile({ selectedCustomer, onBack }: CustomerProfileProps) {
+  const { customer, loading } = useCustomerProfile(selectedCustomer);
   const [selectedTimeRange, setSelectedTimeRange] = useState('6months');
 
   if (loading) return <div className="p-8 text-center">Loading customer profile...</div>;

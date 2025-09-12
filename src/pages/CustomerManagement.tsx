@@ -27,15 +27,15 @@ import { formatDistanceToNow } from "date-fns";
 
 export default function CustomerManagement() {
   const { customers, loading, stats, filters, setFilters } = useCustomerData();
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("overview");
 
   const handleFilterChange = (key: keyof CustomerListFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleCustomerView = (customerId: string) => {
-    setSelectedCustomerId(customerId);
+  const handleCustomerView = (customer: any) => {
+    setSelectedCustomer(customer);
     setActiveTab("profile");
   };
 
@@ -81,7 +81,7 @@ export default function CustomerManagement() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview & Analytics</TabsTrigger>
           <TabsTrigger value="customers">Customer List</TabsTrigger>
-          <TabsTrigger value="profile" disabled={!selectedCustomerId}>Customer Profile</TabsTrigger>
+          <TabsTrigger value="profile" disabled={!selectedCustomer}>Customer Profile</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -289,7 +289,7 @@ export default function CustomerManagement() {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleCustomerView(customer.id)}
+                          onClick={() => handleCustomerView(customer)}
                           className="flex items-center gap-2"
                         >
                           <Eye className="w-4 h-4" />
@@ -311,9 +311,9 @@ export default function CustomerManagement() {
         </TabsContent>
 
         <TabsContent value="profile">
-          {selectedCustomerId && (
+          {selectedCustomer && (
             <CustomerProfile 
-              customerId={selectedCustomerId} 
+              selectedCustomer={selectedCustomer} 
               onBack={() => setActiveTab("customers")}
             />
           )}

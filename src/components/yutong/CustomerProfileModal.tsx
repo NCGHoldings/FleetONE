@@ -74,6 +74,7 @@ export default function CustomerProfileModal({ customer, open, onOpenChange }: C
           total_price,
           status,
           quantity,
+          bus_model,
           yutong_bus_models (
             bus_name,
             model_name
@@ -92,7 +93,7 @@ export default function CustomerProfileModal({ customer, open, onOpenChange }: C
         status: p.status || 'draft',
         bus_model: p.yutong_bus_models ? 
           `${p.yutong_bus_models.bus_name} ${p.yutong_bus_models.model_name}` : 
-          'N/A',
+          p.bus_model || 'N/A', // Fallback to plain text bus_model column
         quantity: p.quantity || 1,
       }));
 
