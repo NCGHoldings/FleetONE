@@ -85,6 +85,7 @@ export const useYutongInvoiceManagement = () => {
         .from('document_storage')
         .insert({
           quotation_id: quotationId,
+          payment_type: 'full',
           document_type: 'invoice',
           document_status: 'draft',
           document_data: base64Data,
