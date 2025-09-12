@@ -54,16 +54,17 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
   const [showViewModal, setShowViewModal] = useState(false);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
 
-  // Early return if quotation is null
-  if (!quotation) {
-    return null;
-  }
 
   useEffect(() => {
     if (isOpen && quotation) {
       loadExistingDocuments();
     }
   }, [isOpen, quotation]);
+
+  // Guard after hooks to keep hook order stable
+  if (!quotation) {
+    return null;
+  }
 
   const loadExistingDocuments = async () => {
     setLoadingDocuments(true);

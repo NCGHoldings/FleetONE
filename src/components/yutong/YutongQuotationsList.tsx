@@ -389,11 +389,16 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         onClose={() => setViewModalOpen(false)}
       />
 
-      <YutongInvoiceGenerator
-        quotation={selectedQuotation}
-        isOpen={invoiceGeneratorOpen}
-        onClose={() => setInvoiceGeneratorOpen(false)}
-      />
+      {invoiceGeneratorOpen && selectedQuotation && (
+        <YutongInvoiceGenerator
+          quotation={selectedQuotation}
+          isOpen={invoiceGeneratorOpen}
+          onClose={() => {
+            setInvoiceGeneratorOpen(false);
+            setSelectedQuotation(null);
+          }}
+        />
+      )}
     </>
   );
 }
