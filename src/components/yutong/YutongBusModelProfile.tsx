@@ -47,11 +47,9 @@ export function YutongBusModelProfile({ busModel, isOpen, onClose }: YutongBusMo
   if (!busModel) return null;
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    return `LKR ${new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 0,
-    }).format(price);
+    }).format(price)}`;
   };
 
   const getConditionColor = (condition: string) => {
