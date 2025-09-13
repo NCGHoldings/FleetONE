@@ -14,6 +14,7 @@ import { BusTypesAdmin } from "@/components/special-hire/BusTypesAdmin";
 import { FuelSettingsAdmin } from "@/components/special-hire/FuelSettingsAdmin";
 import { QuotationsList } from "@/components/special-hire/QuotationsList";
 import { SpecialHireForm } from "@/components/special-hire/SpecialHireForm";
+import { SubmissionsList } from "@/components/special-hire/SubmissionsList";
 import { RateCoverageMaps } from "@/components/special-hire/RateCoverageMaps";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -44,6 +45,7 @@ interface ComparisonPeriod {
 export default function SpecialHire() {
   const [activeTab, setActiveTab] = useState('quotations');
   const [showForm, setShowForm] = useState(false);
+  const [submissionData, setSubmissionData] = useState(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
     pendingQuotations: 0,
@@ -231,11 +233,18 @@ export default function SpecialHire() {
 
   const handleFormSubmit = () => {
     setShowForm(false);
+    setSubmissionData(null);
     loadStats(); // Refresh stats after new quotation
     toast({
       title: 'Success',
       description: 'Quotation created successfully',
     });
+  };
+
+  const handleSelectSubmission = (submission: any) => {
+    setSubmissionData(submission);
+    setActiveTab("quotations");
+    setShowForm(true);
   };
 
   // Show loading state while checking access
@@ -409,10 +418,15 @@ export default function SpecialHire() {
 
       {/* Enhanced Tabs with Role-based Access */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-8">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
           <TabsTrigger value="quotations" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Quotations</span>
+          </TabsTrigger>
+          
+          <TabsTrigger value="submissions" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            <span className="hidden sm:inline">Submissions</span>
           </TabsTrigger>
           
           <TabsTrigger value="confirmed-trips" className="flex items-center gap-2">
@@ -460,7 +474,17 @@ export default function SpecialHire() {
         </TabsList>
 
         <TabsContent value="quotations" className="space-y-6">
+          <div className="flex justify-end mb-4">
+            <Button onClick={() => setShowForm(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              New Quotation
+            </Button>
+          </div>
           <QuotationsList onRefresh={loadStats} />
+        </TabsContent>
+
+        <TabsContent value="submissions" className="space-y-6">
+          <SubmissionsList onSelectSubmission={handleSelectSubmission} />
         </TabsContent>
 
         <TabsContent value="confirmed-trips" className="space-y-6">
@@ -513,8 +537,12 @@ export default function SpecialHire() {
       {/* Enhanced Form Modal */}
       {showForm && (
         <SpecialHireForm 
-          onCancel={() => setShowForm(false)}
+          onCancel={() => {
+            setShowForm(false);
+            setSubmissionData(null);
+          }}
           onSubmit={handleFormSubmit}
+          submissionData={submissionData}
         />
       )}
     </div>

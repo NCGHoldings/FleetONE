@@ -34,6 +34,7 @@ import YutongQuotations from "./pages/YutongQuotations";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
 import PublicComplaint from "./pages/PublicComplaint";
+import PublicSpecialHire from "./pages/PublicSpecialHire";
 import SchoolImportPage from "./pages/SchoolImportPage";
 import CustomerManagement from "./pages/CustomerManagement";
 import AddStudentForm from "./pages/AddStudentForm";
@@ -57,6 +58,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/public/complaint" element={<PublicComplaint />} />
+            <Route path="/public/special-hire" element={<PublicSpecialHire />} />
             
             {/* Protected routes wrapped in AppLayout */}
             <Route 

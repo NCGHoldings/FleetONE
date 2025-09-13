@@ -2697,6 +2697,72 @@ export type Database = {
           },
         ]
       }
+      special_hire_submissions: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string
+          drop_datetime: string
+          drop_location: string
+          hire_type: string
+          id: string
+          number_of_buses: number
+          number_of_passengers: number
+          pickup_datetime: string
+          pickup_location: string
+          selected_at: string | null
+          selected_by: string | null
+          special_request: string | null
+          submission_no: string
+          submission_status: string
+          updated_at: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          customer_email?: string | null
+          customer_name: string
+          customer_phone: string
+          drop_datetime: string
+          drop_location: string
+          hire_type?: string
+          id?: string
+          number_of_buses?: number
+          number_of_passengers: number
+          pickup_datetime: string
+          pickup_location: string
+          selected_at?: string | null
+          selected_by?: string | null
+          special_request?: string | null
+          submission_no?: string
+          submission_status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string
+          drop_datetime?: string
+          drop_location?: string
+          hire_type?: string
+          id?: string
+          number_of_buses?: number
+          number_of_passengers?: number
+          pickup_datetime?: string
+          pickup_location?: string
+          selected_at?: string | null
+          selected_by?: string | null
+          special_request?: string | null
+          submission_no?: string
+          submission_status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       staff_attendance: {
         Row: {
           attendance_date: string

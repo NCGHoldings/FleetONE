@@ -111,9 +111,10 @@ interface Props {
   onCancel: () => void;
   initialData?: any;
   isEditing?: boolean;
+  submissionData?: any;
 }
 
-export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = false }: Props) {
+export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = false, submissionData }: Props) {
   const [busTypes, setBusTypes] = useState<BusType[]>([]);
   const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>([]);
   const [intermediateStops, setIntermediateStops] = useState<IntermediateStop[]>([]);
@@ -182,6 +183,22 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   useEffect(() => {
     loadBusTypes();
     loadParkingLocations();
+    
+    // Auto-fill form from submission data
+    if (submissionData) {
+      form.setValue('companyName', submissionData.company_name || '');
+      form.setValue('customerName', submissionData.customer_name);
+      form.setValue('customerPhone', submissionData.customer_phone);
+      form.setValue('customerEmail', submissionData.customer_email || '');
+      form.setValue('specialRequest', submissionData.special_request || '');
+      form.setValue('hireType', submissionData.hire_type as 'Outside' | 'Lyceum');
+      form.setValue('numberOfBuses', submissionData.number_of_buses);
+      form.setValue('pickupLocation', submissionData.pickup_location);
+      form.setValue('dropLocation', submissionData.drop_location);
+      form.setValue('numberOfPassengers', submissionData.number_of_passengers);
+      form.setValue('pickupDateTime', new Date(submissionData.pickup_datetime));
+      form.setValue('dropDateTime', new Date(submissionData.drop_datetime));
+    }
     
     // If editing, set intermediate stops and additional charges from initial data
     if (isEditing && initialData) {
