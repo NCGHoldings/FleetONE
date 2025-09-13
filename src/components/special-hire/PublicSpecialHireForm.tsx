@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, CheckCircle, Send, Bus } from "lucide-react";
+import { CalendarIcon, CheckCircle, Send, Bus, Plus, X, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PublicSpecialHireFormData {
   companyName: string;
@@ -21,13 +22,24 @@ interface PublicSpecialHireFormData {
   customerEmail: string;
   specialRequest: string;
   hireType: string;
+  busTypeId: string;
   numberOfBuses: number;
   pickupLocation: string;
   dropLocation: string;
+  intermediatePlaces: string[];
   numberOfPassengers: number;
   pickupDateTime: Date | null;
   dropDateTime: Date | null;
 }
+
+interface BusType {
+  id: string;
+  name: string;
+  capacity: number;
+  features: string;
+}
+
+type Language = 'en' | 'si' | 'ta';
 
 export default function PublicSpecialHireForm() {
   const [formData, setFormData] = useState<PublicSpecialHireFormData>({
@@ -37,9 +49,11 @@ export default function PublicSpecialHireForm() {
     customerEmail: '',
     specialRequest: '',
     hireType: '',
+    busTypeId: '',
     numberOfBuses: 1,
     pickupLocation: '',
     dropLocation: '',
+    intermediatePlaces: [],
     numberOfPassengers: 1,
     pickupDateTime: null,
     dropDateTime: null
@@ -47,14 +61,65 @@ export default function PublicSpecialHireForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submissionId, setSubmissionId] = useState('');
+  const [busTypes, setBusTypes] = useState<BusType[]>([]);
+  const [language, setLanguage] = useState<Language>('en');
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchBusTypes();
+  }, []);
+
+  const fetchBusTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bus_types')
+        .select('id, name, capacity, features')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      setBusTypes(data || []);
+    } catch (error) {
+      console.error('Error fetching bus types:', error);
+    }
+  };
+
+  const getDropPointMessage = (lang: Language) => {
+    const messages = {
+      en: "Drop point means the final destination where you will finish the trip. If you finish the trip at the same pickup point, that is your drop point. Trip places (intermediate stops) can be added with the plus button below.",
+      si: "සැරසැර ස්ථානය යනු ගමන අවසන් කරන අවසාන ගමනාන්තයයි. ඔබ එම පිටත් වීමේ ස්ථානයේම ගමන අවසන් කරන්නේ නම්, එය ඔබේ සැරසැර ස්ථානයයි. ගමන් ස්ථාන (අතරමැදි නැවතුම්) පහත ප්ලස් බටනයෙන් එකතු කළ හැක.",
+      ta: "இறக்கும் இடம் என்பது பயணத்தை முடிக்கும் இறுதி இலக்கு ஆகும். நீங்கள் அதே ஏறும் இடத்தில் பயணத்தை முடித்தால், அதுவே உங்கள் இறக்கும் இடம். பயண இடங்கள் (இடையிலான நிறுத்தங்கள்) கீழே உள்ள பிளஸ் பொத்தானைக் கொண்டு சேர்க்கலாம்."
+    };
+    return messages[lang];
+  };
+
+  const addIntermediatePlace = () => {
+    setFormData(prev => ({
+      ...prev,
+      intermediatePlaces: [...prev.intermediatePlaces, '']
+    }));
+  };
+
+  const removeIntermediatePlace = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      intermediatePlaces: prev.intermediatePlaces.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateIntermediatePlace = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      intermediatePlaces: prev.intermediatePlaces.map((place, i) => i === index ? value : place)
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.customerName || !formData.customerPhone || !formData.pickupLocation || 
         !formData.dropLocation || !formData.pickupDateTime || !formData.dropDateTime || 
-        !formData.hireType) {
+        !formData.hireType || !formData.busTypeId) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -91,6 +156,13 @@ export default function PublicSpecialHireForm() {
         submission_status: 'pending'
       });
 
+      // Combine pickup, intermediate places, and drop location
+      const allLocations = [
+        formData.pickupLocation,
+        ...formData.intermediatePlaces.filter(place => place.trim() !== ''),
+        formData.dropLocation
+      ].join(' -> ');
+
       const { data, error } = await supabase
         .from('special_hire_submissions')
         .insert({
@@ -98,7 +170,7 @@ export default function PublicSpecialHireForm() {
           customer_name: formData.customerName,
           customer_phone: formData.customerPhone,
           customer_email: formData.customerEmail || null,
-          special_request: formData.specialRequest || null,
+          special_request: `${formData.specialRequest || ''}\n\nBus Type: ${busTypes.find(bt => bt.id === formData.busTypeId)?.name || 'Not specified'}\nRoute: ${allLocations}${formData.intermediatePlaces.length > 0 ? `\nIntermediate places: ${formData.intermediatePlaces.filter(p => p.trim()).join(', ')}` : ''}`.trim(),
           hire_type: formData.hireType,
           number_of_buses: formData.numberOfBuses,
           pickup_location: formData.pickupLocation,
@@ -176,9 +248,11 @@ export default function PublicSpecialHireForm() {
                   customerEmail: '',
                   specialRequest: '',
                   hireType: '',
+                  busTypeId: '',
                   numberOfBuses: 1,
                   pickupLocation: '',
                   dropLocation: '',
+                  intermediatePlaces: [],
                   numberOfPassengers: 1,
                   pickupDateTime: null,
                   dropDateTime: null
@@ -213,10 +287,24 @@ export default function PublicSpecialHireForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Request Details</CardTitle>
-            <CardDescription>
-              Please provide complete information to help us prepare an accurate quotation for you.
-            </CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Request Details</CardTitle>
+                <CardDescription>
+                  Please provide complete information to help us prepare an accurate quotation for you.
+                </CardDescription>
+              </div>
+              <Select value={language} onValueChange={(value: Language) => setLanguage(value)}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">EN</SelectItem>
+                  <SelectItem value="si">සි</SelectItem>
+                  <SelectItem value="ta">த</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -288,6 +376,24 @@ export default function PublicSpecialHireForm() {
                   </div>
 
                   <div>
+                    <Label htmlFor="busType">Bus Type *</Label>
+                    <Select value={formData.busTypeId} onValueChange={(value) => setFormData(prev => ({ ...prev, busTypeId: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select bus type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {busTypes.map((busType) => (
+                          <SelectItem key={busType.id} value={busType.id}>
+                            {busType.name} ({busType.capacity} seats)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
                     <Label htmlFor="numberOfBuses">Number of Buses *</Label>
                     <Input
                       id="numberOfBuses"
@@ -298,36 +404,88 @@ export default function PublicSpecialHireForm() {
                       required
                     />
                   </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="numberOfPassengers">Number of Passengers *</Label>
-                  <Input
-                    id="numberOfPassengers"
-                    type="number"
-                    min="1"
-                    value={formData.numberOfPassengers}
-                    onChange={(e) => setFormData(prev => ({ ...prev, numberOfPassengers: parseInt(e.target.value) || 1 }))}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
+                  
                   <div>
-                    <Label htmlFor="pickupLocation">Pickup Location *</Label>
-                    <LocationAutocomplete
-                      value={formData.pickupLocation}
-                      onChange={(value) => setFormData(prev => ({ ...prev, pickupLocation: value }))}
-                      placeholder="Enter pickup location"
+                    <Label htmlFor="numberOfPassengers">Number of Passengers *</Label>
+                    <Input
+                      id="numberOfPassengers"
+                      type="number"
+                      min="1"
+                      value={formData.numberOfPassengers}
+                      onChange={(e) => setFormData(prev => ({ ...prev, numberOfPassengers: parseInt(e.target.value) || 1 }))}
+                      required
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="dropLocation">Drop Location *</Label>
-                    <LocationAutocomplete
-                      value={formData.dropLocation}
-                      onChange={(value) => setFormData(prev => ({ ...prev, dropLocation: value }))}
-                      placeholder="Enter drop location"
-                    />
+                </div>
+
+                {/* Route Section */}
+                <div className="space-y-4">
+                  <h4 className="text-md font-semibold flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Route Information
+                  </h4>
+                  
+                  <Alert>
+                    <MapPin className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      {getDropPointMessage(language)}
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="pickupLocation">Pickup Location *</Label>
+                      <LocationAutocomplete
+                        value={formData.pickupLocation}
+                        onChange={(value) => setFormData(prev => ({ ...prev, pickupLocation: value }))}
+                        placeholder="Enter pickup location"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="dropLocation">Drop Location *</Label>
+                      <LocationAutocomplete
+                        value={formData.dropLocation}
+                        onChange={(value) => setFormData(prev => ({ ...prev, dropLocation: value }))}
+                        placeholder="Enter drop location"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Intermediate Places */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Trip Places (Optional)</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addIntermediatePlace}
+                        className="flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add Place
+                      </Button>
+                    </div>
+                    
+                    {formData.intermediatePlaces.map((place, index) => (
+                      <div key={index} className="flex gap-2">
+                        <LocationAutocomplete
+                          value={place}
+                          onChange={(value) => updateIntermediatePlace(index, value)}
+                          placeholder={`Trip place ${index + 1}`}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeIntermediatePlace(index)}
+                          className="px-2"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
