@@ -15,6 +15,7 @@ import { FuelSettingsAdmin } from "@/components/special-hire/FuelSettingsAdmin";
 import { QuotationsList } from "@/components/special-hire/QuotationsList";
 import { SpecialHireForm } from "@/components/special-hire/SpecialHireForm";
 import { SubmissionsList } from "@/components/special-hire/SubmissionsList";
+import { SpecialHireQRGenerator } from "@/components/special-hire/SpecialHireQRGenerator";
 import { RateCoverageMaps } from "@/components/special-hire/RateCoverageMaps";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -484,6 +485,7 @@ export default function SpecialHire() {
         </TabsContent>
 
         <TabsContent value="submissions" className="space-y-6">
+          <SpecialHireQRGenerator />
           <SubmissionsList onSelectSubmission={handleSelectSubmission} />
         </TabsContent>
 
