@@ -32,8 +32,10 @@ const outsideHireSchema = z.object({
 
 // Schema for Other hire types (with km ranges)
 const otherHireRangeSchema = z.object({
-  range_0_25_flat_fee: z.number().min(0, 'Flat fee must be positive'),
-  range_0_25_standard_hours: z.number().min(0, 'Standard hours must be positive'),
+  range_0_10_flat_fee: z.number().min(0, 'Flat fee must be positive'),
+  range_0_10_standard_hours: z.number().min(0, 'Standard hours must be positive'),
+  range_11_25_flat_fee: z.number().min(0, 'Flat fee must be positive'),
+  range_11_25_standard_hours: z.number().min(0, 'Standard hours must be positive'),
   range_26_50_flat_fee: z.number().min(0, 'Flat fee must be positive'),
   range_26_50_standard_hours: z.number().min(0, 'Standard hours must be positive'),
   range_51_75_flat_fee: z.number().min(0, 'Flat fee must be positive'),
@@ -89,6 +91,7 @@ export function RateCardsAdmin() {
   
   // Other Hire states  
   const [showOtherDialog, setShowOtherDialog] = useState(false);
+  const [editingOtherCard, setEditingOtherCard] = useState<string | null>(null);
   
   const { toast } = useToast();
 
@@ -111,8 +114,10 @@ export function RateCardsAdmin() {
     defaultValues: {
       hire_type: 'Lyceum',
       bus_type_id: '',
-      range_0_25_flat_fee: 5000,
-      range_0_25_standard_hours: 2,
+      range_0_10_flat_fee: 3000,
+      range_0_10_standard_hours: 1,
+      range_11_25_flat_fee: 5000,
+      range_11_25_standard_hours: 2,
       range_26_50_flat_fee: 8000,
       range_26_50_standard_hours: 3,
       range_51_75_flat_fee: 12000,
@@ -279,6 +284,9 @@ export function RateCardsAdmin() {
       header: "Actions",
       cell: ({ row }) => (
         <div className="flex space-x-2">
+          <Button variant="outline" size="sm" onClick={() => handleEditOther(row.original)}>
+            <Edit className="h-4 w-4" />
+          </Button>
           <Button variant="outline" size="sm" onClick={() => handleDeleteOtherRange(row.original)}>
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -331,27 +339,52 @@ export function RateCardsAdmin() {
 
   const handleSubmitOtherRange = async (data: OtherHireRangeFormData) => {
     try {
-      // First delete existing ranges for this bus type and hire type
-      const { error: deleteError } = await supabase
-        .from('hire_rate_cards')
-        .delete()
-        .eq('bus_type_id', data.bus_type_id)
-        .eq('hire_type', data.hire_type);
+      // If editing, first delete existing ranges for this bus type and hire type
+      if (editingOtherCard) {
+        const { error: deleteError } = await supabase
+          .from('hire_rate_cards')
+          .delete()
+          .eq('bus_type_id', data.bus_type_id)
+          .eq('hire_type', data.hire_type);
 
-      if (deleteError) throw deleteError;
+        if (deleteError) throw deleteError;
+      } else {
+        // For new entries, still delete existing ranges for this bus type and hire type
+        const { error: deleteError } = await supabase
+          .from('hire_rate_cards')
+          .delete()
+          .eq('bus_type_id', data.bus_type_id)
+          .eq('hire_type', data.hire_type);
 
-      // Create the 4 km ranges + 1 exceeding range
+        if (deleteError) throw deleteError;
+      }
+
+      // Create the 5 km ranges + 1 exceeding range  
       const ranges = [
         {
           hire_type: data.hire_type,
           bus_type_id: data.bus_type_id,
           from_km: 0,
-          to_km: 25,
-          flat_fee_lkr: data.range_0_25_flat_fee,
-          standard_hours: data.range_0_25_standard_hours,
+          to_km: 10,
+          flat_fee_lkr: data.range_0_10_flat_fee,
+          standard_hours: data.range_0_10_standard_hours,
           overtime_rate_lkr_per_hour: data.overtime_rate_lkr_per_hour,
           overnight_charge_lkr_per_day: data.overnight_charge_lkr_per_day,
           exceeding_km_rate_lkr: 0, // Not applicable for fixed ranges
+          effective_from: data.effective_from.toISOString().split('T')[0],
+          effective_to: data.effective_to?.toISOString().split('T')[0] || null,
+          is_active: data.is_active
+        },
+        {
+          hire_type: data.hire_type,
+          bus_type_id: data.bus_type_id,
+          from_km: 11,
+          to_km: 25,
+          flat_fee_lkr: data.range_11_25_flat_fee,
+          standard_hours: data.range_11_25_standard_hours,
+          overtime_rate_lkr_per_hour: data.overtime_rate_lkr_per_hour,
+          overnight_charge_lkr_per_day: data.overnight_charge_lkr_per_day,
+          exceeding_km_rate_lkr: 0,
           effective_from: data.effective_from.toISOString().split('T')[0],
           effective_to: data.effective_to?.toISOString().split('T')[0] || null,
           is_active: data.is_active
@@ -422,10 +455,11 @@ export function RateCardsAdmin() {
 
       toast({ 
         title: "Success", 
-        description: `${data.hire_type} rate ranges created successfully for bus type` 
+        description: `${data.hire_type} rate ranges ${editingOtherCard ? 'updated' : 'created'} successfully for bus type` 
       });
 
       setShowOtherDialog(false);
+      setEditingOtherCard(null);
       otherRangeForm.reset();
       loadData();
     } catch (error: any) {
@@ -452,6 +486,59 @@ export function RateCardsAdmin() {
       is_active: rateCard.is_active
     });
     setShowOutsideDialog(true);
+  };
+
+  const handleEditOther = async (rateCard: RateCard) => {
+    // Set the editing state to the bus type + hire type combination
+    setEditingOtherCard(`${rateCard.bus_type_id}_${rateCard.hire_type}`);
+    
+    // Fetch all ranges for this bus type and hire type to populate the form
+    const { data: ranges, error } = await supabase
+      .from('hire_rate_cards')
+      .select('*')
+      .eq('bus_type_id', rateCard.bus_type_id)
+      .eq('hire_type', rateCard.hire_type)
+      .order('from_km');
+    
+    if (error || !ranges) {
+      toast({
+        title: "Error",
+        description: "Failed to load rate ranges for editing",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Find ranges by their km ranges and populate form
+    const range_0_10 = ranges.find(r => r.from_km === 0 && r.to_km === 10);
+    const range_11_25 = ranges.find(r => r.from_km === 11 && r.to_km === 25);
+    const range_26_50 = ranges.find(r => r.from_km === 26 && r.to_km === 50);
+    const range_51_75 = ranges.find(r => r.from_km === 51 && r.to_km === 75);
+    const range_76_100 = ranges.find(r => r.from_km === 76 && r.to_km === 100);
+    const exceeding = ranges.find(r => r.from_km === 101 && !r.to_km);
+    
+    otherRangeForm.reset({
+      hire_type: rateCard.hire_type as 'Lyceum',
+      bus_type_id: rateCard.bus_type_id,
+      range_0_10_flat_fee: range_0_10?.flat_fee_lkr || 0,
+      range_0_10_standard_hours: range_0_10?.standard_hours || 0,
+      range_11_25_flat_fee: range_11_25?.flat_fee_lkr || 0,
+      range_11_25_standard_hours: range_11_25?.standard_hours || 0,
+      range_26_50_flat_fee: range_26_50?.flat_fee_lkr || 0,
+      range_26_50_standard_hours: range_26_50?.standard_hours || 0,
+      range_51_75_flat_fee: range_51_75?.flat_fee_lkr || 0,
+      range_51_75_standard_hours: range_51_75?.standard_hours || 0,
+      range_76_100_flat_fee: range_76_100?.flat_fee_lkr || 0,
+      range_76_100_standard_hours: range_76_100?.standard_hours || 0,
+      overtime_rate_lkr_per_hour: range_0_10?.overtime_rate_lkr_per_hour || 500,
+      overnight_charge_lkr_per_day: range_0_10?.overnight_charge_lkr_per_day || 0,
+      exceeding_km_rate_lkr: exceeding?.exceeding_km_rate_lkr || 175,
+      effective_from: new Date(rateCard.effective_from),
+      effective_to: rateCard.effective_to ? new Date(rateCard.effective_to) : undefined,
+      is_active: rateCard.is_active
+    });
+    
+    setShowOtherDialog(true);
   };
 
   const handleDeleteOtherRange = async (rateCard: RateCard) => {
@@ -772,12 +859,13 @@ export function RateCardsAdmin() {
                 <div>
                   <CardTitle>Other Hire Rates - KM Range Based</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Lyceum & partner rates: 0-25km, 26-50km, 51-75km, 76-100km + exceeding rate beyond 100km
+                    Lyceum & partner rates: 0-10km, 11-25km, 26-50km, 51-75km, 76-100km + exceeding rate beyond 100km
                   </p>
                 </div>
                 <Dialog open={showOtherDialog} onOpenChange={setShowOtherDialog}>
                   <DialogTrigger asChild>
                     <Button onClick={() => {
+                      setEditingOtherCard(null);
                       otherRangeForm.reset();
                     }}>
                       <Plus className="h-4 w-4 mr-2" />
@@ -786,7 +874,9 @@ export function RateCardsAdmin() {
                   </DialogTrigger>
                   <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Add Other Hire Rate Ranges</DialogTitle>
+                      <DialogTitle>
+                        {editingOtherCard ? 'Edit Other Hire Rate Ranges' : 'Add Other Hire Rate Ranges'}
+                      </DialogTitle>
                       <p className="text-sm text-muted-foreground">
                         Create all km-based rate ranges for the selected bus type
                       </p>
@@ -843,53 +933,101 @@ export function RateCardsAdmin() {
                           />
                         </div>
 
-                        {/* KM Range 0-25km */}
-                        <div className="p-4 border rounded-lg">
-                          <h4 className="font-medium mb-3 text-primary">0-25 KM Range</h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                              control={otherRangeForm.control}
-                              name="range_0_25_flat_fee"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Flat Fee (LKR)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      placeholder="5000"
-                                      {...field}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                         {/* KM Range 0-10km */}
+                         <div className="p-4 border rounded-lg">
+                           <h4 className="font-medium mb-3 text-primary">0-10 KM Range</h4>
+                           <div className="grid grid-cols-2 gap-4">
+                             <FormField
+                               control={otherRangeForm.control}
+                               name="range_0_10_flat_fee"
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel>Flat Fee (LKR)</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="number"
+                                       step="0.01"
+                                       min="0"
+                                       placeholder="3000"
+                                       {...field}
+                                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
 
-                            <FormField
-                              control={otherRangeForm.control}
-                              name="range_0_25_standard_hours"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Standard Hours</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      step="0.5"
-                                      min="0"
-                                      placeholder="2"
-                                      {...field}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
+                             <FormField
+                               control={otherRangeForm.control}
+                               name="range_0_10_standard_hours"
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel>Standard Hours</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="number"
+                                       step="0.5"
+                                       min="0"
+                                       placeholder="1"
+                                       {...field}
+                                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
+                           </div>
+                         </div>
+
+                         {/* KM Range 11-25km */}
+                         <div className="p-4 border rounded-lg">
+                           <h4 className="font-medium mb-3 text-primary">11-25 KM Range</h4>
+                           <div className="grid grid-cols-2 gap-4">
+                             <FormField
+                               control={otherRangeForm.control}
+                               name="range_11_25_flat_fee"
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel>Flat Fee (LKR)</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="number"
+                                       step="0.01"
+                                       min="0"
+                                       placeholder="5000"
+                                       {...field}
+                                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
+
+                             <FormField
+                               control={otherRangeForm.control}
+                               name="range_11_25_standard_hours"
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel>Standard Hours</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="number"
+                                       step="0.5"
+                                       min="0"
+                                       placeholder="2"
+                                       {...field}
+                                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
+                           </div>
+                         </div>
 
                         {/* KM Range 26-50km */}
                         <div className="p-4 border rounded-lg">
@@ -1166,7 +1304,7 @@ export function RateCardsAdmin() {
                             Cancel
                           </Button>
                           <Button type="submit">
-                            Create All Ranges
+                            {editingOtherCard ? 'Update All Ranges' : 'Create All Ranges'}
                           </Button>
                         </div>
                       </form>
