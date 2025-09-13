@@ -75,6 +75,22 @@ export default function PublicSpecialHireForm() {
     setIsSubmitting(true);
 
     try {
+      console.log('Attempting to submit form data:', {
+        company_name: formData.companyName || null,
+        customer_name: formData.customerName,
+        customer_phone: formData.customerPhone,
+        customer_email: formData.customerEmail || null,
+        special_request: formData.specialRequest || null,
+        hire_type: formData.hireType,
+        number_of_buses: formData.numberOfBuses,
+        pickup_location: formData.pickupLocation,
+        drop_location: formData.dropLocation,
+        number_of_passengers: formData.numberOfPassengers,
+        pickup_datetime: formData.pickupDateTime?.toISOString(),
+        drop_datetime: formData.dropDateTime?.toISOString(),
+        submission_status: 'pending'
+      });
+
       const { data, error } = await supabase
         .from('special_hire_submissions')
         .insert({
@@ -95,7 +111,12 @@ export default function PublicSpecialHireForm() {
         .select('submission_no')
         .single();
 
-      if (error) throw error;
+      console.log('Supabase response:', { data, error });
+
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw error;
+      }
 
       setSubmissionId(data.submission_no);
       setSubmitted(true);
@@ -107,9 +128,15 @@ export default function PublicSpecialHireForm() {
 
     } catch (error) {
       console.error('Error creating submission:', error);
+      console.error('Error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
       toast({
         title: "Error",
-        description: "Failed to submit request. Please try again.",
+        description: `Failed to submit request: ${error.message || 'Unknown error'}. Please try again.`,
         variant: "destructive",
       });
     } finally {
