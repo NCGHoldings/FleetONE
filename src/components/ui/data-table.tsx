@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Search, Filter, Download, Eye, Settings } from "lucide-react";
 import { EnhancedSearch } from "@/components/ui/enhanced-search";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -40,6 +41,7 @@ interface DataTableProps<TData, TValue> {
   onAdd?: () => void;
   customSearch?: (data: TData[], query: string) => TData[];
   customFilter?: (data: TData[]) => TData[];
+  onDateRangeChange?: (range: { from: Date; to: Date } | undefined) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -52,6 +54,7 @@ export function DataTable<TData, TValue>({
   onAdd,
   customSearch,
   customFilter,
+  onDateRangeChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -121,6 +124,11 @@ export function DataTable<TData, TValue>({
             <EnhancedSearch
               onSearch={setGlobalFilter}
               searchKeys={searchKeys}
+              className="max-w-sm"
+            />
+          ) : onDateRangeChange ? (
+            <DateRangePicker
+              onDateRangeChange={onDateRangeChange}
               className="max-w-sm"
             />
           ) : (
