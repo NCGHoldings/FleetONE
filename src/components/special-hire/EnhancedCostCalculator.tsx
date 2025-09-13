@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Calculator, MapPin, Plus, Trash2, CheckCircle, XCircle, TrendingUp, DollarSign } from 'lucide-react';
+import { Calculator, Plus, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CostBreakdown } from './CostBreakdown';
@@ -14,6 +13,7 @@ interface QuotationData {
   id: string;
   quotation_no: string;
   customer_name: string;
+  customer_phone: string;
   pickup_location: string;
   drop_location: string;
   pickup_datetime: string;
@@ -51,22 +51,19 @@ interface TripCalculation {
 }
 
 export function EnhancedCostCalculator() {
+  const [selectedQuotationId, setSelectedQuotationId] = useState<string>('');
   const [selectedQuotation, setSelectedQuotation] = useState<QuotationData | null>(null);
   const [quotations, setQuotations] = useState<QuotationData[]>([]);
   const [busTypes, setBusTypes] = useState<any[]>([]);
   const [fuelSettings, setFuelSettings] = useState<any>(null);
-  const [calculation, setCalculation] = useState<TripCalculation | null>(null);
+  const [calculationResult, setCalculationResult] = useState<TripCalculation | null>(null);
   const [loading, setLoading] = useState(false);
   
-  // Trip execution data
   const [actualDistance, setActualDistance] = useState<number>(0);
   const [tripDays, setTripDays] = useState<number>(1);
-  const [commissionPct, setCommissionPct] = useState<number>(0);
-  const [expenses, setExpenses] = useState<ExpenseItem[]>([
-    { id: '1', type: 'fuel', description: 'Fuel Cost', amount: 0, isEstimated: true },
-    { id: '2', type: 'wages', description: 'Driver Wages', amount: 1500, isEstimated: true },
-    { id: '3', type: 'commission', description: 'Commission', amount: 0, isEstimated: true }
-  ]);
+  const [commissionAmount, setCommissionAmount] = useState<number>(0);
+  const [commissionPercentage, setCommissionPercentage] = useState<number>(0);
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
 
   const { toast } = useToast();
 
@@ -106,8 +103,22 @@ export function EnhancedCostCalculator() {
   const handleQuotationSelect = (quotationId: string) => {
     const quotation = quotations.find(q => q.id === quotationId);
     if (quotation) {
+      setSelectedQuotationId(quotationId);
       setSelectedQuotation(quotation);
       setActualDistance(quotation.km_trip || 0);
+      
+      const initialExpenses: ExpenseItem[] = [
+        { id: '1', type: 'fuel', description: 'Fuel Cost', amount: 0, isEstimated: true },
+        { id: '2', type: 'wages', description: 'Driver Wages', amount: 1500, isEstimated: true },
+        { id: '3', type: 'commission', description: 'Commission', amount: 0, isEstimated: true }
+      ];
+      setExpenses(initialExpenses);
+      
+      const pickup = new Date(quotation.pickup_datetime);
+      const drop = new Date(quotation.drop_datetime);
+      const daysDiff = Math.max(1, Math.ceil((drop.getTime() - pickup.getTime()) / (1000 * 60 * 60 * 24)));
+      setTripDays(daysDiff);
+      
       calculateCosts(quotation);
     }
   };
@@ -118,15 +129,11 @@ export function EnhancedCostCalculator() {
     const busType = busTypes.find(bt => bt.id === quotation.bus_type_id);
     if (!busType) return;
 
-    // Calculate actual fuel cost based on total distance and fuel efficiency
     const totalDistance = quotation.km_parking_to_pickup + actualDistance + quotation.km_drop_to_parking;
     const fuelLiters = totalDistance / (busType.avg_km_per_l || 8);
     const actualFuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
-
-    // Calculate maintenance cost based on total distance
     const maintenanceCost = totalDistance * (fuelSettings.maintenance_rate_lkr_per_km || 20);
 
-    // Update fuel cost and maintenance cost in expenses
     const updatedExpenses = expenses.map(exp => {
       if (exp.type === 'fuel') {
         return { ...exp, amount: Math.round(actualFuelCost), isEstimated: false };
@@ -137,7 +144,6 @@ export function EnhancedCostCalculator() {
       return exp;
     });
 
-    // Add maintenance expense if it doesn't exist
     if (!updatedExpenses.find(exp => exp.type === 'maintenance')) {
       updatedExpenses.push({
         id: 'maintenance-auto',
@@ -155,12 +161,10 @@ export function EnhancedCostCalculator() {
     const dailyProfit = tripDays > 1 ? netProfit / tripDays : undefined;
     const profitMargin = quotation.gross_revenue > 0 ? (netProfit / quotation.gross_revenue) * 100 : 0;
 
-    // Calculate customer fuel cost (parking distances only)
     const customerFuelDistance = quotation.km_parking_to_pickup + quotation.km_drop_to_parking;
     const customerFuelCost = (customerFuelDistance / (busType.avg_km_per_l || 8)) * fuelSettings.diesel_price_lkr_per_l * quotation.number_of_buses;
     const customerTotal = quotation.gross_revenue + customerFuelCost;
 
-    // Prepare data for CostBreakdown component
     const costBreakdownData = {
       kmParkingToPickup: quotation.km_parking_to_pickup,
       kmTrip: actualDistance,
@@ -174,7 +178,7 @@ export function EnhancedCostCalculator() {
       grossRevenue: quotation.gross_revenue,
       customerTotalWithFuel: customerTotal,
       driverCharge: updatedExpenses.find(e => e.type === 'wages')?.amount || 0,
-      commissionPct: commissionPct,
+      commissionPct: commissionPercentage,
       commissionAmount: updatedExpenses.find(e => e.type === 'commission')?.amount || 0,
       totalExpenses,
       netProfit,
@@ -190,7 +194,7 @@ export function EnhancedCostCalculator() {
       dropDateTime: quotation.drop_datetime
     };
 
-    setCalculation({
+    setCalculationResult({
       totalDistance,
       actualFuelCost: Math.round(actualFuelCost),
       maintenanceCost: Math.round(maintenanceCost),
@@ -221,41 +225,39 @@ export function EnhancedCostCalculator() {
     );
     setExpenses(updatedExpenses);
     
-    // Recalculate costs when expenses change
     if (selectedQuotation) {
       setTimeout(() => calculateCosts(selectedQuotation), 100);
     }
-  };
-
-  const calculateCommissionFromPercentage = () => {
-    if (!selectedQuotation || commissionPct === 0) return;
-    
-    const commissionAmount = Math.round((selectedQuotation.gross_revenue * commissionPct) / 100);
-    const updatedExpenses = expenses.map(exp => 
-      exp.type === 'commission' ? { ...exp, amount: commissionAmount, isEstimated: false } : exp
-    );
-    setExpenses(updatedExpenses);
-    
-    // Recalculate costs
-    setTimeout(() => calculateCosts(selectedQuotation), 100);
   };
 
   const removeExpense = (id: string) => {
     const updatedExpenses = expenses.filter(exp => exp.id !== id);
     setExpenses(updatedExpenses);
     
-    // Recalculate costs when expenses are removed
     if (selectedQuotation) {
       setTimeout(() => calculateCosts(selectedQuotation), 100);
     }
   };
 
+  const calculateCommissionFromPercentage = (percentage: number) => {
+    if (!selectedQuotation || percentage === 0) return;
+    
+    const commissionAmountCalc = Math.round((selectedQuotation.gross_revenue * percentage) / 100);
+    setCommissionAmount(commissionAmountCalc);
+    
+    const updatedExpenses = expenses.map(exp => 
+      exp.type === 'commission' ? { ...exp, amount: commissionAmountCalc, isEstimated: false } : exp
+    );
+    setExpenses(updatedExpenses);
+    
+    setTimeout(() => calculateCosts(selectedQuotation), 100);
+  };
+
   const confirmTrip = async () => {
-    if (!selectedQuotation || !calculation) return;
+    if (!selectedQuotation || !calculationResult) return;
 
     setLoading(true);
     try {
-      // Create trip confirmation
       const { data: tripConfirmation, error: tripError } = await supabase
         .from('trip_confirmations')
         .insert({
@@ -270,7 +272,7 @@ export function EnhancedCostCalculator() {
           number_of_buses: selectedQuotation.number_of_buses,
           number_of_passengers: selectedQuotation.number_of_passengers,
           actual_distance_km: actualDistance,
-          actual_fuel_cost: calculation.actualFuelCost,
+          actual_fuel_cost: calculationResult.actualFuelCost,
           confirmed_by: (await supabase.auth.getUser()).data.user?.id
         })
         .select()
@@ -278,7 +280,6 @@ export function EnhancedCostCalculator() {
 
       if (tripError) throw tripError;
 
-      // Create expense records
       const expenseRecords = expenses.map(exp => ({
         trip_confirmation_id: tripConfirmation.id,
         expense_type: exp.type,
@@ -293,7 +294,6 @@ export function EnhancedCostCalculator() {
 
       if (expenseError) throw expenseError;
 
-      // Update quotation status
       const { error: updateError } = await supabase
         .from('special_hire_quotations')
         .update({ status: 'confirmed' })
@@ -301,10 +301,8 @@ export function EnhancedCostCalculator() {
 
       if (updateError) throw updateError;
 
-      // Calculate advance payment (50% rounded to nearest 50)
       const advanceAmount = Math.round((selectedQuotation.gross_revenue * 0.5) / 50) * 50;
       
-      // Create advance payment record
       const { error: paymentError } = await supabase
         .from('trip_payments')
         .insert({
@@ -322,10 +320,9 @@ export function EnhancedCostCalculator() {
         description: `Advance payment required: LKR ${advanceAmount.toLocaleString()}`
       });
 
-      // Refresh quotations
       fetchQuotations();
       setSelectedQuotation(null);
-      setCalculation(null);
+      setCalculationResult(null);
 
     } catch (error: any) {
       console.error('Error confirming trip:', error);
@@ -360,7 +357,7 @@ export function EnhancedCostCalculator() {
       });
       fetchQuotations();
       setSelectedQuotation(null);
-      setCalculation(null);
+      setCalculationResult(null);
     }
   };
 
@@ -371,235 +368,231 @@ export function EnhancedCostCalculator() {
   }, [expenses, actualDistance, tripDays, selectedQuotation, busTypes, fuelSettings]);
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Trip Cost Calculator & Analysis
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Quotation Selection */}
+    <Card className="w-full max-w-6xl mx-auto">
+      <CardHeader>
+        <CardTitle className="text-2xl font-bold">Trip Cost Calculator & Analysis</CardTitle>
+        <CardDescription>
+          Calculate actual costs, manage expenses, and analyze profit margins
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Select Quotation</Label>
-            <Select onValueChange={handleQuotationSelect}>
+            <Label htmlFor="quotation-select">Select Quotation</Label>
+            <Select value={selectedQuotationId} onValueChange={handleQuotationSelect}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a quotation to calculate costs" />
+                <SelectValue placeholder="Select a quotation..." />
               </SelectTrigger>
               <SelectContent>
                 {quotations.map((quotation) => (
                   <SelectItem key={quotation.id} value={quotation.id}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{quotation.quotation_no} - {quotation.customer_name}</span>
-                      <Badge variant={quotation.status === 'confirmed' ? 'default' : 'secondary'}>
-                        {quotation.status}
-                      </Badge>
-                    </div>
+                    {quotation.quotation_no} - {quotation.customer_name} (LKR {quotation.gross_revenue?.toLocaleString()})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          {selectedQuotation && (
-            <>
-              {/* Trip Details Display */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
+        {selectedQuotation && (
+          <>
+            <div className="bg-muted/30 p-6 rounded-lg border">
+              <h3 className="font-semibold mb-4 text-lg">Quotation Details</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div>
-                  <Label className="text-sm font-medium">Route</Label>
-                  <p className="text-sm">{selectedQuotation.pickup_location} → {selectedQuotation.drop_location}</p>
+                  <p className="text-muted-foreground text-sm">Customer</p>
+                  <p className="font-medium">{selectedQuotation.customer_name}</p>
+                  <p className="text-xs text-muted-foreground">{selectedQuotation.customer_phone}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Quoted Distance</Label>
-                  <p className="text-sm">{selectedQuotation.km_trip} km</p>
+                  <p className="text-muted-foreground text-sm">Route</p>
+                  <p className="font-medium text-sm">{selectedQuotation.pickup_location}</p>
+                  <p className="text-xs text-muted-foreground">↓</p>
+                  <p className="font-medium text-sm">{selectedQuotation.drop_location}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Quoted Amount</Label>
-                  <p className="text-sm font-bold">LKR {selectedQuotation.gross_revenue?.toLocaleString()}</p>
+                  <p className="text-muted-foreground text-sm">Fleet Details</p>
+                  <p className="font-medium">{selectedQuotation.number_of_buses} Bus{selectedQuotation.number_of_buses > 1 ? 'es' : ''}</p>
+                  <p className="text-xs text-muted-foreground">{selectedQuotation.number_of_passengers} passengers</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-sm">Original Quote</p>
+                  <p className="font-medium text-lg text-green-600">LKR {selectedQuotation.gross_revenue?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">{selectedQuotation.km_trip} km trip</p>
                 </div>
               </div>
+            </div>
 
-              {/* Trip Execution Data */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Actual Trip Distance (km)</Label>
-                  <Input
-                    type="number"
-                    value={actualDistance}
-                    onChange={(e) => setActualDistance(parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Number of Days</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={tripDays}
-                    onChange={(e) => setTripDays(parseInt(e.target.value) || 1)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Commission (%) - Optional</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={commissionPct}
-                      onChange={(e) => setCommissionPct(parseFloat(e.target.value) || 0)}
-                      placeholder="0"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={calculateCommissionFromPercentage}
-                      disabled={!selectedQuotation || commissionPct === 0}
-                    >
-                      Apply
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Enter percentage and click Apply to auto-calculate commission amount
-                  </p>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-blue-50/50 rounded-lg border">
+              <div className="space-y-2">
+                <Label htmlFor="actual-distance">Actual Distance (km)</Label>
+                <Input
+                  id="actual-distance"
+                  type="number"
+                  step="0.1"
+                  value={actualDistance}
+                  onChange={(e) => setActualDistance(Number(e.target.value))}
+                  placeholder={`Original: ${selectedQuotation.km_trip} km`}
+                />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="trip-days">Trip Days</Label>
+                <Input
+                  id="trip-days"
+                  type="number"
+                  value={tripDays}
+                  onChange={(e) => setTripDays(Number(e.target.value))}
+                  placeholder="Number of days"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="commission">Commission (LKR)</Label>
+                <Input
+                  id="commission"
+                  type="number"
+                  step="0.01"
+                  value={commissionAmount}
+                  onChange={(e) => setCommissionAmount(Number(e.target.value))}
+                  placeholder="Commission amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Commission %</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={commissionPercentage}
+                  onChange={(e) => {
+                    const percentage = Number(e.target.value);
+                    setCommissionPercentage(percentage);
+                    calculateCommissionFromPercentage(percentage);
+                  }}
+                  placeholder="Commission %"
+                />
+              </div>
+            </div>
 
-              {/* Expenses Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-lg font-semibold">Expenses Breakdown</Label>
-                  <Button onClick={addExpense} variant="outline" size="sm">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Expense
-                  </Button>
+            <div className="space-y-4 p-4 bg-orange-50/50 rounded-lg border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Trip Expenses Management</h3>
+                  <p className="text-sm text-muted-foreground">Add, edit, or remove actual trip expenses</p>
                 </div>
-
-                {expenses.map((expense) => (
-                  <div key={expense.id} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-3">
-                      <Select 
-                        value={expense.type} 
-                        onValueChange={(value) => updateExpense(expense.id, 'type', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="fuel">Fuel Cost</SelectItem>
-                          <SelectItem value="wages">Driver Wages</SelectItem>
-                          <SelectItem value="maintenance">Maintenance</SelectItem>
-                          <SelectItem value="highway_fees">Highway Fees</SelectItem>
-                          <SelectItem value="permit_cost">Permit Cost</SelectItem>
-                          <SelectItem value="commission">Commission</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-4">
-                      <Input
-                        placeholder="Description"
-                        value={expense.description}
-                        onChange={(e) => updateExpense(expense.id, 'description', e.target.value)}
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        type="number"
-                        placeholder="Amount"
-                        value={expense.amount}
-                        onChange={(e) => updateExpense(expense.id, 'amount', parseFloat(e.target.value) || 0)}
-                        disabled={expense.type === 'fuel'}
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <Badge variant={expense.isEstimated ? 'secondary' : 'default'}>
-                        {expense.isEstimated ? 'Est.' : 'Act.'}
-                      </Badge>
-                    </div>
-                    <div className="col-span-1">
-                      {expense.type !== 'fuel' && (
+                <Button onClick={addExpense} size="sm" className="bg-orange-600 hover:bg-orange-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Expense
+                </Button>
+              </div>
+              
+              {expenses.length > 0 && (
+                <div className="space-y-3">
+                  {expenses.map((expense) => (
+                    <div key={expense.id} className="flex items-center gap-4 p-4 bg-white border rounded-lg shadow-sm">
+                      <div className="flex-1 min-w-0">
+                        <Input
+                          placeholder="Expense description"
+                          value={expense.description}
+                          onChange={(e) => updateExpense(expense.id, 'description', e.target.value)}
+                          className="border-0 bg-transparent focus-visible:ring-1"
+                        />
+                      </div>
+                      <div className="w-32">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Amount"
+                          value={expense.amount}
+                          onChange={(e) => updateExpense(expense.id, 'amount', Number(e.target.value))}
+                          className="text-right"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">LKR {expense.amount.toLocaleString()}</span>
                         <Button
-                          onClick={() => removeExpense(expense.id)}
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
+                          onClick={() => removeExpense(expense.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {calculationResult && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="border-l-4 border-l-blue-500">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-600">
+                        {actualDistance || selectedQuotation.km_trip}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Total Distance (km)</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-l-4 border-l-green-500">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-600">
+                        LKR {selectedQuotation.gross_revenue?.toLocaleString()}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Gross Revenue</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-l-4 border-l-red-500">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-red-600">
+                        LKR {calculationResult?.totalExpenses?.toLocaleString() || '0'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Total Expenses</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="border-l-4 border-l-purple-500">
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-purple-600">
+                        LKR {calculationResult?.netProfit?.toLocaleString() || '0'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Net Profit</p>
+                      <p className="text-xs text-muted-foreground">
+                        Margin: {calculationResult?.profitMargin || 0}%
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+            )}
 
-              {/* Summary Cards */}
-              {calculation && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Card className="p-4 text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      <MapPin className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div className="text-2xl font-bold text-blue-600">{calculation.totalDistance.toFixed(1)} km</div>
-                    <div className="text-sm text-muted-foreground">Total Distance</div>
-                  </Card>
-                  <Card className="p-4 text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      <DollarSign className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div className="text-2xl font-bold text-green-600">LKR {calculation.quotedAmount.toLocaleString()}</div>
-                    <div className="text-sm text-muted-foreground">Revenue</div>
-                  </Card>
-                  <Card className="p-4 text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      <TrendingUp className="h-5 w-5 text-red-600" />
-                    </div>
-                    <div className="text-2xl font-bold text-red-600">LKR {calculation.totalExpenses.toLocaleString()}</div>
-                    <div className="text-sm text-muted-foreground">Total Expenses</div>
-                  </Card>
-                  <Card className="p-4 text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      <TrendingUp className={`h-5 w-5 ${calculation.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`} />
-                    </div>
-                    <div className={`text-2xl font-bold ${calculation.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      LKR {calculation.netProfit.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Net Profit ({calculation.profitMargin.toFixed(1)}%)</div>
-                  </Card>
-                </div>
-              )}
+            <div className="flex gap-4 pt-6 border-t">
+              <Button onClick={confirmTrip} className="flex-1" size="lg">
+                <CheckCircle className="w-5 h-5 mr-2" />
+                Confirm Trip
+              </Button>
+              <Button variant="destructive" onClick={declineTrip} className="flex-1" size="lg">
+                <XCircle className="w-5 h-5 mr-2" />
+                Decline Trip
+              </Button>
+            </div>
 
-              {/* Trip Actions */}
-              {calculation && (
-                <div className="flex gap-2 justify-center">
-                  <Button 
-                    onClick={confirmTrip}
-                    disabled={loading}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    {loading ? 'Confirming...' : 'Confirm Trip'}
-                  </Button>
-                  <Button 
-                    onClick={declineTrip}
-                    variant="outline"
-                    className="border-red-200 text-red-600 hover:bg-red-50"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Decline Trip
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Detailed Cost Breakdown */}
-      {calculation?.costBreakdownData && (
-        <CostBreakdown data={calculation.costBreakdownData} />
-      )}
-    </div>
+            {calculationResult?.costBreakdownData && (
+              <div className="mt-6">
+                <CostBreakdown data={calculationResult.costBreakdownData} />
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
