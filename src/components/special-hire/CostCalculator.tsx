@@ -291,24 +291,75 @@ export function CostCalculator() {
         return;
       }
 
-      // All hire types now use unified 100km flat fee + exceeding rate logic
-      if (allRateCards && allRateCards.length > 0) {
+      // Handle different hire types with proper rate card logic
+      if (!allRateCards || allRateCards.length === 0) {
+        throw new Error(`No rate cards found for ${formData.hireType} hire type. Please configure rate cards first.`);
+      }
+
+      let fixedRate = 0;
+      let exceedingDistanceCharge = 0;
+      let overtimeCharge = 0;
+      let overnightCharge = 0;
+      let baseCoverageKm = 100;
+      let exceedingKm = 0;
+
+      // For Other hire types (Lyceum, etc.) - use range-based rates
+      if (formData.hireType !== 'Outside') {
+        // Find appropriate rate card based on trip distance range
+        rateCard = allRateCards.find(card => 
+          tripDistance >= (card.from_km || 0) && 
+          (card.to_km === null || tripDistance <= card.to_km)
+        );
+
+        if (!rateCard) {
+          // Fallback to first available rate card
+          rateCard = allRateCards[0];
+        }
+
+        if (!rateCard) {
+          throw new Error(`No suitable rate card found for ${formData.hireType} hire type and ${tripDistance}km distance.`);
+        }
+
+        setSelectedRateCard(rateCard);
+
+        // Use flat fee from the range-based rate card
+        fixedRate = rateCard.flat_fee_lkr || 0;
+        
+        // Calculate overtime based on standard hours from rate card
+        const standardHours = rateCard.standard_hours || 8;
+        const overtimeHours = Math.max(0, formData.expectedWorkHours - standardHours);
+        overtimeCharge = overtimeHours * (rateCard.overtime_rate_lkr_per_hour || 0);
+        overnightCharge = formData.overnightDays * (rateCard.overnight_charge_lkr_per_day || 0);
+
+        // Handle exceeding km for distances beyond 100km
+        if (tripDistance > 100) {
+          const exceedingRateCard = allRateCards.find(card => 
+            card.from_km >= 101 && card.exceeding_km_rate_lkr != null
+          );
+          if (exceedingRateCard) {
+            baseCoverageKm = exceedingRateCard.exceeding_km_threshold || 100;
+            exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+            exceedingDistanceCharge = exceedingKm * (exceedingRateCard.exceeding_km_rate_lkr || 0);
+          }
+        }
+      } else {
+        // Outside hire logic - unified flat fee + exceeding rate
         rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
-      }
-      if (!rateCard) {
-        throw new Error(`No rate card found for ${formData.hireType} hire type. Please configure flat fee and exceeding km rate.`);
-      }
-      setSelectedRateCard(rateCard);
+        if (!rateCard) {
+          throw new Error(`No rate card found for ${formData.hireType} hire type. Please configure flat fee and exceeding km rate.`);
+        }
+        setSelectedRateCard(rateCard);
 
-      const fixedRate = rateCard.flat_fee_lkr || 0;
-      const baseCoverageKm = rateCard.exceeding_km_threshold || 100;
-      const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
-      const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
+        fixedRate = rateCard.flat_fee_lkr || 0;
+        baseCoverageKm = rateCard.exceeding_km_threshold || 100;
+        exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+        exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
 
-      // Calculate overtime charges
-      const overtimeHours = Math.max(0, formData.expectedWorkHours - (rateCard.standard_hours || 8));
-      const overtimeCharge = overtimeHours * (rateCard.overtime_rate_lkr_per_hour || 0);
-      const overnightCharge = formData.overnightDays * (rateCard.overnight_charge_lkr_per_day || 0);
+        // Calculate overtime charges
+        const overtimeHours = Math.max(0, formData.expectedWorkHours - (rateCard.standard_hours || 8));
+        overtimeCharge = overtimeHours * (rateCard.overtime_rate_lkr_per_hour || 0);
+        overnightCharge = formData.overnightDays * (rateCard.overnight_charge_lkr_per_day || 0);
+      }
 
       const hireCharge = fixedRate + exceedingDistanceCharge + overtimeCharge + overnightCharge;
 
@@ -363,13 +414,13 @@ export function CostCalculator() {
         rateCardDetails: {
           standardHours: rateCard.standard_hours || 8,
           actualHours: formData.expectedWorkHours,
-          overtimeHours,
+          overtimeHours: Math.max(0, formData.expectedWorkHours - (rateCard.standard_hours || 8)),
           agreedDistance: baseCoverageKm,
           actualDistance: tripDistance,
           exceedingKm,
           freeExceedingKm: 0,
           chargeableExceedingKm: exceedingKm,
-          rateCardRange: `0-999999km`,
+          rateCardRange: `${rateCard.from_km || 0}-${rateCard.to_km || '∞'}km`,
           rateCardId: rateCard.id
         },
         grossRevenue: Math.round(grossRevenue),

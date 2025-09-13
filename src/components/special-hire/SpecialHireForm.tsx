@@ -495,7 +495,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         throw new Error('Bus type not found');
       }
 
-      // Get rate card for unified 100km flat fee + exceeding rate pricing
+      // Get rate cards for the hire type and bus type
       const { data: allRateCards } = await supabase
         .from('hire_rate_cards')
         .select('*')
@@ -504,21 +504,60 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         .eq('is_active', true)
         .order('from_km');
 
-      let rateCard = null;
-      if (allRateCards && allRateCards.length > 0) {
-        rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
+      if (!allRateCards || allRateCards.length === 0) {
+        throw new Error(`No rate cards found for ${data.hireType} hire type. Please configure rate cards first.`);
       }
 
-      if (!rateCard) {
-        throw new Error(`No rate card found for ${data.hireType} hire type. Please configure flat fee and exceeding km rate.`);
-      }
-
-      // Apply unified flat fee + exceeding rate formula with dynamic threshold
       const tripDistance = distanceData.kmTrip || 0;
-      const fixedRate = rateCard.flat_fee_lkr || 0;
-      const baseCoverageKm = rateCard.exceeding_km_threshold || 100;
-      const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
-      const exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
+      let rateCard = null;
+      let fixedRate = 0;
+      let exceedingDistanceCharge = 0;
+      let baseCoverageKm = 100;
+      let exceedingKm = 0;
+
+      // Handle different hire types with proper rate card logic
+      if (data.hireType !== 'Outside') {
+        // For Other hire types (Lyceum, etc.) - use range-based rates
+        rateCard = allRateCards.find(card => 
+          tripDistance >= (card.from_km || 0) && 
+          (card.to_km === null || tripDistance <= card.to_km)
+        );
+
+        if (!rateCard) {
+          // Fallback to first available rate card
+          rateCard = allRateCards[0];
+        }
+
+        if (!rateCard) {
+          throw new Error(`No suitable rate card found for ${data.hireType} hire type and ${tripDistance}km distance.`);
+        }
+
+        // Use flat fee from the range-based rate card
+        fixedRate = rateCard.flat_fee_lkr || 0;
+
+        // Handle exceeding km for distances beyond 100km
+        if (tripDistance > 100) {
+          const exceedingRateCard = allRateCards.find(card => 
+            card.from_km >= 101 && card.exceeding_km_rate_lkr != null
+          );
+          if (exceedingRateCard) {
+            baseCoverageKm = exceedingRateCard.exceeding_km_threshold || 100;
+            exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+            exceedingDistanceCharge = exceedingKm * (exceedingRateCard.exceeding_km_rate_lkr || 0);
+          }
+        }
+      } else {
+        // Outside hire logic - unified flat fee + exceeding rate
+        rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
+        if (!rateCard) {
+          throw new Error(`No rate card found for ${data.hireType} hire type. Please configure flat fee and exceeding km rate.`);
+        }
+
+        fixedRate = rateCard.flat_fee_lkr || 0;
+        baseCoverageKm = rateCard.exceeding_km_threshold || 100;
+        exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+        exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
+      }
       
       // Calculate extra time charges for Outside hire type
       let overtimeCharge = 0;

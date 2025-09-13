@@ -134,12 +134,73 @@ export function EnhancedCostCalculator() {
     const actualFuelCost = fuelLiters * fuelSettings.diesel_price_lkr_per_l;
     const maintenanceCost = totalDistance * (fuelSettings.maintenance_rate_lkr_per_km || 20);
 
+    // Get hire charge from quotation - use gross_revenue which should be calculated from rate cards
+    let hireCharge = quotation.gross_revenue;
+    
+    // If we need to recalculate based on actual distance and rate cards
+    // This ensures we're always using the correct rate card logic
+    const recalculateFromRateCard = async () => {
+      try {
+        const { data: rateCards } = await supabase
+          .from('hire_rate_cards')
+          .select('*')
+          .eq('hire_type', quotation.hire_type)
+          .eq('bus_type_id', quotation.bus_type_id)
+          .eq('is_active', true)
+          .order('from_km');
+
+        if (rateCards && rateCards.length > 0) {
+          let selectedRateCard = null;
+          
+          if (quotation.hire_type !== 'Outside') {
+            // For Other hire types (Lyceum, etc.) - use range-based rates
+            selectedRateCard = rateCards.find(card => 
+              actualDistance >= (card.from_km || 0) && 
+              (card.to_km === null || actualDistance <= card.to_km)
+            );
+            
+            if (!selectedRateCard) {
+              selectedRateCard = rateCards[0];
+            }
+            
+            if (selectedRateCard) {
+              hireCharge = selectedRateCard.flat_fee_lkr || 0;
+              
+              // Handle exceeding km for distances beyond 100km
+              if (actualDistance > 100) {
+                const exceedingRateCard = rateCards.find(card => 
+                  card.from_km >= 101 && card.exceeding_km_rate_lkr != null
+                );
+                if (exceedingRateCard) {
+                  const baseCoverageKm = exceedingRateCard.exceeding_km_threshold || 100;
+                  const exceedingKm = Math.max(0, actualDistance - baseCoverageKm);
+                  const exceedingCharge = exceedingKm * (exceedingRateCard.exceeding_km_rate_lkr || 0);
+                  hireCharge += exceedingCharge;
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error recalculating from rate card:', error);
+      }
+    };
+
+    // Recalculate if distance changed significantly
+    if (Math.abs(actualDistance - (quotation.km_trip || 0)) > 5) {
+      recalculateFromRateCard();
+    }
+
     const updatedExpenses = expenses.map(exp => {
       if (exp.type === 'fuel') {
         return { ...exp, amount: Math.round(actualFuelCost), isEstimated: false };
       }
       if (exp.type === 'maintenance') {
         return { ...exp, amount: Math.round(maintenanceCost), isEstimated: false };
+      }
+      if (exp.type === 'commission') {
+        const commissionAmount = (hireCharge * quotation.number_of_buses) * (commissionPercentage / 100);
+        return { ...exp, amount: Math.round(commissionAmount), isEstimated: false };
       }
       return exp;
     });
@@ -157,25 +218,26 @@ export function EnhancedCostCalculator() {
     setExpenses(updatedExpenses);
 
     const totalExpenses = updatedExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-    const netProfit = quotation.gross_revenue - totalExpenses;
+    const grossRevenue = hireCharge * quotation.number_of_buses;
+    const netProfit = grossRevenue - totalExpenses;
     const dailyProfit = tripDays > 1 ? netProfit / tripDays : undefined;
-    const profitMargin = quotation.gross_revenue > 0 ? (netProfit / quotation.gross_revenue) * 100 : 0;
+    const profitMargin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
 
     const customerFuelDistance = quotation.km_parking_to_pickup + quotation.km_drop_to_parking;
     const customerFuelCost = (customerFuelDistance / (busType.avg_km_per_l || 8)) * fuelSettings.diesel_price_lkr_per_l * quotation.number_of_buses;
-    const customerTotal = quotation.gross_revenue + customerFuelCost;
+    const customerTotal = grossRevenue + customerFuelCost;
 
     const costBreakdownData = {
       kmParkingToPickup: quotation.km_parking_to_pickup,
       kmTrip: actualDistance,
       kmDropToParking: quotation.km_drop_to_parking,
       fuelCostFuelOnly: customerFuelCost,
-      hireCharge: quotation.gross_revenue,
-      fixedRate: quotation.gross_revenue,
+      hireCharge: grossRevenue,
+      fixedRate: hireCharge,
       overtimeCharge: 0,
       overnightCharge: 0,
       exceedingDistanceCharge: 0,
-      grossRevenue: quotation.gross_revenue,
+      grossRevenue,
       customerTotalWithFuel: customerTotal,
       driverCharge: updatedExpenses.find(e => e.type === 'wages')?.amount || 0,
       commissionPct: commissionPercentage,
@@ -191,7 +253,20 @@ export function EnhancedCostCalculator() {
       maintenanceRatePerKm: fuelSettings.maintenance_rate_lkr_per_km || 20,
       numberOfBuses: quotation.number_of_buses,
       pickupDateTime: quotation.pickup_datetime,
-      dropDateTime: quotation.drop_datetime
+      dropDateTime: quotation.drop_datetime,
+      rateCardDetails: {
+        standardHours: 8,
+        actualHours: 8,
+        availableHours: actualDistance / 10,
+        overtimeHours: 0,
+        agreedDistance: Math.min(actualDistance, 100),
+        actualDistance: actualDistance,
+        exceedingKm: Math.max(0, actualDistance - 100),
+        freeExceedingKm: 0,
+        chargeableExceedingKm: Math.max(0, actualDistance - 100),
+        rateCardRange: `Based on ${actualDistance}km distance`,
+        rateCardId: 'calculated'
+      }
     };
 
     setCalculationResult({
