@@ -115,6 +115,7 @@ export function QuotationsList({ onRefresh }: Props) {
 
   const loadQuotations = async () => {
     try {
+      // First, try to get quotations with creator names using a join
       const { data: quotationsData, error } = await supabase
         .from('special_hire_quotations')
         .select(`
@@ -122,45 +123,81 @@ export function QuotationsList({ onRefresh }: Props) {
           bus_types!bus_type_id (
             name,
             capacity
+          ),
+          profiles!created_by (
+            first_name,
+            last_name
           )
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-
-      // Get unique creator IDs that are not null
-      const creatorIds = [...new Set(quotationsData?.map(q => q.created_by).filter(Boolean))] as string[];
-      
-      let creatorMap = new Map();
-      
-      // Only fetch profiles if we have creator IDs
-      if (creatorIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('user_id, first_name')
-          .in('user_id', creatorIds);
-
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-        }
-
-        // Create a map of user_id to first_name
-        profilesData?.forEach(profile => {
-          creatorMap.set(profile.user_id, profile.first_name || 'Unknown User');
-        });
+      if (error) {
+        // If the join fails, try a simpler approach like Yutong
+        const { data: simpleData, error: simpleError } = await supabase
+          .from('special_hire_quotations')
+          .select(`
+            *,
+            bus_types!bus_type_id (
+              name,
+              capacity
+            )
+          `)
+          .order('created_at', { ascending: false });
+          
+        if (simpleError) throw simpleError;
+        
+        // Get creator names separately
+        const quotationsWithCreators = await Promise.all(
+          (simpleData || []).map(async (quotation: any) => {
+            if (quotation.created_by) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('first_name, last_name')
+                .eq('user_id', quotation.created_by)
+                .single();
+                
+              return {
+                ...quotation,
+                created_by_name: profile 
+                  ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+                  : 'Unknown User'
+              };
+            }
+            return {
+              ...quotation,
+              created_by_name: 'System'
+            };
+          })
+        );
+        
+        // Transform the fallback data to match our interface
+        const transformedData = quotationsWithCreators.map(item => ({
+          ...item,
+          bus_type: item.bus_types?.name || 'Unknown',
+          seating_capacity: item.bus_types?.capacity || 54,
+          total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
+          intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
+          audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
+          additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || [])
+        }));
+        
+        setQuotations(transformedData);
+        return;
       }
       
-      // Transform the data to match our interface
-      const transformedData = quotationsData?.map(item => ({
+      // Transform data to include creator name from the join
+      const transformedData = (quotationsData || []).map((item: any) => ({
         ...item,
         bus_type: item.bus_types?.name || 'Unknown',
         seating_capacity: item.bus_types?.capacity || 54,
-        created_by_name: item.created_by ? (creatorMap.get(item.created_by) || 'Unknown User') : 'System',
+        created_by_name: item.profiles 
+          ? `${item.profiles.first_name || ''} ${item.profiles.last_name || ''}`.trim()
+          : (item.created_by ? 'Unknown User' : 'System'),
         total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
         intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
         audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
         additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || [])
-      })) || [];
+      }));
       
       console.log('Transformed quotations with creators:', transformedData.map(q => ({ 
         quotation_no: q.quotation_no, 
