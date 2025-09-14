@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DataTable } from '@/components/ui/data-table';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Eye, CheckCircle, Clock, FileText } from 'lucide-react';
+import { ColumnDef } from '@tanstack/react-table';
 
 interface SpecialHireSubmission {
   id: string;
@@ -32,6 +34,7 @@ interface Props {
 
 export function SubmissionsList({ onSelectSubmission }: Props) {
   const [submissions, setSubmissions] = useState<SpecialHireSubmission[]>([]);
+  const [filteredSubmissions, setFilteredSubmissions] = useState<SpecialHireSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -48,6 +51,7 @@ export function SubmissionsList({ onSelectSubmission }: Props) {
 
       if (error) throw error;
       setSubmissions(data || []);
+      setFilteredSubmissions(data || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
       toast({
@@ -94,6 +98,19 @@ export function SubmissionsList({ onSelectSubmission }: Props) {
     }
   };
 
+  const handleDateRangeChange = (range: { from: Date; to: Date } | undefined) => {
+    if (!range) {
+      setFilteredSubmissions(submissions);
+      return;
+    }
+
+    const filtered = submissions.filter(submission => {
+      const submissionDate = new Date(submission.created_at);
+      return submissionDate >= range.from && submissionDate <= range.to;
+    });
+    setFilteredSubmissions(filtered);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
@@ -112,6 +129,100 @@ export function SubmissionsList({ onSelectSubmission }: Props) {
     }
   };
 
+  const columns: ColumnDef<SpecialHireSubmission>[] = [
+    {
+      accessorKey: "submission_no",
+      header: "Submission #",
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue("submission_no")}</div>
+      ),
+    },
+    {
+      accessorKey: "customer_name",
+      header: "Customer",
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium">{row.getValue("customer_name")}</div>
+          <div className="text-sm text-muted-foreground">{row.original.customer_phone}</div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "hire_type",
+      header: "Hire Type",
+    },
+    {
+      accessorKey: "number_of_buses",
+      header: "Buses",
+    },
+    {
+      accessorKey: "number_of_passengers",
+      header: "Passengers",
+    },
+    {
+      accessorKey: "pickup_location",
+      header: "Pickup Location",
+      cell: ({ row }) => (
+        <div className="max-w-[200px]">
+          <div className="truncate">{row.getValue("pickup_location")}</div>
+          <div className="text-xs text-muted-foreground">
+            {format(new Date(row.original.pickup_datetime), 'MMM dd, HH:mm')}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "drop_location",
+      header: "Drop Location",
+      cell: ({ row }) => (
+        <div className="max-w-[200px]">
+          <div className="truncate">{row.getValue("drop_location")}</div>
+          <div className="text-xs text-muted-foreground">
+            {format(new Date(row.original.drop_datetime), 'MMM dd, HH:mm')}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "submission_status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.getValue("submission_status") as string;
+        return (
+          <Badge className={`${getStatusColor(status)} flex items-center gap-1 w-fit`}>
+            {getStatusIcon(status)}
+            {status}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "created_at",
+      header: "Created",
+      cell: ({ row }) => (
+        <div className="text-sm">
+          {format(new Date(row.getValue("created_at")), 'MMM dd, yyyy')}
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const submission = row.original;
+        return (
+          <Button
+            size="sm"
+            onClick={() => handleSelectSubmission(submission)}
+            disabled={submission.submission_status === 'processed'}
+          >
+            {submission.submission_status === 'processed' ? 'Processed' : 'Use for Quotation'}
+          </Button>
+        );
+      },
+    },
+  ];
+
   if (loading) {
     return (
       <Card>
@@ -128,98 +239,11 @@ export function SubmissionsList({ onSelectSubmission }: Props) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="w-5 h-5" />
-          Customer Submissions ({submissions.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {submissions.length === 0 ? (
-          <div className="text-center py-8">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No submissions yet</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {submissions.map((submission) => (
-              <div
-                key={submission.id}
-                className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold">{submission.customer_name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {submission.submission_no} • {format(new Date(submission.created_at), 'MMM dd, yyyy HH:mm')}
-                    </p>
-                  </div>
-                  <Badge 
-                    className={`${getStatusColor(submission.submission_status)} flex items-center gap-1`}
-                  >
-                    {getStatusIcon(submission.submission_status)}
-                    {submission.submission_status}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                  <div>
-                    <span className="text-muted-foreground">Phone:</span>
-                    <p className="font-medium">{submission.customer_phone}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Hire Type:</span>
-                    <p className="font-medium">{submission.hire_type}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Buses:</span>
-                    <p className="font-medium">{submission.number_of_buses}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Passengers:</span>
-                    <p className="font-medium">{submission.number_of_passengers}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
-                  <div>
-                    <span className="text-muted-foreground">Pickup:</span>
-                    <p className="font-medium truncate">{submission.pickup_location}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(submission.pickup_datetime), 'MMM dd, yyyy HH:mm')}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Drop:</span>
-                    <p className="font-medium truncate">{submission.drop_location}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(submission.drop_datetime), 'MMM dd, yyyy HH:mm')}
-                    </p>
-                  </div>
-                </div>
-
-                {submission.special_request && (
-                  <div className="mb-4">
-                    <span className="text-muted-foreground text-sm">Special Request:</span>
-                    <p className="text-sm bg-muted p-2 rounded mt-1">{submission.special_request}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => handleSelectSubmission(submission)}
-                    disabled={submission.submission_status === 'processed'}
-                  >
-                    {submission.submission_status === 'processed' ? 'Already Processed' : 'Use for Quotation'}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <DataTable
+      columns={columns}
+      data={filteredSubmissions}
+      title={`Customer Submissions (${submissions.length})`}
+      onDateRangeChange={handleDateRangeChange}
+    />
   );
 }
