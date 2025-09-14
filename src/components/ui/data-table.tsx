@@ -120,18 +120,22 @@ export function DataTable<TData, TValue>({
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 flex-1">
-          {customSearch ? (
+          {customSearch && (
             <EnhancedSearch
               onSearch={setGlobalFilter}
               searchKeys={searchKeys}
               className="max-w-sm"
             />
-          ) : onDateRangeChange ? (
+          )}
+          
+          {onDateRangeChange && (
             <DateRangePicker
               onDateRangeChange={onDateRangeChange}
               className="max-w-sm"
             />
-          ) : (
+          )}
+          
+          {!customSearch && !onDateRangeChange && (
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
