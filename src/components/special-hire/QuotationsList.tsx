@@ -672,14 +672,34 @@ export function QuotationsList({ onRefresh }: Props) {
                   >
                     Confirm
                   </Button>
-                  <Button 
-                    variant="destructive"
-                    size="sm" 
-                    onClick={() => handleStatusUpdate(quotation.id, 'declined')}
-                    title="Decline Quotation"
-                  >
-                    Decline
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="destructive"
+                        size="sm" 
+                        title="Decline Quotation"
+                      >
+                        Decline
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Decline Quotation</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to decline quotation {quotation.quotation_no} for {quotation.customer_name}? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleStatusUpdate(quotation.id, 'declined')}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Yes, Decline
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </>
               )}
               <Button 
