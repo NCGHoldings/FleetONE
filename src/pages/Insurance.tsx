@@ -143,10 +143,17 @@ export default function Insurance() {
   };
 
   const getExpiryStatus = (expiryDate: string) => {
-    const days = differenceInDays(parseISO(expiryDate), new Date());
-    if (days < 0) return 'expired';
-    if (days <= 30) return 'expiring-soon';
-    return 'active';
+    if (!expiryDate) return 'unknown';
+    try {
+      const parsedDate = parseISO(expiryDate);
+      if (isNaN(parsedDate.getTime())) return 'unknown';
+      const days = differenceInDays(parsedDate, new Date());
+      if (days < 0) return 'expired';
+      if (days <= 30) return 'expiring-soon';
+      return 'active';
+    } catch (error) {
+      return 'unknown';
+    }
   };
 
   const columns: ColumnDef<InsuranceRecord>[] = [
@@ -177,14 +184,43 @@ export default function Insurance() {
       cell: ({ row }) => {
         const expiryDate = row.getValue("expiry_date") as string;
         const status = getExpiryStatus(expiryDate);
-        return (
-          <div className="flex items-center gap-2">
-            {format(parseISO(expiryDate), 'MMM dd, yyyy')}
-            {status === 'expired' && <AlertTriangle className="h-4 w-4 text-red-500" />}
-            {status === 'expiring-soon' && <Calendar className="h-4 w-4 text-yellow-500" />}
-            {status === 'active' && <CheckCircle className="h-4 w-4 text-green-500" />}
-          </div>
-        );
+        
+        if (!expiryDate || status === 'unknown') {
+          return (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span>Invalid Date</span>
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+            </div>
+          );
+        }
+        
+        try {
+          const parsedDate = parseISO(expiryDate);
+          if (isNaN(parsedDate.getTime())) {
+            return (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span>Invalid Date</span>
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+              </div>
+            );
+          }
+          
+          return (
+            <div className="flex items-center gap-2">
+              {format(parsedDate, 'MMM dd, yyyy')}
+              {status === 'expired' && <AlertTriangle className="h-4 w-4 text-red-500" />}
+              {status === 'expiring-soon' && <Calendar className="h-4 w-4 text-yellow-500" />}
+              {status === 'active' && <CheckCircle className="h-4 w-4 text-green-500" />}
+            </div>
+          );
+        } catch (error) {
+          return (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span>Invalid Date</span>
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+            </div>
+          );
+        }
       },
     },
     {
@@ -200,23 +236,52 @@ export default function Insurance() {
       header: "Days Remaining",
       cell: ({ row }) => {
         const expiryDate = row.original.expiry_date;
-        const daysRemaining = differenceInDays(parseISO(expiryDate), new Date());
         const status = getExpiryStatus(expiryDate);
         
-        return (
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            <span className={
-              status === 'expired' ? 'text-red-600 font-semibold' :
-              status === 'expiring-soon' ? 'text-yellow-600 font-semibold' :
-              'text-green-600'
-            }>
-              {daysRemaining < 0 ? `${Math.abs(daysRemaining)} days overdue` : 
-               daysRemaining === 0 ? 'Expires today' :
-               `${daysRemaining} days`}
-            </span>
-          </div>
-        );
+        if (!expiryDate || status === 'unknown') {
+          return (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>Invalid Date</span>
+            </div>
+          );
+        }
+        
+        try {
+          const parsedDate = parseISO(expiryDate);
+          if (isNaN(parsedDate.getTime())) {
+            return (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span>Invalid Date</span>
+              </div>
+            );
+          }
+          
+          const daysRemaining = differenceInDays(parsedDate, new Date());
+          
+          return (
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span className={
+                status === 'expired' ? 'text-red-600 font-semibold' :
+                status === 'expiring-soon' ? 'text-yellow-600 font-semibold' :
+                'text-green-600'
+              }>
+                {daysRemaining < 0 ? `${Math.abs(daysRemaining)} days overdue` : 
+                 daysRemaining === 0 ? 'Expires today' :
+                 `${daysRemaining} days`}
+              </span>
+            </div>
+          );
+        } catch (error) {
+          return (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>Invalid Date</span>
+            </div>
+          );
+        }
       },
     },
     {
@@ -231,11 +296,13 @@ export default function Insurance() {
             variant={
               status === 'expired' ? 'destructive' : 
               status === 'expiring-soon' ? 'secondary' : 
+              status === 'unknown' ? 'outline' :
               'default'
             }
           >
             {status === 'expired' ? 'Expired' : 
              status === 'expiring-soon' ? 'Expiring Soon' : 
+             status === 'unknown' ? 'Invalid Date' :
              'Active'}
           </Badge>
         );
