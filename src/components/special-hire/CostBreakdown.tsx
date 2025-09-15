@@ -123,12 +123,14 @@ export function CostBreakdown({ data }: Props) {
   const calculatedMaintenanceCost = (safeData.totalTripDistance * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   
   // Calculate additional charges total with per-bus support
-  const additionalChargesTotal = (data.additionalCharges || []).reduce((sum, charge) => {
-    const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
-      ? charge.amount * charge.busesCount 
-      : charge.amount;
-    return sum + effectiveAmount;
-  }, 0);
+  const additionalChargesTotal = Array.isArray(data.additionalCharges) 
+    ? data.additionalCharges.reduce((sum, charge) => {
+        const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
+          ? charge.amount * charge.busesCount 
+          : charge.amount;
+        return sum + effectiveAmount;
+      }, 0)
+    : 0;
   
   // Calculate other expenses total
   const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -234,7 +236,7 @@ export function CostBreakdown({ data }: Props) {
                 <span>-LKR {safeData.discountAmount.toLocaleString()}</span>
               </div>
             )}
-            {(data.additionalCharges && data.additionalCharges.length > 0) && (
+            {(Array.isArray(data.additionalCharges) && data.additionalCharges.length > 0) && (
               <>
                 <Separator />
                 <div className="space-y-2">
@@ -336,7 +338,7 @@ export function CostBreakdown({ data }: Props) {
               <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR {safeData.maintenanceRatePerKm} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
               <span>LKR {calculatedMaintenanceCost.toLocaleString()}</span>
             </div>
-            {(data.additionalCharges && data.additionalCharges.length > 0) && (
+            {(Array.isArray(data.additionalCharges) && data.additionalCharges.length > 0) && (
               <>
                 {data.additionalCharges.map((charge, index) => {
                   const chargeTypeLabels = {
