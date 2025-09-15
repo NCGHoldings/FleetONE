@@ -31,6 +31,8 @@ interface CostData {
     exceedingKm: number;
     freeExceedingKm: number;
     chargeableExceedingKm: number;
+    rateCardRange?: string;
+    rateCardId?: string;
   };
   grossRevenue: number;
   customerTotalWithFuel: number;
@@ -185,7 +187,12 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Hire Charges Breakdown</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Flat Fee (First 100 km)</span>
+              <span>
+                {safeData.rateCardDetails?.rateCardRange ? 
+                  `Base Rate (${safeData.rateCardDetails.rateCardRange} range)` :
+                  'Base Rate (First 100 km)'
+                }
+              </span>
               <span>LKR {safeData.fixedRate.toLocaleString()}</span>
             </div>
             {safeData.overtimeCharge > 0 && (
