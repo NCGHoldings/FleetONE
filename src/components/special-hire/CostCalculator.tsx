@@ -109,18 +109,30 @@ export function CostCalculator() {
         parking: { lat: fuelSettings.parking_lat, lng: fuelSettings.parking_lng }
       });
 
-      // Call edge function to calculate distances using Mapbox API
+      // Call edge function to calculate distances with enhanced accuracy
       const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
         body: {
           pickupLocation: formData.pickupLocation,
           dropLocation: formData.dropLocation,
           intermediateStops,
           parkingLat: fuelSettings.parking_lat,
-          parkingLng: fuelSettings.parking_lng
+          parkingLng: fuelSettings.parking_lng,
+          // Enhanced parameters for accurate distance calculation
+          calculateSegments: true, // Use segment-by-segment calculation for accuracy
+          avoidHighways: false, // Allow highways for bus routes
+          avoidTolls: false, // Allow tolls
+          debugMode: true, // Enable detailed logging
+          routePreference: 'distance', // Prioritize shortest distance
         }
       });
 
-      console.log('Distance calculation result:', distanceData, error);
+      console.log('Distance calculation result:', {
+        distanceData, 
+        error,
+        calculationMethod: distanceData?.calculationMethod,
+        segmentDetails: distanceData?.segmentDetails,
+        routeComparison: distanceData?.routeComparison
+      });
 
       if (error) {
         console.error('Distance calculation error:', error);
