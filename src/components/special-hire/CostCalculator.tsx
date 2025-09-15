@@ -317,15 +317,49 @@ export function CostCalculator() {
 
       // For Other hire types (Lyceum, etc.) - use range-based rates
       if (formData.hireType !== 'Outside') {
-        // Find appropriate rate card based on trip distance range
-        rateCard = allRateCards.find(card => 
-          tripDistance >= (card.from_km || 0) && 
-          (card.to_km === null || tripDistance <= card.to_km)
-        );
+        // For trips beyond 100km, use 75-100km rate for first 100km + exceeding km rate
+        if (tripDistance > 100) {
+          // Find the 75-100km range rate card for the first 100km base charge
+          const baseRateCard = allRateCards.find(card => 
+            card.from_km >= 75 && card.to_km >= 100
+          );
+          
+          if (baseRateCard) {
+            // Use the 75-100km rate for the first 100km
+            fixedRate = baseRateCard.flat_fee_lkr || 0;
+            rateCard = baseRateCard;
+            baseCoverageKm = 100;
+            
+            // Calculate exceeding km beyond 100km
+            exceedingKm = tripDistance - 100;
+            
+            // Find exceeding km rate (could be from same or different rate card)
+            const exceedingRate = baseRateCard.exceeding_km_rate_lkr || 
+                                allRateCards.find(card => card.exceeding_km_rate_lkr != null)?.exceeding_km_rate_lkr || 0;
+            
+            exceedingDistanceCharge = exceedingKm * exceedingRate;
+          } else {
+            // Fallback if no 75-100km range found
+            rateCard = allRateCards.find(card => 
+              tripDistance >= (card.from_km || 0) && 
+              (card.to_km === null || tripDistance <= card.to_km)
+            ) || allRateCards[0];
+            
+            fixedRate = rateCard?.flat_fee_lkr || 0;
+          }
+        } else {
+          // For trips <= 100km, use normal range-based rate card selection
+          rateCard = allRateCards.find(card => 
+            tripDistance >= (card.from_km || 0) && 
+            (card.to_km === null || tripDistance <= card.to_km)
+          );
 
-        if (!rateCard) {
-          // Fallback to first available rate card
-          rateCard = allRateCards[0];
+          if (!rateCard) {
+            // Fallback to first available rate card
+            rateCard = allRateCards[0];
+          }
+          
+          fixedRate = rateCard?.flat_fee_lkr || 0;
         }
 
         if (!rateCard) {
@@ -333,27 +367,12 @@ export function CostCalculator() {
         }
 
         setSelectedRateCard(rateCard);
-
-        // Use flat fee from the range-based rate card
-        fixedRate = rateCard.flat_fee_lkr || 0;
         
         // Calculate overtime based on standard hours from rate card
         const standardHours = rateCard.standard_hours || 8;
         const overtimeHours = Math.max(0, formData.expectedWorkHours - standardHours);
         overtimeCharge = overtimeHours * (rateCard.overtime_rate_lkr_per_hour || 0);
         overnightCharge = formData.overnightDays * (rateCard.overnight_charge_lkr_per_day || 0);
-
-        // Handle exceeding km for distances beyond 100km
-        if (tripDistance > 100) {
-          const exceedingRateCard = allRateCards.find(card => 
-            card.from_km >= 101 && card.exceeding_km_rate_lkr != null
-          );
-          if (exceedingRateCard) {
-            baseCoverageKm = exceedingRateCard.exceeding_km_threshold || 100;
-            exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
-            exceedingDistanceCharge = exceedingKm * (exceedingRateCard.exceeding_km_rate_lkr || 0);
-          }
-        }
       } else {
         // Outside hire logic - unified flat fee + exceeding rate
         rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
