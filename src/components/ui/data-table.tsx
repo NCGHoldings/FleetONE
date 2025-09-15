@@ -42,6 +42,8 @@ interface DataTableProps<TData, TValue> {
   customSearch?: (data: TData[], query: string) => TData[];
   customFilter?: (data: TData[]) => TData[];
   onDateRangeChange?: (range: { from: Date; to: Date } | undefined) => void;
+  editableFields?: string[];
+  onCellEdit?: (rowId: string, field: string, value: any) => Promise<void>;
 }
 
 export function DataTable<TData, TValue>({
@@ -55,11 +57,15 @@ export function DataTable<TData, TValue>({
   customSearch,
   customFilter,
   onDateRangeChange,
+  editableFields = [],
+  onCellEdit,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [globalFilter, setGlobalFilter] = React.useState("");
+  const [editingCell, setEditingCell] = React.useState<{ rowId: string; field: string } | null>(null);
+  const [editingValue, setEditingValue] = React.useState<string>("");
 
   // Apply custom filtering and search
   const filteredData = React.useMemo(() => {
@@ -77,6 +83,28 @@ export function DataTable<TData, TValue>({
     
     return result;
   }, [data, customFilter, customSearch, globalFilter]);
+
+  const handleCellEdit = (rowId: string, field: string, currentValue: any) => {
+    setEditingCell({ rowId, field });
+    setEditingValue(String(currentValue || ""));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingCell || !onCellEdit) return;
+    
+    try {
+      await onCellEdit(editingCell.rowId, editingCell.field, editingValue);
+      setEditingCell(null);
+      setEditingValue("");
+    } catch (error) {
+      console.error("Failed to save edit:", error);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCell(null);
+    setEditingValue("");
+  };
 
   const table = useReactTable({
     data: filteredData,
@@ -243,11 +271,47 @@ export function DataTable<TData, TValue>({
                           width: cell.column.getSize() !== 150 ? cell.column.getSize() : 'auto',
                           minWidth: '120px'
                         }}
-                      >
-                        <div className="truncate" title={typeof cell.getValue() === 'string' ? String(cell.getValue()) : undefined}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </div>
-                      </TableCell>
+                       >
+                         <div className="truncate" title={typeof cell.getValue() === 'string' ? String(cell.getValue()) : undefined}>
+                           {editableFields.includes(cell.column.id) && 
+                            editingCell?.rowId === row.id && 
+                            editingCell?.field === cell.column.id ? (
+                             <div className="flex items-center gap-1">
+                               <Input
+                                 value={editingValue}
+                                 onChange={(e) => setEditingValue(e.target.value)}
+                                 className="h-8 w-full text-sm"
+                                 type={cell.column.id.includes('lkr') || cell.column.id.includes('hours') || cell.column.id.includes('km') ? 'number' : 'text'}
+                                 onKeyDown={(e) => {
+                                   if (e.key === 'Enter') {
+                                     handleSaveEdit();
+                                   } else if (e.key === 'Escape') {
+                                     handleCancelEdit();
+                                   }
+                                 }}
+                                 autoFocus
+                               />
+                               <Button size="sm" variant="ghost" onClick={handleSaveEdit} className="h-6 w-6 p-0">
+                                 ✓
+                               </Button>
+                               <Button size="sm" variant="ghost" onClick={handleCancelEdit} className="h-6 w-6 p-0">
+                                 ✕
+                               </Button>
+                             </div>
+                           ) : (
+                             <div 
+                               className={`${editableFields.includes(cell.column.id) && onCellEdit ? 'cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5' : ''}`}
+                               onClick={() => {
+                                 if (editableFields.includes(cell.column.id) && onCellEdit) {
+                                   handleCellEdit(row.id, cell.column.id, cell.getValue());
+                                 }
+                               }}
+                             >
+                               {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                             </div>
+                           )}
+                         </div>
+                       </TableCell>
                     ))}
                   </TableRow>
                 ))

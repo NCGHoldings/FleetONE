@@ -132,6 +132,38 @@ export function RateCardsAdmin() {
     }
   });
 
+  const handleCellEdit = async (rowId: string, field: string, value: any) => {
+    try {
+      const numericValue = ['flat_fee_lkr', 'exceeding_km_rate_lkr', 'overtime_rate_lkr_per_hour', 'standard_hours', 'exceeding_km_threshold'].includes(field) 
+        ? parseFloat(value) || 0 
+        : value;
+
+      const { error } = await supabase
+        .from('hire_rate_cards')
+        .update({ [field]: numericValue })
+        .eq('id', rowId);
+
+      if (error) throw error;
+
+      // Update local state
+      setRateCards(prev => prev.map(card => 
+        card.id === rowId ? { ...card, [field]: numericValue } : card
+      ));
+
+      toast({
+        title: "Success",
+        description: "Rate updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating rate:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update rate",
+        variant: "destructive",
+      });
+    }
+  };
+
   const loadData = async () => {
     try {
       const [rateCardsResult, busTypesResult] = await Promise.all([
@@ -846,7 +878,13 @@ export function RateCardsAdmin() {
               </div>
             </CardHeader>
             <CardContent>
-              <DataTable columns={outsideColumns} data={outsideRateCards} searchKey="bus_types.name" />
+              <DataTable 
+                columns={outsideColumns} 
+                data={outsideRateCards} 
+                searchKey="bus_types.name" 
+                editableFields={['flat_fee_lkr', 'exceeding_km_rate_lkr', 'exceeding_km_threshold', 'standard_hours']}
+                onCellEdit={handleCellEdit}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1314,7 +1352,13 @@ export function RateCardsAdmin() {
               </div>
             </CardHeader>
             <CardContent>
-              <DataTable columns={otherColumns} data={otherRateCards} searchKey="bus_types.name" />
+              <DataTable 
+                columns={otherColumns} 
+                data={otherRateCards} 
+                searchKey="bus_types.name" 
+                editableFields={['flat_fee_lkr', 'standard_hours', 'overtime_rate_lkr_per_hour']}
+                onCellEdit={handleCellEdit}
+              />
             </CardContent>
           </Card>
         </TabsContent>
