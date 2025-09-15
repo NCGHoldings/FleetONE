@@ -1137,33 +1137,36 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
 
                  {/* Intermediate Stops */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Intermediate Stops</label>
-                    <Button type="button" variant="outline" size="sm" onClick={addIntermediateStop}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Stop
-                    </Button>
+                 <div className="space-y-4">
+                   <div className="flex items-center justify-between">
+                     <label className="text-sm font-medium">Intermediate Stops</label>
+                     <Button type="button" variant="outline" size="sm" onClick={addIntermediateStop}>
+                       <Plus className="h-4 w-4 mr-2" />
+                       Add Stop
+                     </Button>
+                   </div>
+                    {intermediateStops.map((stop) => (
+                      <div key={stop.id} className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <LocationAutocomplete
+                            value={stop.location}
+                            onChange={(value) => updateIntermediateStop(stop.id, value)}
+                            placeholder="Enter intermediate location"
+                            className="w-full min-w-[400px]"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeIntermediateStop(stop.id)}
+                          className="flex-shrink-0 mt-1"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                   {intermediateStops.map((stop) => (
-                     <div key={stop.id} className="flex items-center gap-3">
-                       <LocationAutocomplete
-                         value={stop.location}
-                         onChange={(value) => updateIntermediateStop(stop.id, value)}
-                         placeholder="Enter intermediate location"
-                         className="flex-1"
-                       />
-                       <Button
-                         type="button"
-                         variant="outline"
-                         size="sm"
-                         onClick={() => removeIntermediateStop(stop.id)}
-                       >
-                         <X className="h-4 w-4" />
-                       </Button>
-                     </div>
-                   ))}
-                 </div>
 
                 {/* Multi-parking bus details */}
                 {useMultiParking && busDetails.length > 0 && (

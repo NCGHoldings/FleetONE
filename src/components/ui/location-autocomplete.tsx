@@ -155,7 +155,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto"
+          className="absolute z-50 w-full min-w-[400px] mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto"
         >
           {suggestions.map((suggestion, index) => (
             <div
@@ -169,10 +169,10 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
               <div className="flex items-start gap-2">
                 <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate">
+                  <div className="font-medium text-sm break-words">
                     {suggestion.text}
                   </div>
-                  <div className="text-xs text-muted-foreground truncate">
+                  <div className="text-xs text-muted-foreground break-words">
                     {suggestion.place_name}
                   </div>
                 </div>
