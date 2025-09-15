@@ -42,6 +42,7 @@ const otherHireRangeSchema = z.object({
   range_51_75_standard_hours: z.number().min(0, 'Standard hours must be positive'),
   range_76_100_flat_fee: z.number().min(0, 'Flat fee must be positive'),
   range_76_100_standard_hours: z.number().min(0, 'Standard hours must be positive'),
+  first_100km_flat_fee: z.number().min(0, 'First 100km flat fee must be positive'),
   overtime_rate_lkr_per_hour: z.number().min(0, 'Overtime rate must be positive'),
   overnight_charge_lkr_per_day: z.number().min(0, 'Overnight charge must be 0 or positive'),
   exceeding_km_rate_lkr: z.number().min(0, 'Exceeding KM rate must be positive'),
@@ -124,6 +125,7 @@ export function RateCardsAdmin() {
       range_51_75_standard_hours: 4,
       range_76_100_flat_fee: 15000,
       range_76_100_standard_hours: 5,
+      first_100km_flat_fee: 20000,
       overtime_rate_lkr_per_hour: 500,
       overnight_charge_lkr_per_day: 3000,
       exceeding_km_rate_lkr: 175,
@@ -468,7 +470,7 @@ export function RateCardsAdmin() {
           bus_type_id: data.bus_type_id,
           from_km: 101,
           to_km: null, // Open-ended for exceeding
-          flat_fee_lkr: 0, // No flat fee for exceeding
+          flat_fee_lkr: data.first_100km_flat_fee, // Base charge for first 100km
           standard_hours: 0, // No standard hours for exceeding
           overtime_rate_lkr_per_hour: data.overtime_rate_lkr_per_hour,
           overnight_charge_lkr_per_day: data.overnight_charge_lkr_per_day,
@@ -562,6 +564,7 @@ export function RateCardsAdmin() {
       range_51_75_standard_hours: range_51_75?.standard_hours || 0,
       range_76_100_flat_fee: range_76_100?.flat_fee_lkr || 0,
       range_76_100_standard_hours: range_76_100?.standard_hours || 0,
+      first_100km_flat_fee: exceeding?.flat_fee_lkr || range_0_10?.flat_fee_lkr || 20000,
       overtime_rate_lkr_per_hour: range_0_10?.overtime_rate_lkr_per_hour || 500,
       overnight_charge_lkr_per_day: range_0_10?.overnight_charge_lkr_per_day || 0,
       exceeding_km_rate_lkr: exceeding?.exceeding_km_rate_lkr || 175,
@@ -1211,74 +1214,95 @@ export function RateCardsAdmin() {
                           </div>
                         </div>
 
-                        {/* Common Settings for All Ranges */}
-                        <div className="p-4 border rounded-lg bg-muted/30">
-                          <h4 className="font-medium mb-3 text-primary">Common Settings (All Ranges)</h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                              control={otherRangeForm.control}
-                              name="overtime_rate_lkr_per_hour"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Overtime Rate (LKR/hour)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      placeholder="500"
-                                      {...field}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                         {/* Common Settings for All Ranges */}
+                         <div className="p-4 border rounded-lg bg-muted/30">
+                           <h4 className="font-medium mb-3 text-primary">Common Settings (All Ranges)</h4>
+                           <div className="grid grid-cols-2 gap-4">
+                             <FormField
+                               control={otherRangeForm.control}
+                               name="first_100km_flat_fee"
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel>First 100km Flat Fee (Base Charge)</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="number"
+                                       step="0.01"
+                                       min="0"
+                                       placeholder="20000"
+                                       {...field}
+                                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
 
-                            <FormField
-                              control={otherRangeForm.control}
-                              name="overnight_charge_lkr_per_day"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Overnight Charge (LKR/day)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      placeholder="3000"
-                                      {...field}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                             <FormField
+                               control={otherRangeForm.control}
+                               name="exceeding_km_rate_lkr"
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel>Exceeding Rate (Beyond 100km, LKR/km)</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="number"
+                                       step="0.01"
+                                       min="0"
+                                       placeholder="175"
+                                       {...field}
+                                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
 
-                            <FormField
-                              control={otherRangeForm.control}
-                              name="exceeding_km_rate_lkr"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Exceeding Rate (Beyond 100km, LKR/km)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      placeholder="175"
-                                      {...field}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
+                             <FormField
+                               control={otherRangeForm.control}
+                               name="overtime_rate_lkr_per_hour"
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel>Overtime Rate (LKR/hour)</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="number"
+                                       step="0.01"
+                                       min="0"
+                                       placeholder="500"
+                                       {...field}
+                                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
+
+                             <FormField
+                               control={otherRangeForm.control}
+                               name="overnight_charge_lkr_per_day"
+                               render={({ field }) => (
+                                 <FormItem>
+                                   <FormLabel>Overnight Charge (LKR/day)</FormLabel>
+                                   <FormControl>
+                                     <Input
+                                       type="number"
+                                       step="0.01"
+                                       min="0"
+                                       placeholder="3000"
+                                       {...field}
+                                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                 </FormItem>
+                               )}
+                             />
+                           </div>
+                         </div>
 
                         {/* Date Settings */}
                         <div className="grid grid-cols-2 gap-4">
