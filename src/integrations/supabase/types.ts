@@ -616,7 +616,7 @@ export type Database = {
           feedback_id: string | null
           id: string
           priority: string | null
-          reported_by: string
+          reported_by: string | null
           resolution: string | null
           resolved_at: string | null
           resolved_by_name: string | null
@@ -638,7 +638,7 @@ export type Database = {
           feedback_id?: string | null
           id?: string
           priority?: string | null
-          reported_by: string
+          reported_by?: string | null
           resolution?: string | null
           resolved_at?: string | null
           resolved_by_name?: string | null
@@ -660,7 +660,7 @@ export type Database = {
           feedback_id?: string | null
           id?: string
           priority?: string | null
-          reported_by?: string
+          reported_by?: string | null
           resolution?: string | null
           resolved_at?: string | null
           resolved_by_name?: string | null
