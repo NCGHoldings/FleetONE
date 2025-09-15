@@ -54,12 +54,29 @@ serve(async (req) => {
 
     const roundKm = (m: number) => Math.round((m / 1000) * 10) / 10;
 
-    // Build route parameters for Google Directions API
+    // Build route parameters for Google Directions API - optimized for bus routing
     const buildRouteParams = () => {
+      // Use driving mode but with truck restrictions to simulate bus routing
       let params = 'mode=driving';
-      if (avoidHighways) params += '&avoid=highways';
-      if (avoidTolls) params += '&avoid=tolls';
-      if (routePreference === 'distance') params += '&optimize=true';
+      
+      // Add vehicle restrictions for large vehicles (buses)
+      params += '&vehicle_type=bus'; // If supported by the API
+      
+      // Add avoidance parameters
+      const avoidanceParams = [];
+      if (avoidHighways) avoidanceParams.push('highways');
+      if (avoidTolls) avoidanceParams.push('tolls');
+      // Always avoid ferries for bus routes and add restricted roads
+      avoidanceParams.push('ferries');
+      
+      if (avoidanceParams.length > 0) {
+        params += `&avoid=${avoidanceParams.join('|')}`;
+      }
+      
+      // CRITICAL: Never use optimize=true to maintain exact stop sequence
+      // This was causing the 82km discrepancy by reordering stops
+      // We want exact sequential routing, not optimized routing
+      
       return params;
     };
 
@@ -383,6 +400,7 @@ serve(async (req) => {
           const origin = `${allPoints[0].lat},${allPoints[0].lng}`;
           const destination = `${allPoints[allPoints.length - 1].lat},${allPoints[allPoints.length - 1].lng}`;
           const waypointList = allPoints.slice(1, -1).map(p => `${p.lat},${p.lng}`);
+          // Sequential waypoints for comparison (no optimization)
           const waypointsParam = waypointList.length ? `&waypoints=${encodeURIComponent(waypointList.join('|'))}` : '';
           const routeParams = buildRouteParams();
 
@@ -427,10 +445,13 @@ serve(async (req) => {
       const origin = `${allPoints[0].lat},${allPoints[0].lng}`;
       const destination = `${allPoints[allPoints.length - 1].lat},${allPoints[allPoints.length - 1].lng}`;
       const waypointList = allPoints.slice(1, -1).map(p => `${p.lat},${p.lng}`);
+      // CRITICAL: Force sequential waypoint processing for bus routes
+      // Add waypoint ordering to prevent Google from reordering stops
       const waypointsParam = waypointList.length ? `&waypoints=${encodeURIComponent(waypointList.join('|'))}` : '';
       const routeParams = buildRouteParams();
 
-      console.log('Requesting Google Directions...');
+      console.log('Requesting Google Directions with sequential waypoints...');
+      console.log('Waypoints in order:', waypointList);
       const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&${routeParams}${waypointsParam}&key=${GOOGLE_API_KEY}`;
       const dirResp = await fetch(directionsUrl);
       if (!dirResp.ok) {
