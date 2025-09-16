@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
@@ -106,6 +107,10 @@ export function QuotationsList({ onRefresh }: Props) {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [hireTypeFilter, setHireTypeFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [approvalFilter, setApprovalFilter] = useState('all');
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -729,30 +734,124 @@ export function QuotationsList({ onRefresh }: Props) {
     },
   ];
 
-  const filteredQuotations = quotations.filter(quotation =>
-    quotation.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    quotation.quotation_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    quotation.pickup_location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredQuotations = quotations.filter(quotation => {
+    // Search filter
+    const matchesSearch = quotation.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      quotation.quotation_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      quotation.pickup_location.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || quotation.status === statusFilter;
+
+    // Hire type filter
+    const matchesHireType = hireTypeFilter === 'all' || quotation.hire_type === hireTypeFilter;
+
+    // Approval filter
+    const matchesApproval = approvalFilter === 'all' || 
+      (approvalFilter === 'pending' && (!quotation.approval_status || quotation.approval_status === 'pending')) ||
+      (approvalFilter === 'approved' && quotation.approval_status === 'approved') ||
+      (approvalFilter === 'rejected' && quotation.approval_status === 'rejected');
+
+    // Date filter
+    let matchesDate = true;
+    if (dateFilter !== 'all') {
+      const pickupDate = new Date(quotation.pickup_datetime);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      switch (dateFilter) {
+        case 'today':
+          const quotationDate = new Date(pickupDate);
+          quotationDate.setHours(0, 0, 0, 0);
+          matchesDate = quotationDate.getTime() === today.getTime();
+          break;
+        case 'upcoming':
+          matchesDate = pickupDate >= today;
+          break;
+        case 'past':
+          matchesDate = pickupDate < today;
+          break;
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesHireType && matchesApproval && matchesDate;
+  });
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Quotations</CardTitle>
-            <div className="flex items-center space-x-2">
+      {/* Enhanced Filters and Search */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  placeholder="Search quotations..."
+                  placeholder="Search by quotation, customer, or location..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
+                  className="pl-10"
                 />
               </div>
             </div>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent className="bg-white z-50">
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="sent">Sent</SelectItem>
+                <SelectItem value="accepted">Accepted</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="declined">Declined</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={hireTypeFilter} onValueChange={setHireTypeFilter}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by hire type" />
+              </SelectTrigger>
+              <SelectContent className="bg-white z-50">
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="Lyceum">Lyceum</SelectItem>
+                <SelectItem value="Internal">Internal</SelectItem>
+                <SelectItem value="Outside">Outside</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={approvalFilter} onValueChange={setApprovalFilter}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by approval" />
+              </SelectTrigger>
+              <SelectContent className="bg-white z-50">
+                <SelectItem value="all">All Approvals</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by date" />
+              </SelectTrigger>
+              <SelectContent className="bg-white z-50">
+                <SelectItem value="all">All Dates</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="upcoming">Upcoming</SelectItem>
+                <SelectItem value="past">Past</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quotations ({filteredQuotations.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
