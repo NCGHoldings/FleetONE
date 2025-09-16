@@ -661,7 +661,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         discount_percentage: data.discountPct,
         discount_amount: Math.round(discountAmount),
         driver_charge: driverCharge,
-        other_expenses: [],
+        other_expenses: otherExpenses.map(expense => ({
+          label: expense.label,
+          amount: expense.amount
+        })),
         commission_amount: Math.round(commissionExpense),
         additional_charges: additionalCharges.map(charge => ({
           type: charge.type,
