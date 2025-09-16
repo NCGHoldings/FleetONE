@@ -200,6 +200,19 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       form.setValue('numberOfPassengers', submissionData.number_of_passengers);
       form.setValue('pickupDateTime', new Date(submissionData.pickup_datetime));
       form.setValue('dropDateTime', new Date(submissionData.drop_datetime));
+      
+      // Load intermediate stops from submission data
+      if (submissionData.intermediate_stops) {
+        try {
+          const stops = Array.isArray(submissionData.intermediate_stops) 
+            ? submissionData.intermediate_stops 
+            : JSON.parse(submissionData.intermediate_stops);
+          setIntermediateStops(stops || []);
+        } catch (e) {
+          console.warn('Failed to parse intermediate stops from submission:', e);
+          setIntermediateStops([]);
+        }
+      }
     }
     
     // If editing, set intermediate stops and additional charges from initial data
