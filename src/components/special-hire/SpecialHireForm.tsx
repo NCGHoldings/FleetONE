@@ -435,10 +435,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
               const watchedHireType = form.watch('hireType');
               
               if (watchedBusTypeId && watchedHireType) {
+                // Use Lyceum rates for both Lyceum and Internal hire types
+                const rateCardHireType = watchedHireType === 'Internal' ? 'Lyceum' : watchedHireType;
                 const { data: rateCards } = await supabase
                   .from('hire_rate_cards')
                   .select('exceeding_km_rate_lkr')
-                  .eq('hire_type', watchedHireType)
+                  .eq('hire_type', rateCardHireType)
                   .eq('bus_type_id', watchedBusTypeId)
                   .eq('is_active', true)
                   .limit(1)
@@ -571,10 +573,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }
 
       // Get rate cards for the hire type and bus type
+      // Use Lyceum rates for both Lyceum and Internal hire types
+      const rateCardHireType = data.hireType === 'Internal' ? 'Lyceum' : data.hireType;
       const { data: allRateCards } = await supabase
         .from('hire_rate_cards')
         .select('*')
-        .eq('hire_type', data.hireType)
+        .eq('hire_type', rateCardHireType)
         .eq('bus_type_id', data.busTypeId)
         .eq('is_active', true)
         .order('from_km');
