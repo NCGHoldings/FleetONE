@@ -1384,50 +1384,50 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   />
 
                 {/* Additional Charges */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="text-base font-semibold text-foreground">
+                <div className="space-y-8">
+                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                    <div className="text-xl font-bold text-foreground">
                       Additional Charges
                     </div>
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="lg"
                       onClick={addAdditionalCharge}
-                      className="text-xs"
+                      className="text-base font-medium px-6 py-3 h-12"
                     >
-                      <Plus className="w-3 h-3 mr-1" />
+                      <Plus className="w-5 h-5 mr-2" />
                       Add Charge
                     </Button>
                   </div>
                   
                   {additionalCharges.map((charge, index) => (
-                     <Card key={charge.id} className="p-6 border-2 border-muted bg-card/50">
-                       <div className="space-y-4">
-                         <div className="flex items-center justify-between mb-4">
-                           <h4 className="text-lg font-medium text-foreground">Additional Charge #{index + 1}</h4>
+                     <Card key={charge.id} className="p-8 border-2 border-muted bg-card shadow-lg">
+                       <div className="space-y-8">
+                         <div className="flex items-center justify-between mb-6">
+                           <h4 className="text-2xl font-bold text-foreground">Additional Charge #{index + 1}</h4>
                            <Button
                              type="button"
                              variant="outline"
-                             size="sm"
+                             size="lg"
                              onClick={() => removeAdditionalCharge(charge.id)}
-                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                             className="text-destructive hover:text-destructive hover:bg-destructive/10 px-6 py-3 h-12"
                            >
-                             <Trash2 className="w-4 h-4 mr-2" />
+                             <Trash2 className="w-5 h-5 mr-2" />
                              Remove
                            </Button>
                          </div>
                          
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                           <div className="space-y-2">
-                             <Label className="text-base font-medium text-foreground">
+                         <div className="grid grid-cols-1 gap-8">
+                           <div className="space-y-4">
+                             <Label className="text-lg font-bold text-foreground">
                                Charge Type *
                              </Label>
                              <Select
                                value={charge.type}
                                onValueChange={(value) => updateAdditionalCharge(charge.id, 'type', value)}
                              >
-                               <SelectTrigger className="h-11">
+                               <SelectTrigger className="h-14 text-lg">
                                  <SelectValue placeholder="Select charge type" />
                                </SelectTrigger>
                                <SelectContent className="bg-popover border border-border z-50">
@@ -1435,7 +1435,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                    <SelectItem 
                                      key={type.value} 
                                      value={type.value}
-                                     className="cursor-pointer hover:bg-accent"
+                                     className="cursor-pointer hover:bg-accent text-lg py-3"
                                    >
                                      {type.label}
                                    </SelectItem>
@@ -1444,8 +1444,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                              </Select>
                            </div>
                            
-                           <div className="space-y-2">
-                             <Label className="text-base font-medium text-foreground">
+                           <div className="space-y-4">
+                             <Label className="text-lg font-bold text-foreground">
                                Amount (LKR) *
                              </Label>
                              <Input
@@ -1455,45 +1455,46 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                value={charge.amount}
                                onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
                                placeholder="Enter amount (e.g., 5000.00)"
-                               className="h-11 text-base"
+                               className="h-14 text-lg"
                              />
                            </div>
                          </div>
                          
                           {charge.type === 'other' && (
-                            <div className="space-y-2">
-                              <Label className="text-base font-medium text-foreground">
+                            <div className="space-y-4">
+                              <Label className="text-lg font-bold text-foreground">
                                 Reason / Description *
                               </Label>
                               <Input
                                 value={charge.reason || ''}
                                 onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
                                 placeholder="Please specify the reason for this charge"
-                                className="h-11 text-base"
+                                className="h-14 text-lg"
                               />
                             </div>
                           )}
                           
                           {/* Per Bus Application Settings */}
-                          <div className="border-t pt-4 space-y-4">
-                            <div className="flex items-center justify-between">
-                              <div className="space-y-1">
-                                <Label className="text-base font-medium text-foreground">
+                          <div className="border-t pt-6 space-y-6">
+                            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                              <div className="space-y-2">
+                                <Label className="text-lg font-bold text-foreground">
                                   Apply to Multiple Buses
                                 </Label>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-base text-muted-foreground">
                                   Enable this if the charge should be applied per bus
                                 </p>
                               </div>
                               <Switch
                                 checked={charge.applyPerBus}
                                 onCheckedChange={(checked) => updateAdditionalCharge(charge.id, 'applyPerBus', checked)}
+                                className="scale-125"
                               />
                             </div>
                             
                             {charge.applyPerBus && (
-                              <div className="space-y-2">
-                                <Label className="text-base font-medium text-foreground">
+                              <div className="space-y-4">
+                                <Label className="text-lg font-bold text-foreground">
                                   Number of Buses *
                                 </Label>
                                 <Input
@@ -1503,9 +1504,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                   value={charge.busesCount}
                                   onChange={(e) => updateAdditionalCharge(charge.id, 'busesCount', parseInt(e.target.value) || 1)}
                                   placeholder="Enter number of buses"
-                                  className="h-11 text-base w-32"
+                                  className="h-14 text-lg w-40"
                                 />
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-base text-muted-foreground">
                                   Maximum: {watchedNumberOfBuses} buses (total buses for this trip)
                                 </p>
                               </div>
@@ -1517,13 +1518,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                  </div>
 
                 {/* Other Expenses (Internal Costs) */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="text-base font-semibold text-foreground">
+                <div className="space-y-8">
+                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                    <div className="space-y-2">
+                      <div className="text-xl font-bold text-foreground">
                         Other Expenses (Internal Costs)
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-base text-muted-foreground">
                         Internal expenses that will be deducted from profit (not charged to customer)
                       </p>
                     </div>
