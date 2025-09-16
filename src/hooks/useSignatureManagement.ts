@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 export interface ApprovalData {
   id?: string;
   document_id: string;
-  approval_type: 'prepared_by' | 'approved_by' | 'received_by';
+  approval_type: 'prepared_by' | 'checked_by' | 'approved_by';
   approver_name: string;
   signature_data?: string;
   approval_date: string;

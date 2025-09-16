@@ -131,7 +131,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         document_type: document.document_type as 'sales_receipt' | 'invoice',
         preparedBy: approvalSignatures.prepared_by,
         approvedBy: approvalSignatures.approved_by,
-        receivedBy: approvalSignatures.received_by,
+        checkedBy: approvalSignatures.checked_by,
       };
 
       // Generate new PDF with signatures

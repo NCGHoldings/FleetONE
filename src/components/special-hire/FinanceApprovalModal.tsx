@@ -55,11 +55,11 @@ export const FinanceApprovalModal = ({
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [signatures, setSignatures] = useState({
     prepared_by: null as any,
+    checked_by: null as any,
     approved_by: null as any,
-    received_by: null as any,
   });
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
-  const [currentSignatureType, setCurrentSignatureType] = useState<'prepared_by' | 'approved_by' | 'received_by'>('prepared_by');
+  const [currentSignatureType, setCurrentSignatureType] = useState<'prepared_by' | 'checked_by' | 'approved_by'>('prepared_by');
   const [existingSignatures, setExistingSignatures] = useState<any>({});
   
   const { getDocumentsByQuotation, approveDocument } = useDocumentManagement();
@@ -385,7 +385,7 @@ export const FinanceApprovalModal = ({
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                {(['prepared_by', 'approved_by', 'received_by'] as const).map((type) => {
+                {(['prepared_by', 'checked_by', 'approved_by'] as const).map((type) => {
                   const existingSig = existingSignatures[type];
                   const currentSig = signatures[type];
                   const activeSig = currentSig || existingSig;

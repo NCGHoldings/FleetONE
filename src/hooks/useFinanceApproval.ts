@@ -144,7 +144,7 @@ export const useFinanceApproval = () => {
           document_type: doc.document_type as 'sales_receipt' | 'invoice',
           preparedBy: docApprovals.prepared_by,
           approvedBy: docApprovals.approved_by,
-          receivedBy: docApprovals.received_by,
+          checkedBy: docApprovals.checked_by,
         };
 
         // Generate approved PDF

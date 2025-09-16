@@ -20,7 +20,7 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
 }) => {
   const [approvals, setApprovals] = useState<ApprovalData[]>([]);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
-  const [currentApprovalType, setCurrentApprovalType] = useState<'prepared_by' | 'approved_by' | 'received_by'>('prepared_by');
+  const [currentApprovalType, setCurrentApprovalType] = useState<'prepared_by' | 'checked_by' | 'approved_by'>('prepared_by');
   const [editingApproval, setEditingApproval] = useState<ApprovalData | undefined>();
   
   const { getDocumentApprovals, deleteApproval, isLoading } = useSignatureManagement();
@@ -35,13 +35,13 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
       // Type cast the approvals to match our interface
       const typedApprovals = result.approvals.map(approval => ({
         ...approval,
-        approval_type: approval.approval_type as 'prepared_by' | 'approved_by' | 'received_by'
+        approval_type: approval.approval_type as 'prepared_by' | 'checked_by' | 'approved_by'
       }));
       setApprovals(typedApprovals);
     }
   };
 
-  const handleAddSignature = (approvalType: 'prepared_by' | 'approved_by' | 'received_by') => {
+  const handleAddSignature = (approvalType: 'prepared_by' | 'checked_by' | 'approved_by') => {
     setCurrentApprovalType(approvalType);
     setEditingApproval(undefined);
     setShowSignatureModal(true);
@@ -72,17 +72,17 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
   const getApprovalTypeName = (type: string) => {
     switch (type) {
       case 'prepared_by': return 'Prepared By';
-      case 'approved_by': return 'Approved By';  
-      case 'received_by': return 'Received By';
+      case 'checked_by': return 'Checked By';  
+      case 'approved_by': return 'Approved By';
       default: return type;
     }
   };
 
-  const getApprovalByType = (type: 'prepared_by' | 'approved_by' | 'received_by') => {
+  const getApprovalByType = (type: 'prepared_by' | 'checked_by' | 'approved_by') => {
     return approvals.find(a => a.approval_type === type);
   };
 
-  const approvalTypes: Array<'prepared_by' | 'approved_by' | 'received_by'> = ['prepared_by', 'approved_by', 'received_by'];
+  const approvalTypes: Array<'prepared_by' | 'checked_by' | 'approved_by'> = ['prepared_by', 'checked_by', 'approved_by'];
 
   return (
     <div className="space-y-4">

@@ -39,8 +39,8 @@ export interface InvoiceData {
   document_type?: 'sales_receipt' | 'invoice';
   // Approval signatures
   preparedBy?: ApprovalSignature;
+  checkedBy?: ApprovalSignature;
   approvedBy?: ApprovalSignature;
-  receivedBy?: ApprovalSignature;
 }
 
 export const generateInvoiceHTML = (data: InvoiceData): string => {
@@ -141,23 +141,32 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         </p>
 
         <div style="margin-top: 30px; display: flex; justify-content: space-between;">
-          <div style="width: 45%;">
+          <div style="width: 30%;">
             <b>Prepared by :</b><br>
-            <p style="margin: 5px 0;">Name: ${data.preparedBy?.approver_name || '.................................'}</p>
+            <p style="margin: 5px 0;">Name: ${data.preparedBy?.approver_name || '.........................'}</p>
             ${data.preparedBy?.signature_data 
-              ? `<p style="margin: 5px 0;"><img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; border: 1px solid #ddd;"></p>` 
-              : '<p style="margin: 5px 0;">Signature: ......................................</p>'
+              ? `<p style="margin: 5px 0;"><img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 120px; max-height: 40px; border: 1px solid #ddd;"></p>` 
+              : '<p style="margin: 5px 0;">Signature: .........................</p>'
             }
             <p style="margin: 5px 0;">Date: ${data.preparedBy?.approval_date || currentDate}</p>
           </div>
-          <div style="width: 45%;">
-            <b>Received by :</b><br>
-            <p style="margin: 5px 0;">Name: ${data.receivedBy?.approver_name || '....................................'}</p>
-            ${data.receivedBy?.signature_data 
-              ? `<p style="margin: 5px 0;"><img src="${data.receivedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; border: 1px solid #ddd;"></p>` 
-              : '<p style="margin: 5px 0;">Signature: ......................................</p>'
+          <div style="width: 30%;">
+            <b>Checked by :</b><br>
+            <p style="margin: 5px 0;">Name: ${data.checkedBy?.approver_name || '.........................'}</p>
+            ${data.checkedBy?.signature_data 
+              ? `<p style="margin: 5px 0;"><img src="${data.checkedBy.signature_data}" alt="Signature" style="max-width: 120px; max-height: 40px; border: 1px solid #ddd;"></p>` 
+              : '<p style="margin: 5px 0;">Signature: .........................</p>'
             }
-            <p style="margin: 5px 0;">Date: ${data.receivedBy?.approval_date || '....................................'}</p>
+            <p style="margin: 5px 0;">Date: ${data.checkedBy?.approval_date || '.........................'}</p>
+          </div>
+          <div style="width: 30%;">
+            <b>Approved by :</b><br>
+            <p style="margin: 5px 0;">Name: ${data.approvedBy?.approver_name || '.........................'}</p>
+            ${data.approvedBy?.signature_data 
+              ? `<p style="margin: 5px 0;"><img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 120px; max-height: 40px; border: 1px solid #ddd;"></p>` 
+              : '<p style="margin: 5px 0;">Signature: .........................</p>'
+            }
+            <p style="margin: 5px 0;">Date: ${data.approvedBy?.approval_date || '.........................'}</p>
           </div>
         </div>
 
@@ -300,17 +309,26 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           <div style="display: flex; justify-content: space-between; margin-top: 50px; font-size: 14px;">
             <div style="text-align: center;">
               ${data.preparedBy?.signature_data 
-                ? `<img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 200px; max-height: 60px; margin-bottom: 10px; border: 1px solid #ddd;">` 
-                : '<hr style="width: 200px;">'
+                ? `<img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin-bottom: 10px; border: 1px solid #ddd;">` 
+                : '<hr style="width: 150px;">'
               }
               ${data.preparedBy?.approver_name || 'Darshini Pallewela'}<br>
               Prepared By<br>
               ${data.preparedBy?.approval_date || currentDate}
             </div>
             <div style="text-align: center;">
+              ${data.checkedBy?.signature_data 
+                ? `<img src="${data.checkedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin-bottom: 10px; border: 1px solid #ddd;">` 
+                : '<hr style="width: 150px;">'
+              }
+              ${data.checkedBy?.approver_name || 'Kasun Perera'}<br>
+              Checked By<br>
+              ${data.checkedBy?.approval_date || currentDate}
+            </div>
+            <div style="text-align: center;">
               ${data.approvedBy?.signature_data 
-                ? `<img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 200px; max-height: 60px; margin-bottom: 10px; border: 1px solid #ddd;">` 
-                : '<hr style="width: 200px;">'
+                ? `<img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin-bottom: 10px; border: 1px solid #ddd;">` 
+                : '<hr style="width: 150px;">'
               }
               ${data.approvedBy?.approver_name || 'Sithara Thennakoon'}<br>
               Approved By<br>

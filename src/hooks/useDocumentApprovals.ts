@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 export interface DocumentApproval {
   id: string;
   document_id: string;
-  approval_type: 'prepared_by' | 'approved_by' | 'received_by';
+  approval_type: 'prepared_by' | 'checked_by' | 'approved_by';
   approver_name: string;
   signature_data?: string;
   approval_date: string;
@@ -38,7 +38,7 @@ export const useDocumentApprovals = () => {
 
   const saveApproval = async (
     documentId: string,
-    approvalType: 'prepared_by' | 'approved_by' | 'received_by',
+    approvalType: 'prepared_by' | 'checked_by' | 'approved_by',
     approverName: string,
     approvalDate: Date,
     signatureData?: string

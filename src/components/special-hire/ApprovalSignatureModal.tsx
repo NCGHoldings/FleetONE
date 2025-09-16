@@ -13,7 +13,7 @@ interface ApprovalSignatureModalProps {
   isOpen: boolean;
   onClose: () => void;
   documentId: string;
-  approvalType: 'prepared_by' | 'approved_by' | 'received_by';
+  approvalType: 'prepared_by' | 'checked_by' | 'approved_by';
   title: string;
   onSave: (approvalData: ApprovalData) => void;
   existingApproval?: ApprovalData;

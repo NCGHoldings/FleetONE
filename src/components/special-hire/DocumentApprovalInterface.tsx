@@ -20,7 +20,7 @@ export const DocumentApprovalInterface: React.FC<DocumentApprovalInterfaceProps>
 }) => {
   const [approvals, setApprovals] = useState<DocumentApproval[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [currentApprovalType, setCurrentApprovalType] = useState<'prepared_by' | 'approved_by' | 'received_by'>('prepared_by');
+  const [currentApprovalType, setCurrentApprovalType] = useState<'prepared_by' | 'checked_by' | 'approved_by'>('prepared_by');
   const { getDocumentApprovals, saveApproval, isLoading } = useDocumentApprovals();
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export const DocumentApprovalInterface: React.FC<DocumentApprovalInterfaceProps>
     onApprovalsUpdate?.(data);
   };
 
-  const handleApprovalClick = (type: 'prepared_by' | 'approved_by' | 'received_by') => {
+  const handleApprovalClick = (type: 'prepared_by' | 'checked_by' | 'approved_by') => {
     setCurrentApprovalType(type);
     setShowModal(true);
   };
@@ -52,11 +52,11 @@ export const DocumentApprovalInterface: React.FC<DocumentApprovalInterfaceProps>
     }
   };
 
-  const getApprovalByType = (type: 'prepared_by' | 'approved_by' | 'received_by') => {
+  const getApprovalByType = (type: 'prepared_by' | 'checked_by' | 'approved_by') => {
     return approvals.find(approval => approval.approval_type === type);
   };
 
-  const getApprovalStatus = (type: 'prepared_by' | 'approved_by' | 'received_by') => {
+  const getApprovalStatus = (type: 'prepared_by' | 'checked_by' | 'approved_by') => {
     const approval = getApprovalByType(type);
     if (approval) {
       return { status: 'completed', approval };
@@ -66,8 +66,8 @@ export const DocumentApprovalInterface: React.FC<DocumentApprovalInterfaceProps>
 
   const approvalTypes = [
     { type: 'prepared_by' as const, title: 'Prepared By', description: 'Document preparer signature' },
+    { type: 'checked_by' as const, title: 'Checked By', description: 'Document reviewer signature' },
     { type: 'approved_by' as const, title: 'Approved By', description: 'Finance/Supervisor approval', requiresFinance: true },
-    { type: 'received_by' as const, title: 'Received By', description: 'Customer/Recipient signature' },
   ];
 
   return (

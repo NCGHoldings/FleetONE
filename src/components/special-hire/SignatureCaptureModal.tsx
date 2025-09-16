@@ -16,7 +16,7 @@ interface SignatureCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: ApprovalData) => void;
-  approvalType: 'prepared_by' | 'approved_by' | 'received_by';
+  approvalType: 'prepared_by' | 'checked_by' | 'approved_by';
   title: string;
   documentId: string;
 }
@@ -25,7 +25,7 @@ export interface ApprovalData {
   approverName: string;
   signatureData?: string;
   approvalDate: Date;
-  approvalType: 'prepared_by' | 'approved_by' | 'received_by';
+  approvalType: 'prepared_by' | 'checked_by' | 'approved_by';
 }
 
 export const SignatureCaptureModal: React.FC<SignatureCaptureModalProps> = ({
