@@ -1092,7 +1092,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                             type="number" 
                             min="1"
                             {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : '')}
                           />
                         </FormControl>
                         <FormMessage />
@@ -1226,7 +1226,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                             type="number" 
                             min="1"
                             {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : '')}
                           />
                         </FormControl>
                         <FormMessage />
@@ -1502,7 +1502,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                   min="1"
                                   max={watchedNumberOfBuses}
                                   value={charge.busesCount}
-                                  onChange={(e) => updateAdditionalCharge(charge.id, 'busesCount', parseInt(e.target.value) || 1)}
+                                  onChange={(e) => updateAdditionalCharge(charge.id, 'busesCount', e.target.value ? parseInt(e.target.value) : 1)}
                                   placeholder="Enter number of buses"
                                   className="h-14 text-lg w-40"
                                 />
