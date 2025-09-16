@@ -333,8 +333,17 @@ export function CostBreakdown({ data }: Props) {
             </div>
             <div className="text-center">
               <div className="font-medium text-orange-600">
-                {safeData.rateCardDetails?.availableHours?.toFixed(1) || 
-                 (safeData.kmTrip > 0 ? (safeData.kmTrip / 10).toFixed(1) : '0.0')} hrs
+                {(() => {
+                  const additionalDistance = Array.isArray(data.additionalCharges) 
+                    ? data.additionalCharges
+                        .filter(charge => charge.type === 'additional_distance')
+                        .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+                    : 0;
+                  
+                  const totalDistanceForHours = safeData.kmTrip + additionalDistance;
+                  return safeData.rateCardDetails?.availableHours?.toFixed(1) || 
+                         (totalDistanceForHours > 0 ? (totalDistanceForHours / 10).toFixed(1) : '0.0');
+                })()} hrs
               </div>
               <div className="text-muted-foreground">Available</div>
             </div>
