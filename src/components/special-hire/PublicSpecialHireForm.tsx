@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { WheelTimePicker } from "@/components/ui/wheel-time-picker";
 import { CalendarIcon, CheckCircle, Send, Bus, Plus, X, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -523,18 +524,17 @@ export default function PublicSpecialHireForm() {
                         {formData.pickupDateTime && (
                           <div className="p-3 border-t">
                             <Label htmlFor="pickupTime">Time:</Label>
-                            <Input
-                              id="pickupTime"
-                              type="time"
+                            <WheelTimePicker
                               value={format(formData.pickupDateTime, "HH:mm")}
-                              onChange={(e) => {
+                              onChange={(time) => {
                                 if (formData.pickupDateTime) {
-                                  const [hours, minutes] = e.target.value.split(':');
+                                  const [hours, minutes] = time.split(':');
                                   const newDate = new Date(formData.pickupDateTime);
                                   newDate.setHours(parseInt(hours), parseInt(minutes));
                                   setFormData(prev => ({ ...prev, pickupDateTime: newDate }));
                                 }
                               }}
+                              className="mt-2"
                             />
                           </div>
                         )}
@@ -574,18 +574,17 @@ export default function PublicSpecialHireForm() {
                         {formData.dropDateTime && (
                           <div className="p-3 border-t">
                             <Label htmlFor="dropTime">Time:</Label>
-                            <Input
-                              id="dropTime"
-                              type="time"
+                            <WheelTimePicker
                               value={format(formData.dropDateTime, "HH:mm")}
-                              onChange={(e) => {
+                              onChange={(time) => {
                                 if (formData.dropDateTime) {
-                                  const [hours, minutes] = e.target.value.split(':');
+                                  const [hours, minutes] = time.split(':');
                                   const newDate = new Date(formData.dropDateTime);
                                   newDate.setHours(parseInt(hours), parseInt(minutes));
                                   setFormData(prev => ({ ...prev, dropDateTime: newDate }));
                                 }
                               }}
+                              className="mt-2"
                             />
                           </div>
                         )}
