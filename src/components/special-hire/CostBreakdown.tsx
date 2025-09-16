@@ -161,24 +161,51 @@ export function CostBreakdown({ data }: Props) {
         {/* Distance Breakdown */}
         <div>
           <h4 className="font-medium mb-2">Distance Analysis</h4>
-          <div className="grid grid-cols-4 gap-4 text-sm">
-            <div className="text-center">
-              <div className="font-medium text-blue-600">{safeData.kmParkingToPickup} km</div>
-              <div className="text-muted-foreground">Parking → Pickup</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-green-600">{safeData.kmTrip} km</div>
-              <div className="text-muted-foreground">Trip Distance</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-blue-600">{safeData.kmDropToParking} km</div>
-              <div className="text-muted-foreground">Drop → Parking</div>
-            </div>
-            <div className="text-center">
-              <div className="font-medium text-orange-600">{safeData.totalTripDistance.toFixed(1)} km</div>
-              <div className="text-muted-foreground">Total Distance</div>
-            </div>
-          </div>
+          {(() => {
+            // Calculate additional distance from charges
+            const additionalDistance = Array.isArray(data.additionalCharges) 
+              ? data.additionalCharges
+                  .filter(charge => charge.type === 'additional_distance')
+                  .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+              : 0;
+            
+            const hasAdditionalDistance = additionalDistance > 0;
+            const finalTotalDistance = safeData.totalTripDistance + additionalDistance;
+            
+            return (
+              <>
+                <div className={`grid ${hasAdditionalDistance ? 'grid-cols-5' : 'grid-cols-4'} gap-4 text-sm`}>
+                  <div className="text-center">
+                    <div className="font-medium text-blue-600">{safeData.kmParkingToPickup} km</div>
+                    <div className="text-muted-foreground">Parking → Pickup</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium text-green-600">{safeData.kmTrip} km</div>
+                    <div className="text-muted-foreground">Trip Distance</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium text-blue-600">{safeData.kmDropToParking} km</div>
+                    <div className="text-muted-foreground">Drop → Parking</div>
+                  </div>
+                  {hasAdditionalDistance && (
+                    <div className="text-center">
+                      <div className="font-medium text-purple-600">+{additionalDistance} km</div>
+                      <div className="text-muted-foreground">Additional KM</div>
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <div className="font-medium text-orange-600">{finalTotalDistance.toFixed(1)} km</div>
+                    <div className="text-muted-foreground">Total Distance</div>
+                  </div>
+                </div>
+                {hasAdditionalDistance && (
+                  <div className="text-xs text-muted-foreground mt-2 text-center">
+                    Base: {safeData.totalTripDistance.toFixed(1)} km + Additional: {additionalDistance} km = Total: {finalTotalDistance.toFixed(1)} km
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         <Separator />
