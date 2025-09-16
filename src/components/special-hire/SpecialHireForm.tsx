@@ -34,7 +34,7 @@ const formSchema = z.object({
   
   // Trip Details
   busTypeId: z.string().min(1, 'Bus type is required'),
-  hireType: z.enum(['Outside', 'Lyceum']),
+  hireType: z.enum(['Outside', 'Lyceum', 'Internal']),
   numberOfBuses: z.number().min(1, 'At least 1 bus is required'),
   pickupLocation: z.string().min(1, 'Pickup location is required'),
   dropLocation: z.string().min(1, 'Drop location is required'),
@@ -191,7 +191,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       form.setValue('customerPhone', submissionData.customer_phone);
       form.setValue('customerEmail', submissionData.customer_email || '');
       form.setValue('specialRequest', submissionData.special_request || '');
-      form.setValue('hireType', submissionData.hire_type as 'Outside' | 'Lyceum');
+      form.setValue('hireType', submissionData.hire_type as 'Outside' | 'Lyceum' | 'Internal');
       form.setValue('numberOfBuses', submissionData.number_of_buses);
       form.setValue('pickupLocation', submissionData.pickup_location);
       form.setValue('dropLocation', submissionData.drop_location);
@@ -1029,6 +1029,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                           <SelectContent>
                             <SelectItem value="Outside">Outside</SelectItem>
                             <SelectItem value="Lyceum">Lyceum</SelectItem>
+                            <SelectItem value="Internal">Internal</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />

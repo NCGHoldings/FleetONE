@@ -553,6 +553,7 @@ export function CostCalculator() {
                 <SelectContent>
                   <SelectItem value="Outside">Outside</SelectItem>
                   <SelectItem value="Lyceum">Lyceum</SelectItem>
+                  <SelectItem value="Internal">Internal</SelectItem>
                 </SelectContent>
               </Select>
             </div>

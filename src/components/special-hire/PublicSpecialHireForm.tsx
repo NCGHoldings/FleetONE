@@ -371,6 +371,7 @@ export default function PublicSpecialHireForm() {
                       <SelectContent>
                         <SelectItem value="Outside">Outside Hire</SelectItem>
                         <SelectItem value="Lyceum">Lyceum Hire</SelectItem>
+                        <SelectItem value="Internal">Internal Hire</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
