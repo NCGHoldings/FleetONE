@@ -352,10 +352,23 @@ export function CostBreakdown({ data }: Props) {
             </div>
           </div>
           <div className="text-xs text-muted-foreground mt-1 text-center">
-            {safeData.rateCardDetails?.availableHours ? 
-              `Available: ${safeData.kmTrip}km ÷ 10 kmph = ${safeData.rateCardDetails.availableHours.toFixed(1)} hrs` :
-              safeData.kmTrip > 0 ? `Available: ${safeData.kmTrip}km ÷ 10 kmph = ${(safeData.kmTrip / 10).toFixed(1)} hrs` : ''
-            }
+            {(() => {
+              const additionalDistance = Array.isArray(data.additionalCharges) 
+                ? data.additionalCharges
+                    .filter(charge => charge.type === 'additional_distance')
+                    .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+                : 0;
+              
+              const availableHours = safeData.rateCardDetails?.availableHours || (safeData.kmTrip / 10);
+              
+              if (additionalDistance > 0) {
+                return `Available: ${safeData.kmTrip}km + ${additionalDistance}km additional = ${(safeData.kmTrip + additionalDistance).toFixed(1)}km total, calculated as ${safeData.kmTrip}km ÷ 10 kmph = ${availableHours.toFixed(1)} hrs`;
+              } else {
+                return safeData.rateCardDetails?.availableHours ? 
+                  `Available: ${safeData.kmTrip}km ÷ 10 kmph = ${safeData.rateCardDetails.availableHours.toFixed(1)} hrs` :
+                  safeData.kmTrip > 0 ? `Available: ${safeData.kmTrip}km ÷ 10 kmph = ${(safeData.kmTrip / 10).toFixed(1)} hrs` : '';
+              }
+            })()}
           </div>
         </div>
 
