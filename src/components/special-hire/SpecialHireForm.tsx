@@ -201,16 +201,18 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       form.setValue('pickupDateTime', new Date(submissionData.pickup_datetime));
       form.setValue('dropDateTime', new Date(submissionData.drop_datetime));
       
-      // Load intermediate stops from submission data
-      if (submissionData.intermediate_stops) {
-        try {
-          const stops = Array.isArray(submissionData.intermediate_stops) 
-            ? submissionData.intermediate_stops 
-            : JSON.parse(submissionData.intermediate_stops);
-          setIntermediateStops(stops || []);
-        } catch (e) {
-          console.warn('Failed to parse intermediate stops from submission:', e);
-          setIntermediateStops([]);
+      // Parse intermediate places from special_request field
+      if (submissionData.special_request) {
+        const intermediateMatch = submissionData.special_request.match(/Intermediate places:\s*(.+?)(?:\n|$)/);
+        if (intermediateMatch && intermediateMatch[1]) {
+          const places = intermediateMatch[1]
+            .split(',')
+            .map((place, index) => ({
+              id: `temp-${index}`,
+              location: place.trim()
+            }))
+            .filter(stop => stop.location);
+          setIntermediateStops(places);
         }
       }
     }
