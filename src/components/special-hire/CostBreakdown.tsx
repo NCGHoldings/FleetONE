@@ -52,6 +52,7 @@ interface CostData {
   additionalCharges?: Array<{ 
     type: string; 
     amount: number; 
+    distance?: number; // For additional_distance type
     reason?: string;
     applyPerBus?: boolean;
     busesCount?: number;
@@ -353,6 +354,7 @@ export function CostBreakdown({ data }: Props) {
                     highway: 'Highway Charges',
                     additional_fuel: 'Additional Fuel Costs',
                     driver_charges: 'Driver Charges',
+                    additional_distance: 'Additional Distance/KM',
                     other: charge.reason || 'Other'
                   };
                   
@@ -361,9 +363,16 @@ export function CostBreakdown({ data }: Props) {
                     : charge.amount;
                     
                   const displayLabel = chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type;
-                  const busInfo = (charge.applyPerBus && charge.busesCount) 
-                    ? ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`
-                    : '';
+                  
+                  let busInfo = '';
+                  if (charge.applyPerBus && charge.busesCount) {
+                    busInfo = ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`;
+                  }
+                  
+                  // Special display for distance-based charges
+                  if (charge.type === 'additional_distance' && charge.distance) {
+                    busInfo = ` (${charge.distance} KM × Rate)${busInfo}`;
+                  }
                   
                   return (
                     <div key={index} className="flex justify-between">

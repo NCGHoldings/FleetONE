@@ -63,6 +63,7 @@ const additionalChargeTypes = [
   { value: 'highway', label: 'Highway Charges' },
   { value: 'additional_fuel', label: 'Additional Fuel Costs' },
   { value: 'driver_charges', label: 'Driver Charges' },
+  { value: 'additional_distance', label: 'Additional Distance/KM' },
   { value: 'other', label: 'Other' }
 ];
 
@@ -70,6 +71,7 @@ interface AdditionalCharge {
   id: string;
   type: string;
   amount: number;
+  distance?: number; // For additional_distance type
   reason?: string;
   applyPerBus: boolean;
   busesCount: number;
@@ -404,13 +406,54 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     setAdditionalCharges(charges => [...charges, newCharge]);
   };
 
-  const updateAdditionalCharge = (id: string, field: keyof AdditionalCharge, value: any) => {
+  const updateAdditionalCharge = async (id: string, field: keyof AdditionalCharge, value: any) => {
     setAdditionalCharges(charges => 
-      charges.map(charge => 
-        charge.id === id 
-          ? { ...charge, [field]: value }
-          : charge
-      )
+      charges.map(charge => {
+        if (charge.id === id) {
+          const updatedCharge = { ...charge, [field]: value };
+          
+          // Auto-calculate amount for additional_distance type
+          if (updatedCharge.type === 'additional_distance' && field === 'distance' && value > 0) {
+            // Get the exceeding KM rate from hire rate cards
+            const calculateDistanceAmount = async () => {
+              const watchedBusTypeId = form.watch('busTypeId');
+              const watchedHireType = form.watch('hireType');
+              
+              if (watchedBusTypeId && watchedHireType) {
+                const { data: rateCards } = await supabase
+                  .from('hire_rate_cards')
+                  .select('exceeding_km_rate_lkr')
+                  .eq('hire_type', watchedHireType)
+                  .eq('bus_type_id', watchedBusTypeId)
+                  .eq('is_active', true)
+                  .limit(1)
+                  .single();
+                
+                if (rateCards && rateCards.exceeding_km_rate_lkr) {
+                  const calculatedAmount = value * rateCards.exceeding_km_rate_lkr;
+                  setAdditionalCharges(prevCharges => 
+                    prevCharges.map(prevCharge => 
+                      prevCharge.id === id 
+                        ? { ...prevCharge, amount: calculatedAmount }
+                        : prevCharge
+                    )
+                  );
+                }
+              }
+            };
+            calculateDistanceAmount();
+          }
+          
+          // Reset amount when changing away from additional_distance type
+          if (field === 'type' && charge.type === 'additional_distance' && value !== 'additional_distance') {
+            updatedCharge.amount = 0;
+            updatedCharge.distance = 0;
+          }
+          
+          return updatedCharge;
+        }
+        return charge;
+      })
     );
   };
 
@@ -576,6 +619,14 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
       }
       
+      // Calculate total additional distance from additional_distance charges
+      const totalAdditionalDistance = additionalCharges
+        .filter(charge => charge.type === 'additional_distance')
+        .reduce((sum, charge) => sum + (charge.distance || 0), 0);
+
+      // Use trip distance + additional distance for extra time calculations
+      const totalTripDistanceForCalculation = tripDistance + totalAdditionalDistance;
+
       // Calculate extra time charges for Outside hire type
       let overtimeCharge = 0;
       let overnightCharge = 0;
@@ -584,7 +635,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       if (data.hireType === 'Outside') {
         // Use only quoted distance (tripDistance) for available hours calculation
         const extraTimeResult = calculateExtraTimeCharge(
-          tripDistance,
+          totalTripDistanceForCalculation, // Include additional distance
           data.pickupDateTime,
           data.dropDateTime,
           {
@@ -635,9 +686,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         ? baseCustomerTotal * (data.discountPct / 100)
         : data.discountAmount;
       
-      // Final customer total with additional charges
+      // Final customer total with additional charges (handle distance-based charges)
       const totalAdditionalCharges = additionalCharges.reduce((sum, charge) => {
-        return sum + (charge.applyPerBus ? charge.amount * charge.busesCount : charge.amount);
+        let chargeAmount = charge.type === 'additional_distance' ? (charge.amount || 0) : charge.amount;
+        return sum + (charge.applyPerBus ? chargeAmount * charge.busesCount : chargeAmount);
       }, 0);
       const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount + totalAdditionalCharges;
       
@@ -668,7 +720,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         commission_amount: Math.round(commissionExpense),
         additional_charges: additionalCharges.map(charge => ({
           type: charge.type,
-          amount: charge.amount,
+          amount: charge.type === 'additional_distance' ? (charge.amount || 0) : charge.amount,
+          distance: charge.type === 'additional_distance' ? charge.distance : undefined,
           reason: charge.reason || additionalChargeTypes.find(t => t.value === charge.type)?.label,
           applyPerBus: charge.applyPerBus,
           busesCount: charge.busesCount
@@ -1140,36 +1193,66 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                  </div>
 
 
-                 {/* Intermediate Stops */}
-                 <div className="space-y-4">
-                   <div className="flex items-center justify-between">
-                     <label className="text-sm font-medium">Intermediate Stops</label>
-                     <Button type="button" variant="outline" size="sm" onClick={addIntermediateStop}>
-                       <Plus className="h-4 w-4 mr-2" />
-                       Add Stop
-                     </Button>
-                   </div>
-                    {intermediateStops.map((stop) => (
-                      <div key={stop.id} className="flex items-start gap-3">
-                        <div className="flex-1 min-w-0">
-                          <LocationAutocomplete
-                            value={stop.location}
-                            onChange={(value) => updateIntermediateStop(stop.id, value)}
-                            placeholder="Enter intermediate location"
-                            className="w-full min-w-[400px]"
-                          />
-                        </div>
+                  {/* Intermediate Stops */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Intermediate Stops</label>
+                      <Button type="button" variant="outline" size="sm" onClick={addIntermediateStop}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Stop
+                      </Button>
+                    </div>
+
+                    {intermediateStops.map((stop, index) => (
+                      <div key={stop.id} className="flex items-center gap-2">
+                        <LocationAutocomplete
+                          value={stop.location}
+                          onChange={(value) => updateIntermediateStop(stop.id, value)}
+                          placeholder={`Stop ${index + 1} location`}
+                          className="flex-1"
+                        />
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => removeIntermediateStop(stop.id)}
-                          className="flex-shrink-0 mt-1"
                         >
-                          <X className="h-4 w-4" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     ))}
+
+                    {/* Additional Distance Summary */}
+                    {additionalCharges.some(charge => charge.type === 'additional_distance' && charge.distance > 0) && (
+                      <div className="mt-4 p-4 bg-muted/30 rounded-lg border">
+                        <h4 className="text-sm font-medium text-foreground mb-2">Route Distance Summary</h4>
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          <div className="flex justify-between">
+                            <span>Base trip distance:</span>
+                            <span>{costData ? `${costData.kmTrip} KM` : 'Calculate to see'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Additional distance:</span>
+                            <span>
+                              {additionalCharges
+                                .filter(charge => charge.type === 'additional_distance')
+                                .reduce((sum, charge) => sum + (charge.distance || 0), 0)} KM
+                            </span>
+                          </div>
+                          <div className="flex justify-between font-medium text-foreground border-t pt-1">
+                            <span>Total trip distance:</span>
+                            <span>
+                              {costData 
+                                ? `${costData.kmTrip + additionalCharges
+                                    .filter(charge => charge.type === 'additional_distance')
+                                    .reduce((sum, charge) => sum + (charge.distance || 0), 0)} KM`
+                                : 'Calculate to see'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                 {/* Multi-parking bus details */}
@@ -1444,20 +1527,44 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                              </Select>
                            </div>
                            
-                           <div className="space-y-4">
-                             <Label className="text-lg font-bold text-foreground">
-                               Amount (LKR) *
-                             </Label>
-                             <Input
-                               type="number"
-                               min="0"
-                               step="0.01"
-                               value={charge.amount}
-                               onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
-                               placeholder="Enter amount (e.g., 5000.00)"
-                               className="h-14 text-lg"
-                             />
-                           </div>
+                            {charge.type === 'additional_distance' ? (
+                              <div className="space-y-4">
+                                <Label className="text-lg font-bold text-foreground">
+                                  Additional Distance (KM) *
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.1"
+                                  value={charge.distance || ''}
+                                  onChange={(e) => updateAdditionalCharge(charge.id, 'distance', parseFloat(e.target.value) || 0)}
+                                  placeholder="Enter additional kilometers (e.g., 50)"
+                                  className="h-14 text-lg"
+                                />
+                                {charge.distance && charge.distance > 0 && (
+                                  <div className="p-4 bg-muted/30 rounded-lg">
+                                    <p className="text-sm text-muted-foreground">
+                                      Auto-calculated charge: {charge.distance} KM × Exceeding Rate = LKR {(charge.amount || 0).toLocaleString()}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                <Label className="text-lg font-bold text-foreground">
+                                  Amount (LKR) *
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={charge.amount}
+                                  onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
+                                  placeholder="Enter amount (e.g., 5000.00)"
+                                  className="h-14 text-lg"
+                                />
+                              </div>
+                            )}
                          </div>
                          
                           {charge.type === 'other' && (
