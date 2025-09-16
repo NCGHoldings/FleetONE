@@ -11,6 +11,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Users, UserPlus, Shield, Edit, Trash2, Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { PageAccessModal } from "@/components/staff/PageAccessModal";
@@ -26,6 +27,57 @@ interface Profile {
   hire_date: string;
   status: string;
   roles: string[];
+}
+
+const availableRoles = [
+  'staff', 'driver', 'conductor', 'mechanic', 'supervisor', 'finance', 'admin', 'super_admin'
+];
+
+interface RoleManagementCellProps {
+  staff: Profile;
+  onToggleRole: (userId: string, role: string, shouldHaveRole: boolean) => void;
+  isSuperAdmin: boolean;
+  onOpenPageAccess: () => void;
+}
+
+function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAccess }: RoleManagementCellProps) {
+  const userRoles = staff.roles;
+  
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2 max-w-xs">
+        {availableRoles.map((role) => {
+          if (role === 'super_admin' && !isSuperAdmin) return null;
+          
+          const hasRole = userRoles.includes(role);
+          return (
+            <div key={role} className="flex items-center space-x-2">
+              <Checkbox
+                id={`${staff.user_id}-${role}`}
+                checked={hasRole}
+                onCheckedChange={(checked) => 
+                  onToggleRole(staff.user_id, role as any, !!checked)
+                }
+              />
+              <Label 
+                htmlFor={`${staff.user_id}-${role}`}
+                className="text-xs font-medium capitalize cursor-pointer"
+              >
+                {role.replace('_', ' ')}
+              </Label>
+            </div>
+          );
+        })}
+      </div>
+      
+      {isSuperAdmin && (
+        <Button variant="outline" size="sm" onClick={onOpenPageAccess} className="mt-2">
+          <Lock className="h-4 w-4 mr-2" />
+          Page Access
+        </Button>
+      )}
+    </div>
+  );
 }
 
 export default function StaffManagement() {
@@ -133,21 +185,32 @@ export default function StaffManagement() {
     }
   };
 
-  const handleUpdateRole = async (userId: string, newRole: string) => {
+  const handleToggleRole = async (userId: string, role: string, shouldHaveRole: boolean) => {
     if (!isSuperAdmin) {
       toast.error('Access denied - Super Admin only');
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role: newRole as any })
-        .eq('user_id', userId);
-
-      if (error) throw error;
+      if (shouldHaveRole) {
+        // Add role if not exists
+        const { error } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: role as any });
+        
+        if (error && !error.message.includes('duplicate')) throw error;
+      } else {
+        // Remove role
+        const { error } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userId)
+          .eq('role', role as any);
+          
+        if (error) throw error;
+      }
       
-      toast.success('Role updated successfully');
+      toast.success(`Role ${shouldHaveRole ? 'added' : 'removed'} successfully`);
       fetchStaff();
     } catch (error: any) {
       console.error('Error updating role:', error);
@@ -210,30 +273,7 @@ export default function StaffManagement() {
     ...(isSuperAdmin ? [{
       id: "actions",
       header: "Actions",
-      cell: ({ row }: { row: any }) => (
-        <div className="flex gap-2">
-          <Select onValueChange={(value) => handleUpdateRole(row.original.user_id, value)}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Change Role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="staff">Staff</SelectItem>
-              <SelectItem value="driver">Driver</SelectItem>
-              <SelectItem value="conductor">Conductor</SelectItem>
-              <SelectItem value="mechanic">Mechanic</SelectItem>
-              <SelectItem value="supervisor">Supervisor</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
-            </SelectContent>
-          </Select>
-          {isSuperAdmin && (
-            <Button variant="outline" size="sm" onClick={() => { setPageAccessTarget(row.original); setPageAccessOpen(true); }}>
-              <Lock className="h-4 w-4 mr-2" />
-              Page Access
-            </Button>
-          )}
-        </div>
-      ),
+      cell: ({ row }: { row: any }) => <RoleManagementCell staff={row.original} onToggleRole={handleToggleRole} isSuperAdmin={isSuperAdmin} onOpenPageAccess={() => { setPageAccessTarget(row.original); setPageAccessOpen(true); }} />,
     }] : []),
   ];
 
@@ -241,6 +281,7 @@ export default function StaffManagement() {
   const activeStaff = staff.filter(s => s.status === 'active').length;
   const adminCount = staff.filter(s => s.roles.includes('admin') || s.roles.includes('super_admin')).length;
   const driverCount = staff.filter(s => s.roles.includes('driver')).length;
+  const financeCount = staff.filter(s => s.roles.includes('finance')).length;
 
   if (!isSuperAdmin) {
     return (
@@ -351,6 +392,7 @@ export default function StaffManagement() {
                       <SelectItem value="conductor">Conductor</SelectItem>
                       <SelectItem value="mechanic">Mechanic</SelectItem>
                       <SelectItem value="supervisor">Supervisor</SelectItem>
+                      <SelectItem value="finance">Finance</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                       {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
                     </SelectContent>
@@ -372,7 +414,7 @@ export default function StaffManagement() {
       </div>
 
       {/* Enhanced KPI Cards with Animations */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
           <div className="professional-card hover:shadow-success transition-all duration-500 group">
             <KPICard
@@ -410,6 +452,18 @@ export default function StaffManagement() {
           </div>
         </div>
         <div className="animate-scale-in" style={{ animationDelay: '0.4s' }}>
+          <div className="professional-card hover:shadow-accent transition-all duration-500 group">
+            <KPICard
+              title="Finance"
+              value={financeCount.toString()}
+              icon={<Shield className="h-4 w-4 group-hover:animate-pulse-subtle" />}
+              change="0"
+              changeType="neutral"
+              description="this month"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.5s' }}>
           <div className="professional-card hover:shadow-accent transition-all duration-500 group">
             <KPICard
               title="Drivers"
