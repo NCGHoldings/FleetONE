@@ -1573,66 +1573,6 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   ))}
                  </div>
 
-                {/* Other Expenses (Internal Costs) */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="text-base font-semibold text-foreground">
-                        Other Expenses (Internal Costs)
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Internal expenses that will be deducted from profit (not charged to customer)
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addOtherExpense}
-                      className="text-xs"
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add Expense
-                    </Button>
-                  </div>
-                  
-                  {otherExpenses.map((expense, index) => (
-                    <Card key={expense.id} className="p-4 border border-muted bg-muted/20">
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <Label className="text-sm font-medium text-foreground">Expense Description</Label>
-                          <Input
-                            value={expense.label}
-                            onChange={(e) => updateOtherExpense(expense.id, 'label', e.target.value)}
-                            placeholder="e.g., Office Expenses, Staff Costs, etc."
-                            className="mt-1"
-                          />
-                        </div>
-                        <div className="w-32">
-                          <Label className="text-sm font-medium text-foreground">Amount (LKR)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={expense.amount}
-                            onChange={(e) => updateOtherExpense(expense.id, 'amount', parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                            className="mt-1"
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeOtherExpense(expense.id)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10 mt-6"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
 
                 {/* Commission and Discount Settings */}
                 <div className="space-y-4">
