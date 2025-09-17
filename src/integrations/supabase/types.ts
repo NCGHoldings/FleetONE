@@ -4002,6 +4002,65 @@ export type Database = {
           },
         ]
       }
+      yutong_production_updates: {
+        Row: {
+          created_at: string | null
+          estimated_next_milestone_date: string | null
+          id: string
+          issues_identified: string | null
+          milestone: Database["public"]["Enums"]["production_milestone"]
+          milestone_completed: boolean | null
+          photos: Json | null
+          progress_notes: string | null
+          quality_check_passed: boolean | null
+          supplier_order_id: string
+          update_date: string | null
+          update_time: string | null
+          updated_by: string | null
+          videos: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          estimated_next_milestone_date?: string | null
+          id?: string
+          issues_identified?: string | null
+          milestone: Database["public"]["Enums"]["production_milestone"]
+          milestone_completed?: boolean | null
+          photos?: Json | null
+          progress_notes?: string | null
+          quality_check_passed?: boolean | null
+          supplier_order_id: string
+          update_date?: string | null
+          update_time?: string | null
+          updated_by?: string | null
+          videos?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          estimated_next_milestone_date?: string | null
+          id?: string
+          issues_identified?: string | null
+          milestone?: Database["public"]["Enums"]["production_milestone"]
+          milestone_completed?: boolean | null
+          photos?: Json | null
+          progress_notes?: string | null
+          quality_check_passed?: boolean | null
+          supplier_order_id?: string
+          update_date?: string | null
+          update_time?: string | null
+          updated_by?: string | null
+          videos?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_production_updates_supplier_order_id_fkey"
+            columns: ["supplier_order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_supplier_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_quotation_addons: {
         Row: {
           addon_id: string
@@ -4146,6 +4205,343 @@ export type Database = {
           },
         ]
       }
+      yutong_shipment_tracking: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          estimated_arrival: string | null
+          id: string
+          latitude: number | null
+          location: string | null
+          longitude: number | null
+          milestone_reached: string | null
+          shipment_id: string
+          status: string | null
+          tracking_date: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          estimated_arrival?: string | null
+          id?: string
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          milestone_reached?: string | null
+          shipment_id: string
+          status?: string | null
+          tracking_date?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          estimated_arrival?: string | null
+          id?: string
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          milestone_reached?: string | null
+          shipment_id?: string
+          status?: string | null
+          tracking_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_shipment_tracking_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_shipments: {
+        Row: {
+          actual_arrival_date: string | null
+          actual_departure_date: string | null
+          arrival_port: string | null
+          container_number: string | null
+          created_at: string | null
+          current_status: string | null
+          departure_port: string | null
+          estimated_arrival_date: string | null
+          id: string
+          insurance_amount: number | null
+          order_id: string
+          scheduled_arrival_date: string | null
+          scheduled_departure_date: string | null
+          shipment_reference: string | null
+          shipping_cost: number | null
+          shipping_method: Database["public"]["Enums"]["shipping_method"]
+          shipping_partner_id: string | null
+          special_instructions: string | null
+          supplier_order_id: string | null
+          tracking_number: string | null
+          updated_at: string | null
+          vessel_name: string | null
+        }
+        Insert: {
+          actual_arrival_date?: string | null
+          actual_departure_date?: string | null
+          arrival_port?: string | null
+          container_number?: string | null
+          created_at?: string | null
+          current_status?: string | null
+          departure_port?: string | null
+          estimated_arrival_date?: string | null
+          id?: string
+          insurance_amount?: number | null
+          order_id: string
+          scheduled_arrival_date?: string | null
+          scheduled_departure_date?: string | null
+          shipment_reference?: string | null
+          shipping_cost?: number | null
+          shipping_method: Database["public"]["Enums"]["shipping_method"]
+          shipping_partner_id?: string | null
+          special_instructions?: string | null
+          supplier_order_id?: string | null
+          tracking_number?: string | null
+          updated_at?: string | null
+          vessel_name?: string | null
+        }
+        Update: {
+          actual_arrival_date?: string | null
+          actual_departure_date?: string | null
+          arrival_port?: string | null
+          container_number?: string | null
+          created_at?: string | null
+          current_status?: string | null
+          departure_port?: string | null
+          estimated_arrival_date?: string | null
+          id?: string
+          insurance_amount?: number | null
+          order_id?: string
+          scheduled_arrival_date?: string | null
+          scheduled_departure_date?: string | null
+          shipment_reference?: string | null
+          shipping_cost?: number | null
+          shipping_method?: Database["public"]["Enums"]["shipping_method"]
+          shipping_partner_id?: string | null
+          special_instructions?: string | null
+          supplier_order_id?: string | null
+          tracking_number?: string | null
+          updated_at?: string | null
+          vessel_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_shipments_shipping_partner_id_fkey"
+            columns: ["shipping_partner_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipping_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_shipments_supplier_order_id_fkey"
+            columns: ["supplier_order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_supplier_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_shipping_documents: {
+        Row: {
+          created_at: string | null
+          document_date: string | null
+          document_number: string | null
+          document_status: string | null
+          document_type: Database["public"]["Enums"]["shipping_document_type"]
+          expiry_date: string | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          issued_by: string | null
+          notes: string | null
+          shipment_id: string
+          updated_at: string | null
+          verification_date: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_date?: string | null
+          document_number?: string | null
+          document_status?: string | null
+          document_type: Database["public"]["Enums"]["shipping_document_type"]
+          expiry_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          issued_by?: string | null
+          notes?: string | null
+          shipment_id: string
+          updated_at?: string | null
+          verification_date?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          document_date?: string | null
+          document_number?: string | null
+          document_status?: string | null
+          document_type?: Database["public"]["Enums"]["shipping_document_type"]
+          expiry_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          issued_by?: string | null
+          notes?: string | null
+          shipment_id?: string
+          updated_at?: string | null
+          verification_date?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_shipping_documents_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_shipping_partners: {
+        Row: {
+          address: string | null
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          partner_code: string | null
+          partner_name: string
+          partner_rating: number | null
+          supported_shipping_methods:
+            | Database["public"]["Enums"]["shipping_method"][]
+            | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          partner_code?: string | null
+          partner_name: string
+          partner_rating?: number | null
+          supported_shipping_methods?:
+            | Database["public"]["Enums"]["shipping_method"][]
+            | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          partner_code?: string | null
+          partner_name?: string
+          partner_rating?: number | null
+          supported_shipping_methods?:
+            | Database["public"]["Enums"]["shipping_method"][]
+            | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      yutong_supplier_orders: {
+        Row: {
+          actual_completion_date: string | null
+          chassis_number: string | null
+          created_at: string | null
+          current_milestone:
+            | Database["public"]["Enums"]["production_milestone"]
+            | null
+          engine_number: string | null
+          estimated_completion_date: string | null
+          id: string
+          order_id: string
+          production_progress_percentage: number | null
+          production_start_date: string | null
+          quality_certificates: Json | null
+          status: string | null
+          supplier_notes: string | null
+          supplier_order_date: string | null
+          updated_at: string | null
+          vin_number: string | null
+          yutong_order_reference: string | null
+        }
+        Insert: {
+          actual_completion_date?: string | null
+          chassis_number?: string | null
+          created_at?: string | null
+          current_milestone?:
+            | Database["public"]["Enums"]["production_milestone"]
+            | null
+          engine_number?: string | null
+          estimated_completion_date?: string | null
+          id?: string
+          order_id: string
+          production_progress_percentage?: number | null
+          production_start_date?: string | null
+          quality_certificates?: Json | null
+          status?: string | null
+          supplier_notes?: string | null
+          supplier_order_date?: string | null
+          updated_at?: string | null
+          vin_number?: string | null
+          yutong_order_reference?: string | null
+        }
+        Update: {
+          actual_completion_date?: string | null
+          chassis_number?: string | null
+          created_at?: string | null
+          current_milestone?:
+            | Database["public"]["Enums"]["production_milestone"]
+            | null
+          engine_number?: string | null
+          estimated_completion_date?: string | null
+          id?: string
+          order_id?: string
+          production_progress_percentage?: number | null
+          production_start_date?: string | null
+          quality_certificates?: Json | null
+          status?: string | null
+          supplier_notes?: string | null
+          supplier_order_date?: string | null
+          updated_at?: string | null
+          vin_number?: string | null
+          yutong_order_reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_supplier_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -4228,6 +4624,23 @@ export type Database = {
         | "approved"
         | "rejected"
       permit_status: "valid" | "expired" | "suspended" | "cancelled"
+      production_milestone:
+        | "order_received"
+        | "production_started"
+        | "chassis_assembly"
+        | "body_assembly"
+        | "interior_installation"
+        | "quality_inspection"
+        | "final_testing"
+        | "ready_for_shipment"
+      shipping_document_type:
+        | "commercial_invoice"
+        | "packing_list"
+        | "bill_of_lading"
+        | "certificate_of_origin"
+        | "insurance_certificate"
+        | "customs_declaration"
+      shipping_method: "roro" | "container"
       trip_status: "scheduled" | "ongoing" | "completed" | "cancelled"
       user_status: "active" | "inactive" | "suspended"
       yutong_do_status: "pending" | "issued" | "released" | "utilized"
@@ -4400,6 +4813,25 @@ export const Constants = {
         "rejected",
       ],
       permit_status: ["valid", "expired", "suspended", "cancelled"],
+      production_milestone: [
+        "order_received",
+        "production_started",
+        "chassis_assembly",
+        "body_assembly",
+        "interior_installation",
+        "quality_inspection",
+        "final_testing",
+        "ready_for_shipment",
+      ],
+      shipping_document_type: [
+        "commercial_invoice",
+        "packing_list",
+        "bill_of_lading",
+        "certificate_of_origin",
+        "insurance_certificate",
+        "customs_declaration",
+      ],
+      shipping_method: ["roro", "container"],
       trip_status: ["scheduled", "ongoing", "completed", "cancelled"],
       user_status: ["active", "inactive", "suspended"],
       yutong_do_status: ["pending", "issued", "released", "utilized"],

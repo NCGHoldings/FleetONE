@@ -12,6 +12,8 @@ import { YutongAddOnsAdmin } from "@/components/yutong/YutongAddOnsAdmin";
 import YutongCustomersAdmin from "@/components/yutong/YutongCustomersAdmin";
 import { YutongOrdersList } from "@/components/yutong/YutongOrdersList";
 import { YutongFinanceDashboard } from "@/components/yutong/YutongFinanceDashboard";
+import { YutongSupplierManagement } from '@/components/yutong/YutongSupplierManagement';
+import { YutongLogisticsManagement } from '@/components/yutong/YutongLogisticsManagement';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -134,10 +136,12 @@ export default function YutongQuotations() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="quotations">Quotations</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="finance">Finance</TabsTrigger>
+          <TabsTrigger value="supplier">Supplier</TabsTrigger>
+          <TabsTrigger value="logistics">Logistics</TabsTrigger>
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="bus-models">Bus Models</TabsTrigger>
           <TabsTrigger value="addons">Add-ons</TabsTrigger>
@@ -154,6 +158,14 @@ export default function YutongQuotations() {
 
         <TabsContent value="finance" className="space-y-4">
           <YutongFinanceDashboard />
+        </TabsContent>
+
+        <TabsContent value="supplier" className="space-y-4">
+          <YutongSupplierManagement />
+        </TabsContent>
+
+        <TabsContent value="logistics" className="space-y-4">
+          <YutongLogisticsManagement />
         </TabsContent>
 
         <TabsContent value="customers" className="space-y-4">
