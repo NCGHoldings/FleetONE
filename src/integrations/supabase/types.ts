@@ -2682,6 +2682,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_special_hire_quotations_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "special_hire_quotations_bus_type_id_fkey"
             columns: ["bus_type_id"]
             isOneToOne: false

@@ -830,14 +830,16 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const handleSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      // Check if discount requires admin approval
-      if ((data.discountType === 'percentage' && data.discountPct > 0) || 
-          (data.discountType === 'amount' && data.discountAmount > 0)) {
+        // Get current user data for created_by field
         const { data: userData } = await supabase.auth.getUser();
-        const { data: userRoles } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userData.user?.id);
+        
+        // Check if discount requires admin approval
+        if ((data.discountType === 'percentage' && data.discountPct > 0) || 
+            (data.discountType === 'amount' && data.discountAmount > 0)) {
+          const { data: userRoles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userData.user?.id);
         
         const isAdmin = userRoles?.some(r => r.role === 'admin' || r.role === 'super_admin');
         
@@ -925,7 +927,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         approval_status: ((data.discountType === 'percentage' && data.discountPct > 0) || 
                          (data.discountType === 'amount' && data.discountAmount > 0) ? 'pending' : 'approved') as 'pending' | 'approved' | 'rejected',
         valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
-        audit_log: isEditing ? [...(initialData?.audit_log || []), auditEntry].filter(Boolean) : []
+        audit_log: isEditing ? [...(initialData?.audit_log || []), auditEntry].filter(Boolean) : [],
+        // Set created_by for new quotations
+        ...(isEditing ? {} : { created_by: userData.user?.id })
       };
 
       if (isEditing && initialData) {
