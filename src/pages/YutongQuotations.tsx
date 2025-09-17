@@ -139,9 +139,9 @@ export default function YutongQuotations() {
         </Card>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - Simplified to Core Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-7 xl:grid-cols-14">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <TabsTrigger value="quotations" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Quotations</span>
@@ -154,34 +154,6 @@ export default function YutongQuotations() {
             <DollarSign className="h-4 w-4" />
             <span className="hidden sm:inline">Finance</span>
           </TabsTrigger>
-          <TabsTrigger value="supplier" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />
-            <span className="hidden sm:inline">Supplier</span>
-          </TabsTrigger>
-          <TabsTrigger value="logistics" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            <span className="hidden sm:inline">Logistics</span>
-          </TabsTrigger>
-          <TabsTrigger value="customs" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Customs</span>
-          </TabsTrigger>
-          <TabsTrigger value="processing" className="flex items-center gap-2">
-            <Cog className="h-4 w-4" />
-            <span className="hidden sm:inline">Processing</span>
-          </TabsTrigger>
-          <TabsTrigger value="rmv" className="flex items-center gap-2">
-            <FileCheck className="h-4 w-4" />
-            <span className="hidden sm:inline">RMV</span>
-          </TabsTrigger>
-          <TabsTrigger value="delivery" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            <span className="hidden sm:inline">Delivery</span>
-          </TabsTrigger>
-          <TabsTrigger value="after-sales" className="flex items-center gap-2">
-            <Wrench className="h-4 w-4" />
-            <span className="hidden sm:inline">After-Sales</span>
-          </TabsTrigger>
           <TabsTrigger value="customers" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Customers</span>
@@ -193,10 +165,6 @@ export default function YutongQuotations() {
           <TabsTrigger value="addons" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Add-ons</span>
-          </TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Reports</span>
           </TabsTrigger>
         </TabsList>
 
@@ -212,34 +180,6 @@ export default function YutongQuotations() {
           <YutongFinanceDashboard />
         </TabsContent>
 
-        <TabsContent value="supplier" className="space-y-4">
-          <YutongSupplierManagement />
-        </TabsContent>
-
-        <TabsContent value="logistics" className="space-y-4">
-          <YutongLogisticsManagement />
-        </TabsContent>
-
-        <TabsContent value="customs" className="space-y-4">
-          <YutongCustomsManagement onRefresh={loadStats} />
-        </TabsContent>
-
-        <TabsContent value="processing" className="space-y-4">
-          <YutongVehicleProcessingManagement onRefresh={loadStats} />
-        </TabsContent>
-
-        <TabsContent value="rmv" className="space-y-4">
-          <YutongRMVRegistrationManagement onRefresh={loadStats} />
-        </TabsContent>
-
-        <TabsContent value="delivery" className="space-y-4">
-          <YutongDeliveryManagement onRefresh={loadStats} />
-        </TabsContent>
-
-        <TabsContent value="after-sales" className="space-y-4">
-          <YutongAfterSalesManagement onRefresh={loadStats} />
-        </TabsContent>
-
         <TabsContent value="customers" className="space-y-4">
           <YutongCustomersAdmin />
         </TabsContent>
@@ -250,17 +190,6 @@ export default function YutongQuotations() {
 
         <TabsContent value="addons" className="space-y-4">
           <YutongAddOnsAdmin />
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Reports & Analytics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Sales reports and analytics coming soon...</p>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 

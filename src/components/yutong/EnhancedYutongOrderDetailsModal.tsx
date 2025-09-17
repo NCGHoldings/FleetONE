@@ -1,0 +1,325 @@
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
+import { 
+  Eye, 
+  DollarSign, 
+  Truck, 
+  Package, 
+  Shield, 
+  Cog, 
+  FileCheck, 
+  MapPin, 
+  Wrench,
+  FileText,
+  MessageSquare,
+  Calendar,
+  User
+} from 'lucide-react';
+import { YutongOrder } from '@/hooks/useYutongOrderManagement';
+import { YutongOrderJourney } from './YutongOrderJourney';
+
+interface EnhancedYutongOrderDetailsModalProps {
+  order: YutongOrder | null;
+  open: boolean;
+  onClose: () => void;
+  onRefresh: () => void;
+}
+
+const processTabsConfig = [
+  { key: 'supplier', label: 'Supplier', icon: Truck },
+  { key: 'logistics', label: 'Logistics', icon: Package },
+  { key: 'customs', label: 'Customs', icon: Shield },
+  { key: 'processing', label: 'Processing', icon: Cog },
+  { key: 'rmv', label: 'RMV', icon: FileCheck },
+  { key: 'delivery', label: 'Delivery', icon: MapPin },
+  { key: 'after-sales', label: 'After-Sales', icon: Wrench }
+];
+
+export function EnhancedYutongOrderDetailsModal({ 
+  order, 
+  open, 
+  onClose, 
+  onRefresh 
+}: EnhancedYutongOrderDetailsModalProps) {
+  const [activeTab, setActiveTab] = useState('overview');
+
+  if (!order) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            Order Management - {order.order_no}
+          </DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              <span className="hidden sm:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="journey" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden sm:inline">Journey</span>
+            </TabsTrigger>
+            <TabsTrigger value="financial" className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              <span className="hidden sm:inline">Financial</span>
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Documents</span>
+            </TabsTrigger>
+            <TabsTrigger value="operations" className="flex items-center gap-2">
+              <Cog className="h-4 w-4" />
+              <span className="hidden sm:inline">Operations</span>
+            </TabsTrigger>
+            <TabsTrigger value="communication" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Messages</span>
+            </TabsTrigger>
+            <TabsTrigger value="customer" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">Customer</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Order Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Order Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Order Number</label>
+                      <p className="font-mono text-lg">{order.order_no}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Order Date</label>
+                      <p>{format(new Date(order.order_date), 'MMM dd, yyyy')}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Bus Model</label>
+                      <p className="font-medium">{order.bus_model}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Quantity</label>
+                      <p className="text-2xl font-bold">{order.quantity}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Status */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Current Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Current Phase</label>
+                    <div className="mt-2">
+                      <Badge className="bg-blue-100 text-blue-800 text-lg px-3 py-1">
+                        {order.current_phase.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Overall Progress</label>
+                    <div className="mt-2 space-y-2">
+                      <Progress value={order.progress_percentage || 0} className="w-full h-3" />
+                      <p className="text-lg font-semibold">{Math.round(order.progress_percentage || 0)}% Complete</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Specifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Vehicle Specifications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Engine Type</label>
+                    <p className="font-medium">{order.engine_type || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Gearbox</label>
+                    <p className="font-medium">{order.gearbox_type || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Seating</label>
+                    <p className="font-medium">{order.seating_capacity || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Color</label>
+                    <p className="font-medium">{order.color_scheme || 'Not specified'}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Journey Tab */}
+          <TabsContent value="journey" className="space-y-6">
+            <YutongOrderJourney order={order} />
+          </TabsContent>
+
+          {/* Financial Tab */}
+          <TabsContent value="financial" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Total Amount</span>
+                      <span className="font-bold text-xl">LKR {order.total_amount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Total Paid</span>
+                      <span className="font-bold text-xl text-green-600">LKR {order.total_paid.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Balance Due</span>
+                      <span className="font-bold text-xl text-orange-600">LKR {order.balance_due.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Progress 
+                      value={(order.total_paid / order.total_amount) * 100} 
+                      className="w-full h-4" 
+                    />
+                    <p className="text-center text-sm text-muted-foreground mt-2">
+                      {Math.round((order.total_paid / order.total_amount) * 100)}% Paid
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Mode</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Badge 
+                    variant={order.payment_mode === 'cash' ? 'default' : 'secondary'}
+                    className="text-lg px-4 py-2"
+                  >
+                    {order.payment_mode.toUpperCase()}
+                  </Badge>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Operations Tab with Process Management */}
+          <TabsContent value="operations" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Process Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                  {processTabsConfig.map((tab) => {
+                    const Icon = tab.icon;
+                    return (
+                      <Button
+                        key={tab.key}
+                        variant="outline"
+                        className="flex flex-col items-center p-4 h-auto space-y-2"
+                      >
+                        <Icon className="h-6 w-6" />
+                        <span className="text-xs font-medium">{tab.label}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Button variant="default" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Generate Invoice
+                  </Button>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Send Update
+                  </Button>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Schedule Inspection
+                  </Button>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Export Report
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Documents Tab */}
+          <TabsContent value="documents" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Document management system coming soon...</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Communication Tab */}
+          <TabsContent value="communication" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Communication History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Communication logs and messaging system coming soon...</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Customer Tab */}
+          <TabsContent value="customer" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Customer details and history coming soon...</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}

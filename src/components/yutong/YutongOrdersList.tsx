@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Eye, Edit, CreditCard, Truck, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useYutongOrderManagement, YutongOrder } from '@/hooks/useYutongOrderManagement';
-import { YutongOrderDetailsModal } from './YutongOrderDetailsModal';
+import { EnhancedYutongOrderDetailsModal } from './EnhancedYutongOrderDetailsModal';
 import { YutongCreateOrderModal } from './YutongCreateOrderModal';
 
 const phaseLabels = {
@@ -261,7 +261,7 @@ export function YutongOrdersList() {
       </Card>
 
       {showOrderDetails && selectedOrder && (
-        <YutongOrderDetailsModal
+        <EnhancedYutongOrderDetailsModal
           order={selectedOrder}
           open={showOrderDetails}
           onClose={() => {
