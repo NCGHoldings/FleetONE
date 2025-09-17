@@ -196,12 +196,6 @@ export const useYutongOrderManagement = () => {
             customer_phone,
             customer_email,
             company_name
-          ),
-          yutong_customers (
-            customer_name,
-            contact_phone,
-            email_address,
-            company_name
           )
         `)
         .order('created_at', { ascending: false });

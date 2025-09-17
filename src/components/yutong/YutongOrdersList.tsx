@@ -112,10 +112,9 @@ export function YutongOrdersList() {
       header: "Customer",
       cell: ({ row }) => {
         const quotation = (row.original as any).yutong_quotations;
-        const customer = (row.original as any).yutong_customers;
         
-        const customerName = quotation?.customer_name || customer?.customer_name || 'N/A';
-        const companyName = quotation?.company_name || customer?.company_name;
+        const customerName = quotation?.customer_name || 'N/A';
+        const companyName = quotation?.company_name;
         
         return (
           <div>
