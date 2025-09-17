@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, FileText, Calculator, Truck } from 'lucide-react';
+import { Plus, FileText, Calculator, Truck, ShoppingCart, DollarSign, Package, Shield, Cog, FileCheck, MapPin, Wrench, Users, Bus, BarChart3 } from 'lucide-react';
 import { YutongQuotationsList } from "@/components/yutong/YutongQuotationsList";
 import { YutongQuotationForm } from "@/components/yutong/YutongQuotationFormUpdated";
 import { YutongBusModelsAdmin } from "@/components/yutong/YutongBusModelsAdmin";
@@ -131,7 +131,7 @@ export default function YutongQuotations() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">LKR {stats.totalValue.toLocaleString()}</div>
@@ -141,21 +141,63 @@ export default function YutongQuotations() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="flex w-full overflow-x-auto gap-1 h-auto p-1">
-          <TabsTrigger value="quotations" className="text-xs">Quotations</TabsTrigger>
-          <TabsTrigger value="orders" className="text-xs">Orders</TabsTrigger>
-          <TabsTrigger value="finance" className="text-xs">Finance</TabsTrigger>
-          <TabsTrigger value="supplier" className="text-xs">Supplier</TabsTrigger>
-          <TabsTrigger value="logistics" className="text-xs">Logistics</TabsTrigger>
-          <TabsTrigger value="customs" className="text-xs">Customs</TabsTrigger>
-          <TabsTrigger value="processing" className="text-xs">Processing</TabsTrigger>
-          <TabsTrigger value="rmv" className="text-xs">RMV</TabsTrigger>
-          <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
-          <TabsTrigger value="after-sales" className="text-xs">After-Sales</TabsTrigger>
-          <TabsTrigger value="customers" className="text-xs">Customers</TabsTrigger>
-          <TabsTrigger value="bus-models" className="text-xs">Bus Models</TabsTrigger>
-          <TabsTrigger value="addons" className="text-xs">Add-ons</TabsTrigger>
-          <TabsTrigger value="reports" className="text-xs">Reports</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-7 xl:grid-cols-14">
+          <TabsTrigger value="quotations" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">Quotations</span>
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4" />
+            <span className="hidden sm:inline">Orders</span>
+          </TabsTrigger>
+          <TabsTrigger value="finance" className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            <span className="hidden sm:inline">Finance</span>
+          </TabsTrigger>
+          <TabsTrigger value="supplier" className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            <span className="hidden sm:inline">Supplier</span>
+          </TabsTrigger>
+          <TabsTrigger value="logistics" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            <span className="hidden sm:inline">Logistics</span>
+          </TabsTrigger>
+          <TabsTrigger value="customs" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Customs</span>
+          </TabsTrigger>
+          <TabsTrigger value="processing" className="flex items-center gap-2">
+            <Cog className="h-4 w-4" />
+            <span className="hidden sm:inline">Processing</span>
+          </TabsTrigger>
+          <TabsTrigger value="rmv" className="flex items-center gap-2">
+            <FileCheck className="h-4 w-4" />
+            <span className="hidden sm:inline">RMV</span>
+          </TabsTrigger>
+          <TabsTrigger value="delivery" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            <span className="hidden sm:inline">Delivery</span>
+          </TabsTrigger>
+          <TabsTrigger value="after-sales" className="flex items-center gap-2">
+            <Wrench className="h-4 w-4" />
+            <span className="hidden sm:inline">After-Sales</span>
+          </TabsTrigger>
+          <TabsTrigger value="customers" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Customers</span>
+          </TabsTrigger>
+          <TabsTrigger value="bus-models" className="flex items-center gap-2">
+            <Bus className="h-4 w-4" />
+            <span className="hidden sm:inline">Bus Models</span>
+          </TabsTrigger>
+          <TabsTrigger value="addons" className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add-ons</span>
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Reports</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="quotations" className="space-y-4">
