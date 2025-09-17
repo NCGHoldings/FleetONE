@@ -106,7 +106,7 @@ export function EnhancedYutongOrderDetailsModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Order Number</label>
-                      <p className="font-mono text-lg">{order.order_no}</p>
+                      <p className="font-mono text-base">{order.order_no}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Order Date</label>
@@ -118,7 +118,7 @@ export function EnhancedYutongOrderDetailsModal({
                     </div>
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Quantity</label>
-                      <p className="text-2xl font-bold">{order.quantity}</p>
+                      <p className="text-lg font-bold">{order.quantity}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -142,7 +142,7 @@ export function EnhancedYutongOrderDetailsModal({
                     <label className="text-sm font-medium text-muted-foreground">Overall Progress</label>
                     <div className="mt-2 space-y-2">
                       <Progress value={order.progress_percentage || 0} className="w-full h-3" />
-                      <p className="text-lg font-semibold">{Math.round(order.progress_percentage || 0)}% Complete</p>
+                      <p className="text-base font-semibold">{Math.round(order.progress_percentage || 0)}% Complete</p>
                     </div>
                   </div>
                 </CardContent>
@@ -199,15 +199,15 @@ export function EnhancedYutongOrderDetailsModal({
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Total Amount</span>
-                      <span className="font-bold text-xl">LKR {order.total_amount.toLocaleString()}</span>
+                      <span className="font-bold text-lg">LKR {order.total_amount.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Total Paid</span>
-                      <span className="font-bold text-xl text-green-600">LKR {order.total_paid.toLocaleString()}</span>
+                      <span className="font-bold text-lg text-green-600">LKR {order.total_paid.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Balance Due</span>
-                      <span className="font-bold text-xl text-orange-600">LKR {order.balance_due.toLocaleString()}</span>
+                      <span className="font-bold text-lg text-orange-600">LKR {order.balance_due.toLocaleString()}</span>
                     </div>
                   </div>
                   <div>
@@ -229,7 +229,7 @@ export function EnhancedYutongOrderDetailsModal({
                 <CardContent>
                   <Badge 
                     variant={order.payment_mode === 'cash' ? 'default' : 'secondary'}
-                    className="text-lg px-4 py-2"
+                    className="text-base px-3 py-1"
                   >
                     {order.payment_mode.toUpperCase()}
                   </Badge>
