@@ -3419,6 +3419,84 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_customer_payments: {
+        Row: {
+          bank_name: string | null
+          bank_slip_no: string | null
+          cheque_no: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          payment_amount: number
+          payment_date: string
+          payment_method: string
+          payment_reference: string | null
+          payment_schedule_id: string | null
+          payment_slip_url: string | null
+          status: string
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          bank_name?: string | null
+          bank_slip_no?: string | null
+          cheque_no?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          payment_amount: number
+          payment_date: string
+          payment_method: string
+          payment_reference?: string | null
+          payment_schedule_id?: string | null
+          payment_slip_url?: string | null
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          bank_name?: string | null
+          bank_slip_no?: string | null
+          cheque_no?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          payment_amount?: number
+          payment_date?: string
+          payment_method?: string
+          payment_reference?: string | null
+          payment_schedule_id?: string | null
+          payment_slip_url?: string | null
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_customer_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_customer_payments_payment_schedule_id_fkey"
+            columns: ["payment_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_payment_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_customer_purchases: {
         Row: {
           created_at: string
@@ -3530,6 +3608,96 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_delivery_orders: {
+        Row: {
+          bill_of_lading_no: string | null
+          chassis_numbers: Json | null
+          collected_by: string | null
+          collection_date: string | null
+          commercial_invoice_no: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          do_amount: number
+          do_no: string
+          engine_numbers: Json | null
+          id: string
+          issue_date: string | null
+          issuing_bank: string
+          lc_id: string | null
+          notes: string | null
+          order_id: string
+          packing_list_no: string | null
+          release_date: string | null
+          status: Database["public"]["Enums"]["yutong_do_status"]
+          updated_at: string
+          vehicle_count: number
+        }
+        Insert: {
+          bill_of_lading_no?: string | null
+          chassis_numbers?: Json | null
+          collected_by?: string | null
+          collection_date?: string | null
+          commercial_invoice_no?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          do_amount: number
+          do_no: string
+          engine_numbers?: Json | null
+          id?: string
+          issue_date?: string | null
+          issuing_bank: string
+          lc_id?: string | null
+          notes?: string | null
+          order_id: string
+          packing_list_no?: string | null
+          release_date?: string | null
+          status?: Database["public"]["Enums"]["yutong_do_status"]
+          updated_at?: string
+          vehicle_count?: number
+        }
+        Update: {
+          bill_of_lading_no?: string | null
+          chassis_numbers?: Json | null
+          collected_by?: string | null
+          collection_date?: string | null
+          commercial_invoice_no?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          do_amount?: number
+          do_no?: string
+          engine_numbers?: Json | null
+          id?: string
+          issue_date?: string | null
+          issuing_bank?: string
+          lc_id?: string | null
+          notes?: string | null
+          order_id?: string
+          packing_list_no?: string | null
+          release_date?: string | null
+          status?: Database["public"]["Enums"]["yutong_do_status"]
+          updated_at?: string
+          vehicle_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_delivery_orders_lc_id_fkey"
+            columns: ["lc_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_letter_of_credits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_delivery_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_invoices: {
         Row: {
           amount: number
@@ -3574,6 +3742,265 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      yutong_letter_of_credits: {
+        Row: {
+          amendment_count: number | null
+          amendments: Json | null
+          beneficiary_bank: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          expiry_date: string
+          id: string
+          issue_date: string
+          issuing_bank_branch: string | null
+          issuing_bank_contact: string | null
+          issuing_bank_name: string
+          latest_shipment_date: string | null
+          lc_amount: number
+          lc_no: string
+          lc_type: string
+          notes: string | null
+          order_id: string
+          remaining_amount: number | null
+          required_documents: Json | null
+          status: Database["public"]["Enums"]["yutong_lc_status"]
+          updated_at: string
+          utilized_amount: number | null
+        }
+        Insert: {
+          amendment_count?: number | null
+          amendments?: Json | null
+          beneficiary_bank?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          expiry_date: string
+          id?: string
+          issue_date: string
+          issuing_bank_branch?: string | null
+          issuing_bank_contact?: string | null
+          issuing_bank_name: string
+          latest_shipment_date?: string | null
+          lc_amount: number
+          lc_no: string
+          lc_type?: string
+          notes?: string | null
+          order_id: string
+          remaining_amount?: number | null
+          required_documents?: Json | null
+          status?: Database["public"]["Enums"]["yutong_lc_status"]
+          updated_at?: string
+          utilized_amount?: number | null
+        }
+        Update: {
+          amendment_count?: number | null
+          amendments?: Json | null
+          beneficiary_bank?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          expiry_date?: string
+          id?: string
+          issue_date?: string
+          issuing_bank_branch?: string | null
+          issuing_bank_contact?: string | null
+          issuing_bank_name?: string
+          latest_shipment_date?: string | null
+          lc_amount?: number
+          lc_no?: string
+          lc_type?: string
+          notes?: string | null
+          order_id?: string
+          remaining_amount?: number | null
+          required_documents?: Json | null
+          status?: Database["public"]["Enums"]["yutong_lc_status"]
+          updated_at?: string
+          utilized_amount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_letter_of_credits_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_orders: {
+        Row: {
+          actual_delivery_date: string | null
+          balance_due: number | null
+          bus_model: string
+          color_scheme: string | null
+          created_at: string
+          created_by: string | null
+          current_phase: Database["public"]["Enums"]["yutong_order_phase"]
+          customer_id: string | null
+          engine_type: string | null
+          expected_delivery_date: string | null
+          gearbox_type: string | null
+          id: string
+          notes: string | null
+          order_date: string
+          order_no: string
+          payment_mode: Database["public"]["Enums"]["yutong_payment_mode"]
+          payment_structure: Json | null
+          progress_percentage: number | null
+          quantity: number
+          quotation_id: string
+          seating_capacity: number | null
+          special_features: Json | null
+          status: string
+          total_amount: number
+          total_paid: number | null
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          balance_due?: number | null
+          bus_model: string
+          color_scheme?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_phase?: Database["public"]["Enums"]["yutong_order_phase"]
+          customer_id?: string | null
+          engine_type?: string | null
+          expected_delivery_date?: string | null
+          gearbox_type?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          order_no: string
+          payment_mode?: Database["public"]["Enums"]["yutong_payment_mode"]
+          payment_structure?: Json | null
+          progress_percentage?: number | null
+          quantity?: number
+          quotation_id: string
+          seating_capacity?: number | null
+          special_features?: Json | null
+          status?: string
+          total_amount: number
+          total_paid?: number | null
+          unit_price: number
+          updated_at?: string
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          balance_due?: number | null
+          bus_model?: string
+          color_scheme?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_phase?: Database["public"]["Enums"]["yutong_order_phase"]
+          customer_id?: string | null
+          engine_type?: string | null
+          expected_delivery_date?: string | null
+          gearbox_type?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          order_no?: string
+          payment_mode?: Database["public"]["Enums"]["yutong_payment_mode"]
+          payment_structure?: Json | null
+          progress_percentage?: number | null
+          quantity?: number
+          quotation_id?: string
+          seating_capacity?: number | null
+          special_features?: Json | null
+          status?: string
+          total_amount?: number
+          total_paid?: number | null
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_orders_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_payment_schedules: {
+        Row: {
+          amount: number
+          bank_branch: string | null
+          bank_name: string | null
+          created_at: string
+          due_date: string
+          id: string
+          is_lc_payment: boolean | null
+          milestone_name: string
+          notes: string | null
+          order_id: string
+          payment_date: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_type: Database["public"]["Enums"]["yutong_payment_type"]
+          sequence_order: number
+          status: Database["public"]["Enums"]["yutong_payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          bank_branch?: string | null
+          bank_name?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          is_lc_payment?: boolean | null
+          milestone_name: string
+          notes?: string | null
+          order_id: string
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_type: Database["public"]["Enums"]["yutong_payment_type"]
+          sequence_order?: number
+          status?: Database["public"]["Enums"]["yutong_payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bank_branch?: string | null
+          bank_name?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          is_lc_payment?: boolean | null
+          milestone_name?: string
+          notes?: string | null
+          order_id?: string
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_type?: Database["public"]["Enums"]["yutong_payment_type"]
+          sequence_order?: number
+          status?: Database["public"]["Enums"]["yutong_payment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_payment_schedules_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       yutong_quotation_addons: {
         Row: {
@@ -3736,6 +4163,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_yutong_order_no: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_yutong_quotation_no: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -3799,6 +4230,29 @@ export type Database = {
       permit_status: "valid" | "expired" | "suspended" | "cancelled"
       trip_status: "scheduled" | "ongoing" | "completed" | "cancelled"
       user_status: "active" | "inactive" | "suspended"
+      yutong_do_status: "pending" | "issued" | "released" | "utilized"
+      yutong_lc_status:
+        | "pending"
+        | "issued"
+        | "amended"
+        | "utilized"
+        | "closed"
+        | "cancelled"
+      yutong_order_phase:
+        | "order_confirmation"
+        | "lc_issuance"
+        | "production_order"
+        | "manufacturing"
+        | "shipping_booking"
+        | "customs_clearance"
+        | "port_operations"
+        | "vehicle_processing"
+        | "rmv_registration"
+        | "final_inspection"
+        | "delivery"
+      yutong_payment_mode: "cash" | "lease"
+      yutong_payment_status: "pending" | "paid" | "overdue" | "cancelled"
+      yutong_payment_type: "advance" | "interim" | "balance" | "full"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3948,6 +4402,31 @@ export const Constants = {
       permit_status: ["valid", "expired", "suspended", "cancelled"],
       trip_status: ["scheduled", "ongoing", "completed", "cancelled"],
       user_status: ["active", "inactive", "suspended"],
+      yutong_do_status: ["pending", "issued", "released", "utilized"],
+      yutong_lc_status: [
+        "pending",
+        "issued",
+        "amended",
+        "utilized",
+        "closed",
+        "cancelled",
+      ],
+      yutong_order_phase: [
+        "order_confirmation",
+        "lc_issuance",
+        "production_order",
+        "manufacturing",
+        "shipping_booking",
+        "customs_clearance",
+        "port_operations",
+        "vehicle_processing",
+        "rmv_registration",
+        "final_inspection",
+        "delivery",
+      ],
+      yutong_payment_mode: ["cash", "lease"],
+      yutong_payment_status: ["pending", "paid", "overdue", "cancelled"],
+      yutong_payment_type: ["advance", "interim", "balance", "full"],
     },
   },
 } as const
