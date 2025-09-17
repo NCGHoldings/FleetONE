@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { YutongOrder } from '@/hooks/useYutongOrderManagement';
 import { YutongOrderJourney } from './YutongOrderJourney';
+import { ProcessManagement } from './ProcessManagement';
 
 interface EnhancedYutongOrderDetailsModalProps {
   order: YutongOrder | null;
@@ -178,7 +179,13 @@ export function EnhancedYutongOrderDetailsModal({
 
           {/* Journey Tab */}
           <TabsContent value="journey" className="space-y-6">
-            <YutongOrderJourney order={order} />
+            <YutongOrderJourney 
+              order={order} 
+              onUpdatePhase={(phase, data) => {
+                console.log('Phase update:', phase, data);
+                onRefresh();
+              }}
+            />
           </TabsContent>
 
           {/* Financial Tab */}
@@ -233,54 +240,13 @@ export function EnhancedYutongOrderDetailsModal({
 
           {/* Operations Tab with Process Management */}
           <TabsContent value="operations" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Process Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                  {processTabsConfig.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                      <Button
-                        key={tab.key}
-                        variant="outline"
-                        className="flex flex-col items-center p-4 h-auto space-y-2"
-                      >
-                        <Icon className="h-6 w-6" />
-                        <span className="text-xs font-medium">{tab.label}</span>
-                      </Button>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Button variant="default" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Generate Invoice
-                  </Button>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Send Update
-                  </Button>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Schedule Inspection
-                  </Button>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Export Report
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ProcessManagement 
+              order={order} 
+              onUpdate={(processType, data) => {
+                console.log('Process update:', processType, data);
+                onRefresh();
+              }}
+            />
           </TabsContent>
 
           {/* Documents Tab */}
