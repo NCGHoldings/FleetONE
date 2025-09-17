@@ -3419,6 +3419,248 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_compliance_certificates: {
+        Row: {
+          application_date: string | null
+          approval_date: string | null
+          certificate_name: string
+          certificate_number: string | null
+          certificate_status: string | null
+          certificate_type: string
+          compliance_notes: string | null
+          created_at: string | null
+          expiry_date: string | null
+          file_name: string | null
+          file_path: string | null
+          id: string
+          issue_date: string | null
+          issuing_authority: string
+          order_id: string
+          renewal_reminder_days: number | null
+          renewal_required: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          application_date?: string | null
+          approval_date?: string | null
+          certificate_name: string
+          certificate_number?: string | null
+          certificate_status?: string | null
+          certificate_type: string
+          compliance_notes?: string | null
+          created_at?: string | null
+          expiry_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_authority: string
+          order_id: string
+          renewal_reminder_days?: number | null
+          renewal_required?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          application_date?: string | null
+          approval_date?: string | null
+          certificate_name?: string
+          certificate_number?: string | null
+          certificate_status?: string | null
+          certificate_type?: string
+          compliance_notes?: string | null
+          created_at?: string | null
+          expiry_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_authority?: string
+          order_id?: string
+          renewal_reminder_days?: number | null
+          renewal_required?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_compliance_certificates_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_customer_feedback: {
+        Row: {
+          areas_for_improvement: string | null
+          comments: string | null
+          created_at: string | null
+          customer_id: string
+          customer_service_rating:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          delivery_experience_rating:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          feedback_channel: string | null
+          feedback_type: string
+          follow_up_completed: boolean | null
+          follow_up_required: boolean | null
+          id: string
+          likelihood_to_recommend: number | null
+          order_id: string | null
+          overall_rating: Database["public"]["Enums"]["feedback_rating"]
+          positive_aspects: string | null
+          product_quality_rating:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          responded_to: boolean | null
+          response_date: string | null
+          response_notes: string | null
+          updated_at: string | null
+          value_for_money_rating:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          would_purchase_again: boolean | null
+        }
+        Insert: {
+          areas_for_improvement?: string | null
+          comments?: string | null
+          created_at?: string | null
+          customer_id: string
+          customer_service_rating?:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          delivery_experience_rating?:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          feedback_channel?: string | null
+          feedback_type: string
+          follow_up_completed?: boolean | null
+          follow_up_required?: boolean | null
+          id?: string
+          likelihood_to_recommend?: number | null
+          order_id?: string | null
+          overall_rating: Database["public"]["Enums"]["feedback_rating"]
+          positive_aspects?: string | null
+          product_quality_rating?:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          responded_to?: boolean | null
+          response_date?: string | null
+          response_notes?: string | null
+          updated_at?: string | null
+          value_for_money_rating?:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          would_purchase_again?: boolean | null
+        }
+        Update: {
+          areas_for_improvement?: string | null
+          comments?: string | null
+          created_at?: string | null
+          customer_id?: string
+          customer_service_rating?:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          delivery_experience_rating?:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          feedback_channel?: string | null
+          feedback_type?: string
+          follow_up_completed?: boolean | null
+          follow_up_required?: boolean | null
+          id?: string
+          likelihood_to_recommend?: number | null
+          order_id?: string | null
+          overall_rating?: Database["public"]["Enums"]["feedback_rating"]
+          positive_aspects?: string | null
+          product_quality_rating?:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          responded_to?: boolean | null
+          response_date?: string | null
+          response_notes?: string | null
+          updated_at?: string | null
+          value_for_money_rating?:
+            | Database["public"]["Enums"]["feedback_rating"]
+            | null
+          would_purchase_again?: boolean | null
+        }
+        Relationships: []
+      }
+      yutong_customer_handovers: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          customer_representative_contact: string | null
+          customer_representative_name: string | null
+          customer_signature: string | null
+          documents_provided: Json | null
+          handover_date: string
+          handover_officer_id: string | null
+          handover_officer_name: string
+          handover_photos: Json | null
+          handover_time: string | null
+          id: string
+          location: string
+          notes: string | null
+          officer_signature: string | null
+          order_id: string
+          status: Database["public"]["Enums"]["handover_status"] | null
+          training_duration_hours: number | null
+          training_notes: string | null
+          training_provided: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          customer_representative_contact?: string | null
+          customer_representative_name?: string | null
+          customer_signature?: string | null
+          documents_provided?: Json | null
+          handover_date: string
+          handover_officer_id?: string | null
+          handover_officer_name: string
+          handover_photos?: Json | null
+          handover_time?: string | null
+          id?: string
+          location: string
+          notes?: string | null
+          officer_signature?: string | null
+          order_id: string
+          status?: Database["public"]["Enums"]["handover_status"] | null
+          training_duration_hours?: number | null
+          training_notes?: string | null
+          training_provided?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          customer_representative_contact?: string | null
+          customer_representative_name?: string | null
+          customer_signature?: string | null
+          documents_provided?: Json | null
+          handover_date?: string
+          handover_officer_id?: string | null
+          handover_officer_name?: string
+          handover_photos?: Json | null
+          handover_time?: string | null
+          id?: string
+          location?: string
+          notes?: string | null
+          officer_signature?: string | null
+          order_id?: string
+          status?: Database["public"]["Enums"]["handover_status"] | null
+          training_duration_hours?: number | null
+          training_notes?: string | null
+          training_provided?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       yutong_customer_payments: {
         Row: {
           bank_name: string | null
@@ -3605,6 +3847,227 @@ export type Database = {
           phone?: string
           tax_number?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      yutong_customs_declarations: {
+        Row: {
+          assessment_date: string | null
+          cif_value_lkr: number | null
+          clearance_date: string | null
+          consignee_address: string | null
+          consignee_name: string | null
+          country_of_origin: string | null
+          created_at: string | null
+          cusdec_number: string | null
+          customs_duty_lkr: number | null
+          customs_officer_name: string | null
+          customs_status: Database["public"]["Enums"]["customs_status"] | null
+          declarant_license_no: string | null
+          declarant_name: string | null
+          declaration_date: string | null
+          duty_rate_percentage: number | null
+          excise_duty_lkr: number | null
+          freight_cost_usd: number | null
+          goods_description: string | null
+          hs_code: string | null
+          id: string
+          insurance_cost_usd: number | null
+          invoice_value_usd: number | null
+          pal_lkr: number | null
+          payment_date: string | null
+          payment_receipt_no: string | null
+          shipment_id: string
+          special_instructions: string | null
+          total_duties_lkr: number | null
+          updated_at: string | null
+          vat_lkr: number | null
+        }
+        Insert: {
+          assessment_date?: string | null
+          cif_value_lkr?: number | null
+          clearance_date?: string | null
+          consignee_address?: string | null
+          consignee_name?: string | null
+          country_of_origin?: string | null
+          created_at?: string | null
+          cusdec_number?: string | null
+          customs_duty_lkr?: number | null
+          customs_officer_name?: string | null
+          customs_status?: Database["public"]["Enums"]["customs_status"] | null
+          declarant_license_no?: string | null
+          declarant_name?: string | null
+          declaration_date?: string | null
+          duty_rate_percentage?: number | null
+          excise_duty_lkr?: number | null
+          freight_cost_usd?: number | null
+          goods_description?: string | null
+          hs_code?: string | null
+          id?: string
+          insurance_cost_usd?: number | null
+          invoice_value_usd?: number | null
+          pal_lkr?: number | null
+          payment_date?: string | null
+          payment_receipt_no?: string | null
+          shipment_id: string
+          special_instructions?: string | null
+          total_duties_lkr?: number | null
+          updated_at?: string | null
+          vat_lkr?: number | null
+        }
+        Update: {
+          assessment_date?: string | null
+          cif_value_lkr?: number | null
+          clearance_date?: string | null
+          consignee_address?: string | null
+          consignee_name?: string | null
+          country_of_origin?: string | null
+          created_at?: string | null
+          cusdec_number?: string | null
+          customs_duty_lkr?: number | null
+          customs_officer_name?: string | null
+          customs_status?: Database["public"]["Enums"]["customs_status"] | null
+          declarant_license_no?: string | null
+          declarant_name?: string | null
+          declaration_date?: string | null
+          duty_rate_percentage?: number | null
+          excise_duty_lkr?: number | null
+          freight_cost_usd?: number | null
+          goods_description?: string | null
+          hs_code?: string | null
+          id?: string
+          insurance_cost_usd?: number | null
+          invoice_value_usd?: number | null
+          pal_lkr?: number | null
+          payment_date?: string | null
+          payment_receipt_no?: string | null
+          shipment_id?: string
+          special_instructions?: string | null
+          total_duties_lkr?: number | null
+          updated_at?: string | null
+          vat_lkr?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_customs_declarations_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_delivery_confirmations: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          customer_signature: string | null
+          delivery_date: string
+          delivery_location: string
+          delivery_photos: Json | null
+          delivery_receipt_url: string | null
+          delivery_time: string | null
+          driver_contact: string | null
+          driver_name: string | null
+          id: string
+          order_id: string
+          special_instructions: string | null
+          status: Database["public"]["Enums"]["delivery_status"] | null
+          updated_at: string | null
+          vehicle_condition_on_delivery: string | null
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          customer_signature?: string | null
+          delivery_date: string
+          delivery_location: string
+          delivery_photos?: Json | null
+          delivery_receipt_url?: string | null
+          delivery_time?: string | null
+          driver_contact?: string | null
+          driver_name?: string | null
+          id?: string
+          order_id: string
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["delivery_status"] | null
+          updated_at?: string | null
+          vehicle_condition_on_delivery?: string | null
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          customer_signature?: string | null
+          delivery_date?: string
+          delivery_location?: string
+          delivery_photos?: Json | null
+          delivery_receipt_url?: string | null
+          delivery_time?: string | null
+          driver_contact?: string | null
+          driver_name?: string | null
+          id?: string
+          order_id?: string
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["delivery_status"] | null
+          updated_at?: string | null
+          vehicle_condition_on_delivery?: string | null
+        }
+        Relationships: []
+      }
+      yutong_delivery_inspections: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          checklist_items: Json | null
+          created_at: string | null
+          defects_found: Json | null
+          id: string
+          inspection_date: string
+          inspector_id: string | null
+          inspector_name: string
+          notes: string | null
+          order_id: string
+          overall_rating: number | null
+          photos: Json | null
+          status: Database["public"]["Enums"]["inspection_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          checklist_items?: Json | null
+          created_at?: string | null
+          defects_found?: Json | null
+          id?: string
+          inspection_date?: string
+          inspector_id?: string | null
+          inspector_name: string
+          notes?: string | null
+          order_id: string
+          overall_rating?: number | null
+          photos?: Json | null
+          status?: Database["public"]["Enums"]["inspection_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          checklist_items?: Json | null
+          created_at?: string | null
+          defects_found?: Json | null
+          id?: string
+          inspection_date?: string
+          inspector_id?: string | null
+          inspector_name?: string
+          notes?: string | null
+          order_id?: string
+          overall_rating?: number | null
+          photos?: Json | null
+          status?: Database["public"]["Enums"]["inspection_status"] | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -4002,6 +4465,163 @@ export type Database = {
           },
         ]
       }
+      yutong_port_operations: {
+        Row: {
+          assigned_drivers: Json | null
+          created_at: string | null
+          driver_licenses: Json | null
+          entry_time: string | null
+          equipment_list: Json | null
+          exit_time: string | null
+          id: string
+          insurance_cover_note: string | null
+          insurance_expiry_date: string | null
+          insurance_policy_number: string | null
+          insurance_provider: string | null
+          operation_date: string | null
+          operation_notes: string | null
+          operation_status: string | null
+          photos_on_arrival: Json | null
+          port_pass_number: string | null
+          shipment_id: string
+          supervisor_name: string | null
+          updated_at: string | null
+          vehicle_condition_on_arrival: string | null
+        }
+        Insert: {
+          assigned_drivers?: Json | null
+          created_at?: string | null
+          driver_licenses?: Json | null
+          entry_time?: string | null
+          equipment_list?: Json | null
+          exit_time?: string | null
+          id?: string
+          insurance_cover_note?: string | null
+          insurance_expiry_date?: string | null
+          insurance_policy_number?: string | null
+          insurance_provider?: string | null
+          operation_date?: string | null
+          operation_notes?: string | null
+          operation_status?: string | null
+          photos_on_arrival?: Json | null
+          port_pass_number?: string | null
+          shipment_id: string
+          supervisor_name?: string | null
+          updated_at?: string | null
+          vehicle_condition_on_arrival?: string | null
+        }
+        Update: {
+          assigned_drivers?: Json | null
+          created_at?: string | null
+          driver_licenses?: Json | null
+          entry_time?: string | null
+          equipment_list?: Json | null
+          exit_time?: string | null
+          id?: string
+          insurance_cover_note?: string | null
+          insurance_expiry_date?: string | null
+          insurance_policy_number?: string | null
+          insurance_provider?: string | null
+          operation_date?: string | null
+          operation_notes?: string | null
+          operation_status?: string | null
+          photos_on_arrival?: Json | null
+          port_pass_number?: string | null
+          shipment_id?: string
+          supervisor_name?: string | null
+          updated_at?: string | null
+          vehicle_condition_on_arrival?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_port_operations_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_pre_delivery_inspections: {
+        Row: {
+          created_at: string | null
+          critical_issues: Json | null
+          customer_notified: boolean | null
+          defects_found: Json | null
+          electrical_checks: Json | null
+          exterior_checks: Json | null
+          id: string
+          inspection_date: string | null
+          inspection_passed: boolean | null
+          inspection_photos: Json | null
+          inspector_name: string
+          inspector_signature: string | null
+          interior_checks: Json | null
+          mechanical_checks: Json | null
+          overall_condition_rating: number | null
+          recommendations: string | null
+          reinspection_date: string | null
+          reinspection_required: boolean | null
+          safety_checks: Json | null
+          vehicle_processing_id: string
+          yutong_notified: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          critical_issues?: Json | null
+          customer_notified?: boolean | null
+          defects_found?: Json | null
+          electrical_checks?: Json | null
+          exterior_checks?: Json | null
+          id?: string
+          inspection_date?: string | null
+          inspection_passed?: boolean | null
+          inspection_photos?: Json | null
+          inspector_name: string
+          inspector_signature?: string | null
+          interior_checks?: Json | null
+          mechanical_checks?: Json | null
+          overall_condition_rating?: number | null
+          recommendations?: string | null
+          reinspection_date?: string | null
+          reinspection_required?: boolean | null
+          safety_checks?: Json | null
+          vehicle_processing_id: string
+          yutong_notified?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          critical_issues?: Json | null
+          customer_notified?: boolean | null
+          defects_found?: Json | null
+          electrical_checks?: Json | null
+          exterior_checks?: Json | null
+          id?: string
+          inspection_date?: string | null
+          inspection_passed?: boolean | null
+          inspection_photos?: Json | null
+          inspector_name?: string
+          inspector_signature?: string | null
+          interior_checks?: Json | null
+          mechanical_checks?: Json | null
+          overall_condition_rating?: number | null
+          recommendations?: string | null
+          reinspection_date?: string | null
+          reinspection_required?: boolean | null
+          safety_checks?: Json | null
+          vehicle_processing_id?: string
+          yutong_notified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_pre_delivery_inspections_vehicle_processing_id_fkey"
+            columns: ["vehicle_processing_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_vehicle_processing"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_production_updates: {
         Row: {
           created_at: string | null
@@ -4204,6 +4824,189 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      yutong_rmv_registrations: {
+        Row: {
+          additional_documents_required: Json | null
+          application_date: string | null
+          application_number: string | null
+          assigned_rmv_officer: string | null
+          assigned_staff_member: string | null
+          chassis_number: string
+          completion_date: string | null
+          cr_print_date: string | null
+          created_at: string | null
+          documents_submitted: Json | null
+          engine_number: string
+          id: string
+          inspection_date: string | null
+          inspection_notes: string | null
+          inspection_officer: string | null
+          inspection_passed: boolean | null
+          model_year: number | null
+          number_plate_issued: string | null
+          order_id: string
+          payment_receipt_number: string | null
+          processing_fees_lkr: number | null
+          registration_certificate_number: string | null
+          registration_fees_lkr: number | null
+          registration_number: string | null
+          registration_status: Database["public"]["Enums"]["rmv_status"] | null
+          rmv_office_location: string | null
+          status_notes: string | null
+          submission_date: string | null
+          total_fees_paid_lkr: number | null
+          updated_at: string | null
+          vehicle_processing_id: string | null
+        }
+        Insert: {
+          additional_documents_required?: Json | null
+          application_date?: string | null
+          application_number?: string | null
+          assigned_rmv_officer?: string | null
+          assigned_staff_member?: string | null
+          chassis_number: string
+          completion_date?: string | null
+          cr_print_date?: string | null
+          created_at?: string | null
+          documents_submitted?: Json | null
+          engine_number: string
+          id?: string
+          inspection_date?: string | null
+          inspection_notes?: string | null
+          inspection_officer?: string | null
+          inspection_passed?: boolean | null
+          model_year?: number | null
+          number_plate_issued?: string | null
+          order_id: string
+          payment_receipt_number?: string | null
+          processing_fees_lkr?: number | null
+          registration_certificate_number?: string | null
+          registration_fees_lkr?: number | null
+          registration_number?: string | null
+          registration_status?: Database["public"]["Enums"]["rmv_status"] | null
+          rmv_office_location?: string | null
+          status_notes?: string | null
+          submission_date?: string | null
+          total_fees_paid_lkr?: number | null
+          updated_at?: string | null
+          vehicle_processing_id?: string | null
+        }
+        Update: {
+          additional_documents_required?: Json | null
+          application_date?: string | null
+          application_number?: string | null
+          assigned_rmv_officer?: string | null
+          assigned_staff_member?: string | null
+          chassis_number?: string
+          completion_date?: string | null
+          cr_print_date?: string | null
+          created_at?: string | null
+          documents_submitted?: Json | null
+          engine_number?: string
+          id?: string
+          inspection_date?: string | null
+          inspection_notes?: string | null
+          inspection_officer?: string | null
+          inspection_passed?: boolean | null
+          model_year?: number | null
+          number_plate_issued?: string | null
+          order_id?: string
+          payment_receipt_number?: string | null
+          processing_fees_lkr?: number | null
+          registration_certificate_number?: string | null
+          registration_fees_lkr?: number | null
+          registration_number?: string | null
+          registration_status?: Database["public"]["Enums"]["rmv_status"] | null
+          rmv_office_location?: string | null
+          status_notes?: string | null
+          submission_date?: string | null
+          total_fees_paid_lkr?: number | null
+          updated_at?: string | null
+          vehicle_processing_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_rmv_registrations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_rmv_registrations_vehicle_processing_id_fkey"
+            columns: ["vehicle_processing_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_vehicle_processing"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_service_reminders: {
+        Row: {
+          created_at: string | null
+          customer_contacted: boolean | null
+          customer_contacted_at: string | null
+          due_date: string
+          due_mileage_km: number | null
+          id: string
+          next_reminder_date: string | null
+          notes: string | null
+          order_id: string
+          reminder_sent: boolean | null
+          reminder_sent_at: string | null
+          reminder_type: string
+          service_booked: boolean | null
+          service_booked_at: string | null
+          service_completed: boolean | null
+          service_completed_at: string | null
+          service_description: string | null
+          updated_at: string | null
+          warranty_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_contacted?: boolean | null
+          customer_contacted_at?: string | null
+          due_date: string
+          due_mileage_km?: number | null
+          id?: string
+          next_reminder_date?: string | null
+          notes?: string | null
+          order_id: string
+          reminder_sent?: boolean | null
+          reminder_sent_at?: string | null
+          reminder_type: string
+          service_booked?: boolean | null
+          service_booked_at?: string | null
+          service_completed?: boolean | null
+          service_completed_at?: string | null
+          service_description?: string | null
+          updated_at?: string | null
+          warranty_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_contacted?: boolean | null
+          customer_contacted_at?: string | null
+          due_date?: string
+          due_mileage_km?: number | null
+          id?: string
+          next_reminder_date?: string | null
+          notes?: string | null
+          order_id?: string
+          reminder_sent?: boolean | null
+          reminder_sent_at?: string | null
+          reminder_type?: string
+          service_booked?: boolean | null
+          service_booked_at?: string | null
+          service_completed?: boolean | null
+          service_completed_at?: string | null
+          service_description?: string | null
+          updated_at?: string | null
+          warranty_id?: string | null
+        }
+        Relationships: []
       }
       yutong_shipment_tracking: {
         Row: {
@@ -4542,6 +5345,279 @@ export type Database = {
           },
         ]
       }
+      yutong_support_tickets: {
+        Row: {
+          assigned_to: string | null
+          assigned_to_name: string | null
+          attachments: Json | null
+          category: string
+          closed_at: string | null
+          created_at: string | null
+          customer_contact_email: string | null
+          customer_contact_phone: string | null
+          customer_id: string
+          customer_notes: string | null
+          customer_satisfaction_rating: number | null
+          description: string
+          escalated: boolean | null
+          escalated_at: string | null
+          escalated_to: string | null
+          id: string
+          internal_notes: string | null
+          order_id: string | null
+          priority: Database["public"]["Enums"]["ticket_priority"] | null
+          resolution: string | null
+          resolution_time_hours: number | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["ticket_status"] | null
+          subject: string
+          ticket_number: string
+          updated_at: string | null
+          warranty_id: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          assigned_to_name?: string | null
+          attachments?: Json | null
+          category: string
+          closed_at?: string | null
+          created_at?: string | null
+          customer_contact_email?: string | null
+          customer_contact_phone?: string | null
+          customer_id: string
+          customer_notes?: string | null
+          customer_satisfaction_rating?: number | null
+          description: string
+          escalated?: boolean | null
+          escalated_at?: string | null
+          escalated_to?: string | null
+          id?: string
+          internal_notes?: string | null
+          order_id?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"] | null
+          resolution?: string | null
+          resolution_time_hours?: number | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"] | null
+          subject: string
+          ticket_number: string
+          updated_at?: string | null
+          warranty_id?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          assigned_to_name?: string | null
+          attachments?: Json | null
+          category?: string
+          closed_at?: string | null
+          created_at?: string | null
+          customer_contact_email?: string | null
+          customer_contact_phone?: string | null
+          customer_id?: string
+          customer_notes?: string | null
+          customer_satisfaction_rating?: number | null
+          description?: string
+          escalated?: boolean | null
+          escalated_at?: string | null
+          escalated_to?: string | null
+          id?: string
+          internal_notes?: string | null
+          order_id?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"] | null
+          resolution?: string | null
+          resolution_time_hours?: number | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"] | null
+          subject?: string
+          ticket_number?: string
+          updated_at?: string | null
+          warranty_id?: string | null
+        }
+        Relationships: []
+      }
+      yutong_vehicle_processing: {
+        Row: {
+          accessories_installed: Json | null
+          accessories_required: Json | null
+          arrival_date: string | null
+          chassis_number: string | null
+          created_at: string | null
+          current_stage: Database["public"]["Enums"]["processing_stage"] | null
+          defects_identified: Json | null
+          defects_resolved: Json | null
+          dewaxing_completed_date: string | null
+          dewaxing_contractor: string | null
+          dewaxing_scheduled_date: string | null
+          dvr_sim_installed: boolean | null
+          engine_number: string | null
+          fuel_added_liters: number | null
+          fuel_level_on_arrival: number | null
+          id: string
+          inspection_completed_date: string | null
+          inspection_scheduled_date: string | null
+          inspector_name: string | null
+          order_id: string
+          processing_location: string | null
+          processing_supervisor: string | null
+          ready_for_delivery: boolean | null
+          shipment_id: string
+          stage_progress_percentage: number | null
+          test_drive_date: string | null
+          test_drive_km_reading: number | null
+          test_drive_notes: string | null
+          updated_at: string | null
+          washing_completed_date: string | null
+          washing_contractor: string | null
+          washing_scheduled_date: string | null
+        }
+        Insert: {
+          accessories_installed?: Json | null
+          accessories_required?: Json | null
+          arrival_date?: string | null
+          chassis_number?: string | null
+          created_at?: string | null
+          current_stage?: Database["public"]["Enums"]["processing_stage"] | null
+          defects_identified?: Json | null
+          defects_resolved?: Json | null
+          dewaxing_completed_date?: string | null
+          dewaxing_contractor?: string | null
+          dewaxing_scheduled_date?: string | null
+          dvr_sim_installed?: boolean | null
+          engine_number?: string | null
+          fuel_added_liters?: number | null
+          fuel_level_on_arrival?: number | null
+          id?: string
+          inspection_completed_date?: string | null
+          inspection_scheduled_date?: string | null
+          inspector_name?: string | null
+          order_id: string
+          processing_location?: string | null
+          processing_supervisor?: string | null
+          ready_for_delivery?: boolean | null
+          shipment_id: string
+          stage_progress_percentage?: number | null
+          test_drive_date?: string | null
+          test_drive_km_reading?: number | null
+          test_drive_notes?: string | null
+          updated_at?: string | null
+          washing_completed_date?: string | null
+          washing_contractor?: string | null
+          washing_scheduled_date?: string | null
+        }
+        Update: {
+          accessories_installed?: Json | null
+          accessories_required?: Json | null
+          arrival_date?: string | null
+          chassis_number?: string | null
+          created_at?: string | null
+          current_stage?: Database["public"]["Enums"]["processing_stage"] | null
+          defects_identified?: Json | null
+          defects_resolved?: Json | null
+          dewaxing_completed_date?: string | null
+          dewaxing_contractor?: string | null
+          dewaxing_scheduled_date?: string | null
+          dvr_sim_installed?: boolean | null
+          engine_number?: string | null
+          fuel_added_liters?: number | null
+          fuel_level_on_arrival?: number | null
+          id?: string
+          inspection_completed_date?: string | null
+          inspection_scheduled_date?: string | null
+          inspector_name?: string | null
+          order_id?: string
+          processing_location?: string | null
+          processing_supervisor?: string | null
+          ready_for_delivery?: boolean | null
+          shipment_id?: string
+          stage_progress_percentage?: number | null
+          test_drive_date?: string | null
+          test_drive_km_reading?: number | null
+          test_drive_notes?: string | null
+          updated_at?: string | null
+          washing_completed_date?: string | null
+          washing_contractor?: string | null
+          washing_scheduled_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_vehicle_processing_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_vehicle_processing_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_warranties: {
+        Row: {
+          claim_process: string | null
+          contact_information: Json | null
+          coverage_details: string | null
+          created_at: string | null
+          duration_months: number
+          end_date: string
+          exclusions: string | null
+          id: string
+          mileage_limit_km: number | null
+          order_id: string
+          service_provider: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["warranty_status"] | null
+          terms_and_conditions: string | null
+          updated_at: string | null
+          warranty_certificate_url: string | null
+          warranty_number: string
+          warranty_type: string
+        }
+        Insert: {
+          claim_process?: string | null
+          contact_information?: Json | null
+          coverage_details?: string | null
+          created_at?: string | null
+          duration_months: number
+          end_date: string
+          exclusions?: string | null
+          id?: string
+          mileage_limit_km?: number | null
+          order_id: string
+          service_provider?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["warranty_status"] | null
+          terms_and_conditions?: string | null
+          updated_at?: string | null
+          warranty_certificate_url?: string | null
+          warranty_number: string
+          warranty_type: string
+        }
+        Update: {
+          claim_process?: string | null
+          contact_information?: Json | null
+          coverage_details?: string | null
+          created_at?: string | null
+          duration_months?: number
+          end_date?: string
+          exclusions?: string | null
+          id?: string
+          mileage_limit_km?: number | null
+          order_id?: string
+          service_provider?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["warranty_status"] | null
+          terms_and_conditions?: string | null
+          updated_at?: string | null
+          warranty_certificate_url?: string | null
+          warranty_number?: string
+          warranty_type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -4564,6 +5640,14 @@ export type Database = {
         Returns: string
       }
       generate_yutong_quotation_no: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_yutong_ticket_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_yutong_warranty_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
@@ -4616,7 +5700,31 @@ export type Database = {
         | "staff"
         | "finance"
       approval_status: "pending" | "approved" | "rejected"
+      customs_status:
+        | "draft"
+        | "submitted"
+        | "under_assessment"
+        | "duty_calculated"
+        | "payment_pending"
+        | "payment_completed"
+        | "cleared"
+        | "held"
+        | "rejected"
+      delivery_status:
+        | "pending"
+        | "scheduled"
+        | "in_transit"
+        | "delivered"
+        | "cancelled"
+      feedback_rating: "1" | "2" | "3" | "4" | "5"
       fleet_status: "active" | "maintenance" | "idle" | "retired"
+      handover_status: "scheduled" | "in_progress" | "completed" | "cancelled"
+      inspection_status:
+        | "pending"
+        | "in_progress"
+        | "completed"
+        | "failed"
+        | "approved"
       maintenance_status: "pending" | "in_progress" | "completed" | "cancelled"
       payment_status:
         | "pending_operations"
@@ -4624,6 +5732,20 @@ export type Database = {
         | "approved"
         | "rejected"
       permit_status: "valid" | "expired" | "suspended" | "cancelled"
+      processing_stage:
+        | "arrived"
+        | "dewaxing_scheduled"
+        | "dewaxing_completed"
+        | "washing_scheduled"
+        | "washing_completed"
+        | "inspection_scheduled"
+        | "inspection_in_progress"
+        | "inspection_completed"
+        | "accessories_pending"
+        | "accessories_completed"
+        | "test_drive_pending"
+        | "test_drive_completed"
+        | "ready_for_registration"
       production_milestone:
         | "order_received"
         | "production_started"
@@ -4633,6 +5755,16 @@ export type Database = {
         | "quality_inspection"
         | "final_testing"
         | "ready_for_shipment"
+      rmv_status:
+        | "documents_preparing"
+        | "application_submitted"
+        | "under_review"
+        | "additional_documents_required"
+        | "approved"
+        | "cr_print_ready"
+        | "cr_print_collected"
+        | "registration_completed"
+        | "rejected"
       shipping_document_type:
         | "commercial_invoice"
         | "packing_list"
@@ -4641,8 +5773,16 @@ export type Database = {
         | "insurance_certificate"
         | "customs_declaration"
       shipping_method: "roro" | "container"
+      ticket_priority: "low" | "medium" | "high" | "urgent"
+      ticket_status:
+        | "open"
+        | "in_progress"
+        | "pending_customer"
+        | "resolved"
+        | "closed"
       trip_status: "scheduled" | "ongoing" | "completed" | "cancelled"
       user_status: "active" | "inactive" | "suspended"
+      warranty_status: "active" | "expired" | "claimed" | "void"
       yutong_do_status: "pending" | "issued" | "released" | "utilized"
       yutong_lc_status:
         | "pending"
@@ -4804,7 +5944,34 @@ export const Constants = {
         "finance",
       ],
       approval_status: ["pending", "approved", "rejected"],
+      customs_status: [
+        "draft",
+        "submitted",
+        "under_assessment",
+        "duty_calculated",
+        "payment_pending",
+        "payment_completed",
+        "cleared",
+        "held",
+        "rejected",
+      ],
+      delivery_status: [
+        "pending",
+        "scheduled",
+        "in_transit",
+        "delivered",
+        "cancelled",
+      ],
+      feedback_rating: ["1", "2", "3", "4", "5"],
       fleet_status: ["active", "maintenance", "idle", "retired"],
+      handover_status: ["scheduled", "in_progress", "completed", "cancelled"],
+      inspection_status: [
+        "pending",
+        "in_progress",
+        "completed",
+        "failed",
+        "approved",
+      ],
       maintenance_status: ["pending", "in_progress", "completed", "cancelled"],
       payment_status: [
         "pending_operations",
@@ -4813,6 +5980,21 @@ export const Constants = {
         "rejected",
       ],
       permit_status: ["valid", "expired", "suspended", "cancelled"],
+      processing_stage: [
+        "arrived",
+        "dewaxing_scheduled",
+        "dewaxing_completed",
+        "washing_scheduled",
+        "washing_completed",
+        "inspection_scheduled",
+        "inspection_in_progress",
+        "inspection_completed",
+        "accessories_pending",
+        "accessories_completed",
+        "test_drive_pending",
+        "test_drive_completed",
+        "ready_for_registration",
+      ],
       production_milestone: [
         "order_received",
         "production_started",
@@ -4823,6 +6005,17 @@ export const Constants = {
         "final_testing",
         "ready_for_shipment",
       ],
+      rmv_status: [
+        "documents_preparing",
+        "application_submitted",
+        "under_review",
+        "additional_documents_required",
+        "approved",
+        "cr_print_ready",
+        "cr_print_collected",
+        "registration_completed",
+        "rejected",
+      ],
       shipping_document_type: [
         "commercial_invoice",
         "packing_list",
@@ -4832,8 +6025,17 @@ export const Constants = {
         "customs_declaration",
       ],
       shipping_method: ["roro", "container"],
+      ticket_priority: ["low", "medium", "high", "urgent"],
+      ticket_status: [
+        "open",
+        "in_progress",
+        "pending_customer",
+        "resolved",
+        "closed",
+      ],
       trip_status: ["scheduled", "ongoing", "completed", "cancelled"],
       user_status: ["active", "inactive", "suspended"],
+      warranty_status: ["active", "expired", "claimed", "void"],
       yutong_do_status: ["pending", "issued", "released", "utilized"],
       yutong_lc_status: [
         "pending",
