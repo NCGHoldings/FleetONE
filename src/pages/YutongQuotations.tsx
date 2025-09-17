@@ -14,6 +14,11 @@ import { YutongOrdersList } from "@/components/yutong/YutongOrdersList";
 import { YutongFinanceDashboard } from "@/components/yutong/YutongFinanceDashboard";
 import { YutongSupplierManagement } from '@/components/yutong/YutongSupplierManagement';
 import { YutongLogisticsManagement } from '@/components/yutong/YutongLogisticsManagement';
+import { YutongCustomsManagement } from '@/components/yutong/YutongCustomsManagement';
+import { YutongVehicleProcessingManagement } from '@/components/yutong/YutongVehicleProcessingManagement';
+import { YutongRMVRegistrationManagement } from '@/components/yutong/YutongRMVRegistrationManagement';
+import { YutongDeliveryManagement } from '@/components/yutong/YutongDeliveryManagement';
+import { YutongAfterSalesManagement } from '@/components/yutong/YutongAfterSalesManagement';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -136,16 +141,21 @@ export default function YutongQuotations() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-9">
-          <TabsTrigger value="quotations">Quotations</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="finance">Finance</TabsTrigger>
-          <TabsTrigger value="supplier">Supplier</TabsTrigger>
-          <TabsTrigger value="logistics">Logistics</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="bus-models">Bus Models</TabsTrigger>
-          <TabsTrigger value="addons">Add-ons</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-14 text-xs">
+          <TabsTrigger value="quotations" className="text-xs">Quotations</TabsTrigger>
+          <TabsTrigger value="orders" className="text-xs">Orders</TabsTrigger>
+          <TabsTrigger value="finance" className="text-xs">Finance</TabsTrigger>
+          <TabsTrigger value="supplier" className="text-xs">Supplier</TabsTrigger>
+          <TabsTrigger value="logistics" className="text-xs">Logistics</TabsTrigger>
+          <TabsTrigger value="customs" className="text-xs">Customs</TabsTrigger>
+          <TabsTrigger value="processing" className="text-xs">Processing</TabsTrigger>
+          <TabsTrigger value="rmv" className="text-xs">RMV</TabsTrigger>
+          <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
+          <TabsTrigger value="after-sales" className="text-xs">After-Sales</TabsTrigger>
+          <TabsTrigger value="customers" className="text-xs">Customers</TabsTrigger>
+          <TabsTrigger value="bus-models" className="text-xs">Bus Models</TabsTrigger>
+          <TabsTrigger value="addons" className="text-xs">Add-ons</TabsTrigger>
+          <TabsTrigger value="reports" className="text-xs">Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="quotations" className="space-y-4">
@@ -166,6 +176,26 @@ export default function YutongQuotations() {
 
         <TabsContent value="logistics" className="space-y-4">
           <YutongLogisticsManagement />
+        </TabsContent>
+
+        <TabsContent value="customs" className="space-y-4">
+          <YutongCustomsManagement onRefresh={loadStats} />
+        </TabsContent>
+
+        <TabsContent value="processing" className="space-y-4">
+          <YutongVehicleProcessingManagement onRefresh={loadStats} />
+        </TabsContent>
+
+        <TabsContent value="rmv" className="space-y-4">
+          <YutongRMVRegistrationManagement onRefresh={loadStats} />
+        </TabsContent>
+
+        <TabsContent value="delivery" className="space-y-4">
+          <YutongDeliveryManagement onRefresh={loadStats} />
+        </TabsContent>
+
+        <TabsContent value="after-sales" className="space-y-4">
+          <YutongAfterSalesManagement onRefresh={loadStats} />
         </TabsContent>
 
         <TabsContent value="customers" className="space-y-4">

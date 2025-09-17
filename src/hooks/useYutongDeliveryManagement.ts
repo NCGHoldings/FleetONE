@@ -173,7 +173,7 @@ export function useYutongDeliveryManagement() {
     try {
       const { data, error } = await supabase
         .from('yutong_customer_handovers')
-        .insert([handoverData])
+        .insert(handoverData as any)
         .select()
         .single();
 
@@ -277,7 +277,7 @@ export function useYutongDeliveryManagement() {
     try {
       const { data, error } = await supabase
         .from('yutong_delivery_confirmations')
-        .insert([confirmationData])
+        .insert(confirmationData as any)
         .select()
         .single();
 
