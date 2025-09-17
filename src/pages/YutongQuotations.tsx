@@ -141,7 +141,7 @@ export default function YutongQuotations() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-14 text-xs">
+        <TabsList className="flex w-full overflow-x-auto gap-1 h-auto p-1">
           <TabsTrigger value="quotations" className="text-xs">Quotations</TabsTrigger>
           <TabsTrigger value="orders" className="text-xs">Orders</TabsTrigger>
           <TabsTrigger value="finance" className="text-xs">Finance</TabsTrigger>
