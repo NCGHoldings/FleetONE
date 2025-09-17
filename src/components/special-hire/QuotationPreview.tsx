@@ -63,18 +63,18 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           .single();
 
         if (busTypes) {
-          // Then fetch the rate card for this bus type
+          // Then fetch the rate card for this bus type, prioritizing non-zero exceeding rates
           const { data: rateData } = await supabase
             .from('hire_rate_cards')
             .select('*')
             .eq('bus_type_id', busTypes.id)
             .eq('is_active', true)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+            .order('exceeding_km_rate_lkr', { ascending: false });
 
-          if (rateData) {
-            setRateCard(rateData);
+          if (rateData && rateData.length > 0) {
+            // Find first record with non-zero exceeding_km_rate_lkr, or use first record if all are zero
+            const validRateCard = rateData.find(card => card.exceeding_km_rate_lkr > 0) || rateData[0];
+            setRateCard(validRateCard);
           }
         }
       } catch (error) {
