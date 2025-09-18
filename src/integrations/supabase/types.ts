@@ -1644,6 +1644,51 @@ export type Database = {
         }
         Relationships: []
       }
+      route_expenses: {
+        Row: {
+          amount: number
+          branch_id: string
+          created_at: string
+          created_by: string | null
+          description: string
+          expense_category: string | null
+          expense_date: string
+          expense_type: string
+          id: string
+          receipt_url: string | null
+          route_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          branch_id: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          expense_category?: string | null
+          expense_date?: string
+          expense_type: string
+          id?: string
+          receipt_url?: string | null
+          route_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          branch_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          expense_category?: string | null
+          expense_date?: string
+          expense_type?: string
+          id?: string
+          receipt_url?: string | null
+          route_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       route_permits: {
         Row: {
           allocated_bus_number: string | null
@@ -1742,6 +1787,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      route_staff_costs: {
+        Row: {
+          branch_id: string
+          contact_number: string | null
+          created_at: string
+          created_by: string | null
+          daily_rate: number | null
+          end_date: string | null
+          id: string
+          is_active: boolean
+          monthly_salary: number
+          nic_number: string | null
+          route_id: string
+          staff_name: string
+          staff_type: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          contact_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_rate?: number | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          monthly_salary?: number
+          nic_number?: string | null
+          route_id: string
+          staff_name: string
+          staff_type: string
+          start_date?: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          contact_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_rate?: number | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          monthly_salary?: number
+          nic_number?: string | null
+          route_id?: string
+          staff_name?: string
+          staff_type?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       routes: {
         Row: {
@@ -2012,41 +2111,71 @@ export type Database = {
       school_routes: {
         Row: {
           branch_id: string | null
+          bus_reg_no: string | null
           created_at: string
+          driver_contact: string | null
+          driver_name: string | null
           end_location: string | null
           estimated_duration_minutes: number | null
           id: string
           is_active: boolean | null
+          last_calculated_at: string | null
+          net_profit: number | null
+          outstanding_amount: number | null
           pickup_points: Json | null
+          profit_margin: number | null
           route_code: string
           route_name: string
           start_location: string | null
+          total_expenses: number | null
+          total_income: number | null
+          total_students: number | null
           updated_at: string
         }
         Insert: {
           branch_id?: string | null
+          bus_reg_no?: string | null
           created_at?: string
+          driver_contact?: string | null
+          driver_name?: string | null
           end_location?: string | null
           estimated_duration_minutes?: number | null
           id?: string
           is_active?: boolean | null
+          last_calculated_at?: string | null
+          net_profit?: number | null
+          outstanding_amount?: number | null
           pickup_points?: Json | null
+          profit_margin?: number | null
           route_code: string
           route_name: string
           start_location?: string | null
+          total_expenses?: number | null
+          total_income?: number | null
+          total_students?: number | null
           updated_at?: string
         }
         Update: {
           branch_id?: string | null
+          bus_reg_no?: string | null
           created_at?: string
+          driver_contact?: string | null
+          driver_name?: string | null
           end_location?: string | null
           estimated_duration_minutes?: number | null
           id?: string
           is_active?: boolean | null
+          last_calculated_at?: string | null
+          net_profit?: number | null
+          outstanding_amount?: number | null
           pickup_points?: Json | null
+          profit_margin?: number | null
           route_code?: string
           route_name?: string
           start_location?: string | null
+          total_expenses?: number | null
+          total_income?: number | null
+          total_students?: number | null
           updated_at?: string
         }
         Relationships: [

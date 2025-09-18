@@ -1,222 +1,158 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Edit, Trash2, MapPin } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { useRouteAnalytics } from "@/hooks/useRouteAnalytics";
+import { EnhancedRouteCard } from "@/components/school/EnhancedRouteCard";
+import { toast } from "@/hooks/use-toast";
+import { 
+  ArrowLeft, 
+  Plus, 
+  RefreshCw, 
+  TrendingUp, 
+  Users, 
+  IndianRupee,
+  AlertCircle,
+  BarChart3,
+  Eye,
+  Settings
+} from "lucide-react";
 
-interface Route {
-  id: string;
+interface RouteFormData {
   route_name: string;
   route_code: string;
   start_location: string;
   end_location: string;
-  estimated_duration_minutes: number;
-  pickup_points: any;
-  is_active: boolean;
-  created_at: string;
+  distance_km: string;
+  estimated_duration_min: string;
+  pickup_points: string;
+  driver_name: string;
+  driver_contact: string;
+  bus_reg_no: string;
+}
+
+interface StudentListModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  students: any[];
+  routeName: string;
+}
+
+function StudentListModal({ open, onOpenChange, students, routeName }: StudentListModalProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Students on Route: {routeName}</DialogTitle>
+          <DialogDescription>
+            {students.length} students assigned to this route
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {students.map((student, index) => (
+              <Card key={student.id || index} className="p-4">
+                <div className="space-y-2">
+                  <div className="font-medium">{student.student_name}</div>
+                  <div className="text-sm text-muted-foreground">
+                    Grade: {student.grade || 'N/A'}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Parent: {student.parent_name || 'N/A'}
+                  </div>
+                  <Badge variant={
+                    student.payment_status === 'paid' ? 'default' : 
+                    student.payment_status === 'overdue' ? 'destructive' : 'secondary'
+                  }>
+                    {student.payment_status || 'pending'}
+                  </Badge>
+                  {student.payment_amount && (
+                    <div className="text-sm font-medium">
+                      LKR {Number(student.payment_amount).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function SchoolRouteManagement() {
   const { branchId } = useParams<{ branchId: string }>();
   const navigate = useNavigate();
-  const [routes, setRoutes] = useState<Route[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
-  const [formData, setFormData] = useState({
+  const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
+  const [selectedRouteName, setSelectedRouteName] = useState("");
+  const [studentsModalOpen, setStudentsModalOpen] = useState(false);
+  
+  const [formData, setFormData] = useState<RouteFormData>({
     route_name: "",
     route_code: "",
     start_location: "",
     end_location: "",
-    estimated_duration_minutes: "",
+    distance_km: "",
+    estimated_duration_min: "",
+    pickup_points: "",
+    driver_name: "",
+    driver_contact: "",
+    bus_reg_no: ""
   });
 
-  useEffect(() => {
-    fetchRoutes();
-  }, [branchId]);
+  // Use the enhanced route analytics hook
+  const { 
+    routes, 
+    loading, 
+    error, 
+    refetch, 
+    addRouteExpense, 
+    addStaffCost, 
+    updateRouteInfo 
+  } = useRouteAnalytics(branchId);
 
-  const fetchRoutes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("school_routes")
-        .select("*")
-        .eq("branch_id", branchId)
-        .eq("is_active", true)
-        .order("route_name");
-
-      if (error) throw error;
-      setRoutes(data || []);
-    } catch (error) {
-      console.error("Error fetching routes:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load routes",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleViewStudents = (routeId: string, students: any[]) => {
+    const route = routes.find(r => r.routeId === routeId);
+    setSelectedStudents(students);
+    setSelectedRouteName(route?.routeName || "Unknown Route");
+    setStudentsModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const routeData = {
-        ...formData,
-        estimated_duration_minutes: Number(formData.estimated_duration_minutes),
-        branch_id: branchId,
-      };
-
-      if (editingRoute) {
-        const { error } = await supabase
-          .from("school_routes")
-          .update(routeData)
-          .eq("id", editingRoute.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("school_routes")
-          .insert(routeData);
-        if (error) throw error;
-      }
-
-      toast({
-        title: "Success",
-        description: `Route ${editingRoute ? "updated" : "created"} successfully`,
-      });
-
-      setIsAddModalOpen(false);
-      setEditingRoute(null);
-      setFormData({
-        route_name: "",
-        route_code: "",
-        start_location: "",
-        end_location: "",
-        estimated_duration_minutes: "",
-      });
-      fetchRoutes();
-    } catch (error) {
-      console.error("Error saving route:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save route",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDelete = async (routeId: string) => {
-    if (!confirm("Are you sure you want to delete this route?")) return;
-
-    try {
-      const { error } = await supabase
-        .from("school_routes")
-        .update({ is_active: false })
-        .eq("id", routeId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Route deleted successfully",
-      });
-      fetchRoutes();
-    } catch (error) {
-      console.error("Error deleting route:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete route",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleEdit = (route: Route) => {
-    setEditingRoute(route);
+  const resetForm = () => {
     setFormData({
-      route_name: route.route_name,
-      route_code: route.route_code,
-      start_location: route.start_location,
-      end_location: route.end_location,
-      estimated_duration_minutes: route.estimated_duration_minutes?.toString() || "",
+      route_name: "",
+      route_code: "",
+      start_location: "",
+      end_location: "",
+      distance_km: "",
+      estimated_duration_min: "",
+      pickup_points: "",
+      driver_name: "",
+      driver_contact: "",
+      bus_reg_no: ""
     });
-    setIsAddModalOpen(true);
   };
 
-  const columns = [
-    {
-      accessorKey: "route_code",
-      header: "Route Code",
-      cell: ({ row }: any) => (
-        <Badge variant="outline">{row.getValue("route_code")}</Badge>
-      ),
-    },
-    {
-      accessorKey: "route_name",
-      header: "Route Name",
-    },
-    {
-      accessorKey: "start_location",
-      header: "Start Location",
-    },
-    {
-      accessorKey: "end_location",
-      header: "End Location",
-    },
-    {
-      accessorKey: "estimated_duration_minutes",
-      header: "Duration (mins)",
-    },
-    {
-      id: "pickup_points",
-      header: "Pickup Points",
-      cell: ({ row }: any) => {
-        const points = Array.isArray(row.original.pickup_points) ? row.original.pickup_points : [];
-        return (
-          <div className="flex items-center gap-1">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            {points.length} points
-          </div>
-        );
-      },
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }: any) => (
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleEdit(row.original)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDelete(row.original.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
+  // Calculate overall statistics
+  const totalStudents = routes.reduce((sum, route) => sum + route.totalStudents, 0);
+  const totalIncome = routes.reduce((sum, route) => sum + route.totalIncome, 0);
+  const totalExpenses = routes.reduce((sum, route) => sum + route.totalExpenses, 0);
+  const totalProfit = routes.reduce((sum, route) => sum + route.netProfit, 0);
+  const profitableRoutes = routes.filter(route => route.netProfit > 0).length;
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading routes...</p>
+          <p className="text-muted-foreground">Loading route analytics...</p>
         </div>
       </div>
     );
@@ -224,6 +160,7 @@ export default function SchoolRouteManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button 
@@ -235,103 +172,127 @@ export default function SchoolRouteManagement() {
             Back to Branch
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Route Management</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Route Management & Analytics</h1>
             <p className="text-muted-foreground">
-              Manage bus routes and pickup points for this branch
+              Auto-detected routes with comprehensive financial tracking
             </p>
           </div>
         </div>
-        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => {
-              setEditingRoute(null);
-              setFormData({
-                route_name: "",
-                route_code: "",
-                start_location: "",
-                end_location: "",
-                estimated_duration_minutes: "",
-              });
-            }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Route
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingRoute ? "Edit Route" : "Add New Route"}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="route_code">Route Code</Label>
-                <Input
-                  id="route_code"
-                  value={formData.route_code}
-                  onChange={(e) => setFormData(prev => ({ ...prev, route_code: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="route_name">Route Name</Label>
-                <Input
-                  id="route_name"
-                  value={formData.route_name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, route_name: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="start_location">Start Location</Label>
-                <Input
-                  id="start_location"
-                  value={formData.start_location}
-                  onChange={(e) => setFormData(prev => ({ ...prev, start_location: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="end_location">End Location</Label>
-                <Input
-                  id="end_location"
-                  value={formData.end_location}
-                  onChange={(e) => setFormData(prev => ({ ...prev, end_location: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="estimated_duration_minutes">Duration (minutes)</Label>
-                <Input
-                  id="estimated_duration_minutes"
-                  type="number"
-                  value={formData.estimated_duration_minutes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, estimated_duration_minutes: e.target.value }))}
-                />
-              </div>
-              <div className="flex gap-2 pt-4">
-                <Button type="submit">
-                  {editingRoute ? "Update Route" : "Create Route"}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={refetch}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh Data
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Routes ({routes.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={columns}
-            data={routes}
-            searchKey="route_name"
-          />
-        </CardContent>
-      </Card>
+      {/* Overall Analytics Dashboard */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalStudents}</div>
+            <p className="text-xs text-muted-foreground">
+              Across {routes.length} routes
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+            <IndianRupee className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">LKR {(totalIncome / 1000).toFixed(0)}K</div>
+            <p className="text-xs text-muted-foreground">
+              Monthly revenue
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              LKR {(totalProfit / 1000).toFixed(0)}K
+            </div>
+            <p className="text-xs text-muted-foreground">
+              After all expenses
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Profitable Routes</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{profitableRoutes}/{routes.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {routes.length > 0 ? ((profitableRoutes / routes.length) * 100).toFixed(0) : 0}% profitable
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Routes Grid */}
+      {routes.length > 0 ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {routes.map((route) => (
+            <EnhancedRouteCard
+              key={route.routeId}
+              route={route}
+              onAddExpense={addRouteExpense}
+              onAddStaff={addStaffCost}
+              onUpdateRoute={updateRouteInfo}
+              onViewStudents={handleViewStudents}
+            />
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Routes Detected</h3>
+            <p className="text-muted-foreground text-center max-w-md mb-4">
+              Routes are automatically detected from your student database. 
+              Import student data with route information to see routes here.
+            </p>
+            <Button onClick={() => navigate(`/school-bus/branch/${branchId}/import`)}>
+              Import Student Data
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Students Modal */}
+      <StudentListModal
+        open={studentsModalOpen}
+        onOpenChange={setStudentsModalOpen}
+        students={selectedStudents}
+        routeName={selectedRouteName}
+      />
+
+      {/* Error Display */}
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-center gap-2 py-4">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            <span className="text-red-700">{error}</span>
+            <Button variant="outline" size="sm" onClick={refetch} className="ml-auto">
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
