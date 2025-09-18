@@ -4,18 +4,22 @@ import { Badge } from '@/components/ui/badge';
 import { ApprovalSignatureModal } from './ApprovalSignatureModal';
 import { SignaturePreviewCard } from './SignaturePreviewCard';
 import { useSignatureManagement, type ApprovalData } from '@/hooks/useSignatureManagement';
+import { useDocumentRegeneration } from '@/hooks/useDocumentRegeneration';
+import { supabase } from '@/integrations/supabase/client';
 import { Pen, User, Calendar, Trash2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 interface DocumentSignatureManagerProps {
   documentId: string;
+  quotationId?: string;
   documentStatus: 'draft' | 'approved';
   onSignatureUpdated?: () => void;
 }
 
 export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> = ({
   documentId,
+  quotationId,
   documentStatus,
   onSignatureUpdated,
 }) => {
@@ -25,6 +29,7 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
   const [editingApproval, setEditingApproval] = useState<ApprovalData | undefined>();
   
   const { getDocumentApprovals, deleteApproval, isLoading } = useSignatureManagement();
+  const { regenerateDocumentWithSignatures, isRegenerating } = useDocumentRegeneration();
 
   useEffect(() => {
     loadApprovals();
@@ -68,6 +73,30 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
   const handleSignatureSaved = async () => {
     await loadApprovals();
     onSignatureUpdated?.();
+    
+    // Auto-regenerate document if there's a quotationId available
+    if (quotationId) {
+      try {
+        // Find the document that needs to be updated
+        const { data: documents } = await supabase
+          .from('document_storage')
+          .select('*')
+          .eq('quotation_id', quotationId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (documents && documents.length > 0) {
+          await regenerateDocumentWithSignatures(
+            documents[0].id,
+            quotationId,
+            documents[0].payment_id
+          );
+        }
+      } catch (error) {
+        console.error('Auto-regeneration failed:', error);
+        toast.info('Signature saved. Please manually update the document.');
+      }
+    }
   };
 
   const getApprovalTypeName = (type: string) => {
@@ -104,11 +133,11 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
             variant="outline"
             size="sm"
             onClick={loadApprovals}
-            disabled={isLoading}
+            disabled={isLoading || isRegenerating}
             className="flex items-center gap-2"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            <RefreshCw className={`h-4 w-4 ${(isLoading || isRegenerating) ? 'animate-spin' : ''}`} />
+            {isRegenerating ? 'Updating...' : 'Refresh'}
           </Button>
         </div>
       </div>

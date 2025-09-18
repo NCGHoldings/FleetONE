@@ -38,6 +38,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const [approvals, setApprovals] = useState<ApprovalData[]>([]);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [quotationData, setQuotationData] = useState<any>(null);
+  const [currentDocument, setCurrentDocument] = useState(document);
   const { user } = useAuth();
   const { getDocumentApprovals } = useSignatureManagement();
 
@@ -73,6 +74,11 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         approval_type: approval.approval_type as 'prepared_by' | 'checked_by' | 'approved_by'
       }));
       setApprovals(typedApprovals);
+      
+      // Auto-regenerate document with new signatures
+      if (typedApprovals.length > 0) {
+        await regenerateDocumentWithSignatures();
+      }
     }
   };
 
@@ -96,15 +102,23 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         throw new Error('Failed to fetch payment data');
       }
 
+      // Fetch current signatures
+      const { data: signatures } = await supabase
+        .from('document_approvals')
+        .select('*')
+        .eq('document_id', document.quotation_id);
+
       // Prepare approval signatures
       const approvalSignatures: any = {};
-      approvals.forEach(approval => {
-        approvalSignatures[approval.approval_type] = {
-          approver_name: approval.approver_name,
-          signature_data: approval.signature_data,
-          approval_date: approval.approval_date,
-        };
-      });
+      if (signatures) {
+        signatures.forEach(approval => {
+          approvalSignatures[approval.approval_type] = {
+            approver_name: approval.approver_name,
+            signature_data: approval.signature_data,
+            approval_date: approval.approval_date,
+          };
+        });
+      }
 
       // Calculate total amount
       const calculateTotalAmount = (quotation: any) => {
@@ -117,7 +131,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
       // Create invoice data with signatures
       const invoiceData: InvoiceData = {
-        invoiceNo: `SIGNED-${document.payment_type.toUpperCase()}-${Date.now()}`,
+        invoiceNo: `UPDATED-${document.payment_type.toUpperCase()}-${Date.now()}`,
         invoiceType: document.payment_type as 'advance' | 'balance',
         quotationNo: quotationData.quotation_no,
         customerName: quotationData.customer_name,
@@ -162,7 +176,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         .from('document_storage')
         .update({
           document_data: base64Data,
-          file_name: `SIGNED-${document.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`,
+          file_name: `UPDATED-${document.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`,
           file_size: uint8Array.length,
           updated_at: new Date().toISOString(),
         })
@@ -170,10 +184,16 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
       if (updateError) throw updateError;
 
-      toast.success('Document regenerated with signatures successfully!');
-      
-      // Force refresh the document viewer
-      window.location.reload();
+      // Update local document state instead of reloading
+      setCurrentDocument({
+        ...document,
+        document_data: base64Data,
+        file_name: `UPDATED-${document.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`,
+        file_size: uint8Array.length,
+        generated_at: new Date().toISOString(),
+      });
+
+      toast.success('Document updated with signatures successfully!');
     } catch (error) {
       console.error('Error regenerating document:', error);
       toast.error('Failed to regenerate document with signatures');
@@ -227,13 +247,15 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
               isOpen={false}
               onClose={() => {}}
               document={{
-                ...document,
-                document_type: document.document_type as 'sales_receipt' | 'invoice',
-                payment_type: document.payment_type as 'advance' | 'balance' | 'full',
-                document_status: (document.document_status || 'approved') as 'approved' | 'draft',
-                generated_at: document.generated_at || new Date().toISOString(),
+                ...currentDocument,
+                quotation_id: currentDocument.quotation_id,
+                document_type: currentDocument.document_type as 'sales_receipt' | 'invoice',
+                payment_type: currentDocument.payment_type as 'advance' | 'balance' | 'full',
+                document_status: (currentDocument.document_status || 'approved') as 'approved' | 'draft',
+                generated_at: currentDocument.generated_at || new Date().toISOString(),
               }}
               onDownload={onDownload}
+              onSignatureUpdated={handleApprovalsUpdate}
             />
           </div>
 
@@ -245,6 +267,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
               </div>
               <DocumentSignatureManager
                 documentId={document.quotation_id}
+                quotationId={document.quotation_id}
                 documentStatus={(document.document_status || 'draft') as 'draft' | 'approved'}
                 onSignatureUpdated={handleApprovalsUpdate}
               />

@@ -11,6 +11,7 @@ interface DocumentViewerProps {
   onClose: () => void;
   document: {
     id: string;
+    quotation_id?: string;
     document_type: 'sales_receipt' | 'invoice';
     payment_type: 'advance' | 'balance' | 'full';
     document_status: 'draft' | 'approved';
@@ -233,7 +234,7 @@ export const DocumentViewer = ({
             <TabsContent value="signatures" className="flex-1 mt-2">
               <div className="h-[70vh] overflow-y-auto p-4">
                 <DocumentSignatureManager
-                  documentId={document.id}
+                  documentId={document.quotation_id || document.id}
                   documentStatus={document.document_status}
                   onSignatureUpdated={onSignatureUpdated}
                 />
