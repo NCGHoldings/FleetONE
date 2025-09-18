@@ -120,7 +120,8 @@ export default function PublicSpecialHireForm() {
     
     if (!formData.customerName || !formData.customerPhone || !formData.pickupLocation || 
         !formData.dropLocation || !formData.pickupDateTime || !formData.dropDateTime || 
-        !formData.hireType || !formData.busTypeId) {
+        !formData.hireType || !formData.busTypeId || formData.numberOfBuses === 0 || 
+        formData.numberOfPassengers === 0) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -400,9 +401,19 @@ export default function PublicSpecialHireForm() {
                     <Input
                       id="numberOfBuses"
                       type="number"
-                      min="1"
-                      value={formData.numberOfBuses}
-                      onChange={(e) => setFormData(prev => ({ ...prev, numberOfBuses: parseInt(e.target.value) || 1 }))}
+                      value={formData.numberOfBuses === 0 ? '' : formData.numberOfBuses}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          setFormData(prev => ({ ...prev, numberOfBuses: 0 }));
+                        } else {
+                          const num = parseInt(value);
+                          if (!isNaN(num) && num > 0) {
+                            setFormData(prev => ({ ...prev, numberOfBuses: num }));
+                          }
+                        }
+                      }}
+                      placeholder="Enter number of buses"
                       required
                     />
                   </div>
@@ -412,9 +423,19 @@ export default function PublicSpecialHireForm() {
                     <Input
                       id="numberOfPassengers"
                       type="number"
-                      min="1"
-                      value={formData.numberOfPassengers}
-                      onChange={(e) => setFormData(prev => ({ ...prev, numberOfPassengers: parseInt(e.target.value) || 1 }))}
+                      value={formData.numberOfPassengers === 0 ? '' : formData.numberOfPassengers}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          setFormData(prev => ({ ...prev, numberOfPassengers: 0 }));
+                        } else {
+                          const num = parseInt(value);
+                          if (!isNaN(num) && num > 0) {
+                            setFormData(prev => ({ ...prev, numberOfPassengers: num }));
+                          }
+                        }
+                      }}
+                      placeholder="Enter number of passengers"
                       required
                     />
                   </div>
