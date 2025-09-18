@@ -89,6 +89,10 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     setShowSuggestions(false);
     setSuggestions([]);
     setHighlightedIndex(-1);
+    // Remove focus from input to prevent re-showing suggestions
+    if (inputRef.current) {
+      inputRef.current.blur();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -121,13 +125,11 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   };
 
   const handleBlur = (e: React.FocusEvent) => {
-    // Delay hiding suggestions to allow for clicks
+    // Immediately hide suggestions when clicking outside
     setTimeout(() => {
-      if (!suggestionsRef.current?.contains(document.activeElement)) {
-        setShowSuggestions(false);
-        setHighlightedIndex(-1);
-      }
-    }, 200);
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+    }, 100);
   };
 
   return (
