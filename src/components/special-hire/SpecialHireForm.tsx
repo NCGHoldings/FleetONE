@@ -64,6 +64,7 @@ const additionalChargeTypes = [
   { value: 'additional_fuel', label: 'Additional Fuel Costs' },
   { value: 'driver_charges', label: 'Driver Charges' },
   { value: 'additional_distance', label: 'Additional Distance/KM' },
+  { value: 'refund', label: 'Refund/Adjustment' },
   { value: 'other', label: 'Other' }
 ];
 
@@ -1683,20 +1684,24 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                 )}
                               </div>
                             ) : (
-                              <div className="space-y-4">
-                                <Label className="text-lg font-bold text-foreground">
-                                  Amount (LKR) *
-                                </Label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={charge.amount}
-                                  onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
-                                  placeholder="Enter amount (e.g., 5000.00)"
-                                  className="h-14 text-lg"
-                                />
-                              </div>
+                               <div className="space-y-4">
+                                 <Label className="text-lg font-bold text-foreground">
+                                   Amount (LKR) *
+                                 </Label>
+                                 <Input
+                                   type="number"
+                                   step="0.01"
+                                   value={charge.amount}
+                                   onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
+                                   placeholder="Enter amount (negative for refunds)"
+                                   className="h-14 text-lg"
+                                 />
+                                 {charge.amount < 0 && (
+                                   <div className="p-2 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800">
+                                     💡 Negative amounts will reduce the total cost
+                                   </div>
+                                 )}
+                               </div>
                             )}
                          </div>
                          
