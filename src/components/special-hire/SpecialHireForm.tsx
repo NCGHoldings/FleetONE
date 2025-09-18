@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, MapPin, Plus, X, Trash2, Eye, Calculator } from 'lucide-react';
+import { CalendarIcon, MapPin, Plus, X, Trash2, Eye, Calculator, Save } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -132,7 +132,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     parkingLat: number;
     parkingLng: number;
   }>>([]);
+  const [autoSaved, setAutoSaved] = useState(false);
+  const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+
+  const AUTO_SAVE_KEY = 'special-hire-form-draft';
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -255,6 +260,94 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }
     }
   }, [isEditing, initialData]);
+
+  // Auto-save functionality
+  const saveToLocalStorage = useCallback(() => {
+    const formValues = form.getValues();
+    const saveData = {
+      formValues,
+      intermediateStops,
+      additionalCharges,
+      otherExpenses,
+      useMultiParking,
+      busDetails,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(saveData));
+    setAutoSaved(true);
+    setShowAutoSaveIndicator(true);
+    setTimeout(() => setShowAutoSaveIndicator(false), 2000);
+  }, [form, intermediateStops, additionalCharges, otherExpenses, useMultiParking, busDetails]);
+
+  const loadFromLocalStorage = useCallback(() => {
+    try {
+      const savedData = localStorage.getItem(AUTO_SAVE_KEY);
+      if (savedData && !isEditing && !submissionData && !initialData) {
+        const parsed = JSON.parse(savedData);
+        // Only load if saved within last 7 days
+        if (Date.now() - parsed.timestamp < 7 * 24 * 60 * 60 * 1000) {
+          // Set form values
+          Object.keys(parsed.formValues).forEach((key) => {
+            const value = parsed.formValues[key];
+            if (key === 'pickupDateTime' || key === 'dropDateTime') {
+              form.setValue(key as any, new Date(value));
+            } else {
+              form.setValue(key as any, value);
+            }
+          });
+          
+          // Set other state
+          if (parsed.intermediateStops) setIntermediateStops(parsed.intermediateStops);
+          if (parsed.additionalCharges) setAdditionalCharges(parsed.additionalCharges);
+          if (parsed.otherExpenses) setOtherExpenses(parsed.otherExpenses);
+          if (parsed.useMultiParking) setUseMultiParking(parsed.useMultiParking);
+          if (parsed.busDetails) setBusDetails(parsed.busDetails);
+          
+          toast({
+            title: "Draft Restored",
+            description: "Your previous form data has been restored.",
+            variant: "default"
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load auto-saved data:', error);
+    }
+  }, [form, isEditing, submissionData, initialData, toast]);
+
+  const clearAutoSave = useCallback(() => {
+    localStorage.removeItem(AUTO_SAVE_KEY);
+    setAutoSaved(false);
+  }, []);
+
+  // Load auto-saved data on mount
+  useEffect(() => {
+    loadFromLocalStorage();
+  }, [loadFromLocalStorage]);
+
+  // Auto-save form data when it changes
+  useEffect(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Don't auto-save if editing existing data or loading from submission
+    if (!isEditing && !submissionData && !initialData) {
+      saveTimeoutRef.current = setTimeout(() => {
+        const formValues = form.getValues();
+        // Only save if form has some meaningful data
+        if (formValues.customerName || formValues.pickupLocation || formValues.dropLocation) {
+          saveToLocalStorage();
+        }
+      }, 1000);
+    }
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [form.watch(), intermediateStops, additionalCharges, otherExpenses, useMultiParking, busDetails, isEditing, submissionData, initialData, saveToLocalStorage]);
 
   // Auto-clamp commission pass-through to not exceed commission percentage
   useEffect(() => {
@@ -957,6 +1050,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         });
       }
 
+      // Clear auto-saved data on successful submission
+      clearAutoSave();
+
       onSubmit();
     } catch (error: any) {
       toast({
@@ -973,7 +1069,21 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     <Dialog open={true} onOpenChange={() => onCancel()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Special Hire Quotation' : 'New Special Hire Quotation'}</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{isEditing ? 'Edit Special Hire Quotation' : 'New Special Hire Quotation'}</DialogTitle>
+            {showAutoSaveIndicator && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Save className="h-4 w-4" />
+                <span>Auto-saved</span>
+              </div>
+            )}
+            {autoSaved && !showAutoSaveIndicator && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Save className="h-4 w-4" />
+                <span>Draft saved</span>
+              </div>
+            )}
+          </div>
         </DialogHeader>
 
         <Form {...form}>
