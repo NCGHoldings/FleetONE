@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { DocumentApprovalInterface } from './DocumentApprovalInterface';
+import { DocumentSignatureManager } from './DocumentSignatureManager';
 import { DocumentViewer } from './DocumentViewer';
-import { useDocumentApprovals, type DocumentApproval } from '@/hooks/useDocumentApprovals';
+import { useSignatureManagement, type ApprovalData } from '@/hooks/useSignatureManagement';
 import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -35,10 +35,11 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   document,
   onDownload,
 }) => {
-  const [approvals, setApprovals] = useState<DocumentApproval[]>([]);
+  const [approvals, setApprovals] = useState<ApprovalData[]>([]);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [quotationData, setQuotationData] = useState<any>(null);
   const { user } = useAuth();
+  const { getDocumentApprovals } = useSignatureManagement();
 
   useEffect(() => {
     if (isOpen && document.quotation_id) {
@@ -62,8 +63,17 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
     }
   };
 
-  const handleApprovalsUpdate = (updatedApprovals: DocumentApproval[]) => {
-    setApprovals(updatedApprovals);
+  const handleApprovalsUpdate = async () => {
+    // Reload approvals from database
+    const result = await getDocumentApprovals(document.quotation_id);
+    if (result.success) {
+      // Type cast the approvals to match our interface
+      const typedApprovals = result.approvals.map(approval => ({
+        ...approval,
+        approval_type: approval.approval_type as 'prepared_by' | 'checked_by' | 'approved_by'
+      }));
+      setApprovals(typedApprovals);
+    }
   };
 
   const regenerateDocumentWithSignatures = async () => {
@@ -233,10 +243,10 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Document Approvals</h3>
               </div>
-              <DocumentApprovalInterface
-                documentId={document.id}
-                onApprovalsUpdate={handleApprovalsUpdate}
-                showFinanceApproval={true}
+              <DocumentSignatureManager
+                documentId={document.quotation_id}
+                documentStatus={(document.document_status || 'draft') as 'draft' | 'approved'}
+                onSignatureUpdated={handleApprovalsUpdate}
               />
             </div>
           )}

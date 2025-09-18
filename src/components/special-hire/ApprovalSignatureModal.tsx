@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { SignatureCanvas, SignatureCanvasRef } from '@/components/ui/signature-canvas';
 import { useSignatureManagement, ApprovalData, NameSuggestion } from '@/hooks/useSignatureManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Eraser, Save, User, Calendar } from 'lucide-react';
+import { Eraser, Save, User, Calendar, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface ApprovalSignatureModalProps {
   isOpen: boolean;
@@ -34,7 +35,9 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
   );
   const [nameSuggestions, setNameSuggestions] = useState<NameSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [signatureTab, setSignatureTab] = useState<'draw' | 'none'>('draw');
+  const [signatureTab, setSignatureTab] = useState<'draw' | 'upload' | 'none'>('draw');
+  const [uploadedSignature, setUploadedSignature] = useState<string | null>(null);
+  const [previewSignature, setPreviewSignature] = useState<string | null>(null);
   
   const signatureCanvasRef = useRef<SignatureCanvasRef>(null);
   const { isLoading, saveApproval, getNameSuggestions } = useSignatureManagement();
@@ -42,11 +45,19 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadNameSuggestions();
-      // Load existing signature if available
-      if (existingApproval?.signature_data && signatureCanvasRef.current) {
-        // You would need to implement loading existing signature into canvas
-        // For now, we'll just note that it exists
+      // Load existing signature for preview
+      if (existingApproval?.signature_data) {
+        setPreviewSignature(existingApproval.signature_data);
+        if (existingApproval.signature_data.startsWith('data:image/')) {
+          setUploadedSignature(existingApproval.signature_data);
+          setSignatureTab('upload');
+        }
       }
+    } else {
+      // Reset state when modal closes
+      setUploadedSignature(null);
+      setPreviewSignature(null);
+      setSignatureTab('draw');
     }
   }, [isOpen, existingApproval]);
 
@@ -78,6 +89,66 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
     }
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('Image size must be less than 2MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (result) {
+          // Create an image to resize it
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set max dimensions for signature
+            const maxWidth = 300;
+            const maxHeight = 100;
+            
+            let { width, height } = img;
+            
+            // Calculate scaling to fit within max dimensions
+            if (width > maxWidth || height > maxHeight) {
+              const ratio = Math.min(maxWidth / width, maxHeight / height);
+              width *= ratio;
+              height *= ratio;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Draw and resize image
+            ctx?.drawImage(img, 0, 0, width, height);
+            
+            const resizedDataUrl = canvas.toDataURL('image/png', 0.8);
+            setUploadedSignature(resizedDataUrl);
+            setPreviewSignature(resizedDataUrl);
+          };
+          img.src = result;
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeUploadedSignature = () => {
+    setUploadedSignature(null);
+    setPreviewSignature(null);
+  };
+
   const handleSave = async () => {
     if (!approverName.trim()) {
       return;
@@ -87,6 +158,8 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
     
     if (signatureTab === 'draw' && signatureCanvasRef.current && !signatureCanvasRef.current.isEmpty()) {
       signatureData = signatureCanvasRef.current.toDataURL('image/png');
+    } else if (signatureTab === 'upload' && uploadedSignature) {
+      signatureData = uploadedSignature;
     }
 
     const approvalData: ApprovalData = {
@@ -167,9 +240,10 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
           <div className="space-y-4">
             <Label>Signature</Label>
             
-            <Tabs value={signatureTab} onValueChange={(v) => setSignatureTab(v as 'draw' | 'none')}>
-              <TabsList className="grid w-full grid-cols-2">
+            <Tabs value={signatureTab} onValueChange={(v) => setSignatureTab(v as 'draw' | 'upload' | 'none')}>
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="draw">Draw Signature</TabsTrigger>
+                <TabsTrigger value="upload">Upload Image</TabsTrigger>
                 <TabsTrigger value="none">No Signature</TabsTrigger>
               </TabsList>
               
@@ -194,6 +268,64 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
                   <Eraser className="h-4 w-4" />
                   Clear Signature
                 </Button>
+              </TabsContent>
+
+              <TabsContent value="upload" className="space-y-4">
+                {!uploadedSignature ? (
+                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                    <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Upload a signature image (PNG, JPG, max 2MB)
+                    </p>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <Button variant="outline" className="flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        Choose Image
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="border border-border rounded-lg p-4 bg-muted/20 text-center">
+                      <img 
+                        src={uploadedSignature} 
+                        alt="Uploaded Signature" 
+                        className="max-h-24 mx-auto border border-border rounded"
+                      />
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <Button variant="outline" size="sm" className="w-full flex items-center gap-2">
+                          <Upload className="h-4 w-4" />
+                          Replace Image
+                        </Button>
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={removeUploadedSignature}
+                        className="flex items-center gap-2 text-destructive hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
               
               <TabsContent value="none" className="text-sm text-muted-foreground">

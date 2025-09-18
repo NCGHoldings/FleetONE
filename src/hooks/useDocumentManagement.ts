@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { generateInvoicePDF, type InvoiceData, type ApprovalSignature } from '@/lib/invoice-generator';
 
 export interface StoredDocument {
   id: string;
@@ -37,10 +37,36 @@ export const useDocumentManagement = () => {
         throw new Error('User not authenticated');
       }
 
-      // Generate PDF with DRAFT status
+      // Fetch current signatures for the document
+      const { data: signatures } = await supabase
+        .from('document_approvals')
+        .select('*')
+        .eq('document_id', quotationId);
+
+      // Map signatures to the format expected by invoice generator
+      const signatureMap = {
+        preparedBy: signatures?.find(s => s.approval_type === 'prepared_by') ? {
+          approver_name: signatures.find(s => s.approval_type === 'prepared_by')?.approver_name || '',
+          signature_data: signatures.find(s => s.approval_type === 'prepared_by')?.signature_data,
+          approval_date: signatures.find(s => s.approval_type === 'prepared_by')?.approval_date || ''
+        } : undefined,
+        checkedBy: signatures?.find(s => s.approval_type === 'checked_by') ? {
+          approver_name: signatures.find(s => s.approval_type === 'checked_by')?.approver_name || '',
+          signature_data: signatures.find(s => s.approval_type === 'checked_by')?.signature_data,
+          approval_date: signatures.find(s => s.approval_type === 'checked_by')?.approval_date || ''
+        } : undefined,
+        approvedBy: signatures?.find(s => s.approval_type === 'approved_by') ? {
+          approver_name: signatures.find(s => s.approval_type === 'approved_by')?.approver_name || '',
+          signature_data: signatures.find(s => s.approval_type === 'approved_by')?.signature_data,
+          approval_date: signatures.find(s => s.approval_type === 'approved_by')?.approval_date || ''
+        } : undefined,
+      };
+
+      // Generate PDF with DRAFT status and current signatures
       const draftInvoiceData = {
         ...invoiceData,
         invoice_status: 'draft' as const,
+        ...signatureMap
       };
 
       const pdfBlob = await generateInvoicePDF(draftInvoiceData);
@@ -134,6 +160,31 @@ export const useDocumentManagement = () => {
       const totalApprovedPaid = (approvedPaymentsList || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
 
+      // Fetch current signatures for the document
+      const { data: signatures } = await supabase
+        .from('document_approvals')
+        .select('*')
+        .eq('document_id', draftDoc.quotation_id);
+
+      // Map signatures to the format expected by invoice generator
+      const signatureMap = {
+        preparedBy: signatures?.find(s => s.approval_type === 'prepared_by') ? {
+          approver_name: signatures.find(s => s.approval_type === 'prepared_by')?.approver_name || '',
+          signature_data: signatures.find(s => s.approval_type === 'prepared_by')?.signature_data,
+          approval_date: signatures.find(s => s.approval_type === 'prepared_by')?.approval_date || ''
+        } : undefined,
+        checkedBy: signatures?.find(s => s.approval_type === 'checked_by') ? {
+          approver_name: signatures.find(s => s.approval_type === 'checked_by')?.approver_name || '',
+          signature_data: signatures.find(s => s.approval_type === 'checked_by')?.signature_data,
+          approval_date: signatures.find(s => s.approval_type === 'checked_by')?.approval_date || ''
+        } : undefined,
+        approvedBy: signatures?.find(s => s.approval_type === 'approved_by') ? {
+          approver_name: signatures.find(s => s.approval_type === 'approved_by')?.approver_name || '',
+          signature_data: signatures.find(s => s.approval_type === 'approved_by')?.signature_data,
+          approval_date: signatures.find(s => s.approval_type === 'approved_by')?.approval_date || ''
+        } : undefined,
+      };
+
       const approvedInvoiceData: InvoiceData = {
         invoiceNo: `APPROVED-${paymentData.id}`,
         invoiceType: draftDoc.payment_type as 'advance' | 'balance',
@@ -157,6 +208,7 @@ export const useDocumentManagement = () => {
         conductorName: paymentData.quotation.assigned_conductor_name,
         invoice_status: 'approved',
         document_type: draftDoc.document_type as 'sales_receipt' | 'invoice',
+        ...signatureMap
       };
 
       // Generate approved PDF
@@ -256,6 +308,31 @@ export const useDocumentManagement = () => {
       if (approvedPaymentsError2) throw approvedPaymentsError2;
       const totalApprovedPaid2 = (approvedPaymentsList2 || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
+      // Fetch current signatures for the document
+      const { data: signatures } = await supabase
+        .from('document_approvals')
+        .select('*')
+        .eq('document_id', existingDoc.quotation_id);
+
+      // Map signatures to the format expected by invoice generator
+      const signatureMap = {
+        preparedBy: signatures?.find(s => s.approval_type === 'prepared_by') ? {
+          approver_name: signatures.find(s => s.approval_type === 'prepared_by')?.approver_name || '',
+          signature_data: signatures.find(s => s.approval_type === 'prepared_by')?.signature_data,
+          approval_date: signatures.find(s => s.approval_type === 'prepared_by')?.approval_date || ''
+        } : undefined,
+        checkedBy: signatures?.find(s => s.approval_type === 'checked_by') ? {
+          approver_name: signatures.find(s => s.approval_type === 'checked_by')?.approver_name || '',
+          signature_data: signatures.find(s => s.approval_type === 'checked_by')?.signature_data,
+          approval_date: signatures.find(s => s.approval_type === 'checked_by')?.approval_date || ''
+        } : undefined,
+        approvedBy: signatures?.find(s => s.approval_type === 'approved_by') ? {
+          approver_name: signatures.find(s => s.approval_type === 'approved_by')?.approver_name || '',
+          signature_data: signatures.find(s => s.approval_type === 'approved_by')?.signature_data,
+          approval_date: signatures.find(s => s.approval_type === 'approved_by')?.approval_date || ''
+        } : undefined,
+      };
+
       const invoiceData: InvoiceData = {
         invoiceNo: `REGEN-${existingDoc.payment_type.toUpperCase()}-${Date.now()}`,
         invoiceType: existingDoc.payment_type as 'advance' | 'balance',
@@ -279,6 +356,7 @@ export const useDocumentManagement = () => {
         conductorName: paymentData.quotation.assigned_conductor_name,
         invoice_status: existingDoc.document_status as 'draft' | 'approved',
         document_type: existingDoc.document_type as 'sales_receipt' | 'invoice',
+        ...signatureMap
       };
 
       // Generate new PDF

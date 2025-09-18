@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ApprovalSignatureModal } from './ApprovalSignatureModal';
+import { SignaturePreviewCard } from './SignaturePreviewCard';
 import { useSignatureManagement, type ApprovalData } from '@/hooks/useSignatureManagement';
-import { Pen, User, Calendar, Trash2 } from 'lucide-react';
+import { Pen, User, Calendar, Trash2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -49,7 +50,7 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
 
   const handleEditSignature = (approval: ApprovalData) => {
     setCurrentApprovalType(approval.approval_type);
-    setEditingApproval(approval);
+    setEditingApproval(approval.id ? approval : undefined); // Only set existing approval if it has an ID
     setShowSignatureModal(true);
   };
 
@@ -85,12 +86,31 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
   const approvalTypes: Array<'prepared_by' | 'checked_by' | 'approved_by'> = ['prepared_by', 'checked_by', 'approved_by'];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Document Signatures</h3>
-        <Badge variant={documentStatus === 'approved' ? 'default' : 'secondary'}>
-          {documentStatus === 'approved' ? 'Approved' : 'Draft'}
-        </Badge>
+        <div>
+          <h3 className="text-lg font-medium">Document Signatures</h3>
+          <p className="text-sm text-muted-foreground">
+            Manage signatures for document approval workflow
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Badge variant={documentStatus === 'approved' ? 'default' : 'secondary'}>
+            {documentStatus === 'approved' ? 'Approved' : 'Draft'}
+          </Badge>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadApprovals}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -98,73 +118,50 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
           const approval = getApprovalByType(approvalType);
           
           return (
-            <div key={approvalType} className="border border-border rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm">{getApprovalTypeName(approvalType)}</h4>
-                {approval && (
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditSignature(approval)}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Pen className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDeleteSignature(approval.id!)}
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {approval ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{approval.approver_name}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{format(new Date(approval.approval_date), 'dd/MM/yyyy')}</span>
-                  </div>
-
-                  {approval.signature_data && (
-                    <div className="mt-2">
-                      <img 
-                        src={approval.signature_data} 
-                        alt="Signature" 
-                        className="max-w-full h-12 border border-border rounded"
-                      />
-                    </div>
-                  )}
-                  
-                  <Badge variant="outline" className="text-xs">
-                    {approval.signature_data ? 'With Signature' : 'Name Only'}
-                  </Badge>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleAddSignature(approvalType)}
-                    className="flex items-center gap-2"
-                  >
-                    <Pen className="h-4 w-4" />
-                    Add Signature
-                  </Button>
-                </div>
-              )}
-            </div>
+            <SignaturePreviewCard
+              key={approvalType}
+              title={getApprovalTypeName(approvalType)}
+              approvalType={approvalType}
+              approval={approval}
+              onEdit={() => handleEditSignature(approval || { 
+                approval_type: approvalType,
+                document_id: documentId,
+                approver_name: '',
+                approval_date: format(new Date(), 'yyyy-MM-dd')
+              })}
+              showAddButton={!approval}
+            />
           );
         })}
+      </div>
+
+      {/* Quick Action Summary */}
+      <div className="bg-muted/30 p-4 rounded-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">
+              Signature Status: {approvals.length} of 3 signatures completed
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              All signatures are required for final document approval
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            {approvalTypes.map((type) => {
+              const hasSignature = getApprovalByType(type);
+              return (
+                <div
+                  key={type}
+                  className={`w-3 h-3 rounded-full ${
+                    hasSignature ? 'bg-primary' : 'bg-muted-foreground/30'
+                  }`}
+                  title={`${getApprovalTypeName(type)}: ${hasSignature ? 'Completed' : 'Pending'}`}
+                />
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {showSignatureModal && (
