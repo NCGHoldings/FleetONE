@@ -32,6 +32,11 @@ export const useDocumentManagement = () => {
     try {
       setIsLoading(true);
 
+      // Check if user is authenticated
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
       // Generate PDF with DRAFT status
       const draftInvoiceData = {
         ...invoiceData,
@@ -65,12 +70,15 @@ export const useDocumentManagement = () => {
           document_data: base64Data,
           file_name: fileName,
           file_size: uint8Array.length,
-          generated_by: user?.id,
+          generated_by: user.id,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error inserting document:', error);
+        throw error;
+      }
 
       toast.success(`Draft ${invoiceData.document_type === 'sales_receipt' ? 'sales receipt' : 'invoice'} generated and stored.`);
       return { success: true, document: data };

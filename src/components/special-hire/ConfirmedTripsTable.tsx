@@ -213,6 +213,11 @@ export function ConfirmedTripsTable() {
     try {
       setLoading(true);
       
+      // Check if user is authenticated
+      if (!user?.id) {
+        throw new Error('User not authenticated. Please refresh the page and try again.');
+      }
+      
       // Create payment record with pending status
       const { data: paymentResponse, error: paymentError } = await supabase
         .from('special_hire_payments')
@@ -225,12 +230,19 @@ export function ConfirmedTripsTable() {
           payment_proof_url: paymentData.paymentProofUrl,
           notes: paymentData.notes,
           status: 'pending_finance', // Operations confirms, now needs finance approval
-          created_by: user?.id,
+          created_by: user.id,
         })
         .select()
-        .maybeSingle();
+        .single();
 
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('Payment insertion error:', paymentError);
+        throw new Error(`Failed to create payment record: ${paymentError.message}`);
+      }
+
+      if (!paymentResponse) {
+        throw new Error('No payment record returned from database');
+      }
 
       // Update quotation with trip assignment if provided
       if (paymentData.driverName || paymentData.conductorName || paymentData.busNo) {
@@ -247,50 +259,53 @@ export function ConfirmedTripsTable() {
       }
 
       // Create notification for finance team
-      if (paymentResponse) {
-        const { error: notificationError } = await supabase
-          .from('payment_notifications')
-          .insert({
-            payment_id: paymentResponse.id,
-            quotation_id: selectedTrip.id,
-            notification_type: 'finance_approval_required',
-            target_role: 'finance',
-            message: `Payment of LKR ${paymentData.amount.toLocaleString()} for quotation ${selectedTrip.quotation_no} requires finance approval.`,
-            created_by: user?.id,
-          });
+      const { error: notificationError } = await supabase
+        .from('payment_notifications')
+        .insert({
+          payment_id: paymentResponse.id,
+          quotation_id: selectedTrip.id,
+          notification_type: 'finance_approval_required',
+          target_role: 'finance',
+          message: `Payment of LKR ${paymentData.amount.toLocaleString()} for quotation ${selectedTrip.quotation_no} requires finance approval.`,
+          created_by: user.id,
+        });
 
-        if (notificationError) console.error('Notification error:', notificationError);
+      if (notificationError) {
+        console.error('Notification error:', notificationError);
+        // Don't throw here as notification is not critical
       }
 
       // Generate and store DRAFT documents using the new document management system
-      if (paymentResponse) {
-        const draftInvoiceData: InvoiceData = {
-          invoiceNo: `DRAFT-${paymentResponse.id}`,
-          invoiceType: paymentData.paymentType as 'advance' | 'balance',
-          quotationNo: selectedTrip.quotation_no,
-          customerName: selectedTrip.customer_name,
-          customerPhone: selectedTrip.customer_phone || '',
-          customerEmail: selectedTrip.customer_email,
-          companyName: selectedTrip.company_name,
-          pickupLocation: selectedTrip.pickup_location,
-          dropLocation: selectedTrip.drop_location,
-          pickupDate: new Date(selectedTrip.pickup_datetime),
-          dropDate: new Date(selectedTrip.drop_datetime || selectedTrip.pickup_datetime),
-          busType: 'Standard Bus',
-          numberOfBuses: selectedTrip.number_of_buses,
-          numberOfPassengers: selectedTrip.number_of_passengers,
-          totalAmount: calculateTotalAmount(selectedTrip),
-          advanceAmount: selectedTrip.advance_paid || 0,
-          paidAmount: paymentData.amount,
-          vehicleNo: paymentData.busNo || selectedTrip.assigned_bus_no,
-          driverName: paymentData.driverName || selectedTrip.assigned_driver_name,
-          conductorName: paymentData.conductorName || selectedTrip.assigned_conductor_name,
-          invoice_status: 'draft' as const,
-          document_type: paymentData.paymentType === 'advance' ? 'sales_receipt' as const : 'invoice' as const,
-        };
+      const draftInvoiceData: InvoiceData = {
+        invoiceNo: `DRAFT-${paymentResponse.id}`,
+        invoiceType: paymentData.paymentType as 'advance' | 'balance',
+        quotationNo: selectedTrip.quotation_no,
+        customerName: selectedTrip.customer_name,
+        customerPhone: selectedTrip.customer_phone || '',
+        customerEmail: selectedTrip.customer_email,
+        companyName: selectedTrip.company_name,
+        pickupLocation: selectedTrip.pickup_location,
+        dropLocation: selectedTrip.drop_location,
+        pickupDate: new Date(selectedTrip.pickup_datetime),
+        dropDate: new Date(selectedTrip.drop_datetime || selectedTrip.pickup_datetime),
+        busType: 'Standard Bus',
+        numberOfBuses: selectedTrip.number_of_buses,
+        numberOfPassengers: selectedTrip.number_of_passengers,
+        totalAmount: calculateTotalAmount(selectedTrip),
+        advanceAmount: selectedTrip.advance_paid || 0,
+        paidAmount: paymentData.amount,
+        vehicleNo: paymentData.busNo || selectedTrip.assigned_bus_no,
+        driverName: paymentData.driverName || selectedTrip.assigned_driver_name,
+        conductorName: paymentData.conductorName || selectedTrip.assigned_conductor_name,
+        invoice_status: 'draft' as const,
+        document_type: paymentData.paymentType === 'advance' ? 'sales_receipt' as const : 'invoice' as const,
+      };
 
-        // Store draft document in the new document storage system
-        await generateAndStoreDraftDocument(draftInvoiceData, selectedTrip.id, paymentResponse.id);
+      // Store draft document in the new document storage system
+      const docResult = await generateAndStoreDraftDocument(draftInvoiceData, selectedTrip.id, paymentResponse.id);
+      if (!docResult.success) {
+        console.error('Document generation error:', docResult.error);
+        throw new Error('Failed to generate payment document');
       }
 
       toast.success('Payment confirmed! Draft document generated and stored - awaiting finance approval.');
