@@ -5,9 +5,9 @@ import { toast } from "@/hooks/use-toast";
 interface RouteAnalytics {
   routeId: string;
   routeName: string;
-  busRegNo?: string;
-  driverName?: string;
-  driverContact?: string;
+  busRegNos: string[];
+  totalBuses: number;
+  drivers: { name?: string; contact?: string; busRegNo?: string }[];
   totalStudents: number;
   totalIncome: number;
   outstandingAmount: number;
@@ -52,11 +52,11 @@ export function useRouteAnalytics(branchId?: string) {
 
       if (studentsError) throw studentsError;
 
-      // Group students by route
+      // Group students by route name only (not by bus)
       const routeGroups = new Map<string, any[]>();
       
       students?.forEach(student => {
-        const routeKey = `${student.route || 'No Route'}-${student.bus_reg_no || 'No Bus'}`;
+        const routeKey = student.route || 'No Route';
         if (!routeGroups.has(routeKey)) {
           routeGroups.set(routeKey, []);
         }
@@ -67,12 +67,31 @@ export function useRouteAnalytics(branchId?: string) {
       const routeAnalytics: RouteAnalytics[] = [];
 
       for (const [routeKey, routeStudents] of routeGroups.entries()) {
-        const [routeName, busRegNo] = routeKey.split('-');
+        const routeName = routeKey;
         
-        // Get or create route record
-        let routeRecord = await getOrCreateRoute(branchId, routeName, busRegNo, routeStudents);
+        // Collect all unique buses and drivers for this route
+        const busInfo = new Map<string, { driverName?: string }>();
+        routeStudents.forEach(student => {
+          const busRegNo = student.bus_reg_no;
+          if (busRegNo && busRegNo !== 'No Bus') {
+            if (!busInfo.has(busRegNo)) {
+              busInfo.set(busRegNo, { driverName: student.driver_name });
+            }
+          }
+        });
+
+        const busRegNos = Array.from(busInfo.keys());
+        const drivers = Array.from(busInfo.entries()).map(([busRegNo, info]) => ({
+          name: info.driverName,
+          contact: undefined, // Will be filled from route record
+          busRegNo
+        }));
+
+        // Get or create route record (use first bus for route creation)
+        const firstBusRegNo = busRegNos.length > 0 ? busRegNos[0] : 'No Bus';
+        let routeRecord = await getOrCreateRoute(branchId, routeName, firstBusRegNo, routeStudents);
         
-        // Calculate financial metrics
+        // Calculate financial metrics for all students on this route
         const totalStudents = routeStudents.length;
         const paidStudents = routeStudents.filter(s => s.payment_status === "paid");
         const pendingStudents = routeStudents.filter(s => s.payment_status !== "paid");
@@ -100,9 +119,13 @@ export function useRouteAnalytics(branchId?: string) {
         routeAnalytics.push({
           routeId: routeRecord.id,
           routeName: routeName,
-          busRegNo: busRegNo !== 'No Bus' ? busRegNo : undefined,
-          driverName: routeRecord.driver_name,
-          driverContact: routeRecord.driver_contact,
+          busRegNos: busRegNos,
+          totalBuses: busRegNos.length,
+          drivers: drivers.map(d => ({
+            name: d.name,
+            contact: routeRecord.driver_contact, // Use route record contact
+            busRegNo: d.busRegNo
+          })),
           totalStudents,
           totalIncome,
           outstandingAmount,

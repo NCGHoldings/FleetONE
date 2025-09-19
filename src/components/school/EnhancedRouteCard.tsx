@@ -23,9 +23,9 @@ interface RouteCardProps {
   route: {
     routeId: string;
     routeName: string;
-    busRegNo?: string;
-    driverName?: string;
-    driverContact?: string;
+    busRegNos: string[];
+    totalBuses: number;
+    drivers: { name?: string; contact?: string; busRegNo?: string }[];
     totalStudents: number;
     totalIncome: number;
     outstandingAmount: number;
@@ -69,16 +69,23 @@ export function EnhancedRouteCard({
               </div>
               <div>
                 <CardTitle className="text-lg">{route.routeName}</CardTitle>
-                <CardDescription className="flex items-center gap-2">
-                  {route.busRegNo && (
-                    <Badge variant="outline" className="text-xs">
-                      {route.busRegNo}
-                    </Badge>
-                  )}
-                  {route.driverName && (
-                    <span className="text-xs flex items-center gap-1">
-                      <User className="h-3 w-3" />
-                      {route.driverName}
+                <CardDescription className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {route.busRegNos.length > 0 ? (
+                      route.busRegNos.map((bus, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {bus}
+                        </Badge>
+                      ))
+                    ) : (
+                      <Badge variant="outline" className="text-xs">
+                        No Bus Assigned
+                      </Badge>
+                    )}
+                  </div>
+                  {route.totalBuses > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {route.totalBuses} bus{route.totalBuses > 1 ? 'es' : ''} • {route.drivers.filter(d => d.name).length} driver{route.drivers.filter(d => d.name).length !== 1 ? 's' : ''}
                     </span>
                   )}
                 </CardDescription>
@@ -169,11 +176,24 @@ export function EnhancedRouteCard({
                 </div>
               </div>
               
-              {route.driverContact && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Driver:</span>
-                  <span className="font-medium">{route.driverContact}</span>
+              {route.drivers.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-muted-foreground">Drivers:</div>
+                  {route.drivers.filter(d => d.name).map((driver, index) => (
+                    <div key={index} className="flex items-center gap-2 text-sm">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{driver.name}</span>
+                      {driver.busRegNo && (
+                        <Badge variant="secondary" className="text-xs">{driver.busRegNo}</Badge>
+                      )}
+                      {driver.contact && (
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {driver.contact}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
