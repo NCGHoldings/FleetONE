@@ -192,14 +192,74 @@ export default function DriverAllocation() {
   };
 
   const parseDate = (dateStr: string) => {
-    // Handle format like "2025.07.31"
-    if (dateStr && dateStr.includes('.')) {
-      const parts = dateStr.split('.');
-      if (parts.length === 3) {
-        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-      }
+    if (!dateStr) {
+      console.warn('Empty date string, using current date');
+      return new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
     }
-    return dateStr;
+
+    const dateString = dateStr.toString().trim();
+    console.log('Parsing date:', dateString);
+
+    try {
+      // Handle DD/MM/YYYY format (16/09/2025)
+      if (dateString.includes('/')) {
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[2];
+          const result = `${year}-${month}-${day}`;
+          console.log('Parsed DD/MM/YYYY to:', result);
+          return result;
+        }
+      }
+
+      // Handle DD.MM.YYYY format (16.09.2025)
+      if (dateString.includes('.')) {
+        const parts = dateString.split('.');
+        if (parts.length === 3) {
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[2];
+          const result = `${year}-${month}-${day}`;
+          console.log('Parsed DD.MM.YYYY to:', result);
+          return result;
+        }
+      }
+
+      // Handle DD-MM-YYYY format (16-09-2025)
+      if (dateString.includes('-') && dateString.split('-').length === 3) {
+        const parts = dateString.split('-');
+        if (parts[2].length === 4) { // If third part is year (DD-MM-YYYY)
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[2];
+          const result = `${year}-${month}-${day}`;
+          console.log('Parsed DD-MM-YYYY to:', result);
+          return result;
+        }
+      }
+
+      // If already in YYYY-MM-DD format, return as is
+      if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        console.log('Already in YYYY-MM-DD format:', dateString);
+        return dateString;
+      }
+
+      // Fallback: try to parse as ISO date
+      const parsedDate = new Date(dateString);
+      if (!isNaN(parsedDate.getTime())) {
+        const result = parsedDate.toISOString().split('T')[0];
+        console.log('Parsed as ISO date to:', result);
+        return result;
+      }
+    } catch (error) {
+      console.error('Error parsing date:', dateString, error);
+    }
+
+    // Final fallback: use current date
+    console.warn('Could not parse date:', dateString, 'using current date');
+    return new Date().toISOString().split('T')[0];
   };
 
   const findRouteByName = (routeName: string) => routes.find(r => r.route_name.toLowerCase().includes(routeName.toLowerCase()));
