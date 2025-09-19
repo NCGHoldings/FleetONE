@@ -191,10 +191,21 @@ export default function DriverAllocation() {
     return null;
   };
 
-  const parseDate = (dateStr: string) => {
+  const parseDate = (dateStr: any): string => {
     if (!dateStr) {
       console.warn('Empty date string, using current date');
       return new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    }
+
+    // Handle Excel serial date numbers
+    if (typeof dateStr === 'number') {
+      // Excel serial date to JavaScript date
+      const excelDate = new Date((dateStr - 25569) * 86400 * 1000);
+      if (!isNaN(excelDate.getTime())) {
+        const result = excelDate.toISOString().split('T')[0];
+        console.log('Parsed Excel serial date:', dateStr, 'to:', result);
+        return result;
+      }
     }
 
     const dateString = dateStr.toString().trim();
@@ -267,6 +278,7 @@ export default function DriverAllocation() {
     `${p.first_name} ${p.last_name}`.toLowerCase().includes(name.toLowerCase()) ||
     name.toLowerCase().includes(p.first_name.toLowerCase())
   );
+  const findBusByNumber = (busNo: string) => buses.find(b => b.bus_no.toLowerCase().includes(busNo.toLowerCase()));
 
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -300,16 +312,34 @@ export default function DriverAllocation() {
       const allocRows = jsonData.map((row: any, index: number) => {
         const busNo = row['Bus No']?.toString().trim();
         const routeNo = row['Route']?.toString().trim();
-        const routeName = row['route name']?.toString().trim();
+        const routeName = row['route name']?.toString().trim() || row['Route Name']?.toString().trim();
         const driverName = row['Driver']?.toString().trim();
         const conductorName = row['Conductor']?.toString().trim();
         const whatsapp = row['Whatsapp']?.toString().replace(/\D/g, '');
-        const date = parseDate(row['date']);
-        const time = parseTime(row['Time']);
+        const date = parseDate(row['date'] || row['Date']);
+        const time = parseTime(row['Time'] || row['time']);
         const tripId = `T${(currentTripNumber + index).toString().padStart(4, '0')}`;
+
+        // Find actual IDs from the data
+        const foundBus = busNo ? findBusByNumber(busNo) : null;
+        const foundRoute = routeName ? findRouteByName(routeName) : null;
+        const foundDriver = driverName ? findPersonByName(driverName) : null;
+        const foundConductor = conductorName ? findPersonByName(conductorName) : null;
+
+        console.log('Excel row mapping:', {
+          busNo, foundBus: foundBus?.id,
+          routeName, foundRoute: foundRoute?.id,
+          driverName, foundDriver: foundDriver?.id,
+          conductorName, foundConductor: foundConductor?.id,
+          date, time
+        });
 
         return {
           trip_id: tripId,
+          bus_id: foundBus?.id || null,
+          route_id: foundRoute?.id || null,
+          driver_id: foundDriver?.id || null,
+          conductor_id: foundConductor?.id || null,
           allocation_date: date,
           start_time: time || '06:00',
           end_time: time ? addHours(time, 8) : '18:00',
@@ -321,7 +351,7 @@ export default function DriverAllocation() {
             driver: driverName,
             conductor: conductorName,
             whatsapp,
-            time: row['Time']?.toString()
+            time: row['Time']?.toString() || row['time']?.toString()
           })
         } as any;
       });
