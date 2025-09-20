@@ -86,16 +86,24 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
           .limit(1);
 
         if (documents && documents.length > 0) {
-          await regenerateDocumentWithSignatures(
+          const result = await regenerateDocumentWithSignatures(
             documents[0].id,
             quotationId,
             documents[0].payment_id
           );
+          
+          if (result.success) {
+            toast.success('Document updated with signature');
+          } else {
+            toast.info('Signature saved. Document will be updated on next generation.');
+          }
         }
       } catch (error) {
         console.error('Auto-regeneration failed:', error);
         toast.info('Signature saved. Please manually update the document.');
       }
+    } else {
+      toast.success('Signature saved successfully');
     }
   };
 

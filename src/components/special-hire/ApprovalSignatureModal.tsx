@@ -16,7 +16,7 @@ interface ApprovalSignatureModalProps {
   documentId: string;
   approvalType: 'prepared_by' | 'checked_by' | 'approved_by';
   title: string;
-  onSave: (approvalData: ApprovalData) => void;
+  onSave: () => void;
   existingApproval?: ApprovalData;
 }
 
@@ -151,6 +151,7 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
 
   const handleSave = async () => {
     if (!approverName.trim()) {
+      toast.error('Please enter approver name');
       return;
     }
 
@@ -173,7 +174,7 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
 
     const result = await saveApproval(approvalData);
     if (result.success) {
-      onSave(approvalData);
+      onSave();
       onClose();
     }
   };
