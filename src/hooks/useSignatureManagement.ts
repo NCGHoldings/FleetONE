@@ -11,6 +11,8 @@ export interface ApprovalData {
   signature_data?: string;
   approval_date: string;
   user_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface NameSuggestion {
@@ -46,17 +48,39 @@ export const useSignatureManagement = () => {
     try {
       setIsLoading(true);
 
-      // Save approval data
-      const { data, error } = await supabase
-        .from('document_approvals')
-        .upsert({
-          ...approvalData,
-          user_id: user?.id,
-        })
-        .select()
-        .single();
+      // Prepare data for database
+      const dbData = {
+        document_id: approvalData.document_id,
+        approval_type: approvalData.approval_type,
+        approver_name: approvalData.approver_name,
+        signature_data: approvalData.signature_data,
+        approval_date: approvalData.approval_date,
+        user_id: user?.id,
+      };
 
-      if (error) throw error;
+      let result;
+      if (approvalData.id) {
+        // Update existing approval
+        const { data, error } = await supabase
+          .from('document_approvals')
+          .update(dbData)
+          .eq('id', approvalData.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+      } else {
+        // Insert new approval  
+        const { data, error } = await supabase
+          .from('document_approvals')
+          .insert(dbData)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+      }
 
       // Increment name usage for suggestions
       if (approvalData.approver_name) {
@@ -66,7 +90,7 @@ export const useSignatureManagement = () => {
       }
 
       toast.success('Approval signature saved successfully');
-      return { success: true, data };
+      return { success: true, data: result };
     } catch (error) {
       console.error('Error saving approval:', error);
       toast.error('Failed to save approval signature');

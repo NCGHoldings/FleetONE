@@ -3,13 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SignatureCaptureModal, type ApprovalData } from './SignatureCaptureModal';
-import { useDocumentApprovals, type DocumentApproval } from '@/hooks/useDocumentApprovals';
+import { useSignatureManagement, type ApprovalData as SignatureApprovalData } from '@/hooks/useSignatureManagement';
 import { Pen, Check, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface DocumentApprovalInterfaceProps {
   documentId: string;
-  onApprovalsUpdate?: (approvals: DocumentApproval[]) => void;
+  onApprovalsUpdate?: (approvals: SignatureApprovalData[]) => void;
   showFinanceApproval?: boolean; // Only show for finance team
 }
 
@@ -18,19 +18,26 @@ export const DocumentApprovalInterface: React.FC<DocumentApprovalInterfaceProps>
   onApprovalsUpdate,
   showFinanceApproval = false,
 }) => {
-  const [approvals, setApprovals] = useState<DocumentApproval[]>([]);
+  const [approvals, setApprovals] = useState<SignatureApprovalData[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [currentApprovalType, setCurrentApprovalType] = useState<'prepared_by' | 'checked_by' | 'approved_by'>('prepared_by');
-  const { getDocumentApprovals, saveApproval, isLoading } = useDocumentApprovals();
+  const { getDocumentApprovals, saveApproval, isLoading } = useSignatureManagement();
 
   useEffect(() => {
     loadApprovals();
   }, [documentId]);
 
   const loadApprovals = async () => {
-    const data = await getDocumentApprovals(documentId);
-    setApprovals(data);
-    onApprovalsUpdate?.(data);
+    const result = await getDocumentApprovals(documentId);
+    if (result.success) {
+      // Type cast the approvals to match our interface
+      const typedApprovals = result.approvals.map(approval => ({
+        ...approval,
+        approval_type: approval.approval_type as 'prepared_by' | 'checked_by' | 'approved_by'
+      }));
+      setApprovals(typedApprovals);
+      onApprovalsUpdate?.(typedApprovals);
+    }
   };
 
   const handleApprovalClick = (type: 'prepared_by' | 'checked_by' | 'approved_by') => {
@@ -39,14 +46,15 @@ export const DocumentApprovalInterface: React.FC<DocumentApprovalInterfaceProps>
   };
 
   const handleSaveApproval = async (approvalData: ApprovalData) => {
-    const result = await saveApproval(
-      documentId,
-      approvalData.approvalType,
-      approvalData.approverName,
-      approvalData.approvalDate,
-      approvalData.signatureData
-    );
+    const signatureApprovalData: SignatureApprovalData = {
+      document_id: documentId,
+      approval_type: approvalData.approvalType,
+      approver_name: approvalData.approverName,
+      signature_data: approvalData.signatureData,
+      approval_date: approvalData.approvalDate,
+    };
 
+    const result = await saveApproval(signatureApprovalData);
     if (result.success) {
       await loadApprovals();
     }

@@ -8,8 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { CalendarIcon, Trash2, Pen } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useSignatureManagement } from '@/hooks/useSignatureManagement';
 import { toast } from 'sonner';
 
 interface SignatureCaptureModalProps {
@@ -24,7 +23,7 @@ interface SignatureCaptureModalProps {
 export interface ApprovalData {
   approverName: string;
   signatureData?: string;
-  approvalDate: Date;
+  approvalDate: string;
   approvalType: 'prepared_by' | 'checked_by' | 'approved_by';
 }
 
@@ -39,10 +38,10 @@ export const SignatureCaptureModal: React.FC<SignatureCaptureModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [approverName, setApproverName] = useState('');
-  const [approvalDate, setApprovalDate] = useState<Date>(new Date());
+  const [approvalDate, setApprovalDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const { user } = useAuth();
+  const { saveApproval, getNameSuggestions, isLoading } = useSignatureManagement();
 
   useEffect(() => {
     if (isOpen) {
@@ -52,19 +51,8 @@ export const SignatureCaptureModal: React.FC<SignatureCaptureModalProps> = ({
   }, [isOpen]);
 
   const loadNameSuggestions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('approval_name_suggestions')
-        .select('name')
-        .order('usage_count', { ascending: false })
-        .limit(10);
-
-      if (!error && data) {
-        setNameSuggestions(data.map(item => item.name));
-      }
-    } catch (error) {
-      console.error('Error loading name suggestions:', error);
-    }
+    const suggestions = await getNameSuggestions();
+    setNameSuggestions(suggestions.map(s => s.name));
   };
 
   const initializeCanvas = () => {
@@ -166,37 +154,25 @@ export const SignatureCaptureModal: React.FC<SignatureCaptureModalProps> = ({
 
     const signatureData = getSignatureData();
     
-    const approvalData: ApprovalData = {
-      approverName: approverName.trim(),
-      signatureData,
-      approvalDate,
-      approvalType,
+    const signatureApprovalData = {
+      document_id: documentId,
+      approval_type: approvalType,
+      approver_name: approverName.trim(),
+      signature_data: signatureData,
+      approval_date: approvalDate,
     };
 
-    try {
-      // Save approval to database
-      await supabase
-        .from('document_approvals')
-        .insert({
-          document_id: documentId,
-          approval_type: approvalType,
-          approver_name: approverName.trim(),
-          signature_data: signatureData,
-          approval_date: format(approvalDate, 'yyyy-MM-dd'),
-          user_id: user?.id,
-        });
-
-      // Increment name suggestion usage
-      await supabase.rpc('increment_name_suggestion', {
-        p_name: approverName.trim()
-      });
-
+    const result = await saveApproval(signatureApprovalData);
+    if (result.success) {
+      const approvalData: ApprovalData = {
+        approverName: approverName.trim(),
+        signatureData,
+        approvalDate,
+        approvalType,
+      };
+      
       onSave(approvalData);
       onClose();
-      toast.success('Approval signature saved successfully');
-    } catch (error) {
-      console.error('Error saving approval:', error);
-      toast.error('Failed to save approval');
     }
   };
 
@@ -258,14 +234,14 @@ export const SignatureCaptureModal: React.FC<SignatureCaptureModalProps> = ({
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {approvalDate ? format(approvalDate, "PPP") : <span>Pick a date</span>}
+                  {approvalDate ? format(new Date(approvalDate), "PPP") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
                 <Calendar
                   mode="single"
-                  selected={approvalDate}
-                  onSelect={(date) => date && setApprovalDate(date)}
+                  selected={new Date(approvalDate)}
+                  onSelect={(date) => date && setApprovalDate(format(date, 'yyyy-MM-dd'))}
                   initialFocus
                 />
               </PopoverContent>
@@ -304,11 +280,11 @@ export const SignatureCaptureModal: React.FC<SignatureCaptureModalProps> = ({
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            Save Approval
+          <Button onClick={handleSave} disabled={isLoading || !approverName.trim()}>
+            {isLoading ? 'Saving...' : 'Save Approval'}
           </Button>
         </div>
       </DialogContent>
