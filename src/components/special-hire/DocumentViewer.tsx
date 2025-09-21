@@ -5,6 +5,7 @@ import { Eye, Download, X, FileText, Settings } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DocumentSignatureManager } from './DocumentSignatureManager';
+import { EnhancedPDFViewer } from './EnhancedPDFViewer';
 
 interface DocumentViewerProps {
   isOpen: boolean;
@@ -218,15 +219,19 @@ export const DocumentViewer = ({
                   );
                 }
 
+                // Use the enhanced PDF viewer with editing capabilities
                 return (
-                  <iframe
-                    src={blobUrl || pdfUrl}
-                    className="w-full h-[70vh]"
-                    title={`${document.document_type} Preview`}
-                    onError={() => {
-                      console.error('Failed to load PDF in iframe');
-                    }}
-                  />
+                  <div className="h-[70vh]">
+                    <EnhancedPDFViewer
+                      pdfUrl={blobUrl || pdfUrl}
+                      onDownload={handleDownload}
+                      onSave={(canvasData) => {
+                        console.log('Canvas annotations saved:', canvasData);
+                        // Here you could save the canvas data to your database
+                        // for persistent annotations
+                      }}
+                    />
+                  </div>
                 );
               })()}
             </TabsContent>
