@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Canvas as FabricCanvas, FabricText, FabricImage } from 'fabric';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Canvas as FabricCanvas, FabricText, FabricImage, PencilBrush } from 'fabric';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -7,15 +7,16 @@ import {
   Image as ImageIcon, 
   ZoomIn, 
   ZoomOut, 
-  RotateCw, 
   Download, 
   Save,
-  Undo,
-  Redo,
-  Trash2
+  Trash2,
+  Pen,
+  MousePointer
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface EnhancedPDFViewerProps {
   pdfUrl: string;
@@ -34,32 +35,75 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [zoom, setZoom] = useState(100);
-  const [activeTool, setActiveTool] = useState<'select' | 'text' | 'image'>('select');
+  const [activeTool, setActiveTool] = useState<'select' | 'text' | 'image' | 'draw'>('select');
   const [textToAdd, setTextToAdd] = useState('');
   const [isCanvasReady, setIsCanvasReady] = useState(false);
+
+  // Resize canvas to match container
+  const resizeCanvas = useCallback(() => {
+    if (!fabricCanvas || !pdfContainerRef.current) return;
+    
+    const container = pdfContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    
+    fabricCanvas.setDimensions({
+      width: rect.width,
+      height: rect.height
+    });
+    fabricCanvas.renderAll();
+  }, [fabricCanvas]);
 
   useEffect(() => {
     if (!canvasRef.current || !pdfContainerRef.current) return;
 
-    // Initialize Fabric canvas
+    const container = pdfContainerRef.current;
+    const rect = container.getBoundingClientRect();
+
+    // Initialize Fabric canvas with container dimensions
     const canvas = new FabricCanvas(canvasRef.current, {
-      width: 800,
-      height: 600,
+      width: rect.width || 800,
+      height: rect.height || 600,
       backgroundColor: 'transparent',
     });
 
-    // Set canvas to be overlay on top of PDF
+    // Set canvas properties
     canvas.selection = true;
     canvas.preserveObjectStacking = true;
+    
+    // Initialize drawing brush
+    canvas.freeDrawingBrush = new PencilBrush(canvas);
+    canvas.freeDrawingBrush.width = 2;
+    canvas.freeDrawingBrush.color = '#000000';
 
     setFabricCanvas(canvas);
     setIsCanvasReady(true);
-    toast.success('PDF Editor ready! Use the toolbar to add text and images.');
+    toast.success('PDF Editor ready! Use the toolbar to add annotations.');
+
+    // Handle window resize
+    const handleResize = () => {
+      setTimeout(resizeCanvas, 100);
+    };
+    
+    window.addEventListener('resize', handleResize);
 
     return () => {
       canvas.dispose();
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  // Handle tool changes
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    
+    fabricCanvas.isDrawingMode = activeTool === 'draw';
+    fabricCanvas.selection = activeTool === 'select';
+    
+    if (activeTool === 'draw' && fabricCanvas.freeDrawingBrush) {
+      fabricCanvas.freeDrawingBrush.width = 2;
+      fabricCanvas.freeDrawingBrush.color = '#000000';
+    }
+  }, [activeTool, fabricCanvas]);
 
   // Handle zoom changes
   const handleZoom = (newZoom: number) => {
@@ -74,11 +118,12 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       }
     }
 
-    // Adjust canvas size proportionally
+    // Synchronize canvas zoom
     if (fabricCanvas) {
       const scale = clampedZoom / 100;
       fabricCanvas.setZoom(scale);
       fabricCanvas.renderAll();
+      resizeCanvas();
     }
   };
 
@@ -154,17 +199,51 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     }
   };
 
-  // Save canvas data
-  const handleSave = () => {
-    if (!fabricCanvas) return;
+  // Save canvas data and create combined PDF
+  const handleSave = async () => {
+    if (!fabricCanvas || !pdfContainerRef.current) return;
     
     try {
+      // Save canvas JSON data
       const canvasData = fabricCanvas.toJSON();
       onSave?.(JSON.stringify(canvasData));
-      toast.success('Document annotations saved');
+      
+      // Create a combined PDF with annotations
+      await createAnnotatedPDF();
+      
+      toast.success('Document with annotations saved');
     } catch (error) {
       console.error('Error saving canvas data:', error);
       toast.error('Failed to save annotations');
+    }
+  };
+
+  // Create PDF with annotations
+  const createAnnotatedPDF = async () => {
+    if (!fabricCanvas || !pdfContainerRef.current) return;
+
+    try {
+      // Capture the entire container (PDF + annotations)
+      const canvas = await html2canvas(pdfContainerRef.current, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 2
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save('annotated-document.pdf');
+      
+      toast.success('Annotated PDF downloaded');
+    } catch (error) {
+      console.error('Error creating annotated PDF:', error);
+      toast.error('Failed to create annotated PDF');
     }
   };
 
@@ -183,12 +262,26 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       <div className="flex items-center gap-2 p-3 border-b bg-muted/30">
         {/* Document tools */}
         <div className="flex items-center gap-1">
+          {/* Selection tool */}
           <Button
             variant={activeTool === 'select' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setActiveTool('select')}
+            title="Select objects"
           >
+            <MousePointer className="w-4 h-4 mr-1" />
             Select
+          </Button>
+          
+          {/* Drawing tool */}
+          <Button
+            variant={activeTool === 'draw' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTool('draw')}
+            title="Draw freehand"
+          >
+            <Pen className="w-4 h-4 mr-1" />
+            Draw
           </Button>
           
           <Separator orientation="vertical" className="h-6 mx-2" />
@@ -199,6 +292,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
               variant={activeTool === 'text' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setActiveTool('text')}
+              title="Add text"
             >
               <Type className="w-4 h-4 mr-1" />
               Text
@@ -229,6 +323,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             variant={activeTool === 'image' ? 'default' : 'ghost'}
             size="sm"
             onClick={handleAddImage}
+            title="Add image"
           >
             <ImageIcon className="w-4 h-4 mr-1" />
             Image
@@ -346,7 +441,9 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
           className="absolute top-0 left-0 pointer-events-auto"
           style={{
             zIndex: 10,
-            background: 'transparent'
+            background: 'transparent',
+            width: '100%',
+            height: '100%'
           }}
         />
       </div>
@@ -354,7 +451,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       {/* Status bar */}
       <div className="flex items-center justify-between p-2 border-t bg-muted/30 text-xs text-muted-foreground">
         <div>
-          Mode: {activeTool === 'select' ? 'Selection' : activeTool === 'text' ? 'Text Addition' : 'Image Addition'}
+          Mode: {activeTool === 'select' ? 'Selection' : activeTool === 'draw' ? 'Drawing' : activeTool === 'text' ? 'Text Addition' : 'Image Addition'}
         </div>
         <div>
           Canvas: {isCanvasReady ? 'Ready' : 'Loading...'}
