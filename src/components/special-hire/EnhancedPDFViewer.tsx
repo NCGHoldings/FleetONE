@@ -50,6 +50,13 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       width: rect.width,
       height: rect.height
     });
+    
+    // Ensure canvas styling matches container
+    if (canvasRef.current) {
+      canvasRef.current.style.width = `${rect.width}px`;
+      canvasRef.current.style.height = `${rect.height}px`;
+    }
+    
     fabricCanvas.renderAll();
   }, [fabricCanvas]);
 
@@ -220,27 +227,71 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
 
   // Create PDF with annotations
   const createAnnotatedPDF = async () => {
-    if (!fabricCanvas || !pdfContainerRef.current) return;
+    if (!fabricCanvas) return;
 
     try {
-      // Capture the entire container (PDF + annotations)
-      const canvas = await html2canvas(pdfContainerRef.current, {
-        useCORS: true,
-        allowTaint: true,
-        scale: 2
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      });
-
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save('annotated-document.pdf');
+      // Get canvas dimensions
+      const canvasWidth = fabricCanvas.getWidth();
+      const canvasHeight = fabricCanvas.getHeight();
       
-      toast.success('Annotated PDF downloaded');
+      // Create a temporary canvas to combine PDF background with annotations
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
+
+      tempCanvas.width = canvasWidth;
+      tempCanvas.height = canvasHeight;
+
+      // Fill with white background
+      tempCtx.fillStyle = '#ffffff';
+      tempCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // Try to capture the PDF iframe content
+      const iframe = pdfContainerRef.current?.querySelector('iframe');
+      if (iframe) {
+        try {
+          // Capture the iframe content
+          const iframeCanvas = await html2canvas(iframe, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 1,
+            width: canvasWidth,
+            height: canvasHeight
+          });
+          
+          // Draw the PDF content
+          tempCtx.drawImage(iframeCanvas, 0, 0, canvasWidth, canvasHeight);
+        } catch (iframeError) {
+          console.warn('Could not capture iframe content, using white background');
+        }
+      }
+
+      // Export fabric canvas to image and draw it on top
+      const fabricDataUrl = fabricCanvas.toDataURL({
+        format: 'png',
+        multiplier: 1
+      });
+
+      const fabricImg = new Image();
+      fabricImg.onload = () => {
+        // Draw annotations on top
+        tempCtx.drawImage(fabricImg, 0, 0);
+
+        // Create PDF from the combined canvas
+        const combinedDataUrl = tempCanvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: canvasWidth > canvasHeight ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [canvasWidth, canvasHeight]
+        });
+
+        pdf.addImage(combinedDataUrl, 'PNG', 0, 0, canvasWidth, canvasHeight);
+        pdf.save('annotated-document.pdf');
+        
+        toast.success('Annotated PDF downloaded successfully');
+      };
+
+      fabricImg.src = fabricDataUrl;
     } catch (error) {
       console.error('Error creating annotated PDF:', error);
       toast.error('Failed to create annotated PDF');
@@ -443,7 +494,9 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             zIndex: 10,
             background: 'transparent',
             width: '100%',
-            height: '100%'
+            height: '100%',
+            transform: `scale(${zoom / 100})`,
+            transformOrigin: 'top left'
           }}
         />
       </div>
