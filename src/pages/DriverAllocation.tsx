@@ -194,91 +194,176 @@ export default function DriverAllocation() {
   const parseDate = (dateStr: any): string => {
     if (!dateStr) {
       console.warn('Empty date string, using current date');
-      return new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      return new Date().toISOString().split('T')[0];
     }
 
-    // Handle Excel serial date numbers
+    // Handle Excel serial date numbers (most common issue)
     if (typeof dateStr === 'number') {
-      // Excel serial date to JavaScript date
-      const excelDate = new Date((dateStr - 25569) * 86400 * 1000);
+      console.log('Processing Excel serial date:', dateStr);
+      
+      // Excel stores dates as days since January 1, 1900 (with leap year bug)
+      // But we need to account for the leap year bug in Excel (treats 1900 as leap year)
+      let excelDate;
+      if (dateStr > 59) {
+        // After Feb 28, 1900 - account for Excel's leap year bug
+        excelDate = new Date(1900, 0, dateStr - 1);
+      } else {
+        // Before March 1, 1900 - no adjustment needed
+        excelDate = new Date(1900, 0, dateStr);
+      }
+      
       if (!isNaN(excelDate.getTime())) {
         const result = excelDate.toISOString().split('T')[0];
-        console.log('Parsed Excel serial date:', dateStr, 'to:', result);
+        console.log('Converted Excel date:', dateStr, 'to:', result);
         return result;
       }
     }
 
     const dateString = dateStr.toString().trim();
-    console.log('Parsing date:', dateString);
+    console.log('Parsing date string:', dateString);
 
     try {
       // Handle DD/MM/YYYY format (16/09/2025)
       if (dateString.includes('/')) {
         const parts = dateString.split('/');
         if (parts.length === 3) {
-          const day = parts[0].padStart(2, '0');
-          const month = parts[1].padStart(2, '0');
-          const year = parts[2];
+          let day, month, year;
+          
+          // Detect format based on which part looks like a year
+          if (parts[2].length === 4) {
+            // DD/MM/YYYY
+            day = parts[0].padStart(2, '0');
+            month = parts[1].padStart(2, '0');
+            year = parts[2];
+          } else if (parts[0].length === 4) {
+            // YYYY/MM/DD
+            year = parts[0];
+            month = parts[1].padStart(2, '0');
+            day = parts[2].padStart(2, '0');
+          } else {
+            // Default to DD/MM/YYYY
+            day = parts[0].padStart(2, '0');
+            month = parts[1].padStart(2, '0');
+            year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+          }
+          
           const result = `${year}-${month}-${day}`;
-          console.log('Parsed DD/MM/YYYY to:', result);
+          console.log('Parsed date with / to:', result);
           return result;
         }
       }
 
-      // Handle DD.MM.YYYY format (16.09.2025)
+      // Handle DD.MM.YYYY format
       if (dateString.includes('.')) {
         const parts = dateString.split('.');
         if (parts.length === 3) {
           const day = parts[0].padStart(2, '0');
           const month = parts[1].padStart(2, '0');
-          const year = parts[2];
+          const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
           const result = `${year}-${month}-${day}`;
           console.log('Parsed DD.MM.YYYY to:', result);
           return result;
         }
       }
 
-      // Handle DD-MM-YYYY format (16-09-2025)
-      if (dateString.includes('-') && dateString.split('-').length === 3) {
+      // Handle DD-MM-YYYY format
+      if (dateString.includes('-')) {
         const parts = dateString.split('-');
-        if (parts[2].length === 4) { // If third part is year (DD-MM-YYYY)
-          const day = parts[0].padStart(2, '0');
-          const month = parts[1].padStart(2, '0');
-          const year = parts[2];
-          const result = `${year}-${month}-${day}`;
-          console.log('Parsed DD-MM-YYYY to:', result);
-          return result;
+        if (parts.length === 3) {
+          let day, month, year;
+          
+          if (parts[0].length === 4) {
+            // YYYY-MM-DD (already correct)
+            return dateString;
+          } else {
+            // DD-MM-YYYY
+            day = parts[0].padStart(2, '0');
+            month = parts[1].padStart(2, '0');
+            year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+            const result = `${year}-${month}-${day}`;
+            console.log('Parsed DD-MM-YYYY to:', result);
+            return result;
+          }
         }
       }
 
-      // If already in YYYY-MM-DD format, return as is
-      if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        console.log('Already in YYYY-MM-DD format:', dateString);
-        return dateString;
-      }
-
-      // Fallback: try to parse as ISO date
+      // Try to parse as a regular date
       const parsedDate = new Date(dateString);
       if (!isNaN(parsedDate.getTime())) {
         const result = parsedDate.toISOString().split('T')[0];
-        console.log('Parsed as ISO date to:', result);
+        console.log('Parsed as standard date to:', result);
         return result;
       }
+
     } catch (error) {
       console.error('Error parsing date:', dateString, error);
     }
 
-    // Final fallback: use current date
+    // Final fallback
     console.warn('Could not parse date:', dateString, 'using current date');
     return new Date().toISOString().split('T')[0];
   };
 
-  const findRouteByName = (routeName: string) => routes.find(r => r.route_name.toLowerCase().includes(routeName.toLowerCase()));
-  const findPersonByName = (name: string) => people.find(p => 
-    `${p.first_name} ${p.last_name}`.toLowerCase().includes(name.toLowerCase()) ||
-    name.toLowerCase().includes(p.first_name.toLowerCase())
-  );
-  const findBusByNumber = (busNo: string) => buses.find(b => b.bus_no.toLowerCase().includes(busNo.toLowerCase()));
+  const findRouteByName = (routeName: string) => {
+    if (!routeName) return null;
+    const searchName = routeName.toLowerCase().trim();
+    return routes.find(r => 
+      r.route_name.toLowerCase().includes(searchName) ||
+      r.route_no?.toLowerCase().includes(searchName) ||
+      searchName.includes(r.route_name.toLowerCase())
+    );
+  };
+
+  const findPersonByName = (name: string) => {
+    if (!name) return null;
+    const searchName = name.toLowerCase().trim();
+    
+    // First try exact matches
+    let person = people.find(p => {
+      const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+      return fullName === searchName || 
+             searchName === fullName ||
+             fullName.includes(searchName) ||
+             searchName.includes(fullName);
+    });
+    
+    if (person) return person;
+    
+    // Then try partial matches on first name
+    person = people.find(p => {
+      const firstName = p.first_name.toLowerCase();
+      const lastName = p.last_name.toLowerCase();
+      return searchName.includes(firstName) || 
+             firstName.includes(searchName) ||
+             searchName.includes(lastName) ||
+             lastName.includes(searchName);
+    });
+    
+    if (person) return person;
+    
+    // Finally try very fuzzy matching (for typos)
+    return people.find(p => {
+      const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+      const words = searchName.split(/\s+/);
+      return words.some(word => 
+        fullName.includes(word) || 
+        word.length > 3 && (
+          p.first_name.toLowerCase().includes(word) || 
+          p.last_name.toLowerCase().includes(word)
+        )
+      );
+    });
+  };
+
+  const findBusByNumber = (busNo: string) => {
+    if (!busNo) return null;
+    const searchBus = busNo.toLowerCase().trim();
+    return buses.find(b => 
+      b.bus_no.toLowerCase() === searchBus ||
+      b.bus_no.toLowerCase().includes(searchBus) ||
+      searchBus.includes(b.bus_no.toLowerCase())
+    );
+  };
 
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -310,28 +395,45 @@ export default function DriverAllocation() {
       }
 
       const allocRows = jsonData.map((row: any, index: number) => {
-        const busNo = row['Bus No']?.toString().trim();
-        const routeNo = row['Route']?.toString().trim();
-        const routeName = row['route name']?.toString().trim() || row['Route Name']?.toString().trim();
-        const driverName = row['Driver']?.toString().trim();
-        const conductorName = row['Conductor']?.toString().trim();
-        const whatsapp = row['Whatsapp']?.toString().replace(/\D/g, '');
-        const date = parseDate(row['date'] || row['Date']);
-        const time = parseTime(row['Time'] || row['time']);
+        // More flexible column name detection
+        const getColumnValue = (possibleNames: string[]) => {
+          for (const name of possibleNames) {
+            const value = row[name];
+            if (value !== undefined && value !== null && value !== '') {
+              return value.toString().trim();
+            }
+          }
+          return null;
+        };
+
+        const busNo = getColumnValue(['Bus No', 'bus no', 'Bus', 'bus', 'Bus Number', 'BusNo']);
+        const routeNo = getColumnValue(['Route', 'route', 'Route No', 'route no', 'RouteNo']);
+        const routeName = getColumnValue(['route name', 'Route Name', 'RouteName', 'Route', 'route']);
+        const driverName = getColumnValue(['Driver', 'driver', 'Driver Name', 'DriverName']);
+        const conductorName = getColumnValue(['Conductor', 'conductor', 'Conductor Name', 'ConductorName']);
+        const whatsapp = getColumnValue(['Whatsapp', 'whatsapp', 'WhatsApp', 'Phone', 'phone', 'Contact']);
+        const dateValue = getColumnValue(['date', 'Date', 'Trip Date', 'TripDate', 'Day']);
+        const timeValue = getColumnValue(['Time', 'time', 'Start Time', 'StartTime', 'Departure']);
+
+        const date = parseDate(dateValue);
+        const time = parseTime(timeValue);
         const tripId = `T${(currentTripNumber + index).toString().padStart(4, '0')}`;
 
         // Find actual IDs from the data
         const foundBus = busNo ? findBusByNumber(busNo) : null;
-        const foundRoute = routeName ? findRouteByName(routeName) : null;
+        const foundRoute = (routeName || routeNo) ? findRouteByName(routeName || routeNo) : null;
         const foundDriver = driverName ? findPersonByName(driverName) : null;
         const foundConductor = conductorName ? findPersonByName(conductorName) : null;
 
         console.log('Excel row mapping:', {
-          busNo, foundBus: foundBus?.id,
-          routeName, foundRoute: foundRoute?.id,
-          driverName, foundDriver: foundDriver?.id,
-          conductorName, foundConductor: foundConductor?.id,
-          date, time
+          original: { busNo, routeName, routeNo, driverName, conductorName, dateValue, timeValue },
+          found: { 
+            bus: foundBus ? `${foundBus.bus_no} (${foundBus.id})` : 'Not found',
+            route: foundRoute ? `${foundRoute.route_name} (${foundRoute.id})` : 'Not found',
+            driver: foundDriver ? `${foundDriver.first_name} ${foundDriver.last_name} (${foundDriver.user_id})` : 'Not found',
+            conductor: foundConductor ? `${foundConductor.first_name} ${foundConductor.last_name} (${foundConductor.user_id})` : 'Not found',
+            date, time
+          }
         });
 
         return {
