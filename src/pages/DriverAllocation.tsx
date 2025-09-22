@@ -57,6 +57,18 @@ export default function DriverAllocation() {
     bus_ids: [] as string[],
   });
 
+  const [editForm, setEditForm] = useState({
+    trip_id: "",
+    date: "",
+    start_time: "",
+    end_time: "",
+    route_id: "",
+    driver_id: "",
+    conductor_id: "",
+    bus_id: "",
+    status: "",
+  });
+
   useEffect(() => {
     document.title = "Driver Allocation | NCG Speed";
     const meta = document.querySelector('meta[name="description"]');
@@ -615,6 +627,51 @@ export default function DriverAllocation() {
     }
   };
 
+  const handleEditAllocation = (allocation: AllocationRow) => {
+    setEditForm({
+      trip_id: allocation.trip_id,
+      date: allocation.date,
+      start_time: allocation.start_time || "06:00",
+      end_time: allocation.end_time || "18:00",
+      route_id: routes.find(r => r.route_no === allocation.route_no || r.route_name === allocation.route_name)?.id || "",
+      driver_id: people.find(p => `${p.first_name} ${p.last_name}` === allocation.driver_name)?.user_id || "",
+      conductor_id: people.find(p => `${p.first_name} ${p.last_name}` === allocation.conductor_name)?.user_id || "",
+      bus_id: buses.find(b => b.bus_no === allocation.bus_no)?.id || "",
+      status: allocation.status,
+    });
+    setEditingAllocation(allocation);
+  };
+
+  const handleUpdateAllocation = async () => {
+    if (!editingAllocation || !isSupervisor) return;
+
+    try {
+      const { error } = await supabase
+        .from('driver_allocations')
+        .update({
+          trip_id: editForm.trip_id,
+          allocation_date: editForm.date,
+          start_time: editForm.start_time,
+          end_time: editForm.end_time,
+          route_id: editForm.route_id || null,
+          driver_id: editForm.driver_id || null,
+          conductor_id: editForm.conductor_id || null,
+          bus_id: editForm.bus_id || null,
+          status: editForm.status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingAllocation.id);
+
+      if (error) throw error;
+
+      toast.success('Allocation updated successfully');
+      setEditingAllocation(null);
+      fetchAllocations();
+    } catch (error: any) {
+      toast.error('Failed to update allocation: ' + error.message);
+    }
+  };
+
   const columns: ColumnDef<AllocationRow>[] = [
     { accessorKey: 'trip_id', header: 'Trip ID' },
     { accessorKey: 'date', header: 'Date' },
@@ -642,7 +699,7 @@ export default function DriverAllocation() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setEditingAllocation(row.original)}
+                onClick={() => handleEditAllocation(row.original)}
                 className="h-8 w-8 p-0"
               >
                 <Edit className="h-4 w-4" />
@@ -707,6 +764,132 @@ export default function DriverAllocation() {
                       <p className="text-sm text-muted-foreground">Processing Excel file...</p>
                     </div>
                   )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!editingAllocation} onOpenChange={(open) => !open && setEditingAllocation(null)}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Edit Allocation</DialogTitle>
+                </DialogHeader>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Label>Trip ID</Label>
+                    <Input 
+                      value={editForm.trip_id}
+                      onChange={(e) => setEditForm({ ...editForm, trip_id: e.target.value })} 
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Date</Label>
+                    <Input 
+                      type="date" 
+                      value={editForm.date} 
+                      onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label>Start</Label>
+                      <Input 
+                        type="time" 
+                        value={editForm.start_time} 
+                        onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })} 
+                      />
+                    </div>
+                    <div>
+                      <Label>End</Label>
+                      <Input 
+                        type="time" 
+                        value={editForm.end_time} 
+                        onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })} 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Route</Label>
+                    <Select value={editForm.route_id} onValueChange={(v) => setEditForm({ ...editForm, route_id: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select route" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {routes.map((r) => (
+                          <SelectItem key={r.id} value={r.id}>{r.route_no} — {r.route_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Bus</Label>
+                    <Select value={editForm.bus_id} onValueChange={(v) => setEditForm({ ...editForm, bus_id: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select bus" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {buses.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>{b.bus_no}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Driver</Label>
+                    <Select value={editForm.driver_id} onValueChange={(v) => setEditForm({ ...editForm, driver_id: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select driver" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {people.map((p) => (
+                          <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Conductor</Label>
+                    <Select value={editForm.conductor_id || "none"} onValueChange={(v) => setEditForm({ ...editForm, conductor_id: v === "none" ? "" : v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select conductor (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {people.map((p) => (
+                          <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Status</Label>
+                    <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="col-span-2 flex gap-2">
+                    <Button onClick={handleUpdateAllocation} className="flex-1">
+                      <CheckCircle className="h-4 w-4 mr-2" />Update Allocation
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditingAllocation(null)} className="flex-1">
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
