@@ -153,25 +153,29 @@ export default function DriverAllocation() {
     return overlaps;
   };
 
-  const generateTripId = async () => {
-    // Get the highest trip ID number to continue sequence
+  const generateTripId = async (tripDate: string) => {
+    // Format: TYYYYMMDD-#### (e.g., T20250731-0001)
+    const dateForId = tripDate.replace(/-/g, ''); // Convert YYYY-MM-DD to YYYYMMDD
+    const pattern = `T${dateForId}-%`;
+    
+    // Get the highest trip ID number for this specific date
     const { data } = await supabase
       .from('driver_allocations')
       .select('trip_id')
-      .like('trip_id', 'T%')
-      .order('created_at', { ascending: false })
+      .like('trip_id', pattern)
+      .order('trip_id', { ascending: false })
       .limit(1);
     
     let nextNumber = 1;
     if (data && data.length > 0) {
       const lastTripId = data[0].trip_id;
-      const match = lastTripId.match(/T(\d+)/);
+      const match = lastTripId.match(/T\d{8}-(\d+)/);
       if (match) {
         nextNumber = parseInt(match[1]) + 1;
       }
     }
     
-    return `T${nextNumber.toString().padStart(4, '0')}`;
+    return `T${dateForId}-${nextNumber.toString().padStart(4, '0')}`;
   };
 
   const parseTime = (timeStr: string) => {
@@ -201,20 +205,19 @@ export default function DriverAllocation() {
     if (typeof dateStr === 'number') {
       console.log('Processing Excel serial date:', dateStr);
       
-      // Excel stores dates as days since January 1, 1900 (with leap year bug)
-      // But we need to account for the leap year bug in Excel (treats 1900 as leap year)
-      let excelDate;
-      if (dateStr > 59) {
-        // After Feb 28, 1900 - account for Excel's leap year bug
-        excelDate = new Date(1900, 0, dateStr - 1);
-      } else {
-        // Before March 1, 1900 - no adjustment needed
-        excelDate = new Date(1900, 0, dateStr);
-      }
+      // Excel serial date: days since January 1, 1900
+      // JavaScript Date: milliseconds since January 1, 1970
+      // The difference is 25569 days (70 years * 365.25 days)
       
-      if (!isNaN(excelDate.getTime())) {
-        const result = excelDate.toISOString().split('T')[0];
-        console.log('Converted Excel date:', dateStr, 'to:', result);
+      // Convert Excel serial date to JavaScript date
+      const jsDate = new Date((dateStr - 25569) * 86400 * 1000);
+      
+      // Adjust for timezone to get correct date
+      const utcDate = new Date(jsDate.getTime() + jsDate.getTimezoneOffset() * 60000);
+      
+      if (!isNaN(utcDate.getTime())) {
+        const result = utcDate.toISOString().split('T')[0];
+        console.log('Converted Excel serial date:', dateStr, 'to:', result);
         return result;
       }
     }
@@ -223,25 +226,20 @@ export default function DriverAllocation() {
     console.log('Parsing date string:', dateString);
 
     try {
-      // Handle DD/MM/YYYY format (16/09/2025)
+      // Handle DD/MM/YYYY format (31/07/2025)
       if (dateString.includes('/')) {
         const parts = dateString.split('/');
         if (parts.length === 3) {
           let day, month, year;
           
-          // Detect format based on which part looks like a year
-          if (parts[2].length === 4) {
-            // DD/MM/YYYY
-            day = parts[0].padStart(2, '0');
-            month = parts[1].padStart(2, '0');
-            year = parts[2];
-          } else if (parts[0].length === 4) {
+          // Check if first part is year (YYYY/MM/DD) or day (DD/MM/YYYY)
+          if (parts[0].length === 4) {
             // YYYY/MM/DD
             year = parts[0];
             month = parts[1].padStart(2, '0');
             day = parts[2].padStart(2, '0');
           } else {
-            // Default to DD/MM/YYYY
+            // DD/MM/YYYY or MM/DD/YYYY - assume DD/MM/YYYY for non-US format
             day = parts[0].padStart(2, '0');
             month = parts[1].padStart(2, '0');
             year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
@@ -270,16 +268,15 @@ export default function DriverAllocation() {
       if (dateString.includes('-')) {
         const parts = dateString.split('-');
         if (parts.length === 3) {
-          let day, month, year;
-          
           if (parts[0].length === 4) {
             // YYYY-MM-DD (already correct)
+            console.log('Date already in YYYY-MM-DD format:', dateString);
             return dateString;
           } else {
             // DD-MM-YYYY
-            day = parts[0].padStart(2, '0');
-            month = parts[1].padStart(2, '0');
-            year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
             const result = `${year}-${month}-${day}`;
             console.log('Parsed DD-MM-YYYY to:', result);
             return result;
@@ -287,7 +284,7 @@ export default function DriverAllocation() {
         }
       }
 
-      // Try to parse as a regular date
+      // Try to parse as ISO date or other standard format
       const parsedDate = new Date(dateString);
       if (!isNaN(parsedDate.getTime())) {
         const result = parsedDate.toISOString().split('T')[0];
@@ -299,7 +296,7 @@ export default function DriverAllocation() {
       console.error('Error parsing date:', dateString, error);
     }
 
-    // Final fallback
+    // Final fallback: use current date
     console.warn('Could not parse date:', dateString, 'using current date');
     return new Date().toISOString().split('T')[0];
   };
@@ -315,44 +312,82 @@ export default function DriverAllocation() {
   };
 
   const findPersonByName = (name: string) => {
-    if (!name) return null;
+    if (!name || !name.trim()) return null;
     const searchName = name.toLowerCase().trim();
     
-    // First try exact matches
+    console.log('Searching for person:', searchName);
+    
+    // Remove common prefixes/suffixes
+    const cleanedName = searchName
+      .replace(/^(mr|mrs|ms|dr|prof)\.?\s*/i, '')
+      .replace(/\s+(jr|sr|ii|iii|iv)\.?$/i, '');
+    
+    // Try exact full name match first
     let person = people.find(p => {
       const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
-      return fullName === searchName || 
-             searchName === fullName ||
-             fullName.includes(searchName) ||
-             searchName.includes(fullName);
+      return fullName === cleanedName || 
+             cleanedName === fullName;
     });
     
-    if (person) return person;
+    if (person) {
+      console.log('Found exact match:', person);
+      return person;
+    }
     
-    // Then try partial matches on first name
+    // Try first name exact match
     person = people.find(p => {
       const firstName = p.first_name.toLowerCase();
+      return firstName === cleanedName;
+    });
+    
+    if (person) {
+      console.log('Found first name match:', person);
+      return person;
+    }
+    
+    // Try last name exact match
+    person = people.find(p => {
       const lastName = p.last_name.toLowerCase();
-      return searchName.includes(firstName) || 
-             firstName.includes(searchName) ||
-             searchName.includes(lastName) ||
-             lastName.includes(searchName);
+      return lastName === cleanedName;
     });
     
-    if (person) return person;
+    if (person) {
+      console.log('Found last name match:', person);
+      return person;
+    }
     
-    // Finally try very fuzzy matching (for typos)
-    return people.find(p => {
+    // Try partial matches with full name
+    person = people.find(p => {
       const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
-      const words = searchName.split(/\s+/);
-      return words.some(word => 
-        fullName.includes(word) || 
-        word.length > 3 && (
-          p.first_name.toLowerCase().includes(word) || 
-          p.last_name.toLowerCase().includes(word)
-        )
-      );
+      return fullName.includes(cleanedName) || cleanedName.includes(fullName);
     });
+    
+    if (person) {
+      console.log('Found partial full name match:', person);
+      return person;
+    }
+    
+    // Try fuzzy matching with individual name parts
+    const nameWords = cleanedName.split(/\s+/).filter(word => word.length > 2);
+    
+    for (const word of nameWords) {
+      person = people.find(p => {
+        const firstName = p.first_name.toLowerCase();
+        const lastName = p.last_name.toLowerCase();
+        return firstName.includes(word) || 
+               lastName.includes(word) ||
+               word.includes(firstName) ||
+               word.includes(lastName);
+      });
+      
+      if (person) {
+        console.log('Found fuzzy match for word:', word, '-> person:', person);
+        return person;
+      }
+    }
+    
+    console.log('No person found for:', searchName);
+    return null;
   };
 
   const findBusByNumber = (busNo: string) => {
@@ -417,7 +452,10 @@ export default function DriverAllocation() {
 
         const date = parseDate(dateValue);
         const time = parseTime(timeValue);
-        const tripId = `T${(currentTripNumber + index).toString().padStart(4, '0')}`;
+        
+        // Generate trip ID with new format: TYYYYMMDD-####
+        const dateForId = date.replace(/-/g, ''); // Convert YYYY-MM-DD to YYYYMMDD
+        const tripId = `T${dateForId}-${(currentTripNumber + index).toString().padStart(4, '0')}`;
 
         // Find actual IDs from the data
         const foundBus = busNo ? findBusByNumber(busNo) : null;
@@ -533,7 +571,7 @@ export default function DriverAllocation() {
       return;
     }
 
-    const tripId = form.trip_id || await generateTripId();
+    const tripId = form.trip_id || await generateTripId(form.date);
 
     try {
       // Create one allocation per bus to support many-to-many mapping
