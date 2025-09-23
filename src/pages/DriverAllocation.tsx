@@ -434,25 +434,9 @@ export default function DriverAllocation() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-      let currentTripNumber = 1;
-      
-      // First get the current highest trip ID to continue sequence
-      const { data: existingData } = await supabase
-        .from('driver_allocations')
-        .select('trip_id')
-        .like('trip_id', 'T%')
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (existingData && existingData.length > 0) {
-        const lastTripId = existingData[0].trip_id;
-        const match = lastTripId.match(/T(\d+)/);
-        if (match) {
-          currentTripNumber = parseInt(match[1]) + 1;
-        }
-      }
-
-      const allocRows = jsonData.map((row: any, index: number) => {
+      // Group rows by date first
+      const rowsByDate: { [date: string]: any[] } = {};
+      const parsedRows = jsonData.map((row: any) => {
         // More flexible column name detection
         const getColumnValue = (possibleNames: string[]) => {
           for (const name of possibleNames) {
@@ -475,54 +459,126 @@ export default function DriverAllocation() {
 
         const date = parseDate(dateValue);
         const time = parseTime(timeValue);
-        
-        // Generate trip ID with new format: TYYYYMMDD-####
-        const dateForId = date.replace(/-/g, ''); // Convert YYYY-MM-DD to YYYYMMDD
-        const tripId = `T${dateForId}-${(currentTripNumber + index).toString().padStart(4, '0')}`;
-
-        // Find actual IDs from the data
-        const foundBus = busNo ? findBusByNumber(busNo) : null;
-        const foundRoute = (routeName || routeNo) ? findRouteByName(routeName || routeNo) : null;
-        const foundDriver = driverName ? findPersonByName(driverName) : null;
-        const foundConductor = conductorName ? findPersonByName(conductorName) : null;
-
-        console.log('Excel row mapping:', {
-          original: { busNo, routeName, routeNo, driverName, conductorName, dateValue, timeValue },
-          found: { 
-            bus: foundBus ? `${foundBus.bus_no} (${foundBus.id})` : 'Not found',
-            route: foundRoute ? `${foundRoute.route_name} (${foundRoute.id})` : 'Not found',
-            driver: foundDriver ? `${foundDriver.first_name} ${foundDriver.last_name} (${foundDriver.user_id})` : 'Not found',
-            conductor: foundConductor ? `${foundConductor.first_name} ${foundConductor.last_name} (${foundConductor.user_id})` : 'Not found',
-            date, time
-          }
-        });
 
         return {
-          trip_id: tripId,
-          bus_id: foundBus?.id || null,
-          route_id: foundRoute?.id || null,
-          driver_id: foundDriver?.id || null,
-          conductor_id: foundConductor?.id || null,
-          allocation_date: date,
-          start_time: time || '06:00',
-          end_time: time ? addHours(time, 8) : '18:00',
-          status: 'confirmed',
-          notes: JSON.stringify({
-            bus_no: busNo,
-            route_no: routeNo,
-            route: routeName,
-            driver: driverName,
-            conductor: conductorName,
-            whatsapp,
-            time: row['Time']?.toString() || row['time']?.toString()
-          })
-        } as any;
+          original: row,
+          busNo,
+          routeNo,
+          routeName,
+          driverName,
+          conductorName,
+          whatsapp,
+          dateValue,
+          timeValue,
+          date,
+          time
+        };
       });
+
+      // Group by date
+      parsedRows.forEach((parsedRow) => {
+        if (!rowsByDate[parsedRow.date]) {
+          rowsByDate[parsedRow.date] = [];
+        }
+        rowsByDate[parsedRow.date].push(parsedRow);
+      });
+
+      console.log('Grouped rows by date:', Object.keys(rowsByDate).map(date => `${date}: ${rowsByDate[date].length} trips`));
+
+      // Generate trip IDs for each date group
+      const allocRows = [];
+      for (const [date, rows] of Object.entries(rowsByDate)) {
+        // Get the highest existing trip number for this specific date
+        const dateForId = date.replace(/-/g, ''); // Convert YYYY-MM-DD to YYYYMMDD
+        const pattern = `T${dateForId}-%`;
+        
+        const { data: existingData } = await supabase
+          .from('driver_allocations')
+          .select('trip_id')
+          .like('trip_id', pattern)
+          .order('trip_id', { ascending: false })
+          .limit(1);
+        
+        let nextNumber = 1;
+        if (existingData && existingData.length > 0) {
+          const lastTripId = existingData[0].trip_id;
+          const match = lastTripId.match(/T\d{8}-(\d+)/);
+          if (match) {
+            nextNumber = parseInt(match[1]) + 1;
+          }
+        }
+
+        console.log(`Date ${date}: Starting trip number from ${nextNumber}`);
+
+        // Process each row for this date
+        rows.forEach((parsedRow, index) => {
+          const { busNo, routeNo, routeName, driverName, conductorName, whatsapp, timeValue, date, time, original } = parsedRow;
+          
+          // Generate trip ID with proper daily sequence
+          const tripId = `T${dateForId}-${(nextNumber + index).toString().padStart(4, '0')}`;
+
+          // Find actual IDs from the data
+          const foundBus = busNo ? findBusByNumber(busNo) : null;
+          const foundRoute = (routeName || routeNo) ? findRouteByName(routeName || routeNo) : null;
+          const foundDriver = driverName ? findPersonByName(driverName) : null;
+          const foundConductor = conductorName ? findPersonByName(conductorName) : null;
+
+          console.log(`Row ${index + 1} for ${date} - Trip ID: ${tripId}`, {
+            original: { busNo, routeName, routeNo, driverName, conductorName, dateValue: parsedRow.dateValue, timeValue },
+            found: { 
+              bus: foundBus ? `${foundBus.bus_no} (${foundBus.id})` : 'Not found',
+              route: foundRoute ? `${foundRoute.route_name} (${foundRoute.id})` : 'Not found',
+              driver: foundDriver ? `${foundDriver.first_name} ${foundDriver.last_name} (${foundDriver.user_id})` : 'Not found',
+              conductor: foundConductor ? `${foundConductor.first_name} ${foundConductor.last_name} (${foundConductor.user_id})` : 'Not found',
+              date, time
+            }
+          });
+
+          allocRows.push({
+            trip_id: tripId,
+            bus_id: foundBus?.id || null,
+            route_id: foundRoute?.id || null,
+            driver_id: foundDriver?.user_id || null,
+            conductor_id: foundConductor?.user_id || null,
+            allocation_date: date,
+            start_time: time || '06:00',
+            end_time: time ? addHours(time, 8) : '18:00',
+            status: 'confirmed',
+            notes: JSON.stringify({
+              bus_no: busNo,
+              route_no: routeNo,
+              route: routeName,
+              driver: driverName,
+              conductor: conductorName,
+              whatsapp,
+              time: timeValue
+            })
+          });
+        });
+      }
+
+      console.log(`Generated ${allocRows.length} allocation records`);
 
       const { error } = await supabase.from('driver_allocations').insert(allocRows);
       if (error) throw error;
 
-      toast.success(`Imported ${allocRows.length} allocations`);
+      // Also create daily_trips for each allocation
+      const tripRows = allocRows.map(alloc => ({
+        bus_id: alloc.bus_id,
+        route_id: alloc.route_id,
+        driver_id: alloc.driver_id,
+        conductor_id: alloc.conductor_id,
+        trip_date: alloc.allocation_date,
+        start_time: alloc.start_time,
+        end_time: alloc.end_time,
+        status: 'scheduled' as const,
+        trip_no: alloc.trip_id
+      }));
+
+      const { error: tripError } = await supabase.from('daily_trips').insert(tripRows);
+      if (tripError) console.warn('Failed to create daily trips:', tripError);
+
+      toast.success(`Imported ${allocRows.length} allocations with proper trip IDs`);
       setExcelOpen(false);
       fetchAllocations();
     } catch (error: any) {
