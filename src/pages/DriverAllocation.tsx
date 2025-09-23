@@ -89,14 +89,25 @@ export default function DriverAllocation() {
 
   const fetchLists = async () => {
     try {
-      const [busesRes, routesRes, peopleRes] = await Promise.all([
+      const [busesRes, routesRes, staffRes] = await Promise.all([
         supabase.from('buses').select('id, bus_no'),
         supabase.from('routes').select('id, route_no, route_name'),
-        supabase.from('profiles').select('user_id, first_name, last_name, phone'),
+        // Get staff from profiles joined with user_roles to get active staff members
+        supabase
+          .from('profiles')
+          .select(`
+            user_id, 
+            first_name, 
+            last_name, 
+            phone,
+            user_roles!inner(role)
+          `)
+          .eq('status', 'active')
+          .in('user_roles.role', ['driver', 'conductor', 'supervisor', 'admin', 'super_admin'])
       ]);
       setBuses(busesRes.data || []);
       setRoutes(routesRes.data || []);
-      setPeople(peopleRes.data || []);
+      setPeople(staffRes.data || []);
     } catch (e) {
       console.error(e);
       toast.error('Failed loading lists');
@@ -646,6 +657,29 @@ export default function DriverAllocation() {
     if (!editingAllocation || !isSupervisor) return;
 
     try {
+      // Store names in notes for display purposes if they are custom names
+      const driverName = people.find(p => p.user_id === editForm.driver_id) 
+        ? `${people.find(p => p.user_id === editForm.driver_id)?.first_name} ${people.find(p => p.user_id === editForm.driver_id)?.last_name}`
+        : editForm.driver_id;
+      
+      const conductorName = editForm.conductor_id && editForm.conductor_id !== "none" 
+        ? (people.find(p => p.user_id === editForm.conductor_id) 
+           ? `${people.find(p => p.user_id === editForm.conductor_id)?.first_name} ${people.find(p => p.user_id === editForm.conductor_id)?.last_name}`
+           : editForm.conductor_id)
+        : null;
+
+      const busNo = buses.find(b => b.id === editForm.bus_id)?.bus_no;
+      const route = routes.find(r => r.id === editForm.route_id);
+
+      const notes = JSON.stringify({
+        bus_no: busNo,
+        route_no: route?.route_no,
+        route: route?.route_name,
+        driver: driverName,
+        conductor: conductorName,
+        updated: true
+      });
+
       const { error } = await supabase
         .from('driver_allocations')
         .update({
@@ -654,15 +688,33 @@ export default function DriverAllocation() {
           start_time: editForm.start_time,
           end_time: editForm.end_time,
           route_id: editForm.route_id || null,
-          driver_id: editForm.driver_id || null,
-          conductor_id: editForm.conductor_id || null,
+          driver_id: people.find(p => p.user_id === editForm.driver_id) ? editForm.driver_id : null,
+          conductor_id: editForm.conductor_id && editForm.conductor_id !== "none" && people.find(p => p.user_id === editForm.conductor_id) ? editForm.conductor_id : null,
           bus_id: editForm.bus_id || null,
           status: editForm.status,
+          notes: notes,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingAllocation.id);
 
       if (error) throw error;
+
+      // Also update related daily_trips if exists
+      const { error: tripError } = await supabase
+        .from('daily_trips')
+        .update({
+          bus_id: editForm.bus_id || null,
+          route_id: editForm.route_id || null,
+          driver_id: people.find(p => p.user_id === editForm.driver_id) ? editForm.driver_id : null,
+          conductor_id: editForm.conductor_id && editForm.conductor_id !== "none" && people.find(p => p.user_id === editForm.conductor_id) ? editForm.conductor_id : null,
+          trip_date: editForm.date,
+          start_time: editForm.start_time,
+          end_time: editForm.end_time,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('trip_no', editForm.trip_id);
+
+      if (tripError) console.warn('Failed to update related daily trip:', tripError);
 
       toast.success('Allocation updated successfully');
       setEditingAllocation(null);
@@ -839,31 +891,45 @@ export default function DriverAllocation() {
 
                   <div>
                     <Label>Driver</Label>
-                    <Select value={editForm.driver_id} onValueChange={(v) => setEditForm({ ...editForm, driver_id: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select driver" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {people.map((p) => (
-                          <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Select value={editForm.driver_id} onValueChange={(v) => setEditForm({ ...editForm, driver_id: v })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select driver" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {people.map((p) => (
+                            <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input 
+                        placeholder="Or type new driver name" 
+                        value={editForm.driver_id && !people.find(p => p.user_id === editForm.driver_id) ? editForm.driver_id : ""}
+                        onChange={(e) => setEditForm({ ...editForm, driver_id: e.target.value })}
+                      />
+                    </div>
                   </div>
 
                   <div>
                     <Label>Conductor</Label>
-                    <Select value={editForm.conductor_id || "none"} onValueChange={(v) => setEditForm({ ...editForm, conductor_id: v === "none" ? "" : v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select conductor (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {people.map((p) => (
-                          <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Select value={editForm.conductor_id || "none"} onValueChange={(v) => setEditForm({ ...editForm, conductor_id: v === "none" ? "" : v })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select conductor (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {people.map((p) => (
+                            <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input 
+                        placeholder="Or type new conductor name" 
+                        value={editForm.conductor_id && editForm.conductor_id !== "none" && !people.find(p => p.user_id === editForm.conductor_id) ? editForm.conductor_id : ""}
+                        onChange={(e) => setEditForm({ ...editForm, conductor_id: e.target.value })}
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -942,31 +1008,45 @@ export default function DriverAllocation() {
 
                   <div>
                     <Label>Driver</Label>
-                    <Select value={form.driver_id} onValueChange={(v) => setForm({ ...form, driver_id: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select driver" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {people.map((p) => (
-                          <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Select value={form.driver_id} onValueChange={(v) => setForm({ ...form, driver_id: v })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select driver" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {people.map((p) => (
+                            <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input 
+                        placeholder="Or type new driver name" 
+                        value={form.driver_id && !people.find(p => p.user_id === form.driver_id) ? form.driver_id : ""}
+                        onChange={(e) => setForm({ ...form, driver_id: e.target.value })}
+                      />
+                    </div>
                   </div>
 
                   <div>
                     <Label>Conductor</Label>
-                    <Select value={form.conductor_id || "none"} onValueChange={(v) => setForm({ ...form, conductor_id: v === "none" ? "" : v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select conductor (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {people.map((p) => (
-                          <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Select value={form.conductor_id || "none"} onValueChange={(v) => setForm({ ...form, conductor_id: v === "none" ? "" : v })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select conductor (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {people.map((p) => (
+                            <SelectItem key={p.user_id} value={p.user_id}>{p.first_name} {p.last_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input 
+                        placeholder="Or type new conductor name" 
+                        value={form.conductor_id && form.conductor_id !== "none" && !people.find(p => p.user_id === form.conductor_id) ? form.conductor_id : ""}
+                        onChange={(e) => setForm({ ...form, conductor_id: e.target.value })}
+                      />
+                    </div>
                   </div>
 
                   <div className="col-span-2">
