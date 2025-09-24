@@ -14,6 +14,169 @@ export type Database = {
   }
   public: {
     Tables: {
+      accident_audit_trail: {
+        Row: {
+          accident_id: string
+          action: string
+          changed_at: string
+          changed_by: string | null
+          field_name: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+        }
+        Insert: {
+          accident_id: string
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          field_name: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+        }
+        Update: {
+          accident_id?: string
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          field_name?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accident_audit_trail_accident_id_fkey"
+            columns: ["accident_id"]
+            isOneToOne: false
+            referencedRelation: "accident_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accident_documents: {
+        Row: {
+          accident_id: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id: string
+          original_name: string
+          uploaded_at: string
+          uploaded_by: string | null
+          version: number | null
+        }
+        Insert: {
+          accident_id: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id?: string
+          original_name: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+          version?: number | null
+        }
+        Update: {
+          accident_id?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          original_name?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accident_documents_accident_id_fkey"
+            columns: ["accident_id"]
+            isOneToOne: false
+            referencedRelation: "accident_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accident_records: {
+        Row: {
+          accident_date: string
+          accident_mark: boolean | null
+          approved_amount: number | null
+          bl_number: string | null
+          created_at: string
+          created_by: string | null
+          details_of_accident: string | null
+          estimate_amount: number | null
+          id: string
+          insurer_claim_ref: string | null
+          location: string | null
+          no: number
+          process_details: string | null
+          reported_by: string | null
+          salvage: boolean | null
+          salvage_disposition: string | null
+          salvage_sale_date: string | null
+          salvage_value: number | null
+          status: string | null
+          updated_at: string
+          updated_by: string | null
+          vehicle_number: string
+        }
+        Insert: {
+          accident_date: string
+          accident_mark?: boolean | null
+          approved_amount?: number | null
+          bl_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          details_of_accident?: string | null
+          estimate_amount?: number | null
+          id?: string
+          insurer_claim_ref?: string | null
+          location?: string | null
+          no?: never
+          process_details?: string | null
+          reported_by?: string | null
+          salvage?: boolean | null
+          salvage_disposition?: string | null
+          salvage_sale_date?: string | null
+          salvage_value?: number | null
+          status?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_number: string
+        }
+        Update: {
+          accident_date?: string
+          accident_mark?: boolean | null
+          approved_amount?: number | null
+          bl_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          details_of_accident?: string | null
+          estimate_amount?: number | null
+          id?: string
+          insurer_claim_ref?: string | null
+          location?: string | null
+          no?: never
+          process_details?: string | null
+          reported_by?: string | null
+          salvage?: boolean | null
+          salvage_disposition?: string | null
+          salvage_sale_date?: string | null
+          salvage_value?: number | null
+          status?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_number?: string
+        }
+        Relationships: []
+      }
       approval_name_suggestions: {
         Row: {
           created_at: string

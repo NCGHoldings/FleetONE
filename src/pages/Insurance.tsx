@@ -7,13 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ColumnDef } from "@tanstack/react-table";
-import { Shield, Plus, AlertTriangle, CheckCircle, Calendar, FileText, Clock } from "lucide-react";
+import { Shield, Plus, AlertTriangle, CheckCircle, Calendar, FileText, Clock, Car } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { DocumentUpload } from "@/components/documents/DocumentUpload";
+import { AccidentInsurance } from "@/components/accident/AccidentInsurance";
 
 interface InsuranceRecord {
   id: string;

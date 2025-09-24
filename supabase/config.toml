@@ -17,3 +17,12 @@ verify_jwt = false
 
 [functions.fetch-gps-tracking]
 verify_jwt = false
+
+[functions.accident-records]
+verify_jwt = true
+
+[functions.accident-import]
+verify_jwt = true
+
+[functions.accident-documents]
+verify_jwt = true
