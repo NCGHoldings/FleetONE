@@ -567,18 +567,37 @@ export default function Insurance() {
         </div>
       </div>
 
-      {/* Insurance Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Insurance Policies</CardTitle>
-          <CardDescription>
-            Track all vehicle insurance policies and their expiry dates
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DataTable columns={columns} data={insuranceRecords} />
-        </CardContent>
-      </Card>
+      {/* Tabbed Interface for Insurance Management */}
+      <Tabs defaultValue="policies" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="policies" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Insurance Policies
+          </TabsTrigger>
+          <TabsTrigger value="accidents" className="flex items-center gap-2">
+            <Car className="h-4 w-4" />
+            Accident Insurance
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="policies" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Insurance Policies</CardTitle>
+              <CardDescription>
+                Track all vehicle insurance policies and their expiry dates
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DataTable columns={columns} data={insuranceRecords} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="accidents" className="space-y-4">
+          <AccidentInsurance />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
