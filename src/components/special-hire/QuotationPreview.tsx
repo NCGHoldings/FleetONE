@@ -491,7 +491,29 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                 padding: '8px', 
                 verticalAlign: 'middle',
                 color: '#374151'
-              }}>{customerDistance.toFixed(2)} Km</td>
+              }}>
+                {(() => {
+                  // Calculate additional distance from charges
+                  const additionalDistance = additionalCharges
+                    .filter(charge => charge.type === 'additional_distance')
+                    .reduce((sum, charge) => sum + (charge.distance || 0), 0);
+                  
+                  if (additionalDistance > 0) {
+                    return (
+                      <div>
+                        <div>{customerDistance.toFixed(2)} Km</div>
+                        <div style={{ fontSize: '10px', color: '#7c3aed' }}>
+                          +{additionalDistance} Km (Additional)
+                        </div>
+                        <div style={{ fontSize: '10px', fontWeight: 'bold', borderTop: '1px solid #e5e7eb', paddingTop: '2px', marginTop: '2px' }}>
+                          Total: {(customerDistance + additionalDistance).toFixed(2)} Km
+                        </div>
+                      </div>
+                    );
+                  }
+                  return `${customerDistance.toFixed(2)} Km`;
+                })()}
+              </td>
               <td style={{ 
                 border: '1px solid #d1d5db', 
                 padding: '8px', 
