@@ -334,10 +334,9 @@ export function AccidentInsurance() {
             
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Status</SelectItem>
                 <SelectItem value="Reported">Reported</SelectItem>
                 <SelectItem value="Estimate">Estimate</SelectItem>
                 <SelectItem value="Approved">Approved</SelectItem>
@@ -348,10 +347,9 @@ export function AccidentInsurance() {
             
             <Select value={salvageFilter} onValueChange={setSalvageFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="Salvage" />
+                <SelectValue placeholder="All Salvage" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
                 <SelectItem value="true">Yes</SelectItem>
                 <SelectItem value="false">No</SelectItem>
               </SelectContent>
@@ -359,10 +357,9 @@ export function AccidentInsurance() {
             
             <Select value={accidentMarkFilter} onValueChange={setAccidentMarkFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="Accident Mark" />
+                <SelectValue placeholder="All Marks" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
                 <SelectItem value="true">Yes</SelectItem>
                 <SelectItem value="false">No</SelectItem>
               </SelectContent>
