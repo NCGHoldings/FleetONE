@@ -170,7 +170,7 @@ export function ScheduleMaintenanceModal({ open, onOpenChange, bus, onSuccess }:
                   <SelectValue placeholder="Select service type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {serviceTypes.map((type) => (
+                  {serviceTypes.filter(type => type.name && type.name.trim() !== '').map((type) => (
                     <SelectItem key={type.id} value={type.name}>
                       {type.name}
                     </SelectItem>
@@ -231,7 +231,7 @@ export function ScheduleMaintenanceModal({ open, onOpenChange, bus, onSuccess }:
                   <SelectValue placeholder="Select bay (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {bays.map((bay) => (
+                  {bays.filter(bay => bay.id && bay.id.trim() !== '').map((bay) => (
                     <SelectItem key={bay.id} value={bay.id}>
                       {bay.bay_name} - {bay.bay_number}
                     </SelectItem>

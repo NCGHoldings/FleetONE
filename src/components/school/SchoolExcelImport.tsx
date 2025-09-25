@@ -324,7 +324,7 @@ export function SchoolExcelImport({ branchId, onImportComplete }: Props) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="skip">-- Skip this field --</SelectItem>
-                      {excelColumns.map(col => (
+                      {excelColumns.filter(col => col && col.trim() !== '').map(col => (
                         <SelectItem key={col} value={col}>{col}</SelectItem>
                       ))}
                     </SelectContent>
