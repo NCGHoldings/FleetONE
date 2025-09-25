@@ -519,6 +519,14 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                 padding: '8px', 
                 verticalAlign: 'middle'
               }}>
+                {/* Subtotal before discount */}
+                <div style={{ fontSize: '11px', color: '#374151', marginBottom: '4px' }}>
+                  Subtotal: LKR {(() => {
+                    const subtotal = calculateFinalCustomerTotal(quotation) + (quotation.discount_amount_lkr || 0);
+                    return subtotal.toLocaleString();
+                  })()}
+                </div>
+                
                 {(quotation.discount_amount_lkr || 0) > 0 && (
                   <div style={{ color: '#dc2626', fontSize: '11px', marginBottom: '4px' }}>
                     Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}
