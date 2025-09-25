@@ -50,6 +50,7 @@ export function AccidentInsurance() {
   const [selectedAccident, setSelectedAccident] = useState<AccidentRecord | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [insertingBulkData, setInsertingBulkData] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>();
   const [statusFilter, setStatusFilter] = useState("");
@@ -130,6 +131,101 @@ export function AccidentInsurance() {
     window.URL.revokeObjectURL(url);
     
     toast.success('Accident records exported successfully');
+  };
+
+  const insertBulkData = async () => {
+    setInsertingBulkData(true);
+    try {
+      const bulkData = [
+        { no: 1, vehicle_number: 'NC 8759', accident_date: '2023-01-05', bl_number: 'BL1990945', details_of_accident: 'side glass damage-Puttalama', estimate_amount: null, approved_amount: null, process_details: 'Estimate ,Finall bill and ARI Pending' },
+        { no: 2, vehicle_number: 'NC 8759', accident_date: '2023-08-24', bl_number: 'BL 2079809', details_of_accident: 'face pannel, aluminium molding, Arachchikattuwa- Hit Mahindra lorry', estimate_amount: null, approved_amount: null, process_details: 'Estimate, Final Bill, ARI pending' },
+        { no: 3, vehicle_number: 'NC 8759', accident_date: '2024-08-30', bl_number: 'BL 2212240', details_of_accident: 'Passenger door glass damage', estimate_amount: 285000, approved_amount: null, process_details: 'under engineering dept' },
+        { no: 4, vehicle_number: 'NC 8759', accident_date: '2025-07-15', bl_number: null, details_of_accident: 'Left side front body damage', estimate_amount: null, approved_amount: null, process_details: null },
+        { no: 5, vehicle_number: 'NC 8759', accident_date: '2025-07-29', bl_number: 'BL 2316740', details_of_accident: 'Left side mirror damage', estimate_amount: null, approved_amount: null, process_details: null },
+        { no: 6, vehicle_number: 'NC 8759', accident_date: '2025-09-08', bl_number: null, details_of_accident: 'Front Buffer damage', estimate_amount: null, approved_amount: null, process_details: null },
+        { no: 7, vehicle_number: 'NC 8759', accident_date: '2024-12-21', bl_number: null, details_of_accident: null, estimate_amount: null, approved_amount: null, process_details: null },
+        { no: 8, vehicle_number: 'NC 8760', accident_date: '2023-09-29', bl_number: 'BL 2094683', details_of_accident: '2 Glasses side damage-piolgaovita', estimate_amount: 635000, approved_amount: null, process_details: 'Estimate ,Finall bill and ARI Pending' },
+        { no: 9, vehicle_number: 'NC 8760', accident_date: '2025-02-13', bl_number: 'BL 2263757', details_of_accident: 'FRONT BUFFER DAMAGE', estimate_amount: 585000, approved_amount: null, process_details: null },
+        { no: 10, vehicle_number: 'NC 8760', accident_date: '2024-05-24', bl_number: 'BL2181639', details_of_accident: 'passenger main door glass damage', estimate_amount: 225000, approved_amount: null, process_details: 'JOB COMPLETD,ARI ,FINAL BILL PENDING' },
+        { no: 11, vehicle_number: 'NC 8760', accident_date: '2025-08-18', bl_number: 'BL 2322886', details_of_accident: 'TWO SIDE GLASS DAMAGE', estimate_amount: null, approved_amount: null, process_details: 'JOB COMPLETD,ARI ,FINAL BILL PENDING' },
+        { no: 12, vehicle_number: 'NC 8760', accident_date: '2024-05-30', bl_number: 'BL 2183188', details_of_accident: 'passenger door glass damage', estimate_amount: 232200, approved_amount: null, process_details: 'JOB NOT COMPLETED,FINALL BILL,ARI PENDING' },
+        { no: 13, vehicle_number: 'ND 9155', accident_date: '2024-07-04', bl_number: null, details_of_accident: null, estimate_amount: null, approved_amount: null, process_details: null },
+        { no: 14, vehicle_number: 'ND 9155', accident_date: '2025-04-05', bl_number: null, details_of_accident: 'front wind screen damage', estimate_amount: null, approved_amount: null, process_details: 'REJECT CLAIM SLIC' },
+        { no: 15, vehicle_number: 'ND 4890', accident_date: '2023-01-14', bl_number: 'BL 1994467', details_of_accident: 'Hit by stone fron wind screen damage', estimate_amount: null, approved_amount: null, process_details: 'JOB COMPELETED PAYMNET PENDING' },
+        { no: 16, vehicle_number: 'ND 4890', accident_date: '2024-06-14', bl_number: 'BL-2187725', details_of_accident: 'rear side right side body damage and buffer', estimate_amount: 57000, approved_amount: null, process_details: 'JOB COMPLETED processing unit' },
+        { no: 17, vehicle_number: 'ND 4890', accident_date: '2024-06-25', bl_number: 'BL 2190929', details_of_accident: 'front face damage', estimate_amount: null, approved_amount: null, process_details: 'JOB COMPELETED PAYMNET PENDING' },
+        { no: 18, vehicle_number: 'ND 4890', accident_date: '2025-06-25', bl_number: 'cop A', details_of_accident: 'Right side body damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd estimate,Final bill,Ari' },
+        { no: 19, vehicle_number: 'ND 4890', accident_date: '2024-11-11', bl_number: 'cop', details_of_accident: 'front buffr /LH face pannel', estimate_amount: null, approved_amount: null, process_details: 'job completed Payement pending' },
+        { no: 20, vehicle_number: 'NE 5585', accident_date: '2025-04-05', bl_number: 'BL 2279776', details_of_accident: 'front wind screen damage', estimate_amount: null, approved_amount: null, process_details: 'job completed Payement pending' },
+        { no: 21, vehicle_number: 'ND 5265', accident_date: '2024-11-22', bl_number: null, details_of_accident: 'RIGHT SIDE FRONT BUFFER DAMAGE HIT A DOG', estimate_amount: null, approved_amount: null, process_details: 'JOB COMPELETED ,ESTIMAT,FINAL BILL PENDING' },
+        { no: 22, vehicle_number: 'ND 5265', accident_date: '2023-12-31', bl_number: 'BL 2133730', details_of_accident: 'HIT A MOTOR BIKE FRONT FACE DAMAGE', estimate_amount: null, approved_amount: null, process_details: 'JOB COMPLETD,ARI ,FINAL BILL PENDING' },
+        { no: 23, vehicle_number: 'NE 1269', accident_date: '2025-03-23', bl_number: 'BL 2295003', details_of_accident: 'rear side buffer damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd' },
+        { no: 24, vehicle_number: 'NE 1269', accident_date: '2023-10-11', bl_number: 'BL 2099364', details_of_accident: 'Wind screen damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleated' },
+        { no: 25, vehicle_number: 'NE 0762', accident_date: '2025-05-03', bl_number: 'BL 2288646', details_of_accident: 'front wind screen damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd' },
+        { no: 26, vehicle_number: 'NE 0762', accident_date: '2025-05-08', bl_number: 'BL 2290047', details_of_accident: 'Left side front body damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd' },
+        { no: 27, vehicle_number: 'NE 2062', accident_date: '2024-01-17', bl_number: '2140831', details_of_accident: 'hood body damage', estimate_amount: null, approved_amount: null, process_details: 'JOB NOT COMPLETED ,Estimate, Final bill, ARI, Job not completed' },
+        { no: 28, vehicle_number: 'NE 2062', accident_date: '2024-03-01', bl_number: 'BL 2156074', details_of_accident: 'Right sidee roof damage rear side', estimate_amount: null, approved_amount: null, process_details: 'JOB COMPLETED,Estimate, Final Bill, ARI pending' },
+        { no: 29, vehicle_number: 'NC 8756', accident_date: '2024-02-26', bl_number: 'BL 2267844', details_of_accident: 'TWO SIDE GLASS DAMAGE', estimate_amount: null, approved_amount: null, process_details: null },
+        { no: 30, vehicle_number: 'NC 8756', accident_date: '2025-05-10', bl_number: 'BL 2290862', details_of_accident: 'FRONT HEAVY DAMAGE SALIYAPURA', estimate_amount: null, approved_amount: null, process_details: null },
+        { no: 31, vehicle_number: 'NB 7782', accident_date: '2024-02-28', bl_number: 'cop ( 167472)', details_of_accident: 'Rear side body and buffer damage', estimate_amount: null, approved_amount: null, process_details: ',Estimate,ARI,Final Bill,ARI' },
+        { no: 32, vehicle_number: 'NB7377', accident_date: '2025-05-31', bl_number: 'cop A', details_of_accident: 'left side windcreen damage', estimate_amount: null, approved_amount: null, process_details: 'JOB COMPELETED ,ESTIMAT,FINAL BILL PENDING' },
+        { no: 33, vehicle_number: 'NB7377', accident_date: '2024-10-10', bl_number: 'Coperative', details_of_accident: 'rear side damage hit the loarry', estimate_amount: null, approved_amount: null, process_details: 'job completed, Final bill,ARI, ARI Pending' },
+        { no: 34, vehicle_number: 'NC 7632', accident_date: '2024-06-05', bl_number: 'BL 2185188', details_of_accident: 'Left side front face damage', estimate_amount: 56500, approved_amount: null, process_details: 'processing unit' },
+        { no: 35, vehicle_number: 'NC 7632', accident_date: '2024-04-16', bl_number: 'BL 2170074', details_of_accident: 'RIGHT SIDE FRONT BUFFER AND SIGNAL LIGHT', estimate_amount: null, approved_amount: null, process_details: 'Estimate pending' },
+        { no: 36, vehicle_number: 'NE 2063', accident_date: '2024-03-18', bl_number: 'BL 2161233', details_of_accident: 'Left side front buffer damage', estimate_amount: null, approved_amount: null, process_details: 'job not completed,stimate Final bill ari pending' },
+        { no: 37, vehicle_number: 'NE 2063', accident_date: '2024-04-08', bl_number: 'BL 2167855', details_of_accident: 'front wind screen damage', estimate_amount: null, approved_amount: null, process_details: 'document handed over job not complete estimate pending' },
+        { no: 38, vehicle_number: 'NE 2152', accident_date: '2024-05-17', bl_number: 'BL 2179383', details_of_accident: 'Left side front face damage', estimate_amount: 28500, approved_amount: null, process_details: 'job completed,ARI FINALL BILL PENDING' },
+        { no: 39, vehicle_number: 'NE 2068', accident_date: '2024-06-13', bl_number: 'BL 2187346', details_of_accident: 'rear side buffer damage', estimate_amount: null, approved_amount: null, process_details: 'job not completed,Estimate Final bill ari pending' },
+        { no: 40, vehicle_number: 'NE 2061', accident_date: '2024-05-07', bl_number: 'BL 2176314', details_of_accident: 'rear side left side body and light damage', estimate_amount: null, approved_amount: null, process_details: 'Estimate pending' },
+        { no: 41, vehicle_number: 'NE 2058', accident_date: '2024-08-05', bl_number: 'BL 2203890', details_of_accident: 'Left side front buffer damage', estimate_amount: null, approved_amount: null, process_details: 'job not completed ,estimate ,final bill pending' },
+        { no: 42, vehicle_number: 'NE 2091', accident_date: '2024-09-18', bl_number: 'BL 2217738', details_of_accident: 'REAR SIDE SIGNAL LIGHT DAMAGE RIGHT SIDE', estimate_amount: null, approved_amount: null, process_details: 'Job not compleated' },
+        { no: 43, vehicle_number: 'NE 0480', accident_date: '2024-09-15', bl_number: 'Allianz', details_of_accident: 'Wind screen damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd' },
+        { no: 44, vehicle_number: 'ND 9817', accident_date: '2024-10-19', bl_number: 'BL 2227409', details_of_accident: 'LEFT SIDE HEAD LAMB AND CORNER DAMAGAE', estimate_amount: null, approved_amount: null, process_details: 'Estimate, final bill pending' },
+        { no: 45, vehicle_number: 'NE 2147', accident_date: '2025-07-24', bl_number: 'BL 2315207', details_of_accident: null, estimate_amount: null, approved_amount: null, process_details: 'processing unit' },
+        { no: 46, vehicle_number: 'NE 2147', accident_date: '2025-08-28', bl_number: 'BL 2325681', details_of_accident: null, estimate_amount: null, approved_amount: null, process_details: 'Estimate ,Finall bill and ARI Pending' },
+        { no: 47, vehicle_number: 'NE 2147', accident_date: '2025-03-26', bl_number: 'BL 2276470', details_of_accident: 'front right side damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd estimate,Final bill,Ari' },
+        { no: 48, vehicle_number: 'ND 5262', accident_date: '2025-05-30', bl_number: 'BL 2297257', details_of_accident: 'Right side glass damage', estimate_amount: 125000, approved_amount: null, process_details: 'JOB COMPELETED PAYMNET PENDING' },
+        { no: 49, vehicle_number: 'ND 5262', accident_date: '2025-06-14', bl_number: 'SLIC', details_of_accident: 'Right side body damage', estimate_amount: null, approved_amount: null, process_details: 'final bill pending' },
+        { no: 50, vehicle_number: 'ND 5262', accident_date: '2025-04-27', bl_number: 'BL 2286840', details_of_accident: 'Roof Top Winshield Damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleated' },
+        { no: 51, vehicle_number: 'NE 2260', accident_date: '2025-04-04', bl_number: 'BL 2279555', details_of_accident: 'Left side front buffer damage', estimate_amount: 20500, approved_amount: null, process_details: 'Job not compleatd' },
+        { no: 52, vehicle_number: 'NE 2273', accident_date: '2025-05-21', bl_number: 'PEOPLE', details_of_accident: 'Left side roof damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd' },
+        { no: 53, vehicle_number: 'NB 8118', accident_date: '2025-07-21', bl_number: 'SLIC', details_of_accident: 'front wind screen damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd estimate,Final bill,Ari' },
+        { no: 54, vehicle_number: 'ND 6932', accident_date: '2025-07-22', bl_number: 'cop', details_of_accident: 'FRONT DAMAGE 2HEAD LAMP,BONNET PANEL,L/H WIND SCREEN', estimate_amount: null, approved_amount: null, process_details: null },
+        { no: 55, vehicle_number: 'ND 6056', accident_date: '2025-06-20', bl_number: 'cop A', details_of_accident: 'uper wind screen damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd' },
+        { no: 56, vehicle_number: 'NE 2152', accident_date: '2025-07-25', bl_number: 'BL 2315709', details_of_accident: 'Right side body damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd' },
+        { no: 57, vehicle_number: 'NE 2201', accident_date: '2025-08-01', bl_number: 'SLIC', details_of_accident: 'left side body damage', estimate_amount: null, approved_amount: null, process_details: 'Job not compleatd' }
+      ];
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const record of bulkData) {
+        try {
+          const { error } = await supabase.functions.invoke('accident-records', {
+            method: 'POST',
+            body: record
+          });
+          
+          if (error) {
+            console.error('Error inserting record:', record.no, error);
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (error) {
+          console.error('Error inserting record:', record.no, error);
+          errorCount++;
+        }
+      }
+
+      toast.success(`Bulk data insertion completed! ${successCount} records added successfully${errorCount > 0 ? `, ${errorCount} errors` : ''}.`);
+      fetchAccidents(); // Refresh the data
+    } catch (error) {
+      console.error('Error in bulk data insertion:', error);
+      toast.error('Failed to insert bulk data');
+    } finally {
+      setInsertingBulkData(false);
+    }
   };
 
   const columns: ColumnDef<AccidentRecord>[] = [
@@ -297,6 +393,18 @@ export function AccidentInsurance() {
                   />
                 </Dialog>
               </>
+            )}
+            
+            {isAdmin && (
+              <Button 
+                variant="secondary"
+                className="bg-white/10 hover:bg-white/20 text-white border-white/20 hover:border-white/30 backdrop-blur transition-all duration-200"
+                onClick={insertBulkData}
+                disabled={insertingBulkData}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {insertingBulkData ? 'Adding Data...' : 'Add Bulk Data'}
+              </Button>
             )}
             
             <Button 
