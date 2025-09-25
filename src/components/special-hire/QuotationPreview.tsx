@@ -573,6 +573,22 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               
             </>
           )}
+          
+          {/* Additional Distance Charges */}
+          {additionalCharges.filter(charge => charge.type === 'additional_distance').length > 0 && (
+            <>
+              <br />
+              <strong>Additional Distance Charges:</strong><br />
+              {additionalCharges
+                .filter(charge => charge.type === 'additional_distance')
+                .map((charge, index) => (
+                  <span key={index}>
+                    Additional {charge.distance || 0} km: Rs {charge.amount?.toLocaleString() || '0.00'}
+                    {charge.reason && ` (${charge.reason})`}<br />
+                  </span>
+                ))}
+            </>
+          )}
         </div>
 
         {/* Payment Info */}
