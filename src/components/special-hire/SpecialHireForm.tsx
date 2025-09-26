@@ -162,7 +162,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       commissionPassThroughPct: initialData.commission_pass_through_pct || 0,
       discountType: (initialData.discount_percentage && initialData.discount_percentage > 0) ? 'percentage' : 'amount',
       discountPct: initialData.discount_percentage || 0,
-      discountAmount: initialData.discount_amount || 0,
+      discountAmount: initialData.discount_amount_lkr || 0,
     } : {
       companyName: '',
       customerName: '',
@@ -223,7 +223,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }
     }
     
-    // If editing, set intermediate stops and additional charges from initial data
+    // If editing, set intermediate stops, additional charges, and other expenses from initial data
     if (isEditing && initialData) {
       // Load intermediate stops
       if (initialData.intermediate_stops) {
@@ -257,6 +257,28 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         } catch (e) {
           console.warn('Failed to parse additional charges:', e);
           setAdditionalCharges([]);
+        }
+      }
+
+      // Load other expenses
+      if (initialData.other_expenses) {
+        try {
+          const expenses = Array.isArray(initialData.other_expenses) 
+            ? initialData.other_expenses 
+            : JSON.parse(initialData.other_expenses);
+          
+          // Convert to internal format with IDs
+          const formattedExpenses = expenses.map((expense: any, index: number) => ({
+            id: `existing-expense-${index}`,
+            category: expense.category || 'other',
+            amount: Number(expense.amount) || 0,
+            description: expense.description || ''
+          }));
+          
+          setOtherExpenses(formattedExpenses);
+        } catch (e) {
+          console.warn('Failed to parse other expenses:', e);
+          setOtherExpenses([]);
         }
       }
     }
