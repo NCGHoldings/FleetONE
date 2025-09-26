@@ -2784,8 +2784,6 @@ export type Database = {
           drop_lat: number | null
           drop_lng: number | null
           drop_location: string
-          edit_reason: string | null
-          edit_type: string | null
           extra_charges: number | null
           fuel_cost_fuel_only: number | null
           gross_revenue: number | null
@@ -2793,7 +2791,6 @@ export type Database = {
           hire_type: string
           id: string
           intermediate_stops: Json | null
-          is_active_version: boolean | null
           km_drop_to_parking: number | null
           km_parking_to_pickup: number | null
           km_trip: number | null
@@ -2801,7 +2798,6 @@ export type Database = {
           number_of_buses: number
           number_of_passengers: number
           other_expenses: Json | null
-          parent_quotation_id: string | null
           parking_location_id: string | null
           percentage_adjustment: number | null
           pickup_datetime: string
@@ -2827,7 +2823,6 @@ export type Database = {
           updated_at: string | null
           uses_multi_parking: boolean | null
           valid_until: string | null
-          version_number: string | null
         }
         Insert: {
           additional_charges?: Json | null
@@ -2863,8 +2858,6 @@ export type Database = {
           drop_lat?: number | null
           drop_lng?: number | null
           drop_location: string
-          edit_reason?: string | null
-          edit_type?: string | null
           extra_charges?: number | null
           fuel_cost_fuel_only?: number | null
           gross_revenue?: number | null
@@ -2872,7 +2865,6 @@ export type Database = {
           hire_type: string
           id?: string
           intermediate_stops?: Json | null
-          is_active_version?: boolean | null
           km_drop_to_parking?: number | null
           km_parking_to_pickup?: number | null
           km_trip?: number | null
@@ -2880,7 +2872,6 @@ export type Database = {
           number_of_buses?: number
           number_of_passengers: number
           other_expenses?: Json | null
-          parent_quotation_id?: string | null
           parking_location_id?: string | null
           percentage_adjustment?: number | null
           pickup_datetime: string
@@ -2906,7 +2897,6 @@ export type Database = {
           updated_at?: string | null
           uses_multi_parking?: boolean | null
           valid_until?: string | null
-          version_number?: string | null
         }
         Update: {
           additional_charges?: Json | null
@@ -2942,8 +2932,6 @@ export type Database = {
           drop_lat?: number | null
           drop_lng?: number | null
           drop_location?: string
-          edit_reason?: string | null
-          edit_type?: string | null
           extra_charges?: number | null
           fuel_cost_fuel_only?: number | null
           gross_revenue?: number | null
@@ -2951,7 +2939,6 @@ export type Database = {
           hire_type?: string
           id?: string
           intermediate_stops?: Json | null
-          is_active_version?: boolean | null
           km_drop_to_parking?: number | null
           km_parking_to_pickup?: number | null
           km_trip?: number | null
@@ -2959,7 +2946,6 @@ export type Database = {
           number_of_buses?: number
           number_of_passengers?: number
           other_expenses?: Json | null
-          parent_quotation_id?: string | null
           parking_location_id?: string | null
           percentage_adjustment?: number | null
           pickup_datetime?: string
@@ -2985,7 +2971,6 @@ export type Database = {
           updated_at?: string | null
           uses_multi_parking?: boolean | null
           valid_until?: string | null
-          version_number?: string | null
         }
         Relationships: [
           {
@@ -3000,13 +2985,6 @@ export type Database = {
             columns: ["bus_type_id"]
             isOneToOne: false
             referencedRelation: "bus_types"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "special_hire_quotations_parent_quotation_id_fkey"
-            columns: ["parent_quotation_id"]
-            isOneToOne: false
-            referencedRelation: "special_hire_quotations"
             referencedColumns: ["id"]
           },
           {
@@ -5954,10 +5932,6 @@ export type Database = {
       }
       generate_employee_id: {
         Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_next_version_number: {
-        Args: { p_parent_id: string }
         Returns: string
       }
       generate_yutong_order_no: {

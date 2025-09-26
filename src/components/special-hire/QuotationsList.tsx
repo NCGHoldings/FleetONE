@@ -13,7 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 import { QuotationModal } from './QuotationModal';
 import { EditQuotationModal } from './EditQuotationModal';
 import { QuotationPreview } from './QuotationPreview';
-import { QuotationVersionIndicator } from './QuotationVersionIndicator';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
@@ -70,14 +69,6 @@ interface Quotation {
   discount_amount_lkr?: number;
   additional_charges?: Array<{ type: string; amount: number; reason?: string }> | string;
   total_additional_charges?: number;
-  // Versioning fields
-  parent_quotation_id?: string;
-  version_number?: string;
-  edit_type?: string;
-  edit_reason?: string;
-  is_active_version?: boolean;
-  // All versions for this quotation
-  all_versions?: any[];
 }
 
 // Helper function to calculate total revenue (matches Final Total from QuotationPreview)
@@ -143,7 +134,6 @@ export function QuotationsList({ onRefresh }: Props) {
             last_name
           )
         `)
-        .eq('is_active_version', true) // Only load active versions by default
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -157,7 +147,6 @@ export function QuotationsList({ onRefresh }: Props) {
               capacity
             )
           `)
-          .eq('is_active_version', true)
           .order('created_at', { ascending: false });
           
         if (simpleError) throw simpleError;
@@ -186,49 +175,8 @@ export function QuotationsList({ onRefresh }: Props) {
           })
         );
         
-        // For each quotation, get all versions
-        const quotationsWithVersions = await Promise.all(
-          quotationsWithCreators.map(async (quotation: any) => {
-            const rootId = quotation.parent_quotation_id || quotation.id;
-            const { data: allVersions } = await supabase
-              .from('special_hire_quotations')
-              .select('id, version_number, edit_type, edit_reason, is_active_version, created_at, created_by')
-              .or(`id.eq.${rootId},parent_quotation_id.eq.${rootId}`)
-              .order('version_number', { ascending: false });
-
-            // Get creator names for versions
-            const versionsWithCreators = await Promise.all(
-              (allVersions || []).map(async (version: any) => {
-                if (version.created_by) {
-                  const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('first_name, last_name')
-                    .eq('user_id', version.created_by)
-                    .single();
-                  
-                  return {
-                    ...version,
-                    created_by_name: profile 
-                      ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-                      : 'Unknown User'
-                  };
-                }
-                return {
-                  ...version,
-                  created_by_name: 'System'
-                };
-              })
-            );
-
-            return {
-              ...quotation,
-              all_versions: versionsWithCreators
-            };
-          })
-        );
-        
         // Transform the fallback data to match our interface
-        const transformedData = quotationsWithVersions.map(item => ({
+        const transformedData = quotationsWithCreators.map(item => ({
           ...item,
           bus_type: item.bus_types?.name || 'Unknown',
           seating_capacity: item.bus_types?.capacity || 54,
@@ -242,64 +190,27 @@ export function QuotationsList({ onRefresh }: Props) {
         return;
       }
       
-      // Transform data to include creator name from the join and load versions
-      const quotationsWithVersions = await Promise.all(
-        (quotationsData || []).map(async (item: any) => {
-          const rootId = item.parent_quotation_id || item.id;
-          const { data: allVersions } = await supabase
-            .from('special_hire_quotations')
-            .select('id, version_number, edit_type, edit_reason, is_active_version, created_at, created_by')
-            .or(`id.eq.${rootId},parent_quotation_id.eq.${rootId}`)
-            .order('version_number', { ascending: false });
-
-          // Get creator names for versions
-          const versionsWithCreators = await Promise.all(
-            (allVersions || []).map(async (version: any) => {
-              if (version.created_by) {
-                const { data: profile } = await supabase
-                  .from('profiles')
-                  .select('first_name, last_name')
-                  .eq('user_id', version.created_by)
-                  .single();
-                
-                return {
-                  ...version,
-                  created_by_name: profile 
-                    ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-                    : 'Unknown User'
-                };
-              }
-              return {
-                ...version,
-                created_by_name: 'System'
-              };
-            })
-          );
-
-          return {
-            ...item,
-            bus_type: item.bus_types?.name || 'Unknown',
-            seating_capacity: item.bus_types?.capacity || 54,
-            created_by_name: item.profiles 
-              ? `${item.profiles.first_name || ''} ${item.profiles.last_name || ''}`.trim()
-              : (item.created_by ? 'Unknown User' : 'System'),
-            total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
-            intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
-            audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
-            additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || []),
-            all_versions: versionsWithCreators
-          };
-        })
-      );
+      // Transform data to include creator name from the join
+      const transformedData = (quotationsData || []).map((item: any) => ({
+        ...item,
+        bus_type: item.bus_types?.name || 'Unknown',
+        seating_capacity: item.bus_types?.capacity || 54,
+        created_by_name: item.profiles 
+          ? `${item.profiles.first_name || ''} ${item.profiles.last_name || ''}`.trim()
+          : (item.created_by ? 'Unknown User' : 'System'),
+        total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
+        intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
+        audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
+        additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || [])
+      }));
       
-      console.log('Transformed quotations with versions:', quotationsWithVersions.map(q => ({ 
+      console.log('Transformed quotations with creators:', transformedData.map(q => ({ 
         quotation_no: q.quotation_no, 
-        version_number: q.version_number,
-        versions_count: q.all_versions?.length || 0,
+        created_by: q.created_by, 
         created_by_name: q.created_by_name 
       })));
       
-      setQuotations(quotationsWithVersions);
+      setQuotations(transformedData);
     } catch (error: any) {
       console.error('Error in loadQuotations:', error);
       toast({
@@ -369,44 +280,6 @@ export function QuotationsList({ onRefresh }: Props) {
   const handleViewQuotation = (quotation: Quotation) => {
     setSelectedQuotation(quotation);
     setShowModal(true);
-  };
-
-  const handleViewVersion = async (versionId: string) => {
-    try {
-      const { data: versionData, error } = await supabase
-        .from('special_hire_quotations')
-        .select(`
-          *,
-          bus_types!bus_type_id (
-            name,
-            capacity
-          )
-        `)
-        .eq('id', versionId)
-        .single();
-
-      if (error) throw error;
-
-      // Transform the version data to match our interface
-      const transformedVersion = {
-        ...versionData,
-        bus_type: versionData.bus_types?.name || 'Unknown',
-        seating_capacity: versionData.bus_types?.capacity || 54,
-        total_distance_km: (versionData.km_parking_to_pickup || 0) + (versionData.km_trip || 0) + (versionData.km_drop_to_parking || 0),
-        intermediate_stops: typeof versionData.intermediate_stops === 'string' ? versionData.intermediate_stops : JSON.stringify(versionData.intermediate_stops || []),
-        audit_log: Array.isArray(versionData.audit_log) ? versionData.audit_log : (versionData.audit_log ? [versionData.audit_log] : []),
-        additional_charges: typeof versionData.additional_charges === 'string' ? versionData.additional_charges : JSON.stringify(versionData.additional_charges || [])
-      };
-
-      setSelectedQuotation(transformedVersion as Quotation);
-      setShowModal(true);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to load quotation version",
-        variant: "destructive"
-      });
-    }
   };
 
   const handleDownloadQuotation = (quotation: Quotation) => {
@@ -590,31 +463,7 @@ export function QuotationsList({ onRefresh }: Props) {
       accessorKey: "quotation_no",
       header: "Quotation No",
       cell: ({ row }) => (
-        <div className="flex items-center space-x-2">
-          <div className="font-medium">{row.getValue("quotation_no")}</div>
-          {row.original.all_versions && row.original.all_versions.length > 0 && (
-            <QuotationVersionIndicator
-              currentVersion={{
-                id: row.original.id,
-                version_number: row.original.version_number || '1.0',
-                edit_type: row.original.edit_type,
-                edit_reason: row.original.edit_reason,
-                is_active_version: row.original.is_active_version || true,
-                created_at: row.original.created_at,
-                created_by_name: row.original.created_by_name
-              }}
-              allVersions={row.original.all_versions || []}
-              onViewVersion={(version) => {
-                // Load and view specific version
-                handleViewVersion(version.id);
-              }}
-              onEditVersion={(version) => {
-                // Edit specific version
-                handleEditQuotation(row.original);
-              }}
-            />
-          )}
-        </div>
+        <div className="font-medium">{row.getValue("quotation_no")}</div>
       ),
     },
     {

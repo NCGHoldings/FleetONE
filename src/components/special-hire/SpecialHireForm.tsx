@@ -110,18 +110,14 @@ interface IntermediateStop {
 }
 
 interface Props {
-  onSubmit: (formData?: any) => void;
+  onSubmit: () => void;
   onCancel: () => void;
   initialData?: any;
   isEditing?: boolean;
   submissionData?: any;
-  editConfig?: {
-    editType: 'staff_edit' | 'customer_request';
-    reason?: string;
-  };
 }
 
-export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = false, submissionData, editConfig }: Props) {
+export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = false, submissionData }: Props) {
   const [busTypes, setBusTypes] = useState<BusType[]>([]);
   const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>([]);
   const [intermediateStops, setIntermediateStops] = useState<IntermediateStop[]>([]);
@@ -159,8 +155,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       dropLocation: initialData.drop_location || '',
       
       numberOfPassengers: initialData.number_of_passengers || 1,
-      pickupDateTime: initialData.pickup_datetime ? new Date(initialData.pickup_datetime) : new Date(),
-      dropDateTime: initialData.drop_datetime ? new Date(initialData.drop_datetime) : new Date(),
+      pickupDateTime: initialData.pickup_date_time ? new Date(initialData.pickup_date_time) : new Date(),
+      dropDateTime: initialData.drop_date_time ? new Date(initialData.drop_date_time) : new Date(),
       parkingLocationId: initialData.parking_location_id || '',
       commissionPct: initialData.commission_pct || 0,
       commissionPassThroughPct: initialData.commission_pass_through_pct || 0,
@@ -1053,14 +1049,6 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       };
 
       if (isEditing && initialData) {
-        // For versioning system, don't directly update - let the parent handle it
-        if (editConfig) {
-          // Pass the quotation data to parent for versioning
-          onSubmit(quotationData);
-          return;
-        }
-        
-        // Regular edit - update existing quotation
         const { error } = await supabase
           .from('special_hire_quotations')
           .update(quotationData)
@@ -1088,12 +1076,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       // Clear auto-saved data on successful submission
       clearAutoSave();
 
-      // For versioning system, pass the quotation data to onSubmit
-      if (editConfig) {
-        onSubmit(quotationData);
-      } else {
-        onSubmit();
-      }
+      onSubmit();
     } catch (error: any) {
       toast({
         title: "Error",
