@@ -52,9 +52,8 @@ export function EditQuotationModal({ quotation, onClose, onUpdate }: Props) {
         edit_type: editConfig.editType,
         edit_reason: editConfig.reason,
         is_active_version: true,
-        created_by: user.id,
-        // Maintain the same quotation number for consistency
-        quotation_no: quotation.quotation_no
+        created_by: user.id
+        // quotation_no will be auto-generated for the new version
       };
 
       // Mark current version as inactive
