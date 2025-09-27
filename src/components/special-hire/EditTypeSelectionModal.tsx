@@ -26,7 +26,6 @@ export function EditTypeSelectionModal({ isOpen, onClose, onConfirm, quotationNo
   const handleConfirm = () => {
     if (!selectedType) return;
     onConfirm(selectedType, reason);
-    onClose();
     setSelectedType(null);
     setReason('');
   };
