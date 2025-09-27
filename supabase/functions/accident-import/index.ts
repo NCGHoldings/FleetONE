@@ -48,7 +48,33 @@ function parseDate(dateValue: any): string | null {
   
   // Handle string dates
   if (typeof dateValue === 'string') {
-    const date = new Date(dateValue);
+    const trimmedDate = dateValue.trim();
+    
+    // Handle "DD Month YYYY" format like "05 January 2023"
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // Try to parse "DD Month YYYY" format
+    const parts = trimmedDate.split(' ');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0]);
+      const monthName = parts[1];
+      const year = parseInt(parts[2]);
+      
+      const monthIndex = monthNames.findIndex(m => m.toLowerCase() === monthName.toLowerCase());
+      
+      if (monthIndex !== -1 && !isNaN(day) && !isNaN(year) && day >= 1 && day <= 31) {
+        const date = new Date(year, monthIndex, day);
+        if (!isNaN(date.getTime())) {
+          return date.toISOString().split('T')[0];
+        }
+      }
+    }
+    
+    // Try standard date parsing as fallback
+    const date = new Date(trimmedDate);
     if (!isNaN(date.getTime())) {
       return date.toISOString().split('T')[0];
     }

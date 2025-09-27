@@ -44,8 +44,8 @@ export function AccidentImportModal({ open, onOpenChange, onSuccess }: AccidentI
     ];
     
     const sampleData = [
-      '', 'BUS001', '2024-01-15', 'BL001', 'Sample accident details',
-      '50000', '45000', 'Claim processed', 'false', 'false',
+      '', 'NC 8759', '05 January 2023', 'BL1990945', 'side glass damage-Puttalama',
+      '285000', '250000', 'Estimate, Final bill and ARI Pending', 'false', 'false',
       'John Doe', 'Colombo', 'REF001', '', ''
     ];
     
@@ -264,7 +264,7 @@ export function AccidentImportModal({ open, onOpenChange, onSuccess }: AccidentI
               <ul className="list-disc list-inside space-y-1">
                 <li><strong>Required fields:</strong> VehicleNumber, AccidentDate</li>
                 <li><strong>Update logic:</strong> Records are matched by BL Number OR (Vehicle Number + Accident Date)</li>
-                <li><strong>Date format:</strong> YYYY-MM-DD (e.g., 2024-01-15)</li>
+                <li><strong>Date format:</strong> "DD Month YYYY" (e.g., "05 January 2023") or YYYY-MM-DD (e.g., "2024-01-15")</li>
                 <li><strong>Boolean fields:</strong> Use true/false or yes/no for AccidentMark and Salvage</li>
                 <li><strong>Amounts:</strong> Enter numeric values without currency symbols</li>
                 <li><strong>File types:</strong> Excel (.xlsx, .xls) or CSV (.csv)</li>
