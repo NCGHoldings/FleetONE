@@ -44,6 +44,12 @@ export function EditQuotationModal({ quotation, onClose, onUpdate }: Props) {
 
       const nextVersion = versionData || '1.1';
 
+      // Get base quotation number (remove existing version suffix if present)
+      const baseQuotationNo = quotation.quotation_no.replace(/-v\d+\.\d+$/, '');
+      
+      // Create versioned quotation number
+      const versionedQuotationNo = `${baseQuotationNo}-v${nextVersion}`;
+
       // Create new version with the form data
       const newVersionData = {
         ...quotationData,
@@ -52,8 +58,8 @@ export function EditQuotationModal({ quotation, onClose, onUpdate }: Props) {
         edit_type: editConfig.editType,
         edit_reason: editConfig.reason,
         is_active_version: true,
-        created_by: user.id
-        // quotation_no will be auto-generated for the new version
+        created_by: user.id,
+        quotation_no: versionedQuotationNo
       };
 
       // Mark current version as inactive
