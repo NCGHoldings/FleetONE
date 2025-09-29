@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Car, Plus, FileText, Upload, Download, AlertTriangle, DollarSign, Shield, MapPin, Calendar } from "lucide-react";
+import { Car, Plus, FileText, Upload, Download, AlertTriangle, DollarSign, Shield, MapPin, Calendar, Grid, List } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
@@ -43,6 +43,15 @@ interface AccidentRecord {
   accident_documents?: { count: number };
 }
 
+interface BusStatistic {
+  busNumber: string;
+  count: number;
+  totalEstimate: number;
+  totalApproved: number;
+  latestAccident: string;
+  statusArray: string[];
+}
+
 export function AccidentInsurance() {
   const { hasRole } = useAuth();
   const [accidents, setAccidents] = useState<AccidentRecord[]>([]);
@@ -56,6 +65,8 @@ export function AccidentInsurance() {
   const [statusFilter, setStatusFilter] = useState("");
   const [salvageFilter, setSalvageFilter] = useState("");
   const [accidentMarkFilter, setAccidentMarkFilter] = useState("");
+  const [viewMode, setViewMode] = useState<"table" | "bus-cards">("table");
+  const [selectedBusNumber, setSelectedBusNumber] = useState<string | null>(null);
 
   const isAdmin = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
 
@@ -107,6 +118,49 @@ export function AccidentInsurance() {
   const handleImportSuccess = () => {
     fetchAccidents();
     setIsImportModalOpen(false);
+  };
+
+  // Get unique bus numbers with accident counts
+  const getBusStatistics = (): BusStatistic[] => {
+    const busStats = accidents.reduce((acc, accident) => {
+      const busNumber = accident.vehicle_number;
+      if (!acc[busNumber]) {
+        acc[busNumber] = {
+          count: 0,
+          totalEstimate: 0,
+          totalApproved: 0,
+          latestAccident: accident.accident_date,
+          statuses: new Set()
+        };
+      }
+      acc[busNumber].count++;
+      acc[busNumber].totalEstimate += accident.estimate_amount || 0;
+      acc[busNumber].totalApproved += accident.approved_amount || 0;
+      acc[busNumber].statuses.add(accident.status);
+      
+      if (new Date(accident.accident_date) > new Date(acc[busNumber].latestAccident)) {
+        acc[busNumber].latestAccident = accident.accident_date;
+      }
+      
+      return acc;
+    }, {} as Record<string, any>);
+
+    return Object.entries(busStats).map(([busNumber, stats]) => ({
+      busNumber,
+      count: stats.count,
+      totalEstimate: stats.totalEstimate,
+      totalApproved: stats.totalApproved,
+      latestAccident: stats.latestAccident,
+      statusArray: Array.from(stats.statuses) as string[]
+    })).sort((a, b) => b.count - a.count);
+  };
+
+  // Filter accidents by selected bus
+  const getFilteredAccidents = () => {
+    if (selectedBusNumber) {
+      return accidents.filter(acc => acc.vehicle_number === selectedBusNumber);
+    }
+    return accidents;
   };
 
   const exportCSV = () => {
@@ -180,7 +234,7 @@ export function AccidentInsurance() {
         { no: 29, vehicle_number: 'NC 8756', accident_date: '2024-02-26', bl_number: 'BL 2267844', details_of_accident: 'TWO SIDE GLASS DAMAGE', estimate_amount: null, approved_amount: null, process_details: null },
         { no: 30, vehicle_number: 'NC 8756', accident_date: '2025-05-10', bl_number: 'BL 2290862', details_of_accident: 'FRONT HEAVY DAMAGE SALIYAPURA', estimate_amount: null, approved_amount: null, process_details: null },
         { no: 31, vehicle_number: 'NB 7782', accident_date: '2024-02-28', bl_number: 'cop ( 167472)', details_of_accident: 'Rear side body and buffer damage', estimate_amount: null, approved_amount: null, process_details: ',Estimate,ARI,Final Bill,ARI' },
-        { no: 32, vehicle_number: 'NB7377', accident_date: '2025-05-31', bl_number: 'cop A', details_of_accident: 'left side windcreen damage', estimate_amount: null, approved_amount: null, process_details: 'JOB COMPELETED ,ESTIMAT,FINAL BILL PENDING' },
+        { no: 32, vehicle_number: 'NB7377', accident_date: '2025-05-31', bl_number: 'cop A', details_of_accident: 'left side windscreen damage', estimate_amount: null, approved_amount: null, process_details: 'JOB COMPELETED ,ESTIMAT,FINAL BILL PENDING' },
         { no: 33, vehicle_number: 'NB7377', accident_date: '2024-10-10', bl_number: 'Coperative', details_of_accident: 'rear side damage hit the loarry', estimate_amount: null, approved_amount: null, process_details: 'job completed, Final bill,ARI, ARI Pending' },
         { no: 34, vehicle_number: 'NC 7632', accident_date: '2024-06-05', bl_number: 'BL 2185188', details_of_accident: 'Left side front face damage', estimate_amount: 56500, approved_amount: null, process_details: 'processing unit' },
         { no: 35, vehicle_number: 'NC 7632', accident_date: '2024-04-16', bl_number: 'BL 2170074', details_of_accident: 'RIGHT SIDE FRONT BUFFER AND SIGNAL LIGHT', estimate_amount: null, approved_amount: null, process_details: 'Estimate pending' },
@@ -267,7 +321,7 @@ export function AccidentInsurance() {
         return (
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            {format(parseISO(date), 'MMM dd, yyyy')}
+            <span>{format(parseISO(date), 'MMM dd, yyyy')}</span>
           </div>
         );
       }
@@ -275,7 +329,14 @@ export function AccidentInsurance() {
     {
       accessorKey: "bl_number",
       header: "BL Number",
-      cell: ({ row }) => row.getValue("bl_number") || '-'
+      cell: ({ row }) => {
+        const blNumber = row.getValue("bl_number") as string;
+        return blNumber ? (
+          <span className="font-mono text-sm">{blNumber}</span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      }
     },
     {
       accessorKey: "details_of_accident",
@@ -387,11 +448,12 @@ export function AccidentInsurance() {
     }
   ];
 
-  // Calculate KPIs
-  const totalAccidents = accidents.length;
-  const activeAccidents = accidents.filter(a => a.status !== 'Closed').length;
-  const salvageAccidents = accidents.filter(a => a.salvage).length;
-  const totalEstimate = accidents.reduce((sum, a) => sum + (a.estimate_amount || 0), 0);
+  // KPI calculations
+  const displayedAccidents = getFilteredAccidents();
+  const totalAccidents = displayedAccidents.length;
+  const activeClaims = displayedAccidents.filter(acc => acc.status !== 'Closed').length;
+  const salvageCases = displayedAccidents.filter(acc => acc.salvage).length;
+  const totalEstimateAmount = displayedAccidents.reduce((sum, acc) => sum + (acc.estimate_amount || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -399,15 +461,42 @@ export function AccidentInsurance() {
       <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-destructive via-destructive to-orange-600 p-8 text-white">
         <div className="absolute inset-0 bg-black/20"></div>
         <div className="relative z-10">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center backdrop-blur">
-              <Car className="h-8 w-8" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center backdrop-blur">
+                <Car className="h-8 w-8" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Accident Insurance</h1>
+                <p className="text-white/90 mt-2">
+                  Track and manage vehicle accident claims and related documentation
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Accident Insurance</h1>
-              <p className="text-white/90 mt-2">
-                Track and manage vehicle accident claims and related documentation
-              </p>
+            
+            {/* View Mode Toggle */}
+            <div className="flex gap-1 bg-white/10 rounded-lg p-1 backdrop-blur">
+              <Button
+                variant={viewMode === "table" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  setViewMode("table");
+                  setSelectedBusNumber(null);
+                }}
+                className="text-white hover:text-gray-900"
+              >
+                <List className="h-4 w-4 mr-1" />
+                Table
+              </Button>
+              <Button
+                variant={viewMode === "bus-cards" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("bus-cards")}
+                className="text-white hover:text-gray-900"
+              >
+                <Grid className="h-4 w-4 mr-1" />
+                Bus Cards
+              </Button>
             </div>
           </div>
           
@@ -431,19 +520,17 @@ export function AccidentInsurance() {
                     onSuccess={handleImportSuccess}
                   />
                 </Dialog>
+                
+                <Button 
+                  variant="secondary"
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 hover:border-white/30 backdrop-blur transition-all duration-200"
+                  onClick={insertBulkData}
+                  disabled={insertingBulkData}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {insertingBulkData ? 'Adding Data...' : 'Add Bulk Data'}
+                </Button>
               </>
-            )}
-            
-            {isAdmin && (
-              <Button 
-                variant="secondary"
-                className="bg-white/10 hover:bg-white/20 text-white border-white/20 hover:border-white/30 backdrop-blur transition-all duration-200"
-                onClick={insertBulkData}
-                disabled={insertingBulkData}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                {insertingBulkData ? 'Adding Data...' : 'Add Bulk Data'}
-              </Button>
             )}
             
             <Button 
@@ -462,58 +549,86 @@ export function AccidentInsurance() {
         <div className="absolute bottom-4 left-1/4 h-24 w-24 rounded-full bg-orange-400/20 blur-lg"></div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Search & Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-            <div className="lg:col-span-2">
-              <EnhancedSearch
-                onSearch={setSearchQuery}
-                placeholder="Search vehicle number, BL number..."
-                searchKeys={["vehicle_number", "bl_number", "location"]}
-              />
+      {/* Filters Section - Only show for table view */}
+      {viewMode === "table" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Search & Filters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+              <div className="lg:col-span-2">
+                <EnhancedSearch
+                  onSearch={setSearchQuery}
+                  placeholder="Search vehicle number, BL number..."
+                  searchKeys={["vehicle_number", "bl_number", "location"]}
+                />
+              </div>
+              
+              <DateRangePicker onDateRangeChange={setDateRange} />
+              
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Reported">Reported</SelectItem>
+                  <SelectItem value="Estimate">Estimate</SelectItem>
+                  <SelectItem value="Approved">Approved</SelectItem>
+                  <SelectItem value="Settlement">Settlement</SelectItem>
+                  <SelectItem value="Closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={salvageFilter} onValueChange={setSalvageFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Salvage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Yes</SelectItem>
+                  <SelectItem value="false">No</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={accidentMarkFilter} onValueChange={setAccidentMarkFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Marks" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Yes</SelectItem>
+                  <SelectItem value="false">No</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            
-            <DateRangePicker onDateRangeChange={setDateRange} />
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Reported">Reported</SelectItem>
-                <SelectItem value="Estimate">Estimate</SelectItem>
-                <SelectItem value="Approved">Approved</SelectItem>
-                <SelectItem value="Settlement">Settlement</SelectItem>
-                <SelectItem value="Closed">Closed</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={salvageFilter} onValueChange={setSalvageFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Salvage" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">Yes</SelectItem>
-                <SelectItem value="false">No</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={accidentMarkFilter} onValueChange={setAccidentMarkFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Marks" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">Yes</SelectItem>
-                <SelectItem value="false">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Selected Bus Filter Display */}
+      {selectedBusNumber && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Car className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-semibold text-primary">Viewing accidents for bus: {selectedBusNumber}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Showing {getFilteredAccidents().length} accident record(s)
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedBusNumber(null)}
+              >
+                Clear Filter
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -524,7 +639,9 @@ export function AccidentInsurance() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-900">{totalAccidents}</div>
-            <p className="text-xs text-blue-600">All recorded accidents</p>
+            <p className="text-xs text-blue-600">
+              {selectedBusNumber ? `For ${selectedBusNumber}` : 'All recorded accidents'}
+            </p>
           </CardContent>
         </Card>
 
@@ -534,7 +651,7 @@ export function AccidentInsurance() {
             <AlertTriangle className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-900">{activeAccidents}</div>
+            <div className="text-2xl font-bold text-yellow-900">{activeClaims}</div>
             <p className="text-xs text-yellow-600">Open/In Progress</p>
           </CardContent>
         </Card>
@@ -545,7 +662,7 @@ export function AccidentInsurance() {
             <Shield className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-900">{salvageAccidents}</div>
+            <div className="text-2xl font-bold text-purple-900">{salvageCases}</div>
             <p className="text-xs text-purple-600">Vehicles with salvage</p>
           </CardContent>
         </Card>
@@ -557,35 +674,127 @@ export function AccidentInsurance() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-900">
-              LKR {totalEstimate.toLocaleString()}
+              LKR {totalEstimateAmount.toLocaleString()}
             </div>
             <p className="text-xs text-green-600">Estimated claims value</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Data Table */}
-      {loading ? (
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">Loading accident records...</div>
-          </CardContent>
-        </Card>
+      {/* Content based on view mode */}
+      {viewMode === "bus-cards" ? (
+        <div className="space-y-6">
+          {/* Bus Cards Grid */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Car className="h-5 w-5" />
+                Accident Records by Vehicle
+              </CardTitle>
+              <CardDescription>
+                Click on any bus card to view all accidents for that vehicle
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {getBusStatistics().map((bus) => (
+                  <Card
+                    key={bus.busNumber}
+                    className={`cursor-pointer transition-all hover:shadow-md ${
+                      selectedBusNumber === bus.busNumber 
+                        ? 'ring-2 ring-primary bg-primary/5' 
+                        : 'hover:border-primary/50'
+                    }`}
+                    onClick={() => setSelectedBusNumber(bus.busNumber)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Car className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">{bus.busNumber}</h3>
+                          <p className="text-sm text-muted-foreground">Vehicle Number</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Total Accidents:</span>
+                          <Badge variant={bus.count > 5 ? "destructive" : bus.count > 2 ? "secondary" : "default"}>
+                            {bus.count}
+                          </Badge>
+                        </div>
+                        
+                        {bus.totalEstimate > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-muted-foreground">Est. Amount:</span>
+                            <span className="text-sm font-medium">
+                              LKR {bus.totalEstimate.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">Latest:</span>
+                          <span className="text-sm">
+                            {format(parseISO(bus.latestAccident), 'MMM dd, yyyy')}
+                          </span>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {bus.statusArray.slice(0, 2).map((status: string) => (
+                            <Badge key={status} variant="outline" className="text-xs">
+                              {status}
+                            </Badge>
+                          ))}
+                          {bus.statusArray.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{bus.statusArray.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
+        /* Table View */
         <Card>
           <CardHeader>
-            <CardTitle>Accident Records</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Accident Records
+              {selectedBusNumber && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedBusNumber}
+                </Badge>
+              )}
+            </CardTitle>
             <CardDescription>
-              Manage vehicle accident claims and documentation
+              {selectedBusNumber 
+                ? `Accident records for vehicle ${selectedBusNumber}`
+                : "Comprehensive list of all vehicle accident records and insurance claims"
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <DataTable
-              columns={columns}
-              data={accidents}
-              searchKeys={["vehicle_number", "bl_number", "location", "reported_by"]}
-              title="Accident Records"
-            />
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={getFilteredAccidents()}
+                searchKeys={["vehicle_number", "bl_number", "location", "reported_by"]}
+                title="Accident Records"
+              />
+            )}
           </CardContent>
         </Card>
       )}
