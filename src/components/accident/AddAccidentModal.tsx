@@ -19,13 +19,13 @@ const accidentSchema = z.object({
   accident_date: z.string().min(1, "Accident date is required"),
   bl_number: z.string().optional(),
   details_of_accident: z.string().optional(),
-  estimate_amount: z.number().positive("Amount must be positive").optional().or(z.literal("")),
-  approved_amount: z.number().positive("Amount must be positive").optional().or(z.literal("")),
+  estimate_amount: z.union([z.number().nullable(), z.literal(""), z.literal(0)]).optional(),
+  approved_amount: z.union([z.number().nullable(), z.literal(""), z.literal(0)]).optional(),
   process_details: z.string().optional(),
   accident_mark: z.boolean().default(false),
   salvage: z.boolean().default(false),
   salvage_disposition: z.string().optional(),
-  salvage_value: z.number().positive("Value must be positive").optional().or(z.literal("")),
+  salvage_value: z.union([z.number().nullable(), z.literal(""), z.literal(0)]).optional(),
   salvage_sale_date: z.string().optional(),
   reported_by: z.string().optional(),
   location: z.string().optional(),
@@ -66,19 +66,19 @@ export function AddAccidentModal({ open, onOpenChange, onSuccess }: AddAccidentM
   const onSubmit = async (data: AccidentFormData) => {
     setIsSubmitting(true);
     try {
-      // Prepare the data
+      // Prepare the data - handle empty strings and convert to null/numbers appropriately
       const submitData = {
         vehicle_number: data.vehicle_number.toUpperCase(),
         accident_date: data.accident_date,
         bl_number: data.bl_number || null,
         details_of_accident: data.details_of_accident || null,
-        estimate_amount: data.estimate_amount || null,
-        approved_amount: data.approved_amount || null,
+        estimate_amount: (data.estimate_amount && String(data.estimate_amount) !== "" && Number(data.estimate_amount) !== 0) ? Number(data.estimate_amount) : null,
+        approved_amount: (data.approved_amount && String(data.approved_amount) !== "" && Number(data.approved_amount) !== 0) ? Number(data.approved_amount) : null,
         process_details: data.process_details || null,
         accident_mark: data.accident_mark,
         salvage: data.salvage,
         salvage_disposition: data.salvage_disposition || null,
-        salvage_value: data.salvage_value || null,
+        salvage_value: (data.salvage_value && String(data.salvage_value) !== "" && Number(data.salvage_value) !== 0) ? Number(data.salvage_value) : null,
         salvage_sale_date: data.salvage_sale_date || null,
         reported_by: data.reported_by || null,
         location: data.location || null,
@@ -231,13 +231,12 @@ export function AddAccidentModal({ open, onOpenChange, onSuccess }: AddAccidentM
                   <Input
                     id="estimate_amount"
                     type="number"
-                    {...register("estimate_amount", { valueAsNumber: true })}
+                    {...register("estimate_amount", { 
+                      setValueAs: (value) => value === "" ? null : Number(value)
+                    })}
                     placeholder="0"
                     className="mt-1"
                   />
-                  {errors.estimate_amount && (
-                    <p className="text-sm text-destructive mt-1">{errors.estimate_amount.message}</p>
-                  )}
                 </div>
 
                 <div>
@@ -245,13 +244,12 @@ export function AddAccidentModal({ open, onOpenChange, onSuccess }: AddAccidentM
                   <Input
                     id="approved_amount"
                     type="number"
-                    {...register("approved_amount", { valueAsNumber: true })}
+                    {...register("approved_amount", { 
+                      setValueAs: (value) => value === "" ? null : Number(value)
+                    })}
                     placeholder="0"
                     className="mt-1"
                   />
-                  {errors.approved_amount && (
-                    <p className="text-sm text-destructive mt-1">{errors.approved_amount.message}</p>
-                  )}
                 </div>
               </div>
 
@@ -321,13 +319,12 @@ export function AddAccidentModal({ open, onOpenChange, onSuccess }: AddAccidentM
                       <Input
                         id="salvage_value"
                         type="number"
-                        {...register("salvage_value", { valueAsNumber: true })}
+                        {...register("salvage_value", { 
+                          setValueAs: (value) => value === "" ? null : Number(value)
+                        })}
                         placeholder="0"
                         className="mt-1"
                       />
-                      {errors.salvage_value && (
-                        <p className="text-sm text-destructive mt-1">{errors.salvage_value.message}</p>
-                      )}
                     </div>
 
                     <div>
