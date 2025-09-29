@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
 };
 
 const ALLOWED_FILE_TYPES = ['PDF', 'JPG', 'JPEG', 'PNG', 'DOCX'];
@@ -70,7 +71,7 @@ serve(async (req) => {
         );
 
         return new Response(
-          JSON.stringify(documentsWithUrls),
+          JSON.stringify({ documents: documentsWithUrls }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
@@ -165,8 +166,10 @@ serve(async (req) => {
       }
 
       case 'DELETE': {
-        // Delete document
-        const documentId = url.searchParams.get('documentId');
+        // Delete document - get documentId from request body
+        const body = await req.json();
+        const documentId = body.documentId;
+        
         if (!documentId) {
           throw new Error('Document ID is required for deletion');
         }
@@ -221,9 +224,12 @@ serve(async (req) => {
     console.error('Error in accident-documents function:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ 
+        error: errorMessage,
+        details: error instanceof Error ? error.stack : undefined
+      }),
       { 
-        status: 400,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

@@ -180,16 +180,21 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await supabase.functions.invoke(`accident-documents/${accident.id}/documents`, {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`https://wwjpdszkmtnzshbulkon.supabase.co/functions/v1/accident-documents/${accident.id}/documents`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          'Authorization': `Bearer ${session?.access_token}`
         },
         body: formData
       });
 
-      if (response.error) throw response.error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
 
+      const result = await response.json();
       toast.success('Document uploaded successfully');
       fetchDocuments();
     } catch (error: any) {
@@ -211,16 +216,22 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
     if (!confirm('Are you sure you want to delete this document?')) return;
 
     try {
-      const response = await supabase.functions.invoke(`accident-documents/${accident.id}/documents`, {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`https://wwjpdszkmtnzshbulkon.supabase.co/functions/v1/accident-documents/${accident.id}/documents`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json'
         },
-        body: { documentId }
+        body: JSON.stringify({ documentId })
       });
 
-      if (response.error) throw response.error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
 
+      const result = await response.json();
       toast.success('Document deleted successfully');
       fetchDocuments();
     } catch (error: any) {
