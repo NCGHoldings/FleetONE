@@ -278,6 +278,18 @@ export function AccidentInsurance() {
       cell: ({ row }) => row.getValue("bl_number") || '-'
     },
     {
+      accessorKey: "details_of_accident",
+      header: "Details Of Accident",
+      cell: ({ row }) => {
+        const details = row.getValue("details_of_accident") as string;
+        return details ? (
+          <div className="max-w-48 truncate" title={details}>
+            {details}
+          </div>
+        ) : '-';
+      }
+    },
+    {
       accessorKey: "estimate_amount",
       header: "Estimate",
       cell: ({ row }) => {
@@ -287,10 +299,22 @@ export function AccidentInsurance() {
     },
     {
       accessorKey: "approved_amount",
-      header: "Approved",
+      header: "Approved Amount",
       cell: ({ row }) => {
         const amount = row.getValue("approved_amount") as number;
         return amount ? `LKR ${amount.toLocaleString()}` : '-';
+      }
+    },
+    {
+      accessorKey: "process_details",
+      header: "Details of Process",
+      cell: ({ row }) => {
+        const details = row.getValue("process_details") as string;
+        return details ? (
+          <div className="max-w-48 truncate" title={details}>
+            {details}
+          </div>
+        ) : '-';
       }
     },
     {
