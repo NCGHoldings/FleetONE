@@ -100,11 +100,11 @@ function parseBoolean(value: any): boolean {
 function validateRow(row: ImportRow, rowIndex: number): string[] {
   const errors: string[] = [];
   
-  if (!row.VehicleNumber?.trim()) {
+  if (!row.VehicleNumber || (typeof row.VehicleNumber === 'string' && !row.VehicleNumber.trim())) {
     errors.push('VehicleNumber is required');
   }
   
-  if (!row.AccidentDate?.trim()) {
+  if (!row.AccidentDate) {
     errors.push('AccidentDate is required');
   } else {
     const parsedDate = parseDate(row.AccidentDate);
