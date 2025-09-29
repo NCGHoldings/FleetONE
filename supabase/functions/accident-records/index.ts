@@ -131,15 +131,15 @@ serve(async (req) => {
       }
 
       case 'PUT': {
-        const pathSegments = url.pathname.split('/');
-        const id = pathSegments[pathSegments.length - 1];
+        const body = await req.json();
         
-        if (!id || id === 'accident-records') {
+        // Extract ID from the request body instead of URL path
+        const recordId = body.id;
+        
+        if (!recordId) {
           throw new Error('Record ID is required for updates');
         }
 
-        const body = await req.json();
-        
         // Get user from JWT
         const authHeader = req.headers.get('Authorization');
         if (!authHeader) {
@@ -154,13 +154,16 @@ serve(async (req) => {
           throw new Error('Invalid user');
         }
 
+        // Remove id from body to avoid conflicts, use it in the where clause
+        const { id, ...updateData } = body;
+
         const { data, error } = await supabase
           .from('accident_records')
           .update({
-            ...body,
+            ...updateData,
             updated_by: user.id
           })
-          .eq('id', id)
+          .eq('id', recordId)
           .select()
           .single();
 

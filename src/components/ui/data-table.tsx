@@ -49,7 +49,7 @@ interface DataTableProps<TData, TValue> {
 export function DataTable<TData, TValue>({
   columns,
   data,
-  searchKey = "name",
+  searchKey,
   searchKeys = [],
   title,
   onExport,
@@ -163,7 +163,7 @@ export function DataTable<TData, TValue>({
             />
           )}
           
-          {!customSearch && !onDateRangeChange && (
+          {!customSearch && !onDateRangeChange && searchKey && (
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input

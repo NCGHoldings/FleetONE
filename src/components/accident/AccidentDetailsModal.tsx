@@ -94,18 +94,32 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
 
   const fetchDocuments = async () => {
     try {
-      const response = await supabase.functions.invoke('accident-documents', {
+      // Only fetch documents if we have an accident ID
+      if (!accident?.id) {
+        setDocuments([]);
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`https://wwjpdszkmtnzshbulkon.supabase.co/functions/v1/accident-documents/${accident.id}/documents`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json'
         }
       });
 
-      if (response.error) throw response.error;
-      setDocuments(response.data || []);
+      if (!response.ok) {
+        console.warn('No documents found for this accident');
+        setDocuments([]);
+        return;
+      }
+
+      const result = await response.json();
+      setDocuments(result.documents || []);
     } catch (error) {
       console.error('Error fetching documents:', error);
-      toast.error('Failed to load documents');
+      setDocuments([]);
     }
   };
 
@@ -117,16 +131,21 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
 
     setLoading(true);
     try {
-      const response = await supabase.functions.invoke('accident-records', {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('https://wwjpdszkmtnzshbulkon.supabase.co/functions/v1/accident-records', {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json'
         },
-        body: formData
+        body: JSON.stringify(formData)
       });
 
-      if (response.error) throw response.error;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
+      const result = await response.json();
       toast.success('Accident record updated successfully');
       setEditMode(false);
       onUpdate();
