@@ -94,7 +94,11 @@ serve(async (req) => {
         const amountDue = student.update_new || 0;
         
         // Prepare reminder message
-        const message = generateReminderMessage(student, branchInfo, reminder_type);
+        const studentWithBranchName = {
+          ...student,
+          branch_name: branchInfo[0]?.branch_name || 'Unknown Branch'
+        };
+        const message = generateReminderMessage(studentWithBranchName, branchInfo, reminder_type);
         
         // Send SMS if phone number available
         if (student.father_contact_no || student.mother_contact_no) {
@@ -144,14 +148,15 @@ serve(async (req) => {
 
         successCount++;
         
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(`Failed to send reminder for student ${student.id}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         
         reminderResults.push({
           student_id: student.id,
           student_name: student.student_name,
           status: 'failed',
-          error: error.message
+          error: errorMessage
         });
         
         errorCount++;
@@ -172,13 +177,14 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error sending payment reminders:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: errorMessage,
         details: 'Check the Edge Function logs for more information'
       }),
       {

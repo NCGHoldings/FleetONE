@@ -258,12 +258,13 @@ serve(async (req) => {
           console.log(`Created record for row ${rowIndex}`);
         }
 
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(`Error processing row ${rowIndex}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         result.errors++;
         result.rowErrors.push({
           row: rowIndex,
-          errors: [error.message],
+          errors: [errorMessage],
           data: row
         });
       }
@@ -282,12 +283,13 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in accident import:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error.message 
+        error: errorMessage 
       }),
       { 
         status: 400,

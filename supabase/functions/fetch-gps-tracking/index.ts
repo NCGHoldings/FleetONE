@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
           battery_voltage: position.attributes?.battery ?? null,
           odometer_reading: position.attributes?.odometer ? Math.round(position.attributes.odometer) : null,
           driver_name: device.contact || null,
-          alerts: [],
+          alerts: [] as Array<{type: string, message: string}>,
         }
 
         // Add alerts based on conditions

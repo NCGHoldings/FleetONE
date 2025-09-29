@@ -135,8 +135,9 @@ serve(async (req) => {
         };
 
         validatedRecords.push(record);
-      } catch (error) {
-        errors.push(`Row ${i + 1}: ${error.message}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        errors.push(`Row ${i + 1}: ${errorMessage}`);
       }
     }
 
@@ -230,9 +231,10 @@ serve(async (req) => {
                 insertedCount++;
               }
             }
-          } catch (error) {
+          } catch (error: unknown) {
             console.error('Processing error:', error);
-            errors.push(`Processing error for ${record.student_name}: ${error.message}`);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            errors.push(`Processing error for ${record.student_name}: ${errorMessage}`);
             skippedCount++;
           }
         }
@@ -261,13 +263,14 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error processing Excel import:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: errorMessage,
         details: 'Check the Edge Function logs for more information'
       }),
       {
