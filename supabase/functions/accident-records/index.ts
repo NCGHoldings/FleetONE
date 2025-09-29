@@ -152,8 +152,8 @@ serve(async (req) => {
           throw new Error('Invalid user');
         }
 
-        // Remove id from body to avoid conflicts, use it in the where clause
-        const { id, ...updateData } = body;
+        // Remove id and no from body to avoid conflicts, use it in the where clause
+        const { id, no, ...updateData } = body;
 
         const { data, error } = await supabase
           .from('accident_records')
