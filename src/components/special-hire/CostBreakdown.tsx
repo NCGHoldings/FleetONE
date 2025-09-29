@@ -123,7 +123,11 @@ export function CostBreakdown({ data }: Props) {
   const deductionsFuelCost = ((safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
   
   // Calculate maintenance cost (for all buses)  
-  const calculatedMaintenanceCost = (safeData.totalTripDistance * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
+  // For multi-parking, divide parking distances by number of buses, then add trip distance
+  const distancePerBus = isMultiParking 
+    ? ((safeData.kmParkingToPickup + safeData.kmDropToParking) / safeData.numberOfBuses) + safeData.kmTrip
+    : safeData.totalTripDistance;
+  const calculatedMaintenanceCost = (distancePerBus * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   
   // Calculate additional charges total with per-bus support
   const additionalChargesTotal = Array.isArray(data.additionalCharges) 
@@ -392,7 +396,7 @@ export function CostBreakdown({ data }: Props) {
               <span>LKR {deductionsFuelCost.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>Maintenance Cost (Internal - {safeData.totalTripDistance.toFixed(1)} km × LKR {safeData.maintenanceRatePerKm} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
+              <span>Maintenance Cost (Internal - {distancePerBus.toFixed(1)} km per bus × LKR {safeData.maintenanceRatePerKm} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
               <span>LKR {calculatedMaintenanceCost.toLocaleString()}</span>
             </div>
             {(Array.isArray(data.additionalCharges) && data.additionalCharges.length > 0) && (
