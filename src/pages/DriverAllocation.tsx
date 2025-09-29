@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
+import { BulkImportModal } from "@/components/driver-allocation/BulkImportModal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -41,6 +42,7 @@ export default function DriverAllocation() {
   const [excelOpen, setExcelOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [editingAllocation, setEditingAllocation] = useState<AllocationRow | null>(null);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   const [buses, setBuses] = useState<any[]>([]);
   const [routes, setRoutes] = useState<any[]>([]);
