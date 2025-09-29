@@ -3,7 +3,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2, FileText, Edit, Calculator, Download, CalendarIcon } from "lucide-react";
+import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2, FileText, Edit, Calculator, Download, CalendarIcon, Trash } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,7 +73,8 @@ const createColumns = (
   handleViewDetailsLocal: (tripId: string) => void,
   handleEditTripLocal: (trip: Trip) => void,
   handleViewExpensesLocal: (trip: Trip) => void,
-  handleCancelTripLocal: (tripId: string) => void
+  handleCancelTripLocal: (tripId: string) => void,
+  handleDeleteTripLocal: (tripId: string) => void
 ): ColumnDef<Trip>[] => [
   {
     accessorKey: "trip_no",
@@ -269,6 +270,10 @@ const createColumns = (
             <DropdownMenuItem className="text-destructive" onClick={() => handleCancelTripLocal(trip.id)}>
               Cancel Trip
             </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTripLocal(trip.id)}>
+              <Trash className="h-4 w-4 mr-2" />
+              Delete Trip
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
@@ -326,6 +331,31 @@ export default function DailyTrips() {
       toast({
         title: "Error",
         description: "Failed to cancel trip",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteTripLocal = async (tripId: string) => {
+    try {
+      const { error } = await supabase
+        .from('daily_trips')
+        .delete()
+        .eq('id', tripId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Trip deleted successfully",
+      });
+      
+      fetchTrips();
+    } catch (error) {
+      console.error('Error deleting trip:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete trip",
         variant: "destructive",
       });
     }
@@ -808,7 +838,7 @@ export default function DailyTrips() {
 
       {/* Data Table */}
       <DataTable
-        columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal)}
+        columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal, handleDeleteTripLocal)}
         data={data}
         searchKeys={["Bus No.", "Route No.", "Route", "Driver", "Conductor"]}
         title="Daily Trips"
