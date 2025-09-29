@@ -8,13 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Car, Plus, FileText, Upload, Download, AlertTriangle, DollarSign, Shield, MapPin, Calendar, Grid, List } from "lucide-react";
+import { Car, Plus, FileText, Upload, Download, AlertTriangle, DollarSign, Shield, MapPin, Calendar, Grid, List, PlusCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { format, parseISO } from "date-fns";
 import { AccidentDetailsModal } from "@/components/accident/AccidentDetailsModal";
 import { AccidentImportModal } from "@/components/accident/AccidentImportModal";
+import { AddAccidentModal } from "@/components/accident/AddAccidentModal";
 import { EnhancedSearch } from "@/components/ui/enhanced-search";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -67,6 +68,7 @@ export function AccidentInsurance() {
   const [accidentMarkFilter, setAccidentMarkFilter] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "bus-cards">("table");
   const [selectedBusNumber, setSelectedBusNumber] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const isAdmin = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
 
@@ -504,6 +506,15 @@ export function AccidentInsurance() {
           <div className="flex gap-3 mt-6">
             {isAdmin && (
               <>
+                <Button 
+                  variant="secondary"
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 hover:border-white/30 backdrop-blur transition-all duration-200"
+                  onClick={() => setIsAddModalOpen(true)}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  New Accident
+                </Button>
+                
                 <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
                   <DialogTrigger asChild>
                     <Button 
@@ -808,6 +819,12 @@ export function AccidentInsurance() {
           onUpdate={fetchAccidents}
         />
       )}
+
+      <AddAccidentModal
+        open={isAddModalOpen}
+        onOpenChange={setIsAddModalOpen}
+        onSuccess={fetchAccidents}
+      />
     </div>
   );
 }
