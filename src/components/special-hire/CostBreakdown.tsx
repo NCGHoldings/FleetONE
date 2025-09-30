@@ -457,20 +457,22 @@ export function CostBreakdown({ data }: Props) {
         <Separator />
 
         {/* Net Profit */}
-        <div className="flex justify-between items-center text-lg font-bold">
-          <span>Net Profit{safeData.numberOfBuses > 1 ? ' (per bus)' : ''}</span>
-          <span className={netProfitPerBus >= 0 ? 'text-green-600' : 'text-red-600'}>
-            LKR {netProfitPerBus.toLocaleString()}
-          </span>
-        </div>
-        {safeData.numberOfBuses > 1 && (
-          <div className="flex justify-between items-center text-sm text-muted-foreground mt-1">
-            <span>Total Net Profit ({safeData.numberOfBuses} buses)</span>
-            <span className={correctNetProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
+        <div className="bg-green-50 p-3 rounded-md border-2 border-green-200">
+          <div className="flex justify-between items-center text-lg font-bold text-green-600">
+            <span>Net Profit</span>
+            <span>
               LKR {correctNetProfit.toLocaleString()}
             </span>
           </div>
-        )}
+          {safeData.numberOfBuses > 1 && (
+            <div className="flex justify-between items-center text-sm text-green-700 mt-1">
+              <span>Net Profit per Bus ({safeData.numberOfBuses} buses)</span>
+              <span>
+                LKR {netProfitPerBus.toLocaleString()}
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Net Profit per Day - show only if trip is more than 1 day */}
         {(() => {
@@ -487,22 +489,12 @@ export function CostBreakdown({ data }: Props) {
           const netProfitPerBusPerDay = netProfitPerBus / tripDurationDays;
           
           return (
-            <>
-              <div className="flex justify-between items-center text-sm text-muted-foreground mt-2 pt-2 border-t">
-                <span>Net Profit per Day{safeData.numberOfBuses > 1 ? ' (per bus)' : ''} ({tripDurationDays} days)</span>
-                <span className={netProfitPerBusPerDay >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  LKR {netProfitPerBusPerDay.toLocaleString()}
-                </span>
-              </div>
-              {safeData.numberOfBuses > 1 && (
-                <div className="flex justify-between items-center text-xs text-muted-foreground mt-1">
-                  <span>Total Net Profit per Day ({safeData.numberOfBuses} buses)</span>
-                  <span className={netProfitPerDay >= 0 ? 'text-green-600' : 'text-red-600'}>
-                    LKR {netProfitPerDay.toLocaleString()}
-                  </span>
-                </div>
-              )}
-            </>
+            <div className="flex justify-between items-center text-sm text-muted-foreground mt-2">
+              <span>Net Profit per Day ({tripDurationDays} days)</span>
+              <span className="text-green-600 font-medium">
+                LKR {netProfitPerDay.toLocaleString()}
+              </span>
+            </div>
           );
         })()}
       </CardContent>
