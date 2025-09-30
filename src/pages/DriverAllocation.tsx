@@ -849,19 +849,19 @@ export default function DriverAllocation() {
             <Dialog open={excelOpen} onOpenChange={setExcelOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
-                  <Upload className="h-4 w-4 mr-2" /> Import Excel
+                  <Upload className="h-4 w-4 mr-2" /> Import Excel/CSV
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Import Excel File</DialogTitle>
+                  <DialogTitle>Import Excel or CSV File</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <Label>Excel File</Label>
+                    <Label>Excel or CSV File</Label>
                     <Input 
                       type="file" 
-                      accept=".xlsx,.xls" 
+                      accept=".xlsx,.xls,.csv" 
                       onChange={handleExcelUpload}
                       disabled={uploading}
                     />
