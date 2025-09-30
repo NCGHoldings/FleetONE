@@ -222,13 +222,13 @@ export default function DriverAllocation() {
 
   const parseDate = (dateStr: any): string => {
     if (!dateStr) {
-      console.warn('Empty date string, using current date');
+      console.warn('⚠️ Empty date string, using current date');
       return new Date().toISOString().split('T')[0];
     }
 
     // Handle Excel serial date numbers (most common issue)
     if (typeof dateStr === 'number') {
-      console.log('Processing Excel serial date:', dateStr);
+      console.log('🔢 Processing Excel serial date:', dateStr);
       
       // Excel serial date: days since January 1, 1900
       // JavaScript Date: milliseconds since January 1, 1970
@@ -242,18 +242,18 @@ export default function DriverAllocation() {
       
       if (!isNaN(utcDate.getTime())) {
         const result = utcDate.toISOString().split('T')[0];
-        console.log('Converted Excel serial date:', dateStr, 'to:', result);
+        console.log('✅ Converted Excel serial date:', dateStr, '→', result);
         return result;
       }
     }
 
     const dateString = dateStr.toString().trim();
-    console.log('Parsing date string:', dateString);
+    console.log('📅 Parsing date string:', dateString);
 
     try {
-      // Handle DD/MM/YYYY format (31/07/2025)
+      // Handle DD/MM/YYYY format (most common format in Excel exports)
       if (dateString.includes('/')) {
-        const parts = dateString.split('/');
+        const parts = dateString.split('/').map(p => p.trim());
         if (parts.length === 3) {
           let day, month, year;
           
@@ -264,38 +264,38 @@ export default function DriverAllocation() {
             month = parts[1].padStart(2, '0');
             day = parts[2].padStart(2, '0');
           } else {
-            // DD/MM/YYYY or MM/DD/YYYY - assume DD/MM/YYYY for non-US format
+            // DD/MM/YYYY format (most common in many countries)
             day = parts[0].padStart(2, '0');
             month = parts[1].padStart(2, '0');
             year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
           }
           
           const result = `${year}-${month}-${day}`;
-          console.log('Parsed date with / to:', result);
+          console.log('✅ Parsed DD/MM/YYYY:', dateString, '→', result);
           return result;
         }
       }
 
       // Handle DD.MM.YYYY format
       if (dateString.includes('.')) {
-        const parts = dateString.split('.');
+        const parts = dateString.split('.').map(p => p.trim());
         if (parts.length === 3) {
           const day = parts[0].padStart(2, '0');
           const month = parts[1].padStart(2, '0');
           const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
           const result = `${year}-${month}-${day}`;
-          console.log('Parsed DD.MM.YYYY to:', result);
+          console.log('✅ Parsed DD.MM.YYYY:', dateString, '→', result);
           return result;
         }
       }
 
       // Handle DD-MM-YYYY format
       if (dateString.includes('-')) {
-        const parts = dateString.split('-');
+        const parts = dateString.split('-').map(p => p.trim());
         if (parts.length === 3) {
           if (parts[0].length === 4) {
             // YYYY-MM-DD (already correct)
-            console.log('Date already in YYYY-MM-DD format:', dateString);
+            console.log('✅ Date already in YYYY-MM-DD format:', dateString);
             return dateString;
           } else {
             // DD-MM-YYYY
@@ -303,7 +303,7 @@ export default function DriverAllocation() {
             const month = parts[1].padStart(2, '0');
             const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
             const result = `${year}-${month}-${day}`;
-            console.log('Parsed DD-MM-YYYY to:', result);
+            console.log('✅ Parsed DD-MM-YYYY:', dateString, '→', result);
             return result;
           }
         }
@@ -313,16 +313,16 @@ export default function DriverAllocation() {
       const parsedDate = new Date(dateString);
       if (!isNaN(parsedDate.getTime())) {
         const result = parsedDate.toISOString().split('T')[0];
-        console.log('Parsed as standard date to:', result);
+        console.log('✅ Parsed as standard date:', dateString, '→', result);
         return result;
       }
 
     } catch (error) {
-      console.error('Error parsing date:', dateString, error);
+      console.error('❌ Error parsing date:', dateString, error);
     }
 
     // Final fallback: use current date
-    console.warn('Could not parse date:', dateString, 'using current date');
+    console.warn('⚠️ Could not parse date:', dateString, '- using current date as fallback');
     return new Date().toISOString().split('T')[0];
   };
 
@@ -340,55 +340,59 @@ export default function DriverAllocation() {
     if (!name || !name.trim()) return null;
     const searchName = name.toLowerCase().trim();
     
-    console.log('Searching for person:', searchName);
+    console.log('🔍 Searching for person:', `"${searchName}"`);
+    console.log('📋 Available people:', people.length, 'profiles');
     
-    // Remove common prefixes/suffixes
+    // Remove common prefixes/suffixes and extra whitespace
     const cleanedName = searchName
       .replace(/^(mr|mrs|ms|dr|prof)\.?\s*/i, '')
-      .replace(/\s+(jr|sr|ii|iii|iv)\.?$/i, '');
+      .replace(/\s+(jr|sr|ii|iii|iv)\.?$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    console.log('🧹 Cleaned name:', `"${cleanedName}"`);
     
     // Try exact full name match first
     let person = people.find(p => {
-      const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
-      return fullName === cleanedName || 
-             cleanedName === fullName;
+      const fullName = `${p.first_name} ${p.last_name}`.toLowerCase().trim();
+      return fullName === cleanedName || cleanedName === fullName;
     });
     
     if (person) {
-      console.log('Found exact match:', person);
+      console.log('✅ Found exact match:', `${person.first_name} ${person.last_name}`);
       return person;
     }
     
     // Try first name exact match
     person = people.find(p => {
-      const firstName = p.first_name.toLowerCase();
+      const firstName = p.first_name.toLowerCase().trim();
       return firstName === cleanedName;
     });
     
     if (person) {
-      console.log('Found first name match:', person);
+      console.log('✅ Found first name match:', `${person.first_name} ${person.last_name}`);
       return person;
     }
     
     // Try last name exact match
     person = people.find(p => {
-      const lastName = p.last_name.toLowerCase();
+      const lastName = p.last_name.toLowerCase().trim();
       return lastName === cleanedName;
     });
     
     if (person) {
-      console.log('Found last name match:', person);
+      console.log('✅ Found last name match:', `${person.first_name} ${person.last_name}`);
       return person;
     }
     
     // Try partial matches with full name
     person = people.find(p => {
-      const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+      const fullName = `${p.first_name} ${p.last_name}`.toLowerCase().trim();
       return fullName.includes(cleanedName) || cleanedName.includes(fullName);
     });
     
     if (person) {
-      console.log('Found partial full name match:', person);
+      console.log('✅ Found partial full name match:', `${person.first_name} ${person.last_name}`);
       return person;
     }
     
@@ -397,8 +401,8 @@ export default function DriverAllocation() {
     
     for (const word of nameWords) {
       person = people.find(p => {
-        const firstName = p.first_name.toLowerCase();
-        const lastName = p.last_name.toLowerCase();
+        const firstName = p.first_name.toLowerCase().trim();
+        const lastName = p.last_name.toLowerCase().trim();
         return firstName.includes(word) || 
                lastName.includes(word) ||
                word.includes(firstName) ||
@@ -406,12 +410,19 @@ export default function DriverAllocation() {
       });
       
       if (person) {
-        console.log('Found fuzzy match for word:', word, '-> person:', person);
+        console.log('✅ Found fuzzy match for word:', `"${word}"`, '→', `${person.first_name} ${person.last_name}`);
         return person;
       }
     }
     
-    console.log('No person found for:', searchName);
+    // Log some examples of available names for debugging
+    if (people.length > 0) {
+      const exampleNames = people.slice(0, 5).map(p => `${p.first_name} ${p.last_name}`).join(', ');
+      console.log('❌ No person found for:', `"${searchName}"`, '| Examples:', exampleNames);
+    } else {
+      console.log('❌ No people in database!');
+    }
+    
     return null;
   };
 
@@ -430,39 +441,80 @@ export default function DriverAllocation() {
     if (!file) return;
 
     setUploading(true);
+    const warnings: string[] = [];
+    const errors: string[] = [];
+
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false }) as any[];
+
+      console.log('📊 Excel Import Started');
+      console.log('Total rows:', jsonData.length);
+      console.log('First row sample:', jsonData[0]);
+      console.log('Available columns:', Object.keys(jsonData[0] || {}));
+
+      // Improved column name detection - trim and normalize
+      const getColumnValue = (possibleNames: string[], rowData: any) => {
+        // First, try exact matches with trimmed column names
+        for (const name of possibleNames) {
+          for (const key in rowData) {
+            const trimmedKey = key.trim();
+            if (trimmedKey.toLowerCase() === name.toLowerCase()) {
+              const value = rowData[key];
+              if (value !== undefined && value !== null && value !== '') {
+                return value.toString().trim();
+              }
+            }
+          }
+        }
+
+        // Then try partial matches
+        for (const name of possibleNames) {
+          for (const key in rowData) {
+            const trimmedKey = key.trim().toLowerCase();
+            if (trimmedKey.includes(name.toLowerCase()) || name.toLowerCase().includes(trimmedKey)) {
+              const value = rowData[key];
+              if (value !== undefined && value !== null && value !== '') {
+                return value.toString().trim();
+              }
+            }
+          }
+        }
+        return null;
+      };
 
       // Group rows by date first
       const rowsByDate: { [date: string]: any[] } = {};
-      const parsedRows = jsonData.map((row: any) => {
-        // More flexible column name detection
-        const getColumnValue = (possibleNames: string[]) => {
-          for (const name of possibleNames) {
-            const value = row[name];
-            if (value !== undefined && value !== null && value !== '') {
-              return value.toString().trim();
-            }
-          }
-          return null;
-        };
+      const parsedRows = jsonData.map((row: any, index: number) => {
+        const busNo = getColumnValue(['Bus No', 'bus no', 'Bus', 'bus', 'Bus Number', 'BusNo'], row);
+        const routeNo = getColumnValue(['Route', 'route', 'Route No', 'route no', 'RouteNo'], row);
+        const routeName = getColumnValue(['route name', 'Route Name', 'RouteName'], row) || routeNo;
+        const driverName = getColumnValue(['Driver', 'driver', 'Driver Name', 'DriverName'], row);
+        const conductorName = getColumnValue(['Conductor', 'conductor', 'Conductor Name', 'ConductorName'], row);
+        const whatsapp = getColumnValue(['Whatsapp', 'whatsapp', 'WhatsApp', 'Phone', 'phone', 'Contact'], row);
+        const dateValue = getColumnValue(['date', 'Date', 'DATE', 'Trip Date', 'TripDate', 'Allocation Date'], row);
+        const timeValue = getColumnValue(['Time', 'time', 'Start Time', 'StartTime', 'Departure', 'time'], row);
 
-        const busNo = getColumnValue(['Bus No', 'bus no', 'Bus', 'bus', 'Bus Number', 'BusNo']);
-        const routeNo = getColumnValue(['Route', 'route', 'Route No', 'route no', 'RouteNo']);
-        const routeName = getColumnValue(['route name', 'Route Name', 'RouteName', 'Route', 'route']);
-        const driverName = getColumnValue(['Driver', 'driver', 'Driver Name', 'DriverName']);
-        const conductorName = getColumnValue(['Conductor', 'conductor', 'Conductor Name', 'ConductorName']);
-        const whatsapp = getColumnValue(['Whatsapp', 'whatsapp', 'WhatsApp', 'Phone', 'phone', 'Contact']);
-        const dateValue = getColumnValue(['date', 'Date', 'Trip Date', 'TripDate', 'Day']);
-        const timeValue = getColumnValue(['Time', 'time', 'Start Time', 'StartTime', 'Departure']);
+        console.log(`\n🔍 Row ${index + 1} Raw Data:`, {
+          dateValue,
+          busNo,
+          routeName,
+          driverName,
+          conductorName
+        });
 
         const date = parseDate(dateValue);
         const time = parseTime(timeValue);
 
+        // Validation warnings
+        if (!dateValue) warnings.push(`Row ${index + 1}: No date found`);
+        if (!busNo) warnings.push(`Row ${index + 1}: No bus number found`);
+        if (!driverName) warnings.push(`Row ${index + 1}: No driver name found`);
+
         return {
+          rowIndex: index + 1,
           original: row,
           busNo,
           routeNo,
@@ -485,10 +537,17 @@ export default function DriverAllocation() {
         rowsByDate[parsedRow.date].push(parsedRow);
       });
 
-      console.log('Grouped rows by date:', Object.keys(rowsByDate).map(date => `${date}: ${rowsByDate[date].length} trips`));
+      console.log('\n📅 Grouped by Date:', Object.keys(rowsByDate).map(date => 
+        `${date}: ${rowsByDate[date].length} trips`
+      ));
 
       // Generate trip IDs for each date group
       const allocRows = [];
+      let successCount = 0;
+      let missingDriverCount = 0;
+      let missingConductorCount = 0;
+      let missingBusCount = 0;
+
       for (const [date, rows] of Object.entries(rowsByDate)) {
         // Get the highest existing trip number for this specific date
         const dateForId = date.replace(/-/g, ''); // Convert YYYY-MM-DD to YYYYMMDD
@@ -510,31 +569,46 @@ export default function DriverAllocation() {
           }
         }
 
-        console.log(`Date ${date}: Starting trip number from ${nextNumber}`);
+        console.log(`\n📋 Processing Date ${date}: Starting from trip ${nextNumber}`);
 
         // Process each row for this date
         rows.forEach((parsedRow, index) => {
-          const { busNo, routeNo, routeName, driverName, conductorName, whatsapp, timeValue, date, time, original } = parsedRow;
+          const { busNo, routeNo, routeName, driverName, conductorName, whatsapp, timeValue, date, time, rowIndex } = parsedRow;
           
           // Generate trip ID with proper daily sequence
           const tripId = `T${dateForId}-${(nextNumber + index).toString().padStart(4, '0')}`;
 
-          // Find actual IDs from the data
+          // Find actual IDs from the data with better logging
           const foundBus = busNo ? findBusByNumber(busNo) : null;
           const foundRoute = (routeName || routeNo) ? findRouteByName(routeName || routeNo) : null;
           const foundDriver = driverName ? findPersonByName(driverName) : null;
           const foundConductor = conductorName ? findPersonByName(conductorName) : null;
 
-          console.log(`Row ${index + 1} for ${date} - Trip ID: ${tripId}`, {
-            original: { busNo, routeName, routeNo, driverName, conductorName, dateValue: parsedRow.dateValue, timeValue },
-            found: { 
-              bus: foundBus ? `${foundBus.bus_no} (${foundBus.id})` : 'Not found',
-              route: foundRoute ? `${foundRoute.route_name} (${foundRoute.id})` : 'Not found',
-              driver: foundDriver ? `${foundDriver.first_name} ${foundDriver.last_name} (${foundDriver.user_id})` : 'Not found',
-              conductor: foundConductor ? `${foundConductor.first_name} ${foundConductor.last_name} (${foundConductor.user_id})` : 'Not found',
-              date, time
-            }
+          // Track missing items
+          if (!foundBus && busNo) {
+            missingBusCount++;
+            warnings.push(`Row ${rowIndex}: Bus "${busNo}" not found in database`);
+          }
+          if (!foundDriver && driverName) {
+            missingDriverCount++;
+            warnings.push(`Row ${rowIndex}: Driver "${driverName}" not found in database`);
+          }
+          if (!foundConductor && conductorName) {
+            missingConductorCount++;
+            warnings.push(`Row ${rowIndex}: Conductor "${conductorName}" not found in database`);
+          }
+
+          console.log(`✅ Row ${rowIndex} - Trip ${tripId}:`, {
+            date: `${parsedRow.dateValue} → ${date}`,
+            bus: foundBus ? `✓ ${foundBus.bus_no}` : `✗ "${busNo}" NOT FOUND`,
+            route: foundRoute ? `✓ ${foundRoute.route_name}` : `✗ "${routeName || routeNo}" NOT FOUND`,
+            driver: foundDriver ? `✓ ${foundDriver.first_name} ${foundDriver.last_name}` : `✗ "${driverName}" NOT FOUND`,
+            conductor: foundConductor ? `✓ ${foundConductor.first_name} ${foundConductor.last_name}` : `✗ "${conductorName}" NOT FOUND`
           });
+
+          if (foundBus || foundDriver) {
+            successCount++;
+          }
 
           allocRows.push({
             trip_id: tripId,
@@ -553,13 +627,40 @@ export default function DriverAllocation() {
               driver: driverName,
               conductor: conductorName,
               whatsapp,
-              time: timeValue
+              time: timeValue,
+              import_warnings: !foundBus || !foundDriver || !foundConductor ? 'Missing data' : null
             })
           });
         });
       }
 
-      console.log(`Generated ${allocRows.length} allocation records`);
+      console.log(`\n📊 Import Summary:`);
+      console.log(`Total Rows: ${allocRows.length}`);
+      console.log(`Successful Matches: ${successCount}`);
+      console.log(`Missing Buses: ${missingBusCount}`);
+      console.log(`Missing Drivers: ${missingDriverCount}`);
+      console.log(`Missing Conductors: ${missingConductorCount}`);
+      console.log(`Warnings: ${warnings.length}`);
+
+      if (allocRows.length === 0) {
+        throw new Error('No valid rows to import. Please check your Excel file format.');
+      }
+
+      // Show warnings if any
+      if (warnings.length > 0) {
+        console.warn('⚠️ Import Warnings:', warnings);
+        const proceed = window.confirm(
+          `Found ${warnings.length} warnings:\n\n` +
+          warnings.slice(0, 10).join('\n') +
+          (warnings.length > 10 ? `\n... and ${warnings.length - 10} more` : '') +
+          '\n\nDo you want to proceed with import?'
+        );
+        if (!proceed) {
+          setUploading(false);
+          if (event.target) event.target.value = '';
+          return;
+        }
+      }
 
       const { error } = await supabase.from('driver_allocations').insert(allocRows);
       if (error) throw error;
@@ -580,12 +681,17 @@ export default function DriverAllocation() {
       const { error: tripError } = await supabase.from('daily_trips').insert(tripRows);
       if (tripError) console.warn('Failed to create daily trips:', tripError);
 
-      toast.success(`Imported ${allocRows.length} allocations with proper trip IDs`);
+      toast.success(
+        `✅ Successfully imported ${allocRows.length} allocations!\n` +
+        (missingDriverCount > 0 ? `⚠️ ${missingDriverCount} drivers not found\n` : '') +
+        (missingConductorCount > 0 ? `⚠️ ${missingConductorCount} conductors not found\n` : '') +
+        (missingBusCount > 0 ? `⚠️ ${missingBusCount} buses not found` : '')
+      );
       setExcelOpen(false);
       fetchAllocations();
     } catch (error: any) {
-      console.error('Excel upload error:', error);
-      toast.error('Failed to process Excel file: ' + (error.message || 'Unknown error'));
+      console.error('❌ Excel upload error:', error);
+      toast.error('Failed to process file: ' + (error.message || 'Unknown error'));
     } finally {
       setUploading(false);
       if (event.target) event.target.value = '';
