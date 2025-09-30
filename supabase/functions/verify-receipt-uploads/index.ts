@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface ReceiptVerificationData {
   receipt_id: string;
-  verification_status: 'approved' | 'rejected';
+  verification_status: 'verified' | 'rejected';
   payment_amount?: number;
   payment_date?: string;
   notes?: string;
@@ -64,12 +64,12 @@ serve(async (req) => {
     }
 
     // Start a transaction-like process
-    if (verification_status === 'approved') {
+    if (verification_status === 'verified') {
       // Update receipt status
       const { error: receiptUpdateError } = await supabaseClient
         .from('school_receipts')
         .update({
-          verification_status: 'approved',
+          verification_status: 'verified',
           verified_by,
           verified_at: new Date().toISOString(),
           rejection_reason: null
@@ -160,7 +160,7 @@ serve(async (req) => {
         message: `Receipt ${verification_status} successfully`,
         receipt_id,
         verification_status,
-        student_updated: verification_status === 'approved'
+        student_updated: verification_status === 'verified'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

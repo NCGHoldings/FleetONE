@@ -83,7 +83,7 @@ export default function SchoolReceiptManagement() {
     }
   };
 
-  const handleVerifyReceipt = async (receiptId: string, status: "approved" | "rejected") => {
+  const handleVerifyReceipt = async (receiptId: string, status: "verified" | "rejected") => {
     setVerifyingReceipt(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -104,7 +104,7 @@ export default function SchoolReceiptManagement() {
 
       toast({
         title: "Success",
-        description: `Receipt ${status} successfully${status === 'approved' ? ' and student payment updated' : ''}`,
+        description: `Receipt ${status} successfully${status === 'verified' ? ' and student payment updated' : ''}`,
       });
 
       fetchReceipts();
@@ -249,7 +249,7 @@ export default function SchoolReceiptManagement() {
   const stats = {
     total: receipts.length,
     pending: receipts.filter(r => r.verification_status === "pending").length,
-    approved: receipts.filter(r => r.verification_status === "approved").length,
+    verified: receipts.filter(r => r.verification_status === "verified").length,
     rejected: receipts.filter(r => r.verification_status === "rejected").length,
   };
 
@@ -302,8 +302,8 @@ export default function SchoolReceiptManagement() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-            <div className="text-sm text-muted-foreground">Approved</div>
+            <div className="text-2xl font-bold text-green-600">{stats.verified}</div>
+            <div className="text-sm text-muted-foreground">Verified</div>
           </CardContent>
         </Card>
         <Card>
@@ -378,7 +378,7 @@ export default function SchoolReceiptManagement() {
                 <div>
                   <Label className="text-sm font-medium">Status</Label>
                   <div className="mt-2">
-                    <Badge variant={selectedReceipt.verification_status === "approved" ? "default" : 
+                    <Badge variant={selectedReceipt.verification_status === "verified" ? "default" : 
                                    selectedReceipt.verification_status === "rejected" ? "destructive" : "secondary"}>
                       {selectedReceipt.verification_status}
                     </Badge>
@@ -431,7 +431,7 @@ export default function SchoolReceiptManagement() {
               {selectedReceipt.verification_status === "pending" && (
                 <div className="flex gap-2 pt-4">
                   <Button 
-                    onClick={() => handleVerifyReceipt(selectedReceipt.id, "approved")}
+                    onClick={() => handleVerifyReceipt(selectedReceipt.id, "verified")}
                     disabled={verifyingReceipt || !verificationAmount}
                     className="flex-1"
                   >
