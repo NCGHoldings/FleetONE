@@ -5,10 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, Eye, Check, X, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Eye, Check, X, Download, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { ReceiptUploadQRGenerator } from "@/components/school/ReceiptUploadQRGenerator";
 
 interface Receipt {
   id: string;
@@ -23,6 +27,8 @@ interface Receipt {
   verified_by?: string;
   verified_at?: string;
   created_at: string;
+  payment_amount?: number;
+  payment_date?: string;
   student_name?: string;
   student_admission_no?: string;
 }
@@ -34,6 +40,9 @@ export default function SchoolReceiptManagement() {
   const [loading, setLoading] = useState(true);
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [verifyingReceipt, setVerifyingReceipt] = useState(false);
+  const [verificationNotes, setVerificationNotes] = useState("");
+  const [verificationAmount, setVerificationAmount] = useState("");
 
   useEffect(() => {
     fetchReceipts();
@@ -74,27 +83,35 @@ export default function SchoolReceiptManagement() {
     }
   };
 
-  const handleVerifyReceipt = async (receiptId: string, status: "approved" | "rejected", reason?: string) => {
+  const handleVerifyReceipt = async (receiptId: string, status: "approved" | "rejected") => {
+    setVerifyingReceipt(true);
     try {
-      const { error } = await supabase
-        .from("school_receipts")
-        .update({
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Call edge function for verification with payment processing
+      const { data, error } = await supabase.functions.invoke('verify-receipt-uploads', {
+        body: {
+          receipt_id: receiptId,
           verification_status: status,
-          rejection_reason: reason || null,
-          verified_at: new Date().toISOString(),
-        })
-        .eq("id", receiptId);
+          payment_amount: verificationAmount ? parseFloat(verificationAmount) : null,
+          payment_date: selectedReceipt?.payment_date || new Date().toISOString().split('T')[0],
+          notes: verificationNotes || (status === 'rejected' ? 'Receipt verification failed' : 'Payment verified through receipt upload'),
+          verified_by: user?.id
+        }
+      });
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: `Receipt ${status} successfully`,
+        description: `Receipt ${status} successfully${status === 'approved' ? ' and student payment updated' : ''}`,
       });
 
       fetchReceipts();
       setViewModalOpen(false);
       setSelectedReceipt(null);
+      setVerificationNotes("");
+      setVerificationAmount("");
     } catch (error) {
       console.error("Error verifying receipt:", error);
       toast({
@@ -102,11 +119,15 @@ export default function SchoolReceiptManagement() {
         description: "Failed to verify receipt",
         variant: "destructive",
       });
+    } finally {
+      setVerifyingReceipt(false);
     }
   };
 
   const handleViewReceipt = (receipt: Receipt) => {
     setSelectedReceipt(receipt);
+    setVerificationAmount(receipt.payment_amount?.toString() || "");
+    setVerificationNotes("");
     setViewModalOpen(true);
   };
 
@@ -148,6 +169,18 @@ export default function SchoolReceiptManagement() {
           )}
         </div>
       ),
+    },
+    {
+      accessorKey: "payment_amount",
+      header: "Amount",
+      cell: ({ row }: any) => {
+        const amount = row.getValue("payment_amount") as number;
+        return amount ? (
+          <div className="font-medium">LKR {amount.toLocaleString()}</div>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      },
     },
     {
       accessorKey: "file_name",
@@ -199,22 +232,14 @@ export default function SchoolReceiptManagement() {
             <Download className="h-4 w-4" />
           </Button>
           {row.original.verification_status === "pending" && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleVerifyReceipt(row.original.id, "approved")}
-              >
-                <Check className="h-4 w-4 text-green-600" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleVerifyReceipt(row.original.id, "rejected", "Invalid receipt")}
-              >
-                <X className="h-4 w-4 text-red-600" />
-              </Button>
-            </>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleViewReceipt(row.original)}
+              title="Review & Verify"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
           )}
         </div>
       ),
@@ -258,6 +283,9 @@ export default function SchoolReceiptManagement() {
         </div>
       </div>
 
+      {/* QR Code Generator */}
+      <ReceiptUploadQRGenerator />
+
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -300,51 +328,131 @@ export default function SchoolReceiptManagement() {
         </CardContent>
       </Card>
 
-      {/* View Receipt Modal */}
+      {/* View & Verify Receipt Modal */}
       <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Receipt Details</DialogTitle>
+            <DialogTitle>Verify Receipt</DialogTitle>
           </DialogHeader>
           {selectedReceipt && (
             <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="text-sm font-medium">Student</label>
-                  <p>{selectedReceipt.student_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">File Name</label>
-                  <p>{selectedReceipt.file_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Status</label>
-                  <Badge variant={selectedReceipt.verification_status === "approved" ? "default" : 
-                                 selectedReceipt.verification_status === "rejected" ? "destructive" : "secondary"}>
-                    {selectedReceipt.verification_status}
-                  </Badge>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Uploaded</label>
-                  <p>{format(new Date(selectedReceipt.created_at), "MMM dd, yyyy HH:mm")}</p>
+              {/* Student Information */}
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-2">Student Information</h3>
+                <div className="grid gap-2 md:grid-cols-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Name:</span>
+                    <p className="font-medium">{selectedReceipt.student_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Admission No:</span>
+                    <p className="font-medium">{selectedReceipt.student_admission_no}</p>
+                  </div>
                 </div>
               </div>
+
+              {/* Receipt Details */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label className="text-sm font-medium">Payment Amount</Label>
+                  <Input
+                    type="number"
+                    value={verificationAmount}
+                    onChange={(e) => setVerificationAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    disabled={selectedReceipt.verification_status !== "pending"}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Payment Date</Label>
+                  <p className="text-sm mt-2">
+                    {selectedReceipt.payment_date 
+                      ? format(new Date(selectedReceipt.payment_date), "MMM dd, yyyy")
+                      : "Not specified"}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">File Name</Label>
+                  <p className="text-sm mt-2">{selectedReceipt.file_name}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Status</Label>
+                  <div className="mt-2">
+                    <Badge variant={selectedReceipt.verification_status === "approved" ? "default" : 
+                                   selectedReceipt.verification_status === "rejected" ? "destructive" : "secondary"}>
+                      {selectedReceipt.verification_status}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Uploaded</Label>
+                  <p className="text-sm mt-2">{format(new Date(selectedReceipt.created_at), "MMM dd, yyyy HH:mm")}</p>
+                </div>
+              </div>
+
+              {/* Receipt Preview */}
+              <div>
+                <Label className="text-sm font-medium">Receipt Preview</Label>
+                <div className="mt-2 border rounded-lg p-4 bg-muted/20">
+                  <Button
+                    variant="outline"
+                    onClick={() => downloadReceipt(selectedReceipt)}
+                    className="w-full"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Receipt to View
+                  </Button>
+                </div>
+              </div>
+
+              {/* Verification Notes */}
+              {selectedReceipt.verification_status === "pending" && (
+                <div>
+                  <Label htmlFor="notes">Verification Notes (Optional)</Label>
+                  <Textarea
+                    id="notes"
+                    value={verificationNotes}
+                    onChange={(e) => setVerificationNotes(e.target.value)}
+                    placeholder="Add any notes about this verification..."
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {/* Rejection Reason */}
+              {selectedReceipt.verification_status === "rejected" && selectedReceipt.rejection_reason && (
+                <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                  <Label className="text-sm font-medium text-red-800">Rejection Reason</Label>
+                  <p className="text-sm text-red-700 mt-1">{selectedReceipt.rejection_reason}</p>
+                </div>
+              )}
               
+              {/* Action Buttons */}
               {selectedReceipt.verification_status === "pending" && (
                 <div className="flex gap-2 pt-4">
                   <Button 
                     onClick={() => handleVerifyReceipt(selectedReceipt.id, "approved")}
+                    disabled={verifyingReceipt || !verificationAmount}
                     className="flex-1"
                   >
-                    <Check className="h-4 w-4 mr-2" />
-                    Approve
+                    {verifyingReceipt ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4 mr-2" />
+                    )}
+                    Approve & Update Payment
                   </Button>
                   <Button 
                     variant="destructive"
-                    onClick={() => handleVerifyReceipt(selectedReceipt.id, "rejected", "Invalid receipt")}
+                    onClick={() => handleVerifyReceipt(selectedReceipt.id, "rejected")}
+                    disabled={verifyingReceipt}
                     className="flex-1"
                   >
-                    <X className="h-4 w-4 mr-2" />
+                    {verifyingReceipt ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <X className="h-4 w-4 mr-2" />
+                    )}
                     Reject
                   </Button>
                 </div>

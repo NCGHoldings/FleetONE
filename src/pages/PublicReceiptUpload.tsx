@@ -124,18 +124,13 @@ export default function PublicReceiptUpload() {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('school-receipts')
-        .getPublicUrl(fileName);
-
       // Create receipt record
       const { data: receiptData, error: insertError } = await supabase
         .from('school_receipts')
         .insert({
           student_id: studentData.id,
           branch_id: studentData.branch_id,
-          receipt_url: publicUrl,
+          receipt_url: fileName, // Store path, not public URL (bucket is private)
           file_name: selectedFile.name,
           file_type: selectedFile.type,
           file_size: selectedFile.size,

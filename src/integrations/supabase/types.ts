@@ -2200,6 +2200,8 @@ export type Database = {
           file_size: number | null
           file_type: string | null
           id: string
+          payment_amount: number | null
+          payment_date: string | null
           payment_id: string | null
           receipt_url: string
           rejection_reason: string | null
@@ -2218,6 +2220,8 @@ export type Database = {
           file_size?: number | null
           file_type?: string | null
           id?: string
+          payment_amount?: number | null
+          payment_date?: string | null
           payment_id?: string | null
           receipt_url: string
           rejection_reason?: string | null
@@ -2236,6 +2240,8 @@ export type Database = {
           file_size?: number | null
           file_type?: string | null
           id?: string
+          payment_amount?: number | null
+          payment_date?: string | null
           payment_id?: string | null
           receipt_url?: string
           rejection_reason?: string | null
