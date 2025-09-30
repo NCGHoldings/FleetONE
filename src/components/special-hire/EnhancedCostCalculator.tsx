@@ -90,6 +90,13 @@ export function EnhancedCostCalculator() {
     fetchFuelSettings();
   }, []);
 
+  // Recalculate costs when inputs change
+  useEffect(() => {
+    if (selectedQuotation && fuelSettings && busTypes.length > 0) {
+      calculateCosts(selectedQuotation);
+    }
+  }, [actualDistance, tripDays, commissionAmount, commissionPercentage, expenses, selectedQuotation, fuelSettings, busTypes]);
+
   const fetchQuotations = async () => {
     const { data } = await supabase
       .from('special_hire_quotations')
