@@ -124,7 +124,7 @@ export default function PublicReceiptUpload() {
 
       if (uploadError) throw uploadError;
 
-      // Create receipt record
+      // Create receipt record (no uploaded_by for anonymous users)
       const { data: receiptData, error: insertError } = await supabase
         .from('school_receipts')
         .insert({
@@ -138,6 +138,7 @@ export default function PublicReceiptUpload() {
           verification_status: 'pending',
           payment_amount: parseFloat(paymentAmount),
           payment_date: new Date().toISOString().split('T')[0]
+          // Note: uploaded_by is left null for anonymous submissions
         })
         .select()
         .single();
