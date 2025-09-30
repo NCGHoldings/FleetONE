@@ -118,13 +118,20 @@ export default function PublicReceiptUpload() {
       // Upload file to storage
       const fileName = `${studentData.branch_id}/${studentData.id}/${Date.now()}-${selectedFile.name}`;
       
-      const { error: uploadError } = await supabase.storage
+      console.log('Uploading file to:', fileName);
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('school-receipts')
         .upload(fileName, selectedFile);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      console.log('Upload successful:', uploadData);
 
       // Create receipt record (no uploaded_by for anonymous users)
+      console.log('Creating receipt record...');
       const { data: receiptData, error: insertError } = await supabase
         .from('school_receipts')
         .insert({
@@ -143,8 +150,12 @@ export default function PublicReceiptUpload() {
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        throw insertError;
+      }
 
+      console.log('Receipt record created:', receiptData);
       setSubmissionId(receiptData.id);
       setStep('success');
 
@@ -153,11 +164,11 @@ export default function PublicReceiptUpload() {
         description: "Your payment receipt has been submitted for verification",
       });
 
-    } catch (error) {
-      console.error('Upload error:', error);
+    } catch (error: any) {
+      console.error('Upload error details:', error);
       toast({
         title: "Upload Failed",
-        description: "Failed to upload receipt. Please try again.",
+        description: error.message || "Failed to upload receipt. Please try again.",
         variant: "destructive",
       });
     } finally {
