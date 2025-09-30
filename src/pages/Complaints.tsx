@@ -39,6 +39,8 @@ export default function Complaints() {
   const [loading, setLoading] = useState(true);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -187,6 +189,101 @@ export default function Complaints() {
     }
   };
 
+  const handleEdit = (complaint: Complaint) => {
+    setEditingComplaint(complaint);
+    setFormData({
+      title: complaint.title,
+      description: complaint.description,
+      category: complaint.category,
+      priority: complaint.priority,
+      type: complaint.type,
+      staff_group: complaint.staff_group || ''
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.title || !formData.description || !formData.category || !editingComplaint) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('feedback_complaints')
+        .update({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          priority: formData.priority,
+          type: formData.type,
+          staff_group: formData.staff_group || null,
+        })
+        .eq('id', editingComplaint.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Complaint updated successfully",
+      });
+
+      setFormData({
+        title: '',
+        description: '',
+        category: '',
+        priority: 'medium',
+        type: 'complaint',
+        staff_group: ''
+      });
+      setShowEditDialog(false);
+      setEditingComplaint(null);
+      fetchComplaints();
+    } catch (error) {
+      console.error('Error updating complaint:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update complaint",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async (complaintId: string) => {
+    if (!confirm('Are you sure you want to delete this complaint?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('feedback_complaints')
+        .delete()
+        .eq('id', complaintId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Complaint deleted successfully",
+      });
+
+      fetchComplaints();
+    } catch (error) {
+      console.error('Error deleting complaint:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete complaint",
+        variant: "destructive",
+      });
+    }
+  };
+
   const columns: ColumnDef<Complaint>[] = [
     {
       accessorKey: "feedback_id",
@@ -278,7 +375,20 @@ export default function Complaints() {
             onClick={() => setSelectedComplaint(row.original)}
           >
             <FileText className="h-4 w-4" />
-            View
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleEdit(row.original)}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => handleDelete(row.original.id)}
+          >
+            Delete
           </Button>
           <DocumentUpload
             linkedTable="feedback_complaints"
@@ -473,6 +583,96 @@ export default function Complaints() {
               </Button>
               <Button type="submit">
                 Create Complaint
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Complaint Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Complaint</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div>
+              <Label htmlFor="edit-title">Title *</Label>
+              <Input
+                id="edit-title"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Brief description of the complaint"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-category">Category *</Label>
+              <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="service">Service Quality</SelectItem>
+                  <SelectItem value="driver">Driver Behavior</SelectItem>
+                  <SelectItem value="vehicle">Vehicle Condition</SelectItem>
+                  <SelectItem value="scheduling">Scheduling</SelectItem>
+                  <SelectItem value="safety">Safety Concerns</SelectItem>
+                  <SelectItem value="billing">Billing Issues</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-priority">Priority</Label>
+              <Select value={formData.priority} onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-staff-group">Related Staff Group</Label>
+              <Select value={formData.staff_group} onValueChange={(value) => setFormData(prev => ({ ...prev, staff_group: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select staff group (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="drivers">Drivers</SelectItem>
+                  <SelectItem value="conductors">Conductors</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="customer_service">Customer Service</SelectItem>
+                  <SelectItem value="administration">Administration</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-description">Description *</Label>
+              <Textarea
+                id="edit-description"
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Detailed description of the complaint"
+                rows={4}
+                required
+              />
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Update Complaint
               </Button>
             </div>
           </form>
