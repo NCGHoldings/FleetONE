@@ -35,6 +35,7 @@ import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
 import PublicComplaint from "./pages/PublicComplaint";
 import PublicSpecialHire from "./pages/PublicSpecialHire";
+import PublicReceiptUpload from "./pages/PublicReceiptUpload";
 import SchoolImportPage from "./pages/SchoolImportPage";
 import CustomerManagement from "./pages/CustomerManagement";
 import AddStudentForm from "./pages/AddStudentForm";
@@ -59,6 +60,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/public/complaint" element={<PublicComplaint />} />
             <Route path="/public/special-hire" element={<PublicSpecialHire />} />
+            <Route path="/public/receipt-upload" element={<PublicReceiptUpload />} />
             
             {/* Protected routes wrapped in AppLayout */}
             <Route 
