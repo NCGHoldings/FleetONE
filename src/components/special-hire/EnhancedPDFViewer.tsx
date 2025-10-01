@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface EnhancedPDFViewerProps {
   pdfUrl: string;
@@ -38,6 +40,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   const [isCanvasReady, setIsCanvasReady] = useState(false);
   const [drawingColor, setDrawingColor] = useState('#000000');
   const [brushWidth, setBrushWidth] = useState(2);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (!canvasRef.current || !pdfContainerRef.current) return;
@@ -200,6 +203,92 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     fabricCanvas.clear();
     fabricCanvas.renderAll();
     toast.success('All annotations cleared');
+  };
+
+  // Download PDF with annotations
+  const handleDownloadWithAnnotations = async () => {
+    if (!fabricCanvas || !pdfContainerRef.current) return;
+    
+    setIsGenerating(true);
+    const loadingToast = toast.loading('Generating PDF with annotations...');
+    
+    try {
+      // Get the PDF container and canvas
+      const pdfContainer = pdfContainerRef.current;
+      const canvasElement = canvasRef.current;
+      
+      if (!canvasElement) {
+        throw new Error('Canvas element not found');
+      }
+
+      // Create a temporary container to capture both PDF and canvas
+      const captureContainer = document.createElement('div');
+      captureContainer.style.position = 'fixed';
+      captureContainer.style.left = '-9999px';
+      captureContainer.style.width = `${pdfContainer.offsetWidth}px`;
+      captureContainer.style.height = `${pdfContainer.offsetHeight}px`;
+      captureContainer.style.background = 'white';
+      document.body.appendChild(captureContainer);
+
+      // Clone the iframe content (PDF background)
+      const iframe = pdfContainer.querySelector('iframe');
+      const iframeClone = iframe?.cloneNode(true) as HTMLIFrameElement;
+      if (iframeClone) {
+        captureContainer.appendChild(iframeClone);
+      }
+
+      // Export canvas as image and overlay it
+      const canvasDataUrl = fabricCanvas.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: 2 // Higher resolution
+      });
+      
+      const canvasImage = document.createElement('img');
+      canvasImage.src = canvasDataUrl;
+      canvasImage.style.position = 'absolute';
+      canvasImage.style.top = '0';
+      canvasImage.style.left = '0';
+      canvasImage.style.width = `${canvasElement.offsetWidth}px`;
+      canvasImage.style.height = `${canvasElement.offsetHeight}px`;
+      captureContainer.appendChild(canvasImage);
+
+      // Wait for image to load
+      await new Promise(resolve => {
+        canvasImage.onload = resolve;
+      });
+
+      // Capture the combined content
+      const canvas = await html2canvas(captureContainer, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      // Clean up temporary container
+      document.body.removeChild(captureContainer);
+
+      // Create PDF with the captured content
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      
+      // Download the PDF
+      pdf.save('annotated-document.pdf');
+      
+      toast.success('PDF with annotations downloaded successfully', { id: loadingToast });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF with annotations', { id: loadingToast });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -372,17 +461,16 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             Save
           </Button>
           
-          {onDownload && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onDownload}
-              title="Download PDF"
-            >
-              <Download className="w-4 h-4 mr-1" />
-              Download
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadWithAnnotations}
+            disabled={isGenerating}
+            title="Download PDF with annotations"
+          >
+            <Download className="w-4 h-4 mr-1" />
+            {isGenerating ? 'Generating...' : 'Download'}
+          </Button>
         </div>
       </div>
 
