@@ -205,110 +205,89 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     toast.success('All annotations cleared');
   };
 
-  // Download PDF with annotations
+  // Download PDF with annotations - improved method
   const handleDownloadWithAnnotations = async () => {
-    if (!fabricCanvas || !pdfContainerRef.current) return;
+    if (!fabricCanvas) {
+      toast.error('Canvas not ready');
+      return;
+    }
     
     setIsGenerating(true);
     const loadingToast = toast.loading('Generating PDF with annotations...');
     
     try {
-      // Get the PDF iframe
-      const iframe = pdfContainerRef.current.querySelector('iframe') as HTMLIFrameElement;
-      if (!iframe) throw new Error('PDF iframe not found');
+      // Get the canvas dimensions
+      const canvasWidth = fabricCanvas.width || 800;
+      const canvasHeight = fabricCanvas.height || 600;
       
-      // Wait for PDF to be fully loaded
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Get the actual dimensions of the PDF viewer
-      const viewerWidth = iframe.offsetWidth;
-      const viewerHeight = iframe.offsetHeight;
-      
-      // Create a canvas to capture the combined PDF + annotations
-      const tempCanvas = document.createElement('canvas');
-      const scale = 2; // Higher scale for better quality
-      tempCanvas.width = viewerWidth * scale;
-      tempCanvas.height = viewerHeight * scale;
-      const ctx = tempCanvas.getContext('2d');
+      // Create a high-quality canvas for export
+      const exportCanvas = document.createElement('canvas');
+      const scale = 2; // High DPI
+      exportCanvas.width = canvasWidth * scale;
+      exportCanvas.height = canvasHeight * scale;
+      const ctx = exportCanvas.getContext('2d');
       
       if (!ctx) throw new Error('Could not get canvas context');
       
-      // Set white background
+      // White background
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+      ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
       
-      // Try to capture the PDF iframe content
-      try {
-        // Capture the entire PDF container including iframe
-        const pdfCapture = await html2canvas(pdfContainerRef.current, {
-          scale: scale,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          foreignObjectRendering: true,
-          imageTimeout: 0,
-          removeContainer: false,
-        });
-        
-        // Draw the PDF capture onto our temp canvas
-        ctx.drawImage(pdfCapture, 0, 0, tempCanvas.width, tempCanvas.height);
-      } catch (captureError) {
-        console.warn('Could not capture PDF directly, using placeholder:', captureError);
-        // If iframe capture fails, add a white background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-        
-        // Add text to indicate PDF content
-        ctx.fillStyle = '#cccccc';
-        ctx.font = '24px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('PDF Content', tempCanvas.width / 2, tempCanvas.height / 2);
+      // Try to capture the PDF iframe
+      const pdfContainer = pdfContainerRef.current;
+      if (pdfContainer) {
+        try {
+          const captured = await html2canvas(pdfContainer, {
+            scale: scale,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+          });
+          ctx.drawImage(captured, 0, 0, exportCanvas.width, exportCanvas.height);
+        } catch (err) {
+          console.warn('PDF capture failed, using white background:', err);
+        }
       }
       
-      // Now overlay the Fabric canvas annotations
-      const annotationsDataUrl = fabricCanvas.toDataURL({
+      // Export fabric canvas with high quality
+      const annotationsURL = fabricCanvas.toDataURL({
         format: 'png',
         quality: 1,
         multiplier: scale,
       });
       
-      // Load and draw the annotations
-      const annotationsImg = new Image();
-      annotationsImg.src = annotationsDataUrl;
-      await new Promise((resolve, reject) => {
-        annotationsImg.onload = resolve;
-        annotationsImg.onerror = reject;
+      // Draw annotations on top
+      const annotImg = new Image();
+      await new Promise<void>((resolve, reject) => {
+        annotImg.onload = () => resolve();
+        annotImg.onerror = reject;
+        annotImg.src = annotationsURL;
       });
       
-      // Draw annotations on top of the PDF
-      ctx.drawImage(annotationsImg, 0, 0, tempCanvas.width, tempCanvas.height);
+      ctx.drawImage(annotImg, 0, 0, exportCanvas.width, exportCanvas.height);
       
-      // Convert the combined canvas to a PDF
-      const finalImageData = tempCanvas.toDataURL('image/png', 1.0);
-      
-      // Calculate PDF dimensions (A4 proportions but fit to content)
-      const pdfWidth = 210; // A4 width in mm
-      const pdfHeight = (tempCanvas.height / tempCanvas.width) * pdfWidth;
+      // Convert to PDF
+      const finalImage = exportCanvas.toDataURL('image/png', 1.0);
+      const pdfWidth = 210;
+      const pdfHeight = (exportCanvas.height / exportCanvas.width) * pdfWidth;
       
       const pdf = new jsPDF({
-        orientation: tempCanvas.width > tempCanvas.height ? 'landscape' : 'portrait',
+        orientation: exportCanvas.width > exportCanvas.height ? 'landscape' : 'portrait',
         unit: 'mm',
         format: [pdfWidth, pdfHeight]
       });
       
-      // Add the combined image to the PDF
-      pdf.addImage(finalImageData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      pdf.addImage(finalImage, 'PNG', 0, 0, pdfWidth, pdfHeight);
       
-      // Save the PDF
-      const timestamp = new Date().toISOString().slice(0, 10);
-      pdf.save(`annotated-document-${timestamp}.pdf`);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      pdf.save(`annotated-pdf-${timestamp}.pdf`);
       
-      toast.success('PDF with annotations downloaded successfully!', { id: loadingToast });
+      toast.success('PDF downloaded with annotations!', { id: loadingToast });
       onDownload?.();
     } catch (error) {
-      console.error('Error generating PDF with annotations:', error);
-      toast.error('Failed to generate PDF. Please try again.', { id: loadingToast });
+      console.error('Download error:', error);
+      toast.error('Failed to download. Please try again.', { id: loadingToast });
     } finally {
       setIsGenerating(false);
     }
@@ -316,71 +295,161 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 p-3 border-b bg-background shadow-sm flex-wrap">
-        {/* Document tools */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant={activeTool === 'select' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveTool('select')}
-            title="Select and move objects"
-          >
-            <MousePointer className="w-4 h-4" />
-          </Button>
-          
-          <Separator orientation="vertical" className="h-6 mx-1" />
-          
-          {/* Drawing tool */}
-          <Button
-            variant={activeTool === 'draw' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveTool('draw')}
-            title="Free drawing"
-          >
-            <Pencil className="w-4 h-4" />
-          </Button>
-          
+      {/* Main Toolbar - Blue Box */}
+      <div className="flex items-center gap-2 p-2 bg-primary/10 border-b">
+        {/* Core Tools */}
+        <Button
+          variant={activeTool === 'select' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveTool('select')}
+          title="Select"
+          className="h-9 w-9 p-0"
+        >
+          <MousePointer className="w-4 h-4" />
+        </Button>
+        
+        <Button
+          variant={activeTool === 'draw' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveTool('draw')}
+          title="Draw"
+          className="h-9 w-9 p-0"
+        >
+          <Pencil className="w-4 h-4" />
+        </Button>
+        
+        <Button
+          variant={activeTool === 'text' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setActiveTool('text')}
+          title="Text"
+          className="h-9 w-9 p-0"
+        >
+          <Type className="w-4 h-4" />
+        </Button>
+        
+        <Button
+          variant={activeTool === 'image' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={handleAddImage}
+          title="Image"
+          className="h-9 w-9 p-0"
+        >
+          <ImageIcon className="w-4 h-4" />
+        </Button>
+        
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          className="hidden"
+        />
+        
+        <Separator orientation="vertical" className="h-6 mx-2" />
+        
+        {/* Zoom Controls */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleZoom(zoom - 25)}
+          disabled={zoom <= 25}
+          className="h-9 w-9 p-0"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </Button>
+        
+        <span className="text-sm font-medium min-w-[60px] text-center">
+          {zoom}%
+        </span>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleZoom(zoom + 25)}
+          disabled={zoom >= 200}
+          className="h-9 w-9 p-0"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </Button>
+        
+        <Separator orientation="vertical" className="h-6 mx-2" />
+        
+        {/* Actions */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDelete}
+          title="Delete"
+          className="h-9 w-9 p-0"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleClear}
+          title="Clear All"
+        >
+          Clear All
+        </Button>
+        
+        <div className="flex-1" />
+        
+        <Button
+          variant="default"
+          size="sm"
+          onClick={handleSave}
+          title="Save"
+          className="h-9 w-9 p-0"
+        >
+          <Save className="w-4 h-4" />
+        </Button>
+        
+        <Button
+          variant="default"
+          size="sm"
+          onClick={handleDownloadWithAnnotations}
+          disabled={isGenerating}
+          title="Download"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download
+        </Button>
+      </div>
+      
+      {/* Tool Options Bar */}
+      {(activeTool === 'draw' || activeTool === 'text') && (
+        <div className="flex items-center gap-2 p-2 bg-muted/50 border-b">
           {activeTool === 'draw' && (
             <>
+              <span className="text-sm">Color:</span>
               <input
                 type="color"
                 value={drawingColor}
                 onChange={(e) => setDrawingColor(e.target.value)}
                 className="w-8 h-8 rounded border cursor-pointer"
-                title="Drawing color"
               />
+              <span className="text-sm ml-2">Width:</span>
               <Input
                 type="number"
                 min="1"
                 max="20"
                 value={brushWidth}
                 onChange={(e) => setBrushWidth(Number(e.target.value))}
-                className="w-16 h-8"
-                title="Brush width"
+                className="w-20 h-8"
               />
             </>
           )}
           
-          <Separator orientation="vertical" className="h-6 mx-1" />
-          
-          {/* Text tool */}
-          <Button
-            variant={activeTool === 'text' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveTool('text')}
-            title="Add text"
-          >
-            <Type className="w-4 h-4" />
-          </Button>
-          
           {activeTool === 'text' && (
             <>
               <Input
-                placeholder="Enter text..."
+                placeholder="Type text here..."
                 value={textToAdd}
                 onChange={(e) => setTextToAdd(e.target.value)}
-                className="w-40 h-8"
+                className="flex-1 h-8"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && textToAdd.trim()) {
@@ -392,108 +461,13 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
                 size="sm" 
                 onClick={handleAddText}
                 disabled={!textToAdd.trim()}
-                title="Add text to PDF"
-                variant="default"
               >
-                Add
+                Add Text
               </Button>
             </>
           )}
-          
-          <Separator orientation="vertical" className="h-6 mx-1" />
-          
-          {/* Image tool */}
-          <Button
-            variant={activeTool === 'image' ? 'default' : 'outline'}
-            size="sm"
-            onClick={handleAddImage}
-            title="Add image"
-          >
-            <ImageIcon className="w-4 h-4" />
-          </Button>
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
         </div>
-
-        <Separator orientation="vertical" className="h-6 mx-1" />
-
-        {/* Zoom controls */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleZoom(zoom - 25)}
-            disabled={zoom <= 25}
-            title="Zoom out"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </Button>
-          
-          <span className="text-sm font-medium min-w-[60px] text-center">
-            {zoom}%
-          </span>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleZoom(zoom + 25)}
-            disabled={zoom >= 200}
-            title="Zoom in"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </Button>
-        </div>
-
-        <Separator orientation="vertical" className="h-6 mx-1" />
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-1 ml-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDelete}
-            title="Delete selected object"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClear}
-            title="Clear all annotations"
-          >
-            Clear All
-          </Button>
-          
-          <Separator orientation="vertical" className="h-6 mx-1" />
-          
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleSave}
-            title="Save annotations"
-          >
-            <Save className="w-4 h-4" />
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownloadWithAnnotations}
-            disabled={isGenerating}
-            title="Download PDF with annotations"
-          >
-            <Download className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+      )}
 
       {/* PDF Viewer Container */}
       <div className="flex-1 relative overflow-hidden">
@@ -528,22 +502,6 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             background: 'transparent'
           }}
         />
-      </div>
-
-      {/* Status bar */}
-      <div className="flex items-center justify-between p-2 border-t bg-muted/50 text-xs text-muted-foreground">
-        <div>
-          Mode: {
-            activeTool === 'select' ? 'Selection' : 
-            activeTool === 'draw' ? 'Free Drawing' :
-            activeTool === 'text' ? 'Text Addition' : 
-            'Image Addition'
-          }
-        </div>
-        <div className="flex items-center gap-4">
-          <span>Canvas: {isCanvasReady ? 'Ready ✓' : 'Loading...'}</span>
-          <span>Zoom: {zoom}%</span>
-        </div>
       </div>
     </div>
   );
