@@ -5076,6 +5076,7 @@ export type Database = {
           payment_terms: string | null
           quantity: number
           quotation_no: string
+          responsible_person: string | null
           special_features: string | null
           status: string
           total_price: number
@@ -5101,6 +5102,7 @@ export type Database = {
           payment_terms?: string | null
           quantity?: number
           quotation_no?: string
+          responsible_person?: string | null
           special_features?: string | null
           status?: string
           total_price: number
@@ -5126,6 +5128,7 @@ export type Database = {
           payment_terms?: string | null
           quantity?: number
           quotation_no?: string
+          responsible_person?: string | null
           special_features?: string | null
           status?: string
           total_price?: number
