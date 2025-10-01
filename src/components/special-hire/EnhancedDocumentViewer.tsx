@@ -66,7 +66,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
   const handleApprovalsUpdate = async () => {
     // Reload approvals from database
-    const result = await getDocumentApprovals(document.quotation_id);
+    const result = await getDocumentApprovals(document.id);
     if (result.success) {
       // Type cast the approvals to match our interface
       const typedApprovals = result.approvals.map(approval => ({
@@ -106,7 +106,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
       const { data: signatures } = await supabase
         .from('document_approvals')
         .select('*')
-        .eq('document_id', document.quotation_id);
+        .eq('document_id', document.id);
 
       // Prepare approval signatures
       const approvalSignatures: any = {};
@@ -266,7 +266,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
                 <h3 className="text-lg font-semibold">Document Approvals</h3>
               </div>
               <DocumentSignatureManager
-                documentId={document.quotation_id}
+                documentId={document.id}
                 quotationId={document.quotation_id}
                 documentStatus={(document.document_status || 'draft') as 'draft' | 'approved'}
                 onSignatureUpdated={handleApprovalsUpdate}
