@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Eye, Download, X, FileText, Settings } from 'lucide-react';
@@ -33,8 +33,16 @@ export const DocumentViewer = ({
   onSignatureUpdated
 }: DocumentViewerProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const pdfViewerDownloadRef = useRef<(() => void) | null>(null);
 
   const handleDownload = async () => {
+    // Use the PDF viewer's download function (includes annotations)
+    if (pdfViewerDownloadRef.current) {
+      pdfViewerDownloadRef.current();
+      return;
+    }
+
+    // Fallback to original download
     if (onDownload) {
       setIsLoading(true);
       try {
@@ -224,7 +232,9 @@ export const DocumentViewer = ({
                   <div className="h-[70vh]">
                     <EnhancedPDFViewer
                       pdfUrl={blobUrl || pdfUrl}
-                      onDownload={handleDownload}
+                      onDownloadReady={(downloadFn) => {
+                        pdfViewerDownloadRef.current = downloadFn;
+                      }}
                       onSave={(canvasData) => {
                         console.log('Canvas annotations saved:', canvasData);
                         // Here you could save the canvas data to your database

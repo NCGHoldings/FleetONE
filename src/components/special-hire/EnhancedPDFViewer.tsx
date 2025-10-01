@@ -21,13 +21,13 @@ import html2canvas from 'html2canvas';
 interface EnhancedPDFViewerProps {
   pdfUrl: string;
   onSave?: (canvasData: string) => void;
-  onDownload?: () => void;
+  onDownloadReady?: (downloadFn: () => void) => void;
 }
 
 export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   pdfUrl,
   onSave,
-  onDownload
+  onDownloadReady
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -65,6 +65,11 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     setFabricCanvas(canvas);
     setIsCanvasReady(true);
     toast.success('PDF Editor ready! Use the toolbar to draw, add text and images.');
+
+    // Pass download function to parent
+    if (onDownloadReady) {
+      onDownloadReady(() => handleDownloadWithAnnotations());
+    }
 
     return () => {
       canvas.dispose();
@@ -284,7 +289,6 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       pdf.save(`annotated-pdf-${timestamp}.pdf`);
       
       toast.success('PDF downloaded with annotations!', { id: loadingToast });
-      onDownload?.();
     } catch (error) {
       console.error('Download error:', error);
       toast.error('Failed to download. Please try again.', { id: loadingToast });
