@@ -29,6 +29,8 @@ const formSchema = z.object({
   payment_terms: z.string().optional(),
   warranty_terms: z.string().optional(),
   valid_days: z.number().min(1).max(365).default(30),
+  responsible_person: z.string().min(1, 'Responsible person is required'),
+  responsible_person_other: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -82,6 +84,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       quantity: 1,
       discount_percentage: 0,
       valid_days: 30,
+      responsible_person: '',
     }
   });
 
@@ -185,6 +188,10 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       const totalPrice = calculateTotalPrice();
       const quotationNo = `YTQ-${Date.now()}`;
 
+      const responsiblePerson = data.responsible_person === 'Other' 
+        ? data.responsible_person_other 
+        : data.responsible_person;
+
       const quotationData = {
         quotation_no: quotationNo,
         customer_id: selectedCustomer?.id,
@@ -205,6 +212,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         valid_until: new Date(Date.now() + (data.valid_days * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
         status: 'draft',
         created_by: user.id,
+        responsible_person: responsiblePerson,
       };
 
       const { data: quotation, error } = await supabase
@@ -453,6 +461,49 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Additional Information</h3>
               
+              <FormField
+                control={form.control}
+                name="responsible_person"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Responsible Person *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select responsible person" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Sanath">Sanath</SelectItem>
+                        <SelectItem value="Nadun">Nadun</SelectItem>
+                        <SelectItem value="Hirantha">Hirantha</SelectItem>
+                        <SelectItem value="Indika">Indika</SelectItem>
+                        <SelectItem value="Imesh">Imesh</SelectItem>
+                        <SelectItem value="Bodhika">Bodhika</SelectItem>
+                        <SelectItem value="Other">Other - Type</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {form.watch('responsible_person') === 'Other' && (
+                <FormField
+                  control={form.control}
+                  name="responsible_person_other"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specify Name *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter person's name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
