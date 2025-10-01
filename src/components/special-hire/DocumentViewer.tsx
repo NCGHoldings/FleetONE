@@ -1,11 +1,16 @@
 import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Eye, Download, X, FileText, Settings } from 'lucide-react';
+import { Eye, Download, X, FileText, Settings, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DocumentSignatureManager } from './DocumentSignatureManager';
 import { EnhancedPDFViewer } from './EnhancedPDFViewer';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 interface DocumentViewerProps {
   isOpen: boolean;
@@ -33,7 +38,13 @@ export const DocumentViewer = ({
   onSignatureUpdated
 }: DocumentViewerProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState(document);
   const pdfViewerDownloadRef = useRef<(() => void) | null>(null);
+  const { user, hasRole } = useAuth();
+  
+  // Check if user can manage signatures
+  const canManageSignatures = user && (hasRole('admin') || hasRole('supervisor') || hasRole('finance'));
 
   const handleDownload = async () => {
     // Use the PDF viewer's download function (includes annotations)
@@ -160,6 +171,161 @@ export const DocumentViewer = ({
     return <Badge variant="default" className="bg-green-100 text-green-800">APPROVED</Badge>;
   };
 
+  const regenerateDocumentWithSignatures = async () => {
+    if (!document.quotation_id) {
+      toast.error('Missing quotation data');
+      return;
+    }
+
+    try {
+      setIsRegenerating(true);
+      toast.loading('Updating PDF with signatures...');
+
+      // Fetch quotation data
+      const { data: quotationData, error: quotError } = await supabase
+        .from('special_hire_quotations')
+        .select('*')
+        .eq('id', document.quotation_id)
+        .single();
+
+      if (quotError || !quotationData) {
+        throw new Error('Failed to load quotation data');
+      }
+
+      // Fetch payment data if exists
+      let paymentData = null;
+      if (document.payment_type) {
+        const { data, error: paymentError } = await supabase
+          .from('special_hire_payments')
+          .select('*')
+          .eq('quotation_id', document.quotation_id)
+          .eq('payment_type', document.payment_type)
+          .maybeSingle();
+
+        if (!paymentError && data) {
+          paymentData = data;
+        }
+      }
+
+      // Fetch signatures
+      const { data: signatures, error: sigError } = await supabase
+        .from('document_approvals')
+        .select('*')
+        .eq('document_id', document.id);
+
+      if (sigError) {
+        throw new Error('Failed to fetch signatures');
+      }
+
+      if (!signatures || signatures.length === 0) {
+        toast.warning('No signatures found. Please add signatures first.');
+        return;
+      }
+
+      // Prepare approval signatures
+      const approvalSignatures: any = {};
+      signatures.forEach(approval => {
+        let signatureData = approval.signature_data;
+        if (signatureData && !signatureData.startsWith('data:image/')) {
+          signatureData = `data:image/png;base64,${signatureData}`;
+        }
+        
+        approvalSignatures[approval.approval_type] = {
+          approver_name: approval.approver_name,
+          signature_data: signatureData,
+          approval_date: format(new Date(approval.approval_date), 'dd/MM/yyyy'),
+        };
+      });
+
+      // Calculate total amount
+      const totalAmount = quotationData.gross_revenue + 
+        (quotationData.fuel_cost_fuel_only || 0) + 
+        (quotationData.commission_pass_through_amount || 0) +
+        (quotationData.total_additional_charges || 0) - 
+        (quotationData.discount_amount_lkr || 0);
+
+      // Create invoice data
+      const invoiceData: InvoiceData = {
+        invoiceNo: `UPDATED-${document.payment_type.toUpperCase()}-${Date.now()}`,
+        invoiceType: document.payment_type as 'advance' | 'balance',
+        quotationNo: quotationData.quotation_no,
+        customerName: quotationData.customer_name,
+        customerPhone: quotationData.customer_phone || '',
+        customerEmail: quotationData.customer_email,
+        companyName: quotationData.company_name,
+        pickupLocation: quotationData.pickup_location,
+        dropLocation: quotationData.drop_location,
+        pickupDate: new Date(quotationData.pickup_datetime),
+        dropDate: new Date(quotationData.drop_datetime || quotationData.pickup_datetime),
+        busType: 'Standard Bus',
+        numberOfBuses: quotationData.number_of_buses,
+        numberOfPassengers: quotationData.number_of_passengers,
+        totalAmount,
+        advanceAmount: quotationData.advance_paid || 0,
+        paidAmount: paymentData?.amount || 0,
+        vehicleNo: quotationData.assigned_bus_no,
+        driverName: quotationData.assigned_driver_name,
+        conductorName: quotationData.assigned_conductor_name,
+        invoice_status: 'approved',
+        document_type: document.document_type,
+        preparedBy: approvalSignatures.prepared_by,
+        approvedBy: approvalSignatures.approved_by,
+        checkedBy: approvalSignatures.checked_by,
+      };
+
+      // Generate PDF
+      const pdfBlob = await generateInvoicePDF(invoiceData);
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Convert to base64
+      let base64String = '';
+      const chunkSize = 1024;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        base64String += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      const base64Data = btoa(base64String);
+
+      // Update document in database
+      const newFileName = `SIGNED-${document.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`;
+      const { error: updateError } = await supabase
+        .from('document_storage')
+        .update({
+          document_data: base64Data,
+          file_name: newFileName,
+          file_size: uint8Array.length,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', document.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Update local state
+      const updatedDoc = {
+        ...document,
+        document_data: base64Data,
+        file_name: newFileName,
+        file_size: uint8Array.length,
+      };
+      setCurrentDocument(updatedDoc);
+
+      toast.success('✓ PDF updated with signatures!');
+      
+      // Trigger callback
+      if (onSignatureUpdated) {
+        onSignatureUpdated();
+      }
+    } catch (error) {
+      console.error('Error regenerating document:', error);
+      toast.error('Failed to update PDF with signatures');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-hidden">
@@ -205,8 +371,20 @@ export const DocumentViewer = ({
                   );
                 }
 
-                const pdfUrl = getPdfDataUrl();
-                const blobUrl = getPdfBlob();
+                // Use currentDocument state for updated PDF
+                const displayDoc = currentDocument.document_data !== document.document_data ? currentDocument : document;
+                const pdfUrl = (() => {
+                  try {
+                    if (!displayDoc.document_data) return '';
+                    const arr = toUint8FromAny(displayDoc.document_data);
+                    if (!arr) return '';
+                    return createPdfBlobUrl(arr);
+                  } catch (error) {
+                    console.error('Error creating PDF URL:', error);
+                    return '';
+                  }
+                })();
+                const blobUrl = pdfUrl;
                 
                 if (!pdfUrl && !blobUrl) {
                   return (
@@ -247,7 +425,29 @@ export const DocumentViewer = ({
             </TabsContent>
             
             <TabsContent value="signatures" className="flex-1 mt-2">
-              <div className="h-[70vh] overflow-y-auto p-4">
+              <div className="h-[70vh] overflow-y-auto p-4 space-y-4">
+                {/* Update PDF Button */}
+                {canManageSignatures && (
+                  <div className="bg-primary/10 border-2 border-primary/30 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-primary mb-1">Update PDF with Signatures</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Click to embed all signatures into the PDF document
+                        </p>
+                      </div>
+                      <Button
+                        onClick={regenerateDocumentWithSignatures}
+                        disabled={isRegenerating}
+                        className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+                        {isRegenerating ? 'Updating PDF...' : 'Update PDF Now'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
                 <DocumentSignatureManager
                   documentId={document.id}
                   quotationId={document.quotation_id}
