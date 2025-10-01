@@ -296,6 +296,17 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
   // Check if user has permission to manage signatures (admin/supervisor/finance)
   const canManageSignatures = user && (hasRole('admin') || hasRole('supervisor') || hasRole('finance'));
+  
+  // Debug logging
+  console.log('🔍 EnhancedDocumentViewer Debug:', {
+    user: user?.email,
+    hasUser: !!user,
+    isAdmin: hasRole('admin'),
+    isSupervisor: hasRole('supervisor'),
+    isFinance: hasRole('finance'),
+    canManageSignatures,
+    isOpen
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
