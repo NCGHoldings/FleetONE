@@ -49,9 +49,11 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       backgroundColor: 'transparent',
     });
 
-    // Initialize free drawing brush
-    canvas.freeDrawingBrush.color = drawingColor;
-    canvas.freeDrawingBrush.width = brushWidth;
+    // Initialize free drawing brush - only if it exists
+    if (canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.color = drawingColor;
+      canvas.freeDrawingBrush.width = brushWidth;
+    }
     
     // Set canvas to be overlay on top of PDF
     canvas.selection = true;
