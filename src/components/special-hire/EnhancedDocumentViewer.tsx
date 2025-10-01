@@ -68,9 +68,13 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   };
 
   const handleApprovalsUpdate = async () => {
+    console.log('🔄 Approval updated - reloading and regenerating document...');
+    
     // Reload approvals from database
     const result = await getDocumentApprovals(document.id);
     if (result.success) {
+      console.log('✅ Loaded approvals:', result.approvals.length);
+      
       // Type cast the approvals to match our interface
       const typedApprovals = result.approvals.map(approval => ({
         ...approval,
@@ -78,60 +82,84 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
       }));
       setApprovals(typedApprovals);
       
-      // Auto-regenerate document with new signatures
-      if (quotationData) {
-        toast.info('Updating document with signature...');
-        await regenerateDocumentWithSignatures();
-      } else {
-        // Load quotation data if not available
+      // Ensure quotation data is loaded
+      if (!quotationData) {
+        console.log('⏳ Loading quotation data first...');
         await loadQuotationData();
-        setTimeout(() => regenerateDocumentWithSignatures(), 500);
       }
+      
+      // Give a moment for state to update
+      setTimeout(async () => {
+        console.log('🚀 Starting document regeneration...');
+        toast.info('Regenerating document with signatures...');
+        await regenerateDocumentWithSignatures();
+      }, 300);
     }
   };
 
   const regenerateDocumentWithSignatures = async () => {
     if (!quotationData) {
+      console.error('❌ Missing quotation data');
       toast.error('Missing quotation data to regenerate document');
       return;
     }
 
     try {
       setIsRegenerating(true);
+      console.log('📄 Regenerating document with ID:', document.id);
 
       // Get payment data if payment_id exists
       let paymentData = null;
       if (document.payment_id) {
+        console.log('💰 Fetching payment data...');
         const { data, error: paymentError } = await supabase
           .from('special_hire_payments')
           .select('*')
           .eq('id', document.payment_id)
-          .single();
+          .maybeSingle();
 
         if (!paymentError && data) {
           paymentData = data;
+          console.log('✅ Payment data loaded');
         }
+      } else {
+        console.log('ℹ️ No payment_id - this is normal for some document types');
       }
 
       // Fetch current signatures
-      const { data: signatures } = await supabase
+      console.log('✍️ Fetching signatures for document:', document.id);
+      const { data: signatures, error: sigError } = await supabase
         .from('document_approvals')
         .select('*')
         .eq('document_id', document.id);
 
+      if (sigError) {
+        console.error('❌ Error fetching signatures:', sigError);
+      } else {
+        console.log('✅ Fetched signatures:', signatures?.length || 0);
+      }
+
       // Prepare approval signatures with proper date formatting
       const approvalSignatures: any = {};
-      if (signatures) {
+      if (signatures && signatures.length > 0) {
         signatures.forEach(approval => {
+          const hasSignatureImage = approval.signature_data && approval.signature_data.length > 100;
+          console.log(`  - ${approval.approval_type}: ${approval.approver_name} ${hasSignatureImage ? '(has signature image)' : '(text only)'}`);
+          
           approvalSignatures[approval.approval_type] = {
             approver_name: approval.approver_name,
             signature_data: approval.signature_data,
             approval_date: format(new Date(approval.approval_date), 'dd/MM/yyyy'),
           };
         });
+        console.log('📝 Approval signatures prepared for PDF:', {
+          prepared_by: approvalSignatures.prepared_by?.approver_name || 'N/A',
+          checked_by: approvalSignatures.checked_by?.approver_name || 'N/A',
+          approved_by: approvalSignatures.approved_by?.approver_name || 'N/A',
+        });
+      } else {
+        console.warn('⚠️ No signatures found for this document');
       }
-      
-      console.log('Formatted approval signatures for PDF:', approvalSignatures);
 
       // Calculate total amount
       const calculateTotalAmount = (quotation: any) => {
@@ -172,10 +200,14 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
       };
 
       // Generate new PDF with signatures
+      console.log('🖨️ Generating PDF with invoice data...');
       const pdfBlob = await generateInvoicePDF(invoiceData);
+      console.log('✅ PDF generated, size:', pdfBlob.size, 'bytes');
+      
       const arrayBuffer = await pdfBlob.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       
+      console.log('🔄 Converting PDF to base64...');
       let base64String = '';
       const chunkSize = 1024;
       for (let i = 0; i < uint8Array.length; i += chunkSize) {
@@ -183,36 +215,47 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         base64String += String.fromCharCode.apply(null, Array.from(chunk));
       }
       const base64Data = btoa(base64String);
+      console.log('✅ PDF converted to base64, length:', base64Data.length);
 
       // Update document in database
+      console.log('💾 Updating document in database...');
+      const newFileName = `SIGNED-${document.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`;
       const { error: updateError } = await supabase
         .from('document_storage')
         .update({
           document_data: base64Data,
-          file_name: `UPDATED-${document.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`,
+          file_name: newFileName,
           file_size: uint8Array.length,
           updated_at: new Date().toISOString(),
         })
         .eq('id', document.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('❌ Database update error:', updateError);
+        throw updateError;
+      }
+      
+      console.log('✅ Document updated in database');
 
       // Update local document state with new PDF data
       const updatedDoc = {
         ...document,
         document_data: base64Data,
-        file_name: `UPDATED-${document.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`,
+        file_name: newFileName,
         file_size: uint8Array.length,
         generated_at: document.generated_at || new Date().toISOString(),
       };
       
+      console.log('🔄 Updating component state with new document...');
       setCurrentDocument(updatedDoc);
       
-      // Force re-render by creating new object reference
+      // Force re-render with a slight delay to ensure state updates
       setTimeout(() => {
+        console.log('♻️ Force re-rendering PDF preview...');
         setCurrentDocument({...updatedDoc});
       }, 100);
 
+      console.log('🎉 Document regeneration complete!');
       toast.success('✓ Document updated with signatures!');
     } catch (error) {
       console.error('Error regenerating document:', error);
