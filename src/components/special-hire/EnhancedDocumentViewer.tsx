@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { DocumentSignatureManager } from './DocumentSignatureManager';
 import { DocumentViewer } from './DocumentViewer';
 import { useSignatureManagement, type ApprovalData } from '@/hooks/useSignatureManagement';
@@ -76,30 +77,38 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
       setApprovals(typedApprovals);
       
       // Auto-regenerate document with new signatures
-      if (typedApprovals.length > 0 && quotationData) {
+      if (quotationData) {
+        toast.info('Updating document with signature...');
         await regenerateDocumentWithSignatures();
+      } else {
+        // Load quotation data if not available
+        await loadQuotationData();
+        setTimeout(() => regenerateDocumentWithSignatures(), 500);
       }
     }
   };
 
   const regenerateDocumentWithSignatures = async () => {
-    if (!quotationData || !document.payment_id) {
-      toast.error('Missing required data to regenerate document');
+    if (!quotationData) {
+      toast.error('Missing quotation data to regenerate document');
       return;
     }
 
     try {
       setIsRegenerating(true);
 
-      // Get payment data
-      const { data: paymentData, error: paymentError } = await supabase
-        .from('special_hire_payments')
-        .select('*')
-        .eq('id', document.payment_id)
-        .single();
+      // Get payment data if payment_id exists
+      let paymentData = null;
+      if (document.payment_id) {
+        const { data, error: paymentError } = await supabase
+          .from('special_hire_payments')
+          .select('*')
+          .eq('id', document.payment_id)
+          .single();
 
-      if (paymentError || !paymentData) {
-        throw new Error('Failed to fetch payment data');
+        if (!paymentError && data) {
+          paymentData = data;
+        }
       }
 
       // Fetch current signatures
@@ -147,7 +156,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         numberOfPassengers: quotationData.number_of_passengers,
         totalAmount: calculateTotalAmount(quotationData),
         advanceAmount: quotationData.advance_paid || 0,
-        paidAmount: paymentData.amount,
+        paidAmount: paymentData?.amount || 0,
         vehicleNo: quotationData.assigned_bus_no,
         driverName: quotationData.assigned_driver_name,
         conductorName: quotationData.assigned_conductor_name,
@@ -184,16 +193,23 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
       if (updateError) throw updateError;
 
-      // Update local document state instead of reloading
-      setCurrentDocument({
+      // Update local document state with new PDF data
+      const updatedDoc = {
         ...document,
         document_data: base64Data,
         file_name: `UPDATED-${document.document_type}-${quotationData.quotation_no}-${Date.now()}.pdf`,
         file_size: uint8Array.length,
-        generated_at: new Date().toISOString(),
-      });
+        generated_at: document.generated_at || new Date().toISOString(),
+      };
+      
+      setCurrentDocument(updatedDoc);
+      
+      // Force re-render by creating new object reference
+      setTimeout(() => {
+        setCurrentDocument({...updatedDoc});
+      }, 100);
 
-      toast.success('Document updated with signatures successfully!');
+      toast.success('✓ Document updated with signatures!');
     } catch (error) {
       console.error('Error regenerating document:', error);
       toast.error('Failed to regenerate document with signatures');
@@ -242,8 +258,16 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Document Preview */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Document Preview</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Document Preview</h3>
+              {isRegenerating && (
+                <Badge variant="secondary" className="animate-pulse">
+                  Updating...
+                </Badge>
+              )}
+            </div>
             <DocumentViewer
+              key={currentDocument.document_data} // Force re-render when document data changes
               isOpen={false}
               onClose={() => {}}
               document={{
