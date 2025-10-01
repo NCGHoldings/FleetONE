@@ -66,17 +66,19 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     setIsCanvasReady(true);
     toast.success('PDF Editor ready! Use the toolbar to draw, add text and images.');
 
-    // Pass download function to parent
-    if (onDownloadReady) {
-      onDownloadReady(() => handleDownloadWithAnnotations());
-    }
-
     return () => {
       canvas.dispose();
     };
   }, []);
 
   // Handle tool changes
+  // Pass download function to parent once canvas is ready
+  useEffect(() => {
+    if (fabricCanvas && isCanvasReady && onDownloadReady) {
+      onDownloadReady(handleDownloadWithAnnotations);
+    }
+  }, [fabricCanvas, isCanvasReady, onDownloadReady]);
+
   useEffect(() => {
     if (!fabricCanvas) return;
 
