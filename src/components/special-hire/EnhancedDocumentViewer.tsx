@@ -106,6 +106,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
     try {
       setIsRegenerating(true);
+      toast.loading('Fetching signatures and regenerating PDF...');
       console.log('📄 Regenerating document with ID:', document.id);
 
       // Get payment data if payment_id exists
@@ -135,30 +136,58 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
 
       if (sigError) {
         console.error('❌ Error fetching signatures:', sigError);
-      } else {
-        console.log('✅ Fetched signatures:', signatures?.length || 0);
+        toast.error('Failed to fetch signatures');
+        return;
       }
 
-      // Prepare approval signatures with proper date formatting
+      console.log('✅ Fetched signatures:', signatures?.length || 0);
+      
+      if (!signatures || signatures.length === 0) {
+        toast.warning('No signatures found. Please add signatures first.');
+        return;
+      }
+
+      // Prepare approval signatures with validation and proper date formatting
       const approvalSignatures: any = {};
+      let signatureCount = 0;
+      
       if (signatures && signatures.length > 0) {
         signatures.forEach(approval => {
-          const hasSignatureImage = approval.signature_data && approval.signature_data.length > 100;
-          console.log(`  - ${approval.approval_type}: ${approval.approver_name} ${hasSignatureImage ? '(has signature image)' : '(text only)'}`);
+          // Validate signature data
+          const hasSignatureImage = approval.signature_data && 
+                                   approval.signature_data.length > 100 &&
+                                   (approval.signature_data.startsWith('data:image/') || 
+                                    approval.signature_data.startsWith('iVBOR'));
+          
+          console.log(`  - ${approval.approval_type}: ${approval.approver_name} ${hasSignatureImage ? '✓ (signature image valid)' : '✗ (text only - no image)'}`);
+          
+          if (hasSignatureImage) {
+            signatureCount++;
+          }
+          
+          // Ensure proper base64 format for images
+          let signatureData = approval.signature_data;
+          if (signatureData && !signatureData.startsWith('data:image/')) {
+            signatureData = `data:image/png;base64,${signatureData}`;
+          }
           
           approvalSignatures[approval.approval_type] = {
             approver_name: approval.approver_name,
-            signature_data: approval.signature_data,
+            signature_data: signatureData,
             approval_date: format(new Date(approval.approval_date), 'dd/MM/yyyy'),
           };
         });
+        
         console.log('📝 Approval signatures prepared for PDF:', {
           prepared_by: approvalSignatures.prepared_by?.approver_name || 'N/A',
           checked_by: approvalSignatures.checked_by?.approver_name || 'N/A',
           approved_by: approvalSignatures.approved_by?.approver_name || 'N/A',
+          signatureImagesFound: signatureCount
         });
       } else {
         console.warn('⚠️ No signatures found for this document');
+        toast.warning('No signatures to embed in document');
+        return;
       }
 
       // Calculate total amount
@@ -275,18 +304,6 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
           <DialogTitle className="flex items-center justify-between">
             <span>Document Viewer - {document.file_name}</span>
             <div className="flex items-center gap-2">
-              {canManageSignatures && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={regenerateDocumentWithSignatures}
-                  disabled={isRegenerating}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
-                  Update with Signatures
-                </Button>
-              )}
               {onDownload && (
                 <Button
                   variant="outline"
@@ -301,6 +318,33 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
             </div>
           </DialogTitle>
         </DialogHeader>
+
+        {/* Prominent Update Button */}
+        {canManageSignatures && (
+          <div className="bg-primary/10 border-2 border-primary/30 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-semibold text-primary mb-1">Embed Signatures in PDF</h4>
+                <p className="text-sm text-muted-foreground">
+                  Click to update the PDF with all current signatures from the approval section
+                </p>
+              </div>
+              <Button
+                onClick={regenerateDocumentWithSignatures}
+                disabled={isRegenerating || approvals.length === 0}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+                {isRegenerating ? 'Updating PDF...' : 'Update PDF Now'}
+              </Button>
+            </div>
+            {approvals.length === 0 && (
+              <p className="text-xs text-amber-600 mt-2">
+                ⚠️ Add signatures in the approval section first
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Document Preview */}
