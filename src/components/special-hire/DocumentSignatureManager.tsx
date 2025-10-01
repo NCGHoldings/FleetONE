@@ -72,38 +72,11 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
 
   const handleSignatureSaved = async () => {
     await loadApprovals();
-    onSignatureUpdated?.();
+    toast.success('Signature saved successfully');
     
-    // Auto-regenerate document if there's a quotationId available
-    if (quotationId) {
-      try {
-        // Find the document that needs to be updated
-        const { data: documents } = await supabase
-          .from('document_storage')
-          .select('*')
-          .eq('quotation_id', quotationId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (documents && documents.length > 0) {
-          const result = await regenerateDocumentWithSignatures(
-            documents[0].id,
-            quotationId,
-            documents[0].payment_id
-          );
-          
-          if (result.success) {
-            toast.success('Document updated with signature');
-          } else {
-            toast.info('Signature saved. Document will be updated on next generation.');
-          }
-        }
-      } catch (error) {
-        console.error('Auto-regeneration failed:', error);
-        toast.info('Signature saved. Please manually update the document.');
-      }
-    } else {
-      toast.success('Signature saved successfully');
+    // Notify parent component to handle regeneration
+    if (onSignatureUpdated) {
+      onSignatureUpdated();
     }
   };
 

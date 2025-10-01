@@ -76,7 +76,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
       setApprovals(typedApprovals);
       
       // Auto-regenerate document with new signatures
-      if (typedApprovals.length > 0) {
+      if (typedApprovals.length > 0 && quotationData) {
         await regenerateDocumentWithSignatures();
       }
     }

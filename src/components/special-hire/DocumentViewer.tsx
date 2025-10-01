@@ -239,7 +239,8 @@ export const DocumentViewer = ({
             <TabsContent value="signatures" className="flex-1 mt-2">
               <div className="h-[70vh] overflow-y-auto p-4">
                 <DocumentSignatureManager
-                  documentId={document.quotation_id || document.id}
+                  documentId={document.id}
+                  quotationId={document.quotation_id}
                   documentStatus={document.document_status}
                   onSignatureUpdated={onSignatureUpdated}
                 />
