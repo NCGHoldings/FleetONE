@@ -42,7 +42,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const [quotationData, setQuotationData] = useState<any>(null);
   const [currentDocument, setCurrentDocument] = useState(document);
   const [showSignaturePreview, setShowSignaturePreview] = useState(false);
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const { getDocumentApprovals } = useSignatureManagement();
 
   useEffect(() => {
@@ -295,7 +295,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   };
 
   // Check if user has permission to manage signatures (admin/supervisor/finance)
-  const canManageSignatures = user && ['admin', 'supervisor', 'finance'].includes(user.role || '');
+  const canManageSignatures = user && (hasRole('admin') || hasRole('supervisor') || hasRole('finance'));
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
