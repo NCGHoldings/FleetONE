@@ -10,7 +10,8 @@ import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { RefreshCw, Download } from 'lucide-react';
+import { RefreshCw, Download, Eye } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface EnhancedDocumentViewerProps {
   isOpen: boolean;
@@ -40,6 +41,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [quotationData, setQuotationData] = useState<any>(null);
   const [currentDocument, setCurrentDocument] = useState(document);
+  const [showSignaturePreview, setShowSignaturePreview] = useState(false);
   const { user } = useAuth();
   const { getDocumentApprovals } = useSignatureManagement();
 
@@ -117,17 +119,19 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         .select('*')
         .eq('document_id', document.id);
 
-      // Prepare approval signatures
+      // Prepare approval signatures with proper date formatting
       const approvalSignatures: any = {};
       if (signatures) {
         signatures.forEach(approval => {
           approvalSignatures[approval.approval_type] = {
             approver_name: approval.approver_name,
             signature_data: approval.signature_data,
-            approval_date: approval.approval_date,
+            approval_date: format(new Date(approval.approval_date), 'dd/MM/yyyy'),
           };
         });
       }
+      
+      console.log('Formatted approval signatures for PDF:', approvalSignatures);
 
       // Calculate total amount
       const calculateTotalAmount = (quotation: any) => {
@@ -288,7 +292,58 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Document Approvals</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSignaturePreview(!showSignaturePreview)}
+                  className="flex items-center gap-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  {showSignaturePreview ? 'Hide Preview' : 'Preview Signatures'}
+                </Button>
               </div>
+
+              {/* Signature Preview Section */}
+              {showSignaturePreview && approvals.length > 0 && (
+                <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
+                  <h4 className="font-semibold text-sm">Signature Details Preview</h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    {approvals.map((approval) => (
+                      <div key={approval.id} className="border rounded-md p-3 bg-background">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <p className="text-xs text-muted-foreground uppercase">
+                              {approval.approval_type.replace('_', ' ')}
+                            </p>
+                            <p className="font-semibold">{approval.approver_name}</p>
+                          </div>
+                          <Badge variant="default" className="text-xs">
+                            {format(new Date(approval.approval_date), 'dd MMM yyyy')}
+                          </Badge>
+                        </div>
+                        {approval.signature_data ? (
+                          <div className="border rounded p-2 bg-white">
+                            <img 
+                              src={approval.signature_data} 
+                              alt={`${approval.approver_name} signature`}
+                              className="max-h-20 w-auto mx-auto"
+                            />
+                            <p className="text-xs text-center text-muted-foreground mt-1">
+                              Digital Signature
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="border-2 border-dashed rounded p-3 text-center">
+                            <p className="text-sm font-medium">{approval.approver_name}</p>
+                            <p className="text-xs text-muted-foreground">No signature image</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <DocumentSignatureManager
                 documentId={document.id}
                 quotationId={document.quotation_id}
