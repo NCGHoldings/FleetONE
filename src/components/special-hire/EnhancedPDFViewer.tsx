@@ -7,12 +7,11 @@ import {
   Image as ImageIcon, 
   ZoomIn, 
   ZoomOut, 
-  RotateCw, 
   Download, 
   Save,
-  Undo,
-  Redo,
-  Trash2
+  Trash2,
+  Pencil,
+  MousePointer
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
@@ -34,9 +33,11 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [zoom, setZoom] = useState(100);
-  const [activeTool, setActiveTool] = useState<'select' | 'text' | 'image'>('select');
+  const [activeTool, setActiveTool] = useState<'select' | 'draw' | 'text' | 'image'>('select');
   const [textToAdd, setTextToAdd] = useState('');
   const [isCanvasReady, setIsCanvasReady] = useState(false);
+  const [drawingColor, setDrawingColor] = useState('#000000');
+  const [brushWidth, setBrushWidth] = useState(2);
 
   useEffect(() => {
     if (!canvasRef.current || !pdfContainerRef.current) return;
@@ -48,18 +49,40 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       backgroundColor: 'transparent',
     });
 
+    // Initialize free drawing brush
+    canvas.freeDrawingBrush.color = drawingColor;
+    canvas.freeDrawingBrush.width = brushWidth;
+    
     // Set canvas to be overlay on top of PDF
     canvas.selection = true;
     canvas.preserveObjectStacking = true;
 
     setFabricCanvas(canvas);
     setIsCanvasReady(true);
-    toast.success('PDF Editor ready! Use the toolbar to add text and images.');
+    toast.success('PDF Editor ready! Use the toolbar to draw, add text and images.');
 
     return () => {
       canvas.dispose();
     };
   }, []);
+
+  // Handle tool changes
+  useEffect(() => {
+    if (!fabricCanvas) return;
+
+    // Enable/disable drawing mode based on active tool
+    fabricCanvas.isDrawingMode = activeTool === 'draw';
+    
+    if (activeTool === 'draw' && fabricCanvas.freeDrawingBrush) {
+      fabricCanvas.freeDrawingBrush.color = drawingColor;
+      fabricCanvas.freeDrawingBrush.width = brushWidth;
+    }
+    
+    // Enable selection for other tools
+    if (activeTool === 'select') {
+      fabricCanvas.selection = true;
+    }
+  }, [activeTool, drawingColor, brushWidth, fabricCanvas]);
 
   // Handle zoom changes
   const handleZoom = (newZoom: number) => {
@@ -180,25 +203,64 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 p-3 border-b bg-muted/30">
+      <div className="flex items-center gap-2 p-3 border-b bg-background shadow-sm">
         {/* Document tools */}
         <div className="flex items-center gap-1">
           <Button
-            variant={activeTool === 'select' ? 'default' : 'ghost'}
+            variant={activeTool === 'select' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setActiveTool('select')}
+            title="Select and move objects"
           >
+            <MousePointer className="w-4 h-4 mr-1" />
             Select
           </Button>
+          
+          <Separator orientation="vertical" className="h-6 mx-2" />
+          
+          {/* Drawing tool */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant={activeTool === 'draw' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTool('draw')}
+              title="Free drawing"
+            >
+              <Pencil className="w-4 h-4 mr-1" />
+              Draw
+            </Button>
+            
+            {activeTool === 'draw' && (
+              <div className="flex items-center gap-2 ml-2">
+                <input
+                  type="color"
+                  value={drawingColor}
+                  onChange={(e) => setDrawingColor(e.target.value)}
+                  className="w-8 h-8 rounded border cursor-pointer"
+                  title="Drawing color"
+                />
+                <Input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={brushWidth}
+                  onChange={(e) => setBrushWidth(Number(e.target.value))}
+                  className="w-16 h-8"
+                  title="Brush width"
+                />
+              </div>
+            )}
+          </div>
           
           <Separator orientation="vertical" className="h-6 mx-2" />
           
           {/* Text tool */}
           <div className="flex items-center gap-1">
             <Button
-              variant={activeTool === 'text' ? 'default' : 'ghost'}
+              variant={activeTool === 'text' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setActiveTool('text')}
+              title="Add text"
             >
               <Type className="w-4 h-4 mr-1" />
               Text
@@ -224,11 +286,14 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             )}
           </div>
 
+          <Separator orientation="vertical" className="h-6 mx-2" />
+          
           {/* Image tool */}
           <Button
-            variant={activeTool === 'image' ? 'default' : 'ghost'}
+            variant={activeTool === 'image' ? 'default' : 'outline'}
             size="sm"
             onClick={handleAddImage}
+            title="Add image"
           >
             <ImageIcon className="w-4 h-4 mr-1" />
             Image
@@ -273,27 +338,30 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
         <Separator orientation="vertical" className="h-6 mx-2" />
 
         {/* Action buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 ml-auto">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={handleDelete}
             title="Delete selected object"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4 mr-1" />
+            Delete
           </Button>
           
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={handleClear}
             title="Clear all annotations"
           >
-            Clear
+            Clear All
           </Button>
           
+          <Separator orientation="vertical" className="h-6 mx-2" />
+          
           <Button
-            variant="ghost"
+            variant="default"
             size="sm"
             onClick={handleSave}
             title="Save annotations"
@@ -304,7 +372,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
           
           {onDownload && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={onDownload}
               title="Download PDF"
@@ -352,12 +420,18 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center justify-between p-2 border-t bg-muted/30 text-xs text-muted-foreground">
+      <div className="flex items-center justify-between p-2 border-t bg-muted/50 text-xs text-muted-foreground">
         <div>
-          Mode: {activeTool === 'select' ? 'Selection' : activeTool === 'text' ? 'Text Addition' : 'Image Addition'}
+          Mode: {
+            activeTool === 'select' ? 'Selection' : 
+            activeTool === 'draw' ? 'Free Drawing' :
+            activeTool === 'text' ? 'Text Addition' : 
+            'Image Addition'
+          }
         </div>
-        <div>
-          Canvas: {isCanvasReady ? 'Ready' : 'Loading...'}
+        <div className="flex items-center gap-4">
+          <span>Canvas: {isCanvasReady ? 'Ready ✓' : 'Loading...'}</span>
+          <span>Zoom: {zoom}%</span>
         </div>
       </div>
     </div>
