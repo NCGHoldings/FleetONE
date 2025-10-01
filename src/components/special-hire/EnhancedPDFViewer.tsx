@@ -304,7 +304,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 p-3 border-b bg-background shadow-sm">
+      <div className="flex items-center gap-2 p-3 border-b bg-background shadow-sm flex-wrap">
         {/* Document tools */}
         <div className="flex items-center gap-1">
           <Button
@@ -313,81 +313,74 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             onClick={() => setActiveTool('select')}
             title="Select and move objects"
           >
-            <MousePointer className="w-4 h-4 mr-1" />
-            Select
+            <MousePointer className="w-4 h-4" />
           </Button>
           
-          <Separator orientation="vertical" className="h-6 mx-2" />
+          <Separator orientation="vertical" className="h-6 mx-1" />
           
           {/* Drawing tool */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant={activeTool === 'draw' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveTool('draw')}
-              title="Free drawing"
-            >
-              <Pencil className="w-4 h-4 mr-1" />
-              Draw
-            </Button>
-            
-            {activeTool === 'draw' && (
-              <div className="flex items-center gap-2 ml-2">
-                <input
-                  type="color"
-                  value={drawingColor}
-                  onChange={(e) => setDrawingColor(e.target.value)}
-                  className="w-8 h-8 rounded border cursor-pointer"
-                  title="Drawing color"
-                />
-                <Input
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={brushWidth}
-                  onChange={(e) => setBrushWidth(Number(e.target.value))}
-                  className="w-16 h-8"
-                  title="Brush width"
-                />
-              </div>
-            )}
-          </div>
+          <Button
+            variant={activeTool === 'draw' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTool('draw')}
+            title="Free drawing"
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
           
-          <Separator orientation="vertical" className="h-6 mx-2" />
+          {activeTool === 'draw' && (
+            <>
+              <input
+                type="color"
+                value={drawingColor}
+                onChange={(e) => setDrawingColor(e.target.value)}
+                className="w-8 h-8 rounded border cursor-pointer"
+                title="Drawing color"
+              />
+              <Input
+                type="number"
+                min="1"
+                max="20"
+                value={brushWidth}
+                onChange={(e) => setBrushWidth(Number(e.target.value))}
+                className="w-16 h-8"
+                title="Brush width"
+              />
+            </>
+          )}
           
-          {/* Text tool */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant={activeTool === 'text' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveTool('text')}
-              title="Add text"
-            >
-              <Type className="w-4 h-4 mr-1" />
-              Text
-            </Button>
-            
-            {activeTool === 'text' && (
-              <div className="flex items-center gap-1 ml-2">
-                <Input
-                  placeholder="Enter text..."
-                  value={textToAdd}
-                  onChange={(e) => setTextToAdd(e.target.value)}
-                  className="w-32 h-8"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleAddText();
-                    }
-                  }}
-                />
-                <Button size="sm" onClick={handleAddText}>
-                  Add
-                </Button>
-              </div>
-            )}
-          </div>
+          <Separator orientation="vertical" className="h-6 mx-1" />
+          
+          {/* Text tool - Always show input when text tool is active */}
+          <Button
+            variant={activeTool === 'text' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTool('text')}
+            title="Add text"
+          >
+            <Type className="w-4 h-4" />
+          </Button>
+          
+          {activeTool === 'text' && (
+            <>
+              <Input
+                placeholder="Enter text..."
+                value={textToAdd}
+                onChange={(e) => setTextToAdd(e.target.value)}
+                className="w-40 h-8"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddText();
+                  }
+                }}
+              />
+              <Button size="sm" onClick={handleAddText} title="Add text to document">
+                Add
+              </Button>
+            </>
+          )}
 
-          <Separator orientation="vertical" className="h-6 mx-2" />
+          <Separator orientation="vertical" className="h-6 mx-1" />
           
           {/* Image tool */}
           <Button
@@ -396,8 +389,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             onClick={handleAddImage}
             title="Add image"
           >
-            <ImageIcon className="w-4 h-4 mr-1" />
-            Image
+            <ImageIcon className="w-4 h-4" />
           </Button>
           
           <input
@@ -409,7 +401,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
           />
         </div>
 
-        <Separator orientation="vertical" className="h-6 mx-2" />
+        <Separator orientation="vertical" className="h-6 mx-1" />
 
         {/* Zoom controls */}
         <div className="flex items-center gap-1">
@@ -418,6 +410,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             size="sm"
             onClick={() => handleZoom(zoom - 25)}
             disabled={zoom <= 25}
+            title="Zoom out"
           >
             <ZoomOut className="w-4 h-4" />
           </Button>
@@ -431,12 +424,13 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             size="sm"
             onClick={() => handleZoom(zoom + 25)}
             disabled={zoom >= 200}
+            title="Zoom in"
           >
             <ZoomIn className="w-4 h-4" />
           </Button>
         </div>
 
-        <Separator orientation="vertical" className="h-6 mx-2" />
+        <Separator orientation="vertical" className="h-6 mx-1" />
 
         {/* Action buttons */}
         <div className="flex items-center gap-1 ml-auto">
@@ -446,8 +440,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             onClick={handleDelete}
             title="Delete selected object"
           >
-            <Trash2 className="w-4 h-4 mr-1" />
-            Delete
+            <Trash2 className="w-4 h-4" />
           </Button>
           
           <Button
@@ -459,7 +452,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             Clear All
           </Button>
           
-          <Separator orientation="vertical" className="h-6 mx-2" />
+          <Separator orientation="vertical" className="h-6 mx-1" />
           
           <Button
             variant="default"
@@ -467,8 +460,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             onClick={handleSave}
             title="Save annotations"
           >
-            <Save className="w-4 h-4 mr-1" />
-            Save
+            <Save className="w-4 h-4" />
           </Button>
           
           <Button
@@ -478,8 +470,7 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             disabled={isGenerating}
             title="Download PDF with annotations"
           >
-            <Download className="w-4 h-4 mr-1" />
-            {isGenerating ? 'Generating...' : 'Download'}
+            <Download className="w-4 h-4" />
           </Button>
         </div>
       </div>
