@@ -48,15 +48,58 @@ export const useSignatureManagement = () => {
     try {
       setIsLoading(true);
 
+      // Validate required fields
+      if (!approvalData.document_id) {
+        toast.error('Document ID is required');
+        return { success: false, error: 'Missing document_id' };
+      }
+
+      if (!approvalData.approver_name?.trim()) {
+        toast.error('Approver name is required');
+        return { success: false, error: 'Missing approver_name' };
+      }
+
+      // Verify document exists before attempting to save
+      console.log('Verifying document exists:', approvalData.document_id);
+      const { data: docCheck, error: docError } = await supabase
+        .from('document_storage')
+        .select('id')
+        .eq('id', approvalData.document_id)
+        .maybeSingle();
+
+      if (docError) {
+        console.error('Error checking document:', docError);
+        toast.error('Failed to verify document exists');
+        return { success: false, error: docError };
+      }
+
+      if (!docCheck) {
+        console.error('Document not found:', approvalData.document_id);
+        toast.error('Document not found. Please ensure the document exists before adding signatures.');
+        return { success: false, error: 'Document not found in database' };
+      }
+
+      // Format approval_date properly as a date string (YYYY-MM-DD)
+      let formattedDate = approvalData.approval_date;
+      if (typeof approvalData.approval_date === 'string') {
+        // Ensure it's in YYYY-MM-DD format
+        const dateObj = new Date(approvalData.approval_date);
+        if (!isNaN(dateObj.getTime())) {
+          formattedDate = dateObj.toISOString().split('T')[0];
+        }
+      }
+
       // Prepare data for database
       const dbData = {
         document_id: approvalData.document_id,
         approval_type: approvalData.approval_type,
-        approver_name: approvalData.approver_name,
-        signature_data: approvalData.signature_data,
-        approval_date: approvalData.approval_date,
-        user_id: user?.id,
+        approver_name: approvalData.approver_name.trim(),
+        signature_data: approvalData.signature_data || null,
+        approval_date: formattedDate,
+        user_id: user?.id || null,
       };
+
+      console.log('Saving approval data:', { ...dbData, signature_data: dbData.signature_data ? '[DATA]' : null });
 
       let result;
       if (approvalData.id) {
@@ -68,7 +111,10 @@ export const useSignatureManagement = () => {
           .select()
           .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
         result = data;
       } else {
         // Insert new approval  
@@ -78,22 +124,42 @@ export const useSignatureManagement = () => {
           .select()
           .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error:', error);
+          throw error;
+        }
         result = data;
       }
 
-      // Increment name usage for suggestions
+      // Increment name usage for suggestions (don't fail if this errors)
       if (approvalData.approver_name) {
-        await supabase.rpc('increment_name_suggestion', {
-          p_name: approvalData.approver_name
-        });
+        try {
+          await supabase.rpc('increment_name_suggestion', {
+            p_name: approvalData.approver_name.trim()
+          });
+        } catch (suggestionError) {
+          console.warn('Failed to update name suggestions:', suggestionError);
+          // Don't fail the entire operation if suggestions fail
+        }
       }
 
       toast.success('Approval signature saved successfully');
       return { success: true, data: result };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving approval:', error);
-      toast.error('Failed to save approval signature');
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to save approval signature';
+      
+      if (error?.message?.includes('foreign key')) {
+        errorMessage = 'Document not found. Please ensure the document exists before adding signatures.';
+      } else if (error?.message?.includes('violates')) {
+        errorMessage = 'Database constraint violation. Please check all required fields.';
+      } else if (error?.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
+      toast.error(errorMessage);
       return { success: false, error };
     } finally {
       setIsLoading(false);

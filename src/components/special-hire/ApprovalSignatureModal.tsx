@@ -155,6 +155,11 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
       return;
     }
 
+    if (!documentId) {
+      toast.error('Document ID is missing. Cannot save signature.');
+      return;
+    }
+
     let signatureData: string | undefined;
     
     if (signatureTab === 'draw' && signatureCanvasRef.current && !signatureCanvasRef.current.isEmpty()) {
@@ -172,10 +177,19 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
       approval_date: approvalDate,
     };
 
+    console.log('Attempting to save approval:', { 
+      documentId, 
+      approvalType, 
+      hasSignature: !!signatureData 
+    });
+
     const result = await saveApproval(approvalData);
     if (result.success) {
       onSave();
       onClose();
+    } else {
+      // Error is already shown via toast in the hook
+      console.error('Save approval failed:', result.error);
     }
   };
 
