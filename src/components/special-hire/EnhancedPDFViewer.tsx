@@ -213,86 +213,99 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     const loadingToast = toast.loading('Generating PDF with annotations...');
     
     try {
-      // Create a wrapper to capture both PDF and canvas
-      const wrapper = document.createElement('div');
-      wrapper.style.position = 'relative';
-      wrapper.style.width = '800px';
-      wrapper.style.height = '1100px';
-      wrapper.style.backgroundColor = 'white';
-      
-      // Create an image from the PDF iframe
-      const iframe = pdfContainerRef.current.querySelector('iframe');
+      // Get the PDF iframe
+      const iframe = pdfContainerRef.current.querySelector('iframe') as HTMLIFrameElement;
       if (!iframe) throw new Error('PDF iframe not found');
       
-      // Wait a bit for PDF to fully render
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for PDF to be fully loaded
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Capture the current view by screenshotting the container
-      const pdfScreenshot = await html2canvas(pdfContainerRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: pdfContainerRef.current.scrollWidth,
-        windowHeight: pdfContainerRef.current.scrollHeight,
-      });
+      // Get the actual dimensions of the PDF viewer
+      const viewerWidth = iframe.offsetWidth;
+      const viewerHeight = iframe.offsetHeight;
       
-      // Convert PDF screenshot to image
-      const pdfImage = new Image();
-      pdfImage.src = pdfScreenshot.toDataURL('image/png');
-      await new Promise((resolve) => { pdfImage.onload = resolve; });
+      // Create a canvas to capture the combined PDF + annotations
+      const tempCanvas = document.createElement('canvas');
+      const scale = 2; // Higher scale for better quality
+      tempCanvas.width = viewerWidth * scale;
+      tempCanvas.height = viewerHeight * scale;
+      const ctx = tempCanvas.getContext('2d');
       
-      wrapper.appendChild(pdfImage);
+      if (!ctx) throw new Error('Could not get canvas context');
       
-      // Get annotations as image
+      // Set white background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+      
+      // Try to capture the PDF iframe content
+      try {
+        // Capture the entire PDF container including iframe
+        const pdfCapture = await html2canvas(pdfContainerRef.current, {
+          scale: scale,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          foreignObjectRendering: true,
+          imageTimeout: 0,
+          removeContainer: false,
+        });
+        
+        // Draw the PDF capture onto our temp canvas
+        ctx.drawImage(pdfCapture, 0, 0, tempCanvas.width, tempCanvas.height);
+      } catch (captureError) {
+        console.warn('Could not capture PDF directly, using placeholder:', captureError);
+        // If iframe capture fails, add a white background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // Add text to indicate PDF content
+        ctx.fillStyle = '#cccccc';
+        ctx.font = '24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('PDF Content', tempCanvas.width / 2, tempCanvas.height / 2);
+      }
+      
+      // Now overlay the Fabric canvas annotations
       const annotationsDataUrl = fabricCanvas.toDataURL({
         format: 'png',
         quality: 1,
-        multiplier: 2,
+        multiplier: scale,
       });
       
-      const annotationsImage = new Image();
-      annotationsImage.src = annotationsDataUrl;
-      annotationsImage.style.position = 'absolute';
-      annotationsImage.style.top = '0';
-      annotationsImage.style.left = '0';
-      await new Promise((resolve) => { annotationsImage.onload = resolve; });
-      
-      wrapper.appendChild(annotationsImage);
-      
-      // Add wrapper to DOM temporarily (hidden)
-      wrapper.style.position = 'fixed';
-      wrapper.style.left = '-9999px';
-      document.body.appendChild(wrapper);
-      
-      // Capture the combined content
-      const combinedCanvas = await html2canvas(wrapper, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        backgroundColor: '#ffffff'
+      // Load and draw the annotations
+      const annotationsImg = new Image();
+      annotationsImg.src = annotationsDataUrl;
+      await new Promise((resolve, reject) => {
+        annotationsImg.onload = resolve;
+        annotationsImg.onerror = reject;
       });
       
-      // Clean up
-      document.body.removeChild(wrapper);
+      // Draw annotations on top of the PDF
+      ctx.drawImage(annotationsImg, 0, 0, tempCanvas.width, tempCanvas.height);
       
-      // Create PDF from the combined canvas
-      const imgData = combinedCanvas.toDataURL('image/png');
-      const imgWidth = combinedCanvas.width;
-      const imgHeight = combinedCanvas.height;
+      // Convert the combined canvas to a PDF
+      const finalImageData = tempCanvas.toDataURL('image/png', 1.0);
+      
+      // Calculate PDF dimensions (A4 proportions but fit to content)
+      const pdfWidth = 210; // A4 width in mm
+      const pdfHeight = (tempCanvas.height / tempCanvas.width) * pdfWidth;
       
       const pdf = new jsPDF({
-        orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
-        unit: 'px',
-        format: [imgWidth, imgHeight]
+        orientation: tempCanvas.width > tempCanvas.height ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight]
       });
       
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
-      pdf.save('annotated-document.pdf');
+      // Add the combined image to the PDF
+      pdf.addImage(finalImageData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
       
-      toast.success('PDF with annotations downloaded successfully', { id: loadingToast });
+      // Save the PDF
+      const timestamp = new Date().toISOString().slice(0, 10);
+      pdf.save(`annotated-document-${timestamp}.pdf`);
+      
+      toast.success('PDF with annotations downloaded successfully!', { id: loadingToast });
+      onDownload?.();
     } catch (error) {
       console.error('Error generating PDF with annotations:', error);
       toast.error('Failed to generate PDF. Please try again.', { id: loadingToast });
