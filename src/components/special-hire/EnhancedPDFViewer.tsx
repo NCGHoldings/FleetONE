@@ -364,6 +364,44 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
           
           <Separator orientation="vertical" className="h-6 mx-1" />
           
+          {/* Text tool */}
+          <Button
+            variant={activeTool === 'text' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTool('text')}
+            title="Add text"
+          >
+            <Type className="w-4 h-4" />
+          </Button>
+          
+          {activeTool === 'text' && (
+            <>
+              <Input
+                placeholder="Enter text..."
+                value={textToAdd}
+                onChange={(e) => setTextToAdd(e.target.value)}
+                className="w-40 h-8"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && textToAdd.trim()) {
+                    handleAddText();
+                  }
+                }}
+              />
+              <Button 
+                size="sm" 
+                onClick={handleAddText}
+                disabled={!textToAdd.trim()}
+                title="Add text to PDF"
+                variant="default"
+              >
+                Add
+              </Button>
+            </>
+          )}
+          
+          <Separator orientation="vertical" className="h-6 mx-1" />
+          
           {/* Image tool */}
           <Button
             variant={activeTool === 'image' ? 'default' : 'outline'}
@@ -409,32 +447,6 @@ export const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             title="Zoom in"
           >
             <ZoomIn className="w-4 h-4" />
-          </Button>
-        </div>
-
-        <Separator orientation="vertical" className="h-6 mx-1" />
-
-        {/* Text addition - always visible */}
-        <div className="flex items-center gap-1">
-          <Input
-            placeholder="Add text to PDF..."
-            value={textToAdd}
-            onChange={(e) => setTextToAdd(e.target.value)}
-            className="w-48 h-8"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && textToAdd.trim()) {
-                handleAddText();
-              }
-            }}
-          />
-          <Button 
-            size="sm" 
-            onClick={handleAddText}
-            disabled={!textToAdd.trim()}
-            title="Add text to PDF"
-          >
-            <Type className="w-4 h-4 mr-1" />
-            Add Text
           </Button>
         </div>
 
