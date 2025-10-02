@@ -39,6 +39,7 @@ interface AccidentRecord {
   vehicle_number: string;
   accident_date: string;
   bl_number?: string;
+  Driver?: string;
   details_of_accident?: string;
   estimate_amount?: number;
   approved_amount?: number;
@@ -378,6 +379,16 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
                   id="location"
                   value={formData.location || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                  disabled={!editMode}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="Driver">Driver Name</Label>
+                <Input
+                  id="Driver"
+                  value={formData.Driver || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, Driver: e.target.value }))}
                   disabled={!editMode}
                 />
               </div>

@@ -18,6 +18,7 @@ const accidentSchema = z.object({
   vehicle_number: z.string().min(1, "Vehicle number is required").max(20, "Vehicle number too long"),
   accident_date: z.string().min(1, "Accident date is required"),
   bl_number: z.string().optional(),
+  Driver: z.string().optional(),
   details_of_accident: z.string().optional(),
   estimate_amount: z.union([z.number().nullable(), z.literal(""), z.literal(0)]).optional(),
   approved_amount: z.union([z.number().nullable(), z.literal(""), z.literal(0)]).optional(),
@@ -71,6 +72,7 @@ export function AddAccidentModal({ open, onOpenChange, onSuccess }: AddAccidentM
         vehicle_number: data.vehicle_number.toUpperCase(),
         accident_date: data.accident_date,
         bl_number: data.bl_number || null,
+        Driver: data.Driver || null,
         details_of_accident: data.details_of_accident || null,
         estimate_amount: (data.estimate_amount && String(data.estimate_amount) !== "" && Number(data.estimate_amount) !== 0) ? Number(data.estimate_amount) : null,
         approved_amount: (data.approved_amount && String(data.approved_amount) !== "" && Number(data.approved_amount) !== 0) ? Number(data.approved_amount) : null,
@@ -202,6 +204,16 @@ export function AddAccidentModal({ open, onOpenChange, onSuccess }: AddAccidentM
                   id="reported_by"
                   {...register("reported_by")}
                   placeholder="Reporter name"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="Driver">Driver Name</Label>
+                <Input
+                  id="Driver"
+                  {...register("Driver")}
+                  placeholder="Driver name"
                   className="mt-1"
                 />
               </div>
