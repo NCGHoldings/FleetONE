@@ -774,6 +774,9 @@ export type Database = {
       }
       feedback_complaints: {
         Row: {
+          action_taken: string | null
+          assigned_to: string | null
+          assigned_to_name: string | null
           category: string
           created_at: string
           current_handler: string | null
@@ -785,10 +788,12 @@ export type Database = {
           feedback_id: string | null
           id: string
           priority: string | null
+          related_persons: Json | null
           reported_by: string | null
           resolution: string | null
           resolved_at: string | null
           resolved_by_name: string | null
+          sla_due_date: string | null
           staff_group: string | null
           status: string | null
           title: string
@@ -796,6 +801,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          action_taken?: string | null
+          assigned_to?: string | null
+          assigned_to_name?: string | null
           category: string
           created_at?: string
           current_handler?: string | null
@@ -807,10 +815,12 @@ export type Database = {
           feedback_id?: string | null
           id?: string
           priority?: string | null
+          related_persons?: Json | null
           reported_by?: string | null
           resolution?: string | null
           resolved_at?: string | null
           resolved_by_name?: string | null
+          sla_due_date?: string | null
           staff_group?: string | null
           status?: string | null
           title: string
@@ -818,6 +828,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          action_taken?: string | null
+          assigned_to?: string | null
+          assigned_to_name?: string | null
           category?: string
           created_at?: string
           current_handler?: string | null
@@ -829,10 +842,12 @@ export type Database = {
           feedback_id?: string | null
           id?: string
           priority?: string | null
+          related_persons?: Json | null
           reported_by?: string | null
           resolution?: string | null
           resolved_at?: string | null
           resolved_by_name?: string | null
+          sla_due_date?: string | null
           staff_group?: string | null
           status?: string | null
           title?: string
@@ -840,6 +855,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "feedback_complaints_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "feedback_complaints_current_handler_fkey"
             columns: ["current_handler"]
@@ -1003,6 +1025,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      holidays: {
+        Row: {
+          created_at: string | null
+          holiday_date: string
+          holiday_name: string
+          id: string
+          is_recurring: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          holiday_date: string
+          holiday_name: string
+          id?: string
+          is_recurring?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          holiday_date?: string
+          holiday_name?: string
+          id?: string
+          is_recurring?: boolean | null
+        }
+        Relationships: []
       }
       insurance_records: {
         Row: {
@@ -5969,6 +6015,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_sla_due_date: {
+        Args: { p_business_hours?: number; p_start_date: string }
+        Returns: string
+      }
       create_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: undefined
