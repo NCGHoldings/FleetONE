@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -12,8 +13,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { DocumentUpload } from "@/components/documents/DocumentUpload";
 import { useToast } from "@/hooks/use-toast";
 import ComplaintQRGenerator from "@/components/complaints/ComplaintQRGenerator";
-import { Clock, FileText, AlertTriangle, CheckCircle, XCircle, User, Phone, Bus, MapPin, Flag, Calendar, Plus } from "lucide-react";
+import { Clock, FileText, AlertTriangle, CheckCircle, XCircle, User, Plus, X, UserPlus, Smile, Frown, Calendar, Flag } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
+
+interface RelatedPerson {
+  name: string;
+  role: string;
+}
+
+interface Profile {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+}
 
 interface Complaint {
   id: string;
@@ -32,28 +45,57 @@ interface Complaint {
   escalation_level: number;
   created_at: string;
   resolved_at?: string;
+  assigned_to?: string;
+  assigned_to_name?: string;
+  action_taken?: string;
+  related_persons?: RelatedPerson[];
+  sla_due_date?: string;
 }
 
 export default function Complaints() {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showManageDialog, setShowManageDialog] = useState(false);
+  const [managingComplaint, setManagingComplaint] = useState<Complaint | null>(null);
   const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(null);
+  const [relatedPersons, setRelatedPersons] = useState<RelatedPerson[]>([]);
+  const [newPersonName, setNewPersonName] = useState('');
+  const [newPersonRole, setNewPersonRole] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: '',
     priority: 'medium',
     type: 'complaint',
-    staff_group: ''
+    staff_group: '',
+    status: 'new',
+    assigned_to: '',
+    action_taken: ''
   });
   const { toast } = useToast();
 
   useEffect(() => {
     fetchComplaints();
+    fetchProfiles();
   }, []);
+
+  const fetchProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, user_id, first_name, last_name')
+        .order('first_name');
+      
+      if (error) throw error;
+      setProfiles(data || []);
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
+    }
+  };
 
   const fetchComplaints = async () => {
     try {
@@ -63,7 +105,11 @@ export default function Complaints() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setComplaints(data || []);
+      const transformedData = (data || []).map(item => ({
+        ...item,
+        related_persons: ((item.related_persons as unknown) as RelatedPerson[]) || []
+      }));
+      setComplaints(transformedData);
     } catch (error) {
       toast({
         title: "Error",
@@ -93,16 +139,21 @@ export default function Complaints() {
     }
   };
 
-  const calculateSLA = (createdAt: string, status: string) => {
-    if (status === 'resolved') return 'Resolved';
+  const calculateSLA = (complaint: Complaint) => {
+    if (complaint.status === 'resolved') return <span className="text-success">Resolved</span>;
     
-    const created = new Date(createdAt);
+    const dueDate = complaint.sla_due_date ? new Date(complaint.sla_due_date) : null;
+    if (!dueDate) return <span className="text-muted-foreground">N/A</span>;
+    
     const now = new Date();
-    const hoursDiff = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60));
+    const diff = dueDate.getTime() - now.getTime();
+    const hoursDiff = Math.floor(diff / (1000 * 60 * 60));
     
-    if (hoursDiff > 48) return 'Overdue';
-    if (hoursDiff > 24) return 'Due Soon';
-    return `${48 - hoursDiff}h remaining`;
+    if (diff < 0) return <span className="text-destructive font-semibold">Overdue</span>;
+    if (hoursDiff < 8) return <span className="text-warning font-semibold">{hoursDiff}h left</span>;
+    
+    const daysDiff = Math.ceil(hoursDiff / 8);
+    return <span className="text-success">{daysDiff}d left</span>;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -173,7 +224,10 @@ export default function Complaints() {
         category: '',
         priority: 'medium',
         type: 'complaint',
-        staff_group: ''
+        staff_group: '',
+        status: 'new',
+        assigned_to: '',
+        action_taken: ''
       });
       setShowAddDialog(false);
       
@@ -197,7 +251,10 @@ export default function Complaints() {
       category: complaint.category,
       priority: complaint.priority,
       type: complaint.type,
-      staff_group: complaint.staff_group || ''
+      staff_group: complaint.staff_group || '',
+      status: complaint.status || 'new',
+      assigned_to: complaint.assigned_to || '',
+      action_taken: complaint.action_taken || ''
     });
     setShowEditDialog(true);
   };
@@ -240,7 +297,10 @@ export default function Complaints() {
         category: '',
         priority: 'medium',
         type: 'complaint',
-        staff_group: ''
+        staff_group: '',
+        status: 'new',
+        assigned_to: '',
+        action_taken: ''
       });
       setShowEditDialog(false);
       setEditingComplaint(null);
@@ -350,7 +410,7 @@ export default function Complaints() {
       header: "SLA Status",
       cell: ({ row }) => (
         <div className="text-sm">
-          {calculateSLA(row.original.created_at, row.original.status)}
+          {calculateSLA(row.original)}
         </div>
       ),
     },
