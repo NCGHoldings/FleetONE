@@ -39,6 +39,7 @@ interface AccidentRecord {
   location?: string;
   insurer_claim_ref?: string;
   status: string;
+  Driver?: string;
   created_at: string;
   updated_at: string;
   accident_documents?: { count: number };
@@ -335,6 +336,18 @@ export function AccidentInsurance() {
         const blNumber = row.getValue("bl_number") as string;
         return blNumber ? (
           <span className="font-mono text-sm">{blNumber}</span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      }
+    },
+    {
+      accessorKey: "Driver",
+      header: "Driver",
+      cell: ({ row }) => {
+        const driver = row.getValue("Driver") as string;
+        return driver ? (
+          <span className="text-sm">{driver}</span>
         ) : (
           <span className="text-muted-foreground">-</span>
         );
