@@ -344,10 +344,104 @@ export default function Complaints() {
     }
   };
 
+  const handleManage = (complaint: Complaint) => {
+    setManagingComplaint(complaint);
+    setRelatedPersons(complaint.related_persons || []);
+    setFormData({
+      title: complaint.title,
+      description: complaint.description,
+      category: complaint.category,
+      priority: complaint.priority,
+      type: complaint.type,
+      staff_group: complaint.staff_group || '',
+      status: complaint.status || 'new',
+      assigned_to: complaint.assigned_to || '',
+      action_taken: complaint.action_taken || ''
+    });
+    setShowManageDialog(true);
+  };
+
+  const handleManageUpdate = async () => {
+    if (!managingComplaint) return;
+
+    try {
+      const assignedProfile = profiles.find(p => p.user_id === formData.assigned_to);
+      
+      const { error } = await supabase
+        .from('feedback_complaints')
+        .update({
+          status: formData.status,
+          assigned_to: formData.assigned_to || null,
+          assigned_to_name: assignedProfile ? `${assignedProfile.first_name} ${assignedProfile.last_name}` : null,
+          action_taken: formData.action_taken || null,
+          related_persons: (relatedPersons.length > 0 ? relatedPersons : null) as any,
+          resolved_at: formData.status === 'resolved' ? new Date().toISOString() : null
+        })
+        .eq('id', managingComplaint.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Complaint updated successfully",
+      });
+
+      setShowManageDialog(false);
+      setManagingComplaint(null);
+      setRelatedPersons([]);
+      fetchComplaints();
+    } catch (error) {
+      console.error('Error updating complaint:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update complaint",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const addRelatedPerson = () => {
+    if (!newPersonName.trim() || !newPersonRole.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter both name and role",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setRelatedPersons([...relatedPersons, { name: newPersonName, role: newPersonRole }]);
+    setNewPersonName('');
+    setNewPersonRole('');
+  };
+
+  const removeRelatedPerson = (index: number) => {
+    setRelatedPersons(relatedPersons.filter((_, i) => i !== index));
+  };
+
   const columns: ColumnDef<Complaint>[] = [
     {
+      accessorKey: "type",
+      header: "Type",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          {row.getValue("type") === 'feedback' ? (
+            <Badge className="bg-success text-success-foreground">
+              <Smile className="h-3 w-3 mr-1" />
+              Feedback
+            </Badge>
+          ) : (
+            <Badge className="bg-destructive text-destructive-foreground">
+              <Frown className="h-3 w-3 mr-1" />
+              Complaint
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    {
       accessorKey: "feedback_id",
-      header: "Complaint ID",
+      header: "ID",
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <div className="font-medium">{row.getValue("feedback_id") || `CMP-${row.original.id.slice(-6)}`}</div>
@@ -415,12 +509,12 @@ export default function Complaints() {
       ),
     },
     {
-      accessorKey: "current_handler",
+      accessorKey: "assigned_to_name",
       header: "Assigned To",
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <User className="h-4 w-4 text-muted-foreground" />
-          {row.getValue("current_handler") || "Unassigned"}
+          {row.getValue("assigned_to_name") || "Unassigned"}
         </div>
       ),
     },
@@ -429,6 +523,14 @@ export default function Complaints() {
       header: "Actions",
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => handleManage(row.original)}
+          >
+            <User className="h-4 w-4 mr-1" />
+            Manage
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -567,12 +669,35 @@ export default function Complaints() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
+              <Label htmlFor="type">Type *</Label>
+              <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="complaint">
+                    <div className="flex items-center gap-2">
+                      <Frown className="h-4 w-4" />
+                      Complaint
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="feedback">
+                    <div className="flex items-center gap-2">
+                      <Smile className="h-4 w-4" />
+                      Good Feedback
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label htmlFor="title">Title *</Label>
               <Input
                 id="title"
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Brief description of the complaint"
+                placeholder="Brief description"
                 required
               />
             </div>
@@ -739,15 +864,198 @@ export default function Complaints() {
         </DialogContent>
       </Dialog>
 
+      {/* Manage Complaint Dialog */}
+      <Dialog open={showManageDialog} onOpenChange={setShowManageDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage {managingComplaint?.type === 'feedback' ? 'Feedback' : 'Complaint'} - {managingComplaint?.feedback_id}</DialogTitle>
+          </DialogHeader>
+          <Tabs defaultValue="status" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="status">Status & Assignment</TabsTrigger>
+              <TabsTrigger value="action">Action Taken</TabsTrigger>
+              <TabsTrigger value="persons">Related Persons</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="status" className="space-y-4 mt-4">
+              <div>
+                <Label htmlFor="manage-status">Status *</Label>
+                <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        New
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="in_progress">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        In Progress
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="resolved">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Resolved
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="escalated">
+                      <div className="flex items-center gap-2">
+                        <XCircle className="h-4 w-4" />
+                        Escalated
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="manage-assigned">Assign To Staff</Label>
+                <Select value={formData.assigned_to} onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select staff member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Unassigned</SelectItem>
+                    {profiles.map((profile) => (
+                      <SelectItem key={profile.user_id} value={profile.user_id}>
+                        {profile.first_name} {profile.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium">SLA Status</Label>
+                <div className="mt-2 p-3 border rounded-md">
+                  {managingComplaint && calculateSLA(managingComplaint)}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="action" className="space-y-4 mt-4">
+              <div>
+                <Label htmlFor="manage-action">Action Taken</Label>
+                <Textarea
+                  id="manage-action"
+                  value={formData.action_taken}
+                  onChange={(e) => setFormData(prev => ({ ...prev, action_taken: e.target.value }))}
+                  placeholder="Describe what actions were taken to address this complaint or feedback..."
+                  rows={6}
+                />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Document any steps taken, communications made, or resolutions implemented.
+                </p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="persons" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <Label>Related Persons</Label>
+                
+                {relatedPersons.length > 0 && (
+                  <div className="space-y-2">
+                    {relatedPersons.map((person, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-md bg-muted/50">
+                        <div>
+                          <p className="font-medium">{person.name}</p>
+                          <p className="text-sm text-muted-foreground">{person.role}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeRelatedPerson(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="person-name">Person Name</Label>
+                    <Input
+                      id="person-name"
+                      value={newPersonName}
+                      onChange={(e) => setNewPersonName(e.target.value)}
+                      placeholder="e.g., John Doe"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="person-role">Role/Involvement</Label>
+                    <Input
+                      id="person-role"
+                      value={newPersonRole}
+                      onChange={(e) => setNewPersonRole(e.target.value)}
+                      placeholder="e.g., Driver, Witness"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addRelatedPerson}
+                  className="w-full"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Person
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex gap-2 justify-end pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => setShowManageDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleManageUpdate}>
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* View Complaint Dialog */}
       {selectedComplaint && (
         <Dialog open={!!selectedComplaint} onOpenChange={() => setSelectedComplaint(null)}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Complaint Details - {selectedComplaint.feedback_id}</DialogTitle>
+              <DialogTitle>
+                {selectedComplaint.type === 'feedback' ? 'Feedback' : 'Complaint'} Details - {selectedComplaint.feedback_id}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium">Type</Label>
+                  {selectedComplaint.type === 'feedback' ? (
+                    <Badge className="bg-success text-success-foreground mt-1">
+                      <Smile className="h-3 w-3 mr-1" />
+                      Good Feedback
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-destructive text-destructive-foreground mt-1">
+                      <Frown className="h-3 w-3 mr-1" />
+                      Complaint
+                    </Badge>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Status</Label>
+                  <div className="mt-1">
+                    <Badge className={getStatusColor(selectedComplaint.status)}>
+                      {selectedComplaint.status}
+                    </Badge>
+                  </div>
+                </div>
                 <div>
                   <Label className="text-sm font-medium">Category</Label>
                   <p>{selectedComplaint.category}</p>
@@ -759,17 +1067,46 @@ export default function Complaints() {
                   </Badge>
                 </div>
               </div>
+
+              <div>
+                <Label className="text-sm font-medium">Assigned To</Label>
+                <p className="mt-1">{selectedComplaint.assigned_to_name || 'Unassigned'}</p>
+              </div>
+
               <div>
                 <Label className="text-sm font-medium">Description</Label>
                 <p className="mt-1 text-sm text-muted-foreground">{selectedComplaint.description}</p>
               </div>
+
+              {selectedComplaint.action_taken && (
+                <div>
+                  <Label className="text-sm font-medium">Action Taken</Label>
+                  <p className="mt-1 text-sm text-muted-foreground">{selectedComplaint.action_taken}</p>
+                </div>
+              )}
+
+              {selectedComplaint.related_persons && selectedComplaint.related_persons.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium">Related Persons</Label>
+                  <div className="mt-2 space-y-2">
+                    {selectedComplaint.related_persons.map((person, index) => (
+                      <div key={index} className="p-2 border rounded-md bg-muted/50">
+                        <p className="font-medium">{person.name}</p>
+                        <p className="text-sm text-muted-foreground">{person.role}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selectedComplaint.resolution && (
                 <div>
                   <Label className="text-sm font-medium">Resolution</Label>
                   <p className="mt-1 text-sm text-muted-foreground">{selectedComplaint.resolution}</p>
                 </div>
               )}
-              <div className="flex items-center gap-4 text-sm">
+
+              <div className="flex items-center gap-4 text-sm border-t pt-4">
                 <span>Created: {new Date(selectedComplaint.created_at).toLocaleString()}</span>
                 {selectedComplaint.resolved_at && (
                   <span>Resolved: {new Date(selectedComplaint.resolved_at).toLocaleString()}</span>
