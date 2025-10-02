@@ -66,6 +66,7 @@ interface AccidentDocument {
   version: number;
   uploaded_at: string;
   download_url?: string;
+  document_type: string;
 }
 
 interface AccidentDetailsModalProps {
@@ -81,6 +82,7 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
   const [loading, setLoading] = useState(false);
   const [documents, setDocuments] = useState<AccidentDocument[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [documentType, setDocumentType] = useState<string>('License');
   
   const [formData, setFormData] = useState<Partial<AccidentRecord>>({});
 
@@ -178,8 +180,9 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      uploadFormData.append('documentType', documentType);
 
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(`https://wwjpdszkmtnzshbulkon.supabase.co/functions/v1/accident-documents/${accident.id}/documents`, {
@@ -187,7 +190,7 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
         headers: {
           'Authorization': `Bearer ${session?.access_token}`
         },
-        body: formData
+        body: uploadFormData
       });
 
       if (!response.ok) {
@@ -534,22 +537,6 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
               <h3 className="text-lg font-semibold">Documents</h3>
               {isAdmin && (
                 <div className="flex gap-2">
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.docx"
-                    onChange={handleFileUpload}
-                    style={{ display: 'none' }}
-                    id="file-upload"
-                    disabled={uploading}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => document.getElementById('file-upload')?.click()}
-                    disabled={uploading}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploading ? 'Uploading...' : 'Upload Document'}
-                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -562,6 +549,49 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
               )}
             </div>
 
+            {isAdmin && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="document-type">Document Type</Label>
+                      <Select value={documentType} onValueChange={setDocumentType}>
+                        <SelectTrigger id="document-type">
+                          <SelectValue placeholder="Select document type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="License">License</SelectItem>
+                          <SelectItem value="Estimate Receipt">Estimate Receipt</SelectItem>
+                          <SelectItem value="Final Bill">Final Bill</SelectItem>
+                          <SelectItem value="Part Quotation">Part Quotation</SelectItem>
+                          <SelectItem value="After Repair Inspection">After Repair Inspection</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx"
+                        onChange={handleFileUpload}
+                        style={{ display: 'none' }}
+                        id="file-upload"
+                        disabled={uploading}
+                      />
+                      <Button
+                        onClick={() => document.getElementById('file-upload')?.click()}
+                        disabled={uploading}
+                        className="w-full"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {uploading ? 'Uploading...' : 'Upload Document'}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="space-y-2">
               {documents.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No documents uploaded</p>
@@ -572,7 +602,10 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
                       <div className="flex items-center gap-3">
                         <FileText className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="font-medium">{doc.original_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{doc.original_name}</p>
+                            <Badge variant="outline">{doc.document_type}</Badge>
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {doc.file_type} • {(doc.file_size / 1024 / 1024).toFixed(2)}MB • v{doc.version} • 
                             {format(parseISO(doc.uploaded_at), 'MMM dd, yyyy HH:mm')}

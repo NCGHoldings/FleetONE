@@ -82,6 +82,7 @@ serve(async (req) => {
         // Upload document
         const formData = await req.formData();
         const file = formData.get('file') as File;
+        const documentType = formData.get('documentType') as string || 'Other';
         
         if (!file) {
           throw new Error('No file provided');
@@ -145,7 +146,8 @@ serve(async (req) => {
             file_size: file.size,
             file_path: filePath,
             version: version,
-            uploaded_by: user.id
+            uploaded_by: user.id,
+            document_type: documentType
           })
           .select()
           .single();

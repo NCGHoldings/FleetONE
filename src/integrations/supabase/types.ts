@@ -58,6 +58,7 @@ export type Database = {
       accident_documents: {
         Row: {
           accident_id: string
+          document_type: string
           file_name: string
           file_path: string
           file_size: number
@@ -70,6 +71,7 @@ export type Database = {
         }
         Insert: {
           accident_id: string
+          document_type?: string
           file_name: string
           file_path: string
           file_size: number
@@ -82,6 +84,7 @@ export type Database = {
         }
         Update: {
           accident_id?: string
+          document_type?: string
           file_name?: string
           file_path?: string
           file_size?: number
