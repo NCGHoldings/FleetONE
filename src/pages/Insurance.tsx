@@ -31,9 +31,14 @@ interface InsuranceRecord {
   agent_name?: string;
   agent_phone?: string;
   agent_email?: string;
+  driver_id?: string;
   bus?: {
     bus_no: string;
     registration_number: string;
+  };
+  driver?: {
+    first_name: string;
+    last_name: string;
   };
 }
 
@@ -41,6 +46,7 @@ export default function Insurance() {
   const { hasRole } = useAuth();
   const [insuranceRecords, setInsuranceRecords] = useState<InsuranceRecord[]>([]);
   const [buses, setBuses] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
@@ -56,7 +62,8 @@ export default function Insurance() {
     coverage_amount: '',
     agent_name: '',
     agent_phone: '',
-    agent_email: ''
+    agent_email: '',
+    driver_id: ''
   });
 
   const isAdmin = hasRole('super_admin') || hasRole('admin');
@@ -67,7 +74,8 @@ export default function Insurance() {
         .from('insurance_records')
         .select(`
           *,
-          buses(bus_no, registration_number)
+          buses(bus_no, registration_number),
+          driver:profiles!insurance_records_driver_id_fkey(first_name, last_name)
         `)
         .order('expiry_date', { ascending: true });
 
@@ -91,6 +99,21 @@ export default function Insurance() {
       setBuses(data || []);
     } catch (error) {
       console.error('Error fetching buses:', error);
+    }
+  };
+
+  const fetchDrivers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, employee_id')
+        .eq('status', 'active')
+        .order('first_name');
+
+      if (error) throw error;
+      setDrivers(data || []);
+    } catch (error) {
+      console.error('Error fetching drivers:', error);
     } finally {
       setLoading(false);
     }
@@ -99,6 +122,7 @@ export default function Insurance() {
   useEffect(() => {
     fetchInsuranceRecords();
     fetchBuses();
+    fetchDrivers();
   }, []);
 
   const handleSubmit = async () => {
@@ -140,7 +164,8 @@ export default function Insurance() {
       coverage_amount: '',
       agent_name: '',
       agent_phone: '',
-      agent_email: ''
+      agent_email: '',
+      driver_id: ''
     });
   };
 
@@ -166,6 +191,14 @@ export default function Insurance() {
     {
       accessorKey: "bus.bus_no",
       header: "Bus No",
+    },
+    {
+      accessorKey: "driver",
+      header: "Driver",
+      cell: ({ row }) => {
+        const driver = row.original.driver;
+        return driver ? `${driver.first_name} ${driver.last_name}` : '-';
+      },
     },
     {
       accessorKey: "insurance_company",
@@ -486,6 +519,23 @@ export default function Insurance() {
                     onChange={(e) => setFormData(prev => ({...prev, agent_phone: e.target.value}))}
                     placeholder="+94 77 123 4567"
                   />
+                </div>
+                
+                <div>
+                  <Label htmlFor="driver_id">Assigned Driver</Label>
+                  <select
+                    id="driver_id"
+                    className="w-full border border-input bg-background px-3 py-2 text-sm ring-offset-background rounded-md"
+                    value={formData.driver_id}
+                    onChange={(e) => setFormData(prev => ({...prev, driver_id: e.target.value}))}
+                  >
+                    <option value="">Select Driver (Optional)</option>
+                    {drivers.map(driver => (
+                      <option key={driver.user_id} value={driver.user_id}>
+                        {driver.first_name} {driver.last_name} - {driver.employee_id}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div className="col-span-2">

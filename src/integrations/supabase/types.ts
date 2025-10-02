@@ -111,6 +111,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           details_of_accident: string | null
+          Driver: string | null
           estimate_amount: number | null
           id: string
           insurer_claim_ref: string | null
@@ -135,6 +136,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           details_of_accident?: string | null
+          Driver?: string | null
           estimate_amount?: number | null
           id?: string
           insurer_claim_ref?: string | null
@@ -159,6 +161,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           details_of_accident?: string | null
+          Driver?: string | null
           estimate_amount?: number | null
           id?: string
           insurer_claim_ref?: string | null
@@ -1006,6 +1009,7 @@ export type Database = {
           bus_id: string
           coverage_amount: number | null
           created_at: string
+          driver_id: string | null
           expiry_date: string
           id: string
           insurance_company: string
@@ -1025,6 +1029,7 @@ export type Database = {
           bus_id: string
           coverage_amount?: number | null
           created_at?: string
+          driver_id?: string | null
           expiry_date: string
           id?: string
           insurance_company: string
@@ -1044,6 +1049,7 @@ export type Database = {
           bus_id?: string
           coverage_amount?: number | null
           created_at?: string
+          driver_id?: string | null
           expiry_date?: string
           id?: string
           insurance_company?: string
@@ -1063,6 +1069,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "buses"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_records_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
