@@ -83,14 +83,21 @@ export function SubmissionsList({ onSelectSubmission }: Props) {
         .from('special_hire_quotations')
         .select('*')
         .eq('id', submission.quotation_id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (data) {
-        setSelectedQuotation(data);
-        setViewQuotationModalOpen(true);
+      if (!data) {
+        toast({
+          title: "Not Found",
+          description: "Quotation not found",
+          variant: "destructive",
+        });
+        return;
       }
+
+      setSelectedQuotation(data);
+      setViewQuotationModalOpen(true);
     } catch (error) {
       console.error('Error fetching quotation:', error);
       toast({
