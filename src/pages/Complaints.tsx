@@ -365,14 +365,12 @@ export default function Complaints() {
     if (!managingComplaint) return;
 
     try {
-      const assignedProfile = profiles.find(p => p.user_id === formData.assigned_to);
-      
       const { error } = await supabase
         .from('feedback_complaints')
         .update({
           status: formData.status,
-          assigned_to: formData.assigned_to || null,
-          assigned_to_name: assignedProfile ? `${assignedProfile.first_name} ${assignedProfile.last_name}` : null,
+          assigned_to: null, // Keep as null since we're using text input
+          assigned_to_name: formData.assigned_to || null, // Store the typed name here
           action_taken: formData.action_taken || null,
           related_persons: (relatedPersons.length > 0 ? relatedPersons : null) as any,
           resolved_at: formData.status === 'resolved' ? new Date().toISOString() : null
