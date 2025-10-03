@@ -179,7 +179,7 @@ export default function SchoolStudentDatabase() {
         title: "Success",
         description: "Student deleted successfully",
       });
-      fetchStudents();
+      await fetchStudents();
     } catch (error) {
       console.error("Error deleting student:", error);
       toast({
@@ -576,7 +576,8 @@ export default function SchoolStudentDatabase() {
                   description: "Student updated successfully",
                 });
                 setIsEditModalOpen(false);
-                fetchStudents();
+                setSelectedStudent(null);
+                await fetchStudents();
               } catch (error) {
                 console.error("Error updating student:", error);
                 toast({
