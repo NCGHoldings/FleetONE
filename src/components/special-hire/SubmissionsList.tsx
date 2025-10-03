@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Eye, CheckCircle, Clock, FileText } from 'lucide-react';
 import { ColumnDef } from '@tanstack/react-table';
+import { QuotationModal } from './QuotationModal';
 
 interface SpecialHireSubmission {
   id: string;
@@ -26,6 +27,7 @@ interface SpecialHireSubmission {
   drop_datetime: string;
   submission_status: string;
   created_at: string;
+  quotation_id: string | null;
 }
 
 interface Props {
@@ -36,6 +38,8 @@ export function SubmissionsList({ onSelectSubmission }: Props) {
   const [submissions, setSubmissions] = useState<SpecialHireSubmission[]>([]);
   const [filteredSubmissions, setFilteredSubmissions] = useState<SpecialHireSubmission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewQuotationModalOpen, setViewQuotationModalOpen] = useState(false);
+  const [selectedQuotation, setSelectedQuotation] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -61,6 +65,39 @@ export function SubmissionsList({ onSelectSubmission }: Props) {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewQuotation = async (submission: SpecialHireSubmission) => {
+    if (!submission.quotation_id) {
+      toast({
+        title: "No Quotation",
+        description: "No quotation has been created from this submission yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('special_hire_quotations')
+        .select('*')
+        .eq('id', submission.quotation_id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setSelectedQuotation(data);
+        setViewQuotationModalOpen(true);
+      }
+    } catch (error) {
+      console.error('Error fetching quotation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load quotation",
+        variant: "destructive",
+      });
     }
   };
 
@@ -211,13 +248,26 @@ export function SubmissionsList({ onSelectSubmission }: Props) {
       cell: ({ row }) => {
         const submission = row.original;
         return (
-          <Button
-            size="sm"
-            onClick={() => handleSelectSubmission(submission)}
-            disabled={submission.submission_status === 'processed'}
-          >
-            {submission.submission_status === 'processed' ? 'Processed' : 'Use for Quotation'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {submission.quotation_id && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleViewQuotation(submission)}
+                className="gap-1"
+              >
+                <Eye className="w-4 h-4" />
+                View Quotation
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={() => handleSelectSubmission(submission)}
+              disabled={submission.submission_status === 'processed'}
+            >
+              {submission.submission_status === 'processed' ? 'Processed' : 'Use for Quotation'}
+            </Button>
+          </div>
         );
       },
     },
@@ -239,11 +289,26 @@ export function SubmissionsList({ onSelectSubmission }: Props) {
   }
 
   return (
-    <DataTable
-      columns={columns}
-      data={filteredSubmissions}
-      title={`Customer Submissions (${submissions.length})`}
-      onDateRangeChange={handleDateRangeChange}
-    />
+    <>
+      <DataTable
+        columns={columns}
+        data={filteredSubmissions}
+        title={`Customer Submissions (${submissions.length})`}
+        onDateRangeChange={handleDateRangeChange}
+      />
+      
+      {selectedQuotation && (
+        <QuotationModal
+          quotation={selectedQuotation}
+          open={viewQuotationModalOpen}
+          onOpenChange={(open) => {
+            setViewQuotationModalOpen(open);
+            if (!open) {
+              setSelectedQuotation(null);
+            }
+          }}
+        />
+      )}
+    </>
   );
 }

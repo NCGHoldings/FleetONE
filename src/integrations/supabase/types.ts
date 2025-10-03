@@ -2887,6 +2887,7 @@ export type Database = {
           status_change_reason: string | null
           status_changed_at: string | null
           status_changed_by: string | null
+          submission_id: string | null
           total_additional_charges: number | null
           total_expenses: number | null
           total_paid: number | null
@@ -2966,6 +2967,7 @@ export type Database = {
           status_change_reason?: string | null
           status_changed_at?: string | null
           status_changed_by?: string | null
+          submission_id?: string | null
           total_additional_charges?: number | null
           total_expenses?: number | null
           total_paid?: number | null
@@ -3045,6 +3047,7 @@ export type Database = {
           status_change_reason?: string | null
           status_changed_at?: string | null
           status_changed_by?: string | null
+          submission_id?: string | null
           total_additional_charges?: number | null
           total_expenses?: number | null
           total_paid?: number | null
@@ -3084,6 +3087,13 @@ export type Database = {
             referencedRelation: "fuel_settings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "special_hire_quotations_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_submissions"
+            referencedColumns: ["id"]
+          },
         ]
       }
       special_hire_submissions: {
@@ -3101,6 +3111,7 @@ export type Database = {
           number_of_passengers: number
           pickup_datetime: string
           pickup_location: string
+          quotation_id: string | null
           selected_at: string | null
           selected_by: string | null
           special_request: string | null
@@ -3122,6 +3133,7 @@ export type Database = {
           number_of_passengers: number
           pickup_datetime: string
           pickup_location: string
+          quotation_id?: string | null
           selected_at?: string | null
           selected_by?: string | null
           special_request?: string | null
@@ -3143,6 +3155,7 @@ export type Database = {
           number_of_passengers?: number
           pickup_datetime?: string
           pickup_location?: string
+          quotation_id?: string | null
           selected_at?: string | null
           selected_by?: string | null
           special_request?: string | null
@@ -3150,7 +3163,15 @@ export type Database = {
           submission_status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "special_hire_submissions_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_attendance: {
         Row: {

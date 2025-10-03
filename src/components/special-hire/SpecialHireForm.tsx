@@ -1048,6 +1048,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                          (data.discountType === 'amount' && data.discountAmount > 0) ? 'pending' : 'approved') as 'pending' | 'approved' | 'rejected',
         valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
         audit_log: isEditing ? [...(initialData?.audit_log || []), auditEntry].filter(Boolean) : [],
+        // Link to submission if created from one
+        submission_id: submissionData?.id || null,
         // Set created_by for new quotations
         ...(isEditing ? {} : { created_by: userData.user?.id })
       };
@@ -1073,11 +1075,24 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           description: "Quotation updated successfully"
         });
       } else {
-        const { error } = await supabase
+        const { data: insertedQuotation, error } = await supabase
           .from('special_hire_quotations')
-          .insert([quotationData]);
+          .insert([quotationData])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Update submission with quotation_id if created from submission
+        if (submissionData?.id && insertedQuotation) {
+          await supabase
+            .from('special_hire_submissions')
+            .update({ 
+              quotation_id: insertedQuotation.id,
+              submission_status: 'processed'
+            })
+            .eq('id', submissionData.id);
+        }
 
         toast({
           title: "Success",
