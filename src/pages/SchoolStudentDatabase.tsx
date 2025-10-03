@@ -535,6 +535,143 @@ export default function SchoolStudentDatabase() {
           />
         </CardContent>
       </Card>
+
+      {/* Edit Student Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Student</DialogTitle>
+            <DialogDescription>
+              Update student information
+            </DialogDescription>
+          </DialogHeader>
+          {selectedStudent && (
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              try {
+                const { error } = await supabase
+                  .from("school_students")
+                  .update({
+                    student_name: formData.get("student_name") as string,
+                    admission_no: formData.get("admission_no") as string,
+                    grade: formData.get("grade") as string,
+                    parent_name: formData.get("parent_name") as string,
+                    father_contact_no: formData.get("father_contact_no") as string,
+                    mother_contact_no: formData.get("mother_contact_no") as string,
+                    email_id: formData.get("email_id") as string,
+                    address: formData.get("address") as string,
+                    route: formData.get("route") as string,
+                    bus_reg_no: formData.get("bus_reg_no") as string,
+                    service_type: formData.get("service_type") as string,
+                    payment_status: formData.get("payment_status") as string,
+                    payment_amount: formData.get("payment_amount") ? Number(formData.get("payment_amount")) : null,
+                  })
+                  .eq("id", selectedStudent.id);
+
+                if (error) throw error;
+
+                toast({
+                  title: "Success",
+                  description: "Student updated successfully",
+                });
+                setIsEditModalOpen(false);
+                fetchStudents();
+              } catch (error) {
+                console.error("Error updating student:", error);
+                toast({
+                  title: "Error",
+                  description: "Failed to update student",
+                  variant: "destructive",
+                });
+              }
+            }} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="student_name">Student Name*</Label>
+                  <Input id="student_name" name="student_name" defaultValue={selectedStudent.student_name} required />
+                </div>
+                <div>
+                  <Label htmlFor="admission_no">Admission No</Label>
+                  <Input id="admission_no" name="admission_no" defaultValue={selectedStudent.admission_no || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="grade">Grade</Label>
+                  <Input id="grade" name="grade" defaultValue={selectedStudent.grade || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="parent_name">Parent Name</Label>
+                  <Input id="parent_name" name="parent_name" defaultValue={selectedStudent.parent_name || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="father_contact_no">Father Contact</Label>
+                  <Input id="father_contact_no" name="father_contact_no" defaultValue={selectedStudent.father_contact_no || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="mother_contact_no">Mother Contact</Label>
+                  <Input id="mother_contact_no" name="mother_contact_no" defaultValue={selectedStudent.mother_contact_no || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="email_id">Email</Label>
+                  <Input id="email_id" name="email_id" type="email" defaultValue={selectedStudent.email_id || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="route">Route</Label>
+                  <Input id="route" name="route" defaultValue={selectedStudent.route || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="bus_reg_no">Bus Registration No</Label>
+                  <Input id="bus_reg_no" name="bus_reg_no" defaultValue={selectedStudent.bus_reg_no || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="service_type">Service Type</Label>
+                  <Select name="service_type" defaultValue={selectedStudent.service_type || ""}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BothWay">Both Way</SelectItem>
+                      <SelectItem value="OneWay">One Way</SelectItem>
+                      <SelectItem value="Morning">Morning Only</SelectItem>
+                      <SelectItem value="Evening">Evening Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="payment_status">Payment Status</Label>
+                  <Select name="payment_status" defaultValue={selectedStudent.payment_status}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="overdue">Overdue</SelectItem>
+                      <SelectItem value="partial">Partial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="payment_amount">Payment Amount</Label>
+                  <Input id="payment_amount" name="payment_amount" type="number" defaultValue={selectedStudent.payment_amount || ""} />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input id="address" name="address" defaultValue={selectedStudent.address || ""} />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Save Changes
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
