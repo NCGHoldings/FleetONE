@@ -207,6 +207,127 @@ export type Database = {
         }
         Relationships: []
       }
+      bus_loan_payments: {
+        Row: {
+          actual_payment_date: string | null
+          balance_remaining: number
+          created_at: string
+          id: string
+          interest_amount: number
+          loan_id: string
+          paid_by: string | null
+          payment_date: string
+          payment_number: number
+          payment_proof: string | null
+          payment_status: string
+          principal_amount: number
+          total_installment: number
+        }
+        Insert: {
+          actual_payment_date?: string | null
+          balance_remaining: number
+          created_at?: string
+          id?: string
+          interest_amount: number
+          loan_id: string
+          paid_by?: string | null
+          payment_date: string
+          payment_number: number
+          payment_proof?: string | null
+          payment_status?: string
+          principal_amount: number
+          total_installment: number
+        }
+        Update: {
+          actual_payment_date?: string | null
+          balance_remaining?: number
+          created_at?: string
+          id?: string
+          interest_amount?: number
+          loan_id?: string
+          paid_by?: string | null
+          payment_date?: string
+          payment_number?: number
+          payment_proof?: string | null
+          payment_status?: string
+          principal_amount?: number
+          total_installment?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bus_loan_payments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "bus_loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bus_loans: {
+        Row: {
+          bus_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          interest_rate: number
+          lender_contact: string | null
+          lender_name: string
+          loan_amount: number
+          loan_tenure_months: number
+          loan_type: string
+          monthly_installment: number
+          notes: string | null
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bus_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          interest_rate: number
+          lender_contact?: string | null
+          lender_name: string
+          loan_amount: number
+          loan_tenure_months: number
+          loan_type?: string
+          monthly_installment: number
+          notes?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bus_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          interest_rate?: number
+          lender_contact?: string | null
+          lender_name?: string
+          loan_amount?: number
+          loan_tenure_months?: number
+          loan_type?: string
+          monthly_installment?: number
+          notes?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bus_loans_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bus_types: {
         Row: {
           avg_km_per_l: number | null

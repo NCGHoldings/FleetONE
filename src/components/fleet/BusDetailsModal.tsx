@@ -1,16 +1,58 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bus, Calendar, Gauge, MapPin, Wrench, DollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Bus, Calendar, Gauge, MapPin, Wrench, DollarSign, CreditCard, TrendingUp } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
+import { formatCurrency, calculateLoanProgress } from "@/lib/loan-calculator";
 
 interface BusDetailsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   bus: any;
+  onOpenLoanDashboard?: () => void;
 }
 
-export function BusDetailsModal({ open, onOpenChange, bus }: BusDetailsModalProps) {
+export function BusDetailsModal({ open, onOpenChange, bus, onOpenLoanDashboard }: BusDetailsModalProps) {
   if (!bus) return null;
+
+  const [loanData, setLoanData] = useState<any>(null);
+  const [loanStats, setLoanStats] = useState<{ totalPaid: number; balanceDue: number; progress: number } | null>(null);
+
+  useEffect(() => {
+    if (open && bus) {
+      fetchLoanData();
+    }
+  }, [open, bus]);
+
+  const fetchLoanData = async () => {
+    try {
+      const { data: loan } = await supabase
+        .from("bus_loans")
+        .select("*, bus_loan_payments(*)")
+        .eq("bus_id", bus.id)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (loan) {
+        const payments = loan.bus_loan_payments || [];
+        const paidPayments = payments.filter((p: any) => p.payment_status === "paid");
+        const totalPaid = paidPayments.reduce((sum: number, p: any) => sum + p.total_installment, 0);
+        const balanceDue = loan.loan_amount - totalPaid;
+        const progress = calculateLoanProgress(totalPaid, loan.loan_amount);
+
+        setLoanData(loan);
+        setLoanStats({ totalPaid, balanceDue, progress });
+      } else {
+        setLoanData(null);
+        setLoanStats(null);
+      }
+    } catch (error) {
+      console.error("Error fetching loan data:", error);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -195,6 +237,53 @@ export function BusDetailsModal({ open, onOpenChange, bus }: BusDetailsModalProp
               )}
             </CardContent>
           </Card>
+
+          {/* Loan Information */}
+          {loanData && loanStats && (
+            <Card className="md:col-span-2 border-primary/20 bg-primary/5">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" />
+                  Loan Information
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={onOpenLoanDashboard}>
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  View Full Details
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Loan Amount</p>
+                    <p className="font-bold text-lg">{formatCurrency(loanData.loan_amount)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {loanData.lender_name}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Monthly EMI</p>
+                    <p className="font-bold text-lg text-primary">{formatCurrency(loanData.monthly_installment)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      @ {loanData.interest_rate}% interest
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Amount Paid</p>
+                    <p className="font-bold text-lg text-green-600">{formatCurrency(loanStats.totalPaid)}</p>
+                    <Progress value={loanStats.progress} className="mt-2 h-2" />
+                    <p className="text-xs text-muted-foreground mt-1">{loanStats.progress}% paid</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Balance Due</p>
+                    <p className="font-bold text-lg text-destructive">{formatCurrency(loanStats.balanceDue)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Until {new Date(loanData.end_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DialogContent>
     </Dialog>

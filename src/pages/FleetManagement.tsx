@@ -3,7 +3,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus, Loader2, Eye, Edit, History, CalendarPlus, UserX } from "lucide-react";
+import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus, Loader2, Eye, Edit, History, CalendarPlus, UserX, CreditCard } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
@@ -28,6 +28,8 @@ import { BusDetailsModal } from "@/components/fleet/BusDetailsModal";
 import { EditBusModal } from "@/components/fleet/EditBusModal";
 import { ServiceHistoryModal } from "@/components/fleet/ServiceHistoryModal";
 import { ScheduleMaintenanceModal } from "@/components/fleet/ScheduleMaintenanceModal";
+import { BusLoanModal } from "@/components/fleet/BusLoanModal";
+import { BusLoanDashboardModal } from "@/components/fleet/BusLoanDashboardModal";
 
 interface Fleet {
   id: string;
@@ -78,6 +80,8 @@ const FleetManagementComponent = () => {
   const [serviceHistoryModalOpen, setServiceHistoryModalOpen] = useState(false);
   const [scheduleMaintenanceModalOpen, setScheduleMaintenanceModalOpen] = useState(false);
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
+  const [loanModalOpen, setLoanModalOpen] = useState(false);
+  const [loanDashboardModalOpen, setLoanDashboardModalOpen] = useState(false);
   const { toast } = useToast();
 
   const handleViewDetails = (bus: Fleet) => {
@@ -98,6 +102,24 @@ const FleetManagementComponent = () => {
   const handleScheduleMaintenance = (bus: Fleet) => {
     setSelectedBus(bus);
     setScheduleMaintenanceModalOpen(true);
+  };
+
+  const handleManageLoan = async (bus: Fleet) => {
+    setSelectedBus(bus);
+    
+    // Check if bus has active loan
+    const { data: loanData } = await supabase
+      .from("bus_loans")
+      .select("id")
+      .eq("bus_id", bus.id)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (loanData) {
+      setLoanDashboardModalOpen(true);
+    } else {
+      setLoanModalOpen(true);
+    }
   };
 
   const handleDeactivate = (bus: Fleet) => {
@@ -230,8 +252,12 @@ const FleetManagementComponent = () => {
                 <CalendarPlus className="w-4 h-4" />
                 Schedule Maintenance
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleManageLoan(fleet)} className="gap-2">
+                <CreditCard className="w-4 h-4" />
+                Manage Loan
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => handleDeactivate(fleet)} 
                 className={`gap-2 ${fleet.status === 'retired' ? 'text-success' : 'text-destructive'}`}
               >
@@ -638,6 +664,10 @@ const FleetManagementComponent = () => {
         open={detailsModalOpen}
         onOpenChange={setDetailsModalOpen}
         bus={selectedBus}
+        onOpenLoanDashboard={() => {
+          setDetailsModalOpen(false);
+          setLoanDashboardModalOpen(true);
+        }}
       />
 
       <EditBusModal
@@ -658,6 +688,21 @@ const FleetManagementComponent = () => {
         onOpenChange={setScheduleMaintenanceModalOpen}
         bus={selectedBus}
         onSuccess={fetchFleet}
+      />
+
+      <BusLoanModal
+        open={loanModalOpen}
+        onOpenChange={setLoanModalOpen}
+        busId={selectedBus?.id || ""}
+        busNumber={selectedBus?.bus_no || ""}
+        onSuccess={fetchFleet}
+      />
+
+      <BusLoanDashboardModal
+        open={loanDashboardModalOpen}
+        onOpenChange={setLoanDashboardModalOpen}
+        busId={selectedBus?.id || ""}
+        busNumber={selectedBus?.bus_no || ""}
       />
 
       {/* Deactivate Confirmation Dialog */}
