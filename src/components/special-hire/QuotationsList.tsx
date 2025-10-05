@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2, Loader2 } from 'lucide-react';
+import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2, Loader2, Calculator } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { QuotationModal } from './QuotationModal';
@@ -110,9 +110,10 @@ const getRevenueBreakdown = (quotation: Quotation) => {
 
 interface Props {
   onRefresh: () => void;
+  onViewInCalculator?: (quotationId: string) => void;
 }
 
-export function QuotationsList({ onRefresh }: Props) {
+export function QuotationsList({ onRefresh, onViewInCalculator }: Props) {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -765,6 +766,15 @@ export function QuotationsList({ onRefresh }: Props) {
                 title="View Quotation"
               >
                 <Eye className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => onViewInCalculator?.(quotation.id)}
+                title="View Cost Breakdown"
+                className="text-primary hover:text-primary"
+              >
+                <Calculator className="h-4 w-4" />
               </Button>
               {quotation.status === 'draft' && (
                 <>

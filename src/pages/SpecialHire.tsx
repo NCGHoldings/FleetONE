@@ -47,6 +47,7 @@ export default function SpecialHire() {
   const [activeTab, setActiveTab] = useState('quotations');
   const [showForm, setShowForm] = useState(false);
   const [submissionData, setSubmissionData] = useState(null);
+  const [selectedCalculatorQuotationId, setSelectedCalculatorQuotationId] = useState<string | undefined>(undefined);
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
     pendingQuotations: 0,
@@ -248,6 +249,11 @@ export default function SpecialHire() {
     setShowForm(true);
   };
 
+  const handleViewInCalculator = (quotationId: string) => {
+    setSelectedCalculatorQuotationId(quotationId);
+    setActiveTab('calculator');
+  };
+
   // Show loading state while checking access
   if (checkingAccess) {
     return (
@@ -439,6 +445,11 @@ export default function SpecialHire() {
             <Calculator className="h-4 w-4" />
             <span className="hidden sm:inline">Calculator</span>
           </TabsTrigger>
+          
+          <TabsTrigger value="calculator-legacy" className="flex items-center gap-2 hidden">
+            <Calculator className="h-4 w-4" />
+            <span className="hidden sm:inline">Calculator</span>
+          </TabsTrigger>
 
           {/* Admin-only tabs */}
           {isAdmin && (
@@ -481,7 +492,10 @@ export default function SpecialHire() {
               New Quotation
             </Button>
           </div>
-          <QuotationsList onRefresh={loadStats} />
+            <QuotationsList 
+              onRefresh={loadStats} 
+              onViewInCalculator={handleViewInCalculator}
+            />
         </TabsContent>
 
         <TabsContent value="submissions" className="space-y-6">
@@ -494,7 +508,7 @@ export default function SpecialHire() {
         </TabsContent>
 
         <TabsContent value="calculator" className="space-y-6">
-          <EnhancedCostCalculator />
+          <EnhancedCostCalculator preselectedQuotationId={selectedCalculatorQuotationId} />
         </TabsContent>
 
         {/* Admin-only content */}
