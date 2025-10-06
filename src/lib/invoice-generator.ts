@@ -140,35 +140,43 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           *Note: Please make sure to place the name, signature and date in the given space accordingly.
         </p>
 
-        <div style="margin-top: 30px; display: flex; justify-content: space-between;">
-          <div style="width: 30%;">
-            <b>Prepared by :</b><br>
-            <p style="margin: 5px 0;">Name: ${data.preparedBy?.approver_name || '.........................'}</p>
-            ${data.preparedBy?.signature_data 
-              ? `<p style="margin: 5px 0;"><img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 120px; max-height: 40px; border: 1px solid #ddd;"></p>` 
-              : '<p style="margin: 5px 0;">Signature: .........................</p>'
-            }
-            <p style="margin: 5px 0;">Date: ${data.preparedBy?.approval_date || currentDate}</p>
-          </div>
-          <div style="width: 30%;">
-            <b>Checked by :</b><br>
-            <p style="margin: 5px 0;">Name: ${data.checkedBy?.approver_name || '.........................'}</p>
-            ${data.checkedBy?.signature_data 
-              ? `<p style="margin: 5px 0;"><img src="${data.checkedBy.signature_data}" alt="Signature" style="max-width: 120px; max-height: 40px; border: 1px solid #ddd;"></p>` 
-              : '<p style="margin: 5px 0;">Signature: .........................</p>'
-            }
-            <p style="margin: 5px 0;">Date: ${data.checkedBy?.approval_date || '.........................'}</p>
-          </div>
-          <div style="width: 30%;">
-            <b>Approved by :</b><br>
-            <p style="margin: 5px 0;">Name: ${data.approvedBy?.approver_name || '.........................'}</p>
-            ${data.approvedBy?.signature_data 
-              ? `<p style="margin: 5px 0;"><img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 120px; max-height: 40px; border: 1px solid #ddd;"></p>` 
-              : '<p style="margin: 5px 0;">Signature: .........................</p>'
-            }
-            <p style="margin: 5px 0;">Date: ${data.approvedBy?.approval_date || '.........................'}</p>
-          </div>
-        </div>
+        <!-- Signature Section -->
+        <table style="width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 14px;">
+          <tr style="background: #f0f0f0;">
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Prepared By</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Checked By</th>
+            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Approved By</th>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #000; padding: 10px; vertical-align: top;">
+              <b>Name:</b> ${data.preparedBy?.approver_name || '.........................'}<br>
+              <b>Signature:</b><br>
+              ${data.preparedBy?.signature_data 
+                ? `<img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin: 5px 0; border: 1px solid #ddd;">` 
+                : '<div style="height: 50px; border-bottom: 1px solid #000; margin: 5px 0;"></div>'
+              }
+              <br><b>Date:</b> ${data.preparedBy?.approval_date || currentDate}
+            </td>
+            <td style="border: 1px solid #000; padding: 10px; vertical-align: top;">
+              <b>Name:</b> ${data.checkedBy?.approver_name || '.........................'}<br>
+              <b>Signature:</b><br>
+              ${data.checkedBy?.signature_data 
+                ? `<img src="${data.checkedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin: 5px 0; border: 1px solid #ddd;">` 
+                : '<div style="height: 50px; border-bottom: 1px solid #000; margin: 5px 0;"></div>'
+              }
+              <br><b>Date:</b> ${data.checkedBy?.approval_date || '.........................'} 
+            </td>
+            <td style="border: 1px solid #000; padding: 10px; vertical-align: top;">
+              <b>Name:</b> ${data.approvedBy?.approver_name || '.........................'}<br>
+              <b>Signature:</b><br>
+              ${data.approvedBy?.signature_data 
+                ? `<img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin: 5px 0; border: 1px solid #ddd;">` 
+                : '<div style="height: 50px; border-bottom: 1px solid #000; margin: 5px 0;"></div>'
+              }
+              <br><b>Date:</b> ${data.approvedBy?.approval_date || '.........................'}
+            </td>
+          </tr>
+        </table>
 
         <div style="margin-top: 40px; text-align: center; font-size: 12px;">
           Page 1 of 1 <br>
@@ -305,36 +313,43 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             1. Cheques are to be drawn in favour of <b>NCG EXPRESS (PVT) LIMITED</b> and A/C payee only.
           </div>
 
-          <!-- Signatures -->
-          <div style="display: flex; justify-content: space-between; margin-top: 50px; font-size: 14px;">
-            <div style="text-align: center;">
-              ${data.preparedBy?.signature_data 
-                ? `<img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin-bottom: 10px; border: 1px solid #ddd;">` 
-                : '<hr style="width: 150px;">'
-              }
-              ${data.preparedBy?.approver_name || 'Darshini Pallewela'}<br>
-              Prepared By<br>
-              ${data.preparedBy?.approval_date || currentDate}
-            </div>
-            <div style="text-align: center;">
-              ${data.checkedBy?.signature_data 
-                ? `<img src="${data.checkedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin-bottom: 10px; border: 1px solid #ddd;">` 
-                : '<hr style="width: 150px;">'
-              }
-              ${data.checkedBy?.approver_name || 'Kasun Perera'}<br>
-              Checked By<br>
-              ${data.checkedBy?.approval_date || currentDate}
-            </div>
-            <div style="text-align: center;">
-              ${data.approvedBy?.signature_data 
-                ? `<img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin-bottom: 10px; border: 1px solid #ddd;">` 
-                : '<hr style="width: 150px;">'
-              }
-              ${data.approvedBy?.approver_name || 'Sithara Thennakoon'}<br>
-              Approved By<br>
-              ${data.approvedBy?.approval_date || format(new Date(Date.now() - 24 * 60 * 60 * 1000), 'dd/MM/yyyy')}
-            </div>
-          </div>
+          <!-- Signature Section -->
+          <table style="width: 100%; border-collapse: collapse; margin-top: 50px; font-size: 14px;">
+            <tr style="background: #f0f0f0;">
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">Prepared By</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">Checked By</th>
+              <th style="border: 1px solid #000; padding: 8px; text-align: center;">Approved By</th>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #000; padding: 10px; vertical-align: top; text-align: center;">
+                <b>Name:</b> ${data.preparedBy?.approver_name || '.........................'}<br>
+                <b>Signature:</b><br>
+                ${data.preparedBy?.signature_data 
+                  ? `<img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin: 5px 0; border: 1px solid #ddd;">` 
+                  : '<div style="height: 50px; border-bottom: 1px solid #000; margin: 5px 0; width: 150px; display: inline-block;"></div>'
+                }
+                <br><b>Date:</b> ${data.preparedBy?.approval_date || currentDate}
+              </td>
+              <td style="border: 1px solid #000; padding: 10px; vertical-align: top; text-align: center;">
+                <b>Name:</b> ${data.checkedBy?.approver_name || '.........................'}<br>
+                <b>Signature:</b><br>
+                ${data.checkedBy?.signature_data 
+                  ? `<img src="${data.checkedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin: 5px 0; border: 1px solid #ddd;">` 
+                  : '<div style="height: 50px; border-bottom: 1px solid #000; margin: 5px 0; width: 150px; display: inline-block;"></div>'
+                }
+                <br><b>Date:</b> ${data.checkedBy?.approval_date || currentDate}
+              </td>
+              <td style="border: 1px solid #000; padding: 10px; vertical-align: top; text-align: center;">
+                <b>Name:</b> ${data.approvedBy?.approver_name || '.........................'}<br>
+                <b>Signature:</b><br>
+                ${data.approvedBy?.signature_data 
+                  ? `<img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin: 5px 0; border: 1px solid #ddd;">` 
+                  : '<div style="height: 50px; border-bottom: 1px solid #000; margin: 5px 0; width: 150px; display: inline-block;"></div>'
+                }
+                <br><b>Date:</b> ${data.approvedBy?.approval_date || format(new Date(Date.now() - 24 * 60 * 60 * 1000), 'dd/MM/yyyy')}
+              </td>
+            </tr>
+          </table>
 
           <!-- Note -->
           <div style="margin-top: 30px; font-size: 12px; text-align: center; color: #555; font-style: italic;">
