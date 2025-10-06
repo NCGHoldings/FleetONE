@@ -64,17 +64,38 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
       const result = await deleteApproval(approvalId);
       if (result.success) {
         await loadApprovals();
+        
+        // Automatically regenerate PDF after deleting signature
+        if (quotationId) {
+          toast.info('Updating PDF...');
+          const regenResult = await regenerateDocumentWithSignatures(documentId, quotationId);
+          if (regenResult.success) {
+            toast.success('Signature deleted and PDF updated!');
+          }
+        } else {
+          toast.success('Signature deleted successfully');
+        }
+        
         onSignatureUpdated?.();
-        toast.success('Signature deleted successfully');
       }
     }
   };
 
   const handleSignatureSaved = async () => {
     await loadApprovals();
-    toast.success('Signature saved successfully');
     
-    // Notify parent component to handle regeneration
+    // Automatically regenerate PDF with new signatures
+    if (quotationId) {
+      toast.info('Updating PDF with new signature...');
+      const result = await regenerateDocumentWithSignatures(documentId, quotationId);
+      if (result.success) {
+        toast.success('PDF updated with signature!');
+      }
+    } else {
+      toast.success('Signature saved successfully');
+    }
+    
+    // Notify parent component
     if (onSignatureUpdated) {
       onSignatureUpdated();
     }
