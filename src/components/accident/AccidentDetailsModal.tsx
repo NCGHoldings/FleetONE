@@ -53,6 +53,7 @@ interface AccidentRecord {
   location?: string;
   insurer_claim_ref?: string;
   status: string;
+  ari_status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -367,6 +368,31 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
               </div>
 
               <div>
+                <Label htmlFor="ari_status">ARI Status</Label>
+                {editMode ? (
+                  <Select 
+                    value={formData.ari_status || 'incomplete'} 
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, ari_status: value }))}
+                    disabled={!editMode}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="incomplete">Incomplete</SelectItem>
+                      <SelectItem value="complete">Complete</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex items-center h-10 px-3 py-2 border rounded-md bg-muted">
+                    <Badge variant={formData.ari_status === 'complete' ? 'default' : 'secondary'}>
+                      {formData.ari_status === 'complete' ? 'Complete' : 'Incomplete'}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <Label htmlFor="reported_by">Reported By</Label>
                 <Input
                   id="reported_by"
@@ -565,6 +591,8 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
                           <SelectItem value="Final Bill">Final Bill</SelectItem>
                           <SelectItem value="Part Quotation">Part Quotation</SelectItem>
                           <SelectItem value="After Repair Inspection">After Repair Inspection</SelectItem>
+                          <SelectItem value="Police Report">Police Report</SelectItem>
+                          <SelectItem value="Accident Photo">Accident Photo</SelectItem>
                           <SelectItem value="Other">Other</SelectItem>
                         </SelectContent>
                       </Select>

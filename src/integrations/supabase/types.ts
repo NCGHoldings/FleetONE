@@ -110,6 +110,7 @@ export type Database = {
           accident_date: string
           accident_mark: boolean | null
           approved_amount: number | null
+          ari_status: string
           bl_number: string | null
           created_at: string
           created_by: string | null
@@ -135,6 +136,7 @@ export type Database = {
           accident_date: string
           accident_mark?: boolean | null
           approved_amount?: number | null
+          ari_status?: string
           bl_number?: string | null
           created_at?: string
           created_by?: string | null
@@ -160,6 +162,7 @@ export type Database = {
           accident_date?: string
           accident_mark?: boolean | null
           approved_amount?: number | null
+          ari_status?: string
           bl_number?: string | null
           created_at?: string
           created_by?: string | null

@@ -27,7 +27,7 @@ serve(async (req) => {
         // Build query with filters
         let query = supabase
           .from('accident_records')
-          .select('*')
+          .select('*, ari_status')
           .order('created_at', { ascending: false });
 
         // Apply filters

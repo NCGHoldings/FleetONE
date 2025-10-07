@@ -40,6 +40,7 @@ interface AccidentRecord {
   insurer_claim_ref?: string;
   status: string;
   Driver?: string;
+  ari_status?: string;
   created_at: string;
   updated_at: string;
   accident_documents?: { count: number };
@@ -431,6 +432,72 @@ export function AccidentInsurance() {
           <Badge variant={mark ? "destructive" : "outline"}>
             {mark ? "Yes" : "No"}
           </Badge>
+        );
+      }
+    },
+    {
+      accessorKey: "ari_status",
+      header: "ARI Status",
+      cell: ({ row }) => {
+        const ariStatus = row.getValue("ari_status") as string || 'incomplete';
+        const [isEditing, setIsEditing] = useState(false);
+        
+        const handleStatusChange = async (newStatus: string) => {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const response = await fetch('https://wwjpdszkmtnzshbulkon.supabase.co/functions/v1/accident-records', {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${session?.access_token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                id: row.original.id,
+                ari_status: newStatus
+              })
+            });
+
+            if (response.ok) {
+              toast.success('ARI Status updated successfully');
+              fetchAccidents();
+              setIsEditing(false);
+            } else {
+              throw new Error('Failed to update ARI status');
+            }
+          } catch (error) {
+            console.error('Error updating ARI status:', error);
+            toast.error('Failed to update ARI status');
+          }
+        };
+
+        if (!isAdmin) {
+          return (
+            <Badge variant={ariStatus === 'complete' ? 'default' : 'secondary'}>
+              {ariStatus === 'complete' ? 'Complete' : 'Incomplete'}
+            </Badge>
+          );
+        }
+
+        if (isEditing) {
+          return (
+            <Select value={ariStatus} onValueChange={handleStatusChange}>
+              <SelectTrigger className="w-32 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="incomplete">Incomplete</SelectItem>
+                <SelectItem value="complete">Complete</SelectItem>
+              </SelectContent>
+            </Select>
+          );
+        }
+
+        return (
+          <div onClick={() => setIsEditing(true)} className="cursor-pointer">
+            <Badge variant={ariStatus === 'complete' ? 'default' : 'secondary'}>
+              {ariStatus === 'complete' ? 'Complete' : 'Incomplete'}
+            </Badge>
+          </div>
         );
       }
     },
