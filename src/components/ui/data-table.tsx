@@ -333,17 +333,36 @@ export function DataTable<TData, TValue>({
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          {(() => {
-            const totalRows = table.getFilteredRowModel().rows.length;
-            if (totalRows === 0) return "0 results";
-            
-            const { pageIndex, pageSize } = table.getState().pagination;
-            const startIndex = pageIndex * pageSize + 1;
-            const endIndex = Math.min(startIndex + pageSize - 1, totalRows);
-            
-            return `${startIndex}-${endIndex} of ${totalRows} results`;
-          })()}
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-muted-foreground">
+            {(() => {
+              const totalRows = table.getFilteredRowModel().rows.length;
+              if (totalRows === 0) return "0 results";
+              
+              const { pageIndex, pageSize } = table.getState().pagination;
+              const startIndex = pageIndex * pageSize + 1;
+              const endIndex = Math.min(startIndex + pageSize - 1, totalRows);
+              
+              return `${startIndex}-${endIndex} of ${totalRows} results`;
+            })()}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Rows per page:</span>
+            <select
+              value={table.getState().pagination.pageSize}
+              onChange={(e) => {
+                const value = e.target.value;
+                table.setPageSize(value === 'all' ? table.getFilteredRowModel().rows.length : Number(value));
+              }}
+              className="h-8 w-[100px] rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="all">All</option>
+            </select>
+          </div>
         </div>
         <div className="flex items-center space-x-2">
           <Button
