@@ -349,17 +349,17 @@ export function DataTable<TData, TValue>({
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Rows per page:</span>
             <select
-              value={table.getState().pagination.pageSize}
+              value={table.getState().pagination.pageSize >= 999999 ? 'all' : table.getState().pagination.pageSize}
               onChange={(e) => {
                 const value = e.target.value;
-                table.setPageSize(value === 'all' ? table.getFilteredRowModel().rows.length : Number(value));
+                table.setPageSize(value === 'all' ? 999999 : Number(value));
               }}
               className="h-8 w-[100px] rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
               <option value="all">All</option>
             </select>
           </div>
