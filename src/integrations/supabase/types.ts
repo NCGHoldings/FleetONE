@@ -4375,9 +4375,12 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          is_main_customer: boolean | null
           notes: string | null
+          parent_customer_id: string | null
           payment_terms: number | null
           phone: string
+          relationship_notes: string | null
           tax_number: string | null
           updated_at: string
         }
@@ -4396,9 +4399,12 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_main_customer?: boolean | null
           notes?: string | null
+          parent_customer_id?: string | null
           payment_terms?: number | null
           phone: string
+          relationship_notes?: string | null
           tax_number?: string | null
           updated_at?: string
         }
@@ -4417,13 +4423,24 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_main_customer?: boolean | null
           notes?: string | null
+          parent_customer_id?: string | null
           payment_terms?: number | null
           phone?: string
+          relationship_notes?: string | null
           tax_number?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "yutong_customers_parent_customer_id_fkey"
+            columns: ["parent_customer_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       yutong_customization_options: {
         Row: {

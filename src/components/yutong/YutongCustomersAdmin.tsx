@@ -13,9 +13,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Search, Eye, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Trash2, Link, Unlink, Building2, User } from 'lucide-react';
 import { ColumnDef } from '@tanstack/react-table';
 import CustomerProfileModal from './CustomerProfileModal';
+import { useAuth } from '@/hooks/useAuth';
+import { useYutongCustomerCards } from '@/hooks/useYutongCustomerCards';
 
 const customerSchema = z.object({
   company_name: z.string().min(1, 'Company name is required'),
@@ -54,6 +56,12 @@ interface Customer {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  parent_customer_id?: string | null;
+  is_main_customer?: boolean;
+  relationship_notes?: string | null;
+  parent_customer?: {
+    company_name: string;
+  };
 }
 
 export default function YutongCustomersAdmin() {
@@ -65,6 +73,23 @@ export default function YutongCustomersAdmin() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { unlinkSubCustomer } = useYutongCustomerCards();
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .then(({ data }) => {
+          setUserRoles(data?.map(r => r.role) || []);
+        });
+    }
+  }, [user]);
+
+  const canManageLinks = userRoles.includes('admin') || userRoles.includes('supervisor') || userRoles.includes('super_admin');
 
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -89,7 +114,10 @@ export default function YutongCustomersAdmin() {
     try {
       const { data, error } = await supabase
         .from('yutong_customers')
-        .select('*')
+        .select(`
+          *,
+          parent_customer:yutong_customers!parent_customer_id(company_name)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -103,6 +131,25 @@ export default function YutongCustomersAdmin() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUnlinkCustomer = async (customerId: string) => {
+    if (!confirm('Are you sure you want to unlink this sub-customer?')) return;
+
+    try {
+      await unlinkSubCustomer(customerId);
+      toast({
+        title: "Success",
+        description: "Sub-customer unlinked successfully",
+      });
+      loadCustomers();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -259,6 +306,32 @@ export default function YutongCustomersAdmin() {
       ),
     },
     {
+      header: 'Hierarchy',
+      cell: ({ row }) => {
+        const customer = row.original;
+        if (customer.parent_customer_id) {
+          return (
+            <div className="flex items-center gap-2">
+              <User className="h-3 w-3 text-muted-foreground" />
+              <div className="text-sm">
+                <span className="text-muted-foreground">Sub of:</span>{' '}
+                <span className="font-medium">{customer.parent_customer?.company_name}</span>
+                {customer.relationship_notes && (
+                  <div className="text-xs text-muted-foreground">({customer.relationship_notes})</div>
+                )}
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="flex items-center gap-1 text-sm">
+            <Building2 className="h-3 w-3" />
+            <span>Main Customer</span>
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: 'credit_limit',
       header: 'Credit Limit',
       cell: ({ row }) => (
@@ -276,32 +349,45 @@ export default function YutongCustomersAdmin() {
     },
     {
       id: 'actions',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleViewProfile(row.original)}
-            title="View customer profile and history"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(row.original)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleDelete(row.original.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const customer = row.original;
+        return (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleViewProfile(customer)}
+              title="View customer profile and history"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEdit(customer)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            {canManageLinks && customer.parent_customer_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleUnlinkCustomer(customer.id)}
+                title="Unlink from main customer"
+              >
+                <Unlink className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDelete(customer.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 

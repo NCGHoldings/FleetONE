@@ -6,13 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ColumnDef } from '@tanstack/react-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, Trash2, FileText } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText, LayoutGrid, Table } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { YutongQuotationViewModal } from './YutongQuotationViewModal';
 import { YutongInvoiceGenerator } from './YutongInvoiceGenerator';
 import { YutongEditQuotationModal } from './YutongEditQuotationModal';
+import { YutongCustomerCardView } from './YutongCustomerCardView';
+import { useAuth } from '@/hooks/useAuth';
 
 interface YutongQuotation {
   id: string;
@@ -48,7 +50,31 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [invoiceGeneratorOpen, setInvoiceGeneratorOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'card'>(() => {
+    return (localStorage.getItem('yutong_quotation_view_mode') as 'table' | 'card') || 'table';
+  });
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .then(({ data }) => {
+          setUserRoles(data?.map(r => r.role) || []);
+        });
+    }
+  }, [user]);
+
+  const canManageLinks = userRoles.includes('admin') || userRoles.includes('supervisor') || userRoles.includes('super_admin');
+
+  const handleViewModeChange = (mode: 'table' | 'card') => {
+    setViewMode(mode);
+    localStorage.setItem('yutong_quotation_view_mode', mode);
+  };
 
   const loadQuotations = async () => {
     try {
@@ -379,14 +405,38 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Yutong Bus Quotations</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Yutong Bus Quotations</CardTitle>
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleViewModeChange('table')}
+              >
+                <Table className="h-4 w-4 mr-2" />
+                Table View
+              </Button>
+              <Button
+                variant={viewMode === 'card' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleViewModeChange('card')}
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Card View
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <DataTable 
-            columns={columns} 
-            data={quotations} 
-            searchKey="quotation_no"
-          />
+          {viewMode === 'table' ? (
+            <DataTable 
+              columns={columns} 
+              data={quotations} 
+              searchKey="quotation_no"
+            />
+          ) : (
+            <YutongCustomerCardView canManageLinks={canManageLinks} />
+          )}
         </CardContent>
       </Card>
 
