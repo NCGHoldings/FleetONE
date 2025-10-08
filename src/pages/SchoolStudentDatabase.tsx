@@ -57,6 +57,8 @@ interface Student {
   payment_amount?: number;
   payment_status: string;
   last_payment_date?: string;
+  emergency_contact_name?: string;
+  emergency_contact_number?: string;
   created_at: string;
 }
 
@@ -270,6 +272,27 @@ export default function SchoolStudentDatabase() {
       ),
     },
     {
+      accessorKey: "pickup_point",
+      header: "Pickup/Drop-off",
+      cell: ({ row }: any) => (
+        <div className="max-w-[200px]">
+          {row.original.pickup_point && (
+            <div className="text-sm">
+              <span className="font-medium">Pickup:</span> {row.original.pickup_point}
+            </div>
+          )}
+          {row.original.dropoff_point && (
+            <div className="text-sm">
+              <span className="font-medium">Drop:</span> {row.original.dropoff_point}
+            </div>
+          )}
+          {!row.original.pickup_point && !row.original.dropoff_point && (
+            <span className="text-muted-foreground">N/A</span>
+          )}
+        </div>
+      ),
+    },
+    {
       accessorKey: "service_type",
       header: "Service",
       cell: ({ row }: any) => {
@@ -280,6 +303,26 @@ export default function SchoolStudentDatabase() {
           </Badge>
         );
       },
+    },
+    {
+      accessorKey: "emergency_contact_name",
+      header: "Emergency Contact",
+      cell: ({ row }: any) => (
+        <div>
+          {row.original.emergency_contact_name && (
+            <div className="font-medium">{row.original.emergency_contact_name}</div>
+          )}
+          {row.original.emergency_contact_number && (
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <Phone className="h-3 w-3" />
+              {row.original.emergency_contact_number}
+            </div>
+          )}
+          {!row.original.emergency_contact_name && !row.original.emergency_contact_number && (
+            <span className="text-muted-foreground">N/A</span>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: "payment_status",
@@ -583,6 +626,10 @@ export default function SchoolStudentDatabase() {
                     route: formData.get("route") as string,
                     bus_reg_no: formData.get("bus_reg_no") as string,
                     service_type: formData.get("service_type") as string,
+                    pickup_point: formData.get("pickup_point") as string,
+                    dropoff_point: formData.get("dropoff_point") as string,
+                    emergency_contact_name: formData.get("emergency_contact_name") as string,
+                    emergency_contact_number: formData.get("emergency_contact_number") as string,
                     payment_status: formData.get("payment_status") as string,
                     payment_amount: formData.get("payment_amount") ? Number(formData.get("payment_amount")) : null,
                   })
@@ -644,6 +691,14 @@ export default function SchoolStudentDatabase() {
                   <Input id="bus_reg_no" name="bus_reg_no" defaultValue={selectedStudent.bus_reg_no || ""} />
                 </div>
                 <div>
+                  <Label htmlFor="pickup_point">Pickup Point</Label>
+                  <Input id="pickup_point" name="pickup_point" defaultValue={selectedStudent.pickup_point || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="dropoff_point">Drop-off Point</Label>
+                  <Input id="dropoff_point" name="dropoff_point" defaultValue={selectedStudent.dropoff_point || ""} />
+                </div>
+                <div>
                   <Label htmlFor="service_type">Service Type</Label>
                   <Select name="service_type" defaultValue={selectedStudent.service_type || ""}>
                     <SelectTrigger>
@@ -656,6 +711,14 @@ export default function SchoolStudentDatabase() {
                       <SelectItem value="Evening">Evening Only</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div>
+                  <Label htmlFor="emergency_contact_name">Emergency Contact Name</Label>
+                  <Input id="emergency_contact_name" name="emergency_contact_name" defaultValue={selectedStudent.emergency_contact_name || ""} />
+                </div>
+                <div>
+                  <Label htmlFor="emergency_contact_number">Emergency Contact Number</Label>
+                  <Input id="emergency_contact_number" name="emergency_contact_number" defaultValue={selectedStudent.emergency_contact_number || ""} />
                 </div>
                 <div>
                   <Label htmlFor="payment_status">Payment Status</Label>

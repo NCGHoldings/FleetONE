@@ -2557,6 +2557,8 @@ export type Database = {
           driver_name: string | null
           dropoff_point: string | null
           email_id: string | null
+          emergency_contact_name: string | null
+          emergency_contact_number: string | null
           father_contact_no: string | null
           grade: string | null
           id: string
@@ -2592,6 +2594,8 @@ export type Database = {
           driver_name?: string | null
           dropoff_point?: string | null
           email_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_number?: string | null
           father_contact_no?: string | null
           grade?: string | null
           id?: string
@@ -2627,6 +2631,8 @@ export type Database = {
           driver_name?: string | null
           dropoff_point?: string | null
           email_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_number?: string | null
           father_contact_no?: string | null
           grade?: string | null
           id?: string

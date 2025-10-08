@@ -36,7 +36,9 @@ export default function AddStudentForm() {
     care_taker_contact_no: "",
     driver_name: "",
     driver_contact_no: "",
-    school_location: ""
+    school_location: "",
+    emergency_contact_name: "",
+    emergency_contact_number: ""
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -306,6 +308,31 @@ export default function AddStudentForm() {
                   id="care_taker_contact_no"
                   value={formData.care_taker_contact_no}
                   onChange={(e) => handleInputChange("care_taker_contact_no", e.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Emergency Contact Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Emergency Contact Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="emergency_contact_name">Emergency Contact Name</Label>
+                <Input
+                  id="emergency_contact_name"
+                  value={formData.emergency_contact_name}
+                  onChange={(e) => handleInputChange("emergency_contact_name", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="emergency_contact_number">Emergency Contact Number</Label>
+                <Input
+                  id="emergency_contact_number"
+                  value={formData.emergency_contact_number}
+                  onChange={(e) => handleInputChange("emergency_contact_number", e.target.value)}
                 />
               </div>
             </CardContent>
