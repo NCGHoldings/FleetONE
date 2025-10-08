@@ -119,11 +119,12 @@ export default function AddStudentForm() {
                 />
               </div>
               <div>
-                <Label htmlFor="admission_no">Admission Number</Label>
+                <Label htmlFor="admission_no">Admission Number *</Label>
                 <Input
                   id="admission_no"
                   value={formData.admission_no}
                   onChange={(e) => handleInputChange("admission_no", e.target.value)}
+                  required
                 />
               </div>
               <div>
