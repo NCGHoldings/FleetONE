@@ -3827,6 +3827,47 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_bus_model_images: {
+        Row: {
+          bus_model_id: string
+          caption: string | null
+          created_at: string
+          display_order: number
+          id: string
+          image_url: string
+          is_primary: boolean
+          updated_at: string
+        }
+        Insert: {
+          bus_model_id: string
+          caption?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url: string
+          is_primary?: boolean
+          updated_at?: string
+        }
+        Update: {
+          bus_model_id?: string
+          caption?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string
+          is_primary?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_bus_model_images_bus_model_id_fkey"
+            columns: ["bus_model_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_bus_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_bus_models: {
         Row: {
           audiovisual_system: string | null

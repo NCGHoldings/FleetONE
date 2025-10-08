@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Bus, Calendar, Settings, Fuel, Shield, Users } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { YutongImageGallery } from './YutongImageGallery';
 
 interface BusModel {
   id: string;
@@ -44,6 +46,35 @@ interface YutongBusModelProfileProps {
 }
 
 export function YutongBusModelProfile({ busModel, isOpen, onClose }: YutongBusModelProfileProps) {
+  const [images, setImages] = useState<any[]>([]);
+  const [loadingImages, setLoadingImages] = useState(true);
+
+  useEffect(() => {
+    if (busModel && isOpen) {
+      loadImages();
+    }
+  }, [busModel?.id, isOpen]);
+
+  const loadImages = async () => {
+    if (!busModel) return;
+    
+    try {
+      setLoadingImages(true);
+      const { data, error } = await supabase
+        .from('yutong_bus_model_images')
+        .select('*')
+        .eq('bus_model_id', busModel.id)
+        .order('display_order');
+
+      if (error) throw error;
+      setImages(data || []);
+    } catch (error) {
+      console.error('Error loading images:', error);
+    } finally {
+      setLoadingImages(false);
+    }
+  };
+
   if (!busModel) return null;
 
   const formatPrice = (price: number) => {
@@ -109,23 +140,14 @@ export function YutongBusModelProfile({ busModel, isOpen, onClose }: YutongBusMo
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-6">
-          {/* Hero Image */}
-          <div className="relative aspect-video bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg overflow-hidden border">
-            {busModel.image_url ? (
-              <img
-                src={busModel.image_url}
-                alt={busModel.bus_name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <Bus className="h-16 w-16 text-primary/50 mx-auto mb-2" />
-                  <p className="text-muted-foreground text-sm">No image available</p>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Image Gallery */}
+          {loadingImages ? (
+            <div className="aspect-video bg-muted flex items-center justify-center rounded-lg">
+              <p className="text-muted-foreground">Loading images...</p>
+            </div>
+          ) : (
+            <YutongImageGallery images={images} />
+          )}
           {/* Header Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="text-center">

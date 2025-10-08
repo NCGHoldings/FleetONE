@@ -6,13 +6,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Edit, Trash2, Upload, Image, Eye, Copy } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Image, Eye, Copy, Images } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { YutongBusModelProfile } from './YutongBusModelProfile';
+import { YutongImageManager } from './YutongImageManager';
 
 const formSchema = z.object({
   bus_name: z.string().min(1, 'Bus name is required'),
@@ -91,6 +93,9 @@ export function YutongBusModelsAdmin() {
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<BusModel | null>(null);
+  const [imageManagerOpen, setImageManagerOpen] = useState(false);
+  const [managingModelId, setManagingModelId] = useState<string | null>(null);
+  const [imageCountsMap, setImageCountsMap] = useState<Record<string, { count: number; primaryImage: string | null }>>({});
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -116,6 +121,33 @@ export function YutongBusModelsAdmin() {
         ...model,
         capacity: model.capacity?.toString() || ''
       })));
+      
+      // Load image counts and primary images for each model
+      if (data && data.length > 0) {
+        const imageCountsPromises = data.map(async (model) => {
+          const { data: images } = await supabase
+            .from('yutong_bus_model_images')
+            .select('id, image_url, is_primary')
+            .eq('bus_model_id', model.id);
+          
+          const primaryImage = images?.find(img => img.is_primary)?.image_url || images?.[0]?.image_url || null;
+          
+          return {
+            id: model.id,
+            count: images?.length || 0,
+            primaryImage
+          };
+        });
+        
+        const imageCounts = await Promise.all(imageCountsPromises);
+        const countsMap = imageCounts.reduce((acc, { id, count, primaryImage }) => {
+          acc[id] = { count, primaryImage };
+          return acc;
+        }, {} as Record<string, { count: number; primaryImage: string | null }>);
+        
+        setImageCountsMap(countsMap);
+      }
+      
       console.log('Bus models loaded successfully:', data?.length || 0, 'records');
     } catch (error: any) {
       console.error('Error loading bus models:', error);
@@ -827,9 +859,9 @@ export function YutongBusModelsAdmin() {
           {busModels.map((model) => (
             <Card key={model.id} className="overflow-hidden">
               <div className="relative aspect-video bg-muted">
-                {model.image_url ? (
+                {imageCountsMap[model.id]?.primaryImage ? (
                   <img
-                    src={model.image_url}
+                    src={imageCountsMap[model.id].primaryImage!}
                     alt={model.bus_name}
                     className="w-full h-full object-cover"
                   />
@@ -838,26 +870,12 @@ export function YutongBusModelsAdmin() {
                     <Image className="h-12 w-12 text-muted-foreground" />
                   </div>
                 )}
-                <div className="absolute top-2 right-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, model.id);
-                    }}
-                    className="hidden"
-                    id={`upload-${model.id}`}
-                  />
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => document.getElementById(`upload-${model.id}`)?.click()}
-                    disabled={uploadingImage === model.id}
-                  >
-                    <Upload className="h-4 w-4" />
-                  </Button>
-                </div>
+                {imageCountsMap[model.id]?.count > 0 && (
+                  <Badge className="absolute top-2 left-2 bg-black/60 text-white">
+                    <Images className="h-3 w-3 mr-1" />
+                    {imageCountsMap[model.id].count}
+                  </Badge>
+                )}
               </div>
               
               <CardContent className="p-4">
@@ -890,9 +908,22 @@ export function YutongBusModelsAdmin() {
                       variant="secondary" 
                       size="sm"
                       onClick={() => handleViewProfile(model)}
+                      className="col-span-2"
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      onClick={() => {
+                        setManagingModelId(model.id);
+                        setImageManagerOpen(true);
+                      }}
+                      className="col-span-2"
+                    >
+                      <Images className="h-4 w-4 mr-1" />
+                      Manage Images
                     </Button>
                     <Button 
                       variant="outline" 
@@ -914,6 +945,7 @@ export function YutongBusModelsAdmin() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleDelete(model.id)}
+                      className="col-span-2"
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
@@ -942,6 +974,21 @@ export function YutongBusModelsAdmin() {
           setSelectedModel(null);
         }}
       />
+      
+      {managingModelId && (
+        <YutongImageManager
+          busModelId={managingModelId}
+          busModelName={busModels.find(m => m.id === managingModelId)?.bus_name || ''}
+          isOpen={imageManagerOpen}
+          onClose={() => {
+            setImageManagerOpen(false);
+            setManagingModelId(null);
+          }}
+          onUpdate={() => {
+            loadBusModels();
+          }}
+        />
+      )}
     </Card>
   );
 }
