@@ -28,6 +28,10 @@ interface YutongQuotation {
   payment_terms?: string;
   warranty_terms?: string;
   discount_percentage?: number;
+  version_number?: string;
+  edit_type?: string;
+  edit_reason?: string;
+  parent_quotation_id?: string;
 }
 
 interface YutongQuotationViewModalProps {
@@ -224,6 +228,9 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
             <div className="flex items-center gap-4">
               <DialogTitle>Quotation - {quotation.quotation_no}</DialogTitle>
               {getStatusBadge(quotation.status)}
+              {quotation.version_number && quotation.version_number !== '1.0' && (
+                <Badge variant="outline">v{quotation.version_number}</Badge>
+              )}
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleEmail} disabled={loading}>
@@ -241,6 +248,24 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
             </div>
           </div>
         </DialogHeader>
+
+        {/* Version Info */}
+        {(quotation.edit_type || quotation.edit_reason) && (
+          <div className="bg-muted p-4 rounded-lg space-y-2">
+            <h4 className="font-semibold text-sm">Version Information</h4>
+            {quotation.edit_type && (
+              <p className="text-sm">
+                <span className="font-medium">Edit Type:</span>{' '}
+                {quotation.edit_type === 'staff_edit' ? 'Staff Edit' : 'Customer Request'}
+              </p>
+            )}
+            {quotation.edit_reason && (
+              <p className="text-sm">
+                <span className="font-medium">Reason:</span> {quotation.edit_reason}
+              </p>
+            )}
+          </div>
+        )}
         
         <div className="mt-4">
           <YutongQuotationPreview ref={printRef} quotation={quotation} />
