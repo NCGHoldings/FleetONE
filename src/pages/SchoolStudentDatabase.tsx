@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { 
   Users, 
@@ -67,6 +68,7 @@ interface Branch {
 export default function SchoolStudentDatabase() {
   const { branchId } = useParams<{ branchId: string }>();
   const navigate = useNavigate();
+  const { userRoles } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [branch, setBranch] = useState<Branch | null>(null);
@@ -78,6 +80,8 @@ export default function SchoolStudentDatabase() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  
+  const isSuperAdmin = userRoles?.includes('super_admin');
 
   useEffect(() => {
     fetchBranchData();
@@ -361,37 +365,39 @@ export default function SchoolStudentDatabase() {
             <Plus className="h-4 w-4 mr-2" />
             Add Student
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" disabled={clearing}>
-                {clearing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Clearing...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Clear Branch Students
-                  </>
-                )}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Clear all students for {branch?.branch_name}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will archive all active students in this branch (set as inactive). You can re-import afterwards.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={clearBranchStudents}>
-                  Confirm
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {isSuperAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={clearing}>
+                  {clearing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Clearing...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Clear Branch Students
+                    </>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear all students for {branch?.branch_name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will archive all active students in this branch (set as inactive). You can re-import afterwards.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={clearBranchStudents}>
+                    Confirm
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
 
