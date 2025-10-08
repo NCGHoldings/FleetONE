@@ -65,6 +65,7 @@ interface TempAddOn {
   quantity: number;
   unit_price: number;
   total_price: number;
+  is_free_of_charge?: boolean;
   notes?: string;
 }
 
@@ -168,7 +169,9 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     const discountAmount = form.watch('discount_amount') || 0;
     
     const subtotal = quantity * unitPrice;
-    const addOnsTotal = tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0);
+    const addOnsTotal = tempAddOns.reduce((sum, addon) => {
+      return addon.is_free_of_charge ? sum : sum + addon.total_price;
+    }, 0);
     
     return subtotal - discountAmount + addOnsTotal;
   };
@@ -232,6 +235,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
           quantity: addon.quantity,
           unit_price: addon.unit_price,
           total_price: addon.total_price,
+          is_free_of_charge: addon.is_free_of_charge || false,
           notes: addon.notes,
         }));
 
@@ -594,7 +598,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                 </div>
                 <div className="flex justify-between">
                   <span>Add-ons:</span>
-                  <span>LKR {tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0).toLocaleString()}</span>
+                  <span>LKR {tempAddOns.reduce((sum, addon) => addon.is_free_of_charge ? sum : sum + addon.total_price, 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between font-semibold text-lg">
                   <span>Total:</span>

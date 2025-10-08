@@ -38,6 +38,7 @@ interface QuotationAddOn {
   addon_id: string;
   quantity: number;
   unit_price: number;
+  is_free_of_charge?: boolean;
   notes?: string;
   yutong_addons?: {
     addon_name: string;
@@ -125,7 +126,9 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
     }, [quotation.id, quotation.bus_model_id]);
 
     // Calculate totals correctly to avoid double-counting
-    const addOnsTotal = addOns.reduce((sum, addon) => sum + (addon.quantity * addon.unit_price), 0);
+    const addOnsTotal = addOns.reduce((sum, addon) => {
+      return addon.is_free_of_charge ? sum : sum + (addon.quantity * addon.unit_price);
+    }, 0);
     
     // Calculate bus subtotal (quantity * unit_price with discount applied)
     const busSubtotalBeforeDiscount = quotation.quantity * quotation.unit_price;
@@ -314,6 +317,9 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                       <tr key={index}>
                         <td style={{ padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
                           <b>ADD-ON:</b> {addon.yutong_addons?.addon_name || 'N/A'}
+                          {addon.is_free_of_charge && (
+                            <span style={{ marginLeft: '8px', color: '#22c55e', fontWeight: 'bold' }}>[FREE OF CHARGE]</span>
+                          )}
                           {addon.notes && (
                             <>
                               <br/><b>NOTES:</b> {addon.notes}
@@ -321,13 +327,13 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                           )}
                         </td>
                         <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                          {addon.unit_price.toLocaleString()}
+                          {addon.is_free_of_charge ? 'FREE' : addon.unit_price.toLocaleString()}
                         </td>
                         <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
                           {addon.quantity}
                         </td>
                         <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
-                          {(addon.quantity * addon.unit_price).toLocaleString()}
+                          {addon.is_free_of_charge ? 'FREE' : (addon.quantity * addon.unit_price).toLocaleString()}
                         </td>
                       </tr>
                     ))}

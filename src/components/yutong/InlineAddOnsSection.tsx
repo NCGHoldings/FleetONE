@@ -155,7 +155,9 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
     });
   };
 
-  const totalAddOnsValue = addOns.reduce((sum, addon) => sum + addon.total_price, 0);
+  const totalAddOnsValue = addOns.reduce((sum, addon) => {
+    return addon.is_free_of_charge ? sum : sum + addon.total_price;
+  }, 0);
 
   return (
     <Card>

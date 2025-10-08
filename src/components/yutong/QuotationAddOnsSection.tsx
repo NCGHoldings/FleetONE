@@ -37,6 +37,7 @@ interface QuotationAddOn {
   quantity: number;
   unit_price: number;
   total_price: number;
+  is_free_of_charge?: boolean;
   notes?: string;
   yutong_addons?: AddOn;
 }
@@ -273,7 +274,9 @@ export function QuotationAddOnsSection({ quotationId, onAddOnsChange }: Quotatio
     );
   }
 
-  const totalAddOnsValue = quotationAddOns.reduce((sum, addon) => sum + addon.total_price, 0);
+  const totalAddOnsValue = quotationAddOns.reduce((sum, addon) => {
+    return addon.is_free_of_charge ? sum : sum + addon.total_price;
+  }, 0);
 
   return (
     <Card>
