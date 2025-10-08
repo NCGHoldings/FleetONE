@@ -18,6 +18,7 @@ const formSchema = z.object({
   addon_id: z.string().min(1, 'Add-on is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(0, 'Unit price must be positive'),
+  is_free_of_charge: z.boolean().default(false),
   notes: z.string().optional(),
 });
 
@@ -36,6 +37,7 @@ interface TempAddOn {
   quantity: number;
   unit_price: number;
   total_price: number;
+  is_free_of_charge?: boolean;
   notes?: string;
 }
 
@@ -55,6 +57,7 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
       addon_id: '',
       quantity: 1,
       unit_price: 0,
+      is_free_of_charge: false,
       notes: '',
     },
   });
@@ -95,7 +98,8 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
   const calculateTotalPrice = () => {
     const quantity = form.watch('quantity') || 0;
     const unitPrice = form.watch('unit_price') || 0;
-    return quantity * unitPrice;
+    const isFree = form.watch('is_free_of_charge') || false;
+    return isFree ? 0 : quantity * unitPrice;
   };
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -120,6 +124,7 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
         quantity: values.quantity,
         unit_price: values.unit_price,
         total_price: totalPrice,
+        is_free_of_charge: values.is_free_of_charge,
         notes: values.notes,
       };
 
@@ -241,6 +246,7 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
                               step="0.01"
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              disabled={form.watch('is_free_of_charge')}
                             />
                           </FormControl>
                           <FormMessage />
@@ -248,6 +254,31 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
                       )}
                     />
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="is_free_of_charge"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <input
+                            type="checkbox"
+                            checked={field.value}
+                            onChange={field.onChange}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel className="font-medium">
+                            Free of Charge
+                          </FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Mark this add-on as complimentary (no cost)
+                          </p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -278,9 +309,17 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
                         <span>Quantity:</span>
                         <span>{form.watch('quantity') || 0}</span>
                       </div>
+                      {form.watch('is_free_of_charge') && (
+                        <div className="flex justify-between text-green-600 font-medium">
+                          <span>Status:</span>
+                          <span>FREE OF CHARGE</span>
+                        </div>
+                      )}
                       <div className="flex justify-between font-bold text-lg border-t pt-2">
                         <span>Total Price:</span>
-                        <span>LKR {calculateTotalPrice().toLocaleString()}</span>
+                        <span className={form.watch('is_free_of_charge') ? 'text-green-600' : ''}>
+                          {form.watch('is_free_of_charge') ? 'FREE' : `LKR ${calculateTotalPrice().toLocaleString()}`}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -318,11 +357,16 @@ export function InlineAddOnsSection({ addOns, onAddOnsChange }: InlineAddOnsSect
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-medium">{addon.addon_name}</h4>
+                    {addon.is_free_of_charge && (
+                      <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300">
+                        FREE OF CHARGE
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Quantity: {addon.quantity} × LKR {addon.unit_price.toLocaleString()} = 
-                    <span className="font-bold text-primary ml-1">
-                      LKR {addon.total_price.toLocaleString()}
+                    <span className={`font-bold ml-1 ${addon.is_free_of_charge ? 'text-green-600' : 'text-primary'}`}>
+                      {addon.is_free_of_charge ? 'FREE' : `LKR ${addon.total_price.toLocaleString()}`}
                     </span>
                   </div>
                   {addon.notes && (
