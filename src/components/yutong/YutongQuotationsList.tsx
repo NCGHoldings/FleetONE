@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ColumnDef } from '@tanstack/react-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Eye, Edit, Trash2, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +47,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
   const [selectedQuotation, setSelectedQuotation] = useState<YutongQuotation | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [invoiceGeneratorOpen, setInvoiceGeneratorOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const { toast } = useToast();
 
   const loadQuotations = async () => {
@@ -250,6 +252,11 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
     setViewModalOpen(true);
   };
 
+  const handleEditQuotation = (quotation: YutongQuotation) => {
+    setSelectedQuotation(quotation);
+    setEditModalOpen(true);
+  };
+
   const handleGenerateInvoice = (quotation: YutongQuotation) => {
     setSelectedQuotation(quotation);
     setInvoiceGeneratorOpen(true);
@@ -338,7 +345,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
                 <FileText className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => handleEditQuotation(quotation)} title="Edit Quotation">
               <Edit className="h-4 w-4" />
             </Button>
             <Select
@@ -399,6 +406,37 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
           }}
         />
       )}
+
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Quotation</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Editing quotation: <strong>{selectedQuotation?.quotation_no}</strong>
+            </p>
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-800">
+                Edit functionality is currently being developed. For now, you can view the quotation details and create a new version if needed.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditModalOpen(false)}>
+                Close
+              </Button>
+              <Button onClick={() => {
+                if (selectedQuotation) {
+                  setEditModalOpen(false);
+                  handleViewQuotation(selectedQuotation);
+                }
+              }}>
+                View Details
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
