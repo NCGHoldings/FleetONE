@@ -20,7 +20,7 @@ interface YutongQuotation {
   bus_model: string;
   quantity: number;
   unit_price: number;
-  discount_percentage?: number;
+  discount_amount?: number;
   total_price: number;
   payment_terms?: string;
   delivery_timeline?: string;
@@ -100,7 +100,7 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
       busModel: quotation.bus_model,
       quantity: quotation.quantity,
       unitPrice: quotation.unit_price,
-      discountPercentage: quotation.discount_percentage,
+      discountAmount: quotation.discount_amount,
       totalPrice: quotation.total_price,
       paymentTerms: quotation.payment_terms,
       deliveryTimeline: quotation.delivery_timeline,
@@ -133,7 +133,7 @@ export const YutongInvoiceGenerator: React.FC<YutongInvoiceGeneratorProps> = ({
       busModel: quotation?.bus_model || '',
       quantity: quotation?.quantity ?? 0,
       unitPrice: quotation?.unit_price ?? 0,
-      discountPercentage: quotation?.discount_percentage,
+      discountAmount: quotation?.discount_amount,
       totalPrice: quotation?.total_price ?? 0,
       paymentTerms: quotation?.payment_terms,
       deliveryTimeline: quotation?.delivery_timeline,

@@ -23,7 +23,7 @@ const formSchema = z.object({
   bus_model_id: z.string().min(1, 'Bus model is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
-  discount_percentage: z.number().min(0).max(100).optional(),
+  discount_amount: z.number().min(0).optional(),
   special_features: z.string().optional(),
   delivery_timeline: z.string().optional(),
   payment_terms: z.string().optional(),
@@ -82,7 +82,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     resolver: zodResolver(formSchema),
     defaultValues: {
       quantity: 1,
-      discount_percentage: 0,
+      discount_amount: 0,
       valid_days: 30,
       responsible_person: '',
     }
@@ -165,10 +165,9 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const calculateTotalPrice = () => {
     const quantity = form.watch('quantity') || 0;
     const unitPrice = form.watch('unit_price') || 0;
-    const discountPercentage = form.watch('discount_percentage') || 0;
+    const discountAmount = form.watch('discount_amount') || 0;
     
     const subtotal = quantity * unitPrice;
-    const discountAmount = subtotal * (discountPercentage / 100);
     const addOnsTotal = tempAddOns.reduce((sum, addon) => sum + addon.total_price, 0);
     
     return subtotal - discountAmount + addOnsTotal;
@@ -203,7 +202,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         bus_model_id: data.bus_model_id,
         quantity: data.quantity,
         unit_price: data.unit_price,
-        discount_percentage: data.discount_percentage || 0,
+        discount_amount: data.discount_amount || 0,
         total_price: totalPrice,
         special_features: data.special_features,
         delivery_timeline: data.delivery_timeline,
@@ -430,10 +429,10 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
 
                 <FormField
                   control={form.control}
-                  name="discount_percentage"
+                  name="discount_amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Discount (%)</FormLabel>
+                      <FormLabel>Discount (LKR)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -590,8 +589,8 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   <span>LKR {((form.watch('quantity') || 0) * (form.watch('unit_price') || 0)).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Discount ({form.watch('discount_percentage') || 0}%):</span>
-                  <span>-LKR {(((form.watch('quantity') || 0) * (form.watch('unit_price') || 0)) * ((form.watch('discount_percentage') || 0) / 100)).toLocaleString()}</span>
+                  <span>Discount:</span>
+                  <span>-LKR {(form.watch('discount_amount') || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Add-ons:</span>

@@ -22,7 +22,7 @@ interface YutongQuotation {
   delivery_timeline?: string;
   payment_terms?: string;
   warranty_terms?: string;
-  discount_percentage?: number;
+  discount_amount?: number;
 }
 
 interface BusModelDetails {
@@ -129,8 +129,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
     
     // Calculate bus subtotal (quantity * unit_price with discount applied)
     const busSubtotalBeforeDiscount = quotation.quantity * quotation.unit_price;
-    const discountAmount = quotation.discount_percentage ? 
-      (busSubtotalBeforeDiscount * quotation.discount_percentage / 100) : 0;
+    const discountAmount = quotation.discount_amount || 0;
     const busSubtotal = busSubtotalBeforeDiscount - discountAmount;
     
     // Grand total should be bus subtotal + add-ons (not quotation.total_price which already includes add-ons)
@@ -273,11 +272,11 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                 </tr>
                 
                 {/* Show discount breakdown if applicable */}
-                {quotation.discount_percentage > 0 ? (
+                {(quotation.discount_amount || 0) > 0 ? (
                   <>
                     <tr>
                       <td colSpan={3} style={{ fontWeight: 'bold', textAlign: 'right', padding: '8px', fontSize: '14px', border: '1px solid #003366', color: '#d32f2f' }}>
-                        Discount ({quotation.discount_percentage}%)
+                        Discount
                       </td>
                       <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366', color: '#d32f2f', fontWeight: 'bold' }}>
                         -{discountAmount.toLocaleString()}

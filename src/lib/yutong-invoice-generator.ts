@@ -12,7 +12,7 @@ export interface YutongInvoiceData {
   busModel: string;
   quantity: number;
   unitPrice: number;
-  discountPercentage?: number;
+  discountAmount?: number;
   totalPrice: number;
   paymentTerms?: string;
   deliveryTimeline?: string;
@@ -44,7 +44,7 @@ export const generateYutongInvoiceHTML = (data: YutongInvoiceData): string => {
   const currentDate = format(new Date(), 'dd/MM/yyyy');
   const companyLogo = data.companyLogo || '/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png';
   const isDraft = data.invoice_status === 'draft';
-  const discountAmount = (data.unitPrice * data.quantity * (data.discountPercentage || 0)) / 100;
+  const discountAmount = data.discountAmount || 0;
   const subtotal = data.unitPrice * data.quantity;
   const finalAmount = subtotal - discountAmount;
   
@@ -160,9 +160,9 @@ export const generateYutongInvoiceHTML = (data: YutongInvoiceData): string => {
             <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">Subtotal:</td>
             <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee; font-weight: bold;">LKR ${subtotal.toLocaleString()}</td>
           </tr>
-          ${data.discountPercentage && data.discountPercentage > 0 ? `
+          ${discountAmount > 0 ? `
           <tr>
-            <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">Discount (${data.discountPercentage}%):</td>
+            <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">Discount:</td>
             <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee; color: #dc3545;">-LKR ${discountAmount.toLocaleString()}</td>
           </tr>
           ` : ''}
