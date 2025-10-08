@@ -10,6 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { InlineAddOnsSection } from './InlineAddOnsSection';
 
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
@@ -56,6 +57,7 @@ interface YutongEditQuotationModalProps {
 
 export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }: YutongEditQuotationModalProps) {
   const { toast } = useToast();
+  const [quotationAddOns, setQuotationAddOns] = useState<any[]>([]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -75,7 +77,7 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
     }
   });
 
-  // Load quotation data into form when dialog opens
+  // Load quotation data and add-ons when dialog opens
   useEffect(() => {
     if (quotation && open) {
       form.reset({
@@ -92,8 +94,53 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
         warranty_terms: quotation.warranty_terms || '',
         responsible_person: quotation.responsible_person || '',
       });
+
+      // Load existing add-ons
+      loadQuotationAddOns();
     }
   }, [quotation, open, form]);
+
+  const loadQuotationAddOns = async () => {
+    if (!quotation?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('yutong_quotation_addons')
+        .select(`
+          id,
+          addon_id,
+          quantity,
+          unit_price,
+          total_price,
+          is_free_of_charge,
+          notes,
+          yutong_addons (
+            addon_name,
+            category
+          )
+        `)
+        .eq('quotation_id', quotation.id);
+
+      if (error) throw error;
+      
+      // Transform the data to match TempAddOn structure
+      const transformedAddOns = (data || []).map((item: any) => ({
+        id: item.id,
+        addon_id: item.addon_id,
+        addon_name: item.yutong_addons?.addon_name || '',
+        category: item.yutong_addons?.category || '',
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        is_free_of_charge: item.is_free_of_charge || false,
+        notes: item.notes || '',
+      }));
+      
+      setQuotationAddOns(transformedAddOns);
+    } catch (error) {
+      console.error('Error loading add-ons:', error);
+    }
+  };
 
   const calculateTotalPrice = () => {
     const quantity = form.watch('quantity') || 0;
@@ -117,7 +164,8 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
 
       const totalPrice = calculateTotalPrice();
 
-      const { error } = await supabase
+      // Update quotation
+      const { error: quotationError } = await supabase
         .from('yutong_quotations')
         .update({
           customer_name: data.customer_name,
@@ -137,7 +185,34 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
         })
         .eq('id', quotation.id);
 
-      if (error) throw error;
+      if (quotationError) throw quotationError;
+
+      // Update add-ons: Delete existing and insert new ones
+      const { error: deleteError } = await supabase
+        .from('yutong_quotation_addons')
+        .delete()
+        .eq('quotation_id', quotation.id);
+
+      if (deleteError) throw deleteError;
+
+      // Insert new add-ons
+      if (quotationAddOns.length > 0) {
+        const addOnsToInsert = quotationAddOns.map(addon => ({
+          quotation_id: quotation.id,
+          addon_id: addon.addon_id,
+          quantity: addon.quantity,
+          unit_price: addon.unit_price,
+          total_price: addon.total_price,
+          is_free_of_charge: addon.is_free_of_charge || false,
+          notes: addon.notes || null,
+        }));
+
+        const { error: insertError } = await supabase
+          .from('yutong_quotation_addons')
+          .insert(addOnsToInsert);
+
+        if (insertError) throw insertError;
+      }
 
       toast({
         title: "Success",
@@ -296,6 +371,15 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                   )}
                 />
               </div>
+            </div>
+
+            {/* Add-ons Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Add-Ons</h3>
+              <InlineAddOnsSection
+                addOns={quotationAddOns}
+                onAddOnsChange={setQuotationAddOns}
+              />
             </div>
 
             {/* Additional Information */}
