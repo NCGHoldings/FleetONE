@@ -281,15 +281,6 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                         <br/><b>SPECIAL FEATURES:</b> {quotation.special_features}
                       </>
                     )}
-                    {(quotation.seat_colour || quotation.curtain_colour || quotation.body_colour || quotation.seat_headrest_logo) && (
-                      <>
-                        <br/><br/><b>CUSTOMIZATION:</b>
-                        {quotation.seat_colour && <><br/>• Seat Colour: {quotation.seat_colour}</>}
-                        {quotation.curtain_colour && <><br/>• Curtain Colour: {quotation.curtain_colour}</>}
-                        {quotation.body_colour && <><br/>• Body Colour: {quotation.body_colour}</>}
-                        {quotation.seat_headrest_logo && <><br/>• Headrest Logo: {quotation.seat_headrest_logo}</>}
-                      </>
-                    )}
                   </td>
                   <td style={{ textAlign: 'center', padding: '8px', fontSize: '14px', border: '1px solid #003366' }}>
                     {quotation.unit_price.toLocaleString()}
@@ -401,6 +392,27 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
               <p style={{ margin: '3px 0' }}><b>Branch Code :</b> 020</p>
               <p style={{ margin: '3px 0' }}><b>Swift Code :</b> CCEYLKLX</p>
             </div>
+
+            {/* Vehicle Customization */}
+            {(quotation.seat_colour || quotation.curtain_colour || quotation.body_colour || quotation.seat_headrest_logo) && (
+              <div style={{ fontSize: '14px', marginTop: '20px', padding: '15px', border: '2px solid #003366', borderRadius: '8px', background: '#f8f9fa' }}>
+                <h3 style={{ margin: '0 0 10px 0', color: '#003366', fontSize: '16px', fontWeight: 'bold' }}>VEHICLE CUSTOMIZATION</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {quotation.seat_colour && (
+                    <p style={{ margin: '4px 0' }}><b>Seat Colour:</b> {quotation.seat_colour}</p>
+                  )}
+                  {quotation.curtain_colour && (
+                    <p style={{ margin: '4px 0' }}><b>Curtain Colour:</b> {quotation.curtain_colour}</p>
+                  )}
+                  {quotation.body_colour && (
+                    <p style={{ margin: '4px 0' }}><b>Body Colour:</b> {quotation.body_colour}</p>
+                  )}
+                  {quotation.seat_headrest_logo && (
+                    <p style={{ margin: '4px 0' }}><b>Seat Headrest Logo:</b> {quotation.seat_headrest_logo}</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Page 1 Footer with Signatures */}
