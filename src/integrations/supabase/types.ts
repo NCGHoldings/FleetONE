@@ -5220,6 +5220,7 @@ export type Database = {
           addon_id: string
           created_at: string
           id: string
+          is_free_of_charge: boolean | null
           notes: string | null
           quantity: number
           quotation_id: string
@@ -5231,6 +5232,7 @@ export type Database = {
           addon_id: string
           created_at?: string
           id?: string
+          is_free_of_charge?: boolean | null
           notes?: string | null
           quantity?: number
           quotation_id: string
@@ -5242,6 +5244,7 @@ export type Database = {
           addon_id?: string
           created_at?: string
           id?: string
+          is_free_of_charge?: boolean | null
           notes?: string | null
           quantity?: number
           quotation_id?: string
