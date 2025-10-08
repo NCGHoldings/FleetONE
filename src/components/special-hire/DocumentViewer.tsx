@@ -68,7 +68,7 @@ export const DocumentViewer = ({
         console.error('Unable to decode document for download');
         return;
       }
-      const blob = new Blob([arr], { type: 'application/pdf' });
+      const blob = new Blob([new Uint8Array(arr)], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const link = window.document.createElement('a');
       link.href = url;
@@ -129,7 +129,7 @@ export const DocumentViewer = ({
   };
 
   const createPdfBlobUrl = (arr: Uint8Array) => {
-    const blob = new Blob([arr], { type: 'application/pdf' });
+    const blob = new Blob([new Uint8Array(arr)], { type: 'application/pdf' });
     return URL.createObjectURL(blob);
   };
 
