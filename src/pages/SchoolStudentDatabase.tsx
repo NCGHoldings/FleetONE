@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -59,6 +60,7 @@ interface Student {
   last_payment_date?: string;
   emergency_contact_name?: string;
   emergency_contact_number?: string;
+  remarks?: string;
   created_at: string;
 }
 
@@ -632,6 +634,7 @@ export default function SchoolStudentDatabase() {
                     emergency_contact_number: formData.get("emergency_contact_number") as string,
                     payment_status: formData.get("payment_status") as string,
                     payment_amount: formData.get("payment_amount") ? Number(formData.get("payment_amount")) : null,
+                    remarks: formData.get("remarks") as string,
                   })
                   .eq("id", selectedStudent.id);
 
@@ -741,6 +744,10 @@ export default function SchoolStudentDatabase() {
                 <div className="col-span-2">
                   <Label htmlFor="address">Address</Label>
                   <Input id="address" name="address" defaultValue={selectedStudent.address || ""} />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="remarks">Remarks / Special Notes</Label>
+                  <Textarea id="remarks" name="remarks" defaultValue={selectedStudent.remarks || ""} placeholder="Special notes about this student..." rows={3} />
                 </div>
               </div>
               <div className="flex justify-end gap-2">

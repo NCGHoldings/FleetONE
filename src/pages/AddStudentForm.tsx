@@ -38,7 +38,8 @@ export default function AddStudentForm() {
     driver_contact_no: "",
     school_location: "",
     emergency_contact_name: "",
-    emergency_contact_number: ""
+    emergency_contact_number: "",
+    remarks: ""
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -334,6 +335,25 @@ export default function AddStudentForm() {
                   id="emergency_contact_number"
                   value={formData.emergency_contact_number}
                   onChange={(e) => handleInputChange("emergency_contact_number", e.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Remarks / Special Notes */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Remarks / Special Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div>
+                <Label htmlFor="remarks">Special Points or Remarks</Label>
+                <Textarea
+                  id="remarks"
+                  value={formData.remarks}
+                  onChange={(e) => handleInputChange("remarks", e.target.value)}
+                  placeholder="Enter any special notes, medical conditions, pickup instructions, or other important information about the student..."
+                  rows={4}
                 />
               </div>
             </CardContent>

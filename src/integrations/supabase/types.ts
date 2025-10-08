@@ -2637,6 +2637,7 @@ export type Database = {
           pickup_point: string | null
           pickup_point_cord: string | null
           pickup_point_definition: string | null
+          remarks: string | null
           route: string | null
           sbs_cord: string | null
           school_location: string | null
@@ -2677,6 +2678,7 @@ export type Database = {
           pickup_point?: string | null
           pickup_point_cord?: string | null
           pickup_point_definition?: string | null
+          remarks?: string | null
           route?: string | null
           sbs_cord?: string | null
           school_location?: string | null
@@ -2717,6 +2719,7 @@ export type Database = {
           pickup_point?: string | null
           pickup_point_cord?: string | null
           pickup_point_definition?: string | null
+          remarks?: string | null
           route?: string | null
           sbs_cord?: string | null
           school_location?: string | null
