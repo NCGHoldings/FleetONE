@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ColumnDef } from '@tanstack/react-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Eye, Edit, Trash2, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { YutongQuotationViewModal } from './YutongQuotationViewModal';
 import { YutongInvoiceGenerator } from './YutongInvoiceGenerator';
+import { YutongEditQuotationModal } from './YutongEditQuotationModal';
 
 interface YutongQuotation {
   id: string;
@@ -407,36 +407,18 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         />
       )}
 
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Quotation</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Editing quotation: <strong>{selectedQuotation?.quotation_no}</strong>
-            </p>
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p className="text-sm text-yellow-800">
-                Edit functionality is currently being developed. For now, you can view the quotation details and create a new version if needed.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditModalOpen(false)}>
-                Close
-              </Button>
-              <Button onClick={() => {
-                if (selectedQuotation) {
-                  setEditModalOpen(false);
-                  handleViewQuotation(selectedQuotation);
-                }
-              }}>
-                View Details
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <YutongEditQuotationModal
+        quotation={selectedQuotation}
+        open={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setSelectedQuotation(null);
+        }}
+        onSuccess={() => {
+          loadQuotations();
+          onRefresh();
+        }}
+      />
     </>
   );
 }
