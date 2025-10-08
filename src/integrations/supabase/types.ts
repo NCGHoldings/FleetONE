@@ -4425,6 +4425,36 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_customization_options: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          option_type: Database["public"]["Enums"]["yutong_customization_type"]
+          option_value: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          option_type: Database["public"]["Enums"]["yutong_customization_type"]
+          option_value: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          option_type?: Database["public"]["Enums"]["yutong_customization_type"]
+          option_value?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       yutong_customs_declarations: {
         Row: {
           assessment_date: string | null
@@ -5312,11 +5342,13 @@ export type Database = {
       }
       yutong_quotations: {
         Row: {
+          body_colour: string | null
           bus_model: string
           bus_model_id: string | null
           company_name: string | null
           created_at: string
           created_by: string | null
+          curtain_colour: string | null
           customer_email: string
           customer_id: string | null
           customer_name: string
@@ -5330,6 +5362,8 @@ export type Database = {
           quotation_no: string
           responsible_person: string | null
           responsible_person_id: string | null
+          seat_colour: string | null
+          seat_headrest_logo: string | null
           special_features: string | null
           status: string
           total_price: number
@@ -5340,11 +5374,13 @@ export type Database = {
           warranty_terms: string | null
         }
         Insert: {
+          body_colour?: string | null
           bus_model: string
           bus_model_id?: string | null
           company_name?: string | null
           created_at?: string
           created_by?: string | null
+          curtain_colour?: string | null
           customer_email: string
           customer_id?: string | null
           customer_name: string
@@ -5358,6 +5394,8 @@ export type Database = {
           quotation_no: string
           responsible_person?: string | null
           responsible_person_id?: string | null
+          seat_colour?: string | null
+          seat_headrest_logo?: string | null
           special_features?: string | null
           status?: string
           total_price: number
@@ -5368,11 +5406,13 @@ export type Database = {
           warranty_terms?: string | null
         }
         Update: {
+          body_colour?: string | null
           bus_model?: string
           bus_model_id?: string | null
           company_name?: string | null
           created_at?: string
           created_by?: string | null
+          curtain_colour?: string | null
           customer_email?: string
           customer_id?: string | null
           customer_name?: string
@@ -5386,6 +5426,8 @@ export type Database = {
           quotation_no?: string
           responsible_person?: string | null
           responsible_person_id?: string | null
+          seat_colour?: string | null
+          seat_headrest_logo?: string | null
           special_features?: string | null
           status?: string
           total_price?: number
@@ -6421,6 +6463,11 @@ export type Database = {
       trip_status: "scheduled" | "ongoing" | "completed" | "cancelled"
       user_status: "active" | "inactive" | "suspended"
       warranty_status: "active" | "expired" | "claimed" | "void"
+      yutong_customization_type:
+        | "seat_colour"
+        | "curtain_colour"
+        | "body_colour"
+        | "headrest_logo"
       yutong_do_status: "pending" | "issued" | "released" | "utilized"
       yutong_lc_status:
         | "pending"
@@ -6674,6 +6721,12 @@ export const Constants = {
       trip_status: ["scheduled", "ongoing", "completed", "cancelled"],
       user_status: ["active", "inactive", "suspended"],
       warranty_status: ["active", "expired", "claimed", "void"],
+      yutong_customization_type: [
+        "seat_colour",
+        "curtain_colour",
+        "body_colour",
+        "headrest_logo",
+      ],
       yutong_do_status: ["pending", "issued", "released", "utilized"],
       yutong_lc_status: [
         "pending",

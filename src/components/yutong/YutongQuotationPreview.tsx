@@ -24,6 +24,10 @@ interface YutongQuotation {
   warranty_terms?: string;
   discount_amount?: number;
   responsible_person_id?: string;
+  seat_colour?: string;
+  curtain_colour?: string;
+  body_colour?: string;
+  seat_headrest_logo?: string;
 }
 
 interface BusModelDetails {
@@ -272,9 +276,18 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                     <b>ENGINE:</b> {busDetails.engine}<br/>
                     <b>YEAR:</b> {busDetails.year}<br/>
                     <b>CONDITION:</b> {busDetails.condition}
-                    {quotation.special_features && (
+                     {quotation.special_features && (
                       <>
                         <br/><b>SPECIAL FEATURES:</b> {quotation.special_features}
+                      </>
+                    )}
+                    {(quotation.seat_colour || quotation.curtain_colour || quotation.body_colour || quotation.seat_headrest_logo) && (
+                      <>
+                        <br/><br/><b>CUSTOMIZATION:</b>
+                        {quotation.seat_colour && <><br/>• Seat Colour: {quotation.seat_colour}</>}
+                        {quotation.curtain_colour && <><br/>• Curtain Colour: {quotation.curtain_colour}</>}
+                        {quotation.body_colour && <><br/>• Body Colour: {quotation.body_colour}</>}
+                        {quotation.seat_headrest_logo && <><br/>• Headrest Logo: {quotation.seat_headrest_logo}</>}
                       </>
                     )}
                   </td>

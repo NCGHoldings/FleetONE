@@ -30,6 +30,10 @@ const formSchema = z.object({
   warranty_terms: z.string().optional(),
   valid_days: z.number().min(1).max(365).default(30),
   responsible_person_id: z.string().optional(),
+  seat_colour: z.string().optional(),
+  curtain_colour: z.string().optional(),
+  body_colour: z.string().optional(),
+  seat_headrest_logo: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -76,6 +80,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const [createdQuotationId, setCreatedQuotationId] = useState<string | null>(null);
   const [tempAddOns, setTempAddOns] = useState<TempAddOn[]>([]);
   const [responsiblePersons, setResponsiblePersons] = useState<any[]>([]);
+  const [customizationOptions, setCustomizationOptions] = useState<any[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -92,7 +97,23 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     loadBusModels();
     loadCustomers();
     loadResponsiblePersons();
+    loadCustomizationOptions();
   }, []);
+
+  const loadCustomizationOptions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("yutong_customization_options")
+        .select("*")
+        .eq("is_active", true)
+        .order("display_order");
+
+      if (error) throw error;
+      setCustomizationOptions(data || []);
+    } catch (error: any) {
+      console.error("Error loading customization options:", error);
+    }
+  };
 
   const loadBusModels = async () => {
     try {
@@ -231,11 +252,15 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         status: 'draft',
         created_by: user.id,
         responsible_person_id: data.responsible_person_id || null,
+        seat_colour: data.seat_colour || null,
+        curtain_colour: data.curtain_colour || null,
+        body_colour: data.body_colour || null,
+        seat_headrest_logo: data.seat_headrest_logo || null,
       };
 
       const { data: quotation, error } = await supabase
         .from('yutong_quotations')
-        .insert([quotationData])
+        .insert([quotationData as any])
         .select()
         .single();
 
@@ -507,6 +532,120 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   </FormItem>
                 )}
               />
+
+              {/* Vehicle Customization Section */}
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-semibold">Vehicle Customization</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="seat_colour"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Seat Colour</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select seat colour" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {customizationOptions
+                              .filter(opt => opt.option_type === 'seat_colour')
+                              .map((opt) => (
+                                <SelectItem key={opt.id} value={opt.option_value}>
+                                  {opt.option_value}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="curtain_colour"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Curtain Colour</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select curtain colour" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {customizationOptions
+                              .filter(opt => opt.option_type === 'curtain_colour')
+                              .map((opt) => (
+                                <SelectItem key={opt.id} value={opt.option_value}>
+                                  {opt.option_value}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="body_colour"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Body Colour</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select body colour" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {customizationOptions
+                              .filter(opt => opt.option_type === 'body_colour')
+                              .map((opt) => (
+                                <SelectItem key={opt.id} value={opt.option_value}>
+                                  {opt.option_value}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="seat_headrest_logo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Seat Headrest Logo</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select headrest logo" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {customizationOptions
+                              .filter(opt => opt.option_type === 'headrest_logo')
+                              .map((opt) => (
+                                <SelectItem key={opt.id} value={opt.option_value}>
+                                  {opt.option_value}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField

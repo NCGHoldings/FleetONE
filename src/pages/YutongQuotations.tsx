@@ -13,6 +13,7 @@ import YutongCustomersAdmin from "@/components/yutong/YutongCustomersAdmin";
 import { YutongOrdersList } from "@/components/yutong/YutongOrdersList";
 import { YutongFinanceDashboard } from "@/components/yutong/YutongFinanceDashboard";
 import YutongResponsiblePersonsAdmin from "@/components/yutong/YutongResponsiblePersonsAdmin";
+import { YutongCustomizationAdmin } from "@/components/yutong/YutongCustomizationAdmin";
 import { YutongSupplierManagement } from '@/components/yutong/YutongSupplierManagement';
 import { YutongLogisticsManagement } from '@/components/yutong/YutongLogisticsManagement';
 import { YutongCustomsManagement } from '@/components/yutong/YutongCustomsManagement';
@@ -199,6 +200,9 @@ export default function YutongQuotations() {
 
         <TabsContent value="settings" className="space-y-4">
           <YutongResponsiblePersonsAdmin />
+          <div className="mt-4">
+            <YutongCustomizationAdmin />
+          </div>
         </TabsContent>
       </Tabs>
 
