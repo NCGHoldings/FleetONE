@@ -5345,6 +5345,7 @@ export type Database = {
           body_colour: string | null
           bus_model: string
           bus_model_id: string | null
+          business_registration_number: string | null
           company_name: string | null
           created_at: string
           created_by: string | null
@@ -5353,6 +5354,7 @@ export type Database = {
           customer_id: string | null
           customer_name: string
           customer_phone: string
+          customer_type: string | null
           delivery_timeline: string | null
           discount_amount: number | null
           discount_percentage: number | null
@@ -5367,6 +5369,7 @@ export type Database = {
           seat_headrest_logo: string | null
           special_features: string | null
           status: string
+          tax_registration_number: string | null
           total_price: number
           unit_price: number
           updated_at: string
@@ -5378,6 +5381,7 @@ export type Database = {
           body_colour?: string | null
           bus_model: string
           bus_model_id?: string | null
+          business_registration_number?: string | null
           company_name?: string | null
           created_at?: string
           created_by?: string | null
@@ -5386,6 +5390,7 @@ export type Database = {
           customer_id?: string | null
           customer_name: string
           customer_phone: string
+          customer_type?: string | null
           delivery_timeline?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
@@ -5400,6 +5405,7 @@ export type Database = {
           seat_headrest_logo?: string | null
           special_features?: string | null
           status?: string
+          tax_registration_number?: string | null
           total_price: number
           unit_price: number
           updated_at?: string
@@ -5411,6 +5417,7 @@ export type Database = {
           body_colour?: string | null
           bus_model?: string
           bus_model_id?: string | null
+          business_registration_number?: string | null
           company_name?: string | null
           created_at?: string
           created_by?: string | null
@@ -5419,6 +5426,7 @@ export type Database = {
           customer_id?: string | null
           customer_name?: string
           customer_phone?: string
+          customer_type?: string | null
           delivery_timeline?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
@@ -5433,6 +5441,7 @@ export type Database = {
           seat_headrest_logo?: string | null
           special_features?: string | null
           status?: string
+          tax_registration_number?: string | null
           total_price?: number
           unit_price?: number
           updated_at?: string

@@ -21,6 +21,9 @@ const formSchema = z.object({
   customer_email: z.string().email('Valid email is required').optional().or(z.literal('')),
   company_name: z.string().optional(),
   finance_company: z.string().optional(),
+  customer_type: z.enum(['personal', 'company']).default('personal'),
+  business_registration_number: z.string().optional(),
+  tax_registration_number: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
@@ -91,6 +94,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       quantity: 1,
       discount_amount: 0,
       valid_days: 30,
+      customer_type: 'personal',
     }
   });
 
@@ -258,6 +262,9 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         body_colour: data.body_colour || null,
         seat_headrest_logo: data.seat_headrest_logo || null,
         finance_company: data.finance_company || null,
+        customer_type: data.customer_type || 'personal',
+        business_registration_number: data.business_registration_number || null,
+        tax_registration_number: data.tax_registration_number || null,
       };
 
       const { data: quotation, error } = await supabase
@@ -373,6 +380,62 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   )}
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="customer_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Customer Type *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select customer type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="personal">Personal Customer</SelectItem>
+                          <SelectItem value="company">Company</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {form.watch('customer_type') === 'company' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="business_registration_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Registration Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Business registration number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="tax_registration_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tax Registration Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Tax registration number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
