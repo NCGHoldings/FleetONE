@@ -53,6 +53,8 @@ serve(async (req) => {
           branch_id,
           payment_status,
           payment_amount,
+          payment_balance,
+          fixed_monthly_amount,
           update_new
         )
       `)
@@ -80,47 +82,36 @@ serve(async (req) => {
         throw new Error(`Failed to update receipt: ${receiptUpdateError.message}`);
       }
 
-      // Update student payment status if receipt is approved
+      // Get student's current payment details
       const studentData = receipt.school_students;
       if (studentData) {
-        const updateData: any = {
-          payment_status: 'paid',
-          last_payment_date: payment_date || new Date().toISOString().split('T')[0],
-          updated_at: new Date().toISOString()
-        };
+        const fixedAmount = studentData.fixed_monthly_amount || studentData.payment_amount || 0;
+        const previousBalance = studentData.payment_balance || 0;
+        const amountPaid = payment_amount || 0;
+        const difference = amountPaid - fixedAmount;
+        const newBalance = previousBalance + difference;
 
-        // Update payment amount if provided
-        if (payment_amount && payment_amount > 0) {
-          updateData.payment_amount = payment_amount;
-        }
-
-        const { error: studentUpdateError } = await supabaseClient
-          .from('school_students')
-          .update(updateData)
-          .eq('id', studentData.id);
-
-        if (studentUpdateError) {
-          console.error('Failed to update student payment status:', studentUpdateError);
-          // Don't throw here as receipt is already updated
-        }
-
-        // Create payment record
-        const { error: paymentError } = await supabaseClient
-          .from('school_payments')
+        // Create payment transaction record (trigger will update student automatically)
+        const { error: transactionError } = await supabaseClient
+          .from('school_payment_transactions')
           .insert({
             student_id: studentData.id,
-            branch_id: studentData.branch_id,
-            amount: payment_amount || studentData.update_new || 0,
+            payment_month: payment_date || new Date().toISOString().split('T')[0],
+            fixed_amount: fixedAmount,
+            amount_paid: amountPaid,
+            difference: difference,
+            payment_balance_before: previousBalance,
+            payment_balance_after: newBalance,
+            payment_method: 'Receipt Upload',
+            reference_no: receipt_id,
             payment_date: payment_date || new Date().toISOString().split('T')[0],
-            payment_method: 'receipt_upload',
-            status: 'verified',
-            verified_by,
-            receipt_id: receipt_id,
-            notes: notes || 'Payment verified through receipt upload'
+            notes: notes || 'Payment verified through receipt upload',
+            created_by: verified_by
           });
 
-        if (paymentError) {
-          console.error('Failed to create payment record:', paymentError);
+        if (transactionError) {
+          console.error('Failed to create payment transaction:', transactionError);
+          throw new Error(`Failed to create payment transaction: ${transactionError.message}`);
         }
       }
 
