@@ -5355,7 +5355,7 @@ export type Database = {
           id?: string
           payment_terms?: string | null
           quantity?: number
-          quotation_no?: string
+          quotation_no: string
           responsible_person?: string | null
           responsible_person_id?: string | null
           special_features?: string | null
