@@ -5,26 +5,24 @@ import { Building2, Users, TrendingUp, Calendar } from "lucide-react";
 import { format } from "date-fns";
 
 interface CustomerCardProps {
-  customer: {
-    id: string;
-    customer_code: string;
-    company_name: string;
-  };
-  subCustomersCount: number;
-  totalQuotations: number;
+  customerName: string;
+  companyName: string | null;
+  quotationCount: number;
   totalValue: number;
   latestQuotationDate: string | null;
-  onViewDetails: (customerId: string) => void;
-  onLinkSubCustomer: (customerId: string) => void;
+  subCustomerNames: string[];
+  onViewDetails: (customerName: string) => void;
+  onLinkSubCustomer: (customerName: string) => void;
   canManageLinks: boolean;
 }
 
 export function YutongCustomerCard({
-  customer,
-  subCustomersCount,
-  totalQuotations,
+  customerName,
+  companyName,
+  quotationCount,
   totalValue,
   latestQuotationDate,
+  subCustomerNames,
   onViewDetails,
   onLinkSubCustomer,
   canManageLinks,
@@ -36,14 +34,14 @@ export function YutongCustomerCard({
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">{customer.customer_code}</span>
+              <span className="text-sm text-muted-foreground">{customerName}</span>
             </div>
-            <h3 className="font-semibold text-lg leading-tight">{customer.company_name}</h3>
+            <h3 className="font-semibold text-lg leading-tight">{companyName || customerName}</h3>
           </div>
-          {subCustomersCount > 0 && (
+          {subCustomerNames.length > 0 && (
             <Badge variant="secondary" className="flex items-center gap-1">
               <Users className="h-3 w-3" />
-              {subCustomersCount}
+              {subCustomerNames.length}
             </Badge>
           )}
         </div>
@@ -53,7 +51,7 @@ export function YutongCustomerCard({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Quotations</p>
-            <p className="text-2xl font-bold">{totalQuotations}</p>
+            <p className="text-2xl font-bold">{quotationCount}</p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Total Value</p>
@@ -82,7 +80,7 @@ export function YutongCustomerCard({
           variant="outline"
           size="sm"
           className="flex-1"
-          onClick={() => onViewDetails(customer.id)}
+          onClick={() => onViewDetails(customerName)}
         >
           View Details
         </Button>
@@ -90,7 +88,7 @@ export function YutongCustomerCard({
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => onLinkSubCustomer(customer.id)}
+            onClick={() => onLinkSubCustomer(customerName)}
           >
             Link Sub-Customer
           </Button>

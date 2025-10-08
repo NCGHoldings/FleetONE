@@ -5377,9 +5377,12 @@ export type Database = {
           discount_percentage: number | null
           finance_company: string | null
           id: string
+          is_sub_customer: boolean | null
+          main_customer_name: string | null
           payment_terms: string | null
           quantity: number
           quotation_no: string
+          relationship_notes: string | null
           responsible_person: string | null
           responsible_person_id: string | null
           seat_colour: string | null
@@ -5413,9 +5416,12 @@ export type Database = {
           discount_percentage?: number | null
           finance_company?: string | null
           id?: string
+          is_sub_customer?: boolean | null
+          main_customer_name?: string | null
           payment_terms?: string | null
           quantity?: number
           quotation_no: string
+          relationship_notes?: string | null
           responsible_person?: string | null
           responsible_person_id?: string | null
           seat_colour?: string | null
@@ -5449,9 +5455,12 @@ export type Database = {
           discount_percentage?: number | null
           finance_company?: string | null
           id?: string
+          is_sub_customer?: boolean | null
+          main_customer_name?: string | null
           payment_terms?: string | null
           quantity?: number
           quotation_no?: string
+          relationship_notes?: string | null
           responsible_person?: string | null
           responsible_person_id?: string | null
           seat_colour?: string | null

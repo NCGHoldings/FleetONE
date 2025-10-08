@@ -4,7 +4,7 @@ import { Search } from "lucide-react";
 import { YutongCustomerCard } from "./YutongCustomerCard";
 import { YutongCustomerLinkModal } from "./YutongCustomerLinkModal";
 import { YutongCustomerDetailModal } from "./YutongCustomerDetailModal";
-import { useYutongCustomerCards } from "@/hooks/useYutongCustomerCards";
+import { useYutongQuotationCards } from "@/hooks/useYutongQuotationCards";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -14,30 +14,30 @@ interface YutongCustomerCardViewProps {
 
 export function YutongCustomerCardView({ canManageLinks }: YutongCustomerCardViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerName, setSelectedCustomerName] = useState<string | null>(null);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const { customerCards, loading, loadCustomerCards, linkSubCustomer } = useYutongCustomerCards();
+  const { cards, loading, loadCards, linkSubCustomer } = useYutongQuotationCards();
   const { toast } = useToast();
 
   useEffect(() => {
-    loadCustomerCards();
+    loadCards();
   }, []);
 
-  const filteredCards = customerCards.filter((card) =>
-    card.customer.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    card.customer.customer_code.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCards = cards.filter((card) =>
+    card.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (card.companyName && card.companyName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleLinkSubCustomer = async (subCustomerId: string, mainCustomerId: string, notes: string) => {
+  const handleLinkSubCustomer = async (subCustomerName: string, mainCustomerName: string, notes: string) => {
     try {
-      await linkSubCustomer(subCustomerId, mainCustomerId, notes);
+      await linkSubCustomer(subCustomerName, mainCustomerName, notes);
       toast({
         title: "Success",
         description: "Sub-customer linked successfully",
       });
       setLinkModalOpen(false);
-      loadCustomerCards();
+      loadCards();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -72,18 +72,19 @@ export function YutongCustomerCardView({ canManageLinks }: YutongCustomerCardVie
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredCards.map((card) => (
           <YutongCustomerCard
-            key={card.customer.id}
-            customer={card.customer}
-            subCustomersCount={card.subCustomersCount}
-            totalQuotations={card.totalQuotations}
+            key={card.customerName}
+            customerName={card.customerName}
+            companyName={card.companyName}
+            quotationCount={card.quotationCount}
             totalValue={card.totalValue}
             latestQuotationDate={card.latestQuotationDate}
-            onViewDetails={(id) => {
-              setSelectedCustomerId(id);
+            subCustomerNames={card.subCustomerNames}
+            onViewDetails={(name) => {
+              setSelectedCustomerName(name);
               setDetailModalOpen(true);
             }}
-            onLinkSubCustomer={(id) => {
-              setSelectedCustomerId(id);
+            onLinkSubCustomer={(name) => {
+              setSelectedCustomerName(name);
               setLinkModalOpen(true);
             }}
             canManageLinks={canManageLinks}
@@ -100,14 +101,14 @@ export function YutongCustomerCardView({ canManageLinks }: YutongCustomerCardVie
       <YutongCustomerLinkModal
         open={linkModalOpen}
         onOpenChange={setLinkModalOpen}
-        mainCustomerId={selectedCustomerId}
+        mainCustomerName={selectedCustomerName}
         onLink={handleLinkSubCustomer}
       />
 
       <YutongCustomerDetailModal
         open={detailModalOpen}
         onOpenChange={setDetailModalOpen}
-        customerId={selectedCustomerId}
+        customerName={selectedCustomerName}
       />
     </div>
   );

@@ -1,101 +1,85 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { Building2, Users, TrendingUp } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface YutongCustomerDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  customerId: string | null;
+  customerName: string | null;
+}
+
+interface Quotation {
+  id: string;
+  quotation_no: string;
+  bus_model: string;
+  quantity: number;
+  total_price: number;
+  status: string;
+  created_at: string;
+  customer_name: string;
+  company_name: string | null;
+  relationship_notes: string | null;
 }
 
 export function YutongCustomerDetailModal({
   open,
   onOpenChange,
-  customerId,
+  customerName,
 }: YutongCustomerDetailModalProps) {
-  const [customer, setCustomer] = useState<any>(null);
-  const [directQuotations, setDirectQuotations] = useState<any[]>([]);
-  const [relatedQuotations, setRelatedQuotations] = useState<any[]>([]);
-  const [subCustomers, setSubCustomers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"separate" | "combined">("separate");
+  const [loading, setLoading] = useState(false);
+  const [directQuotations, setDirectQuotations] = useState<Quotation[]>([]);
+  const [relatedQuotations, setRelatedQuotations] = useState<Quotation[]>([]);
+  const [combinedView, setCombinedView] = useState(false);
 
   useEffect(() => {
-    if (open && customerId) {
+    if (open && customerName) {
       loadCustomerDetails();
     }
-  }, [open, customerId]);
+  }, [open, customerName]);
 
   const loadCustomerDetails = async () => {
-    if (!customerId) return;
+    if (!customerName) return;
 
-    setLoading(true);
     try {
-      // Load customer
-      const { data: customerData, error: customerError } = await supabase
-        .from("yutong_customers")
+      setLoading(true);
+
+      // Get direct quotations for this customer
+      const { data: direct, error: directError } = await supabase
+        .from("yutong_quotations")
         .select("*")
-        .eq("id", customerId)
-        .single();
+        .eq("customer_name", customerName)
+        .or("is_sub_customer.eq.false,main_customer_name.is.null");
 
-      if (customerError) throw customerError;
-      setCustomer(customerData);
+      if (directError) throw directError;
 
-        // Load direct quotations
-        const { data: directData, error: directError } = await supabase
-          .from("yutong_quotations")
-          .select("*")
-          .eq("customer_id", customerId)
-          .order("created_at", { ascending: false });
-
-        if (directError) throw directError;
-        setDirectQuotations(directData || []);
-
-      // Load sub-customers
-      const { data: subData, error: subError } = await supabase
-        .from("yutong_customers")
+      // Get related quotations (sub-customers linked to this customer)
+      const { data: related, error: relatedError } = await supabase
+        .from("yutong_quotations")
         .select("*")
-        .eq("parent_customer_id", customerId);
+        .eq("main_customer_name", customerName)
+        .eq("is_sub_customer", true);
 
-      if (subError) throw subError;
-      setSubCustomers(subData || []);
+      if (relatedError) throw relatedError;
 
-      // Load related quotations from sub-customers
-      if (subData && subData.length > 0) {
-        const subCustomerIds = subData.map((sub) => sub.id);
-        const { data: relatedData, error: relatedError } = await supabase
-          .from("yutong_quotations")
-          .select("*, yutong_customers(company_name, relationship_notes)")
-          .in("customer_id", subCustomerIds)
-          .order("created_at", { ascending: false });
-
-        if (relatedError) throw relatedError;
-        setRelatedQuotations(relatedData || []);
-      } else {
-        setRelatedQuotations([]);
-      }
-    } catch (error: any) {
+      setDirectQuotations(direct || []);
+      setRelatedQuotations(related || []);
+    } catch (error) {
       console.error("Error loading customer details:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const quotationColumns: ColumnDef<any>[] = [
+  const quotationColumns: ColumnDef<Quotation>[] = [
     {
       accessorKey: "quotation_no",
       header: "Quotation No",
@@ -111,49 +95,50 @@ export function YutongCustomerDetailModal({
     {
       accessorKey: "total_price",
       header: "Amount",
-      cell: ({ row }) => (
-        <span className="font-medium">
-          {new Intl.NumberFormat("en-LK", {
-            style: "currency",
-            currency: "LKR",
-          }).format(row.getValue("total_price"))}
-        </span>
-      ),
+      cell: ({ row }) => {
+        return new Intl.NumberFormat("en-LK", {
+          style: "currency",
+          currency: "LKR",
+        }).format(row.getValue("total_price"));
+      },
     },
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }) => (
-        <Badge variant={row.getValue("status") === "confirmed" ? "default" : "secondary"}>
-          {row.getValue("status")}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const status = row.getValue("status") as string;
+        return (
+          <Badge variant={status === "confirmed" ? "default" : "secondary"}>
+            {status}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: "created_at",
       header: "Date",
-      cell: ({ row }) => format(new Date(row.getValue("created_at")), "MMM dd, yyyy"),
+      cell: ({ row }) => {
+        return format(new Date(row.getValue("created_at")), "MMM dd, yyyy");
+      },
     },
   ];
 
-  const relatedQuotationColumns: ColumnDef<any>[] = [
-    ...quotationColumns.slice(0, 1),
+  const relatedQuotationColumns: ColumnDef<Quotation>[] = [
     {
-      accessorKey: "yutong_customers",
+      accessorKey: "customer_name",
       header: "Sub-Customer",
-      cell: ({ row }) => {
-        const customer = row.getValue("yutong_customers") as any;
-        return (
-          <div>
-            <p className="font-medium">{customer?.company_name}</p>
-            {customer?.relationship_notes && (
-              <p className="text-xs text-muted-foreground">{customer.relationship_notes}</p>
-            )}
-          </div>
-        );
-      },
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium">{row.original.customer_name}</div>
+          {row.original.relationship_notes && (
+            <div className="text-xs text-muted-foreground">
+              {row.original.relationship_notes}
+            </div>
+          )}
+        </div>
+      ),
     },
-    ...quotationColumns.slice(1),
+    ...quotationColumns,
   ];
 
   const directTotal = directQuotations.reduce((sum, q) => sum + (q.total_price || 0), 0);
@@ -163,8 +148,14 @@ export function YutongCustomerDetailModal({
   if (loading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <Skeleton className="h-64" />
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <Skeleton className="h-8 w-64" />
+          </DialogHeader>
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
         </DialogContent>
       </Dialog>
     );
@@ -172,167 +163,122 @@ export function YutongCustomerDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            {customer?.company_name}
-          </DialogTitle>
+          <DialogTitle>{customerName}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Customer Info */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Customer Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Customer Code</p>
-                  <p className="font-medium">{customer?.customer_code}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Contact Person</p>
-                  <p className="font-medium">{customer?.contact_person}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{customer?.phone}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Totals */}
-          <div className="flex gap-2 justify-end">
-            <Button
-              variant={viewMode === "separate" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("separate")}
-            >
-              Separate View
-            </Button>
-            <Button
-              variant={viewMode === "combined" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("combined")}
-            >
-              Combined View
-            </Button>
-          </div>
-
-          {viewMode === "separate" ? (
-            <div className="grid grid-cols-3 gap-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Direct Orders</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-baseline gap-2">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="text-2xl font-bold">
-                      {new Intl.NumberFormat("en-LK", {
-                        style: "currency",
-                        currency: "LKR",
-                        notation: "compact",
-                      }).format(directTotal)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {directQuotations.length} quotations
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Related Orders</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-baseline gap-2">
-                    <Users className="h-4 w-4 text-blue-600" />
-                    <span className="text-2xl font-bold">
-                      {new Intl.NumberFormat("en-LK", {
-                        style: "currency",
-                        currency: "LKR",
-                        notation: "compact",
-                      }).format(relatedTotal)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {relatedQuotations.length} quotations from {subCustomers.length} sub-customers
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Grand Total</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-baseline gap-2">
-                    <TrendingUp className="h-4 w-4 text-purple-600" />
-                    <span className="text-2xl font-bold">
-                      {new Intl.NumberFormat("en-LK", {
-                        style: "currency",
-                        currency: "LKR",
-                        notation: "compact",
-                      }).format(combinedTotal)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {directQuotations.length + relatedQuotations.length} total quotations
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Combined Total</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Direct Quotations
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-baseline gap-2">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  <span className="text-3xl font-bold">
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold">{directQuotations.length}</div>
+                  <p className="text-xs text-muted-foreground">
                     {new Intl.NumberFormat("en-LK", {
                       style: "currency",
                       currency: "LKR",
-                    }).format(combinedTotal)}
-                  </span>
+                      notation: "compact",
+                    }).format(directTotal)}
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {directQuotations.length + relatedQuotations.length} quotations •{" "}
-                  {subCustomers.length + 1} customers in group
-                </p>
               </CardContent>
             </Card>
-          )}
 
-          {/* Quotations */}
-          <Tabs defaultValue="direct">
-            <TabsList>
-              <TabsTrigger value="direct">
-                Direct Quotations ({directQuotations.length})
-              </TabsTrigger>
-              {subCustomers.length > 0 && (
-                <TabsTrigger value="related">
-                  Related Quotations ({relatedQuotations.length})
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Related Quotations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold">{relatedQuotations.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {new Intl.NumberFormat("en-LK", {
+                      style: "currency",
+                      currency: "LKR",
+                      notation: "compact",
+                    }).format(relatedTotal)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Combined Total
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold">
+                    {directQuotations.length + relatedQuotations.length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {new Intl.NumberFormat("en-LK", {
+                      style: "currency",
+                      currency: "LKR",
+                      notation: "compact",
+                    }).format(combinedTotal)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="combined-view"
+              checked={combinedView}
+              onCheckedChange={setCombinedView}
+            />
+            <Label htmlFor="combined-view">Combined View</Label>
+          </div>
+
+          {/* Quotations Tables */}
+          {combinedView ? (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">All Quotations</h3>
+              <DataTable
+                columns={relatedQuotationColumns}
+                data={[...directQuotations, ...relatedQuotations]}
+              />
+            </div>
+          ) : (
+            <Tabs defaultValue="direct">
+              <TabsList>
+                <TabsTrigger value="direct">
+                  Direct Orders ({directQuotations.length})
                 </TabsTrigger>
-              )}
-            </TabsList>
+                <TabsTrigger value="related">
+                  Related Orders ({relatedQuotations.length})
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="direct" className="mt-4">
-              <DataTable columns={quotationColumns} data={directQuotations} />
-            </TabsContent>
-
-            {subCustomers.length > 0 && (
-              <TabsContent value="related" className="mt-4">
-                <DataTable columns={relatedQuotationColumns} data={relatedQuotations} />
+              <TabsContent value="direct" className="space-y-4">
+                <DataTable columns={quotationColumns} data={directQuotations} />
               </TabsContent>
-            )}
-          </Tabs>
+
+              <TabsContent value="related" className="space-y-4">
+                {relatedQuotations.length > 0 ? (
+                  <DataTable columns={relatedQuotationColumns} data={relatedQuotations} />
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No related orders found
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -17,7 +17,6 @@ import { Plus, Search, Eye, Edit, Trash2, Link, Unlink, Building2, User } from '
 import { ColumnDef } from '@tanstack/react-table';
 import CustomerProfileModal from './CustomerProfileModal';
 import { useAuth } from '@/hooks/useAuth';
-import { useYutongCustomerCards } from '@/hooks/useYutongCustomerCards';
 
 const customerSchema = z.object({
   company_name: z.string().min(1, 'Company name is required'),
@@ -74,7 +73,6 @@ export default function YutongCustomersAdmin() {
   const [showProfile, setShowProfile] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const { unlinkSubCustomer } = useYutongCustomerCards();
   const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
@@ -138,7 +136,16 @@ export default function YutongCustomersAdmin() {
     if (!confirm('Are you sure you want to unlink this sub-customer?')) return;
 
     try {
-      await unlinkSubCustomer(customerId);
+      const { error } = await supabase
+        .from('yutong_customers')
+        .update({
+          parent_customer_id: null,
+          relationship_notes: null,
+        })
+        .eq('id', customerId);
+
+      if (error) throw error;
+
       toast({
         title: "Success",
         description: "Sub-customer unlinked successfully",
