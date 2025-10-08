@@ -78,60 +78,35 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
 
   const loadQuotations = async () => {
     try {
-      const { data, error } = await (supabase as any)
+      // Fetch quotations first
+      const { data: quotationsData, error } = await supabase
         .from('yutong_quotations')
-        .select(`
-          *,
-          profiles!created_by(
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        // If the join fails, try a simpler approach
-        const { data: simpleData, error: simpleError } = await (supabase as any)
-          .from('yutong_quotations')
-          .select('*')
-          .order('created_at', { ascending: false });
-          
-        if (simpleError) throw simpleError;
-        
-        // Get creator names separately
-        const quotationsWithCreators = await Promise.all(
-          (simpleData || []).map(async (quotation: any) => {
-            if (quotation.created_by) {
-              const { data: profile } = await (supabase as any)
-                .from('profiles')
-                .select('first_name, last_name')
-                .eq('user_id', quotation.created_by)
-                .single();
-                
-              return {
-                ...quotation,
-                creator_name: profile 
-                  ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-                  : 'Unknown User'
-              };
-            }
-            return {
-              ...quotation,
-              creator_name: 'Unknown User'
-            };
-          })
-        );
-        
-        setQuotations(quotationsWithCreators);
-        return;
-      }
+      if (error) throw error;
+
+      // Get all unique user IDs
+      const userIds = [...new Set(quotationsData?.map(q => q.created_by).filter(Boolean))];
       
-      // Transform data to include creator name
-      const transformedData = (data || []).map((quotation: any) => ({
+      // Batch fetch all profiles in ONE query
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name')
+        .in('user_id', userIds);
+
+      // Create a lookup map for quick access
+      const profileMap = new Map(
+        profiles?.map(p => [
+          p.user_id, 
+          `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown User'
+        ])
+      );
+
+      // Transform data with creator names from the map
+      const transformedData = quotationsData.map((quotation: any) => ({
         ...quotation,
-        creator_name: quotation.profiles 
-          ? `${quotation.profiles.first_name || ''} ${quotation.profiles.last_name || ''}`.trim()
-          : 'Unknown User'
+        creator_name: quotation.created_by ? profileMap.get(quotation.created_by) || 'Unknown User' : 'Unknown User'
       }));
       
       setQuotations(transformedData);
@@ -139,7 +114,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
       console.error('Error loading quotations:', error);
       toast({
         title: "Error",
-        description: "Failed to load quotations: " + error.message,
+        description: error.message || "Failed to load quotations",
         variant: "destructive"
       });
     } finally {

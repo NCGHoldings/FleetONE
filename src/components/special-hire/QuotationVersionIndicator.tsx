@@ -27,6 +27,7 @@ interface Props {
   allVersions: QuotationVersion[];
   onViewVersion: (version: QuotationVersion) => void;
   onEditVersion: (version: QuotationVersion) => void;
+  onLoadVersions?: () => Promise<void>;
   showEditOption?: boolean;
 }
 
@@ -35,9 +36,20 @@ export function QuotationVersionIndicator({
   allVersions, 
   onViewVersion, 
   onEditVersion,
+  onLoadVersions,
   showEditOption = true
 }: Props) {
-  // If only one version, show simple badge
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const handleOpenChange = async (open: boolean) => {
+    if (open && allVersions.length === 0 && onLoadVersions) {
+      setIsLoading(true);
+      await onLoadVersions();
+      setIsLoading(false);
+    }
+  };
+
+  // If only one version or no versions loaded yet, show simple badge
   if (allVersions.length <= 1) {
     return (
       <Badge variant="outline" className="text-xs">
@@ -78,9 +90,9 @@ export function QuotationVersionIndicator({
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+        <Button variant="outline" size="sm" className="h-6 px-2 text-xs" disabled={isLoading}>
           <History className="h-3 w-3 mr-1" />
           v{currentVersion.version_number}
           <ChevronDown className="h-3 w-3 ml-1" />
@@ -90,7 +102,12 @@ export function QuotationVersionIndicator({
         <DropdownMenuLabel>Version History</DropdownMenuLabel>
         <DropdownMenuSeparator />
         
-        {sortedVersions.map((version) => (
+        {isLoading ? (
+          <div className="flex items-center justify-center p-4 text-xs text-muted-foreground">
+            Loading versions...
+          </div>
+        ) : (
+          sortedVersions.map((version) => (
           <DropdownMenuItem key={version.id} className="flex flex-col items-start p-3">
             <div className="flex items-center justify-between w-full mb-2">
               <div className="flex items-center space-x-2">
@@ -149,7 +166,8 @@ export function QuotationVersionIndicator({
               </div>
             )}
           </DropdownMenuItem>
-        ))}
+          ))
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
