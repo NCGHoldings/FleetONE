@@ -20,6 +20,7 @@ const formSchema = z.object({
   customer_phone: z.string().min(1, 'Phone number is required'),
   customer_email: z.string().email('Valid email is required').optional().or(z.literal('')),
   company_name: z.string().optional(),
+  finance_company: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
@@ -256,6 +257,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         curtain_colour: data.curtain_colour || null,
         body_colour: data.body_colour || null,
         seat_headrest_logo: data.seat_headrest_logo || null,
+        finance_company: data.finance_company || null,
       };
 
       const { data: quotation, error } = await supabase
@@ -357,6 +359,22 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   )}
                 />
                 
+                <FormField
+                  control={form.control}
+                  name="finance_company"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Finance Company</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Optional" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="customer_name"

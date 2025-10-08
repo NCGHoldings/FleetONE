@@ -28,6 +28,7 @@ interface YutongQuotation {
   curtain_colour?: string;
   body_colour?: string;
   seat_headrest_logo?: string;
+  finance_company?: string;
 }
 
 interface BusModelDetails {
@@ -250,6 +251,9 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
               <p style={{ margin: '4px 0', fontSize: '14px' }}><b>ADDRESS :</b> {quotation.customer_address || ''}</p>
               <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CONTACT :</b> {quotation.customer_phone} / {quotation.customer_email}</p>
               <p style={{ margin: '4px 0', fontSize: '14px' }}><b>DATE :</b> {formattedDate}</p>
+              {quotation.finance_company && (
+                <p style={{ margin: '4px 0', fontSize: '14px' }}><b>FINANCE COMPANY :</b> {quotation.finance_company}</p>
+              )}
             </div>
 
             {/* Quotation No */}

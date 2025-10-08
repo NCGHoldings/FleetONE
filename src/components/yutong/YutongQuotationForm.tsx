@@ -21,6 +21,7 @@ const formSchema = z.object({
   customer_phone: z.string().min(1, 'Phone number is required'),
   customer_email: z.string().email('Valid email is required'),
   company_name: z.string().optional(),
+  finance_company: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
@@ -201,6 +202,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         curtain_colour: data.curtain_colour || null,
         body_colour: data.body_colour || null,
         seat_headrest_logo: data.seat_headrest_logo || null,
+        finance_company: data.finance_company || null,
         created_by: user?.id
       };
 
@@ -323,6 +325,20 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                     <FormLabel>Company Name</FormLabel>
                     <FormControl>
                       <Input placeholder="Company name (optional)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="finance_company"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Finance Company</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Finance company (optional)" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

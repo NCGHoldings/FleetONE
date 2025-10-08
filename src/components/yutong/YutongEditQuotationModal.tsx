@@ -17,6 +17,7 @@ const formSchema = z.object({
   customer_phone: z.string().min(1, 'Phone number is required'),
   customer_email: z.string().email('Valid email is required'),
   company_name: z.string().optional(),
+  finance_company: z.string().optional(),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
   discount_amount: z.number().min(0).optional(),
@@ -40,6 +41,7 @@ interface YutongQuotation {
   customer_phone: string;
   customer_email: string;
   company_name?: string;
+  finance_company?: string;
   bus_model: string;
   quantity: number;
   unit_price: number;
@@ -75,6 +77,7 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
       customer_phone: '',
       customer_email: '',
       company_name: '',
+      finance_company: '',
       quantity: 1,
       unit_price: 0,
       discount_amount: 0,
@@ -98,6 +101,7 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
         customer_phone: quotation.customer_phone || '',
         customer_email: quotation.customer_email || '',
         company_name: quotation.company_name || '',
+        finance_company: quotation.finance_company || '',
         quantity: quotation.quantity || 1,
         unit_price: quotation.unit_price || 0,
         discount_amount: quotation.discount_amount || 0,
@@ -218,6 +222,7 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
           curtain_colour: data.curtain_colour || null,
           body_colour: data.body_colour || null,
           seat_headrest_logo: data.seat_headrest_logo || null,
+          finance_company: data.finance_company || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', quotation.id);
@@ -298,6 +303,22 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                   )}
                 />
                 
+                <FormField
+                  control={form.control}
+                  name="finance_company"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Finance Company</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Optional" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="customer_name"

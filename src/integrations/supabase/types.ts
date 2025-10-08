@@ -5356,6 +5356,7 @@ export type Database = {
           delivery_timeline: string | null
           discount_amount: number | null
           discount_percentage: number | null
+          finance_company: string | null
           id: string
           payment_terms: string | null
           quantity: number
@@ -5388,6 +5389,7 @@ export type Database = {
           delivery_timeline?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
+          finance_company?: string | null
           id?: string
           payment_terms?: string | null
           quantity?: number
@@ -5420,6 +5422,7 @@ export type Database = {
           delivery_timeline?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
+          finance_company?: string | null
           id?: string
           payment_terms?: string | null
           quantity?: number
