@@ -50,7 +50,7 @@ export function YutongCustomerLinkModal({
       const { data, error } = await supabase
         .from("yutong_customers")
         .select("id, customer_code, company_name, parent_customer_id")
-        .or("is_main_customer.eq.true,parent_customer_id.is.null")
+        .is("parent_customer_id", null)
         .neq("id", mainCustomerId || "")
         .order("company_name");
 
