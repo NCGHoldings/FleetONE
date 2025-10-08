@@ -18,7 +18,7 @@ import { InlineAddOnsSection } from './InlineAddOnsSection';
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
   customer_phone: z.string().min(1, 'Phone number is required'),
-  customer_email: z.string().email('Valid email is required'),
+  customer_email: z.string().email('Valid email is required').optional().or(z.literal('')),
   company_name: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
@@ -369,9 +369,9 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   name="customer_email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email *</FormLabel>
+                      <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" {...field} />
+                        <Input type="email" {...field} placeholder="Optional" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
