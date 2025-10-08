@@ -11,6 +11,7 @@ import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { InlineAddOnsSection } from './InlineAddOnsSection';
+import { EditTypeSelectionModal } from '../special-hire/EditTypeSelectionModal';
 
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
@@ -62,6 +63,13 @@ interface YutongQuotation {
   curtain_colour?: string;
   body_colour?: string;
   seat_headrest_logo?: string;
+  status?: string;
+  valid_until?: string;
+  parent_quotation_id?: string;
+  version_number?: string;
+  edit_type?: string;
+  edit_reason?: string;
+  is_active_version?: boolean;
 }
 
 interface YutongEditQuotationModalProps {
@@ -75,6 +83,11 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
   const { toast } = useToast();
   const [quotationAddOns, setQuotationAddOns] = useState<any[]>([]);
   const [customizationOptions, setCustomizationOptions] = useState<any[]>([]);
+  const [showEditTypeModal, setShowEditTypeModal] = useState(true);
+  const [editConfig, setEditConfig] = useState<{
+    editType: 'staff_edit' | 'customer_request';
+    editReason: string;
+  } | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -101,6 +114,14 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
       seat_headrest_logo: '',
     }
   });
+
+  // Reset edit type modal when dialog opens
+  useEffect(() => {
+    if (open) {
+      setShowEditTypeModal(true);
+      setEditConfig(null);
+    }
+  }, [open]);
 
   // Load quotation data and add-ons when dialog opens
   useEffect(() => {
@@ -200,23 +221,66 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
     return subtotal - discountAmount;
   };
 
+  const handleEditTypeConfirm = (editType: 'staff_edit' | 'customer_request', reason?: string) => {
+    setEditConfig({
+      editType,
+      editReason: reason || '',
+    });
+    setShowEditTypeModal(false);
+  };
+
+  const handleEditTypeCancel = () => {
+    setShowEditTypeModal(false);
+    onClose();
+  };
+
   const handleFormSubmit = async (data: FormData) => {
     try {
-      if (!quotation) {
+      if (!quotation || !editConfig) {
         toast({
           title: "Error",
-          description: "No quotation selected for editing",
+          description: "No quotation or edit configuration found",
           variant: "destructive",
         });
         return;
       }
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const totalPrice = calculateTotalPrice();
 
-      // Update quotation
-      const { error: quotationError } = await supabase
+      // Generate next version number
+      const { data: versionData, error: versionError } = await supabase
+        .rpc('generate_next_version_number', { p_parent_id: quotation.id });
+
+      if (versionError) throw versionError;
+      const nextVersion = versionData || '1.1';
+
+      // Get base quotation number (without version suffix)
+      const baseQuotationNo = quotation.quotation_no.replace(/-v[\d.]+$/, '');
+      const versionedQuotationNo = `${baseQuotationNo}-v${nextVersion}`;
+
+      // Mark old quotation as inactive
+      const { error: deactivateError } = await supabase
         .from('yutong_quotations')
-        .update({
+        .update({ is_active_version: false })
+        .eq('id', quotation.id);
+
+      if (deactivateError) throw deactivateError;
+
+      // Create new quotation version
+      const { data: newQuotation, error: quotationError } = await supabase
+        .from('yutong_quotations')
+        .insert({
+          quotation_no: versionedQuotationNo,
+          parent_quotation_id: quotation.id,
+          version_number: nextVersion,
+          edit_type: editConfig.editType,
+          edit_reason: editConfig.editReason,
+          is_active_version: true,
+          bus_model: quotation.bus_model,
           customer_name: data.customer_name,
           customer_phone: data.customer_phone,
           customer_email: data.customer_email,
@@ -238,24 +302,19 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
           customer_type: data.customer_type || 'personal',
           business_registration_number: data.business_registration_number || null,
           tax_registration_number: data.tax_registration_number || null,
-          updated_at: new Date().toISOString(),
+          status: quotation.status,
+          valid_until: quotation.valid_until,
+          created_by: user.id,
         })
-        .eq('id', quotation.id);
+        .select()
+        .single();
 
       if (quotationError) throw quotationError;
 
-      // Update add-ons: Delete existing and insert new ones
-      const { error: deleteError } = await supabase
-        .from('yutong_quotation_addons')
-        .delete()
-        .eq('quotation_id', quotation.id);
-
-      if (deleteError) throw deleteError;
-
-      // Insert new add-ons
+      // Insert add-ons for new version
       if (quotationAddOns.length > 0) {
         const addOnsToInsert = quotationAddOns.map(addon => ({
-          quotation_id: quotation.id,
+          quotation_id: newQuotation.id,
           addon_id: addon.addon_id,
           quantity: addon.quantity,
           unit_price: addon.unit_price,
@@ -273,22 +332,37 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
 
       toast({
         title: "Success",
-        description: "Quotation updated successfully",
+        description: `New quotation version ${nextVersion} created successfully`,
       });
 
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Error updating quotation:', error);
+      console.error('Error creating quotation version:', error);
       toast({
         title: "Error",
-        description: "Failed to update quotation",
+        description: "Failed to create quotation version",
         variant: "destructive",
       });
     }
   };
 
   if (!quotation) return null;
+
+  // Show edit type selection modal first
+  if (showEditTypeModal) {
+    return (
+      <EditTypeSelectionModal
+        isOpen={showEditTypeModal}
+        onClose={handleEditTypeCancel}
+        onConfirm={handleEditTypeConfirm}
+        quotationNo={quotation.quotation_no}
+      />
+    );
+  }
+
+  // If no edit config yet, don't show the form
+  if (!editConfig) return null;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

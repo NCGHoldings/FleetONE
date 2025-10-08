@@ -5455,10 +5455,14 @@ export type Database = {
           delivery_timeline: string | null
           discount_amount: number | null
           discount_percentage: number | null
+          edit_reason: string | null
+          edit_type: string | null
           finance_company: string | null
           id: string
+          is_active_version: boolean | null
           is_sub_customer: boolean | null
           main_customer_name: string | null
+          parent_quotation_id: string | null
           payment_terms: string | null
           quantity: number
           quotation_no: string
@@ -5475,6 +5479,7 @@ export type Database = {
           updated_at: string
           valid_days: number
           valid_until: string
+          version_number: string | null
           warranty_terms: string | null
         }
         Insert: {
@@ -5494,10 +5499,14 @@ export type Database = {
           delivery_timeline?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
+          edit_reason?: string | null
+          edit_type?: string | null
           finance_company?: string | null
           id?: string
+          is_active_version?: boolean | null
           is_sub_customer?: boolean | null
           main_customer_name?: string | null
+          parent_quotation_id?: string | null
           payment_terms?: string | null
           quantity?: number
           quotation_no: string
@@ -5514,6 +5523,7 @@ export type Database = {
           updated_at?: string
           valid_days?: number
           valid_until: string
+          version_number?: string | null
           warranty_terms?: string | null
         }
         Update: {
@@ -5533,10 +5543,14 @@ export type Database = {
           delivery_timeline?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
+          edit_reason?: string | null
+          edit_type?: string | null
           finance_company?: string | null
           id?: string
+          is_active_version?: boolean | null
           is_sub_customer?: boolean | null
           main_customer_name?: string | null
+          parent_quotation_id?: string | null
           payment_terms?: string | null
           quantity?: number
           quotation_no?: string
@@ -5553,6 +5567,7 @@ export type Database = {
           updated_at?: string
           valid_days?: number
           valid_until?: string
+          version_number?: string | null
           warranty_terms?: string | null
         }
         Relationships: [
@@ -5568,6 +5583,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "yutong_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_quotations_parent_quotation_id_fkey"
+            columns: ["parent_quotation_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_quotations"
             referencedColumns: ["id"]
           },
           {
