@@ -142,6 +142,28 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
     }
   };
 
+  const loadResponsiblePersons = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("yutong_responsible_persons")
+        .select("*")
+        .eq("is_active", true)
+        .order("is_default", { ascending: false })
+        .order("name");
+
+      if (error) throw error;
+      setResponsiblePersons(data || []);
+
+      // Set default person if available
+      const defaultPerson = data?.find(p => p.is_default);
+      if (defaultPerson) {
+        form.setValue("responsible_person_id", defaultPerson.id);
+      }
+    } catch (error: any) {
+      console.error("Error loading responsible persons:", error);
+    }
+  };
+
   const handleCustomerChange = (customerId: string) => {
     const customer = customers.find(c => c.id === customerId);
     setSelectedCustomer(customer);
@@ -462,46 +484,31 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
               
               <FormField
                 control={form.control}
-                name="responsible_person"
+                name="responsible_person_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Responsible Person *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <FormLabel>Responsible Person</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select responsible person" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Sanath">Sanath</SelectItem>
-                        <SelectItem value="Nadun">Nadun</SelectItem>
-                        <SelectItem value="Hirantha">Hirantha</SelectItem>
-                        <SelectItem value="Indika">Indika</SelectItem>
-                        <SelectItem value="Imesh">Imesh</SelectItem>
-                        <SelectItem value="Bodhika">Bodhika</SelectItem>
-                        <SelectItem value="Other">Other - Type</SelectItem>
+                        {responsiblePersons.map((person) => (
+                          <SelectItem key={person.id} value={person.id}>
+                            {person.name} {person.position && `- ${person.position}`} {person.is_default && "(Default)"}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              {form.watch('responsible_person') === 'Other' && (
-                <FormField
-                  control={form.control}
-                  name="responsible_person_other"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Specify Name *</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Enter person's name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
