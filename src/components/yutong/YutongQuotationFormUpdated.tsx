@@ -241,7 +241,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         customer_id: selectedCustomer?.id,
         customer_name: data.customer_name,
         customer_phone: data.customer_phone,
-        customer_email: data.customer_email || null,
+        customer_email: data.customer_email,
         company_name: data.company_name,
         bus_model: selectedModel ? `${selectedModel.bus_name} ${selectedModel.model_name}` : 'Unknown Model',
         bus_model_id: data.bus_model_id,

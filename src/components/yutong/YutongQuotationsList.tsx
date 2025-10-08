@@ -15,7 +15,6 @@ import { YutongInvoiceGenerator } from './YutongInvoiceGenerator';
 import { YutongEditQuotationModal } from './YutongEditQuotationModal';
 import { YutongCustomerCardView } from './YutongCustomerCardView';
 import { useAuth } from '@/hooks/useAuth';
-import { QuotationVersionIndicator } from '../special-hire/QuotationVersionIndicator';
 
 interface YutongQuotation {
   id: string;
@@ -38,11 +37,6 @@ interface YutongQuotation {
   payment_terms?: string;
   warranty_terms?: string;
   discount_percentage?: number;
-  version_number?: string;
-  parent_quotation_id?: string;
-  edit_type?: string;
-  edit_reason?: string;
-  is_active_version?: boolean;
 }
 
 interface YutongQuotationsListProps {
@@ -84,11 +78,10 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
 
   const loadQuotations = async () => {
     try {
-      // Fetch only active version quotations
+      // Fetch quotations first
       const { data: quotationsData, error } = await supabase
         .from('yutong_quotations')
         .select('*')
-        .eq('is_active_version', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -255,36 +248,14 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
     }
   };
 
-  const handleViewQuotation = async (versionOrId: YutongQuotation | { id: string }) => {
-    const id = typeof versionOrId === 'object' && 'id' in versionOrId ? versionOrId.id : '';
-    if (!id) return;
-    
-    const { data } = await supabase
-      .from('yutong_quotations')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (data) {
-      setSelectedQuotation(data);
-      setViewModalOpen(true);
-    }
+  const handleViewQuotation = (quotation: YutongQuotation) => {
+    setSelectedQuotation(quotation);
+    setViewModalOpen(true);
   };
 
-  const handleEditQuotation = async (versionOrId: YutongQuotation | { id: string }) => {
-    const id = typeof versionOrId === 'object' && 'id' in versionOrId ? versionOrId.id : '';
-    if (!id) return;
-    
-    const { data } = await supabase
-      .from('yutong_quotations')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (data) {
-      setSelectedQuotation(data);
-      setEditModalOpen(true);
-    }
+  const handleEditQuotation = (quotation: YutongQuotation) => {
+    setSelectedQuotation(quotation);
+    setEditModalOpen(true);
   };
 
   const handleGenerateInvoice = (quotation: YutongQuotation) => {
@@ -296,74 +267,9 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
     {
       accessorKey: "quotation_no",
       header: "Quotation No",
-      cell: ({ row }) => {
-        const quotation = row.original;
-        const [versions, setVersions] = useState<any[]>([]);
-        
-        return (
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{quotation.quotation_no}</span>
-            <QuotationVersionIndicator
-              currentVersion={{
-                id: quotation.id,
-                version_number: quotation.version_number || "1.0",
-                edit_type: quotation.edit_type,
-                edit_reason: quotation.edit_reason,
-                is_active_version: quotation.is_active_version || true,
-                created_at: quotation.created_at,
-                created_by_name: quotation.creator_name,
-              }}
-              allVersions={versions}
-              onViewVersion={handleViewQuotation}
-              onEditVersion={handleEditQuotation}
-              onLoadVersions={async () => {
-                const parentId = quotation.parent_quotation_id || quotation.id;
-                const { data } = await supabase
-                  .from("yutong_quotations")
-                  .select(`
-                    id,
-                    version_number,
-                    edit_type,
-                    edit_reason,
-                    is_active_version,
-                    created_at,
-                    created_by
-                  `)
-                  .or(`id.eq.${parentId},parent_quotation_id.eq.${parentId}`)
-                  .order("version_number", { ascending: false });
-                
-                // Fetch creator names for versions
-                const userIds = [...new Set(data?.map(v => v.created_by).filter(Boolean))];
-                const { data: profiles } = await supabase
-                  .from('profiles')
-                  .select('user_id, first_name, last_name')
-                  .in('user_id', userIds);
-                
-                const profileMap = new Map(
-                  profiles?.map(p => [
-                    p.user_id, 
-                    `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown User'
-                  ])
-                );
-                
-                const versionData = (data || []).map(v => ({
-                  id: v.id,
-                  version_number: v.version_number || "1.0",
-                  edit_type: v.edit_type,
-                  edit_reason: v.edit_reason,
-                  is_active_version: v.is_active_version,
-                  created_at: v.created_at,
-                  created_by_name: v.created_by 
-                    ? profileMap.get(v.created_by) || 'Unknown User'
-                    : 'Unknown User',
-                }));
-                
-                setVersions(versionData);
-              }}
-            />
-          </div>
-        );
-      },
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue("quotation_no")}</div>
+      ),
     },
     {
       accessorKey: "customer_name",
