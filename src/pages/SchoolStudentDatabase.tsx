@@ -25,7 +25,8 @@ import {
   Phone,
   Mail,
   MapPin,
-  Loader2
+  Loader2,
+  ArrowLeft
 } from "lucide-react";
 
 interface Student {
@@ -340,6 +341,18 @@ export default function SchoolStudentDatabase() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-4 mb-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(`/school-bus/branch/${branchId}`)}
+          className="gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Branch
+        </Button>
+      </div>
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
