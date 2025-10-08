@@ -153,15 +153,11 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + data.valid_days);
-
-      // Generate quotation number
-      const quotationNo = `YTQ-${Date.now()}`;
       
       console.log('Creating quotation with user:', user);
       console.log('User ID:', user?.id);
 
       const quotationData = {
-        quotation_no: quotationNo,
         customer_name: data.customer_name,
         customer_phone: data.customer_phone,
         customer_email: data.customer_email,

@@ -6278,7 +6278,7 @@ export type Database = {
         Returns: string
       }
       generate_yutong_quotation_no: {
-        Args: Record<PropertyKey, never>
+        Args: Record<PropertyKey, never> | { quotation_date?: string }
         Returns: string
       }
       generate_yutong_ticket_number: {

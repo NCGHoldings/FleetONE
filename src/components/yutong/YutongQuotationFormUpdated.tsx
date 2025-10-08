@@ -210,10 +210,8 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       }
 
       const totalPrice = calculateTotalPrice();
-      const quotationNo = `YTQ-${Date.now()}`;
 
       const quotationData = {
-        quotation_no: quotationNo,
         customer_id: selectedCustomer?.id,
         customer_name: data.customer_name,
         customer_phone: data.customer_phone,
