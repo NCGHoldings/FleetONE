@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ColumnDef } from "@tanstack/react-table";
 import { RecordPaymentModal } from "@/components/school/RecordPaymentModal";
 import { PaymentHistoryModal } from "@/components/school/PaymentHistoryModal";
+import { OutstandingStudentsView } from "@/components/school/OutstandingStudentsView";
 
 interface Student {
   id: string;
@@ -347,20 +349,37 @@ export default function SchoolPayments() {
         </Card>
       </div>
 
-      {/* Payment Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Student Payment Status</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={columns}
-            data={students}
-            searchKey="student_name"
-            title="Student Payments"
+      {/* Tabs for Different Views */}
+      <Tabs defaultValue="all" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="all">All Students</TabsTrigger>
+          <TabsTrigger value="outstanding">Outstanding</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="space-y-0">
+          <Card>
+            <CardHeader>
+              <CardTitle>Student Payment Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={columns}
+                data={students}
+                searchKey="student_name"
+                title="Student Payments"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="outstanding" className="space-y-0">
+          <OutstandingStudentsView
+            students={students}
+            onRecordPayment={handleRecordPayment}
+            onViewHistory={handleViewHistory}
           />
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
       <RecordPaymentModal
         isOpen={showPaymentModal}
