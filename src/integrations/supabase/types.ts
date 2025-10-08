@@ -2302,6 +2302,68 @@ export type Database = {
         }
         Relationships: []
       }
+      school_payment_transactions: {
+        Row: {
+          amount_paid: number
+          created_at: string | null
+          created_by: string | null
+          difference: number
+          fixed_amount: number
+          id: string
+          notes: string | null
+          payment_balance_after: number
+          payment_balance_before: number
+          payment_date: string
+          payment_method: string
+          payment_month: string
+          reference_no: string | null
+          student_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount_paid: number
+          created_at?: string | null
+          created_by?: string | null
+          difference: number
+          fixed_amount: number
+          id?: string
+          notes?: string | null
+          payment_balance_after: number
+          payment_balance_before: number
+          payment_date?: string
+          payment_method?: string
+          payment_month: string
+          reference_no?: string | null
+          student_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string | null
+          created_by?: string | null
+          difference?: number
+          fixed_amount?: number
+          id?: string
+          notes?: string | null
+          payment_balance_after?: number
+          payment_balance_before?: number
+          payment_date?: string
+          payment_method?: string
+          payment_month?: string
+          reference_no?: string | null
+          student_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_payment_transactions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "school_students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_payments: {
         Row: {
           amount: number
@@ -2553,6 +2615,7 @@ export type Database = {
           care_taker_name: string | null
           created_at: string
           created_by: string | null
+          current_amount_due: number | null
           driver_contact_no: string | null
           driver_name: string | null
           dropoff_point: string | null
@@ -2560,6 +2623,7 @@ export type Database = {
           emergency_contact_name: string | null
           emergency_contact_number: string | null
           father_contact_no: string | null
+          fixed_monthly_amount: number | null
           grade: string | null
           id: string
           is_active: boolean | null
@@ -2567,6 +2631,7 @@ export type Database = {
           mother_contact_no: string | null
           parent_name: string | null
           payment_amount: number | null
+          payment_balance: number | null
           payment_date: string | null
           payment_status: string | null
           pickup_point: string | null
@@ -2590,6 +2655,7 @@ export type Database = {
           care_taker_name?: string | null
           created_at?: string
           created_by?: string | null
+          current_amount_due?: number | null
           driver_contact_no?: string | null
           driver_name?: string | null
           dropoff_point?: string | null
@@ -2597,6 +2663,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_number?: string | null
           father_contact_no?: string | null
+          fixed_monthly_amount?: number | null
           grade?: string | null
           id?: string
           is_active?: boolean | null
@@ -2604,6 +2671,7 @@ export type Database = {
           mother_contact_no?: string | null
           parent_name?: string | null
           payment_amount?: number | null
+          payment_balance?: number | null
           payment_date?: string | null
           payment_status?: string | null
           pickup_point?: string | null
@@ -2627,6 +2695,7 @@ export type Database = {
           care_taker_name?: string | null
           created_at?: string
           created_by?: string | null
+          current_amount_due?: number | null
           driver_contact_no?: string | null
           driver_name?: string | null
           dropoff_point?: string | null
@@ -2634,6 +2703,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_number?: string | null
           father_contact_no?: string | null
+          fixed_monthly_amount?: number | null
           grade?: string | null
           id?: string
           is_active?: boolean | null
@@ -2641,6 +2711,7 @@ export type Database = {
           mother_contact_no?: string | null
           parent_name?: string | null
           payment_amount?: number | null
+          payment_balance?: number | null
           payment_date?: string | null
           payment_status?: string | null
           pickup_point?: string | null

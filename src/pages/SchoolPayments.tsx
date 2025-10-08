@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download } from "lucide-react";
+import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,8 @@ import { DataTable } from "@/components/ui/data-table";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ColumnDef } from "@tanstack/react-table";
+import { RecordPaymentModal } from "@/components/school/RecordPaymentModal";
+import { PaymentHistoryModal } from "@/components/school/PaymentHistoryModal";
 
 interface Student {
   id: string;
@@ -20,6 +22,9 @@ interface Student {
   parent_name: string;
   father_contact_no: string;
   update_new: number;
+  fixed_monthly_amount: number;
+  payment_balance: number;
+  current_amount_due: number;
 }
 
 interface Branch {
@@ -34,12 +39,17 @@ export default function SchoolPayments() {
   const [students, setStudents] = useState<Student[]>([]);
   const [branch, setBranch] = useState<Branch | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [stats, setStats] = useState({
     totalStudents: 0,
     paidStudents: 0,
     pendingPayments: 0,
     totalRevenue: 0,
-    overdueAmount: 0
+    overdueAmount: 0,
+    totalOwed: 0,
+    totalCredit: 0,
   });
 
   useEffect(() => {
@@ -103,44 +113,29 @@ export default function SchoolPayments() {
       .reduce((sum, s) => sum + (s.payment_amount || 0), 0);
     const overdueAmount = studentData
       .filter(s => s.payment_status === 'overdue')
-      .reduce((sum, s) => sum + (s.update_new || 0), 0);
+      .reduce((sum, s) => sum + (s.current_amount_due || s.update_new || 0), 0);
+    const totalOwed = studentData.reduce((sum, s) => sum + (s.payment_balance < 0 ? Math.abs(s.payment_balance) : 0), 0);
+    const totalCredit = studentData.reduce((sum, s) => sum + (s.payment_balance > 0 ? s.payment_balance : 0), 0);
 
     setStats({
       totalStudents,
       paidStudents,
       pendingPayments,
       totalRevenue,
-      overdueAmount
+      overdueAmount,
+      totalOwed,
+      totalCredit,
     });
   };
 
-  const handleMarkAsPaid = async (studentId: string, amount: number) => {
-    try {
-      const { error } = await supabase
-        .from('school_students')
-        .update({
-          payment_status: 'paid',
-          payment_amount: amount,
-          last_payment_date: new Date().toISOString().split('T')[0]
-        })
-        .eq('id', studentId);
+  const handleRecordPayment = (student: Student) => {
+    setSelectedStudent(student);
+    setShowPaymentModal(true);
+  };
 
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Payment marked as received",
-      });
-
-      fetchStudents();
-    } catch (error) {
-      console.error('Error updating payment:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update payment status",
-        variant: "destructive",
-      });
-    }
+  const handleViewHistory = (student: Student) => {
+    setSelectedStudent(student);
+    setShowHistoryModal(true);
   };
 
   const columns: ColumnDef<Student>[] = [
@@ -158,7 +153,7 @@ export default function SchoolPayments() {
     },
     {
       accessorKey: "payment_status",
-      header: "Payment Status",
+      header: "Status",
       cell: ({ row }) => {
         const status = row.getValue("payment_status") as string;
         return (
@@ -175,19 +170,43 @@ export default function SchoolPayments() {
       },
     },
     {
-      accessorKey: "update_new",
+      accessorKey: "fixed_monthly_amount",
+      header: "Fixed Amount",
+      cell: ({ row }) => {
+        const amount = row.getValue("fixed_monthly_amount") as number;
+        return <span className="font-medium text-primary">LKR {amount?.toLocaleString() || 0}</span>;
+      },
+    },
+    {
+      accessorKey: "payment_balance",
+      header: "Balance",
+      cell: ({ row }) => {
+        const balance = row.getValue("payment_balance") as number;
+        const isNegative = balance < 0;
+        return (
+          <span className={isNegative ? "font-medium text-destructive" : "font-medium text-green-600"}>
+            LKR {balance?.toLocaleString() || 0}
+            <span className="text-xs ml-1">
+              {isNegative ? "(owed)" : balance > 0 ? "(credit)" : ""}
+            </span>
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: "current_amount_due",
       header: "Amount Due",
       cell: ({ row }) => {
-        const amount = row.getValue("update_new") as number;
-        return amount ? `LKR ${amount.toLocaleString()}` : '-';
+        const due = row.getValue("current_amount_due") as number;
+        return <span className="font-semibold">LKR {due?.toLocaleString() || 0}</span>;
       },
     },
     {
       accessorKey: "payment_amount",
-      header: "Last Payment",
+      header: "Last Paid",
       cell: ({ row }) => {
         const amount = row.getValue("payment_amount") as number;
-        return amount ? `LKR ${amount.toLocaleString()}` : '-';
+        return <span className="font-medium">LKR {amount?.toLocaleString() || 0}</span>;
       },
     },
     {
@@ -207,19 +226,24 @@ export default function SchoolPayments() {
       header: "Actions",
       cell: ({ row }) => {
         const student = row.original;
-        const suggestedAmount = student.update_new || student.payment_amount || 0;
-        
-        return student.payment_status !== 'paid' ? (
-          <Button
-            size="sm"
-            onClick={() => handleMarkAsPaid(student.id, suggestedAmount)}
-            className="bg-success text-success-foreground hover:bg-success/90"
-          >
-            <CreditCard className="w-3 h-3 mr-1" />
-            Mark Paid (LKR {suggestedAmount.toLocaleString()})
-          </Button>
-        ) : (
-          <Badge variant="default">Paid</Badge>
+        return (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => handleRecordPayment(student)}
+            >
+              <Receipt className="h-4 w-4 mr-1" />
+              Record Payment
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleViewHistory(student)}
+            >
+              <History className="h-4 w-4 mr-1" />
+              History
+            </Button>
+          </div>
         );
       },
     },
@@ -254,7 +278,7 @@ export default function SchoolPayments() {
       </div>
 
       {/* Payment Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Students</CardTitle>
@@ -268,15 +292,15 @@ export default function SchoolPayments() {
             <CardTitle className="text-sm font-medium">Paid Students</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{stats.paidStudents}</div>
+            <div className="text-2xl font-bold text-green-600">{stats.paidStudents}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">{stats.pendingPayments}</div>
+            <div className="text-2xl font-bold text-yellow-600">{stats.pendingPayments}</div>
           </CardContent>
         </Card>
         <Card>
@@ -299,6 +323,28 @@ export default function SchoolPayments() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Owed</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">
+              LKR {stats.totalOwed.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Outstanding</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Advance Paid</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              LKR {stats.totalCredit.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Credit</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Payment Table */}
@@ -315,6 +361,28 @@ export default function SchoolPayments() {
           />
         </CardContent>
       </Card>
+
+      <RecordPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedStudent(null);
+        }}
+        student={selectedStudent}
+        onSuccess={() => {
+          fetchStudents();
+        }}
+      />
+
+      <PaymentHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => {
+          setShowHistoryModal(false);
+          setSelectedStudent(null);
+        }}
+        studentId={selectedStudent?.id || null}
+        studentName={selectedStudent?.student_name || ""}
+      />
     </div>
   );
 }
