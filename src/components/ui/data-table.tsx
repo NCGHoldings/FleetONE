@@ -10,6 +10,7 @@ import {
   SortingState,
   ColumnFiltersState,
   VisibilityState,
+  PaginationState,
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +65,10 @@ export function DataTable<TData, TValue>({
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [globalFilter, setGlobalFilter] = React.useState("");
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
   const [editingCell, setEditingCell] = React.useState<{ rowId: string; field: string } | null>(null);
   const [editingValue, setEditingValue] = React.useState<string>("");
 
@@ -116,15 +121,12 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    initialState: {
-      pagination: {
-        pageSize: 10,
-      },
-    },
+    onPaginationChange: setPagination,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
+      pagination,
     },
   });
 
