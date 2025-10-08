@@ -93,11 +93,25 @@ export function useRouteAnalytics(branchId?: string) {
         
         // Calculate financial metrics for all students on this route
         const totalStudents = routeStudents.length;
-        const paidStudents = routeStudents.filter(s => s.payment_status === "paid");
-        const pendingStudents = routeStudents.filter(s => s.payment_status !== "paid");
         
-        const totalIncome = paidStudents.reduce((sum, s) => sum + (Number(s.payment_amount) || 0), 0);
-        const outstandingAmount = pendingStudents.reduce((sum, s) => sum + (Number(s.payment_amount) || 0), 0);
+        // Calculate expected income from all students' monthly fees
+        const expectedIncome = routeStudents.reduce((sum, s) => sum + (Number(s.fixed_monthly_amount) || 0), 0);
+        
+        // Calculate collected income from payment_balance (positive balance = paid ahead)
+        const totalIncome = routeStudents.reduce((sum, s) => {
+          const balance = Number(s.payment_balance) || 0;
+          const monthlyAmount = Number(s.fixed_monthly_amount) || 0;
+          // If balance is positive, they've paid; add the payment
+          return sum + Math.min(balance, monthlyAmount);
+        }, 0);
+        
+        // Outstanding = students with negative or zero balance
+        const outstandingAmount = routeStudents.reduce((sum, s) => {
+          const balance = Number(s.payment_balance) || 0;
+          const due = Number(s.current_amount_due) || 0;
+          // If they haven't paid fully, add what's due
+          return sum + (balance < (Number(s.fixed_monthly_amount) || 0) ? due : 0);
+        }, 0);
 
         // Get expenses for this route
         const { expenses, staffCosts } = await getRouteExpenses(routeRecord.id);
