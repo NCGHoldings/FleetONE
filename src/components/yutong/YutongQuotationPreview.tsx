@@ -23,6 +23,7 @@ interface YutongQuotation {
   payment_terms?: string;
   warranty_terms?: string;
   discount_amount?: number;
+  responsible_person_id?: string;
 }
 
 interface BusModelDetails {
@@ -51,9 +52,10 @@ interface YutongQuotationPreviewProps {
 
 export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotationPreviewProps>(
   ({ quotation }, ref) => {
-    const [addOns, setAddOns] = useState<QuotationAddOn[]>([]);
-    const [busModelDetails, setBusModelDetails] = useState<BusModelDetails | null>(null);
-    const [loading, setLoading] = useState(true);
+  const [addOns, setAddOns] = useState<QuotationAddOn[]>([]);
+  const [busModelDetails, setBusModelDetails] = useState<BusModelDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [responsiblePerson, setResponsiblePerson] = useState<any>(null);
 
     // Get bus model details with fallback values
     const getBusModelDetails = () => {
@@ -115,6 +117,19 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           } else {
             setAddOns(addOnData || []);
           }
+
+          // Fetch responsible person if linked
+          if (quotation.responsible_person_id) {
+            const { data: personData, error: personError } = await supabase
+              .from("yutong_responsible_persons")
+              .select("*")
+              .eq("id", quotation.responsible_person_id)
+              .single();
+
+            if (!personError && personData) {
+              setResponsiblePerson(personData);
+            }
+          }
         } catch (error) {
           console.error('Error fetching quotation data:', error);
         } finally {
@@ -123,7 +138,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
       };
 
       fetchData();
-    }, [quotation.id, quotation.bus_model_id]);
+    }, [quotation.id, quotation.bus_model_id, quotation.responsible_person_id]);
 
     // Calculate totals correctly to avoid double-counting
     const addOnsTotal = addOns.reduce((sum, addon) => {
@@ -390,9 +405,18 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             </div>
 
             <div className="footer-contact">
-              <div style={{ display: 'flex', alignItems: 'center' }}>📞 0770455981</div>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                📞 {responsiblePerson?.phone || '+94 77 766 5501'}
+              </div>
               <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
-              <div style={{ display: 'flex', alignItems: 'center' }}>✉️ yutong@ncg.lk</div>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                ✉️ {responsiblePerson?.email || 'info@yutonglankabus.lk'}
+              </div>
+              {responsiblePerson && (
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  👤 {responsiblePerson.name}
+                </div>
+              )}
             </div>
           </div>
         </div>

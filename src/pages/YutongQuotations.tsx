@@ -12,6 +12,7 @@ import { YutongAddOnsAdmin } from "@/components/yutong/YutongAddOnsAdmin";
 import YutongCustomersAdmin from "@/components/yutong/YutongCustomersAdmin";
 import { YutongOrdersList } from "@/components/yutong/YutongOrdersList";
 import { YutongFinanceDashboard } from "@/components/yutong/YutongFinanceDashboard";
+import YutongResponsiblePersonsAdmin from "@/components/yutong/YutongResponsiblePersonsAdmin";
 import { YutongSupplierManagement } from '@/components/yutong/YutongSupplierManagement';
 import { YutongLogisticsManagement } from '@/components/yutong/YutongLogisticsManagement';
 import { YutongCustomsManagement } from '@/components/yutong/YutongCustomsManagement';
@@ -141,7 +142,7 @@ export default function YutongQuotations() {
 
       {/* Main Content - Simplified to Core Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
           <TabsTrigger value="quotations" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Quotations</span>
@@ -165,6 +166,10 @@ export default function YutongQuotations() {
           <TabsTrigger value="addons" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Add-ons</span>
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center gap-2">
+            <Cog className="h-4 w-4" />
+            <span className="hidden sm:inline">Settings</span>
           </TabsTrigger>
         </TabsList>
 
@@ -190,6 +195,10 @@ export default function YutongQuotations() {
 
         <TabsContent value="addons" className="space-y-4">
           <YutongAddOnsAdmin />
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          <YutongResponsiblePersonsAdmin />
         </TabsContent>
       </Tabs>
 

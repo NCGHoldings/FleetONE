@@ -5288,6 +5288,7 @@ export type Database = {
           quantity: number
           quotation_no: string
           responsible_person: string | null
+          responsible_person_id: string | null
           special_features: string | null
           status: string
           total_price: number
@@ -5315,6 +5316,7 @@ export type Database = {
           quantity?: number
           quotation_no?: string
           responsible_person?: string | null
+          responsible_person_id?: string | null
           special_features?: string | null
           status?: string
           total_price: number
@@ -5342,6 +5344,7 @@ export type Database = {
           quantity?: number
           quotation_no?: string
           responsible_person?: string | null
+          responsible_person_id?: string | null
           special_features?: string | null
           status?: string
           total_price?: number
@@ -5366,7 +5369,50 @@ export type Database = {
             referencedRelation: "yutong_customers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "yutong_quotations_responsible_person_id_fkey"
+            columns: ["responsible_person_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_responsible_persons"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      yutong_responsible_persons: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          name: string
+          phone: string
+          position: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name: string
+          phone: string
+          position?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name?: string
+          phone?: string
+          position?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       yutong_rmv_registrations: {
         Row: {

@@ -30,6 +30,7 @@ const formSchema = z.object({
   payment_terms: z.string().optional(),
   warranty_terms: z.string().optional(),
   valid_days: z.number().min(1).max(365).default(30),
+  responsible_person_id: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -65,6 +66,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const [createdQuotationId, setCreatedQuotationId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("basic");
   const [tempAddOns, setTempAddOns] = useState<TempAddOn[]>([]);
+  const [responsiblePersons, setResponsiblePersons] = useState<any[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -79,7 +81,30 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
 
   useEffect(() => {
     loadBusModels();
+    loadResponsiblePersons();
   }, []);
+
+  const loadResponsiblePersons = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("yutong_responsible_persons")
+        .select("*")
+        .eq("is_active", true)
+        .order("is_default", { ascending: false })
+        .order("name");
+
+      if (error) throw error;
+      setResponsiblePersons(data || []);
+
+      // Set default person if available
+      const defaultPerson = data?.find(p => p.is_default);
+      if (defaultPerson) {
+        form.setValue("responsible_person_id", defaultPerson.id);
+      }
+    } catch (error: any) {
+      console.error("Error loading responsible persons:", error);
+    }
+  };
 
   const loadBusModels = async () => {
     try {
@@ -154,6 +179,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         delivery_timeline: data.delivery_timeline || '',
         payment_terms: data.payment_terms || '',
         warranty_terms: data.warranty_terms || '',
+        responsible_person_id: data.responsible_person_id || null,
         created_by: user?.id
       };
 
@@ -450,6 +476,34 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="responsible_person_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Responsible Person</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select responsible person" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {responsiblePersons.map((person) => (
+                        <SelectItem key={person.id} value={person.id}>
+                          {person.name} {person.position && `- ${person.position}`} {person.is_default && "(Default)"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Add-ons Section */}
             <div className="space-y-4">

@@ -29,8 +29,7 @@ const formSchema = z.object({
   payment_terms: z.string().optional(),
   warranty_terms: z.string().optional(),
   valid_days: z.number().min(1).max(365).default(30),
-  responsible_person: z.string().min(1, 'Responsible person is required'),
-  responsible_person_other: z.string().optional(),
+  responsible_person_id: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -76,6 +75,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [createdQuotationId, setCreatedQuotationId] = useState<string | null>(null);
   const [tempAddOns, setTempAddOns] = useState<TempAddOn[]>([]);
+  const [responsiblePersons, setResponsiblePersons] = useState<any[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -85,13 +85,13 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       quantity: 1,
       discount_amount: 0,
       valid_days: 30,
-      responsible_person: '',
     }
   });
 
   useEffect(() => {
     loadBusModels();
     loadCustomers();
+    loadResponsiblePersons();
   }, []);
 
   const loadBusModels = async () => {
@@ -190,10 +190,6 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       const totalPrice = calculateTotalPrice();
       const quotationNo = `YTQ-${Date.now()}`;
 
-      const responsiblePerson = data.responsible_person === 'Other' 
-        ? data.responsible_person_other 
-        : data.responsible_person;
-
       const quotationData = {
         quotation_no: quotationNo,
         customer_id: selectedCustomer?.id,
@@ -214,7 +210,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         valid_until: new Date(Date.now() + (data.valid_days * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
         status: 'draft',
         created_by: user.id,
-        responsible_person: responsiblePerson,
+        responsible_person_id: data.responsible_person_id || null,
       };
 
       const { data: quotation, error } = await supabase
