@@ -16,7 +16,7 @@ import { EditTypeSelectionModal } from '../special-hire/EditTypeSelectionModal';
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
   customer_phone: z.string().min(1, 'Phone number is required'),
-  customer_email: z.string().email('Valid email is required'),
+  customer_email: z.string().email('Valid email is required').optional().or(z.literal('')),
   company_name: z.string().optional(),
   finance_company: z.string().optional(),
   customer_type: z.enum(['personal', 'company']).default('personal'),
@@ -283,7 +283,7 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
           bus_model: quotation.bus_model,
           customer_name: data.customer_name,
           customer_phone: data.customer_phone,
-          customer_email: data.customer_email,
+          customer_email: data.customer_email || null,
           company_name: data.company_name,
           quantity: data.quantity,
           unit_price: data.unit_price,
