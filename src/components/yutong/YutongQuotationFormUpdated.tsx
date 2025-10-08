@@ -304,11 +304,11 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
       });
 
       onSubmit();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating quotation:', error);
       toast({
         title: "Error",
-        description: "Failed to create quotation",
+        description: error.message || error.details || "Failed to create quotation. Please check the console for details.",
         variant: "destructive",
       });
     }
