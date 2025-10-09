@@ -1,6 +1,7 @@
 import React, { forwardRef, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { useYutongSignatures, YutongSignature } from '@/hooks/useYutongSignatures';
 
 interface YutongQuotation {
   id: string;
@@ -64,6 +65,8 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
   const [busModelDetails, setBusModelDetails] = useState<BusModelDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [responsiblePerson, setResponsiblePerson] = useState<any>(null);
+  const [signatures, setSignatures] = useState<YutongSignature[]>([]);
+  const { fetchSignatures } = useYutongSignatures();
 
     // Get bus model details with fallback values
     const getBusModelDetails = () => {
@@ -440,15 +443,54 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           {/* Page 1 Footer with Signatures */}
           <div className="page-footer">
             <div className="signatures">
-              <div className="signature-field">
-                <div className="signature-line">Approved By</div>
-              </div>
-              <div className="signature-field">
-                <div className="signature-line">Sales Manager</div>
-              </div>
-              <div className="signature-field">
-                <div className="signature-line">Date</div>
-              </div>
+              {signatures.length > 0 ? (
+                <>
+                  {['sales_manager', 'approved_by', 'customer'].map((role) => {
+                    const sig = signatures.find(s => s.signature_role === role);
+                    return (
+                      <div key={role} className="signature-field">
+                        {sig ? (
+                          <>
+                            {sig.signature_type === 'drawing' || sig.signature_type === 'image' ? (
+                              <img 
+                                src={sig.signature_data} 
+                                alt={`${sig.signer_name} signature`}
+                                style={{ maxHeight: '60px', margin: '10px auto', display: 'block' }}
+                              />
+                            ) : (
+                              <div style={{ fontFamily: 'cursive', fontSize: '18px', textAlign: 'center', padding: '10px' }}>
+                                {sig.signature_data}
+                              </div>
+                            )}
+                            <div className="signature-line">
+                              {sig.signer_name}
+                              <br />
+                              <small>{format(new Date(sig.signed_at), 'dd/MM/yyyy')}</small>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="signature-line">
+                            {role === 'sales_manager' ? 'Sales Manager' : 
+                             role === 'approved_by' ? 'Approved By' : 'Customer'}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              ) : (
+                <>
+                  <div className="signature-field">
+                    <div className="signature-line">Sales Manager</div>
+                  </div>
+                  <div className="signature-field">
+                    <div className="signature-line">Approved By</div>
+                  </div>
+                  <div className="signature-field">
+                    <div className="signature-line">Customer</div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="footer-contact">

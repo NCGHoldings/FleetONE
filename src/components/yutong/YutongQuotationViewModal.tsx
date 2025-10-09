@@ -2,11 +2,13 @@ import React, { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { Printer, Download, Mail } from 'lucide-react';
+import { Printer, Download, Mail, PenTool } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { YutongQuotationPreview } from './YutongQuotationPreview';
+import { YutongSignatureManager } from './YutongSignatureManager';
 import { useToast } from '@/hooks/use-toast';
 
 interface YutongQuotation {
@@ -42,10 +44,20 @@ interface YutongQuotationViewModalProps {
 
 export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuotationViewModalProps) {
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('preview');
+  const [refreshKey, setRefreshKey] = useState(0);
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   if (!quotation) return null;
+
+  const handleSignaturesUpdated = () => {
+    setRefreshKey(prev => prev + 1);
+    toast({
+      title: "Success",
+      description: "Quotation updated with new signatures. You can regenerate the PDF.",
+    });
+  };
 
   const getStatusBadge = (status: string) => {
     const colors = {

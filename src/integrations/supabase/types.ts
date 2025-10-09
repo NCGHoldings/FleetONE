@@ -1760,6 +1760,9 @@ export type Database = {
           license_number: string | null
           nic: string | null
           phone: string | null
+          signature_data: string | null
+          signature_image_url: string | null
+          signature_type: string | null
           status: Database["public"]["Enums"]["user_status"] | null
           updated_at: string
           user_id: string
@@ -1780,6 +1783,9 @@ export type Database = {
           license_number?: string | null
           nic?: string | null
           phone?: string | null
+          signature_data?: string | null
+          signature_image_url?: string | null
+          signature_type?: string | null
           status?: Database["public"]["Enums"]["user_status"] | null
           updated_at?: string
           user_id: string
@@ -1800,6 +1806,9 @@ export type Database = {
           license_number?: string | null
           nic?: string | null
           phone?: string | null
+          signature_data?: string | null
+          signature_image_url?: string | null
+          signature_type?: string | null
           status?: Database["public"]["Enums"]["user_status"] | null
           updated_at?: string
           user_id?: string
@@ -5430,6 +5439,53 @@ export type Database = {
           },
           {
             foreignKeyName: "yutong_quotation_addons_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_quotation_signatures: {
+        Row: {
+          created_at: string | null
+          id: string
+          quotation_id: string
+          signature_data: string | null
+          signature_role: string
+          signature_type: string
+          signed_at: string | null
+          signed_by: string | null
+          signer_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          quotation_id: string
+          signature_data?: string | null
+          signature_role: string
+          signature_type: string
+          signed_at?: string | null
+          signed_by?: string | null
+          signer_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          quotation_id?: string
+          signature_data?: string | null
+          signature_role?: string
+          signature_type?: string
+          signed_at?: string | null
+          signed_by?: string | null
+          signer_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_quotation_signatures_quotation_id_fkey"
             columns: ["quotation_id"]
             isOneToOne: false
             referencedRelation: "yutong_quotations"
