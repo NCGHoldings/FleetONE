@@ -61,8 +61,8 @@ serve(async (req) => {
           query = query.eq('status', status);
         }
 
-        // Pagination
-        const limit = parseInt(searchParams.get('limit') || '50');
+        // Pagination - default to 1000 to show all records
+        const limit = parseInt(searchParams.get('limit') || '1000');
         const offset = parseInt(searchParams.get('offset') || '0');
         query = query.range(offset, offset + limit - 1);
 
