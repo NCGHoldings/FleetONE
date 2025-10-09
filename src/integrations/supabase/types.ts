@@ -6455,6 +6455,10 @@ export type Database = {
         Args: { p_parent_id: string }
         Returns: string
       }
+      generate_next_yutong_version_number: {
+        Args: { p_parent_id: string }
+        Returns: string
+      }
       generate_yutong_order_no: {
         Args: Record<PropertyKey, never>
         Returns: string
