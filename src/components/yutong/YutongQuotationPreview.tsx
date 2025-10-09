@@ -141,6 +141,10 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
               setResponsiblePerson(personData);
             }
           }
+
+          // Fetch signatures for this quotation
+          const sigs = await fetchSignatures(quotation.id);
+          setSignatures(sigs);
         } catch (error) {
           console.error('Error fetching quotation data:', error);
         } finally {
