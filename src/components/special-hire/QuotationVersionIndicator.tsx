@@ -49,14 +49,9 @@ export function QuotationVersionIndicator({
     }
   };
 
-  // If only one version or no versions loaded yet, show simple badge
-  if (allVersions.length <= 1) {
-    return (
-      <Badge variant="outline" className="text-xs">
-        v{currentVersion.version_number}
-      </Badge>
-    );
-  }
+  // Always show as clickable to make version history discoverable
+  const hasMultipleVersions = allVersions.length > 1;
+  const versionCount = allVersions.length;
 
   // Sort versions by version number
   const sortedVersions = [...allVersions].sort((a, b) => {
@@ -92,81 +87,126 @@ export function QuotationVersionIndicator({
   return (
     <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-6 px-2 text-xs" disabled={isLoading}>
-          <History className="h-3 w-3 mr-1" />
-          v{currentVersion.version_number}
-          <ChevronDown className="h-3 w-3 ml-1" />
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-7 px-3 text-xs gap-1.5 hover:bg-accent" 
+          disabled={isLoading}
+        >
+          <History className="h-3.5 w-3.5" />
+          <span className="font-medium">v{currentVersion.version_number}</span>
+          {hasMultipleVersions && (
+            <Badge variant="secondary" className="h-4 px-1 text-[10px] ml-0.5">
+              {versionCount}
+            </Badge>
+          )}
+          <ChevronDown className="h-3 w-3 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel>Version History</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-96">
+        <DropdownMenuLabel className="flex items-center gap-2">
+          <History className="h-4 w-4" />
+          Version History
+          <Badge variant="outline" className="ml-auto text-xs">
+            {versionCount} {versionCount === 1 ? 'version' : 'versions'}
+          </Badge>
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         
         {isLoading ? (
-          <div className="flex items-center justify-center p-4 text-xs text-muted-foreground">
-            Loading versions...
+          <div className="flex items-center justify-center p-6 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Loading version history...
+            </div>
+          </div>
+        ) : sortedVersions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-6 text-xs text-muted-foreground">
+            <History className="h-8 w-8 mb-2 opacity-20" />
+            <p>No version history available</p>
           </div>
         ) : (
-          sortedVersions.map((version) => (
-          <DropdownMenuItem key={version.id} className="flex flex-col items-start p-3">
-            <div className="flex items-center justify-between w-full mb-2">
-              <div className="flex items-center space-x-2">
-                <Badge 
-                  variant={version.is_active_version ? "default" : "outline"}
-                  className="text-xs"
-                >
-                  v{version.version_number}
-                  {version.is_active_version && " (Active)"}
-                </Badge>
-                <Badge 
-                  variant={getEditTypeVariant(version.edit_type)}
-                  className="text-xs"
-                >
-                  {getEditTypeLabel(version.edit_type)}
-                </Badge>
-              </div>
-              
-              <div className="flex space-x-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onViewVersion(version);
-                  }}
-                >
-                  <Eye className="h-3 w-3" />
-                </Button>
+          <div className="max-h-96 overflow-y-auto">
+            {sortedVersions.map((version, index) => (
+              <DropdownMenuItem 
+                key={version.id} 
+                className="flex flex-col items-start p-3 cursor-default focus:bg-accent/50"
+              >
+                <div className="flex items-center justify-between w-full mb-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge 
+                      variant={version.is_active_version ? "default" : "outline"}
+                      className="text-xs font-semibold"
+                    >
+                      v{version.version_number}
+                      {version.is_active_version && " • Active"}
+                    </Badge>
+                    <Badge 
+                      variant={getEditTypeVariant(version.edit_type)}
+                      className="text-xs"
+                    >
+                      {getEditTypeLabel(version.edit_type)}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs hover:bg-accent"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewVersion(version);
+                      }}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1" />
+                      View
+                    </Button>
+                    
+                    {showEditOption && version.is_active_version && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs hover:bg-accent"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditVersion(version);
+                        }}
+                      >
+                        <Edit className="h-3.5 w-3.5 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                </div>
                 
-                {showEditOption && version.is_active_version && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditVersion(version);
-                    }}
-                  >
-                    <Edit className="h-3 w-3" />
-                  </Button>
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <span className="font-medium">
+                    {format(new Date(version.created_at), 'MMM dd, yyyy')}
+                  </span>
+                  <span>at</span>
+                  <span>{format(new Date(version.created_at), 'HH:mm')}</span>
+                  {version.created_by_name && (
+                    <>
+                      <span className="mx-1">•</span>
+                      <span className="text-foreground/70">{version.created_by_name}</span>
+                    </>
+                  )}
+                </div>
+                
+                {version.edit_reason && (
+                  <div className="text-xs text-muted-foreground mt-2 p-2 bg-accent/30 rounded w-full">
+                    <span className="font-medium text-foreground/70">Reason: </span>
+                    {version.edit_reason}
+                  </div>
                 )}
-              </div>
-            </div>
-            
-            <div className="text-xs text-muted-foreground">
-              {format(new Date(version.created_at), 'MMM dd, yyyy HH:mm')}
-              {version.created_by_name && ` • ${version.created_by_name}`}
-            </div>
-            
-            {version.edit_reason && (
-              <div className="text-xs text-muted-foreground mt-1 max-w-full truncate">
-                {version.edit_reason}
-              </div>
-            )}
-          </DropdownMenuItem>
-          ))
+                
+                {index < sortedVersions.length - 1 && (
+                  <div className="w-full h-px bg-border mt-3" />
+                )}
+              </DropdownMenuItem>
+            ))}
+          </div>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
