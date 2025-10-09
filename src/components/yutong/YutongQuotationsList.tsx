@@ -317,23 +317,61 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
               onViewVersion={handleViewQuotation}
               onEditVersion={handleEditQuotation}
               onLoadVersions={async () => {
-                const parentId = quotation.parent_quotation_id || quotation.id;
-                const { data } = await supabase
-                  .from("yutong_quotations")
-                  .select(`
-                    id,
-                    version_number,
-                    edit_type,
-                    edit_reason,
-                    is_active_version,
-                    created_at,
-                    created_by
-                  `)
-                  .or(`id.eq.${parentId},parent_quotation_id.eq.${parentId}`)
-                  .order("version_number", { ascending: false });
+                // Step 1: Find the root parent by following the chain backwards
+                let currentId = quotation.parent_quotation_id || quotation.id;
+                let rootId = currentId;
+                const seenIds = new Set([currentId]);
                 
-                // Fetch creator names for versions
-                const userIds = [...new Set(data?.map(v => v.created_by).filter(Boolean))];
+                // Follow the parent chain to find the root
+                while (true) {
+                  const { data: parentData } = await supabase
+                    .from("yutong_quotations")
+                    .select("id, parent_quotation_id")
+                    .eq("id", currentId)
+                    .maybeSingle();
+                  
+                  if (!parentData?.parent_quotation_id || seenIds.has(parentData.parent_quotation_id)) {
+                    rootId = parentData?.id || rootId;
+                    break;
+                  }
+                  
+                  currentId = parentData.parent_quotation_id;
+                  rootId = currentId;
+                  seenIds.add(currentId);
+                }
+                
+                // Step 2: Fetch ALL versions in the family tree recursively
+                const allVersions = new Map();
+                const toProcess = [rootId];
+                const processed = new Set();
+                
+                while (toProcess.length > 0) {
+                  const processId = toProcess.shift();
+                  if (!processId || processed.has(processId)) continue;
+                  processed.add(processId);
+                  
+                  // Fetch this version and its direct children
+                  const { data } = await supabase
+                    .from("yutong_quotations")
+                    .select(`
+                      id, version_number, edit_type, edit_reason,
+                      is_active_version, created_at, created_by,
+                      parent_quotation_id
+                    `)
+                    .or(`id.eq.${processId},parent_quotation_id.eq.${processId}`);
+                  
+                  data?.forEach(v => {
+                    allVersions.set(v.id, v);
+                    if (v.parent_quotation_id === processId && !processed.has(v.id)) {
+                      toProcess.push(v.id);
+                    }
+                  });
+                }
+                
+                // Step 3: Fetch creator names and format data
+                const versions = Array.from(allVersions.values());
+                const userIds = [...new Set(versions.map(v => v.created_by).filter(Boolean))];
+                
                 const { data: profiles } = await supabase
                   .from('profiles')
                   .select('user_id, first_name, last_name')
@@ -346,7 +384,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
                   ])
                 );
                 
-                const versionData = (data || []).map(v => ({
+                const versionData = versions.map(v => ({
                   id: v.id,
                   version_number: v.version_number || "1.0",
                   edit_type: v.edit_type,
