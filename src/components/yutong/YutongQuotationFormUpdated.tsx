@@ -20,6 +20,7 @@ const formSchema = z.object({
   customer_phone: z.string().min(1, 'Phone number is required'),
   customer_email: z.string().email('Valid email is required').optional().or(z.literal('')),
   company_name: z.string().optional(),
+  customer_address: z.string().optional(),
   finance_company: z.string().optional(),
   customer_type: z.enum(['personal', 'company']).default('personal'),
   business_registration_number: z.string().optional(),
@@ -243,6 +244,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         customer_phone: data.customer_phone,
         customer_email: data.customer_email || null,
         company_name: data.company_name,
+        customer_address: data.customer_address || null,
         bus_model: selectedModel ? `${selectedModel.bus_name} ${selectedModel.model_name}` : 'Unknown Model',
         bus_model_id: data.bus_model_id,
         quantity: data.quantity,
@@ -380,6 +382,20 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="customer_address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer Address</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Enter customer address" rows={2} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
