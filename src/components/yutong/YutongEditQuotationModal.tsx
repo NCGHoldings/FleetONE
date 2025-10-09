@@ -258,9 +258,8 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
       if (versionError) throw versionError;
       const nextVersion = versionData || '1.1';
 
-      // Get base quotation number (without version suffix)
+      // Get base quotation number (without version suffix) - let trigger add version
       const baseQuotationNo = quotation.quotation_no.replace(/-v[\d.]+$/, '');
-      const versionedQuotationNo = `${baseQuotationNo}-v${nextVersion}`;
 
       // Mark old quotation as inactive
       const { error: deactivateError } = await supabase
@@ -270,11 +269,11 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
 
       if (deactivateError) throw deactivateError;
 
-      // Create new quotation version
+      // Create new quotation version - pass base quotation_no, let trigger add version suffix
       const { data: newQuotation, error: quotationError } = await supabase
         .from('yutong_quotations')
         .insert({
-          quotation_no: versionedQuotationNo,
+          quotation_no: baseQuotationNo,
           parent_quotation_id: quotation.id,
           version_number: nextVersion,
           edit_type: editConfig.editType,
@@ -309,7 +308,14 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
         .select()
         .single();
 
-      if (quotationError) throw quotationError;
+      if (quotationError) {
+        // Reactivate old quotation if new version creation failed
+        await supabase
+          .from('yutong_quotations')
+          .update({ is_active_version: true })
+          .eq('id', quotation.id);
+        throw quotationError;
+      }
 
       // Insert add-ons for new version
       if (quotationAddOns.length > 0) {
