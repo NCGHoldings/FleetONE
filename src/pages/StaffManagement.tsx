@@ -9,12 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Users, UserPlus, Shield, Edit, Trash2, Lock } from "lucide-react";
+import { Users, UserPlus, Shield, Edit, Trash2, Lock, PenTool } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { PageAccessModal } from "@/components/staff/PageAccessModal";
+import { ProfileSignatureManager } from "@/components/staff/ProfileSignatureManager";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
   id: string;
@@ -477,27 +479,45 @@ export default function StaffManagement() {
         </div>
       </div>
 
-      {/* Staff Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Staff Directory</CardTitle>
-          <CardDescription>
-            Manage all staff members, their roles and access permissions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DataTable columns={columns} data={staff} />
-          {isSuperAdmin && (
-            <PageAccessModal
-              open={pageAccessOpen}
-              onOpenChange={setPageAccessOpen}
-              userId={pageAccessTarget?.user_id || null}
-              userName={pageAccessTarget ? `${pageAccessTarget.first_name} ${pageAccessTarget.last_name}` : undefined}
-            />
-          )}
+      {/* Staff Management Tabs */}
+      <Tabs defaultValue="directory" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="directory">
+            <Users className="h-4 w-4 mr-2" />
+            Staff Directory
+          </TabsTrigger>
+          <TabsTrigger value="signature">
+            <PenTool className="h-4 w-4 mr-2" />
+            My Signature
+          </TabsTrigger>
+        </TabsList>
 
-        </CardContent>
-      </Card>
+        <TabsContent value="directory">
+          <Card>
+            <CardHeader>
+              <CardTitle>Staff Directory</CardTitle>
+              <CardDescription>
+                Manage all staff members, their roles and access permissions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DataTable columns={columns} data={staff} />
+              {isSuperAdmin && (
+                <PageAccessModal
+                  open={pageAccessOpen}
+                  onOpenChange={setPageAccessOpen}
+                  userId={pageAccessTarget?.user_id || null}
+                  userName={pageAccessTarget ? `${pageAccessTarget.first_name} ${pageAccessTarget.last_name}` : undefined}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="signature">
+          <ProfileSignatureManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

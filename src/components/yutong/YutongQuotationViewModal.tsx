@@ -172,7 +172,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
       
       toast({
         title: "Success",
-        description: "Quotation PDF downloaded successfully"
+        description: "Quotation PDF downloaded successfully with signatures included"
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -279,9 +279,28 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
           </div>
         )}
         
-        <div className="mt-4">
-          <YutongQuotationPreview ref={printRef} quotation={quotation} />
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="preview">Quotation Preview</TabsTrigger>
+            <TabsTrigger value="signatures">
+              <PenTool className="h-4 w-4 mr-2" />
+              Manage Signatures
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="preview" className="mt-6">
+            <div ref={printRef}>
+              <YutongQuotationPreview quotation={quotation} key={refreshKey} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="signatures" className="mt-6">
+            <YutongSignatureManager 
+              quotationId={quotation.id}
+              onSignaturesUpdated={handleSignaturesUpdated}
+            />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

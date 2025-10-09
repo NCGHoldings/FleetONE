@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ColumnDef } from '@tanstack/react-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, Trash2, FileText, LayoutGrid, Table } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText, LayoutGrid, Table, PenTool } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -59,6 +59,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
   const [viewMode, setViewMode] = useState<'table' | 'card'>(() => {
     return (localStorage.getItem('yutong_quotation_view_mode') as 'table' | 'card') || 'table';
   });
+  const [signatureCounts, setSignatureCounts] = useState<Map<string, number>>(new Map());
   const { toast } = useToast();
   const { user } = useAuth();
   const [userRoles, setUserRoles] = useState<string[]>([]);
@@ -117,6 +118,23 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
       }));
       
       setQuotations(transformedData);
+
+      // Fetch signature counts for all quotations
+      if (quotationsData && quotationsData.length > 0) {
+        const quotationIds = quotationsData.map(q => q.id);
+        const { data: signatureData } = await supabase
+          .from('yutong_quotation_signatures')
+          .select('quotation_id, signature_role')
+          .in('quotation_id', quotationIds);
+
+        // Count signatures per quotation
+        const counts = new Map<string, number>();
+        signatureData?.forEach(sig => {
+          const count = counts.get(sig.quotation_id) || 0;
+          counts.set(sig.quotation_id, count + 1);
+        });
+        setSignatureCounts(counts);
+      }
     } catch (error: any) {
       console.error('Error loading quotations:', error);
       toast({
@@ -453,6 +471,19 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
           {row.original.creator_name || 'Unknown'}
         </div>
       ),
+    },
+    {
+      accessorKey: "signatures",
+      header: "Signatures",
+      cell: ({ row }) => {
+        const count = signatureCounts.get(row.original.id) || 0;
+        return (
+          <Badge variant={count === 3 ? "default" : "secondary"} className="gap-1">
+            <PenTool className="h-3 w-3" />
+            {count}/3
+          </Badge>
+        );
+      },
     },
     {
       id: "actions",
