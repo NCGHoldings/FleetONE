@@ -251,15 +251,18 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
 
       const totalPrice = calculateTotalPrice();
 
-      // Generate next version number
+      // Generate next version number using Yutong-specific function
       const { data: versionData, error: versionError } = await supabase
-        .rpc('generate_next_version_number', { p_parent_id: quotation.id });
+        .rpc('generate_next_yutong_version_number' as any, { p_parent_id: quotation.id });
 
       if (versionError) throw versionError;
       const nextVersion = versionData || '1.1';
 
-      // Get base quotation number (without version suffix) - let trigger add version
-      const baseQuotationNo = quotation.quotation_no.replace(/-v[\d.]+$/, '');
+      // Get base quotation number (remove existing version suffix if present)
+      const baseQuotationNo = quotation.quotation_no.replace(/-v\d+\.\d+$/, '');
+      
+      // Create versioned quotation number like Special Hire does
+      const versionedQuotationNo = `${baseQuotationNo}-v${nextVersion}`;
 
       // Mark old quotation as inactive
       const { error: deactivateError } = await supabase
@@ -269,11 +272,11 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
 
       if (deactivateError) throw deactivateError;
 
-      // Create new quotation version - pass base quotation_no, let trigger add version suffix
-      const { data: newQuotation, error: quotationError } = await supabase
+      // Create new quotation version with versioned quotation number
+      const { data: newQuotation, error: quotationError } = await (supabase
         .from('yutong_quotations')
-        .insert({
-          quotation_no: baseQuotationNo,
+        .insert as any)({
+          quotation_no: versionedQuotationNo,
           parent_quotation_id: quotation.id,
           version_number: nextVersion,
           edit_type: editConfig.editType,
