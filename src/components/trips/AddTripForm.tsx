@@ -42,8 +42,8 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
     trip_date: new Date(),
     bus_id: "",
     route_id: "",
-    driver_id: "",
-    conductor_id: "",
+    driver_name: "",
+    conductor_name: "",
     start_time: "",
     end_time: "",
     odometer_start: "",
@@ -149,13 +149,20 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
       const fuel_cost = parseFloat(formData.fuel_cost) || 0;
       const net_income = income - fuel_cost;
 
+      // Create notes JSON with driver and conductor names
+      const notesData = {
+        driver: formData.driver_name || null,
+        conductor: formData.conductor_name || null,
+        notes: formData.notes || null
+      };
+
       const tripData = {
         trip_no: `TRP-${format(formData.trip_date, 'yyyyMMdd')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`,
         trip_date: format(formData.trip_date, 'yyyy-MM-dd'),
         bus_id: formData.bus_id,
         route_id: formData.route_id,
-        driver_id: formData.driver_id || null,
-        conductor_id: formData.conductor_id || null,
+        driver_id: null, // Store names in notes instead
+        conductor_id: null, // Store names in notes instead
         start_time: formData.start_time || null,
         end_time: formData.end_time || null,
         odometer_start: parseInt(formData.odometer_start) || null,
@@ -170,7 +177,7 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
         net_income: net_income,
         km_per_liter: calculations.km_per_liter,
         performance_score: calculations.performance_score,
-        notes: formData.notes || null,
+        notes: JSON.stringify(notesData),
         status: 'scheduled' as const
       };
 
@@ -259,8 +266,8 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="driver_id">Driver</Label>
-          <Select value={formData.driver_id} onValueChange={(value) => setFormData(prev => ({ ...prev, driver_id: value }))}>
+          <Label htmlFor="driver_name">Driver</Label>
+          <Select value={formData.driver_name} onValueChange={(value) => setFormData(prev => ({ ...prev, driver_name: value }))}>
             <SelectTrigger>
               <SelectValue placeholder="Select driver" />
             </SelectTrigger>
@@ -275,8 +282,8 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="conductor_id">Conductor</Label>
-          <Select value={formData.conductor_id} onValueChange={(value) => setFormData(prev => ({ ...prev, conductor_id: value }))}>
+          <Label htmlFor="conductor_name">Conductor</Label>
+          <Select value={formData.conductor_name} onValueChange={(value) => setFormData(prev => ({ ...prev, conductor_name: value }))}>
             <SelectTrigger>
               <SelectValue placeholder="Select conductor" />
             </SelectTrigger>
