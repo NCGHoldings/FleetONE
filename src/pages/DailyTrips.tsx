@@ -399,10 +399,14 @@ export default function DailyTrips() {
   const fetchTrips = async () => {
     setLoading(true);
     try {
-      // Fetch daily trips data
+      // Fetch daily trips data with joins to buses and routes tables
       const { data: trips, error } = await supabase
         .from('daily_trips')
-        .select('*')
+        .select(`
+          *,
+          buses:bus_id(bus_no, model, capacity),
+          routes:route_id(route_no, route_name)
+        `)
         .order('trip_date', { ascending: false });
 
       if (error) {
@@ -416,16 +420,10 @@ export default function DailyTrips() {
         return;
       }
 
-      // Also fetch additional data from driver allocations for better display
-      const { data: allocations } = await supabase
-        .from('driver_allocations')
-        .select('*');
-
       // Transform the data to match our interface
-      const transformedTrips: Trip[] = trips.map(trip => {
-        // Find matching allocation data for better display
-        const allocation = allocations?.find(a => a.trip_id === trip.trip_no);
-        const notes = allocation ? safeParseJSON(allocation.notes) : {};
+      const transformedTrips: Trip[] = trips.map((trip: any) => {
+        // Parse notes field to get driver and conductor names
+        const notes = safeParseJSON(trip.notes);
 
         return {
           id: trip.id,
@@ -434,16 +432,15 @@ export default function DailyTrips() {
           route_id: trip.route_id || '',
           driver_id: trip.driver_id,
           conductor_id: trip.conductor_id,
-          bus_no: notes.bus_no || `Bus-${trip.bus_id?.slice(0, 8) || 'Unknown'}`,
-          route_no: notes.route_no || `R-${trip.route_id?.slice(0, 8) || 'Unknown'}`,
-          route: notes.route || `Route-${trip.route_id?.slice(0, 8) || 'Unknown'}`,
-          driver_name: notes.driver || (trip.driver_id ? `Driver-${trip.driver_id.slice(0, 8)}` : undefined),
-          conductor_name: notes.conductor || (trip.conductor_id ? `Conductor-${trip.conductor_id.slice(0, 8)}` : undefined),
-          whatsapp: notes.whatsapp || trip.whatsapp,
+          bus_no: trip.buses?.bus_no || 'N/A',
+          route_no: trip.routes?.route_no || 'N/A',
+          route: trip.routes?.route_name || 'N/A',
+          driver_name: notes.driver,
+          conductor_name: notes.conductor,
+          whatsapp: trip.whatsapp,
           trip_date: trip.trip_date,
           start_time: trip.start_time,
           end_time: trip.end_time,
-          time: notes.time,
           odometer_start: trip.odometer_start,
           odometer_end: trip.odometer_end,
           distance_km: trip.distance_km || 0,
