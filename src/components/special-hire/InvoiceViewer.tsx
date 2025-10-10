@@ -200,8 +200,7 @@ export const InvoiceViewer = ({ isOpen, onClose, invoiceData }: InvoiceViewerPro
 
             <TabsContent value="preview" className="flex-1 overflow-auto border rounded-lg bg-background mt-2">
               <div 
-                className="text-foreground"
-                style={{ minHeight: '800px', width: '100%', overflow: 'visible' }}
+                className="text-foreground p-4"
                 dangerouslySetInnerHTML={{ __html: generateInvoiceHTML(displayData) }}
               />
             </TabsContent>
