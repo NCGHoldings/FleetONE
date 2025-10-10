@@ -875,15 +875,19 @@ export default function DailyTrips() {
       </Card>
 
       {/* Data Table */}
-      <DataTable
-        columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal, handleDeleteTripLocal)}
-        data={data}
-        searchKeys={["Bus No.", "Route No.", "Route", "Driver", "Conductor"]}
-        title="Daily Trips"
-        onExport={handleExport}
-        customSearch={customSearch}
-        customFilter={customFilter}
-      />
+      <Card>
+        <CardContent className="pt-6">
+          <DataTable
+            columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal, handleDeleteTripLocal)}
+            data={data}
+            searchKeys={["Bus No.", "Route No.", "Route", "Driver", "Conductor"]}
+            title="Daily Trips"
+            onExport={handleExport}
+            customSearch={customSearch}
+            customFilter={customFilter}
+          />
+        </CardContent>
+      </Card>
 
       {/* Modals */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
