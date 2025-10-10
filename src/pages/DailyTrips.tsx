@@ -876,7 +876,7 @@ export default function DailyTrips() {
 
       {/* Data Table */}
       <Card>
-        <CardContent className="pt-6 overflow-x-auto">
+        <CardContent className="pt-6">
           <DataTable
             columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal, handleDeleteTripLocal)}
             data={data}
