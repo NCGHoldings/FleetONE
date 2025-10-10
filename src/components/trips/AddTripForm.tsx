@@ -33,11 +33,8 @@ interface Route {
   distance_km: number;
 }
 
-interface Profile {
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  employee_id: string;
+interface StaffMember {
+  name: string;
 }
 
 export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormProps) {
@@ -58,7 +55,8 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
 
   const [buses, setBuses] = useState<Bus[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [drivers, setDrivers] = useState<StaffMember[]>([]);
+  const [conductors, setConductors] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [calculations, setCalculations] = useState({
     distance_km: 0,
@@ -79,15 +77,36 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
 
   const fetchData = async () => {
     try {
-      const [busesRes, routesRes, profilesRes] = await Promise.all([
+      const [busesRes, routesRes, allocationsRes] = await Promise.all([
         supabase.from('buses').select('id, bus_no, model, capacity, expected_km_per_liter').eq('status', 'active'),
         supabase.from('routes').select('id, route_no, route_name, distance_km').eq('is_active', true),
-        supabase.from('profiles').select('user_id, first_name, last_name, employee_id').eq('status', 'active')
+        supabase.from('driver_allocations').select('notes')
       ]);
 
       if (busesRes.data) setBuses(busesRes.data);
       if (routesRes.data) setRoutes(routesRes.data);
-      if (profilesRes.data) setProfiles(profilesRes.data);
+      
+      // Extract unique driver and conductor names from driver_allocations notes
+      if (allocationsRes.data) {
+        const driverSet = new Set<string>();
+        const conductorSet = new Set<string>();
+        
+        allocationsRes.data.forEach((allocation: any) => {
+          try {
+            const notes = typeof allocation.notes === 'string' 
+              ? JSON.parse(allocation.notes) 
+              : allocation.notes;
+            
+            if (notes?.driver) driverSet.add(notes.driver);
+            if (notes?.conductor) conductorSet.add(notes.conductor);
+          } catch (e) {
+            // Skip invalid JSON
+          }
+        });
+        
+        setDrivers(Array.from(driverSet).sort().map(name => ({ name })));
+        setConductors(Array.from(conductorSet).sort().map(name => ({ name })));
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -246,9 +265,9 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
               <SelectValue placeholder="Select driver" />
             </SelectTrigger>
             <SelectContent>
-              {profiles.map((profile) => (
-                <SelectItem key={profile.user_id} value={profile.user_id}>
-                  {profile.first_name} {profile.last_name} ({profile.employee_id})
+              {drivers.map((driver) => (
+                <SelectItem key={driver.name} value={driver.name}>
+                  {driver.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -262,9 +281,9 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
               <SelectValue placeholder="Select conductor" />
             </SelectTrigger>
             <SelectContent>
-              {profiles.map((profile) => (
-                <SelectItem key={profile.user_id} value={profile.user_id}>
-                  {profile.first_name} {profile.last_name} ({profile.employee_id})
+              {conductors.map((conductor) => (
+                <SelectItem key={conductor.name} value={conductor.name}>
+                  {conductor.name}
                 </SelectItem>
               ))}
             </SelectContent>
