@@ -5,6 +5,7 @@ import { ApprovalSignatureModal } from './ApprovalSignatureModal';
 import { SignaturePreviewCard } from './SignaturePreviewCard';
 import { useSignatureManagement, type ApprovalData } from '@/hooks/useSignatureManagement';
 import { useDocumentRegeneration } from '@/hooks/useDocumentRegeneration';
+import { useDocumentManagement } from '@/hooks/useDocumentManagement';
 import { supabase } from '@/integrations/supabase/client';
 import { Pen, User, Calendar, Trash2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
@@ -13,6 +14,7 @@ import { toast } from 'sonner';
 interface DocumentSignatureManagerProps {
   documentId: string;
   quotationId?: string;
+  paymentId?: string;
   documentStatus: 'draft' | 'approved';
   onSignatureUpdated?: () => void;
 }
@@ -20,6 +22,7 @@ interface DocumentSignatureManagerProps {
 export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> = ({
   documentId,
   quotationId,
+  paymentId,
   documentStatus,
   onSignatureUpdated,
 }) => {
@@ -27,16 +30,18 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [currentApprovalType, setCurrentApprovalType] = useState<'prepared_by' | 'checked_by' | 'approved_by'>('prepared_by');
   const [editingApproval, setEditingApproval] = useState<ApprovalData | undefined>();
+  const [actualDocumentId, setActualDocumentId] = useState<string>(documentId);
   
   const { getDocumentApprovals, deleteApproval, isLoading } = useSignatureManagement();
   const { regenerateDocumentWithSignatures, isRegenerating } = useDocumentRegeneration();
+  const { ensureDocumentExists } = useDocumentManagement();
 
   useEffect(() => {
     loadApprovals();
   }, [documentId]);
 
   const loadApprovals = async () => {
-    const result = await getDocumentApprovals(documentId);
+    const result = await getDocumentApprovals(actualDocumentId);
     if (result.success) {
       // Type cast the approvals to match our interface
       const typedApprovals = result.approvals.map(approval => ({
@@ -47,16 +52,42 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
     }
   };
 
-  const handleAddSignature = (approvalType: 'prepared_by' | 'checked_by' | 'approved_by') => {
-    setCurrentApprovalType(approvalType);
-    setEditingApproval(undefined);
-    setShowSignatureModal(true);
+  const handleAddSignature = async (approvalType: 'prepared_by' | 'checked_by' | 'approved_by') => {
+    // Ensure document exists before opening signature modal
+    if (quotationId && !actualDocumentId) {
+      const result = await ensureDocumentExists(quotationId, paymentId);
+      if (result.success && result.documentId) {
+        setActualDocumentId(result.documentId);
+        setCurrentApprovalType(approvalType);
+        setEditingApproval(undefined);
+        setShowSignatureModal(true);
+      } else {
+        toast.error('Failed to prepare document for signature.');
+      }
+    } else {
+      setCurrentApprovalType(approvalType);
+      setEditingApproval(undefined);
+      setShowSignatureModal(true);
+    }
   };
 
-  const handleEditSignature = (approval: ApprovalData) => {
-    setCurrentApprovalType(approval.approval_type);
-    setEditingApproval(approval.id ? approval : undefined); // Only set existing approval if it has an ID
-    setShowSignatureModal(true);
+  const handleEditSignature = async (approval: ApprovalData) => {
+    // Ensure document exists before editing signature
+    if (quotationId && !actualDocumentId) {
+      const result = await ensureDocumentExists(quotationId, paymentId);
+      if (result.success && result.documentId) {
+        setActualDocumentId(result.documentId);
+        setCurrentApprovalType(approval.approval_type);
+        setEditingApproval(approval.id ? approval : undefined);
+        setShowSignatureModal(true);
+      } else {
+        toast.error('Failed to prepare document for signature.');
+      }
+    } else {
+      setCurrentApprovalType(approval.approval_type);
+      setEditingApproval(approval.id ? approval : undefined);
+      setShowSignatureModal(true);
+    }
   };
 
   const handleDeleteSignature = async (approvalId: string) => {
@@ -199,7 +230,7 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
         <ApprovalSignatureModal
           isOpen={showSignatureModal}
           onClose={() => setShowSignatureModal(false)}
-          documentId={documentId}
+          documentId={actualDocumentId}
           approvalType={currentApprovalType}
           title={`${getApprovalTypeName(currentApprovalType)} Signature`}
           onSave={handleSignatureSaved}

@@ -18,6 +18,7 @@ interface DocumentViewerProps {
   document: {
     id: string;
     quotation_id?: string;
+    payment_id?: string;
     document_type: 'sales_receipt' | 'invoice';
     payment_type: 'advance' | 'balance' | 'full';
     document_status: 'draft' | 'approved';
@@ -451,6 +452,7 @@ export const DocumentViewer = ({
                 <DocumentSignatureManager
                   documentId={document.id}
                   quotationId={document.quotation_id}
+                  paymentId={document.payment_id}
                   documentStatus={document.document_status}
                   onSignatureUpdated={onSignatureUpdated}
                 />

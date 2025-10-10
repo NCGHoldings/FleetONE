@@ -396,11 +396,58 @@ export const useDocumentManagement = () => {
     }
   };
 
+  const ensureDocumentExists = async (quotationId: string, paymentId?: string) => {
+    try {
+      // Check if a document already exists for this quotation
+      const { data: existing, error: fetchError } = await supabase
+        .from('document_storage')
+        .select('id')
+        .eq('quotation_id', quotationId)
+        .maybeSingle();
+      
+      if (fetchError) throw fetchError;
+      
+      if (existing) {
+        return { success: true, documentId: existing.id };
+      }
+
+      // No document exists, create a stub
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data: newDoc, error: insertError } = await supabase
+        .from('document_storage')
+        .insert({
+          quotation_id: quotationId,
+          payment_id: paymentId || null,
+          document_type: 'sales_receipt',
+          payment_type: 'advance',
+          document_status: 'draft',
+          document_data: '', // Empty until PDF is generated
+          file_name: `stub-${quotationId}`,
+          file_size: 0,
+          generated_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      return { success: true, documentId: newDoc.id };
+    } catch (error) {
+      console.error('Error ensuring document exists:', error);
+      toast.error('Failed to prepare document for signatures.');
+      return { success: false, error };
+    }
+  };
+
   return {
     generateAndStoreDraftDocument,
     approveDocument,
     getDocumentsByQuotation,
     regenerateDocument,
+    ensureDocumentExists,
     isLoading,
   };
 };

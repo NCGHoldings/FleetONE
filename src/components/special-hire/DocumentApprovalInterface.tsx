@@ -4,31 +4,39 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SignatureCaptureModal, type ApprovalData } from './SignatureCaptureModal';
 import { useSignatureManagement, type ApprovalData as SignatureApprovalData } from '@/hooks/useSignatureManagement';
+import { useDocumentManagement } from '@/hooks/useDocumentManagement';
 import { Pen, Check, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface DocumentApprovalInterfaceProps {
   documentId: string;
+  quotationId?: string;
+  paymentId?: string;
   onApprovalsUpdate?: (approvals: SignatureApprovalData[]) => void;
   showFinanceApproval?: boolean; // Only show for finance team
 }
 
 export const DocumentApprovalInterface: React.FC<DocumentApprovalInterfaceProps> = ({
   documentId,
+  quotationId,
+  paymentId,
   onApprovalsUpdate,
   showFinanceApproval = false,
 }) => {
   const [approvals, setApprovals] = useState<SignatureApprovalData[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [currentApprovalType, setCurrentApprovalType] = useState<'prepared_by' | 'checked_by' | 'approved_by'>('prepared_by');
+  const [actualDocumentId, setActualDocumentId] = useState<string>(documentId);
   const { getDocumentApprovals, saveApproval, isLoading } = useSignatureManagement();
+  const { ensureDocumentExists } = useDocumentManagement();
 
   useEffect(() => {
     loadApprovals();
   }, [documentId]);
 
   const loadApprovals = async () => {
-    const result = await getDocumentApprovals(documentId);
+    const result = await getDocumentApprovals(actualDocumentId);
     if (result.success) {
       // Type cast the approvals to match our interface
       const typedApprovals = result.approvals.map(approval => ({
@@ -40,14 +48,26 @@ export const DocumentApprovalInterface: React.FC<DocumentApprovalInterfaceProps>
     }
   };
 
-  const handleApprovalClick = (type: 'prepared_by' | 'checked_by' | 'approved_by') => {
-    setCurrentApprovalType(type);
-    setShowModal(true);
+  const handleApprovalClick = async (type: 'prepared_by' | 'checked_by' | 'approved_by') => {
+    // Ensure document exists before opening signature modal
+    if (quotationId && !actualDocumentId) {
+      const result = await ensureDocumentExists(quotationId, paymentId);
+      if (result.success && result.documentId) {
+        setActualDocumentId(result.documentId);
+        setCurrentApprovalType(type);
+        setShowModal(true);
+      } else {
+        toast.error('Failed to prepare document for signature.');
+      }
+    } else {
+      setCurrentApprovalType(type);
+      setShowModal(true);
+    }
   };
 
   const handleSaveApproval = async (approvalData: ApprovalData) => {
     const signatureApprovalData: SignatureApprovalData = {
-      document_id: documentId,
+      document_id: actualDocumentId,
       approval_type: approvalData.approvalType,
       approver_name: approvalData.approverName,
       signature_data: approvalData.signatureData,
@@ -159,7 +179,7 @@ export const DocumentApprovalInterface: React.FC<DocumentApprovalInterfaceProps>
         onSave={handleSaveApproval}
         approvalType={currentApprovalType}
         title={approvalTypes.find(t => t.type === currentApprovalType)?.title || 'Add Approval'}
-        documentId={documentId}
+        documentId={actualDocumentId}
       />
     </div>
   );

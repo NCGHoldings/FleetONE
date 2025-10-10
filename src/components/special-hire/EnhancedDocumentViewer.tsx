@@ -445,6 +445,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
               <DocumentSignatureManager
                 documentId={document.id}
                 quotationId={document.quotation_id}
+                paymentId={document.payment_id}
                 documentStatus={(document.document_status || 'draft') as 'draft' | 'approved'}
                 onSignatureUpdated={handleApprovalsUpdate}
               />
