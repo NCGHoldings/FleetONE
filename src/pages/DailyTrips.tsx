@@ -8,6 +8,10 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
@@ -291,8 +295,8 @@ export default function DailyTrips() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [dieselPrice, setDieselPrice] = useState<number>(150);
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
   const [importing, setImporting] = useState(false);
   const [dateFilter, setDateFilter] = useState<{ from?: Date; to?: Date } | undefined>();
   const { toast } = useToast();
@@ -504,12 +508,15 @@ export default function DailyTrips() {
     setImporting(true);
 
     try {
+      const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+      const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+
       // Fetch ALL driver allocations for the selected date range (don't filter yet)
       const { data: allocations, error: allocError } = await supabase
         .from('driver_allocations')
         .select('*')
-        .gte('allocation_date', startDate)
-        .lte('allocation_date', endDate);
+        .gte('allocation_date', formattedStartDate)
+        .lte('allocation_date', formattedEndDate);
 
       if (allocError) {
         console.error('Error fetching allocations:', allocError);
@@ -744,22 +751,56 @@ export default function DailyTrips() {
         <CardContent>
           <div className="flex items-end gap-4">
             <div className="flex-1">
-              <Label htmlFor="start-date">Start Date</Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+              <Label>Start Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={startDate}
+                    onSelect={setStartDate}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="flex-1">
-              <Label htmlFor="end-date">End Date</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
+              <Label>End Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !endDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={endDate}
+                    onSelect={setEndDate}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <Button 
               onClick={importDriverAllocationData}
