@@ -231,7 +231,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         chargeableExceedingKm: Math.max(0, (quotation.km_trip || 0) - 100)
       },
       grossRevenue: quotation.gross_revenue || 0,
-      customerTotalWithFuel: (quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.total_additional_charges || 0) - (quotation.discount_amount_lkr || 0),
+      customerTotalWithFuel: (quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0) + (quotation.total_additional_charges || 0) - (quotation.discount_amount_lkr || 0),
       driverCharge: 0,
       otherExpenses: [],
       commissionPct: 0,
