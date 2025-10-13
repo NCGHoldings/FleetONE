@@ -10,6 +10,8 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
 // Pages
 import Auth from "./pages/Auth";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import Dashboard from "./pages/Dashboard";
 import DailyTrips from "./pages/DailyTrips";
 import FleetManagement from "./pages/FleetManagement";
@@ -69,6 +71,26 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <Dashboard />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Profile />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/settings" 
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Settings />
                   </AppLayout>
                 </ProtectedRoute>
               } 
