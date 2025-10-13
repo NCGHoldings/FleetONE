@@ -197,7 +197,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const mileage = data.numberOfBuses * 100; // Placeholder mileage calculation
 
     return `
-      <div style="font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #fff; color: #000; width: 100%; max-width: 210mm; min-height: 297mm; box-sizing: border-box; position: relative;">
+      <div style="font-family: Arial, sans-serif; margin: 0; padding: 20px 20px 40px 20px; background: #fff; color: #000; width: 100%; max-width: 210mm; min-height: 297mm; box-sizing: border-box; position: relative;">
         ${isDraft ? '<div class="draft-watermark"><div class="draft-text">DRAFT</div></div>' : ''}
         <style>
           ${draftWatermarkStyles}
@@ -314,37 +314,37 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           </div>
 
           <!-- Signature Section -->
-          <table style="width: 100%; border-collapse: collapse; margin-top: 50px; font-size: 14px;">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 30px; font-size: 14px;">
             <tr style="background: #f0f0f0;">
               <th style="border: 1px solid #000; padding: 8px; text-align: center;">Prepared By</th>
               <th style="border: 1px solid #000; padding: 8px; text-align: center;">Checked By</th>
               <th style="border: 1px solid #000; padding: 8px; text-align: center;">Approved By</th>
             </tr>
             <tr>
-              <td style="border: 1px solid #000; padding: 10px; vertical-align: top; text-align: center;">
+              <td style="border: 1px solid #000; padding: 15px; vertical-align: top; text-align: center;">
                 <b>Name:</b> ${data.preparedBy?.approver_name || '.........................'}<br>
                 <b>Signature:</b><br>
                 ${data.preparedBy?.signature_data 
-                  ? `<img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin: 5px 0; border: 1px solid #ddd;">` 
-                  : '<div style="height: 50px; border-bottom: 1px solid #000; margin: 5px 0; width: 150px; display: inline-block;"></div>'
+                  ? `<img src="${data.preparedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 60px; margin: 5px 0; border: 1px solid #ddd;">` 
+                  : '<div style="height: 60px; border-bottom: 1px solid #000; margin: 5px 0; width: 150px; display: inline-block;"></div>'
                 }
                 <br><b>Date:</b> ${data.preparedBy?.approval_date || currentDate}
               </td>
-              <td style="border: 1px solid #000; padding: 10px; vertical-align: top; text-align: center;">
+              <td style="border: 1px solid #000; padding: 15px; vertical-align: top; text-align: center;">
                 <b>Name:</b> ${data.checkedBy?.approver_name || '.........................'}<br>
                 <b>Signature:</b><br>
                 ${data.checkedBy?.signature_data 
-                  ? `<img src="${data.checkedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin: 5px 0; border: 1px solid #ddd;">` 
-                  : '<div style="height: 50px; border-bottom: 1px solid #000; margin: 5px 0; width: 150px; display: inline-block;"></div>'
+                  ? `<img src="${data.checkedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 60px; margin: 5px 0; border: 1px solid #ddd;">` 
+                  : '<div style="height: 60px; border-bottom: 1px solid #000; margin: 5px 0; width: 150px; display: inline-block;"></div>'
                 }
                 <br><b>Date:</b> ${data.checkedBy?.approval_date || currentDate}
               </td>
-              <td style="border: 1px solid #000; padding: 10px; vertical-align: top; text-align: center;">
+              <td style="border: 1px solid #000; padding: 15px; vertical-align: top; text-align: center;">
                 <b>Name:</b> ${data.approvedBy?.approver_name || '.........................'}<br>
                 <b>Signature:</b><br>
                 ${data.approvedBy?.signature_data 
-                  ? `<img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 50px; margin: 5px 0; border: 1px solid #ddd;">` 
-                  : '<div style="height: 50px; border-bottom: 1px solid #000; margin: 5px 0; width: 150px; display: inline-block;"></div>'
+                  ? `<img src="${data.approvedBy.signature_data}" alt="Signature" style="max-width: 150px; max-height: 60px; margin: 5px 0; border: 1px solid #ddd;">` 
+                  : '<div style="height: 60px; border-bottom: 1px solid #000; margin: 5px 0; width: 150px; display: inline-block;"></div>'
                 }
                 <br><b>Date:</b> ${data.approvedBy?.approval_date || format(new Date(Date.now() - 24 * 60 * 60 * 1000), 'dd/MM/yyyy')}
               </td>
@@ -352,8 +352,14 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           </table>
 
           <!-- Note -->
-          <div style="margin-top: 30px; font-size: 12px; text-align: center; color: #555; font-style: italic;">
+          <div style="margin-top: 20px; font-size: 12px; text-align: center; color: #555; font-style: italic;">
             "This is a computer-generated invoice and does not require a physical signature."
+          </div>
+
+          <!-- Footer -->
+          <div style="margin-top: 40px; padding-top: 20px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
+            Page 1 of 1<br>
+            NCG Express Transport Management System
           </div>
         </div>
       </div>
@@ -430,7 +436,8 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
     // Create PDF with proper margins
     const pdf = new jsPDF('p', 'mm', 'a4');
     const imgWidth = 210; // A4 width in mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const pageHeight = 297; // A4 height in mm
+    let imgHeight = (canvas.height * imgWidth) / canvas.width;
     
   // Convert canvas to JPEG data URL only (avoid PNG signature errors)
   let imgData: string;
@@ -441,8 +448,27 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
     throw new Error('Failed to generate image (JPEG) for PDF');
   }
     
-    // Add image with no margins for clean edge-to-edge rendering
-    pdf.addImage(imgData, imgData.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG', 0, 0, imgWidth, imgHeight);
+    // Handle content that exceeds A4 page height
+    if (imgHeight > pageHeight) {
+      // If content is taller than A4, add multiple pages
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      // Add first page
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Add additional pages if needed
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+    } else {
+      // Content fits on one page - add image with no margins for clean rendering
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+    }
     
     console.log('PDF generation completed successfully');
     return pdf.output('blob');
