@@ -219,17 +219,38 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
       maintenanceRatePerKm: 20, // Default, could be fetched from settings
       pickupDateTime: quotation.pickup_datetime,
       dropDateTime: quotation.drop_datetime,
-      rateCardDetails: {
-        standardHours: quotation.standard_hours || 8,
-        actualHours: quotation.actual_hours || 8,
-        availableHours: quotation.available_hours || 8,
-        overtimeHours: quotation.overtime_hours || 0,
-        agreedDistance: quotation.km_trip || 0,
-        actualDistance: quotation.km_trip || 0,
-        exceedingKm: Math.max(0, (quotation.km_trip || 0) - 100),
-        freeExceedingKm: 0,
-        chargeableExceedingKm: Math.max(0, (quotation.km_trip || 0) - 100)
-      },
+      rateCardDetails: (() => {
+        // Calculate actual hours from datetime fields
+        let actualHours = 8;
+        let availableHours = 8;
+        const standardHours = 8;
+        
+        if (quotation.pickup_datetime && quotation.drop_datetime) {
+          const pickupTime = new Date(quotation.pickup_datetime);
+          const dropTime = new Date(quotation.drop_datetime);
+          actualHours = Math.max(0, (dropTime.getTime() - pickupTime.getTime()) / (1000 * 60 * 60));
+        }
+        
+        // Calculate available hours from distance (baseline speed: 10 km/h)
+        const baselineSpeed = 10; // km/h
+        const tripDistance = quotation.km_trip || 0;
+        availableHours = tripDistance / baselineSpeed;
+        
+        // Calculate overtime hours
+        const overtimeHours = Math.max(0, actualHours - availableHours);
+        
+        return {
+          standardHours,
+          actualHours,
+          availableHours,
+          overtimeHours,
+          agreedDistance: quotation.km_trip || 0,
+          actualDistance: quotation.km_trip || 0,
+          exceedingKm: Math.max(0, (quotation.km_trip || 0) - 100),
+          freeExceedingKm: 0,
+          chargeableExceedingKm: Math.max(0, (quotation.km_trip || 0) - 100)
+        };
+      })(),
       grossRevenue: quotation.gross_revenue || 0,
       customerTotalWithFuel: (quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0) + (quotation.total_additional_charges || 0) - (quotation.discount_amount_lkr || 0),
       driverCharge: 0,
