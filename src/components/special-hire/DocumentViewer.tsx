@@ -44,8 +44,8 @@ export const DocumentViewer = ({
   const pdfViewerDownloadRef = useRef<(() => void) | null>(null);
   const { user, hasRole } = useAuth();
   
-  // Check if user can manage signatures
-  const canManageSignatures = user && (hasRole('admin') || hasRole('supervisor') || hasRole('finance'));
+  // Check if user can manage signatures - allow all authenticated users
+  const canManageSignatures = !!user;
 
   const handleDownload = async () => {
     // Use the PDF viewer's download function (includes annotations)
