@@ -203,6 +203,9 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           ${draftWatermarkStyles}
           @media print {
             .invoice-container { width: 210mm !important; max-width: none !important; }
+            .page-break { page-break-before: always; }
+            .signature-section { page-break-inside: avoid; }
+            .keep-together { page-break-inside: avoid; }
           }
         </style>
         
@@ -303,8 +306,8 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             </tr>
           </table>
 
-          <!-- Payment Info -->
-          <div style="margin-top: 20px; font-size: 13px; clear: both;">
+          <!-- Payment Info & Terms - Keep Together on Page 1 -->
+          <div class="keep-together" style="margin-top: 20px; font-size: 13px; clear: both;">
             <strong>Payment Info</strong><br>
             Account No: <b>193414017578</b><br>
             Account Name: <b>NCG Express (Pvt) Limited</b><br>
@@ -313,8 +316,19 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             1. Cheques are to be drawn in favour of <b>NCG EXPRESS (PVT) LIMITED</b> and A/C payee only.
           </div>
 
-          <!-- Signature Section -->
-          <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px;">
+          <!-- Footer for Page 1 -->
+          <div style="margin-top: 15px; padding-top: 10px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
+            Page 1 of 2<br>
+            NCG Express Transport Management System
+          </div>
+
+          <!-- Page Break Before Signatures -->
+          <div class="page-break"></div>
+
+          <!-- Signature Section on Page 2 -->
+          <div style="margin-top: 20px;">
+
+            <table class="signature-section" style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px;">
             <tr style="background: #f0f0f0;">
               <th style="border: 1px solid #000; padding: 8px; text-align: center;">Prepared By</th>
               <th style="border: 1px solid #000; padding: 8px; text-align: center;">Checked By</th>
@@ -356,10 +370,11 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             "This is a computer-generated invoice and does not require a physical signature."
           </div>
 
-          <!-- Footer -->
-          <div style="margin-top: 20px; padding-top: 15px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
-            Page 1 of 1<br>
-            NCG Express Transport Management System
+            <!-- Footer for Page 2 -->
+            <div style="margin-top: 20px; padding-top: 15px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
+              Page 2 of 2<br>
+              NCG Express Transport Management System
+            </div>
           </div>
         </div>
       </div>
