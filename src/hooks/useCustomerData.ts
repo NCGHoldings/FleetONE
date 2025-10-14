@@ -101,21 +101,38 @@ export function useCustomerData() {
       // Create a map to consolidate customers
       const customerMap = new Map<string, CustomerData>();
 
-      // Process Yutong customers
-      yutongCustomers.data?.forEach(customer => {
-        const key = customer.phone || customer.email || customer.id;
+      // Helper function to normalize phone numbers
+      const normalizePhone = (phone: string | null | undefined): string => {
+        if (!phone) return '';
+        return phone.replace(/[\s\-\+]/g, '').replace(/^94/, '0');
+      };
+
+      // Helper function to normalize company name
+      const normalizeCompanyName = (name: string | null | undefined): string => {
+        if (!name || name.trim() === '') return '';
+        return name.trim();
+      };
+
+      // Process Yutong quotations as primary source for Yutong customers
+      yutongQuotations.data?.forEach(quotation => {
+        const normalizedPhone = normalizePhone(quotation.customer_phone);
+        const normalizedEmail = quotation.customer_email?.toLowerCase().trim() || '';
+        
+        // Use phone as primary key, fallback to email, then ID
+        const key = normalizedPhone || normalizedEmail || quotation.id;
+        
         if (!customerMap.has(key)) {
           customerMap.set(key, {
-            id: customer.id,
-            name: customer.contact_person || customer.company_name,
-            company_name: customer.company_name,
-            phone: customer.phone,
-            email: customer.email,
-            address: customer.address,
-            city: customer.city,
+            id: quotation.id,
+            name: quotation.customer_name,
+            company_name: normalizeCompanyName(quotation.company_name),
+            phone: quotation.customer_phone,
+            email: quotation.customer_email,
+            address: quotation.customer_address,
+            city: '',
             source: 'yutong',
-            customer_type: customer.company_name ? 'corporate' : 'individual',
-            created_at: customer.created_at,
+            customer_type: quotation.company_name ? 'corporate' : 'individual',
+            created_at: quotation.created_at,
             analytics: {
               total_lifetime_value: 0,
               yutong_revenue: 0,
@@ -127,8 +144,8 @@ export function useCustomerData() {
               special_hire_bookings: 0,
               owned_buses: 0,
               avg_booking_value: 0,
-              first_interaction: customer.created_at,
-              last_interaction: customer.updated_at || customer.created_at,
+              first_interaction: quotation.created_at,
+              last_interaction: quotation.updated_at || quotation.created_at,
               months_active: 0,
               booking_frequency: 0,
               preferred_bus_types: [],
@@ -138,14 +155,24 @@ export function useCustomerData() {
               monthly_revenue_trend: []
             }
           });
+        } else {
+          // Merge data if key exists (prefer non-empty values)
+          const existing = customerMap.get(key)!;
+          if (!existing.email && quotation.customer_email) {
+            existing.email = quotation.customer_email;
+          }
+          if (!existing.company_name && quotation.company_name) {
+            existing.company_name = normalizeCompanyName(quotation.company_name);
+          }
+          if (!existing.address && quotation.customer_address) {
+            existing.address = quotation.customer_address;
+          }
+          // Update last interaction if this quotation is newer
+          if (new Date(quotation.created_at) > new Date(existing.analytics.last_interaction)) {
+            existing.analytics.last_interaction = quotation.created_at;
+          }
         }
       });
-
-      // Helper function to normalize phone numbers
-      const normalizePhone = (phone: string | null | undefined): string => {
-        if (!phone) return '';
-        return phone.replace(/[\s\-\+]/g, '').replace(/^94/, '0');
-      };
 
       // Process Special Hire customers
       specialHireQuotations.data?.forEach(quotation => {
@@ -247,27 +274,40 @@ export function useCustomerData() {
         }
       });
 
+      // Define revenue statuses constant
+      const REVENUE_STATUSES = ['converted_to_order', 'confirmed', 'order_created', 'completed'];
+
       // Calculate analytics for each customer
       const enrichedCustomers = Array.from(customerMap.values()).map(customer => {
-        // Calculate Yutong analytics
-        const customerYutongQuotations = yutongQuotations.data?.filter(q => 
-          q.customer_phone === customer.phone || 
-          q.customer_email === customer.email ||
-          q.customer_name === customer.name
-        ) || [];
+        // Calculate Yutong analytics - use normalized matching
+        const normalizedCustomerPhone = normalizePhone(customer.phone);
+        const normalizedCustomerEmail = customer.email?.toLowerCase().trim() || '';
+        
+        const customerYutongQuotations = yutongQuotations.data?.filter(q => {
+          const normalizedQuotationPhone = normalizePhone(q.customer_phone);
+          const normalizedQuotationEmail = q.customer_email?.toLowerCase().trim() || '';
+          
+          return normalizedQuotationPhone === normalizedCustomerPhone || 
+                 normalizedQuotationEmail === normalizedCustomerEmail ||
+                 q.customer_name?.trim().toLowerCase() === customer.name?.trim().toLowerCase();
+        }) || [];
 
         customer.analytics.yutong_purchases = customerYutongQuotations.length;
-        // Include all non-cancelled/rejected quotations in revenue
+        
+        // Only count revenue from confirmed/converted/completed statuses
         customer.analytics.yutong_revenue = customerYutongQuotations
-          .filter(q => q.status && !['cancelled', 'rejected', 'draft'].includes(q.status.toLowerCase()))
+          .filter(q => q.status && REVENUE_STATUSES.includes(q.status.toLowerCase()))
           .reduce((sum, q) => sum + (Number(q.total_price) || 0), 0);
 
-        // Calculate Special Hire analytics
-        const customerSpecialHireQuotations = specialHireQuotations.data?.filter(q =>
-          q.customer_phone === customer.phone ||
-          q.customer_email === customer.email ||
-          q.customer_name === customer.name
-        ) || [];
+        // Calculate Special Hire analytics - use normalized matching
+        const customerSpecialHireQuotations = specialHireQuotations.data?.filter(q => {
+          const normalizedQuotationPhone = normalizePhone(q.customer_phone);
+          const normalizedQuotationEmail = q.customer_email?.toLowerCase().trim() || '';
+          
+          return normalizedQuotationPhone === normalizedCustomerPhone ||
+                 normalizedQuotationEmail === normalizedCustomerEmail ||
+                 q.customer_name?.trim().toLowerCase() === customer.name?.trim().toLowerCase();
+        }) || [];
 
         customer.analytics.special_hire_bookings = customerSpecialHireQuotations.length;
         // Include completed and confirmed trips in revenue
@@ -334,11 +374,11 @@ export function useCustomerData() {
           monthlyData.set(monthKey, { revenue: 0, transactions: 0 });
         }
 
-        // Add Yutong transactions
+        // Add Yutong transactions - only revenue statuses
         customerYutongQuotations.forEach(q => {
           const monthKey = q.created_at.slice(0, 7);
           const existing = monthlyData.get(monthKey);
-          if (existing && q.status && !['cancelled', 'rejected', 'draft'].includes(q.status.toLowerCase())) {
+          if (existing && q.status && REVENUE_STATUSES.includes(q.status.toLowerCase())) {
             existing.revenue += Number(q.total_price) || 0;
             existing.transactions += 1;
           }
@@ -499,54 +539,55 @@ export function useCustomerProfile(selectedCustomer: { id: string; name: string;
           }
         }
 
-        // Fetch all related data using phone/email/name for comprehensive lookup
+        // Fetch all related data using normalized phone/email/name for comprehensive lookup
+        // Helper function to normalize phone numbers
+        const normalizePhone = (phone: string | null | undefined): string => {
+          if (!phone) return '';
+          return phone.replace(/[\s\-\+]/g, '').replace(/^94/, '0');
+        };
+
+        const normalizedPhone = normalizePhone(selectedCustomer.phone);
+        const normalizedEmail = selectedCustomer.email?.toLowerCase().trim() || '';
+
         const [yutongQuotationsResult, specialHireResult, busesResult] = await Promise.allSettled([
-          // Yutong quotations - build proper query
+          // Yutong quotations - use normalized matching
           (async () => {
-            let query = supabase.from('yutong_quotations').select('*');
-            const conditions: string[] = [];
+            const { data: allQuotations } = await supabase
+              .from('yutong_quotations')
+              .select('*');
             
-            if (selectedCustomer.phone) {
-              conditions.push(`customer_phone.eq.${selectedCustomer.phone}`);
-            }
-            if (selectedCustomer.email) {
-              conditions.push(`customer_email.eq.${selectedCustomer.email}`);
-            }
-            if (selectedCustomer.name) {
-              conditions.push(`customer_name.ilike.%${selectedCustomer.name.replace(/'/g, "''")}%`);
-            }
+            const filtered = allQuotations?.filter(q => {
+              const qPhone = normalizePhone(q.customer_phone);
+              const qEmail = q.customer_email?.toLowerCase().trim() || '';
+              const qName = q.customer_name?.trim().toLowerCase() || '';
+              const sName = selectedCustomer.name?.trim().toLowerCase() || '';
+              
+              return (normalizedPhone && qPhone === normalizedPhone) ||
+                     (normalizedEmail && qEmail === normalizedEmail) ||
+                     (qName && sName && qName.includes(sName));
+            }) || [];
             
-            if (conditions.length > 0) {
-              query = query.or(conditions.join(','));
-            } else {
-              return { data: [], error: null };
-            }
-            
-            return await query;
+            return { data: filtered, error: null };
           })(),
           
-          // Special hire quotations - build proper query
+          // Special hire quotations - use normalized matching
           (async () => {
-            let query = supabase.from('special_hire_quotations').select('*');
-            const conditions: string[] = [];
+            const { data: allQuotations } = await supabase
+              .from('special_hire_quotations')
+              .select('*');
             
-            if (selectedCustomer.phone) {
-              conditions.push(`customer_phone.eq.${selectedCustomer.phone}`);
-            }
-            if (selectedCustomer.email) {
-              conditions.push(`customer_email.eq.${selectedCustomer.email}`);
-            }
-            if (selectedCustomer.name) {
-              conditions.push(`customer_name.ilike.%${selectedCustomer.name.replace(/'/g, "''")}%`);
-            }
+            const filtered = allQuotations?.filter(q => {
+              const qPhone = normalizePhone(q.customer_phone);
+              const qEmail = q.customer_email?.toLowerCase().trim() || '';
+              const qName = q.customer_name?.trim().toLowerCase() || '';
+              const sName = selectedCustomer.name?.trim().toLowerCase() || '';
+              
+              return (normalizedPhone && qPhone === normalizedPhone) ||
+                     (normalizedEmail && qEmail === normalizedEmail) ||
+                     (qName && sName && qName.includes(sName));
+            }) || [];
             
-            if (conditions.length > 0) {
-              query = query.or(conditions.join(','));
-            } else {
-              return { data: [], error: null };
-            }
-            
-            return await query;
+            return { data: filtered, error: null };
           })(),
           
           // Buses (fleet ownership)
@@ -580,29 +621,29 @@ export function useCustomerProfile(selectedCustomer: { id: string; name: string;
                   ownedBuses.length > 0 ? 'fleet_owner' : 'yutong',
           created_at: customerData?.created_at || new Date().toISOString(),
           analytics: {
-            // Financial metrics
+            // Financial metrics - use correct status filtering
             total_lifetime_value: [
-              ...yutongQuotations.filter(q => q.status === 'confirmed').map(q => q.total_price || 0),
-              ...specialHireQuotations.filter(q => q.trip_status === 'completed').map(q => q.gross_revenue || 0)
+              ...yutongQuotations.filter(q => q.status && ['converted_to_order', 'confirmed', 'order_created', 'completed'].includes(q.status.toLowerCase())).map(q => q.total_price || 0),
+              ...specialHireQuotations.filter(q => q.trip_status && ['completed', 'confirmed'].includes(q.trip_status.toLowerCase())).map(q => q.gross_revenue || 0)
             ].reduce((sum, val) => sum + val, 0),
             
-            yutong_revenue: yutongQuotations.filter(q => q.status === 'confirmed').reduce((sum, q) => sum + (q.total_price || 0), 0),
-            special_hire_revenue: specialHireQuotations.filter(q => q.trip_status === 'completed').reduce((sum, q) => sum + (q.gross_revenue || 0), 0),
+            yutong_revenue: yutongQuotations.filter(q => q.status && ['converted_to_order', 'confirmed', 'order_created', 'completed'].includes(q.status.toLowerCase())).reduce((sum, q) => sum + (q.total_price || 0), 0),
+            special_hire_revenue: specialHireQuotations.filter(q => q.trip_status && ['completed', 'confirmed'].includes(q.trip_status.toLowerCase())).reduce((sum, q) => sum + (q.gross_revenue || 0), 0),
             maintenance_revenue: 0, // Would need maintenance records to calculate this
             
             outstanding_balance: specialHireQuotations.reduce((sum, q) => sum + (q.balance_due || 0), 0),
             
             // Transaction counts
             total_transactions: yutongQuotations.length + specialHireQuotations.length,
-            yutong_purchases: yutongQuotations.filter(q => q.status === 'confirmed').length,
+            yutong_purchases: yutongQuotations.filter(q => q.status && ['converted_to_order', 'confirmed', 'order_created', 'completed'].includes(q.status.toLowerCase())).length,
             special_hire_bookings: specialHireQuotations.length,
             owned_buses: ownedBuses.length,
             
             // Behavioral metrics
             avg_booking_value: (() => {
               const allTransactions = [
-                ...yutongQuotations.filter(q => q.status === 'confirmed').map(q => q.total_price || 0),
-                ...specialHireQuotations.filter(q => q.trip_status === 'completed').map(q => q.gross_revenue || 0)
+                ...yutongQuotations.filter(q => q.status && ['converted_to_order', 'confirmed', 'order_created', 'completed'].includes(q.status.toLowerCase())).map(q => q.total_price || 0),
+                ...specialHireQuotations.filter(q => q.trip_status && ['completed', 'confirmed'].includes(q.trip_status.toLowerCase())).map(q => q.gross_revenue || 0)
               ];
               return allTransactions.length > 0 ? allTransactions.reduce((sum, val) => sum + val, 0) / allTransactions.length : 0;
             })(),
