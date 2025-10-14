@@ -219,12 +219,32 @@ export default function CustomerManagement() {
           {/* Customer List */}
           <Card>
             <CardHeader>
-              <CardTitle>Customer List ({customers.length} customers)</CardTitle>
-              <CardDescription>Complete customer database with analytics</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Customer List ({customers.length} customers)</CardTitle>
+                  <CardDescription>
+                    Complete customer database with analytics
+                    {stats.customers_with_complete_contact < stats.total_customers && (
+                      <span className="text-orange-600 ml-2">
+                        • {stats.total_customers - stats.customers_with_complete_contact} with incomplete contact info
+                      </span>
+                    )}
+                  </CardDescription>
+                </div>
+                {filters.search || filters.source !== 'all' || filters.customer_type !== 'all' || 
+                 filters.revenue_range !== 'all' || filters.activity !== 'all' ? (
+                  <Badge variant="secondary">
+                    Filtered: {customers.length} of {stats.total_customers}
+                  </Badge>
+                ) : null}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {customers.map((customer) => (
+                {customers.map((customer) => {
+                  const hasIncompleteData = !customer.phone || !customer.email;
+                  
+                  return (
                   <div key={customer.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
@@ -235,6 +255,11 @@ export default function CustomerManagement() {
                           )}
                           {getSourceBadge(customer.source)}
                           {getCustomerTypeBadge(customer.customer_type)}
+                          {hasIncompleteData && (
+                            <Badge variant="outline" className="text-orange-600 border-orange-300">
+                              Incomplete Data
+                            </Badge>
+                          )}
                         </div>
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -298,11 +323,30 @@ export default function CustomerManagement() {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+                })}
                 
                 {customers.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No customers found matching your filters.
+                  <div className="text-center py-12">
+                    <div className="text-muted-foreground mb-4">
+                      {stats.total_customers === 0 
+                        ? "No customers in the database yet."
+                        : "No customers found matching your filters."}
+                    </div>
+                    {stats.total_customers > 0 && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setFilters({
+                          search: '',
+                          source: 'all',
+                          customer_type: 'all',
+                          revenue_range: 'all',
+                          activity: 'all'
+                        })}
+                      >
+                        Clear All Filters
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

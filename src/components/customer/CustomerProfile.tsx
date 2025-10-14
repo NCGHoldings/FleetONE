@@ -50,15 +50,19 @@ export function CustomerProfile({ selectedCustomer, onBack }: CustomerProfilePro
     }).format(amount)}`;
   };
 
-  // Sample data for charts (would be calculated from real data)
-  const revenueChartData = [
-    { month: 'Jan', revenue: 450000, transactions: 3 },
-    { month: 'Feb', revenue: 650000, transactions: 5 },
-    { month: 'Mar', revenue: 1200000, transactions: 8 },
-    { month: 'Apr', revenue: 900000, transactions: 6 },
-    { month: 'May', revenue: 1500000, transactions: 10 },
-    { month: 'Jun', revenue: 1800000, transactions: 12 },
-  ];
+  // Use real data from customer analytics
+  const revenueChartData = customer.analytics.monthly_revenue_trend.map(item => {
+    // Format month as short name (e.g., "Jan 2024")
+    const [year, month] = item.month.split('-');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthName = monthNames[parseInt(month) - 1];
+    
+    return {
+      month: `${monthName} ${year.slice(2)}`,
+      revenue: item.revenue,
+      transactions: item.transactions
+    };
+  });
 
   const serviceDistributionData = [
     { name: 'Yutong Sales', value: customer.analytics.yutong_revenue, color: '#3b82f6' },

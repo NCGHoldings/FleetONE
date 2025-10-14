@@ -141,9 +141,17 @@ export function useCustomerData() {
         }
       });
 
+      // Helper function to normalize phone numbers
+      const normalizePhone = (phone: string | null | undefined): string => {
+        if (!phone) return '';
+        return phone.replace(/[\s\-\+]/g, '').replace(/^94/, '0');
+      };
+
       // Process Special Hire customers
       specialHireQuotations.data?.forEach(quotation => {
-        const key = quotation.customer_phone || quotation.customer_email || quotation.customer_name;
+        const normalizedPhone = normalizePhone(quotation.customer_phone);
+        const normalizedEmail = quotation.customer_email?.toLowerCase().trim() || '';
+        const key = normalizedPhone || normalizedEmail || quotation.customer_name?.toLowerCase().trim() || quotation.id;
         let customer = customerMap.get(key);
         
         if (!customer) {
@@ -249,8 +257,9 @@ export function useCustomerData() {
         ) || [];
 
         customer.analytics.yutong_purchases = customerYutongQuotations.length;
+        // Include all non-cancelled/rejected quotations in revenue
         customer.analytics.yutong_revenue = customerYutongQuotations
-          .filter(q => q.status === 'confirmed' || q.status === 'delivered')
+          .filter(q => q.status && !['cancelled', 'rejected', 'draft'].includes(q.status.toLowerCase()))
           .reduce((sum, q) => sum + (Number(q.total_price) || 0), 0);
 
         // Calculate Special Hire analytics
@@ -261,8 +270,9 @@ export function useCustomerData() {
         ) || [];
 
         customer.analytics.special_hire_bookings = customerSpecialHireQuotations.length;
+        // Include completed and confirmed trips in revenue
         customer.analytics.special_hire_revenue = customerSpecialHireQuotations
-          .filter(q => q.trip_status === 'completed')
+          .filter(q => q.trip_status && ['completed', 'confirmed'].includes(q.trip_status.toLowerCase()))
           .reduce((sum, q) => sum + (Number(q.gross_revenue) || 0), 0);
 
         // Calculate total metrics
@@ -296,7 +306,7 @@ export function useCustomerData() {
           ...customerYutongQuotations.slice(-5).map(q => ({
             id: q.id,
             type: 'yutong_quotation' as const,
-            description: `${q.bus_model} - ${q.quantity} units`,
+            description: `${q.bus_model || 'Bus'} - ${q.quantity || 1} units`,
             amount: Number(q.total_price) || 0,
             date: q.created_at,
             status: q.status || 'draft'
@@ -304,7 +314,7 @@ export function useCustomerData() {
           ...customerSpecialHireQuotations.slice(-5).map(q => ({
             id: q.id,
             type: 'special_hire' as const,
-            description: `${q.pickup_location} to ${q.drop_location}`,
+            description: `${q.pickup_location || 'Pickup'} to ${q.drop_location || 'Drop'}`,
             amount: Number(q.gross_revenue) || 0,
             date: q.created_at,
             status: q.trip_status || 'quotation'
@@ -312,6 +322,45 @@ export function useCustomerData() {
         ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
 
         customer.analytics.recent_transactions = recentTransactions;
+
+        // Calculate monthly revenue trend (last 12 months)
+        const monthlyData = new Map<string, { revenue: number; transactions: number }>();
+        const now = new Date();
+        
+        // Initialize last 12 months
+        for (let i = 11; i >= 0; i--) {
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthKey = date.toISOString().slice(0, 7); // YYYY-MM format
+          monthlyData.set(monthKey, { revenue: 0, transactions: 0 });
+        }
+
+        // Add Yutong transactions
+        customerYutongQuotations.forEach(q => {
+          const monthKey = q.created_at.slice(0, 7);
+          const existing = monthlyData.get(monthKey);
+          if (existing && q.status && !['cancelled', 'rejected', 'draft'].includes(q.status.toLowerCase())) {
+            existing.revenue += Number(q.total_price) || 0;
+            existing.transactions += 1;
+          }
+        });
+
+        // Add Special Hire transactions
+        customerSpecialHireQuotations.forEach(q => {
+          const monthKey = q.created_at.slice(0, 7);
+          const existing = monthlyData.get(monthKey);
+          if (existing && q.trip_status && ['completed', 'confirmed'].includes(q.trip_status.toLowerCase())) {
+            existing.revenue += Number(q.gross_revenue) || 0;
+            existing.transactions += 1;
+          }
+        });
+
+        customer.analytics.monthly_revenue_trend = Array.from(monthlyData.entries())
+          .map(([month, data]) => ({
+            month,
+            revenue: data.revenue,
+            transactions: data.transactions
+          }))
+          .sort((a, b) => a.month.localeCompare(b.month));
 
         return customer;
       });
@@ -382,10 +431,12 @@ export function useCustomerData() {
     filters,
     setFilters,
     refetch: fetchCustomerData,
-    // Aggregate statistics
+    // Aggregate statistics - use filteredCustomers for accurate counts
     stats: {
       total_customers: customers.length,
+      filtered_customers: filteredCustomers.length,
       total_revenue: customers.reduce((sum, c) => sum + c.analytics.total_lifetime_value, 0),
+      filtered_revenue: filteredCustomers.reduce((sum, c) => sum + c.analytics.total_lifetime_value, 0),
       active_customers: customers.filter(c => {
         const daysSinceLastInteraction = (new Date().getTime() - new Date(c.analytics.last_interaction).getTime()) / (1000 * 60 * 60 * 24);
         return daysSinceLastInteraction <= 90;
@@ -395,7 +446,11 @@ export function useCustomerData() {
         : 0,
       yutong_customers: customers.filter(c => c.source === 'yutong' || c.analytics.yutong_purchases > 0).length,
       special_hire_customers: customers.filter(c => c.source === 'special_hire' || c.analytics.special_hire_bookings > 0).length,
-      fleet_owners: customers.filter(c => c.source === 'fleet_owner' || c.analytics.owned_buses > 0).length
+      fleet_owners: customers.filter(c => c.source === 'fleet_owner' || c.analytics.owned_buses > 0).length,
+      // Data quality metrics
+      customers_with_phone: customers.filter(c => c.phone && c.phone.trim()).length,
+      customers_with_email: customers.filter(c => c.email && c.email.trim()).length,
+      customers_with_complete_contact: customers.filter(c => c.phone && c.phone.trim() && c.email && c.email.trim()).length
     }
   };
 }
@@ -446,23 +501,64 @@ export function useCustomerProfile(selectedCustomer: { id: string; name: string;
 
         // Fetch all related data using phone/email/name for comprehensive lookup
         const [yutongQuotationsResult, specialHireResult, busesResult] = await Promise.allSettled([
-          // Yutong quotations
-          supabase
-            .from('yutong_quotations')
-            .select('*')
-            .or(`customer_phone.eq.${selectedCustomer.phone || ''},customer_email.eq.${selectedCustomer.email || ''},customer_name.ilike.%${selectedCustomer.name}%`),
+          // Yutong quotations - build proper query
+          (async () => {
+            let query = supabase.from('yutong_quotations').select('*');
+            const conditions: string[] = [];
+            
+            if (selectedCustomer.phone) {
+              conditions.push(`customer_phone.eq.${selectedCustomer.phone}`);
+            }
+            if (selectedCustomer.email) {
+              conditions.push(`customer_email.eq.${selectedCustomer.email}`);
+            }
+            if (selectedCustomer.name) {
+              conditions.push(`customer_name.ilike.%${selectedCustomer.name.replace(/'/g, "''")}%`);
+            }
+            
+            if (conditions.length > 0) {
+              query = query.or(conditions.join(','));
+            } else {
+              return { data: [], error: null };
+            }
+            
+            return await query;
+          })(),
           
-          // Special hire quotations
-          supabase
-            .from('special_hire_quotations')
-            .select('*')
-            .or(`customer_phone.eq.${selectedCustomer.phone || ''},customer_email.eq.${selectedCustomer.email || ''},customer_name.ilike.%${selectedCustomer.name}%`),
+          // Special hire quotations - build proper query
+          (async () => {
+            let query = supabase.from('special_hire_quotations').select('*');
+            const conditions: string[] = [];
+            
+            if (selectedCustomer.phone) {
+              conditions.push(`customer_phone.eq.${selectedCustomer.phone}`);
+            }
+            if (selectedCustomer.email) {
+              conditions.push(`customer_email.eq.${selectedCustomer.email}`);
+            }
+            if (selectedCustomer.name) {
+              conditions.push(`customer_name.ilike.%${selectedCustomer.name.replace(/'/g, "''")}%`);
+            }
+            
+            if (conditions.length > 0) {
+              query = query.or(conditions.join(','));
+            } else {
+              return { data: [], error: null };
+            }
+            
+            return await query;
+          })(),
           
           // Buses (fleet ownership)
-          supabase
-            .from('buses')
-            .select('*')
-            .or(`owner_name.ilike.%${selectedCustomer.name}%`)
+          (async () => {
+            if (!selectedCustomer.name) {
+              return { data: [], error: null };
+            }
+            return await supabase
+              .from('buses')
+              .select('*')
+              .ilike('owner_name', `%${selectedCustomer.name.replace(/'/g, "''")}%`);
+          })()
         ]);
 
         const yutongQuotations = yutongQuotationsResult.status === 'fulfilled' ? yutongQuotationsResult.value.data || [] : [];
