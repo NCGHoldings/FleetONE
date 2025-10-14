@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { PublicPaymentDetails } from "@/components/school/PublicPaymentDetails";
 
 export default function PublicReceiptUpload() {
   const { toast } = useToast();
   const [step, setStep] = useState<'admission' | 'confirm' | 'upload' | 'success'>('admission');
   const [admissionNo, setAdmissionNo] = useState("");
   const [studentData, setStudentData] = useState<any>(null);
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string>("");
@@ -56,8 +58,19 @@ export default function PublicReceiptUpload() {
         return;
       }
 
+      // Fetch payment history for transparency
+      const { data: transactions } = await supabase
+        .from('school_payment_transactions')
+        .select('*')
+        .eq('student_id', data.id)
+        .order('payment_date', { ascending: false })
+        .limit(5);
+
       setStudentData(data);
-      setPaymentAmount(data.update_new?.toString() || data.payment_amount?.toString() || "");
+      setPaymentHistory(transactions || []);
+      
+      // Pre-fill with current amount due (includes any outstanding balance)
+      setPaymentAmount(data.current_amount_due?.toString() || data.fixed_monthly_amount?.toString() || "");
       setStep('confirm');
 
     } catch (error) {
@@ -180,6 +193,7 @@ export default function PublicReceiptUpload() {
     setStep('admission');
     setAdmissionNo("");
     setStudentData(null);
+    setPaymentHistory([]);
     setPaymentAmount("");
     setSelectedFile(null);
     setFilePreview("");
@@ -313,6 +327,14 @@ export default function PublicReceiptUpload() {
                 </div>
               </div>
 
+              {/* Payment Details & History */}
+              <PublicPaymentDetails
+                fixedMonthlyAmount={studentData.fixed_monthly_amount || 0}
+                paymentBalance={studentData.payment_balance || 0}
+                currentAmountDue={studentData.current_amount_due || studentData.fixed_monthly_amount || 0}
+                paymentHistory={paymentHistory}
+              />
+
               {/* Payment Amount */}
               <div className="space-y-2">
                 <Label htmlFor="amount">Payment Amount (LKR)</Label>
@@ -323,11 +345,19 @@ export default function PublicReceiptUpload() {
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   placeholder="Enter payment amount"
                 />
-                {studentData.update_new && (
-                  <p className="text-xs text-muted-foreground">
-                    Expected amount: LKR {parseFloat(studentData.update_new).toLocaleString()}
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 space-y-1">
+                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                    Recommended Payment: LKR {(studentData.current_amount_due || studentData.fixed_monthly_amount || 0).toLocaleString()}
                   </p>
-                )}
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    This includes your fixed monthly fee of LKR {(studentData.fixed_monthly_amount || 0).toLocaleString()}
+                    {studentData.payment_balance !== 0 && (
+                      <span className={studentData.payment_balance < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium"}>
+                        {" "}{studentData.payment_balance < 0 ? "+ outstanding balance" : "- credit balance"} of LKR {Math.abs(studentData.payment_balance).toLocaleString()}
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
 
               {/* File Upload */}
