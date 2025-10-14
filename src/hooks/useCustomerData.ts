@@ -279,7 +279,7 @@ export function useCustomerData() {
 
       // Calculate analytics for each customer
       const enrichedCustomers = Array.from(customerMap.values()).map(customer => {
-        // Calculate Yutong analytics - use normalized matching
+        // Calculate Yutong analytics - use normalized matching (only match non-empty values)
         const normalizedCustomerPhone = normalizePhone(customer.phone);
         const normalizedCustomerEmail = customer.email?.toLowerCase().trim() || '';
         
@@ -287,9 +287,15 @@ export function useCustomerData() {
           const normalizedQuotationPhone = normalizePhone(q.customer_phone);
           const normalizedQuotationEmail = q.customer_email?.toLowerCase().trim() || '';
           
-          return normalizedQuotationPhone === normalizedCustomerPhone || 
-                 normalizedQuotationEmail === normalizedCustomerEmail ||
-                 q.customer_name?.trim().toLowerCase() === customer.name?.trim().toLowerCase();
+          // Only match if both values are non-empty
+          const phoneMatch = normalizedCustomerPhone && normalizedQuotationPhone && 
+                            normalizedQuotationPhone === normalizedCustomerPhone;
+          const emailMatch = normalizedCustomerEmail && normalizedQuotationEmail && 
+                            normalizedQuotationEmail === normalizedCustomerEmail;
+          const nameMatch = customer.name && q.customer_name && 
+                           q.customer_name?.trim().toLowerCase() === customer.name?.trim().toLowerCase();
+          
+          return phoneMatch || emailMatch || nameMatch;
         }) || [];
 
         customer.analytics.yutong_purchases = customerYutongQuotations.length;
@@ -299,14 +305,20 @@ export function useCustomerData() {
           .filter(q => q.status && REVENUE_STATUSES.includes(q.status.toLowerCase()))
           .reduce((sum, q) => sum + (Number(q.total_price) || 0), 0);
 
-        // Calculate Special Hire analytics - use normalized matching
+        // Calculate Special Hire analytics - use normalized matching (only match non-empty values)
         const customerSpecialHireQuotations = specialHireQuotations.data?.filter(q => {
           const normalizedQuotationPhone = normalizePhone(q.customer_phone);
           const normalizedQuotationEmail = q.customer_email?.toLowerCase().trim() || '';
           
-          return normalizedQuotationPhone === normalizedCustomerPhone ||
-                 normalizedQuotationEmail === normalizedCustomerEmail ||
-                 q.customer_name?.trim().toLowerCase() === customer.name?.trim().toLowerCase();
+          // Only match if both values are non-empty
+          const phoneMatch = normalizedCustomerPhone && normalizedQuotationPhone && 
+                            normalizedQuotationPhone === normalizedCustomerPhone;
+          const emailMatch = normalizedCustomerEmail && normalizedQuotationEmail && 
+                            normalizedQuotationEmail === normalizedCustomerEmail;
+          const nameMatch = customer.name && q.customer_name && 
+                           q.customer_name?.trim().toLowerCase() === customer.name?.trim().toLowerCase();
+          
+          return phoneMatch || emailMatch || nameMatch;
         }) || [];
 
         customer.analytics.special_hire_bookings = customerSpecialHireQuotations.length;
