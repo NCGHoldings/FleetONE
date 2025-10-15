@@ -631,6 +631,252 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     setOtherExpenses(expenses => expenses.filter(expense => expense.id !== id));
   };
 
+  const calculateMultiBusFleetCosts = async (data: FormData, fuelSettings: any) => {
+    try {
+      // Validate all buses have type selected
+      if (selectedBusFleet.some(b => !b.busTypeId || b.quantity < 1)) {
+        throw new Error('Please select a bus type and quantity for all fleet entries');
+      }
+
+      // Calculate distances (same for all buses)
+      const validIntermediateStops = intermediateStops.filter(stop => stop.location?.trim());
+      const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
+        body: {
+          pickupLocation: data.pickupLocation,
+          dropLocation: data.dropLocation,
+          intermediateStops: validIntermediateStops,
+          parkingLat: fuelSettings.parking_lat,
+          parkingLng: fuelSettings.parking_lng,
+        }
+      });
+
+      if (error || !distanceData) {
+        throw new Error('Distance calculation failed');
+      }
+
+      const tripDistance = distanceData.kmTrip || 0;
+      const busFleetDetails = [];
+      let combinedSubtotal = 0;
+      let totalBuses = 0;
+      let totalCapacity = 0;
+      let totalFuelCost = 0;
+      let totalMaintenanceCost = 0;
+
+      // Loop through each bus type in the fleet
+      for (const bus of selectedBusFleet) {
+        const { data: busTypeData } = await supabase
+          .from('bus_types')
+          .select('*')
+          .eq('id', bus.busTypeId)
+          .single();
+
+        if (!busTypeData) continue;
+
+        // Get rate cards for this specific bus type
+        const rateCardHireType = data.hireType === 'Internal' ? 'Lyceum' : data.hireType;
+        const { data: allRateCards } = await supabase
+          .from('hire_rate_cards')
+          .select('*')
+          .eq('hire_type', rateCardHireType)
+          .eq('bus_type_id', bus.busTypeId)
+          .eq('is_active', true)
+          .order('from_km');
+
+        if (!allRateCards || allRateCards.length === 0) {
+          throw new Error(`No rate cards found for ${busTypeData.name}`);
+        }
+
+        // Calculate hire charge for this bus type (same logic as single bus)
+        let hireChargePerBus = 0;
+        let rateCard = null;
+        let overtimeCharge = 0;
+        let overnightCharge = 0;
+
+        if (data.hireType === 'Outside') {
+          // Outside hire: flat rate + exceeding km
+          rateCard = allRateCards.find(c => c.flat_fee_lkr != null) || allRateCards[0];
+          const fixedRate = rateCard.flat_fee_lkr || 0;
+          const baseCoverageKm = rateCard.exceeding_km_threshold || 100;
+          const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+          const exceedingCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
+          hireChargePerBus = fixedRate + exceedingCharge;
+
+          // Calculate overtime/overnight for Outside hire
+          const expectedHours = (data.dropDateTime.getTime() - data.pickupDateTime.getTime()) / (1000 * 60 * 60);
+          const availableHours = tripDistance / 10; // 10 km/h baseline
+          if (expectedHours > availableHours) {
+            overtimeCharge = (expectedHours - availableHours) * (rateCard.overtime_rate_lkr_per_hour || 500);
+            hireChargePerBus += overtimeCharge;
+          }
+          
+          // Check for overnight charges
+          const tripDays = Math.ceil((data.dropDateTime.getTime() - data.pickupDateTime.getTime()) / (1000 * 60 * 60 * 24));
+          if (tripDays > 1) {
+            overnightCharge = (tripDays - 1) * (rateCard.overnight_charge_lkr_per_day || 3000);
+            hireChargePerBus += overnightCharge;
+          }
+        } else {
+          // Lyceum/Internal: range-based rates
+          rateCard = allRateCards.find(card => 
+            tripDistance >= (card.from_km || 0) && 
+            (card.to_km === null || tripDistance <= card.to_km)
+          ) || allRateCards[0];
+          
+          hireChargePerBus = rateCard?.flat_fee_lkr || 0;
+
+          // Handle exceeding km for distances > 100km
+          if (tripDistance > 100) {
+            const exceedingCard = allRateCards.find(c => c.from_km >= 101 && c.exceeding_km_rate_lkr);
+            if (exceedingCard) {
+              const exceedingKm = tripDistance - 100;
+              hireChargePerBus += exceedingKm * (exceedingCard.exceeding_km_rate_lkr || 0);
+            }
+          }
+        }
+
+        // Calculate fuel cost (empty running only)
+        const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
+        const fuelLitersPerBus = emptyRunKm / (busTypeData.avg_km_per_l || 8);
+        const fuelCostPerBus = fuelLitersPerBus * fuelSettings.diesel_price_lkr_per_l;
+
+        // Calculate maintenance cost (total distance)
+        const totalTripKm = (distanceData.kmParkingToPickup || 0) + tripDistance + (distanceData.kmDropToParking || 0);
+        const maintenanceCostPerBus = totalTripKm * (fuelSettings.maintenance_rate_lkr_per_km || 20);
+
+        // Subtotals for this bus type
+        const subtotalPerBus = hireChargePerBus + fuelCostPerBus + maintenanceCostPerBus;
+        const subtotalAllBuses = subtotalPerBus * bus.quantity;
+
+        // Add to fleet details
+        busFleetDetails.push({
+          bus_type_id: busTypeData.id,
+          bus_type_name: busTypeData.name,
+          quantity: bus.quantity,
+          seating_capacity: busTypeData.capacity,
+          hire_charge_per_bus: Math.round(hireChargePerBus),
+          fuel_cost_per_bus: Math.round(fuelCostPerBus),
+          maintenance_cost_per_bus: Math.round(maintenanceCostPerBus),
+          subtotal_per_bus: Math.round(subtotalPerBus),
+          subtotal_all_buses: Math.round(subtotalAllBuses)
+        });
+
+        // Aggregate totals
+        combinedSubtotal += subtotalAllBuses;
+        totalBuses += bus.quantity;
+        totalCapacity += busTypeData.capacity * bus.quantity;
+        totalFuelCost += fuelCostPerBus * bus.quantity;
+        totalMaintenanceCost += maintenanceCostPerBus * bus.quantity;
+      }
+
+      // Apply commission and discounts to combined total
+      const grossRevenue = combinedSubtotal;
+      const commissionExpenseAmount = grossRevenue * (data.commissionPct / 100);
+      const commissionPassThroughAmount = grossRevenue * (Math.min(data.commissionPassThroughPct, data.commissionPct) / 100);
+      
+      let discountAmount = 0;
+      if (data.discountType === 'percentage') {
+        discountAmount = grossRevenue * (data.discountPct / 100);
+      } else {
+        discountAmount = data.discountAmount;
+      }
+
+      const subtotalAfterAdjustments = grossRevenue + commissionPassThroughAmount - discountAmount;
+      
+      // Apply additional charges
+      const totalAdditionalCharges = additionalCharges.reduce((sum, charge) => {
+        if (charge.applyPerBus) {
+          return sum + (charge.amount * charge.busesCount);
+        }
+        return sum + charge.amount;
+      }, 0);
+
+      const finalCustomerTotal = subtotalAfterAdjustments + totalAdditionalCharges;
+
+      // Calculate total expenses
+      const driverChargeTotal = totalBuses * 1500; // Default driver charge per bus
+      const totalOtherExpenses = otherExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+      const totalExpenses = driverChargeTotal + totalFuelCost + totalMaintenanceCost + 
+                            commissionExpenseAmount + totalOtherExpenses;
+      
+      const netProfit = finalCustomerTotal - totalExpenses;
+
+      // Set cost data with bus fleet details
+      const costs = {
+        km_parking_to_pickup: Math.round((distanceData.kmParkingToPickup || 0) * 10) / 10,
+        km_trip: Math.round((distanceData.kmTrip || 0) * 10) / 10,
+        km_drop_to_parking: Math.round((distanceData.kmDropToParking || 0) * 10) / 10,
+        bus_fleet_details: busFleetDetails,
+        fuel_cost_fuel_only: Math.round(totalFuelCost),
+        hire_charge: Math.round(grossRevenue),
+        extra_charges: 0, // Multi-bus doesn't have separate extra charges
+        gross_revenue: Math.round(grossRevenue),
+        commission_pct: data.commissionPct,
+        commission_pass_through_pct: Math.min(data.commissionPassThroughPct, data.commissionPct),
+        commission_pass_through_amount: Math.round(commissionPassThroughAmount),
+        discount_percentage: data.discountPct,
+        discount_amount: Math.round(discountAmount),
+        discount_type: data.discountType,
+        driver_charge: 1500,
+        other_expenses: otherExpenses.map(expense => ({
+          label: expense.label,
+          amount: expense.amount
+        })),
+        commission_amount: Math.round(commissionExpenseAmount),
+        additional_charges: additionalCharges.map(charge => ({
+          type: charge.type,
+          amount: charge.amount,
+          reason: charge.reason,
+          applyPerBus: charge.applyPerBus,
+          busesCount: charge.busesCount
+        })),
+        total_additional_charges: Math.round(totalAdditionalCharges),
+        total_expenses: Math.round(totalExpenses),
+        net_profit: Math.round(netProfit)
+      };
+
+      setCostData({
+        kmParkingToPickup: costs.km_parking_to_pickup,
+        kmTrip: costs.km_trip,
+        kmDropToParking: costs.km_drop_to_parking,
+        busFleetDetails: {
+          buses: busFleetDetails,
+          total_buses: totalBuses,
+          total_capacity: totalCapacity,
+          combined_subtotal: Math.round(combinedSubtotal)
+        },
+        grossRevenue: Math.round(grossRevenue),
+        customerTotalWithFuel: Math.round(finalCustomerTotal),
+        fuelCostFuelOnly: Math.round(totalFuelCost),
+        maintenanceCost: Math.round(totalMaintenanceCost),
+        commissionPct: data.commissionPct,
+        commissionAmount: Math.round(commissionExpenseAmount),
+        commissionPassThroughPct: Math.min(data.commissionPassThroughPct, data.commissionPct),
+        commissionPassThroughAmount: Math.round(commissionPassThroughAmount),
+        discountType: data.discountType,
+        discountPct: data.discountType === 'percentage' ? data.discountPct : 0,
+        discountAmount: Math.round(discountAmount),
+        additionalCharges: costs.additional_charges,
+        totalAdditionalCharges: costs.total_additional_charges,
+        driverCharge: 1500,
+        otherExpenses: costs.other_expenses,
+        totalExpenses: costs.total_expenses,
+        netProfit: costs.net_profit,
+        numberOfBuses: totalBuses,
+        isMultiParking: false
+      });
+      
+      toast({
+        title: "Multi-Bus Fleet Cost Calculated",
+        description: `${totalBuses} buses | ${totalCapacity} seats | LKR ${Math.round(finalCustomerTotal).toLocaleString()}`
+      });
+
+      return { costs, distanceData };
+    } catch (error: any) {
+      console.error('Error calculating multi-bus costs:', error);
+      throw error;
+    }
+  };
+
   const calculateCosts = async (data: FormData) => {
     try {
       // Get selected parking location
@@ -642,6 +888,16 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       if (!fuelSettings) {
         throw new Error('Selected parking location not found');
+      }
+
+      // Check if multi-bus mode is active
+      if (isMultiBusMode && selectedBusFleet.length > 0) {
+        return await calculateMultiBusFleetCosts(data, fuelSettings);
+      }
+
+      // Single bus validation
+      if (!data.busTypeId) {
+        throw new Error('Please select a bus type');
       }
 
       console.log('Calculating distance with real Mapbox API:', {
@@ -852,6 +1108,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         km_parking_to_pickup: Math.round((distanceData.kmParkingToPickup || 0) * 10) / 10,
         km_trip: Math.round((distanceData.kmTrip || 0) * 10) / 10,
         km_drop_to_parking: Math.round((distanceData.kmDropToParking || 0) * 10) / 10,
+        bus_fleet_details: null, // Single bus mode doesn't use fleet details
         fuel_cost_fuel_only: Math.round(totalFuelCost),
         hire_charge: Math.round(hireCharge),
         extra_charges: Math.round(totalExtraTimeCharge),
@@ -1054,6 +1311,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         total_additional_charges: costs.total_additional_charges,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
+        bus_fleet_details: isMultiBusMode && costs.bus_fleet_details 
+          ? JSON.stringify(costs.bus_fleet_details) 
+          : null,
         approval_status: ((data.discountType === 'percentage' && data.discountPct > 0) || 
                          (data.discountType === 'amount' && data.discountAmount > 0) ? 'pending' : 'approved') as 'pending' | 'approved' | 'rejected',
         valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
