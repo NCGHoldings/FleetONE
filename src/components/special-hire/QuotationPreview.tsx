@@ -472,109 +472,264 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             </tr>
           </thead>
           <tbody>
-            <tr>
-            <td style={{ 
-              border: '1px solid #d1d5db', 
-              padding: '8px', 
-              textAlign: 'center', 
-              verticalAlign: 'middle',
-              color: '#374151'
-            }}>
-              {quotation.bus_fleet_details?.buses?.[0]?.bus_type_name || quotation.bus_type}
-            </td>
-            <td style={{ 
-              border: '1px solid #d1d5db', 
-              padding: '8px', 
-              textAlign: 'center', 
-              verticalAlign: 'middle',
-              color: '#374151'
-            }}>{quotation.number_of_buses.toString().padStart(2, '0')}</td>
-            <td style={{ 
-              border: '1px solid #d1d5db', 
-              padding: '8px', 
-              textAlign: 'center', 
-              verticalAlign: 'middle',
-              color: '#374151'
-            }}>
-              {quotation.bus_fleet_details?.total_capacity || quotation.seating_capacity || 54}
-            </td>
-              <td style={{ 
-                border: '1px solid #d1d5db', 
-                padding: '8px', 
-                verticalAlign: 'middle'
-              }}>
-                <div style={{ fontSize: '11px', color: '#374151' }}>
-                  Route Details
-                </div>
-              </td>
-              <td style={{ 
-                border: '1px solid #d1d5db', 
-                padding: '8px', 
-                verticalAlign: 'middle',
-                color: '#374151'
-              }}>
-                {(() => {
-                  // Calculate additional distance from charges
-                  const additionalDistance = additionalCharges
-                    .filter(charge => charge.type === 'additional_distance')
-                    .reduce((sum, charge) => sum + (charge.distance || 0), 0);
-                  
-                  if (additionalDistance > 0) {
-                    return (
-                      <div>
-                        <div>{customerDistance.toFixed(2)} Km</div>
-                        <div style={{ fontSize: '10px', color: '#7c3aed' }}>
-                          +{additionalDistance} Km (Additional)
-                        </div>
-                        <div style={{ fontSize: '10px', fontWeight: 'bold', borderTop: '1px solid #e5e7eb', paddingTop: '2px', marginTop: '2px' }}>
-                          Total: {(customerDistance + additionalDistance).toFixed(2)} Km
-                        </div>
+            {quotation.bus_fleet_details?.buses && quotation.bus_fleet_details.buses.length > 0 ? (
+              <>
+                {/* Individual bus rows */}
+                {quotation.bus_fleet_details.buses.map((bus, index) => (
+                  <tr key={index}>
+                    <td style={{ 
+                      border: '1px solid #d1d5db', 
+                      padding: '8px', 
+                      textAlign: 'center', 
+                      verticalAlign: 'middle',
+                      color: '#374151'
+                    }}>
+                      {bus.bus_type_name}
+                    </td>
+                    <td style={{ 
+                      border: '1px solid #d1d5db', 
+                      padding: '8px', 
+                      textAlign: 'center', 
+                      verticalAlign: 'middle',
+                      color: '#374151'
+                    }}>
+                      {bus.quantity}x
+                    </td>
+                    <td style={{ 
+                      border: '1px solid #d1d5db', 
+                      padding: '8px', 
+                      textAlign: 'center', 
+                      verticalAlign: 'middle',
+                      color: '#374151'
+                    }}>
+                      {bus.seating_capacity * bus.quantity} seats
+                    </td>
+                    <td style={{ 
+                      border: '1px solid #d1d5db', 
+                      padding: '8px', 
+                      verticalAlign: 'middle'
+                    }}>
+                      <div style={{ fontSize: '11px', color: '#374151' }}>
+                        Route Details
                       </div>
-                    );
-                  }
-                  return `${customerDistance.toFixed(2)} Km`;
-                })()}
-              </td>
-              <td style={{ 
-                border: '1px solid #d1d5db', 
-                padding: '8px', 
-                verticalAlign: 'middle'
-              }}>
-                {/* Subtotal before discount */}
-                <div style={{ fontSize: '11px', color: '#374151', marginBottom: '4px' }}>
-                  Subtotal: LKR {(() => {
-                    const subtotal = calculateFinalCustomerTotal(quotation) + (quotation.discount_amount_lkr || 0);
-                    return subtotal.toLocaleString();
-                  })()}
-                </div>
+                    </td>
+                    <td style={{ 
+                      border: '1px solid #d1d5db', 
+                      padding: '8px', 
+                      verticalAlign: 'middle',
+                      color: '#374151'
+                    }}>
+                      {(() => {
+                        const additionalDistance = additionalCharges
+                          .filter(charge => charge.type === 'additional_distance')
+                          .reduce((sum, charge) => sum + (charge.distance || 0), 0);
+                        
+                        if (additionalDistance > 0) {
+                          return (
+                            <div>
+                              <div>{customerDistance.toFixed(2)} Km</div>
+                              <div style={{ fontSize: '10px', color: '#7c3aed' }}>
+                                +{additionalDistance} Km (Additional)
+                              </div>
+                              <div style={{ fontSize: '10px', fontWeight: 'bold', borderTop: '1px solid #e5e7eb', paddingTop: '2px', marginTop: '2px' }}>
+                                Total: {(customerDistance + additionalDistance).toFixed(2)} Km
+                              </div>
+                            </div>
+                          );
+                        }
+                        return `${customerDistance.toFixed(2)} Km`;
+                      })()}
+                    </td>
+                    <td style={{ 
+                      border: '1px solid #d1d5db', 
+                      padding: '8px', 
+                      verticalAlign: 'middle',
+                      textAlign: 'right'
+                    }}>
+                      <div style={{ fontSize: '11px', color: '#374151' }}>
+                        LKR {bus.subtotal_all_buses?.toLocaleString() || '0'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
                 
-                {(quotation.discount_amount_lkr || 0) > 0 && (
-                  <div style={{ color: '#dc2626', fontSize: '11px', marginBottom: '4px' }}>
-                    Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}
-                  </div>
-                )}
-                <div style={{ 
-                  fontWeight: 'bold', 
-                  borderTop: '1px solid #d1d5db', 
-                  paddingTop: '4px', 
-                  marginTop: '4px', 
-                  fontSize: '12px',
+                {/* Total Fleet Row */}
+                <tr style={{ backgroundColor: '#f9fafb', fontWeight: '600' }}>
+                  <td style={{ 
+                    border: '1px solid #d1d5db', 
+                    padding: '8px', 
+                    textAlign: 'center', 
+                    verticalAlign: 'middle',
+                    color: '#374151'
+                  }}>
+                    Total Fleet
+                  </td>
+                  <td style={{ 
+                    border: '1px solid #d1d5db', 
+                    padding: '8px', 
+                    textAlign: 'center', 
+                    verticalAlign: 'middle',
+                    color: '#374151'
+                  }}>
+                    {quotation.bus_fleet_details.total_buses?.toString().padStart(2, '0')}
+                  </td>
+                  <td style={{ 
+                    border: '1px solid #d1d5db', 
+                    padding: '8px', 
+                    textAlign: 'center', 
+                    verticalAlign: 'middle',
+                    color: '#374151'
+                  }}>
+                    {quotation.bus_fleet_details.total_capacity} seats
+                  </td>
+                  <td colSpan={2} style={{ 
+                    border: '1px solid #d1d5db', 
+                    padding: '8px'
+                  }}></td>
+                  <td style={{ 
+                    border: '1px solid #d1d5db', 
+                    padding: '8px', 
+                    verticalAlign: 'middle'
+                  }}>
+                    <div style={{ fontSize: '11px', color: '#374151', marginBottom: '4px' }}>
+                      Subtotal: LKR {(() => {
+                        const subtotal = calculateFinalCustomerTotal(quotation) + (quotation.discount_amount_lkr || 0);
+                        return subtotal.toLocaleString();
+                      })()}
+                    </div>
+                    
+                    {(quotation.discount_amount_lkr || 0) > 0 && (
+                      <div style={{ color: '#dc2626', fontSize: '11px', marginBottom: '4px' }}>
+                        Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}
+                      </div>
+                    )}
+                    <div style={{ 
+                      fontWeight: 'bold', 
+                      borderTop: '1px solid #d1d5db', 
+                      paddingTop: '4px', 
+                      marginTop: '4px', 
+                      fontSize: '12px',
+                      color: '#374151'
+                    }}>
+                      Final Total: LKR {calculateFinalCustomerTotal(quotation).toLocaleString()}
+                      {quotation.number_of_buses > 1 && (
+                        <div style={{ 
+                          fontSize: '10px', 
+                          color: '#6b7280', 
+                          fontWeight: 'normal',
+                          marginTop: '2px'
+                        }}>
+                          Per Bus: LKR {(calculateFinalCustomerTotal(quotation) / quotation.number_of_buses).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              </>
+            ) : (
+              /* Single bus row */
+              <tr>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  textAlign: 'center', 
+                  verticalAlign: 'middle',
                   color: '#374151'
                 }}>
-                  Final Total: LKR {calculateFinalCustomerTotal(quotation).toLocaleString()}
-                  {quotation.number_of_buses > 1 && (
-                    <div style={{ 
-                      fontSize: '10px', 
-                      color: '#6b7280', 
-                      fontWeight: 'normal',
-                      marginTop: '2px'
-                    }}>
-                      Per Bus: LKR {(calculateFinalCustomerTotal(quotation) / quotation.number_of_buses).toLocaleString()}
+                  {quotation.bus_type}
+                </td>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  textAlign: 'center', 
+                  verticalAlign: 'middle',
+                  color: '#374151'
+                }}>{quotation.number_of_buses.toString().padStart(2, '0')}</td>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  textAlign: 'center', 
+                  verticalAlign: 'middle',
+                  color: '#374151'
+                }}>
+                  {quotation.seating_capacity || 54} seats
+                </td>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  verticalAlign: 'middle'
+                }}>
+                  <div style={{ fontSize: '11px', color: '#374151' }}>
+                    Route Details
+                  </div>
+                </td>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  verticalAlign: 'middle',
+                  color: '#374151'
+                }}>
+                  {(() => {
+                    const additionalDistance = additionalCharges
+                      .filter(charge => charge.type === 'additional_distance')
+                      .reduce((sum, charge) => sum + (charge.distance || 0), 0);
+                    
+                    if (additionalDistance > 0) {
+                      return (
+                        <div>
+                          <div>{customerDistance.toFixed(2)} Km</div>
+                          <div style={{ fontSize: '10px', color: '#7c3aed' }}>
+                            +{additionalDistance} Km (Additional)
+                          </div>
+                          <div style={{ fontSize: '10px', fontWeight: 'bold', borderTop: '1px solid #e5e7eb', paddingTop: '2px', marginTop: '2px' }}>
+                            Total: {(customerDistance + additionalDistance).toFixed(2)} Km
+                          </div>
+                        </div>
+                      );
+                    }
+                    return `${customerDistance.toFixed(2)} Km`;
+                  })()}
+                </td>
+                <td style={{ 
+                  border: '1px solid #d1d5db', 
+                  padding: '8px', 
+                  verticalAlign: 'middle'
+                }}>
+                  <div style={{ fontSize: '11px', color: '#374151', marginBottom: '4px' }}>
+                    Subtotal: LKR {(() => {
+                      const subtotal = calculateFinalCustomerTotal(quotation) + (quotation.discount_amount_lkr || 0);
+                      return subtotal.toLocaleString();
+                    })()}
+                  </div>
+                  
+                  {(quotation.discount_amount_lkr || 0) > 0 && (
+                    <div style={{ color: '#dc2626', fontSize: '11px', marginBottom: '4px' }}>
+                      Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}
                     </div>
                   )}
-                </div>
-              </td>
-            </tr>
+                  <div style={{ 
+                    fontWeight: 'bold', 
+                    borderTop: '1px solid #d1d5db', 
+                    paddingTop: '4px', 
+                    marginTop: '4px', 
+                    fontSize: '12px',
+                    color: '#374151'
+                  }}>
+                    Final Total: LKR {calculateFinalCustomerTotal(quotation).toLocaleString()}
+                    {quotation.number_of_buses > 1 && (
+                      <div style={{ 
+                        fontSize: '10px', 
+                        color: '#6b7280', 
+                        fontWeight: 'normal',
+                        marginTop: '2px'
+                      }}>
+                        Per Bus: LKR {(calculateFinalCustomerTotal(quotation) / quotation.number_of_buses).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )}
             </tbody>
           </table>
 
