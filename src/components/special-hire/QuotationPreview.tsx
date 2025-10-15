@@ -69,20 +69,36 @@ interface Props {
 export function QuotationPreview({ quotation, className = "" }: Props) {
   const [rateCard, setRateCard] = useState<any>(null);
   
-  // Ensure bus_fleet_details is always parsed as an object
+  // Ensure bus_fleet_details is always parsed and normalized to correct structure
   const parsedQuotation = {
     ...quotation,
-    bus_fleet_details: typeof quotation.bus_fleet_details === 'string' 
-      ? JSON.parse(quotation.bus_fleet_details) 
-      : quotation.bus_fleet_details
+    bus_fleet_details: (() => {
+      const parsed = typeof quotation.bus_fleet_details === 'string' 
+        ? JSON.parse(quotation.bus_fleet_details) 
+        : quotation.bus_fleet_details;
+      
+      // Handle if bus_fleet_details is just an array (legacy format from database)
+      if (Array.isArray(parsed)) {
+        return {
+          buses: parsed,
+          total_buses: parsed.reduce((sum, b) => sum + (b.quantity || 0), 0),
+          total_capacity: parsed.reduce((sum, b) => sum + ((b.seating_capacity || 0) * (b.quantity || 1)), 0),
+          combined_subtotal: parsed.reduce((sum, b) => sum + (b.subtotal_all_buses || 0), 0)
+        };
+      }
+      
+      // Already in correct format (object with buses property)
+      return parsed;
+    })()
   };
   
-  console.log('QuotationPreview Debug:', {
-    original: quotation.bus_fleet_details,
-    parsed: parsedQuotation.bus_fleet_details,
-    isArray: Array.isArray(parsedQuotation.bus_fleet_details?.buses),
-    busesCount: parsedQuotation.bus_fleet_details?.buses?.length
-  });
+  console.log('=== QuotationPreview Debug ===');
+  console.log('Raw bus_fleet_details:', quotation.bus_fleet_details);
+  console.log('Parsed bus_fleet_details:', parsedQuotation.bus_fleet_details);
+  console.log('Is buses array?:', Array.isArray(parsedQuotation.bus_fleet_details?.buses));
+  console.log('Buses:', parsedQuotation.bus_fleet_details?.buses);
+  console.log('Total buses:', parsedQuotation.bus_fleet_details?.total_buses);
+  console.log('Total capacity:', parsedQuotation.bus_fleet_details?.total_capacity);
 
   useEffect(() => {
     const fetchRateCard = async () => {

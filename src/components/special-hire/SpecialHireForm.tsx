@@ -1315,7 +1315,17 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         net_profit: costs.net_profit,
         customer_total_with_fuel: costs.customerTotalWithFuel || costData?.customerTotalWithFuel,
         bus_fleet_details: isMultiBusMode && costs.bus_fleet_details
-          ? JSON.stringify(costs.bus_fleet_details) 
+          ? JSON.stringify(
+              // Ensure we're saving the full object structure with buses, total_buses, etc.
+              Array.isArray(costs.bus_fleet_details) 
+                ? {
+                    buses: costs.bus_fleet_details,
+                    total_buses: costs.bus_fleet_details.reduce((sum, b) => sum + (b.quantity || 0), 0),
+                    total_capacity: costs.bus_fleet_details.reduce((sum, b) => sum + ((b.seating_capacity || 0) * (b.quantity || 1)), 0),
+                    combined_subtotal: costs.bus_fleet_details.reduce((sum, b) => sum + (b.subtotal_all_buses || 0), 0)
+                  }
+                : costs.bus_fleet_details
+            ) 
           : null,
         approval_status: ((data.discountType === 'percentage' && data.discountPct > 0) || 
                          (data.discountType === 'amount' && data.discountAmount > 0) ? 'pending' : 'approved') as 'pending' | 'approved' | 'rejected',
