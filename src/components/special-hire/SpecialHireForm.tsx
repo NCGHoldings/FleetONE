@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, MapPin, Plus, X, Trash2, Eye, Calculator, Save, Users } from 'lucide-react';
+import { CalendarIcon, MapPin, Plus, X, Trash2, Eye, Calculator, Save, Users, TrendingUp, DollarSign, Phone } from 'lucide-react';
 import { AddReferralAgentModal } from './AddReferralAgentModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -2535,22 +2535,22 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   </div>
 
                   {/* Referral Agent Section */}
-                  <div className="col-span-2 border-t pt-6 mt-4">
-                    <div className="flex items-center gap-2 mb-5">
-                      <Users className="h-5 w-5 text-muted-foreground" />
-                      <div className="text-base font-semibold">Referral Agent</div>
-                      <div className="text-xs text-muted-foreground">(Optional)</div>
+                  <div className="col-span-2 border-t pt-8 mt-6 bg-muted/20 -mx-6 px-6 pb-6 rounded-lg">
+                    <div className="flex items-center gap-3 mb-6">
+                      <Users className="h-6 w-6 text-primary" />
+                      <div className="text-lg font-bold">Referral Agent</div>
+                      <div className="text-sm text-muted-foreground font-medium">(Optional)</div>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                      {/* Agent Selector - Takes 2 columns on large screens */}
-                      <div className="lg:col-span-2">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Agent Selector - Full width on large screens */}
+                      <div className="lg:col-span-3">
                         <FormField
                           control={form.control}
                           name="referralAgentId"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-sm font-medium">Select Agent</FormLabel>
+                              <FormLabel className="text-base font-semibold">Select Agent</FormLabel>
                               <Select 
                                 onValueChange={(value) => {
                                   if (value === 'add-new') {
@@ -2563,7 +2563,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                 value={field.value}
                               >
                                 <FormControl>
-                                  <SelectTrigger className="h-11">
+                                  <SelectTrigger className="h-12 text-base">
                                     <SelectValue placeholder="Choose an agent or add new" />
                                   </SelectTrigger>
                                 </FormControl>
@@ -2580,13 +2580,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                       {referralAgents.map((agent) => (
                                         <SelectItem key={agent.id} value={agent.id}>
                                           <div className="py-1">
-                                            <div className="font-medium">{agent.agent_name}</div>
-                                            <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                                            <div className="font-semibold text-base">{agent.agent_name}</div>
+                                            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
                                               <span>{agent.phone || 'No phone'}</span>
                                               <span>•</span>
-                                              <span>{agent.total_referrals} referrals</span>
+                                              <span className="font-medium">{agent.total_referrals} referrals</span>
                                               <span>•</span>
-                                              <span>LKR {agent.total_commission_earned?.toLocaleString() || '0'}</span>
+                                              <span className="font-medium">LKR {agent.total_commission_earned?.toLocaleString() || '0'}</span>
                                             </div>
                                           </div>
                                         </SelectItem>
@@ -2607,7 +2607,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                         name="referralCommissionPct"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium">Commission %</FormLabel>
+                            <FormLabel className="text-base font-semibold">Commission %</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -2615,7 +2615,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                 min="0"
                                 max="100"
                                 placeholder="3.0"
-                                className="h-11"
+                                className="h-12 text-base font-medium"
                                 {...field}
                                 onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                                 disabled={!form.watch('referralAgentId')}
@@ -2627,8 +2627,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       />
 
                       {/* Calculated Commission Amount (Read-only) */}
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium">Commission Amount</FormLabel>
+                      <FormItem className="lg:col-span-2">
+                        <FormLabel className="text-base font-semibold">Commission Amount</FormLabel>
                         <Input
                           type="text"
                           value={
@@ -2637,33 +2637,62 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                               : 'LKR 0'
                           }
                           disabled
-                          className="h-11 bg-muted/50 font-semibold"
+                          className="h-12 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-lg font-bold text-green-700 dark:text-green-400"
                         />
-                        <div className="text-xs text-muted-foreground mt-1.5">
-                          Auto-calculated
+                        <div className="text-sm text-muted-foreground mt-2 font-medium">
+                          Auto-calculated from total revenue
                         </div>
                       </FormItem>
                     </div>
 
                     {/* Show Agent Stats */}
                     {selectedAgent && form.watch('referralAgentId') && (
-                      <div className="mt-5 p-5 bg-gradient-to-br from-muted/50 to-muted/30 rounded-lg border shadow-sm">
-                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                          Agent Performance
+                      <div className="mt-8 p-6 bg-white dark:bg-slate-900 rounded-xl border-2 shadow-sm">
+                        <div className="text-sm font-bold text-muted-foreground uppercase tracking-wide mb-6">
+                          Agent Performance History
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                          <div className="space-y-1">
-                            <div className="text-2xl font-bold">{selectedAgent.total_referrals}</div>
-                            <div className="text-sm text-muted-foreground">Total Trips Referred</div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {/* Stat 1 - Total Trips */}
+                          <div className="space-y-3 p-5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border-2 border-blue-200/70 dark:border-blue-800/50">
+                            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                              <TrendingUp className="h-5 w-5" />
+                              <span className="text-xs font-bold uppercase tracking-wide">Total Trips</span>
+                            </div>
+                            <div className="text-4xl font-bold tracking-tight text-blue-900 dark:text-blue-100">
+                              {selectedAgent.total_referrals}
+                            </div>
+                            <div className="text-base font-medium text-blue-700 dark:text-blue-300">
+                              Trips Referred
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <div className="text-2xl font-bold">LKR {selectedAgent.total_commission_earned?.toLocaleString() || '0'}</div>
-                            <div className="text-sm text-muted-foreground">Total Commission Earned</div>
+                          
+                          {/* Stat 2 - Commission Earned */}
+                          <div className="space-y-3 p-5 rounded-lg bg-green-50/70 dark:bg-green-950/30 border-2 border-green-200/70 dark:border-green-800/50">
+                            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                              <DollarSign className="h-5 w-5" />
+                              <span className="text-xs font-bold uppercase tracking-wide">Earned</span>
+                            </div>
+                            <div className="text-3xl font-bold tracking-tight text-green-900 dark:text-green-100">
+                              LKR {selectedAgent.total_commission_earned?.toLocaleString() || '0'}
+                            </div>
+                            <div className="text-base font-medium text-green-700 dark:text-green-300">
+                              Total Commission
+                            </div>
                           </div>
+                          
+                          {/* Stat 3 - Contact */}
                           {selectedAgent.phone && (
-                            <div className="space-y-1">
-                              <div className="text-lg font-semibold">{selectedAgent.phone}</div>
-                              <div className="text-sm text-muted-foreground">Contact Number</div>
+                            <div className="space-y-3 p-5 rounded-lg bg-purple-50/70 dark:bg-purple-950/30 border-2 border-purple-200/70 dark:border-purple-800/50">
+                              <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                                <Phone className="h-5 w-5" />
+                                <span className="text-xs font-bold uppercase tracking-wide">Contact</span>
+                              </div>
+                              <div className="text-2xl font-bold tracking-tight text-purple-900 dark:text-purple-100">
+                                {selectedAgent.phone}
+                              </div>
+                              <div className="text-base font-medium text-purple-700 dark:text-purple-300">
+                                Phone Number
+                              </div>
                             </div>
                           )}
                         </div>
