@@ -722,7 +722,7 @@ export function CostCalculator() {
           {calculating ? 'Calculating...' : 'Calculate Costs'}
         </Button>
 
-        {costData && <CostBreakdown costData={costData} />}
+        {costData && <CostBreakdown data={costData} />}
       </CardContent>
     </Card>
   );
