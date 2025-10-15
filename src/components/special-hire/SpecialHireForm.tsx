@@ -1277,7 +1277,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         customer_phone: data.customerPhone,
         customer_email: data.customerEmail || null,
         special_request: data.specialRequest || null,
-        bus_type_id: data.busTypeId,
+        bus_type_id: isMultiBusMode ? null : (data.busTypeId || null),
         hire_type: data.hireType,
         number_of_buses: data.numberOfBuses,
         pickup_location: data.pickupLocation,
