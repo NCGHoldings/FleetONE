@@ -831,7 +831,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         })),
         total_additional_charges: Math.round(totalAdditionalCharges),
         total_expenses: Math.round(totalExpenses),
-        net_profit: Math.round(netProfit)
+        net_profit: Math.round(netProfit),
+        customerTotalWithFuel: Math.round(finalCustomerTotal)
       };
 
       setCostData({
@@ -1134,7 +1135,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         })),
         total_additional_charges: Math.round(totalAdditionalCharges),
         total_expenses: Math.round(totalExpenses),
-        net_profit: Math.round(netProfit)
+        net_profit: Math.round(netProfit),
+        customerTotalWithFuel: Math.round(finalCustomerTotal)
       };
 
       // Also set display data for UI
@@ -1311,7 +1313,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         total_additional_charges: costs.total_additional_charges,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
-        bus_fleet_details: isMultiBusMode && costs.bus_fleet_details 
+        customerTotalWithFuel: costs.customerTotalWithFuel || costData?.customerTotalWithFuel,
+        bus_fleet_details: isMultiBusMode && costs.bus_fleet_details
           ? JSON.stringify(costs.bus_fleet_details) 
           : null,
         approval_status: ((data.discountType === 'percentage' && data.discountPct > 0) || 
