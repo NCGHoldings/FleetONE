@@ -3058,6 +3058,7 @@ export type Database = {
           customer_email: string | null
           customer_name: string
           customer_phone: string
+          customer_total_with_fuel: number | null
           discount_amount_lkr: number | null
           discount_percentage: number | null
           discount_type: string | null
@@ -3139,6 +3140,7 @@ export type Database = {
           customer_email?: string | null
           customer_name: string
           customer_phone: string
+          customer_total_with_fuel?: number | null
           discount_amount_lkr?: number | null
           discount_percentage?: number | null
           discount_type?: string | null
@@ -3220,6 +3222,7 @@ export type Database = {
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string
+          customer_total_with_fuel?: number | null
           discount_amount_lkr?: number | null
           discount_percentage?: number | null
           discount_type?: string | null
