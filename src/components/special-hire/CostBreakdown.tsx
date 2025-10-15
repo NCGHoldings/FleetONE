@@ -180,7 +180,7 @@ export function CostBreakdown({ data }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Multi-Bus Fleet Breakdown */}
-        {data.busFleetDetails && (
+        {data.busFleetDetails?.buses && data.busFleetDetails.buses.length > 0 && (
           <div>
             <h4 className="font-medium mb-4 text-lg">Bus Fleet Breakdown</h4>
             <div className="overflow-x-auto">
