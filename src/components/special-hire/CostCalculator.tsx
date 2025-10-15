@@ -88,12 +88,16 @@ export function CostCalculator() {
       
       if (error || !distanceData) throw new Error('Distance calculation failed');
       
+      const tripDistance = distanceData.kmTrip || 0;
       const busFleetDetails = [];
       let combinedSubtotal = 0;
       let totalBuses = 0;
       let totalCapacity = 0;
       let totalFuelCost = 0;
       let totalMaintenanceCost = 0;
+      let totalOvertimeCharge = 0;
+      let totalOvernightCharge = 0;
+      let totalExceedingDistanceCharge = 0;
       
       for (const bus of selectedBusFleet) {
         const busType = busTypes.find(bt => bt.id === bus.busTypeId);
@@ -108,20 +112,61 @@ export function CostCalculator() {
           .order('from_km');
         
         let hireChargePerBus = 0;
+        let overtimeChargePerBus = 0;
+        let overnightChargePerBus = 0;
+        let exceedingDistanceChargePerBus = 0;
         const rateCard = rateCards?.[0];
         
+        if (!rateCard) {
+          toast({
+            title: "Rate Card Missing",
+            description: `No rate card found for ${busType.name}`,
+            variant: "destructive"
+          });
+          continue;
+        }
+        
         if (formData.hireType === 'Outside') {
-          const fixedRate = rateCard?.flat_fee_lkr || 0;
-          const exceedingKm = Math.max(0, distanceData.kmTrip - 100);
-          hireChargePerBus = fixedRate + (exceedingKm * (rateCard?.exceeding_km_rate_lkr || 0));
+          const fixedRate = rateCard.flat_fee_lkr || 0;
+          const baseCoverageKm = rateCard.exceeding_km_threshold || 100;
+          const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+          exceedingDistanceChargePerBus = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
+          
+          // Calculate overtime/overnight charges
+          if (formData.expectedWorkHours && formData.expectedWorkHours > 0) {
+            const availableHours = tripDistance / 10; // baseline 10 kmph
+            const extraHours = Math.max(0, formData.expectedWorkHours - availableHours);
+            
+            if (extraHours > 0) {
+              if (extraHours <= 10) {
+                overtimeChargePerBus = extraHours * (rateCard.overtime_rate_lkr_per_hour || 500);
+              } else {
+                overnightChargePerBus += (rateCard.overnight_charge_lkr_per_day || 3000);
+                let remaining = extraHours - 24;
+                
+                while (remaining > 0) {
+                  if (remaining > 10) {
+                    overnightChargePerBus += (rateCard.overnight_charge_lkr_per_day || 3000);
+                    remaining -= 24;
+                  } else {
+                    overtimeChargePerBus += remaining * (rateCard.overtime_rate_lkr_per_hour || 500);
+                    remaining = 0;
+                  }
+                }
+              }
+            }
+          }
+          
+          hireChargePerBus = fixedRate + exceedingDistanceChargePerBus + overtimeChargePerBus + overnightChargePerBus;
         } else {
-          hireChargePerBus = rateCard?.flat_fee_lkr || 0;
+          // For other hire types, use flat fee
+          hireChargePerBus = rateCard.flat_fee_lkr || 0;
         }
         
         const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
         const fuelCostPerBus = (emptyRunKm / (busType.avg_km_per_l || 8)) * fuelSettings.diesel_price_lkr_per_l;
         const totalTripDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
-        const maintenanceCostPerBus = totalTripDistance * 20;
+        const maintenanceCostPerBus = totalTripDistance * (fuelSettings.maintenance_rate_lkr_per_km || 20);
         
         const subtotalPerBus = hireChargePerBus + fuelCostPerBus + maintenanceCostPerBus;
         
@@ -133,6 +178,9 @@ export function CostCalculator() {
           hire_charge_per_bus: Math.round(hireChargePerBus),
           fuel_cost_per_bus: Math.round(fuelCostPerBus),
           maintenance_cost_per_bus: Math.round(maintenanceCostPerBus),
+          overtime_charge_per_bus: Math.round(overtimeChargePerBus),
+          overnight_charge_per_bus: Math.round(overnightChargePerBus),
+          exceeding_distance_charge_per_bus: Math.round(exceedingDistanceChargePerBus),
           subtotal_per_bus: Math.round(subtotalPerBus),
           subtotal_all_buses: Math.round(subtotalPerBus * bus.quantity)
         });
@@ -142,24 +190,82 @@ export function CostCalculator() {
         totalCapacity += busType.capacity * bus.quantity;
         totalFuelCost += fuelCostPerBus * bus.quantity;
         totalMaintenanceCost += maintenanceCostPerBus * bus.quantity;
+        totalOvertimeCharge += overtimeChargePerBus * bus.quantity;
+        totalOvernightCharge += overnightChargePerBus * bus.quantity;
+        totalExceedingDistanceCharge += exceedingDistanceChargePerBus * bus.quantity;
       }
       
+      // Apply commission and discount
       const grossRevenue = combinedSubtotal;
-      const finalCustomerTotal = grossRevenue;
-      const totalExpenses = (formData.driverCharge * totalBuses) + totalFuelCost + totalMaintenanceCost;
+      const commissionExpenseAmount = grossRevenue * (formData.commissionPct / 100);
+      const commissionPassThroughAmount = grossRevenue * (formData.commissionPassThroughPct / 100);
+      
+      let discountAmount = 0;
+      if (formData.discountType === 'percentage') {
+        discountAmount = grossRevenue * (formData.discountPct / 100);
+      } else if (formData.discountType === 'amount') {
+        discountAmount = formData.discountAmount;
+      }
+      
+      const subtotalAfterAdjustments = grossRevenue + commissionPassThroughAmount - discountAmount;
+      const adjustmentAmount = subtotalAfterAdjustments * (formData.percentageAdjustment / 100);
+      const finalCustomerTotal = subtotalAfterAdjustments + adjustmentAmount;
+      
+      const totalExpenses = 
+        (formData.driverCharge * totalBuses) + 
+        totalFuelCost + 
+        totalMaintenanceCost + 
+        commissionExpenseAmount;
+      
+      const netProfit = finalCustomerTotal - totalExpenses;
+      
+      const totalTripDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
       
       setCostData({
-        ...distanceData,
+        kmParkingToPickup: distanceData.kmParkingToPickup,
+        kmTrip: distanceData.kmTrip,
+        kmDropToParking: distanceData.kmDropToParking,
+        totalTripDistance: totalTripDistance,
+        
         busFleetDetails: {
           buses: busFleetDetails,
           total_buses: totalBuses,
           total_capacity: totalCapacity,
           combined_subtotal: Math.round(combinedSubtotal)
         },
+        
+        hireCharge: busFleetDetails.reduce((sum, b) => sum + b.hire_charge_per_bus * b.quantity, 0),
+        overtimeCharge: Math.round(totalOvertimeCharge),
+        overnightCharge: Math.round(totalOvernightCharge),
+        exceedingDistanceCharge: Math.round(totalExceedingDistanceCharge),
+        
+        fuelCostFuelOnly: Math.round(totalFuelCost),
+        maintenanceCost: Math.round(totalMaintenanceCost),
+        busTypeEfficiency: 8,
+        fuelPricePerLiter: fuelSettings.diesel_price_lkr_per_l,
+        maintenanceRatePerKm: fuelSettings.maintenance_rate_lkr_per_km || 20,
+        
         grossRevenue: Math.round(grossRevenue),
         customerTotalWithFuel: Math.round(finalCustomerTotal),
+        
+        commissionPct: formData.commissionPct,
+        commissionAmount: Math.round(commissionExpenseAmount),
+        commissionPassThroughPct: formData.commissionPassThroughPct,
+        commissionPassThroughAmount: Math.round(commissionPassThroughAmount),
+        
+        discountType: formData.discountType,
+        discountPct: formData.discountPct,
+        discountAmount: Math.round(discountAmount),
+        
+        percentageAdjustment: formData.percentageAdjustment,
+        adjustmentAmount: Math.round(adjustmentAmount),
+        
+        driverCharge: formData.driverCharge * totalBuses,
         totalExpenses: Math.round(totalExpenses),
-        netProfit: Math.round(finalCustomerTotal - totalExpenses)
+        netProfit: Math.round(netProfit),
+        
+        numberOfBuses: totalBuses,
+        isMultiBusMode: true
       });
       
       toast({
