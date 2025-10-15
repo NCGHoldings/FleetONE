@@ -4,7 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Calculator, MapPin } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Calculator, MapPin, Plus, Trash2 } from 'lucide-react';
 import { CostBreakdown } from './CostBreakdown';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -17,20 +19,19 @@ export function CostCalculator() {
     hireType: 'Outside',
     numberOfBuses: 1,
     driverCharge: 1500,
-    // Commission handling (separated): total commission to pay and portion passed to customer
     commissionPct: 0,
     commissionPassThroughPct: 0,
-    // Discount handling (requires admin approval if > 0)
     discountType: 'percentage' as 'percentage' | 'amount',
     discountPct: 0,
     discountAmount: 0,
-    // General adjustment for other purposes (positive=surcharge, negative=discount)
     percentageAdjustment: 0,
     expectedWorkHours: 8,
     overnightDays: 0,
     agreedDistance: 0
   });
   
+  const [isMultiBusMode, setIsMultiBusMode] = useState(false);
+  const [selectedBusFleet, setSelectedBusFleet] = useState<Array<{id: string, busTypeId: string, quantity: number}>>([]);
   const [costData, setCostData] = useState<any>(null);
   const [calculating, setCalculating] = useState(false);
   const [busTypes, setBusTypes] = useState<any[]>([]);
@@ -61,9 +62,135 @@ export function CostCalculator() {
     if (data) setFuelSettings(data);
   };
 
+  const calculateMultiBusFleetCosts = async () => {
+    if (selectedBusFleet.some(b => !b.busTypeId || b.quantity < 1)) {
+      toast({ 
+        title: "Incomplete Bus Selection", 
+        description: "Please select a bus type and quantity for all entries",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setCalculating(true);
+    
+    try {
+      const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
+        body: {
+          pickupLocation: formData.pickupLocation,
+          dropLocation: formData.dropLocation,
+          intermediateStops,
+          parkingLat: fuelSettings.parking_lat,
+          parkingLng: fuelSettings.parking_lng,
+          calculateSegments: true,
+        }
+      });
+      
+      if (error || !distanceData) throw new Error('Distance calculation failed');
+      
+      const busFleetDetails = [];
+      let combinedSubtotal = 0;
+      let totalBuses = 0;
+      let totalCapacity = 0;
+      let totalFuelCost = 0;
+      let totalMaintenanceCost = 0;
+      
+      for (const bus of selectedBusFleet) {
+        const busType = busTypes.find(bt => bt.id === bus.busTypeId);
+        if (!busType) continue;
+        
+        const { data: rateCards } = await supabase
+          .from('hire_rate_cards')
+          .select('*')
+          .eq('hire_type', formData.hireType)
+          .eq('bus_type_id', bus.busTypeId)
+          .eq('is_active', true)
+          .order('from_km');
+        
+        let hireChargePerBus = 0;
+        const rateCard = rateCards?.[0];
+        
+        if (formData.hireType === 'Outside') {
+          const fixedRate = rateCard?.flat_fee_lkr || 0;
+          const exceedingKm = Math.max(0, distanceData.kmTrip - 100);
+          hireChargePerBus = fixedRate + (exceedingKm * (rateCard?.exceeding_km_rate_lkr || 0));
+        } else {
+          hireChargePerBus = rateCard?.flat_fee_lkr || 0;
+        }
+        
+        const emptyRunKm = (distanceData.kmParkingToPickup || 0) + (distanceData.kmDropToParking || 0);
+        const fuelCostPerBus = (emptyRunKm / (busType.avg_km_per_l || 8)) * fuelSettings.diesel_price_lkr_per_l;
+        const totalTripDistance = (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0);
+        const maintenanceCostPerBus = totalTripDistance * 20;
+        
+        const subtotalPerBus = hireChargePerBus + fuelCostPerBus + maintenanceCostPerBus;
+        
+        busFleetDetails.push({
+          bus_type_id: busType.id,
+          bus_type_name: busType.name,
+          quantity: bus.quantity,
+          seating_capacity: busType.capacity,
+          hire_charge_per_bus: Math.round(hireChargePerBus),
+          fuel_cost_per_bus: Math.round(fuelCostPerBus),
+          maintenance_cost_per_bus: Math.round(maintenanceCostPerBus),
+          subtotal_per_bus: Math.round(subtotalPerBus),
+          subtotal_all_buses: Math.round(subtotalPerBus * bus.quantity)
+        });
+        
+        combinedSubtotal += subtotalPerBus * bus.quantity;
+        totalBuses += bus.quantity;
+        totalCapacity += busType.capacity * bus.quantity;
+        totalFuelCost += fuelCostPerBus * bus.quantity;
+        totalMaintenanceCost += maintenanceCostPerBus * bus.quantity;
+      }
+      
+      const grossRevenue = combinedSubtotal;
+      const finalCustomerTotal = grossRevenue;
+      const totalExpenses = (formData.driverCharge * totalBuses) + totalFuelCost + totalMaintenanceCost;
+      
+      setCostData({
+        ...distanceData,
+        busFleetDetails: {
+          buses: busFleetDetails,
+          total_buses: totalBuses,
+          total_capacity: totalCapacity,
+          combined_subtotal: Math.round(combinedSubtotal)
+        },
+        grossRevenue: Math.round(grossRevenue),
+        customerTotalWithFuel: Math.round(finalCustomerTotal),
+        totalExpenses: Math.round(totalExpenses),
+        netProfit: Math.round(finalCustomerTotal - totalExpenses)
+      });
+      
+      toast({
+        title: "Multi-Bus Fleet Calculated",
+        description: `${totalBuses} buses | ${totalCapacity} seats | LKR ${Math.round(finalCustomerTotal).toLocaleString()}`
+      });
+    } catch (error: any) {
+      toast({ title: "Calculation Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setCalculating(false);
+    }
+  };
+
   const calculateCosts = async () => {
     if (!fuelSettings) {
       toast({ title: "Error", description: "Fuel settings not loaded", variant: "destructive" });
+      return;
+    }
+
+    if (isMultiBusMode && selectedBusFleet.length > 0) {
+      return calculateMultiBusFleetCosts();
+    }
+
+    if (!formData.busType) {
+      toast({ title: "Error", description: "Please select a bus type", variant: "destructive" });
+      return;
+    }
+
+    // Single bus mode validation
+    if (!formData.busType) {
+      toast({ title: "Error", description: "Please select a bus type", variant: "destructive" });
       return;
     }
 
@@ -494,224 +621,110 @@ export function CostCalculator() {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Cost Calculator
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Pickup Location</Label>
-              <div className="relative">
-                <Input
-                  placeholder="Enter pickup location"
-                  value={formData.pickupLocation}
-                  onChange={(e) => setFormData({...formData, pickupLocation: e.target.value})}
-                />
-                <MapPin className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calculator className="h-5 w-5" />
+          Cost Calculator
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Pickup Location</Label>
+            <Input
+              value={formData.pickupLocation}
+              onChange={(e) => setFormData({...formData, pickupLocation: e.target.value})}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Drop Location</Label>
+            <Input
+              value={formData.dropLocation}
+              onChange={(e) => setFormData({...formData, dropLocation: e.target.value})}
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label>Drop Location</Label>
-              <div className="relative">
-                <Input
-                  placeholder="Enter drop location"
-                  value={formData.dropLocation}
-                  onChange={(e) => setFormData({...formData, dropLocation: e.target.value})}
-                />
-                <MapPin className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-              </div>
+          <div className="col-span-2">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <Label>Multi-Bus Fleet Mode</Label>
+              <Switch
+                checked={isMultiBusMode}
+                onCheckedChange={(checked) => {
+                  setIsMultiBusMode(checked);
+                  if (checked) {
+                    setSelectedBusFleet([{ id: crypto.randomUUID(), busTypeId: '', quantity: 1 }]);
+                  } else {
+                    setSelectedBusFleet([]);
+                  }
+                }}
+              />
             </div>
+          </div>
 
+          {isMultiBusMode ? (
+            <div className="col-span-2 space-y-3">
+              {selectedBusFleet.map((bus, index) => (
+                <div key={bus.id} className="flex gap-2">
+                  <Select value={bus.busTypeId} onValueChange={(value) => {
+                    const updated = [...selectedBusFleet];
+                    updated[index].busTypeId = value;
+                    setSelectedBusFleet(updated);
+                  }}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select bus type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {busTypes.map((bt) => (
+                        <SelectItem key={bt.id} value={bt.id}>{bt.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={bus.quantity}
+                    onChange={(e) => {
+                      const updated = [...selectedBusFleet];
+                      updated[index].quantity = parseInt(e.target.value) || 1;
+                      setSelectedBusFleet(updated);
+                    }}
+                    className="w-24"
+                  />
+                  <Button variant="ghost" size="icon" onClick={() => setSelectedBusFleet(selectedBusFleet.filter((_, i) => i !== index))}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="outline" onClick={() => setSelectedBusFleet([...selectedBusFleet, { id: crypto.randomUUID(), busTypeId: '', quantity: 1 }])}>
+                <Plus className="h-4 w-4 mr-2" /> Add Bus
+              </Button>
+            </div>
+          ) : (
             <div className="space-y-2">
               <Label>Bus Type</Label>
               <Select onValueChange={(value) => setFormData({...formData, busType: value})}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select bus type" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {busTypes.map((busType) => (
-                    <SelectItem key={busType.id} value={busType.id}>
-                      {busType.name} ({busType.capacity} seats)
-                    </SelectItem>
+                  {busTypes.map((bt) => (
+                    <SelectItem key={bt.id} value={bt.id}>{bt.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label>Hire Type</Label>
-              <Select onValueChange={(value) => setFormData({...formData, hireType: value})} defaultValue={formData.hireType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Outside">Outside</SelectItem>
-                  <SelectItem value="Lyceum">Lyceum</SelectItem>
-                  <SelectItem value="Internal">Internal</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Number of Buses</Label>
-              <Input
-                type="number"
-                min="1"
-                value={formData.numberOfBuses}
-                onChange={(e) => setFormData({...formData, numberOfBuses: parseInt(e.target.value) || 1})}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Driver Charge (LKR)</Label>
-              <Input
-                type="number"
-                value={formData.driverCharge}
-                onChange={(e) => setFormData({...formData, driverCharge: parseInt(e.target.value) || 0})}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Commission (%) - Optional</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.1"
-                value={formData.commissionPct}
-                onChange={(e) => setFormData({...formData, commissionPct: parseFloat(e.target.value) || 0})}
-              />
-              <p className="text-xs text-muted-foreground">
-                Leave at 0 if no commission applies. Enter percentage if commission is required.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Pass to customer (%)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.1"
-                value={formData.commissionPassThroughPct}
-                onChange={(e) => setFormData({...formData, commissionPassThroughPct: parseFloat(e.target.value) || 0})}
-              />
-              <p className="text-xs text-muted-foreground">
-                Must be less than or equal to Commission to pay (%). This portion is added to the customer total.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Expected Work Hours</Label>
-              <Input
-                type="number"
-                min="1"
-                step="0.5"
-                value={formData.expectedWorkHours}
-                onChange={(e) => setFormData({...formData, expectedWorkHours: parseFloat(e.target.value) || 8})}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Overnight Days (Outside only)</Label>
-              <Input
-                type="number"
-                min="0"
-                value={formData.overnightDays}
-                onChange={(e) => setFormData({...formData, overnightDays: parseInt(e.target.value) || 0})}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Discount (%)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.1"
-                value={formData.discountPct}
-                onChange={(e) => setFormData({...formData, discountPct: parseFloat(e.target.value) || 0})}
-              />
-              <p className="text-xs text-muted-foreground text-amber-600">
-                ⚠️ Discounts require admin approval and may prevent quotation creation
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Agreed Distance (km)</Label>
-              <Input
-                type="number"
-                min="0"
-                placeholder="Leave empty to use trip distance"
-                value={formData.agreedDistance || ''}
-                onChange={(e) => setFormData({...formData, agreedDistance: parseFloat(e.target.value) || 0})}
-              />
-            </div>
-          </div>
-
-          {/* Intermediate Stops */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>Intermediate Stops</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIntermediateStops([...intermediateStops, { id: Date.now().toString(), location: '' }])}
-              >
-                Add Stop
-              </Button>
-            </div>
-            {intermediateStops.map((stop, index) => (
-              <div key={stop.id} className="flex gap-2 items-center">
-                <Input
-                  placeholder={`Stop ${index + 1} location`}
-                  value={stop.location}
-                  onChange={(e) => {
-                    const updated = [...intermediateStops];
-                    updated[index].location = e.target.value;
-                    setIntermediateStops(updated);
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIntermediateStops(intermediateStops.filter(s => s.id !== stop.id))}
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-          </div>
-
-          {/* Rate Card Information */}
-          {selectedRateCard && (
-            <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-              <h4 className="font-medium">Selected Rate Card</h4>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>Range: {selectedRateCard.from_km}-{selectedRateCard.to_km}km</div>
-                <div>Base Rate: LKR {selectedRateCard.flat_fee_lkr?.toLocaleString()}</div>
-                <div>Standard Hours: {selectedRateCard.standard_hours}hrs</div>
-                <div>Overtime Rate: LKR {selectedRateCard.overtime_rate_lkr_per_hour}/hr</div>
-              </div>
-            </div>
           )}
+        </div>
 
-          <Button 
-            onClick={calculateCosts} 
-            disabled={calculating || !formData.pickupLocation || !formData.dropLocation || !formData.busType}
-            className="w-full"
-          >
-            {calculating ? 'Calculating...' : 'Calculate Costs'}
-          </Button>
-        </CardContent>
-      </Card>
+        <Button onClick={calculateCosts} disabled={calculating} className="w-full">
+          <Calculator className="h-4 w-4 mr-2" />
+          {calculating ? 'Calculating...' : 'Calculate Costs'}
+        </Button>
 
-      {costData && <CostBreakdown data={costData} />}
-    </div>
+        {costData && <CostBreakdown costData={costData} />}
+      </CardContent>
+    </Card>
   );
 }
+
