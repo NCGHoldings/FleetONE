@@ -68,6 +68,21 @@ interface Props {
 
 export function QuotationPreview({ quotation, className = "" }: Props) {
   const [rateCard, setRateCard] = useState<any>(null);
+  
+  // Ensure bus_fleet_details is always parsed as an object
+  const parsedQuotation = {
+    ...quotation,
+    bus_fleet_details: typeof quotation.bus_fleet_details === 'string' 
+      ? JSON.parse(quotation.bus_fleet_details) 
+      : quotation.bus_fleet_details
+  };
+  
+  console.log('QuotationPreview Debug:', {
+    original: quotation.bus_fleet_details,
+    parsed: parsedQuotation.bus_fleet_details,
+    isArray: Array.isArray(parsedQuotation.bus_fleet_details?.buses),
+    busesCount: parsedQuotation.bus_fleet_details?.buses?.length
+  });
 
   useEffect(() => {
     const fetchRateCard = async () => {
@@ -76,7 +91,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         const { data: busTypes } = await supabase
           .from('bus_types')
           .select('id')
-          .eq('name', quotation.bus_type)
+          .eq('name', parsedQuotation.bus_type)
           .single();
 
         if (busTypes) {
@@ -100,7 +115,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     };
 
     fetchRateCard();
-  }, [quotation.bus_type]);
+  }, [parsedQuotation.bus_type]);
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -111,20 +126,20 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
   };
 
   // Use the exact same value that CostBreakdown displays
-  const calculateFinalCustomerTotal = (quotation: QuotationData): number => {
+  const calculateFinalCustomerTotal = (quot: QuotationData): number => {
     // The customerTotalWithFuel is already calculated for ALL buses in CostCalculator
     // and stored correctly in the database. Just use it directly.
-    if (quotation.customerTotalWithFuel !== undefined && quotation.customerTotalWithFuel !== null) {
-      return quotation.customerTotalWithFuel;
+    if (quot.customerTotalWithFuel !== undefined && quot.customerTotalWithFuel !== null) {
+      return quot.customerTotalWithFuel;
     }
     
     // Fallback (total for ALL buses). Note: fuel_cost_fuel_only is already total across buses
-    const grossRevenue = quotation.gross_revenue || 0; // Already for all buses
-    const fuelCostTotal = quotation.fuel_cost_fuel_only || 0; // Do NOT multiply by buses
-    const commissionPassThrough = quotation.commission_pass_through_amount || 0;
-    const additionalCharges = quotation.total_additional_charges || 0;
-    const discount = quotation.discount_amount_lkr || 0;
-    const percentageAdjustment = quotation.percentage_adjustment || 0;
+    const grossRevenue = parsedQuotation.gross_revenue || 0; // Already for all buses
+    const fuelCostTotal = parsedQuotation.fuel_cost_fuel_only || 0; // Do NOT multiply by buses
+    const commissionPassThrough = parsedQuotation.commission_pass_through_amount || 0;
+    const additionalCharges = parsedQuotation.total_additional_charges || 0;
+    const discount = parsedQuotation.discount_amount_lkr || 0;
+    const percentageAdjustment = parsedQuotation.percentage_adjustment || 0;
     
     const customerTotalBeforeAdjustment = grossRevenue + fuelCostTotal + commissionPassThrough + additionalCharges - discount;
     const adjustmentAmount = customerTotalBeforeAdjustment * (percentageAdjustment / 100);
@@ -133,17 +148,17 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     return Math.round(finalCustomerTotal);
   };
 
-  const pickup = formatDateTime(quotation.pickup_datetime);
-  const dropoff = quotation.drop_datetime ? formatDateTime(quotation.drop_datetime) : null;
+  const pickup = formatDateTime(parsedQuotation.pickup_datetime);
+  const dropoff = parsedQuotation.drop_datetime ? formatDateTime(parsedQuotation.drop_datetime) : null;
   
   // Calculate customer pickup to drop distance only (excluding parking distances)
-  const customerDistance = quotation.km_trip || 0;
+  const customerDistance = parsedQuotation.km_trip || 0;
 
   // Parse intermediate stops for display
   let intermediateStops = [];
   try {
-    if (quotation.intermediate_stops) {
-      intermediateStops = JSON.parse(quotation.intermediate_stops);
+    if (parsedQuotation.intermediate_stops) {
+      intermediateStops = JSON.parse(parsedQuotation.intermediate_stops);
     }
   } catch (e) {
     console.warn('Failed to parse intermediate stops:', e);
@@ -152,11 +167,11 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
   // Parse additional charges for display
   let additionalCharges = [];
   try {
-    if (quotation.additional_charges) {
-      if (typeof quotation.additional_charges === 'string') {
-        additionalCharges = JSON.parse(quotation.additional_charges);
+    if (parsedQuotation.additional_charges) {
+      if (typeof parsedQuotation.additional_charges === 'string') {
+        additionalCharges = JSON.parse(parsedQuotation.additional_charges);
       } else {
-        additionalCharges = quotation.additional_charges;
+        additionalCharges = parsedQuotation.additional_charges;
       }
     }
   } catch (e) {
@@ -164,7 +179,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
   }
 
   // Build route description
-  let routeDescription = `From ${quotation.pickup_location}`;
+  let routeDescription = `From ${parsedQuotation.pickup_location}`;
   if (intermediateStops.length > 0) {
     intermediateStops.forEach((stop: any) => {
       if (stop.location) {
@@ -172,10 +187,10 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
       }
     });
   }
-  routeDescription += ` → ${quotation.drop_location}`;
+  routeDescription += ` → ${parsedQuotation.drop_location}`;
 
   // Check if DRAFT watermark should be shown
-  const showDraftWatermark = quotation.approval_status === 'pending' && (quotation.discount_percentage || 0) > 0;
+  const showDraftWatermark = parsedQuotation.approval_status === 'pending' && (parsedQuotation.discount_percentage || 0) > 0;
 
   return (
     <div className={`bg-white text-black font-sans ${className}`} style={{ 
@@ -239,8 +254,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               specialhire.ncgexpress@ncg.lk
             </div>
             <div className="text-xs mt-1 text-gray-700">
-              Quotation Generated on {format(new Date(quotation.created_at), 'dd/MM/yyyy, hh:mm a')}<br />
-              Quotation No: {quotation.quotation_no}
+              Quotation Generated on {format(new Date(parsedQuotation.created_at), 'dd/MM/yyyy, hh:mm a')}<br />
+              Quotation No: {parsedQuotation.quotation_no}
             </div>
           </div>
         </div>
@@ -250,19 +265,19 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-1">
               <span className="font-semibold text-blue-600 min-w-[80px]">Company Name:</span>
-              <span className="text-gray-800">{quotation.company_name || "NCG Express"}</span>
+              <span className="text-gray-800">{parsedQuotation.company_name || "NCG Express"}</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="font-semibold text-blue-600 min-w-[80px]">Contact Number:</span>
-              <span className="text-gray-800">{quotation.customer_phone}</span>
+              <span className="text-gray-800">{parsedQuotation.customer_phone}</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="font-semibold text-blue-600 min-w-[80px]">Customer Name:</span>
-              <span className="text-gray-800">{quotation.customer_name}</span>
+              <span className="text-gray-800">{parsedQuotation.customer_name}</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="font-semibold text-blue-600 min-w-[80px]">Email Address:</span>
-              <span className="text-gray-800">{quotation.customer_email || "N/A"}</span>
+              <span className="text-gray-800">{parsedQuotation.customer_email || "N/A"}</span>
             </div>
           </div>
         </div>
@@ -292,7 +307,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   padding: '8px', 
                   verticalAlign: 'middle',
                   color: '#374151'
-                }} colSpan={3}>{quotation.pickup_location}</td>
+                }} colSpan={3}>{parsedQuotation.pickup_location}</td>
               </tr>
               <tr>
                 <th style={{ 
@@ -347,7 +362,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   padding: '8px', 
                   verticalAlign: 'middle',
                   color: '#374151'
-                }} colSpan={3}>{quotation.drop_location}</td>
+                }} colSpan={3}>{parsedQuotation.drop_location}</td>
               </tr>
               <tr>
                 <th style={{ 
@@ -472,10 +487,10 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             </tr>
           </thead>
           <tbody>
-            {Array.isArray(quotation.bus_fleet_details?.buses) && quotation.bus_fleet_details.buses.length > 0 ? (
+            {Array.isArray(parsedQuotation.bus_fleet_details?.buses) && parsedQuotation.bus_fleet_details.buses.length > 0 ? (
               <>
                 {/* Individual bus rows */}
-                {quotation.bus_fleet_details.buses.map((bus, index) => (
+                {parsedQuotation.bus_fleet_details.buses.map((bus, index) => (
                   <tr key={index}>
                     <td style={{ 
                       border: '1px solid #d1d5db', 
@@ -571,7 +586,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     verticalAlign: 'middle',
                     color: '#374151'
                   }}>
-                    {quotation.bus_fleet_details.total_buses?.toString().padStart(2, '0')}
+                    {parsedQuotation.bus_fleet_details.total_buses?.toString().padStart(2, '0')}
                   </td>
                   <td style={{ 
                     border: '1px solid #d1d5db', 
@@ -580,7 +595,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     verticalAlign: 'middle',
                     color: '#374151'
                   }}>
-                    {quotation.bus_fleet_details.total_capacity} seats
+                    {parsedQuotation.bus_fleet_details.total_capacity} seats
                   </td>
                   <td colSpan={2} style={{ 
                     border: '1px solid #d1d5db', 
@@ -593,14 +608,14 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   }}>
                     <div style={{ fontSize: '11px', color: '#374151', marginBottom: '4px' }}>
                       Subtotal: LKR {(() => {
-                        const subtotal = calculateFinalCustomerTotal(quotation) + (quotation.discount_amount_lkr || 0);
+                        const subtotal = calculateFinalCustomerTotal(parsedQuotation) + (parsedQuotation.discount_amount_lkr || 0);
                         return subtotal.toLocaleString();
                       })()}
                     </div>
                     
-                    {(quotation.discount_amount_lkr || 0) > 0 && (
+                    {(parsedQuotation.discount_amount_lkr || 0) > 0 && (
                       <div style={{ color: '#dc2626', fontSize: '11px', marginBottom: '4px' }}>
-                        Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}
+                        Discount: -LKR {parsedQuotation.discount_amount_lkr?.toLocaleString()}
                       </div>
                     )}
                     <div style={{ 
@@ -611,15 +626,15 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       fontSize: '12px',
                       color: '#374151'
                     }}>
-                      Final Total: LKR {calculateFinalCustomerTotal(quotation).toLocaleString()}
-                      {quotation.number_of_buses > 1 && (
+                      Final Total: LKR {calculateFinalCustomerTotal(parsedQuotation).toLocaleString()}
+                      {parsedQuotation.number_of_buses > 1 && (
                         <div style={{ 
                           fontSize: '10px', 
                           color: '#6b7280', 
                           fontWeight: 'normal',
                           marginTop: '2px'
                         }}>
-                          Per Bus: LKR {(calculateFinalCustomerTotal(quotation) / quotation.number_of_buses).toLocaleString()}
+                          Per Bus: LKR {(calculateFinalCustomerTotal(parsedQuotation) / parsedQuotation.number_of_buses).toLocaleString()}
                         </div>
                       )}
                     </div>
@@ -636,7 +651,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   verticalAlign: 'middle',
                   color: '#374151'
                 }}>
-                  {quotation.bus_type}
+                  {parsedQuotation.bus_type}
                 </td>
                 <td style={{ 
                   border: '1px solid #d1d5db', 
@@ -644,7 +659,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   textAlign: 'center', 
                   verticalAlign: 'middle',
                   color: '#374151'
-                }}>{quotation.number_of_buses.toString().padStart(2, '0')}</td>
+                }}>{parsedQuotation.number_of_buses.toString().padStart(2, '0')}</td>
                 <td style={{ 
                   border: '1px solid #d1d5db', 
                   padding: '8px', 
@@ -652,7 +667,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                   verticalAlign: 'middle',
                   color: '#374151'
                 }}>
-                  {quotation.seating_capacity || 54} seats
+                  {parsedQuotation.seating_capacity || 54} seats
                 </td>
                 <td style={{ 
                   border: '1px solid #d1d5db', 
@@ -697,14 +712,14 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                 }}>
                   <div style={{ fontSize: '11px', color: '#374151', marginBottom: '4px' }}>
                     Subtotal: LKR {(() => {
-                      const subtotal = calculateFinalCustomerTotal(quotation) + (quotation.discount_amount_lkr || 0);
+                      const subtotal = calculateFinalCustomerTotal(parsedQuotation) + (parsedQuotation.discount_amount_lkr || 0);
                       return subtotal.toLocaleString();
                     })()}
                   </div>
                   
-                  {(quotation.discount_amount_lkr || 0) > 0 && (
+                  {(parsedQuotation.discount_amount_lkr || 0) > 0 && (
                     <div style={{ color: '#dc2626', fontSize: '11px', marginBottom: '4px' }}>
-                      Discount: -LKR {quotation.discount_amount_lkr?.toLocaleString()}
+                      Discount: -LKR {parsedQuotation.discount_amount_lkr?.toLocaleString()}
                     </div>
                   )}
                   <div style={{ 
@@ -715,15 +730,15 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                     fontSize: '12px',
                     color: '#374151'
                   }}>
-                    Final Total: LKR {calculateFinalCustomerTotal(quotation).toLocaleString()}
-                    {quotation.number_of_buses > 1 && (
+                    Final Total: LKR {calculateFinalCustomerTotal(parsedQuotation).toLocaleString()}
+                    {parsedQuotation.number_of_buses > 1 && (
                       <div style={{ 
                         fontSize: '10px', 
                         color: '#6b7280', 
                         fontWeight: 'normal',
                         marginTop: '2px'
                       }}>
-                        Per Bus: LKR {(calculateFinalCustomerTotal(quotation) / quotation.number_of_buses).toLocaleString()}
+                        Per Bus: LKR {(calculateFinalCustomerTotal(parsedQuotation) / parsedQuotation.number_of_buses).toLocaleString()}
                       </div>
                     )}
                   </div>
@@ -741,7 +756,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <div className="flex items-center gap-2 text-sm mb-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 <span className="font-medium text-green-700">Start:</span>
-                <span className="text-gray-800">{quotation.pickup_location}</span>
+                <span className="text-gray-800">{parsedQuotation.pickup_location}</span>
               </div>
               
               {intermediateStops.map((stop: any, index: number) => (
@@ -755,7 +770,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
               <div className="flex items-center gap-2 text-sm">
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                 <span className="font-medium text-red-700">End:</span>
-                <span className="text-gray-800">{quotation.drop_location}</span>
+                <span className="text-gray-800">{parsedQuotation.drop_location}</span>
               </div>
             </div>
           </div>
