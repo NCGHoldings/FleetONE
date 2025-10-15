@@ -2535,66 +2535,71 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   </div>
 
                   {/* Referral Agent Section */}
-                  <div className="col-span-2 border-t pt-4 mt-2">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <div className="text-sm font-medium text-muted-foreground">
-                        Referral Agent (Optional)
-                      </div>
+                  <div className="col-span-2 border-t pt-6 mt-4">
+                    <div className="flex items-center gap-2 mb-5">
+                      <Users className="h-5 w-5 text-muted-foreground" />
+                      <div className="text-base font-semibold">Referral Agent</div>
+                      <div className="text-xs text-muted-foreground">(Optional)</div>
                     </div>
                     
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      {/* Agent Selector */}
-                      <FormField
-                        control={form.control}
-                        name="referralAgentId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm font-medium text-foreground">Agent Name</FormLabel>
-                            <Select 
-                              onValueChange={(value) => {
-                                if (value === 'add-new') {
-                                  setShowAddAgentModal(true);
-                                } else {
-                                  field.onChange(value);
-                                  handleAgentSelect(value);
-                                }
-                              }}
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger className="h-10 text-base">
-                                  <SelectValue placeholder="Select agent or add new" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="add-new">
-                                  <div className="flex items-center gap-2 font-medium text-primary">
-                                    <Plus className="h-4 w-4" />
-                                    Add New Agent
-                                  </div>
-                                </SelectItem>
-                                {referralAgents.length > 0 && (
-                                  <>
-                                    <Separator className="my-1" />
-                                    {referralAgents.map((agent) => (
-                                      <SelectItem key={agent.id} value={agent.id}>
-                                        <div>
-                                          <div className="font-medium">{agent.agent_name}</div>
-                                          <div className="text-xs text-muted-foreground">
-                                            {agent.phone || 'No phone'} • {agent.total_referrals} trips • {agent.default_commission_pct}%
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                      {/* Agent Selector - Takes 2 columns on large screens */}
+                      <div className="lg:col-span-2">
+                        <FormField
+                          control={form.control}
+                          name="referralAgentId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium">Select Agent</FormLabel>
+                              <Select 
+                                onValueChange={(value) => {
+                                  if (value === 'add-new') {
+                                    setShowAddAgentModal(true);
+                                  } else {
+                                    field.onChange(value);
+                                    handleAgentSelect(value);
+                                  }
+                                }}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-11">
+                                    <SelectValue placeholder="Choose an agent or add new" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="add-new">
+                                    <div className="flex items-center gap-2 py-1 font-medium text-primary">
+                                      <Plus className="h-4 w-4" />
+                                      Add New Agent
+                                    </div>
+                                  </SelectItem>
+                                  {referralAgents.length > 0 && (
+                                    <>
+                                      <Separator className="my-1" />
+                                      {referralAgents.map((agent) => (
+                                        <SelectItem key={agent.id} value={agent.id}>
+                                          <div className="py-1">
+                                            <div className="font-medium">{agent.agent_name}</div>
+                                            <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                                              <span>{agent.phone || 'No phone'}</span>
+                                              <span>•</span>
+                                              <span>{agent.total_referrals} referrals</span>
+                                              <span>•</span>
+                                              <span>LKR {agent.total_commission_earned?.toLocaleString() || '0'}</span>
+                                            </div>
                                           </div>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </>
-                                )}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                                        </SelectItem>
+                                      ))}
+                                    </>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
                       {/* Commission Percentage */}
                       <FormField
@@ -2602,7 +2607,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                         name="referralCommissionPct"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm font-medium text-foreground">Commission %</FormLabel>
+                            <FormLabel className="text-sm font-medium">Commission %</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
@@ -2610,23 +2615,20 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                 min="0"
                                 max="100"
                                 placeholder="3.0"
-                                className="h-10 text-base"
+                                className="h-11"
                                 {...field}
                                 onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                                 disabled={!form.watch('referralAgentId')}
                               />
                             </FormControl>
                             <FormMessage />
-                            <div className="text-xs text-muted-foreground">
-                              Agent commission rate
-                            </div>
                           </FormItem>
                         )}
                       />
 
                       {/* Calculated Commission Amount (Read-only) */}
                       <FormItem>
-                        <FormLabel className="text-sm font-medium text-foreground">Commission Amount</FormLabel>
+                        <FormLabel className="text-sm font-medium">Commission Amount</FormLabel>
                         <Input
                           type="text"
                           value={
@@ -2635,31 +2637,33 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                               : 'LKR 0'
                           }
                           disabled
-                          className="h-10 text-base bg-muted"
+                          className="h-11 bg-muted/50 font-semibold"
                         />
-                        <div className="text-xs text-muted-foreground">
-                          Auto-calculated from total
+                        <div className="text-xs text-muted-foreground mt-1.5">
+                          Auto-calculated
                         </div>
                       </FormItem>
                     </div>
 
                     {/* Show Agent Stats */}
                     {selectedAgent && form.watch('referralAgentId') && (
-                      <div className="mt-3 p-3 bg-muted/50 rounded-lg border">
-                        <div className="text-xs font-medium text-muted-foreground mb-2">Agent History</div>
-                        <div className="flex gap-6 text-sm">
-                          <div>
-                            <span className="font-semibold text-foreground">{selectedAgent.total_referrals}</span>
-                            <span className="text-muted-foreground ml-1">trips referred</span>
+                      <div className="mt-5 p-5 bg-gradient-to-br from-muted/50 to-muted/30 rounded-lg border shadow-sm">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                          Agent Performance
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                          <div className="space-y-1">
+                            <div className="text-2xl font-bold">{selectedAgent.total_referrals}</div>
+                            <div className="text-sm text-muted-foreground">Total Trips Referred</div>
                           </div>
-                          <div>
-                            <span className="font-semibold text-foreground">LKR {selectedAgent.total_commission_earned?.toLocaleString() || '0'}</span>
-                            <span className="text-muted-foreground ml-1">total earned</span>
+                          <div className="space-y-1">
+                            <div className="text-2xl font-bold">LKR {selectedAgent.total_commission_earned?.toLocaleString() || '0'}</div>
+                            <div className="text-sm text-muted-foreground">Total Commission Earned</div>
                           </div>
                           {selectedAgent.phone && (
-                            <div>
-                              <span className="text-muted-foreground">Phone:</span>
-                              <span className="font-medium text-foreground ml-1">{selectedAgent.phone}</span>
+                            <div className="space-y-1">
+                              <div className="text-lg font-semibold">{selectedAgent.phone}</div>
+                              <div className="text-sm text-muted-foreground">Contact Number</div>
                             </div>
                           )}
                         </div>
