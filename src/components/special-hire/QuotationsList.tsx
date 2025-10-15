@@ -172,6 +172,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator }: Props) {
         intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
         audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
         additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || []),
+        bus_fleet_details: typeof item.bus_fleet_details === 'string' ? JSON.parse(item.bus_fleet_details) : item.bus_fleet_details,
         all_versions: [] // Load versions lazily when needed
       }));
 
@@ -313,7 +314,8 @@ export function QuotationsList({ onRefresh, onViewInCalculator }: Props) {
         total_distance_km: (versionData.km_parking_to_pickup || 0) + (versionData.km_trip || 0) + (versionData.km_drop_to_parking || 0),
         intermediate_stops: typeof versionData.intermediate_stops === 'string' ? versionData.intermediate_stops : JSON.stringify(versionData.intermediate_stops || []),
         audit_log: Array.isArray(versionData.audit_log) ? versionData.audit_log : (versionData.audit_log ? [versionData.audit_log] : []),
-        additional_charges: typeof versionData.additional_charges === 'string' ? versionData.additional_charges : JSON.stringify(versionData.additional_charges || [])
+        additional_charges: typeof versionData.additional_charges === 'string' ? versionData.additional_charges : JSON.stringify(versionData.additional_charges || []),
+        bus_fleet_details: typeof versionData.bus_fleet_details === 'string' ? JSON.parse(versionData.bus_fleet_details) : versionData.bus_fleet_details
       };
 
       setSelectedQuotation(transformedVersion as Quotation);
