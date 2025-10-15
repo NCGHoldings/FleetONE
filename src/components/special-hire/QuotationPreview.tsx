@@ -400,235 +400,104 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Vehicle Details */}
-        {quotation.bus_fleet_details?.buses && quotation.bus_fleet_details.buses.length > 0 ? (
-          // Multi-Bus Fleet Display
-          <div style={{ marginTop: '12px' }}>
-            <div style={{ 
-              backgroundColor: '#dbeafe', 
+        <table style={{ 
+          width: '100%', 
+          borderCollapse: 'collapse', 
+          fontSize: '11px',
+          marginTop: '12px',
+          fontFamily: '"Segoe UI", Arial, sans-serif'
+        }}>
+          <thead>
+            <tr>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '12%'
+              }}>Model</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '8%'
+              }}>Vehicles</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '8%'
+              }}>Capacity</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '35%'
+              }}>Description</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '10%'
+              }}>Mileage</th>
+              <th style={{ 
+                border: '1px solid #d1d5db', 
+                padding: '8px', 
+                backgroundColor: '#eff6ff', 
+                fontWeight: '600', 
+                color: '#2563eb', 
+                textAlign: 'left', 
+                verticalAlign: 'middle',
+                width: '27%'
+              }}>Total Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+            <td style={{ 
+              border: '1px solid #d1d5db', 
               padding: '8px', 
-              fontWeight: '600', 
-              color: '#1e40af',
-              fontSize: '12px',
-              marginBottom: '8px',
-              borderRadius: '4px'
+              textAlign: 'center', 
+              verticalAlign: 'middle',
+              color: '#374151'
             }}>
-              Bus Fleet Details
-            </div>
-            <table style={{ 
-              width: '100%', 
-              borderCollapse: 'collapse', 
-              fontSize: '10px',
-              fontFamily: '"Segoe UI", Arial, sans-serif'
+              {quotation.bus_fleet_details?.buses?.[0]?.bus_type_name || quotation.bus_type}
+            </td>
+            <td style={{ 
+              border: '1px solid #d1d5db', 
+              padding: '8px', 
+              textAlign: 'center', 
+              verticalAlign: 'middle',
+              color: '#374151'
+            }}>{quotation.number_of_buses.toString().padStart(2, '0')}</td>
+            <td style={{ 
+              border: '1px solid #d1d5db', 
+              padding: '8px', 
+              textAlign: 'center', 
+              verticalAlign: 'middle',
+              color: '#374151'
             }}>
-              <thead>
-                <tr>
-                  <th style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    backgroundColor: '#eff6ff', 
-                    fontWeight: '600', 
-                    color: '#2563eb', 
-                    textAlign: 'left' 
-                  }}>Bus Type</th>
-                  <th style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    backgroundColor: '#eff6ff', 
-                    fontWeight: '600', 
-                    color: '#2563eb', 
-                    textAlign: 'center' 
-                  }}>Qty</th>
-                  <th style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    backgroundColor: '#eff6ff', 
-                    fontWeight: '600', 
-                    color: '#2563eb', 
-                    textAlign: 'center' 
-                  }}>Capacity</th>
-                  <th style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    backgroundColor: '#eff6ff', 
-                    fontWeight: '600', 
-                    color: '#2563eb', 
-                    textAlign: 'right' 
-                  }}>Hire Charge/Bus</th>
-                  <th style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    backgroundColor: '#eff6ff', 
-                    fontWeight: '600', 
-                    color: '#2563eb', 
-                    textAlign: 'right' 
-                  }}>Fuel/Bus</th>
-                  <th style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    backgroundColor: '#eff6ff', 
-                    fontWeight: '600', 
-                    color: '#2563eb', 
-                    textAlign: 'right' 
-                  }}>Total Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                {quotation.bus_fleet_details.buses.map((bus, index) => (
-                  <tr key={index}>
-                    <td style={{ border: '1px solid #d1d5db', padding: '6px', color: '#374151' }}>
-                      {bus.bus_type_name}
-                    </td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '6px', textAlign: 'center', color: '#374151' }}>
-                      {bus.quantity}x
-                    </td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '6px', textAlign: 'center', color: '#374151' }}>
-                      {bus.seating_capacity * bus.quantity} seats
-                    </td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '6px', textAlign: 'right', color: '#374151' }}>
-                      LKR {bus.hire_charge_per_bus.toLocaleString()}
-                    </td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '6px', textAlign: 'right', color: '#374151' }}>
-                      LKR {bus.fuel_cost_per_bus.toLocaleString()}
-                    </td>
-                    <td style={{ border: '1px solid #d1d5db', padding: '6px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>
-                      LKR {bus.subtotal_all_buses.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-                <tr>
-                  <td colSpan={2} style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    fontWeight: '700', 
-                    backgroundColor: '#dbeafe', 
-                    color: '#1e40af' 
-                  }}>Total Fleet</td>
-                  <td style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    textAlign: 'center', 
-                    fontWeight: '700', 
-                    backgroundColor: '#dbeafe', 
-                    color: '#1e40af' 
-                  }}>
-                    {quotation.bus_fleet_details.total_capacity} seats
-                  </td>
-                  <td colSpan={2} style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    backgroundColor: '#dbeafe' 
-                  }}></td>
-                  <td style={{ 
-                    border: '1px solid #d1d5db', 
-                    padding: '6px', 
-                    textAlign: 'right', 
-                    fontWeight: '700', 
-                    fontSize: '11px',
-                    backgroundColor: '#dbeafe', 
-                    color: '#1e40af' 
-                  }}>
-                    LKR {quotation.bus_fleet_details.combined_subtotal.toLocaleString()}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          // Single Bus Type Display (existing)
-          <table style={{ 
-            width: '100%', 
-            borderCollapse: 'collapse', 
-            fontSize: '11px',
-            marginTop: '12px',
-            fontFamily: '"Segoe UI", Arial, sans-serif'
-          }}>
-            <thead>
-              <tr>
-                <th style={{ 
-                  border: '1px solid #d1d5db', 
-                  padding: '8px', 
-                  backgroundColor: '#eff6ff', 
-                  fontWeight: '600', 
-                  color: '#2563eb', 
-                  textAlign: 'left', 
-                  verticalAlign: 'middle',
-                  width: '12%'
-                }}>Model</th>
-                <th style={{ 
-                  border: '1px solid #d1d5db', 
-                  padding: '8px', 
-                  backgroundColor: '#eff6ff', 
-                  fontWeight: '600', 
-                  color: '#2563eb', 
-                  textAlign: 'left', 
-                  verticalAlign: 'middle',
-                  width: '8%'
-                }}>Vehicles</th>
-                <th style={{ 
-                  border: '1px solid #d1d5db', 
-                  padding: '8px', 
-                  backgroundColor: '#eff6ff', 
-                  fontWeight: '600', 
-                  color: '#2563eb', 
-                  textAlign: 'left', 
-                  verticalAlign: 'middle',
-                  width: '8%'
-                }}>Capacity</th>
-                <th style={{ 
-                  border: '1px solid #d1d5db', 
-                  padding: '8px', 
-                  backgroundColor: '#eff6ff', 
-                  fontWeight: '600', 
-                  color: '#2563eb', 
-                  textAlign: 'left', 
-                  verticalAlign: 'middle',
-                  width: '35%'
-                }}>Description</th>
-                <th style={{ 
-                  border: '1px solid #d1d5db', 
-                  padding: '8px', 
-                  backgroundColor: '#eff6ff', 
-                  fontWeight: '600', 
-                  color: '#2563eb', 
-                  textAlign: 'left', 
-                  verticalAlign: 'middle',
-                  width: '10%'
-                }}>Mileage</th>
-                <th style={{ 
-                  border: '1px solid #d1d5db', 
-                  padding: '8px', 
-                  backgroundColor: '#eff6ff', 
-                  fontWeight: '600', 
-                  color: '#2563eb', 
-                  textAlign: 'left', 
-                  verticalAlign: 'middle',
-                  width: '27%'
-                }}>Total Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-              <td style={{ 
-                border: '1px solid #d1d5db', 
-                padding: '8px', 
-                textAlign: 'center', 
-                verticalAlign: 'middle',
-                color: '#374151'
-              }}>{quotation.bus_type}</td>
-              <td style={{ 
-                border: '1px solid #d1d5db', 
-                padding: '8px', 
-                textAlign: 'center', 
-                verticalAlign: 'middle',
-                color: '#374151'
-              }}>{quotation.number_of_buses.toString().padStart(2, '0')}</td>
-              <td style={{ 
-                border: '1px solid #d1d5db', 
-                padding: '8px', 
-                textAlign: 'center', 
-                verticalAlign: 'middle',
-                color: '#374151'
-              }}>{quotation.seating_capacity || 54}</td>
+              {quotation.bus_fleet_details?.total_capacity || quotation.seating_capacity || 54}
+            </td>
               <td style={{ 
                 border: '1px solid #d1d5db', 
                 padding: '8px', 
@@ -708,7 +577,6 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             </tr>
             </tbody>
           </table>
-        )}
 
         {/* Route Information */}
         {intermediateStops.length > 0 && (
