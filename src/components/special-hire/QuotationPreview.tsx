@@ -400,7 +400,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
         </div>
 
         {/* Vehicle Details */}
-        {quotation.bus_fleet_details ? (
+        {quotation.bus_fleet_details?.buses && quotation.bus_fleet_details.buses.length > 0 ? (
           // Multi-Bus Fleet Display
           <div style={{ marginTop: '12px' }}>
             <div style={{ 
