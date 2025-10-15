@@ -3045,6 +3045,7 @@ export type Database = {
           assigned_driver_name: string | null
           audit_log: Json | null
           balance_due: number | null
+          bus_fleet_details: Json | null
           bus_type_id: string | null
           cancellation_reason: string | null
           commission_amount: number | null
@@ -3125,6 +3126,7 @@ export type Database = {
           assigned_driver_name?: string | null
           audit_log?: Json | null
           balance_due?: number | null
+          bus_fleet_details?: Json | null
           bus_type_id?: string | null
           cancellation_reason?: string | null
           commission_amount?: number | null
@@ -3205,6 +3207,7 @@ export type Database = {
           assigned_driver_name?: string | null
           audit_log?: Json | null
           balance_due?: number | null
+          bus_fleet_details?: Json | null
           bus_type_id?: string | null
           cancellation_reason?: string | null
           commission_amount?: number | null

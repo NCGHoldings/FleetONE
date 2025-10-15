@@ -67,6 +67,23 @@ interface CostData {
     kmDropToParking: number;
   }>;
   isMultiParking?: boolean;
+  // Multi-bus fleet support
+  busFleetDetails?: {
+    buses: Array<{
+      bus_type_id: string;
+      bus_type_name: string;
+      quantity: number;
+      seating_capacity: number;
+      hire_charge_per_bus: number;
+      fuel_cost_per_bus: number;
+      maintenance_cost_per_bus: number;
+      subtotal_per_bus: number;
+      subtotal_all_buses: number;
+    }>;
+    total_buses: number;
+    total_capacity: number;
+    combined_subtotal: number;
+  };
 }
 
 interface Props {
@@ -162,6 +179,62 @@ export function CostBreakdown({ data }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Multi-Bus Fleet Breakdown */}
+        {data.busFleetDetails && (
+          <div>
+            <h4 className="font-medium mb-4 text-lg">Bus Fleet Breakdown</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="border border-border p-2 text-left">Bus Type</th>
+                    <th className="border border-border p-2 text-center">Qty</th>
+                    <th className="border border-border p-2 text-center">Capacity</th>
+                    <th className="border border-border p-2 text-right">Hire/Bus</th>
+                    <th className="border border-border p-2 text-right">Fuel/Bus</th>
+                    <th className="border border-border p-2 text-right">Maintenance/Bus</th>
+                    <th className="border border-border p-2 text-right">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.busFleetDetails.buses.map((bus, index) => (
+                    <tr key={index} className="hover:bg-muted/50">
+                      <td className="border border-border p-2 font-medium">{bus.bus_type_name}</td>
+                      <td className="border border-border p-2 text-center">{bus.quantity}x</td>
+                      <td className="border border-border p-2 text-center">
+                        {bus.seating_capacity * bus.quantity} seats
+                      </td>
+                      <td className="border border-border p-2 text-right">
+                        LKR {bus.hire_charge_per_bus.toLocaleString()}
+                      </td>
+                      <td className="border border-border p-2 text-right">
+                        LKR {bus.fuel_cost_per_bus.toLocaleString()}
+                      </td>
+                      <td className="border border-border p-2 text-right">
+                        LKR {bus.maintenance_cost_per_bus.toLocaleString()}
+                      </td>
+                      <td className="border border-border p-2 text-right font-semibold text-primary">
+                        LKR {bus.subtotal_all_buses.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-primary/10 font-bold">
+                    <td className="border border-border p-2" colSpan={2}>Total Fleet</td>
+                    <td className="border border-border p-2 text-center">
+                      {data.busFleetDetails.total_capacity} seats
+                    </td>
+                    <td className="border border-border p-2" colSpan={3}></td>
+                    <td className="border border-border p-2 text-right text-lg text-primary">
+                      LKR {data.busFleetDetails.combined_subtotal.toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <Separator className="my-4" />
+          </div>
+        )}
+
         {/* Distance Breakdown */}
         <div>
           <h4 className="font-medium mb-2">Distance Analysis</h4>

@@ -33,7 +33,7 @@ const formSchema = z.object({
   specialRequest: z.string().optional(),
   
   // Trip Details
-  busTypeId: z.string().min(1, 'Bus type is required'),
+  busTypeId: z.string().optional(), // Made optional for multi-bus mode
   hireType: z.enum(['Outside', 'Lyceum', 'Internal']),
   numberOfBuses: z.number().min(1, 'At least 1 bus is required'),
   pickupLocation: z.string().min(1, 'Pickup location is required'),
@@ -82,6 +82,12 @@ interface OtherExpense {
   id: string;
   label: string;
   amount: number;
+}
+
+interface SelectedBusFleet {
+  id: string;
+  busTypeId: string;
+  quantity: number;
 }
 
 type FormData = z.infer<typeof formSchema>;
@@ -137,6 +143,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     parkingLat: number;
     parkingLng: number;
   }>>([]);
+  const [isMultiBusMode, setIsMultiBusMode] = useState(false);
+  const [selectedBusFleet, setSelectedBusFleet] = useState<SelectedBusFleet[]>([
+    { id: crypto.randomUUID(), busTypeId: '', quantity: 1 }
+  ]);
   const [autoSaved, setAutoSaved] = useState(false);
   const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1229,31 +1239,70 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                 <CardTitle className="text-lg">Trip Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6 p-6">
+                {/* Multi-Bus Fleet Mode Toggle */}
+                <div className="md:col-span-4">
+                  <Card className="bg-muted/50">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-base font-semibold">Bus Fleet Selection</Label>
+                          <p className="text-sm text-muted-foreground">Request multiple bus types for this trip</p>
+                        </div>
+                        <Switch 
+                          checked={isMultiBusMode}
+                          onCheckedChange={(checked) => {
+                            setIsMultiBusMode(checked);
+                            if (!checked) {
+                              // Reset to single bus mode
+                              setSelectedBusFleet([{ id: crypto.randomUUID(), busTypeId: '', quantity: 1 }]);
+                            }
+                          }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="busTypeId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Bus Type *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select bus type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {busTypes.map((busType) => (
-                              <SelectItem key={busType.id} value={busType.id}>
-                                {busType.name} (Capacity: {busType.capacity})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {!isMultiBusMode ? (
+                    // Single Bus Type Mode
+                    <FormField
+                      control={form.control}
+                      name="busTypeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bus Type *</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select bus type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {busTypes.map((busType) => (
+                                <SelectItem key={busType.id} value={busType.id}>
+                                  {busType.name} (Capacity: {busType.capacity})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    // Multi-Bus Fleet Mode - Show fleet summary in header
+                    <div className="lg:col-span-1">
+                      <Label>Fleet Summary</Label>
+                      <div className="text-sm mt-2 p-3 bg-primary/10 rounded-md">
+                        <div className="font-medium">Total Buses: {selectedBusFleet.reduce((sum, bus) => sum + (bus.quantity || 0), 0)}</div>
+                        <div className="text-muted-foreground">Total Capacity: {selectedBusFleet.reduce((sum, bus) => {
+                          const busType = busTypes.find(bt => bt.id === bus.busTypeId);
+                          return sum + ((busType?.capacity || 0) * (bus.quantity || 0));
+                        }, 0)} seats</div>
+                      </div>
+                    </div>
+                  )}
 
                   <FormField
                     control={form.control}
@@ -1322,25 +1371,123 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     </div>
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="numberOfBuses"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Number of Buses *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="1"
-                            {...field}
-                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : '')}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {!isMultiBusMode && (
+                    <FormField
+                      control={form.control}
+                      name="numberOfBuses"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Number of Buses *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : '')}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
+
+                {/* Multi-Bus Fleet Selection UI */}
+                {isMultiBusMode && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">Fleet Configuration</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedBusFleet([...selectedBusFleet, { 
+                            id: crypto.randomUUID(), 
+                            busTypeId: '', 
+                            quantity: 1 
+                          }]);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Bus Type
+                      </Button>
+                    </div>
+                    
+                    {selectedBusFleet.map((bus, index) => (
+                      <Card key={bus.id} className="bg-card">
+                        <CardContent className="pt-6">
+                          <div className="grid grid-cols-12 gap-4 items-end">
+                            <div className="col-span-6">
+                              <Label>Bus Type</Label>
+                              <Select
+                                value={bus.busTypeId}
+                                onValueChange={(value) => {
+                                  const updated = [...selectedBusFleet];
+                                  updated[index] = { ...updated[index], busTypeId: value };
+                                  setSelectedBusFleet(updated);
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select bus type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {busTypes.map((busType) => (
+                                    <SelectItem key={busType.id} value={busType.id}>
+                                      {busType.name} ({busType.capacity} seats)
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div className="col-span-3">
+                              <Label>Quantity</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={bus.quantity}
+                                onChange={(e) => {
+                                  const updated = [...selectedBusFleet];
+                                  updated[index] = { ...updated[index], quantity: parseInt(e.target.value) || 1 };
+                                  setSelectedBusFleet(updated);
+                                }}
+                              />
+                            </div>
+                            
+                            <div className="col-span-3 flex items-center gap-2">
+                              {(() => {
+                                const busType = busTypes.find(bt => bt.id === bus.busTypeId);
+                                return busType ? (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {bus.quantity}x {busType.name} = {bus.quantity * busType.capacity} seats
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs text-muted-foreground">
+                                    Select bus type
+                                  </Badge>
+                                );
+                              })()}
+                              {selectedBusFleet.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setSelectedBusFleet(selectedBusFleet.filter((_, i) => i !== index));
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <FormField
