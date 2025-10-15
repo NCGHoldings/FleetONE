@@ -1972,6 +1972,48 @@ export type Database = {
           },
         ]
       }
+      referral_agents: {
+        Row: {
+          agent_name: string
+          created_at: string | null
+          created_by: string | null
+          default_commission_pct: number | null
+          id: string
+          notes: string | null
+          phone: string | null
+          status: string | null
+          total_commission_earned: number | null
+          total_referrals: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_name: string
+          created_at?: string | null
+          created_by?: string | null
+          default_commission_pct?: number | null
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string | null
+          total_commission_earned?: number | null
+          total_referrals?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_name?: string
+          created_at?: string | null
+          created_by?: string | null
+          default_commission_pct?: number | null
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string | null
+          total_commission_earned?: number | null
+          total_referrals?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       repair_staff_log: {
         Row: {
           created_at: string
@@ -3092,6 +3134,9 @@ export type Database = {
           pickup_lng: number | null
           pickup_location: string
           quotation_no: string
+          referral_agent_id: string | null
+          referral_commission_amount: number | null
+          referral_commission_pct: number | null
           refund_amount: number | null
           refund_processed_at: string | null
           refund_processed_by: string | null
@@ -3174,6 +3219,9 @@ export type Database = {
           pickup_lng?: number | null
           pickup_location: string
           quotation_no?: string
+          referral_agent_id?: string | null
+          referral_commission_amount?: number | null
+          referral_commission_pct?: number | null
           refund_amount?: number | null
           refund_processed_at?: string | null
           refund_processed_by?: string | null
@@ -3256,6 +3304,9 @@ export type Database = {
           pickup_lng?: number | null
           pickup_location?: string
           quotation_no?: string
+          referral_agent_id?: string | null
+          referral_commission_amount?: number | null
+          referral_commission_pct?: number | null
           refund_amount?: number | null
           refund_processed_at?: string | null
           refund_processed_by?: string | null
@@ -3304,6 +3355,13 @@ export type Database = {
             columns: ["parking_location_id"]
             isOneToOne: false
             referencedRelation: "fuel_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_quotations_referral_agent_id_fkey"
+            columns: ["referral_agent_id"]
+            isOneToOne: false
+            referencedRelation: "referral_agents"
             referencedColumns: ["id"]
           },
           {

@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, MapPin, Plus, X, Trash2, Eye, Calculator, Save } from 'lucide-react';
+import { CalendarIcon, MapPin, Plus, X, Trash2, Eye, Calculator, Save, Users } from 'lucide-react';
+import { AddReferralAgentModal } from './AddReferralAgentModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +53,10 @@ const formSchema = z.object({
   discountType: z.enum(['percentage', 'amount']).default('percentage'),
   discountPct: z.number().min(0, 'Discount percentage must be positive').max(100, 'Discount cannot exceed 100%').default(0),
   discountAmount: z.number().min(0, 'Discount amount must be positive').default(0),
+  
+  // Referral Agent (optional)
+  referralAgentId: z.string().optional(),
+  referralCommissionPct: z.number().min(0).max(100).default(3.0),
 }).refine((data) => data.commissionPassThroughPct <= data.commissionPct, {
   message: "Commission pass-through cannot exceed commission percentage",
   path: ["commissionPassThroughPct"],
@@ -149,6 +154,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   ]);
   const [autoSaved, setAutoSaved] = useState(false);
   const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState(false);
+  
+  // Referral Agent state
+  const [referralAgents, setReferralAgents] = useState<any[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<any>(null);
+  const [showAddAgentModal, setShowAddAgentModal] = useState(false);
+  
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
@@ -177,6 +188,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       discountType: (initialData.discount_percentage && initialData.discount_percentage > 0) ? 'percentage' : 'amount',
       discountPct: initialData.discount_percentage || 0,
       discountAmount: initialData.discount_amount_lkr || 0,
+      referralAgentId: initialData.referral_agent_id || '',
+      referralCommissionPct: initialData.referral_commission_pct || 3.0,
     } : {
       companyName: '',
       customerName: '',
@@ -197,6 +210,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       discountType: 'percentage',
       discountPct: 0,
       discountAmount: 0,
+      referralAgentId: '',
+      referralCommissionPct: 3.0,
     }
   });
 
@@ -205,6 +220,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   useEffect(() => {
     loadBusTypes();
     loadParkingLocations();
+    loadReferralAgents();
     
     // Auto-fill form from submission data
     if (submissionData) {
@@ -519,6 +535,59 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         variant: "destructive"
       });
     }
+  };
+
+  const loadReferralAgents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('referral_agents')
+        .select('*')
+        .eq('status', 'active')
+        .order('agent_name');
+
+      if (error) throw error;
+      setReferralAgents(data || []);
+    } catch (error: any) {
+      console.error('Error loading referral agents:', error);
+      // Silently fail - agents are optional
+    }
+  };
+
+  const handleAgentSelect = async (agentId: string) => {
+    if (!agentId) {
+      setSelectedAgent(null);
+      form.setValue('referralCommissionPct', 3.0);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('referral_agents')
+        .select('*')
+        .eq('id', agentId)
+        .single();
+
+      if (error) throw error;
+      
+      setSelectedAgent(data);
+      // Auto-fill commission percentage with agent's default rate
+      form.setValue('referralCommissionPct', data.default_commission_pct || 3.0);
+    } catch (error: any) {
+      console.error('Error loading agent details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load agent details",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAgentAdded = async (agentId: string) => {
+    // Reload agents list
+    await loadReferralAgents();
+    // Select the newly added agent
+    form.setValue('referralAgentId', agentId);
+    handleAgentSelect(agentId);
   };
 
   const addIntermediateStop = () => {
@@ -1404,6 +1473,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   };
 
   return (
+    <>
     <Dialog open={true} onOpenChange={() => onCancel()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -2463,6 +2533,139 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       />
                     )}
                   </div>
+
+                  {/* Referral Agent Section */}
+                  <div className="col-span-2 border-t pt-4 mt-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <div className="text-sm font-medium text-muted-foreground">
+                        Referral Agent (Optional)
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* Agent Selector */}
+                      <FormField
+                        control={form.control}
+                        name="referralAgentId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-foreground">Agent Name</FormLabel>
+                            <Select 
+                              onValueChange={(value) => {
+                                if (value === 'add-new') {
+                                  setShowAddAgentModal(true);
+                                } else {
+                                  field.onChange(value);
+                                  handleAgentSelect(value);
+                                }
+                              }}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-10 text-base">
+                                  <SelectValue placeholder="Select agent or add new" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="add-new">
+                                  <div className="flex items-center gap-2 font-medium text-primary">
+                                    <Plus className="h-4 w-4" />
+                                    Add New Agent
+                                  </div>
+                                </SelectItem>
+                                {referralAgents.length > 0 && (
+                                  <>
+                                    <Separator className="my-1" />
+                                    {referralAgents.map((agent) => (
+                                      <SelectItem key={agent.id} value={agent.id}>
+                                        <div>
+                                          <div className="font-medium">{agent.agent_name}</div>
+                                          <div className="text-xs text-muted-foreground">
+                                            {agent.phone || 'No phone'} • {agent.total_referrals} trips • {agent.default_commission_pct}%
+                                          </div>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Commission Percentage */}
+                      <FormField
+                        control={form.control}
+                        name="referralCommissionPct"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-foreground">Commission %</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="100"
+                                placeholder="3.0"
+                                className="h-10 text-base"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                disabled={!form.watch('referralAgentId')}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                            <div className="text-xs text-muted-foreground">
+                              Agent commission rate
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Calculated Commission Amount (Read-only) */}
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-foreground">Commission Amount</FormLabel>
+                        <Input
+                          type="text"
+                          value={
+                            form.watch('referralAgentId') && costData?.customerTotalWithFuel
+                              ? `LKR ${Math.round((costData.customerTotalWithFuel * form.watch('referralCommissionPct')) / 100).toLocaleString()}`
+                              : 'LKR 0'
+                          }
+                          disabled
+                          className="h-10 text-base bg-muted"
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          Auto-calculated from total
+                        </div>
+                      </FormItem>
+                    </div>
+
+                    {/* Show Agent Stats */}
+                    {selectedAgent && form.watch('referralAgentId') && (
+                      <div className="mt-3 p-3 bg-muted/50 rounded-lg border">
+                        <div className="text-xs font-medium text-muted-foreground mb-2">Agent History</div>
+                        <div className="flex gap-6 text-sm">
+                          <div>
+                            <span className="font-semibold text-foreground">{selectedAgent.total_referrals}</span>
+                            <span className="text-muted-foreground ml-1">trips referred</span>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-foreground">LKR {selectedAgent.total_commission_earned?.toLocaleString() || '0'}</span>
+                            <span className="text-muted-foreground ml-1">total earned</span>
+                          </div>
+                          {selectedAgent.phone && (
+                            <div>
+                              <span className="text-muted-foreground">Phone:</span>
+                              <span className="font-medium text-foreground ml-1">{selectedAgent.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 </div>
               </CardContent>
@@ -2490,10 +2693,18 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                {loading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Quotation' : 'Create Quotation')}
              </Button>
            </div>
-         </div>
-          </form>
-        </Form>
+          </div>
+           </form>
+         </Form>
       </DialogContent>
     </Dialog>
+
+    {/* Add Referral Agent Modal */}
+    <AddReferralAgentModal
+      open={showAddAgentModal}
+      onOpenChange={setShowAddAgentModal}
+      onAgentAdded={handleAgentAdded}
+    />
+    </>
   );
 }
