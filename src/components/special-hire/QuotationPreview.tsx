@@ -472,7 +472,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
             </tr>
           </thead>
           <tbody>
-            {quotation.bus_fleet_details?.buses && quotation.bus_fleet_details.buses.length > 0 ? (
+            {Array.isArray(quotation.bus_fleet_details?.buses) && quotation.bus_fleet_details.buses.length > 0 ? (
               <>
                 {/* Individual bus rows */}
                 {quotation.bus_fleet_details.buses.map((bus, index) => (
@@ -484,7 +484,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       verticalAlign: 'middle',
                       color: '#374151'
                     }}>
-                      {bus.bus_type_name}
+                      {bus?.bus_type_name || 'N/A'}
                     </td>
                     <td style={{ 
                       border: '1px solid #d1d5db', 
@@ -493,7 +493,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       verticalAlign: 'middle',
                       color: '#374151'
                     }}>
-                      {bus.quantity}x
+                      {bus?.quantity || 0}x
                     </td>
                     <td style={{ 
                       border: '1px solid #d1d5db', 
@@ -502,7 +502,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       verticalAlign: 'middle',
                       color: '#374151'
                     }}>
-                      {bus.seating_capacity * bus.quantity} seats
+                      {((bus?.seating_capacity || 0) * (bus?.quantity || 1))} seats
                     </td>
                     <td style={{ 
                       border: '1px solid #d1d5db', 
@@ -547,7 +547,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       textAlign: 'right'
                     }}>
                       <div style={{ fontSize: '11px', color: '#374151' }}>
-                        LKR {bus.subtotal_all_buses?.toLocaleString() || '0'}
+                        LKR {(bus?.subtotal_all_buses || 0).toLocaleString()}
                       </div>
                     </td>
                   </tr>

@@ -165,7 +165,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator }: Props) {
       // Transform data with creator names from the map
       const transformedData = quotationsData.map((item: any) => ({
         ...item,
-        bus_type: item.bus_types?.name || 'Unknown',
+        bus_type: item.bus_fleet_details?.buses?.[0]?.bus_type_name || item.bus_types?.name || 'Unknown',
         seating_capacity: item.bus_types?.capacity || 54,
         created_by_name: item.created_by ? profileMap.get(item.created_by) || 'Unknown User' : 'System',
         total_distance_km: (item.km_parking_to_pickup || 0) + (item.km_trip || 0) + (item.km_drop_to_parking || 0),
