@@ -111,9 +111,10 @@ const getRevenueBreakdown = (quotation: Quotation) => {
 interface Props {
   onRefresh: () => void;
   onViewInCalculator?: (quotationId: string) => void;
+  refreshTrigger?: number;
 }
 
-export function QuotationsList({ onRefresh, onViewInCalculator }: Props) {
+export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }: Props) {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -196,6 +197,28 @@ export function QuotationsList({ onRefresh, onViewInCalculator }: Props) {
 
   useEffect(() => {
     loadQuotations();
+  }, [refreshTrigger]);
+
+  // Set up realtime subscription for automatic updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('quotations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'special_hire_quotations'
+        },
+        () => {
+          loadQuotations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const getStatusBadge = (status: string) => {

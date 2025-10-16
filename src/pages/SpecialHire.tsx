@@ -48,6 +48,7 @@ export default function SpecialHire() {
   const [showForm, setShowForm] = useState(false);
   const [submissionData, setSubmissionData] = useState(null);
   const [selectedCalculatorQuotationId, setSelectedCalculatorQuotationId] = useState<string | undefined>(undefined);
+  const [refreshQuotationsTrigger, setRefreshQuotationsTrigger] = useState(0);
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
     pendingQuotations: 0,
@@ -237,6 +238,7 @@ export default function SpecialHire() {
     setShowForm(false);
     setSubmissionData(null);
     loadStats(); // Refresh stats after new quotation
+    setRefreshQuotationsTrigger(prev => prev + 1); // Trigger quotations list refresh
     toast({
       title: 'Success',
       description: 'Quotation created successfully',
@@ -493,7 +495,8 @@ export default function SpecialHire() {
             </Button>
           </div>
             <QuotationsList 
-              onRefresh={loadStats} 
+              onRefresh={loadStats}
+              refreshTrigger={refreshQuotationsTrigger}
               onViewInCalculator={handleViewInCalculator}
             />
         </TabsContent>
