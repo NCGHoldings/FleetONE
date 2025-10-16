@@ -19,7 +19,9 @@ import {
   AlertTriangle,
   Package,
   Settings2,
-  GraduationCap
+  GraduationCap,
+  ShoppingCart,
+  FileSpreadsheet
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -75,6 +77,11 @@ const yutongItems = [
   { id: "yutong_addons", title: "Add-ons", url: "/yutong-quotations?tab=addons", icon: Package },
 ];
 
+const nspItems = [
+  { id: "nsp_daily_sales", title: "Daily Sales", url: "/nsp-daily-sales", icon: ShoppingCart },
+  { id: "nsp_summary", title: "Summary & Reports", url: "/nsp-summary", icon: FileSpreadsheet },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -122,6 +129,7 @@ const visibleMain = mainItems.filter((i) => hasAccess(i.id));
 const visibleOperations = operationsItems.filter((i) => hasAccess(i.id));
 const visibleBusiness = businessItems.filter((i) => hasAccess(i.id));
 const visibleYutong = yutongItems.filter((i) => hasAccess(i.id));
+const visibleNSP = nspItems.filter((i) => hasAccess(i.id));
 
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"} collapsible="icon">
@@ -210,6 +218,27 @@ const visibleYutong = yutongItems.filter((i) => hasAccess(i.id));
           <SidebarGroupContent>
             <SidebarMenu>
 {visibleYutong.map((item) => (
+  <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse"></div>
+            NCG Spare Parts
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+{visibleNSP.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
       <NavLink to={item.url} className={getNavCls}>

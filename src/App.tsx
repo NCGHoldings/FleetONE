@@ -47,6 +47,8 @@ import SchoolBranchReports from "./pages/SchoolBranchReports";
 import GlobalSchoolImport from "./pages/GlobalSchoolImport";
 import GlobalSchoolPayments from "./pages/GlobalSchoolPayments";
 import TotalDashboard from "./pages/TotalDashboard";
+import NSPDailySales from "./pages/NSPDailySales";
+import NSPSalesSummary from "./pages/NSPSalesSummary";
 
 const queryClient = new QueryClient();
 
@@ -418,6 +420,28 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <YutongQuotations />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/nsp-daily-sales" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
+                  <AppLayout>
+                    <NSPDailySales />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/nsp-summary" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
+                  <AppLayout>
+                    <NSPSalesSummary />
                   </AppLayout>
                 </ProtectedRoute>
               } 

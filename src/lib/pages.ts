@@ -12,6 +12,7 @@ export type PageCategories = {
   operations: PageItem[];
   business: PageItem[];
   yutong: PageItem[];
+  nsp: PageItem[];
 };
 
 export const PAGES: PageCategories = {
@@ -45,6 +46,10 @@ export const PAGES: PageCategories = {
     { id: "yutong_bus_models", title: "Bus Models", url: "/yutong-quotations?tab=bus-models" },
     { id: "yutong_addons", title: "Add-ons", url: "/yutong-quotations?tab=addons" },
   ],
+  nsp: [
+    { id: "nsp_daily_sales", title: "Daily Sales", url: "/nsp-daily-sales" },
+    { id: "nsp_summary", title: "Summary & Reports", url: "/nsp-summary" },
+  ],
 };
 
 export const ALL_PAGES_FLAT: PageItem[] = [
@@ -52,4 +57,5 @@ export const ALL_PAGES_FLAT: PageItem[] = [
   ...PAGES.operations,
   ...PAGES.business,
   ...PAGES.yutong,
+  ...PAGES.nsp,
 ];

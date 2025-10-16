@@ -1567,6 +1567,54 @@ export type Database = {
         }
         Relationships: []
       }
+      nsp_daily_sales: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          lss_inside_sale: number
+          lss_outside_sale: number
+          notes: string | null
+          other_income: Json | null
+          pepiliyana_sale: number
+          sale_date: string
+          total_sale: number
+          tyre_quantity: string | null
+          tyre_sale: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lss_inside_sale?: number
+          lss_outside_sale?: number
+          notes?: string | null
+          other_income?: Json | null
+          pepiliyana_sale?: number
+          sale_date: string
+          total_sale?: number
+          tyre_quantity?: string | null
+          tyre_sale?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lss_inside_sale?: number
+          lss_outside_sale?: number
+          notes?: string | null
+          other_income?: Json | null
+          pepiliyana_sale?: number
+          sale_date?: string
+          total_sale?: number
+          tyre_quantity?: string | null
+          tyre_sale?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payment_notifications: {
         Row: {
           created_at: string | null
