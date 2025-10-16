@@ -6694,6 +6694,10 @@ export type Database = {
         }
         Returns: Json
       }
+      verify_admission_number: {
+        Args: { p_admission_no: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role:

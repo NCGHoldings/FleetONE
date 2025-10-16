@@ -34,29 +34,40 @@ export default function PublicReceiptUpload() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('school_students')
-        .select(`
-          *,
-          school_branches!inner(
-            branch_name,
-            branch_code
-          )
-        `)
-        .eq('admission_no', admissionNo.trim())
-        .eq('is_active', true)
-        .maybeSingle();
+      // Use secure verification function instead of direct SELECT query
+      // This protects student PII from being exposed through anonymous queries
+      const { data: verifyResult, error } = await supabase
+        .rpc('verify_admission_number', {
+          p_admission_no: admissionNo.trim()
+        });
 
       if (error) throw error;
 
-      if (!data) {
+      const result = verifyResult as { found: boolean; message?: string; student?: any };
+
+      if (!result || !result.found) {
         toast({
           title: "Student Not Found",
-          description: "No active student found with this admission number",
+          description: result?.message || "No active student found with this admission number",
           variant: "destructive",
         });
         return;
       }
+
+      const studentInfo = result.student;
+
+      // Fetch branch name separately (not exposed by secure function)
+      const { data: branchData } = await supabase
+        .from('school_branches')
+        .select('branch_name, branch_code')
+        .eq('id', studentInfo.branch_id)
+        .single();
+
+      // Format data to match expected structure
+      const data = {
+        ...studentInfo,
+        school_branches: branchData
+      };
 
       // Fetch payment history for transparency
       const { data: transactions } = await supabase
