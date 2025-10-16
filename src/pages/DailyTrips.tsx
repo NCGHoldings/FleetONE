@@ -744,9 +744,11 @@ export default function DailyTrips() {
             Add New Trip
           </Button>
           <Button 
-            onClick={() => data.length > 0 && handleQuickEntryLocal(data[0])}
+            onClick={() => {
+              setSelectedTrip(null);
+              setShowQuickEntry(true);
+            }}
             className="gap-2 bg-gradient-to-r from-green-600 to-blue-600"
-            disabled={data.length === 0}
           >
             <Zap className="w-4 h-4" />
             Quick Entry
@@ -951,16 +953,19 @@ export default function DailyTrips() {
           <DialogHeader>
             <DialogTitle>Quick Entry - Income & Expenses</DialogTitle>
           </DialogHeader>
-          {selectedTrip && (
-            <QuickEntryPanel
-              tripId={selectedTrip.id}
-              onSuccess={() => {
-                fetchTrips();
-                setShowQuickEntry(false);
-              }}
-              onCancel={() => setShowQuickEntry(false)}
-            />
-          )}
+          <QuickEntryPanel
+            tripId={selectedTrip?.id}
+            allowTripSelection={!selectedTrip}
+            onSuccess={() => {
+              fetchTrips();
+              setShowQuickEntry(false);
+              setSelectedTrip(null);
+            }}
+            onCancel={() => {
+              setShowQuickEntry(false);
+              setSelectedTrip(null);
+            }}
+          />
         </DialogContent>
       </Dialog>
 
