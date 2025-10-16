@@ -463,6 +463,7 @@ export type Database = {
           fuel_liters: number | null
           id: string
           income: number | null
+          income_details: Json | null
           km_per_liter: number | null
           net_income: number | null
           notes: string | null
@@ -494,6 +495,7 @@ export type Database = {
           fuel_liters?: number | null
           id?: string
           income?: number | null
+          income_details?: Json | null
           km_per_liter?: number | null
           net_income?: number | null
           notes?: string | null
@@ -525,6 +527,7 @@ export type Database = {
           fuel_liters?: number | null
           id?: string
           income?: number | null
+          income_details?: Json | null
           km_per_liter?: number | null
           net_income?: number | null
           notes?: string | null
@@ -6606,6 +6609,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_expenses_from_details: {
+        Args: { details: Json }
+        Returns: number
+      }
+      calculate_income_from_details: {
+        Args: { details: Json }
+        Returns: number
+      }
       calculate_sla_due_date: {
         Args: { p_business_hours?: number; p_start_date: string }
         Returns: string

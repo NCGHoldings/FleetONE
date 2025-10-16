@@ -3,7 +3,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2, FileText, Edit, Calculator, Download, CalendarIcon, Trash } from "lucide-react";
+import { Calendar, DollarSign, Fuel, Route, MoreHorizontal, Plus, Loader2, FileText, Edit, Calculator, Download, CalendarIcon, Trash, Zap } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ import { AddTripForm } from "@/components/trips/AddTripForm";
 import { OtherExpensesModal } from "@/components/trips/OtherExpensesModal";
 import { ExportModal } from "@/components/trips/ExportModal";
 import { EditTripForm } from "@/components/trips/EditTripForm";
+import { QuickEntryPanel } from "@/components/trips/QuickEntryPanel";
 
 interface Trip {
   id: string;
@@ -78,7 +79,8 @@ const createColumns = (
   handleEditTripLocal: (trip: Trip) => void,
   handleViewExpensesLocal: (trip: Trip) => void,
   handleCancelTripLocal: (tripId: string) => void,
-  handleDeleteTripLocal: (tripId: string) => void
+  handleDeleteTripLocal: (tripId: string) => void,
+  handleQuickEntryLocal: (trip: Trip) => void
 ): ColumnDef<Trip>[] => [
   {
     accessorKey: "trip_no",
@@ -259,6 +261,10 @@ const createColumns = (
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleQuickEntryLocal(trip)}>
+              <Zap className="h-4 w-4 mr-2" />
+              Quick Entry
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleViewDetailsLocal(trip.id)}>
               <FileText className="h-4 w-4 mr-2" />
               View Details
@@ -294,6 +300,7 @@ export default function DailyTrips() {
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showQuickEntry, setShowQuickEntry] = useState(false);
   const [dieselPrice, setDieselPrice] = useState<number>(150);
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
@@ -313,6 +320,11 @@ export default function DailyTrips() {
   const handleViewExpensesLocal = (trip: Trip) => {
     setSelectedTrip(trip);
     setShowExpensesModal(true);
+  };
+
+  const handleQuickEntryLocal = (trip: Trip) => {
+    setSelectedTrip(trip);
+    setShowQuickEntry(true);
   };
 
   const handleCancelTripLocal = async (tripId: string) => {
@@ -731,6 +743,14 @@ export default function DailyTrips() {
             <Plus className="w-4 h-4" />
             Add New Trip
           </Button>
+          <Button 
+            onClick={() => data.length > 0 && handleQuickEntryLocal(data[0])}
+            className="gap-2 bg-gradient-to-r from-green-600 to-blue-600"
+            disabled={data.length === 0}
+          >
+            <Zap className="w-4 h-4" />
+            Quick Entry
+          </Button>
         </div>
       </div>
 
@@ -878,7 +898,7 @@ export default function DailyTrips() {
       <Card>
         <CardContent className="pt-6">
           <DataTable
-            columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal, handleDeleteTripLocal)}
+            columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal, handleDeleteTripLocal, handleQuickEntryLocal)}
             data={data}
             searchKeys={["Bus No.", "Route No.", "Route", "Driver", "Conductor"]}
             title="Daily Trips"
@@ -925,6 +945,24 @@ export default function DailyTrips() {
         trip={selectedTrip}
         onUpdate={fetchTrips}
       />
+
+      <Dialog open={showQuickEntry} onOpenChange={setShowQuickEntry}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Quick Entry - Income & Expenses</DialogTitle>
+          </DialogHeader>
+          {selectedTrip && (
+            <QuickEntryPanel
+              tripId={selectedTrip.id}
+              onSuccess={() => {
+                fetchTrips();
+                setShowQuickEntry(false);
+              }}
+              onCancel={() => setShowQuickEntry(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <ExportModal
         isOpen={showExportModal}
