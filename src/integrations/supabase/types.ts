@@ -3899,6 +3899,30 @@ export type Database = {
           },
         ]
       }
+      upload_rate_limits: {
+        Row: {
+          created_at: string | null
+          form_type: string
+          ip_address: string
+          submission_count: number | null
+          window_start: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          form_type: string
+          ip_address: string
+          submission_count?: number | null
+          window_start?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          form_type?: string
+          ip_address?: string
+          submission_count?: number | null
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       user_page_permissions: {
         Row: {
           granted_at: string
@@ -6620,6 +6644,10 @@ export type Database = {
       calculate_sla_due_date: {
         Args: { p_business_hours?: number; p_start_date: string }
         Returns: string
+      }
+      cleanup_old_rate_limits: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       create_admin_user: {
         Args: Record<PropertyKey, never>

@@ -10,13 +10,13 @@ jwt_expiry = 3600
 password = "password"
 
 [functions.calculate-distance]
-verify_jwt = false
+verify_jwt = false  # Public: Used by public special hire form
 
 [functions.send-quotation-email]
-verify_jwt = false
+verify_jwt = true  # SECURITY FIX: Requires authentication for email sending
 
 [functions.fetch-gps-tracking]
-verify_jwt = false
+verify_jwt = true  # SECURITY FIX: Requires authentication for GPS data access
 
 [functions.accident-records]
 verify_jwt = true
@@ -26,3 +26,18 @@ verify_jwt = true
 
 [functions.accident-documents]
 verify_jwt = true
+
+[functions.search-locations]
+verify_jwt = false  # Public: Used by public forms for location autocomplete
+
+[functions.process-school-excel]
+verify_jwt = true  # Requires authentication for import operations
+
+[functions.send-payment-reminders]
+verify_jwt = true  # Requires authentication for email operations
+
+[functions.verify-receipt-uploads]
+verify_jwt = true  # Requires authentication for verification
+
+[functions.driver-allocation-import]
+verify_jwt = true  # Requires authentication for import operations

@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, CheckCircle, Send } from "lucide-react";
+import { publicComplaintSchema } from "@/lib/validation";
+import { z } from "zod";
 
 interface PublicComplaintFormData {
   customerName: string;
@@ -37,13 +39,19 @@ export default function PublicComplaintForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.description || !formData.category) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
+    // Validate form data
+    try {
+      publicComplaintSchema.parse(formData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        toast({
+          title: "Validation Error",
+          description: firstError.message,
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setIsSubmitting(true);

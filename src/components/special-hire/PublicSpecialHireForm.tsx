@@ -15,6 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { publicSpecialHireSchema } from "@/lib/validation";
+import { z } from "zod";
 
 interface PublicSpecialHireFormData {
   companyName: string;
@@ -118,25 +120,19 @@ export default function PublicSpecialHireForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.customerName || !formData.customerPhone || !formData.pickupLocation || 
-        !formData.dropLocation || !formData.pickupDateTime || !formData.dropDateTime || 
-        !formData.hireType || !formData.busTypeId || formData.numberOfBuses === 0 || 
-        formData.numberOfPassengers === 0) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (formData.pickupDateTime >= formData.dropDateTime) {
-      toast({
-        title: "Error",
-        description: "Drop date/time must be after pickup date/time",
-        variant: "destructive",
-      });
-      return;
+    // Validate form data
+    try {
+      publicSpecialHireSchema.parse(formData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        toast({
+          title: "Validation Error",
+          description: firstError.message,
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -339,11 +335,14 @@ export default function PublicSpecialHireForm() {
                     <Label htmlFor="customerPhone">Phone Number *</Label>
                     <Input
                       id="customerPhone"
+                      type="tel"
+                      placeholder="+94771234567"
                       value={formData.customerPhone}
                       onChange={(e) => setFormData(prev => ({ ...prev, customerPhone: e.target.value }))}
-                      placeholder="Your phone number"
+                      maxLength={15}
                       required
                     />
+                    <p className="text-xs text-muted-foreground mt-1">Format: +94XXXXXXXXX or 10-15 digits</p>
                   </div>
                 </div>
                 

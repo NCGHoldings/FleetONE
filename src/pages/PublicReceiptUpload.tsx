@@ -14,7 +14,6 @@ export default function PublicReceiptUpload() {
   const [step, setStep] = useState<'admission' | 'confirm' | 'upload' | 'success'>('admission');
   const [admissionNo, setAdmissionNo] = useState("");
   const [studentData, setStudentData] = useState<any>(null);
-  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string>("");
@@ -23,10 +22,23 @@ export default function PublicReceiptUpload() {
   const [submissionId, setSubmissionId] = useState("");
 
   const handleSearchStudent = async () => {
-    if (!admissionNo.trim()) {
+    const trimmedAdmissionNo = admissionNo.trim();
+    
+    // Input validation
+    if (!trimmedAdmissionNo) {
       toast({
         title: "Admission Number Required",
         description: "Please enter your child's admission number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate admission number format (alphanumeric, 5-20 characters)
+    if (!/^[A-Za-z0-9-]+$/.test(trimmedAdmissionNo) || trimmedAdmissionNo.length < 3 || trimmedAdmissionNo.length > 20) {
+      toast({
+        title: "Invalid Format",
+        description: "Admission number must be 3-20 characters (letters, numbers, and hyphens only)",
         variant: "destructive",
       });
       return;
@@ -38,7 +50,7 @@ export default function PublicReceiptUpload() {
       // This protects student PII from being exposed through anonymous queries
       const { data: verifyResult, error } = await supabase
         .rpc('verify_admission_number', {
-          p_admission_no: admissionNo.trim()
+          p_admission_no: trimmedAdmissionNo
         });
 
       if (error) throw error;
@@ -69,16 +81,7 @@ export default function PublicReceiptUpload() {
         school_branches: branchData
       };
 
-      // Fetch payment history for transparency
-      const { data: transactions } = await supabase
-        .from('school_payment_transactions')
-        .select('*')
-        .eq('student_id', data.id)
-        .order('payment_date', { ascending: false })
-        .limit(5);
-
       setStudentData(data);
-      setPaymentHistory(transactions || []);
       
       // Pre-fill with current amount due (includes any outstanding balance)
       setPaymentAmount(data.current_amount_due?.toString() || data.fixed_monthly_amount?.toString() || "");
@@ -204,7 +207,6 @@ export default function PublicReceiptUpload() {
     setStep('admission');
     setAdmissionNo("");
     setStudentData(null);
-    setPaymentHistory([]);
     setPaymentAmount("");
     setSelectedFile(null);
     setFilePreview("");
@@ -338,23 +340,35 @@ export default function PublicReceiptUpload() {
                 </div>
               </div>
 
-              {/* Payment Details & History */}
+              {/* Payment Details */}
               <PublicPaymentDetails
                 fixedMonthlyAmount={studentData.fixed_monthly_amount || 0}
                 paymentBalance={studentData.payment_balance || 0}
                 currentAmountDue={studentData.current_amount_due || studentData.fixed_monthly_amount || 0}
-                paymentHistory={paymentHistory}
+                paymentHistory={[]}
               />
 
-              {/* Payment Amount */}
+              {/* Payment Amount with validation */}
               <div className="space-y-2">
                 <Label htmlFor="amount">Payment Amount (LKR)</Label>
                 <Input
                   id="amount"
                   type="number"
+                  min="1"
+                  max="1000000"
                   value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (isNaN(value) || value <= 0) {
+                      setPaymentAmount("");
+                    } else if (value > 1000000) {
+                      setPaymentAmount("1000000");
+                    } else {
+                      setPaymentAmount(e.target.value);
+                    }
+                  }}
                   placeholder="Enter payment amount"
+                  required
                 />
                 <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 space-y-1">
                   <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
