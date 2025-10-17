@@ -253,7 +253,7 @@ export function QuickEntryForm({
       </div>
 
       {/* Scrollable Form Content */}
-      <div className="flex-1 overflow-auto p-3 md:p-6 pb-32 md:pb-6">
+      <div className="flex-1 overflow-auto p-3 md:p-4 pb-32 md:pb-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           {/* Revenue Section */}
           <Card>
@@ -270,7 +270,7 @@ export function QuickEntryForm({
                     value={income.bus_collection || ''}
                     onChange={(e) => setIncome({ ...income, bus_collection: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -281,7 +281,7 @@ export function QuickEntryForm({
                     value={income.call_booking || ''}
                     onChange={(e) => setIncome({ ...income, call_booking: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -292,7 +292,7 @@ export function QuickEntryForm({
                     value={income.agent_booking || ''}
                     onChange={(e) => setIncome({ ...income, agent_booking: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -303,7 +303,7 @@ export function QuickEntryForm({
                     value={income.luggage_income || ''}
                     onChange={(e) => setIncome({ ...income, luggage_income: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -314,7 +314,7 @@ export function QuickEntryForm({
                     value={income.miscellaneous_income || ''}
                     onChange={(e) => setIncome({ ...income, miscellaneous_income: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -325,7 +325,7 @@ export function QuickEntryForm({
                     value={income.others || ''}
                     onChange={(e) => setIncome({ ...income, others: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
               </div>
@@ -338,7 +338,7 @@ export function QuickEntryForm({
               <CardTitle className="text-lg md:text-xl">Expenses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="fuel" className="text-sm md:text-base">Fuel Expenses</Label>
                   <Input
@@ -347,7 +347,7 @@ export function QuickEntryForm({
                     value={expenses.fuel || ''}
                     onChange={(e) => setExpenses({ ...expenses, fuel: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -358,7 +358,7 @@ export function QuickEntryForm({
                     value={expenses.repair || ''}
                     onChange={(e) => setExpenses({ ...expenses, repair: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -369,7 +369,7 @@ export function QuickEntryForm({
                     value={expenses.tyre_tube || ''}
                     onChange={(e) => setExpenses({ ...expenses, tyre_tube: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -380,7 +380,7 @@ export function QuickEntryForm({
                     value={expenses.salary || ''}
                     onChange={(e) => setExpenses({ ...expenses, salary: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -391,7 +391,7 @@ export function QuickEntryForm({
                     value={expenses.police || ''}
                     onChange={(e) => setExpenses({ ...expenses, police: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -402,7 +402,7 @@ export function QuickEntryForm({
                     value={expenses.food || ''}
                     onChange={(e) => setExpenses({ ...expenses, food: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -413,7 +413,7 @@ export function QuickEntryForm({
                     value={expenses.emission_fitness || ''}
                     onChange={(e) => setExpenses({ ...expenses, emission_fitness: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -424,7 +424,7 @@ export function QuickEntryForm({
                     value={expenses.permits_renewal || ''}
                     onChange={(e) => setExpenses({ ...expenses, permits_renewal: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -435,7 +435,7 @@ export function QuickEntryForm({
                     value={expenses.staff_accommodation || ''}
                     onChange={(e) => setExpenses({ ...expenses, staff_accommodation: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -446,7 +446,7 @@ export function QuickEntryForm({
                     value={expenses.highway_charges || ''}
                     onChange={(e) => setExpenses({ ...expenses, highway_charges: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -457,7 +457,7 @@ export function QuickEntryForm({
                     value={expenses.accident_compensation || ''}
                     onChange={(e) => setExpenses({ ...expenses, accident_compensation: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -468,7 +468,7 @@ export function QuickEntryForm({
                     value={expenses.parking || ''}
                     onChange={(e) => setExpenses({ ...expenses, parking: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -479,7 +479,7 @@ export function QuickEntryForm({
                     value={expenses.log_sheet || ''}
                     onChange={(e) => setExpenses({ ...expenses, log_sheet: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -490,7 +490,7 @@ export function QuickEntryForm({
                     value={expenses.vehicle_hire || ''}
                     onChange={(e) => setExpenses({ ...expenses, vehicle_hire: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -501,7 +501,7 @@ export function QuickEntryForm({
                     value={expenses.ntc || ''}
                     onChange={(e) => setExpenses({ ...expenses, ntc: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -512,7 +512,7 @@ export function QuickEntryForm({
                     value={expenses.runner || ''}
                     onChange={(e) => setExpenses({ ...expenses, runner: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -523,7 +523,7 @@ export function QuickEntryForm({
                     value={expenses.short_misc || ''}
                     onChange={(e) => setExpenses({ ...expenses, short_misc: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -534,7 +534,7 @@ export function QuickEntryForm({
                     value={expenses.temporary_permit || ''}
                     onChange={(e) => setExpenses({ ...expenses, temporary_permit: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -545,7 +545,7 @@ export function QuickEntryForm({
                     value={expenses.body_wash || ''}
                     onChange={(e) => setExpenses({ ...expenses, body_wash: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -556,7 +556,7 @@ export function QuickEntryForm({
                     value={expenses.legal_court || ''}
                     onChange={(e) => setExpenses({ ...expenses, legal_court: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
                 <div className="space-y-2">
@@ -567,7 +567,7 @@ export function QuickEntryForm({
                     value={expenses.other || ''}
                     onChange={(e) => setExpenses({ ...expenses, other: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-11 md:h-10 text-base"
+                    className="h-9 text-base"
                   />
                 </div>
               </div>
@@ -577,28 +577,28 @@ export function QuickEntryForm({
       </div>
 
       {/* Sticky Footer with Summary and Actions - Mobile Optimized */}
-      <div className="fixed md:static bottom-0 left-0 right-0 border-t bg-card p-3 md:p-6 shadow-lg md:shadow-none">
+      <div className="fixed md:static bottom-0 left-0 right-0 border-t bg-card p-3 md:p-4 shadow-lg md:shadow-none">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-3 gap-2 md:gap-8 mb-3 md:mb-6">
+          <div className="grid grid-cols-3 gap-3 md:gap-8 mb-3 md:mb-4">
             <div>
-              <p className="text-xs md:text-sm text-muted-foreground">Revenue</p>
-              <p className="text-sm md:text-2xl font-bold text-green-600">
-                {totalRevenue.toFixed(2)}
+              <p className="text-xs md:text-sm text-muted-foreground mb-1">Total Revenue</p>
+              <p className="text-base md:text-2xl font-bold text-green-600">
+                Rs {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
             </div>
             <div>
-              <p className="text-xs md:text-sm text-muted-foreground">Expenses</p>
-              <p className="text-sm md:text-2xl font-bold text-red-600">
-                {totalExpenses.toFixed(2)}
+              <p className="text-xs md:text-sm text-muted-foreground mb-1">Total Expenses</p>
+              <p className="text-base md:text-2xl font-bold text-red-600">
+                Rs {totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
             </div>
             <div>
-              <p className="text-xs md:text-sm text-muted-foreground">Net Profit</p>
+              <p className="text-xs md:text-sm text-muted-foreground mb-1">Net Profit</p>
               <p className={cn(
-                "text-sm md:text-2xl font-bold",
+                "text-base md:text-2xl font-bold",
                 netProfit >= 0 ? "text-green-600" : "text-red-600"
               )}>
-                {netProfit.toFixed(2)}
+                Rs {netProfit.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
             </div>
           </div>
