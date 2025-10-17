@@ -1582,6 +1582,7 @@ export type Database = {
           pepiliyana_sale: number
           sale_date: string
           total_sale: number
+          tyre_entries: Json | null
           tyre_quantity: string | null
           tyre_sale: number
           updated_at: string
@@ -1597,6 +1598,7 @@ export type Database = {
           pepiliyana_sale?: number
           sale_date: string
           total_sale?: number
+          tyre_entries?: Json | null
           tyre_quantity?: string | null
           tyre_sale?: number
           updated_at?: string
@@ -1612,6 +1614,7 @@ export type Database = {
           pepiliyana_sale?: number
           sale_date?: string
           total_sale?: number
+          tyre_entries?: Json | null
           tyre_quantity?: string | null
           tyre_sale?: number
           updated_at?: string

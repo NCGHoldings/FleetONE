@@ -50,7 +50,9 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
       if (data) {
         setLssOutsideSale(data.lss_outside_sale || 0);
         setLssInsideSale(data.lss_inside_sale || 0);
-        setTyreEntries(Array.isArray(data.tyre_entries) ? data.tyre_entries as unknown as TyreEntry[] : []);
+        // Handle tyre_entries - it may not exist in older records
+        const tyreEntriesData = (data as any).tyre_entries;
+        setTyreEntries(Array.isArray(tyreEntriesData) ? tyreEntriesData : []);
         setPepiliyanaSale(data.pepiliyana_sale || 0);
         setOtherIncome(Array.isArray(data.other_income) ? data.other_income as unknown as OtherIncomeItem[] : []);
         setNotes(data.notes || "");
