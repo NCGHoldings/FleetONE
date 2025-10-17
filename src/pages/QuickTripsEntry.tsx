@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ArrowLeft } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { CalendarIcon, ArrowLeft, Menu } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { QuickEntryBusList } from "@/components/trips/QuickEntryBusList";
 import { QuickEntryForm } from "@/components/trips/QuickEntryForm";
 
@@ -28,10 +30,12 @@ interface TripData {
 export default function QuickTripsEntry() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [trips, setTrips] = useState<TripData[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showBusList, setShowBusList] = useState(false);
 
   useEffect(() => {
     loadTripsForDate(selectedDate);
@@ -117,6 +121,13 @@ export default function QuickTripsEntry() {
     }
   };
 
+  const handleSelectTrip = (tripId: string) => {
+    setSelectedTripId(tripId);
+    if (isMobile) {
+      setShowBusList(false);
+    }
+  };
+
   const selectedTrip = trips.find(t => t.id === selectedTripId);
   const completedCount = trips.filter(hasData).length;
 
@@ -124,19 +135,30 @@ export default function QuickTripsEntry() {
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
       <div className="border-b bg-card">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 p-3 md:p-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate('/trips')}
+              className="shrink-0"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Quick Entry - Daily Trips</h1>
-              <p className="text-sm text-muted-foreground">
-                {trips.length} trips scheduled • {completedCount} completed
+            {isMobile && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowBusList(true)}
+                className="shrink-0"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            )}
+            <div className="min-w-0">
+              <h1 className="text-lg md:text-2xl font-bold truncate">Quick Entry</h1>
+              <p className="text-xs md:text-sm text-muted-foreground">
+                {trips.length} trips • {completedCount} completed
               </p>
             </div>
           </div>
@@ -146,12 +168,14 @@ export default function QuickTripsEntry() {
               <Button
                 variant="outline"
                 className={cn(
-                  "w-[240px] justify-start text-left font-normal",
+                  "w-full md:w-[240px] justify-start text-left font-normal",
                   !selectedDate && "text-muted-foreground"
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -168,14 +192,36 @@ export default function QuickTripsEntry() {
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar - Bus List */}
-        <QuickEntryBusList
-          trips={trips}
-          selectedTripId={selectedTripId}
-          onSelectTrip={setSelectedTripId}
-          getCompletionStatus={getCompletionStatus}
-          loading={loading}
-        />
+        {/* Desktop Sidebar - Bus List */}
+        {!isMobile && (
+          <QuickEntryBusList
+            trips={trips}
+            selectedTripId={selectedTripId}
+            onSelectTrip={handleSelectTrip}
+            getCompletionStatus={getCompletionStatus}
+            loading={loading}
+          />
+        )}
+
+        {/* Mobile Drawer - Bus List */}
+        {isMobile && (
+          <Sheet open={showBusList} onOpenChange={setShowBusList}>
+            <SheetContent side="bottom" className="h-[80vh]">
+              <SheetHeader>
+                <SheetTitle>Select Bus</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 h-[calc(100%-4rem)]">
+                <QuickEntryBusList
+                  trips={trips}
+                  selectedTripId={selectedTripId}
+                  onSelectTrip={handleSelectTrip}
+                  getCompletionStatus={getCompletionStatus}
+                  loading={loading}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
 
         {/* Main Area - Data Entry Form */}
         <div className="flex-1 overflow-auto">
@@ -187,9 +233,9 @@ export default function QuickTripsEntry() {
               </div>
             </div>
           ) : trips.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full p-4">
               <div className="text-center">
-                <p className="text-lg text-muted-foreground mb-2">No trips scheduled for this date</p>
+                <p className="text-base md:text-lg text-muted-foreground mb-2">No trips scheduled for this date</p>
                 <Button onClick={() => navigate('/trips')}>
                   Go to Daily Trips
                 </Button>
@@ -204,8 +250,16 @@ export default function QuickTripsEntry() {
               onSaveAndNext={handleSaveAndNext}
             />
           ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">Select a bus to enter data</p>
+            <div className="flex items-center justify-center h-full p-4">
+              <div className="text-center">
+                <p className="text-muted-foreground mb-3">Select a bus to enter data</p>
+                {isMobile && (
+                  <Button onClick={() => setShowBusList(true)}>
+                    <Menu className="mr-2 h-4 w-4" />
+                    Select Bus
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
