@@ -146,7 +146,19 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        
+        // Check for duplicate BL Number error
+        if (errorData.error?.includes('DUPLICATE_BL_NUMBER:')) {
+          const blNumber = errorData.error.split(':')[1];
+          toast.error(
+            `BL Number "${blNumber}" is already used by another accident record. Please use a different BL Number or leave it empty.`,
+            { duration: 6000 }
+          );
+          return;
+        }
+        
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
@@ -338,13 +350,17 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
               </div>
 
               <div>
-                <Label htmlFor="bl_number">BL Number</Label>
+                <Label htmlFor="bl_number">BL Number (Optional)</Label>
                 <Input
                   id="bl_number"
                   value={formData.bl_number || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, bl_number: e.target.value }))}
                   disabled={!editMode}
+                  placeholder="Leave empty if not available"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Must be unique across all records
+                </p>
               </div>
 
               <div>

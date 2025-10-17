@@ -105,10 +105,16 @@ serve(async (req) => {
           throw new Error('Invalid user');
         }
 
+        // Clean up bl_number: convert empty string to null
+        const cleanedBody = {
+          ...body,
+          bl_number: body.bl_number?.trim() || null
+        };
+
         const { data, error } = await supabase
           .from('accident_records')
           .insert({
-            ...body,
+            ...cleanedBody,
             created_by: user.id,
             updated_by: user.id
           })
@@ -116,6 +122,10 @@ serve(async (req) => {
           .single();
 
         if (error) {
+          // Check for duplicate BL Number error
+          if (error.code === '23505' && error.message?.includes('accident_records_bl_number_key')) {
+            throw new Error(`DUPLICATE_BL_NUMBER:${body.bl_number || 'unknown'}`);
+          }
           throw error;
         }
 
@@ -155,10 +165,16 @@ serve(async (req) => {
         // Remove id and no from body to avoid conflicts, use it in the where clause
         const { id, no, ...updateData } = body;
 
+        // Clean up bl_number: convert empty string to null
+        const cleanedUpdateData = {
+          ...updateData,
+          bl_number: updateData.bl_number?.trim() || null
+        };
+
         const { data, error } = await supabase
           .from('accident_records')
           .update({
-            ...updateData,
+            ...cleanedUpdateData,
             updated_by: user.id
           })
           .eq('id', recordId)
@@ -166,6 +182,10 @@ serve(async (req) => {
           .single();
 
         if (error) {
+          // Check for duplicate BL Number error
+          if (error.code === '23505' && error.message?.includes('accident_records_bl_number_key')) {
+            throw new Error(`DUPLICATE_BL_NUMBER:${updateData.bl_number || 'unknown'}`);
+          }
           throw error;
         }
 
