@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 
 export interface TyreEntry {
   type: string;
+  quantity?: string;
   amount: number;
 }
 
@@ -18,6 +19,7 @@ interface TyreSaleModalProps {
 
 export function TyreSaleModal({ open, onClose, onAdd }: TyreSaleModalProps) {
   const [type, setType] = useState("");
+  const [quantity, setQuantity] = useState("");
   const [amount, setAmount] = useState<number>(0);
 
   const handleSubmit = () => {
@@ -27,16 +29,19 @@ export function TyreSaleModal({ open, onClose, onAdd }: TyreSaleModalProps) {
 
     onAdd({
       type: type.trim(),
+      quantity: quantity.trim() || undefined,
       amount: amount,
     });
 
     // Reset form
     setType("");
+    setQuantity("");
     setAmount(0);
   };
 
   const handleClose = () => {
     setType("");
+    setQuantity("");
     setAmount(0);
     onClose();
   };
@@ -59,6 +64,17 @@ export function TyreSaleModal({ open, onClose, onAdd }: TyreSaleModalProps) {
               value={type}
               onChange={(e) => setType(e.target.value)}
               placeholder="e.g., Jiashun, Bridgestone"
+              className="h-12"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quantity">Quantity (Optional - for reference only)</Label>
+            <Input
+              id="quantity"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="e.g., 6 tyres"
               className="h-12"
             />
           </div>

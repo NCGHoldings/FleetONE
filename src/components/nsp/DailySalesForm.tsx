@@ -228,6 +228,11 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
                   >
                     <div className="flex-1">
                       <p className="font-medium">{item.type}</p>
+                      {item.quantity && (
+                        <p className="text-xs text-muted-foreground">
+                          Qty: {item.quantity}
+                        </p>
+                      )}
                       <p className="text-sm text-green-600 font-semibold">
                         Rs. {item.amount.toLocaleString()}
                       </p>
