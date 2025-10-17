@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,6 +37,7 @@ interface SalesSummaryTableProps {
 }
 
 export function SalesSummaryTable({ dateRange }: SalesSummaryTableProps) {
+  const navigate = useNavigate();
   const [salesData, setSalesData] = useState<SalesRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export function SalesSummaryTable({ dateRange }: SalesSummaryTableProps) {
 
   const handleEdit = (record: SalesRecord) => {
     // Navigate to daily sales page with pre-filled data
-    window.location.href = `/nsp-daily-sales?edit=${record.id}&date=${record.sale_date}`;
+    navigate(`/nsp-daily-sales?edit=${record.id}&date=${record.sale_date}`);
   };
 
   const handleDeleteClick = (id: string) => {
