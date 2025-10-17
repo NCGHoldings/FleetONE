@@ -215,7 +215,7 @@ export function SalesSummaryTable({ dateRange }: SalesSummaryTableProps) {
                   return (
                     <TableRow key={record.id} className="hover:bg-muted/50">
                       <TableCell className="font-medium">
-                        {format(new Date(record.sale_date), "MMM dd, yyyy")}
+                        {format(new Date(record.sale_date + 'T00:00:00'), "MMM dd, yyyy")}
                       </TableCell>
                       <TableCell className="text-right">{formatCompact(record.lss_outside_sale)}</TableCell>
                       <TableCell className="text-right">{formatCompact(record.lss_inside_sale)}</TableCell>
