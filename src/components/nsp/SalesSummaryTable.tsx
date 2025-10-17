@@ -2,9 +2,20 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { TrendingUp, Calendar, DollarSign } from "lucide-react";
+import { TrendingUp, Calendar, DollarSign, Pencil, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SalesRecord {
   id: string;
@@ -27,6 +38,7 @@ interface SalesSummaryTableProps {
 export function SalesSummaryTable({ dateRange }: SalesSummaryTableProps) {
   const [salesData, setSalesData] = useState<SalesRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSalesData();
@@ -76,6 +88,44 @@ export function SalesSummaryTable({ dateRange }: SalesSummaryTableProps) {
       return `${(value / 1000).toFixed(1)}k`;
     }
     return value.toString();
+  };
+
+  const handleEdit = (record: SalesRecord) => {
+    // Navigate to daily sales page with pre-filled data
+    window.location.href = `/nsp-daily-sales?edit=${record.id}&date=${record.sale_date}`;
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteId) return;
+
+    try {
+      const { error } = await supabase
+        .from('nsp_daily_sales')
+        .delete()
+        .eq('id', deleteId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Sales record deleted successfully",
+      });
+
+      loadSalesData();
+    } catch (error: any) {
+      console.error('Error deleting record:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete sales record",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteId(null);
+    }
   };
 
   const stats = calculateStats();
@@ -150,6 +200,7 @@ export function SalesSummaryTable({ dateRange }: SalesSummaryTableProps) {
                   <TableHead className="text-right">Pepiliyana</TableHead>
                   <TableHead className="text-right">Other</TableHead>
                   <TableHead className="text-right font-bold">Total</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -172,6 +223,26 @@ export function SalesSummaryTable({ dateRange }: SalesSummaryTableProps) {
                       <TableCell className="text-right font-bold text-green-600">
                         {formatCurrency(record.total_sale)}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(record)}
+                            className="h-8 w-8"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteClick(record.id)}
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -180,6 +251,23 @@ export function SalesSummaryTable({ dateRange }: SalesSummaryTableProps) {
           </div>
         </Card>
       )}
+
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Sales Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this sales record? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
