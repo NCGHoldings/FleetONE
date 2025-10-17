@@ -7,7 +7,16 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
 };
 
-const ALLOWED_FILE_TYPES = ['PDF', 'JPG', 'JPEG', 'PNG', 'DOCX'];
+const ALLOWED_FILE_TYPES = [
+  // Images
+  'PDF', 'JPG', 'JPEG', 'PNG', 'GIF', 'BMP', 'TIFF', 'WEBP', 'SVG',
+  // Documents
+  'DOC', 'DOCX', 'XLS', 'XLSX', 'PPT', 'PPTX', 'TXT', 'RTF', 'ODT',
+  // Archives
+  'ZIP', 'RAR', '7Z',
+  // Other
+  'CSV', 'JSON', 'XML'
+];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 serve(async (req) => {
@@ -91,7 +100,7 @@ serve(async (req) => {
         // Validate file type
         const fileExtension = file.name.split('.').pop()?.toUpperCase();
         if (!fileExtension || !ALLOWED_FILE_TYPES.includes(fileExtension)) {
-          throw new Error(`File type ${fileExtension} not allowed. Allowed types: ${ALLOWED_FILE_TYPES.join(', ')}`);
+          throw new Error(`File type .${fileExtension} not supported. Allowed types: Images (JPG, PNG, GIF, etc.), Documents (PDF, DOCX, XLSX, etc.), and Archives (ZIP, RAR).`);
         }
 
         // Validate file size

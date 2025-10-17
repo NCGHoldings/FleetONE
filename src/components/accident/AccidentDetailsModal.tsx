@@ -179,9 +179,28 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
     const file = event.target.files[0];
     
     // Validate file type
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const allowedTypes = [
+      // Images
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 
+      'image/tiff', 'image/webp', 'image/svg+xml',
+      // Documents
+      'application/pdf',
+      'application/msword', // .doc
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+      'application/vnd.ms-excel', // .xls
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-powerpoint', // .ppt
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+      'text/plain', // .txt
+      'application/rtf', // .rtf
+      'application/vnd.oasis.opendocument.text', // .odt
+      // Archives
+      'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+      // Other
+      'text/csv', 'application/json', 'application/xml', 'text/xml'
+    ];
     if (!allowedTypes.includes(file.type)) {
-      toast.error('Only PDF, JPG, PNG, and DOCX files are allowed');
+      toast.error('File type not supported. Please upload images, documents, or common file formats.');
       return;
     }
 
