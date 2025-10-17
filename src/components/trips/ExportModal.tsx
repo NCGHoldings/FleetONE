@@ -5,9 +5,15 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CalendarIcon, Download } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { 
+  getRevenueAccountCode, 
+  getExpenseAccountCode, 
+  formatExportAmount 
+} from "@/lib/account-codes";
 
 interface Trip {
   id: string;
@@ -34,7 +40,11 @@ interface Trip {
   km_per_liter: number;
   performance_score?: number;
   status: string;
+  income_details?: any;
+  other_expenses_details?: any;
 }
+
+type ExportFormat = 'summary' | 'detailed' | 'journal';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -53,6 +63,8 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
     from?: Date;
     to?: Date;
   }>({});
+
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('summary');
 
   const [columns, setColumns] = useState<ExportColumn[]>([
     { key: 'trip_no', label: 'Trip ID', selected: true },
@@ -141,6 +153,17 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
 
   const exportToCSV = () => {
     const filteredData = filterDataByDate(data);
+    
+    if (exportFormat === 'summary') {
+      exportSummaryFormat(filteredData);
+    } else if (exportFormat === 'detailed') {
+      exportDetailedFormat(filteredData);
+    } else if (exportFormat === 'journal') {
+      exportJournalFormat(filteredData);
+    }
+  };
+
+  const exportSummaryFormat = (filteredData: Trip[]) => {
     const selectedColumns = columns.filter(col => col.selected);
     
     if (selectedColumns.length === 0) {
@@ -166,11 +189,130 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
       ...rows.map(row => row.join(','))
     ].join('\n');
 
-    // Download file
+    downloadCSV(csvContent, 'daily_trips_summary');
+  };
+
+  const exportDetailedFormat = (filteredData: Trip[]) => {
+    const headers = ['Trip No', 'Bus No', 'Date', 'Account Code', 'Account Name', 'Amount', 'Type'];
+    const rows: string[][] = [];
+
+    filteredData.forEach(trip => {
+      // Process Revenue
+      if (trip.income_details) {
+        Object.entries(trip.income_details).forEach(([fieldName, amount]) => {
+          if (amount && Number(amount) > 0) {
+            const accountCode = getRevenueAccountCode(fieldName);
+            if (accountCode) {
+              rows.push([
+                trip.trip_no || '',
+                trip.bus_no || '',
+                format(new Date(trip.trip_date), 'yyyy-MM-dd'),
+                accountCode.code,
+                accountCode.name,
+                formatExportAmount(Number(amount)),
+                'Revenue'
+              ]);
+            }
+          }
+        });
+      }
+
+      // Process Expenses
+      if (trip.other_expenses_details) {
+        Object.entries(trip.other_expenses_details).forEach(([fieldName, amount]) => {
+          if (amount && Number(amount) > 0) {
+            const accountCode = getExpenseAccountCode(fieldName);
+            if (accountCode) {
+              rows.push([
+                trip.trip_no || '',
+                trip.bus_no || '',
+                format(new Date(trip.trip_date), 'yyyy-MM-dd'),
+                accountCode.code,
+                accountCode.name,
+                formatExportAmount(Number(amount)),
+                'Expense'
+              ]);
+            }
+          }
+        });
+      }
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => 
+        cell.includes(',') ? `"${cell.replace(/"/g, '""')}"` : cell
+      ).join(','))
+    ].join('\n');
+
+    downloadCSV(csvContent, 'daily_trips_detailed');
+  };
+
+  const exportJournalFormat = (filteredData: Trip[]) => {
+    const headers = ['Date', 'Trip No', 'Bus No', 'Account Code', 'Account Name', 'Debit', 'Credit', 'Description'];
+    const rows: string[][] = [];
+
+    filteredData.forEach(trip => {
+      const description = `Bus ${trip.bus_no} - ${trip.route || 'N/A'}`;
+
+      // Process Revenue (Credit)
+      if (trip.income_details) {
+        Object.entries(trip.income_details).forEach(([fieldName, amount]) => {
+          if (amount && Number(amount) > 0) {
+            const accountCode = getRevenueAccountCode(fieldName);
+            if (accountCode) {
+              rows.push([
+                format(new Date(trip.trip_date), 'yyyy-MM-dd'),
+                trip.trip_no || '',
+                trip.bus_no || '',
+                accountCode.code,
+                accountCode.name,
+                '', // Debit
+                formatExportAmount(Number(amount)), // Credit
+                description
+              ]);
+            }
+          }
+        });
+      }
+
+      // Process Expenses (Debit)
+      if (trip.other_expenses_details) {
+        Object.entries(trip.other_expenses_details).forEach(([fieldName, amount]) => {
+          if (amount && Number(amount) > 0) {
+            const accountCode = getExpenseAccountCode(fieldName);
+            if (accountCode) {
+              rows.push([
+                format(new Date(trip.trip_date), 'yyyy-MM-dd'),
+                trip.trip_no || '',
+                trip.bus_no || '',
+                accountCode.code,
+                accountCode.name,
+                formatExportAmount(Number(amount)), // Debit
+                '', // Credit
+                description
+              ]);
+            }
+          }
+        });
+      }
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => 
+        cell.includes(',') ? `"${cell.replace(/"/g, '""')}"` : cell
+      ).join(','))
+    ].join('\n');
+
+    downloadCSV(csvContent, 'daily_trips_journal');
+  };
+
+  const downloadCSV = (csvContent: string, baseFilename: string) => {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const filename = `daily_trips_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    const filename = `${baseFilename}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     
     link.setAttribute('href', url);
     link.setAttribute('download', filename);
@@ -196,6 +338,31 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Export Format Selection */}
+          <div>
+            <Label className="text-base font-medium mb-3 block">Export Format</Label>
+            <RadioGroup value={exportFormat} onValueChange={(value) => setExportFormat(value as ExportFormat)}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="summary" id="summary" />
+                <Label htmlFor="summary" className="font-normal">
+                  Summary Format - Totals only (current format)
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="detailed" id="detailed" />
+                <Label htmlFor="detailed" className="font-normal">
+                  Detailed Accounting Format - With account codes and line items
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="journal" id="journal" />
+                <Label htmlFor="journal" className="font-normal">
+                  Journal Entry Format - Debit/Credit columns for accounting software
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
           {/* Date Range Selection */}
           <div>
             <Label className="text-base font-medium mb-3 block">Date Range</Label>
@@ -256,10 +423,11 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
             </div>
           </div>
 
-          {/* Column Selection */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <Label className="text-base font-medium">Select Columns</Label>
+          {/* Column Selection - Only for Summary Format */}
+          {exportFormat === 'summary' && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-medium">Select Columns</Label>
               <div className="space-x-2">
                 <Button variant="outline" size="sm" onClick={selectAll}>
                   Select All
@@ -284,13 +452,23 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
                 </div>
               ))}
             </div>
-          </div>
+            </div>
+          )}
 
           {/* Export Summary */}
           <div className="bg-muted/20 p-3 rounded-lg">
             <div className="text-sm text-muted-foreground">
               <div>Records to export: {filteredCount} of {data.length}</div>
-              <div>Selected columns: {selectedCount} of {columns.length}</div>
+              {exportFormat === 'summary' && (
+                <div>Selected columns: {selectedCount} of {columns.length}</div>
+              )}
+              {exportFormat !== 'summary' && (
+                <div className="mt-1 text-xs">
+                  {exportFormat === 'detailed' 
+                    ? 'Export will include all revenue and expense line items with account codes'
+                    : 'Export will be formatted as journal entries with debit/credit columns'}
+                </div>
+              )}
             </div>
           </div>
 
@@ -299,7 +477,10 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={exportToCSV} disabled={selectedCount === 0}>
+            <Button 
+              onClick={exportToCSV} 
+              disabled={exportFormat === 'summary' && selectedCount === 0}
+            >
               <Download className="w-4 h-4 mr-2" />
               Export CSV
             </Button>

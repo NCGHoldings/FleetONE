@@ -18,38 +18,40 @@ interface QuickEntryPanelProps {
   onCancel: () => void;
 }
 
+// Revenue Interface - Account Codes (41xxx)
 interface IncomeDetails {
-  bus_collection: number;
-  call_booking: number;
-  agent_booking: number;
-  luggage_income: number;
-  miscellaneous_income: number;
-  others: number;
+  bus_collection: number;        // 41101003 - BUS COLLECTION
+  call_booking: number;          // 41101001 - CALL BOOKING
+  agent_booking: number;         // 41101002 - AGENT BOOKING
+  luggage_income: number;        // 41101004 - LUGGAGE INCOME
+  miscellaneous_income: number;  // 41106002 - MISCELLANEOUS INCOME
+  others: number;                // 41106002 - MISCELLANEOUS INCOME
   others_description: string;
 }
 
+// Expense Interface - Account Codes (51201xxx)
 interface ExpenseDetails {
-  fuel: number;
-  repair: number;
-  tyre_tube: number;
-  salary: number;
-  police: number;
-  food: number;
-  emission_fitness: number;
-  permits_renewal: number;
-  staff_accommodation: number;
-  highway_charges: number;
-  accident_compensation: number;
-  parking: number;
-  log_sheet: number;
-  vehicle_hire: number;
-  ntc: number;
-  runner: number;
-  short_misc: number;
-  temporary_permit: number;
-  body_wash: number;
-  legal_court: number;
-  other: number;
+  fuel: number;                   // 51201001 - FUEL EXPENSES
+  repair: number;                 // 51201002 - BUS MAINTENANCE & REPAIR
+  tyre_tube: number;              // 51201003 - TYRE & TUBE EXPENSES
+  salary: number;                 // 51201004 - WAGES - DRIVERS & ASSISTA
+  police: number;                 // 51201005 - FINES AND PENALTIES
+  food: number;                   // 51201006 - STAFF MEALS & WELFARE
+  emission_fitness: number;       // 51201007 - EMISSION REPORTS/ FITNESS
+  permits_renewal: number;        // 51201008 - PERMITS RENEWAL CHARGES
+  staff_accommodation: number;    // 51201013 - STAFF ACCOMMODATION
+  highway_charges: number;        // 51201014 - HIGHWAY CHARGES
+  accident_compensation: number;  // 51201016 - ACCIDENT COMPENSATION
+  parking: number;                // 51201017 - PARKING FEE
+  log_sheet: number;              // 51201018 - LOG SHEET CHARGES
+  vehicle_hire: number;           // 51201019 - VEHICLE HIRE CHARGES
+  ntc: number;                    // 51201020 - NTC
+  runner: number;                 // 51201021 - RUNNER
+  short_misc: number;             // 51201022 - SHORT - MISCELLANIOUS
+  temporary_permit: number;       // 51201024 - TEMPORY PERMIT
+  body_wash: number;              // 51201025 - BODY WASH AND SERVICE
+  legal_court: number;            // 51201026 - LEGAL & COURT FEE
+  other: number;                  // 51201022 - SHORT - MISCELLANIOUS
   other_description: string;
 }
 
