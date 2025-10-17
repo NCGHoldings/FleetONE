@@ -253,9 +253,9 @@ export function QuickEntryForm({
             <CardTitle>Expenses</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2">
               <div>
-                <Label>Fuel</Label>
+                <Label>Fuel Expenses</Label>
                 <Input
                   type="number"
                   value={expenses.fuel || ''}
@@ -263,7 +263,7 @@ export function QuickEntryForm({
                 />
               </div>
               <div>
-                <Label>Repair</Label>
+                <Label>Bus Maintenance & Repair</Label>
                 <Input
                   type="number"
                   value={expenses.repair || ''}
@@ -279,7 +279,7 @@ export function QuickEntryForm({
                 />
               </div>
               <div>
-                <Label>Salary</Label>
+                <Label>Wages - Drivers & Assistants</Label>
                 <Input
                   type="number"
                   value={expenses.salary || ''}
@@ -287,7 +287,7 @@ export function QuickEntryForm({
                 />
               </div>
               <div>
-                <Label>Police/Fines</Label>
+                <Label>Fines and Penalties</Label>
                 <Input
                   type="number"
                   value={expenses.police || ''}
@@ -295,7 +295,7 @@ export function QuickEntryForm({
                 />
               </div>
               <div>
-                <Label>Food</Label>
+                <Label>Staff Meals & Welfare</Label>
                 <Input
                   type="number"
                   value={expenses.food || ''}
@@ -303,7 +303,47 @@ export function QuickEntryForm({
                 />
               </div>
               <div>
-                <Label>Parking</Label>
+                <Label>Emission Reports/Fitness</Label>
+                <Input
+                  type="number"
+                  value={expenses.emission_fitness || ''}
+                  onChange={(e) => setExpenses({ ...expenses, emission_fitness: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label>Permits Renewal Charges</Label>
+                <Input
+                  type="number"
+                  value={expenses.permits_renewal || ''}
+                  onChange={(e) => setExpenses({ ...expenses, permits_renewal: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label>Staff Accommodation</Label>
+                <Input
+                  type="number"
+                  value={expenses.staff_accommodation || ''}
+                  onChange={(e) => setExpenses({ ...expenses, staff_accommodation: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label>Highway Charges</Label>
+                <Input
+                  type="number"
+                  value={expenses.highway_charges || ''}
+                  onChange={(e) => setExpenses({ ...expenses, highway_charges: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label>Accident Compensation</Label>
+                <Input
+                  type="number"
+                  value={expenses.accident_compensation || ''}
+                  onChange={(e) => setExpenses({ ...expenses, accident_compensation: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label>Parking Fee</Label>
                 <Input
                   type="number"
                   value={expenses.parking || ''}
@@ -311,11 +351,19 @@ export function QuickEntryForm({
                 />
               </div>
               <div>
-                <Label>Highway</Label>
+                <Label>Log Sheet Charges</Label>
                 <Input
                   type="number"
-                  value={expenses.highway_charges || ''}
-                  onChange={(e) => setExpenses({ ...expenses, highway_charges: Number(e.target.value) })}
+                  value={expenses.log_sheet || ''}
+                  onChange={(e) => setExpenses({ ...expenses, log_sheet: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label>Vehicle Hire Charges</Label>
+                <Input
+                  type="number"
+                  value={expenses.vehicle_hire || ''}
+                  onChange={(e) => setExpenses({ ...expenses, vehicle_hire: Number(e.target.value) })}
                 />
               </div>
               <div>
@@ -335,11 +383,35 @@ export function QuickEntryForm({
                 />
               </div>
               <div>
-                <Label>Body Wash</Label>
+                <Label>Short - Miscellaneous</Label>
+                <Input
+                  type="number"
+                  value={expenses.short_misc || ''}
+                  onChange={(e) => setExpenses({ ...expenses, short_misc: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label>Temporary Permit</Label>
+                <Input
+                  type="number"
+                  value={expenses.temporary_permit || ''}
+                  onChange={(e) => setExpenses({ ...expenses, temporary_permit: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label>Body Wash and Service</Label>
                 <Input
                   type="number"
                   value={expenses.body_wash || ''}
                   onChange={(e) => setExpenses({ ...expenses, body_wash: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label>Legal & Court Fee</Label>
+                <Input
+                  type="number"
+                  value={expenses.legal_court || ''}
+                  onChange={(e) => setExpenses({ ...expenses, legal_court: Number(e.target.value) })}
                 />
               </div>
               <div>
