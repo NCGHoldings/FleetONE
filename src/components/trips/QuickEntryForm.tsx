@@ -242,16 +242,6 @@ export function QuickEntryForm({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="border-b bg-card p-3 md:p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold">Bus {busNo}</h2>
-            {route && <p className="text-xs md:text-sm text-muted-foreground mt-1">{route}</p>}
-          </div>
-        </div>
-      </div>
-
       {/* Scrollable Form Content */}
       <div className="flex-1 overflow-auto p-3 md:p-4 pb-32 md:pb-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
