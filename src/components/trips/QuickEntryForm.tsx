@@ -99,6 +99,13 @@ export function QuickEntryForm({
     loadTripData();
   }, [tripId]);
 
+  // Helper function to safely parse numbers from database
+  const safeParseNumber = (val: any): number => {
+    if (val === null || val === undefined || val === '') return 0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  };
+
   const loadTripData = async () => {
     setLoading(true);
     try {
@@ -110,11 +117,45 @@ export function QuickEntryForm({
 
       if (error) throw error;
 
-      if (data?.income_details && typeof data.income_details === 'object') {
-        setIncome({ ...income, ...(data.income_details as Partial<IncomeDetails>) });
+      if (data?.income_details && typeof data.income_details === 'object' && !Array.isArray(data.income_details)) {
+        const incomeData = data.income_details as any;
+        const parsedIncome: IncomeDetails = {
+          bus_collection: safeParseNumber(incomeData.bus_collection),
+          call_booking: safeParseNumber(incomeData.call_booking),
+          agent_booking: safeParseNumber(incomeData.agent_booking),
+          luggage_income: safeParseNumber(incomeData.luggage_income),
+          miscellaneous_income: safeParseNumber(incomeData.miscellaneous_income),
+          others: safeParseNumber(incomeData.others),
+        };
+        setIncome(parsedIncome);
       }
-      if (data?.other_expenses_details && typeof data.other_expenses_details === 'object') {
-        setExpenses({ ...expenses, ...(data.other_expenses_details as Partial<ExpenseDetails>) });
+      
+      if (data?.other_expenses_details && typeof data.other_expenses_details === 'object' && !Array.isArray(data.other_expenses_details)) {
+        const expensesData = data.other_expenses_details as any;
+        const parsedExpenses: ExpenseDetails = {
+          fuel: safeParseNumber(expensesData.fuel),
+          repair: safeParseNumber(expensesData.repair),
+          tyre_tube: safeParseNumber(expensesData.tyre_tube),
+          salary: safeParseNumber(expensesData.salary),
+          police: safeParseNumber(expensesData.police),
+          food: safeParseNumber(expensesData.food),
+          emission_fitness: safeParseNumber(expensesData.emission_fitness),
+          permits_renewal: safeParseNumber(expensesData.permits_renewal),
+          staff_accommodation: safeParseNumber(expensesData.staff_accommodation),
+          highway_charges: safeParseNumber(expensesData.highway_charges),
+          accident_compensation: safeParseNumber(expensesData.accident_compensation),
+          parking: safeParseNumber(expensesData.parking),
+          log_sheet: safeParseNumber(expensesData.log_sheet),
+          vehicle_hire: safeParseNumber(expensesData.vehicle_hire),
+          ntc: safeParseNumber(expensesData.ntc),
+          runner: safeParseNumber(expensesData.runner),
+          short_misc: safeParseNumber(expensesData.short_misc),
+          temporary_permit: safeParseNumber(expensesData.temporary_permit),
+          body_wash: safeParseNumber(expensesData.body_wash),
+          legal_court: safeParseNumber(expensesData.legal_court),
+          other: safeParseNumber(expensesData.other),
+        };
+        setExpenses(parsedExpenses);
       }
     } catch (error) {
       console.error('Error loading trip data:', error);
@@ -134,6 +175,15 @@ export function QuickEntryForm({
       const totalExpenses = calculateTotal(expenses);
       const netIncome = totalIncome - totalExpenses;
 
+      console.log('💾 Saving Quick Entry Data:', {
+        tripId,
+        income_details: income,
+        other_expenses_details: expenses,
+        totalIncome,
+        totalExpenses,
+        netIncome
+      });
+
       const { error } = await supabase
         .from('daily_trips')
         .update({
@@ -148,10 +198,20 @@ export function QuickEntryForm({
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Trip data saved successfully",
-      });
+      console.log('✅ Data saved successfully to database');
+
+      if (totalIncome === 0 && totalExpenses === 0) {
+        toast({
+          title: "Warning",
+          description: "All values are zero. Please verify your entries.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: `Saved: Income LKR ${totalIncome.toLocaleString()}, Expenses LKR ${totalExpenses.toLocaleString()}`,
+        });
+      }
 
       onSuccess();
       if (andNext) {
@@ -201,7 +261,8 @@ export function QuickEntryForm({
               <Input
                 type="number"
                 value={income.bus_collection || ''}
-                onChange={(e) => setIncome({ ...income, bus_collection: Number(e.target.value) })}
+                onChange={(e) => setIncome({ ...income, bus_collection: safeParseNumber(e.target.value) })}
+                placeholder="0.00"
               />
             </div>
             <div>
@@ -209,7 +270,8 @@ export function QuickEntryForm({
               <Input
                 type="number"
                 value={income.call_booking || ''}
-                onChange={(e) => setIncome({ ...income, call_booking: Number(e.target.value) })}
+                onChange={(e) => setIncome({ ...income, call_booking: safeParseNumber(e.target.value) })}
+                placeholder="0.00"
               />
             </div>
             <div>
@@ -217,7 +279,8 @@ export function QuickEntryForm({
               <Input
                 type="number"
                 value={income.agent_booking || ''}
-                onChange={(e) => setIncome({ ...income, agent_booking: Number(e.target.value) })}
+                onChange={(e) => setIncome({ ...income, agent_booking: safeParseNumber(e.target.value) })}
+                placeholder="0.00"
               />
             </div>
             <div>
@@ -225,7 +288,8 @@ export function QuickEntryForm({
               <Input
                 type="number"
                 value={income.luggage_income || ''}
-                onChange={(e) => setIncome({ ...income, luggage_income: Number(e.target.value) })}
+                onChange={(e) => setIncome({ ...income, luggage_income: safeParseNumber(e.target.value) })}
+                placeholder="0.00"
               />
             </div>
             <div>
@@ -233,7 +297,8 @@ export function QuickEntryForm({
               <Input
                 type="number"
                 value={income.miscellaneous_income || ''}
-                onChange={(e) => setIncome({ ...income, miscellaneous_income: Number(e.target.value) })}
+                onChange={(e) => setIncome({ ...income, miscellaneous_income: safeParseNumber(e.target.value) })}
+                placeholder="0.00"
               />
             </div>
             <div>
@@ -241,7 +306,8 @@ export function QuickEntryForm({
               <Input
                 type="number"
                 value={income.others || ''}
-                onChange={(e) => setIncome({ ...income, others: Number(e.target.value) })}
+                onChange={(e) => setIncome({ ...income, others: safeParseNumber(e.target.value) })}
+                placeholder="0.00"
               />
             </div>
           </CardContent>
@@ -259,7 +325,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.fuel || ''}
-                  onChange={(e) => setExpenses({ ...expenses, fuel: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, fuel: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -267,7 +334,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.repair || ''}
-                  onChange={(e) => setExpenses({ ...expenses, repair: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, repair: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -275,7 +343,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.tyre_tube || ''}
-                  onChange={(e) => setExpenses({ ...expenses, tyre_tube: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, tyre_tube: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -283,7 +352,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.salary || ''}
-                  onChange={(e) => setExpenses({ ...expenses, salary: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, salary: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -291,7 +361,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.police || ''}
-                  onChange={(e) => setExpenses({ ...expenses, police: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, police: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -299,7 +370,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.food || ''}
-                  onChange={(e) => setExpenses({ ...expenses, food: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, food: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -307,7 +379,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.emission_fitness || ''}
-                  onChange={(e) => setExpenses({ ...expenses, emission_fitness: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, emission_fitness: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -315,7 +388,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.permits_renewal || ''}
-                  onChange={(e) => setExpenses({ ...expenses, permits_renewal: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, permits_renewal: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -323,7 +397,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.staff_accommodation || ''}
-                  onChange={(e) => setExpenses({ ...expenses, staff_accommodation: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, staff_accommodation: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -331,7 +406,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.highway_charges || ''}
-                  onChange={(e) => setExpenses({ ...expenses, highway_charges: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, highway_charges: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -339,7 +415,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.accident_compensation || ''}
-                  onChange={(e) => setExpenses({ ...expenses, accident_compensation: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, accident_compensation: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -347,7 +424,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.parking || ''}
-                  onChange={(e) => setExpenses({ ...expenses, parking: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, parking: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -355,7 +433,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.log_sheet || ''}
-                  onChange={(e) => setExpenses({ ...expenses, log_sheet: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, log_sheet: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -363,7 +442,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.vehicle_hire || ''}
-                  onChange={(e) => setExpenses({ ...expenses, vehicle_hire: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, vehicle_hire: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -371,7 +451,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.ntc || ''}
-                  onChange={(e) => setExpenses({ ...expenses, ntc: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, ntc: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -379,7 +460,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.runner || ''}
-                  onChange={(e) => setExpenses({ ...expenses, runner: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, runner: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -387,7 +469,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.short_misc || ''}
-                  onChange={(e) => setExpenses({ ...expenses, short_misc: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, short_misc: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -395,7 +478,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.temporary_permit || ''}
-                  onChange={(e) => setExpenses({ ...expenses, temporary_permit: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, temporary_permit: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -403,7 +487,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.body_wash || ''}
-                  onChange={(e) => setExpenses({ ...expenses, body_wash: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, body_wash: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -411,7 +496,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.legal_court || ''}
-                  onChange={(e) => setExpenses({ ...expenses, legal_court: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, legal_court: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
               <div>
@@ -419,7 +505,8 @@ export function QuickEntryForm({
                 <Input
                   type="number"
                   value={expenses.other || ''}
-                  onChange={(e) => setExpenses({ ...expenses, other: Number(e.target.value) })}
+                  onChange={(e) => setExpenses({ ...expenses, other: safeParseNumber(e.target.value) })}
+                  placeholder="0.00"
                 />
               </div>
             </div>
