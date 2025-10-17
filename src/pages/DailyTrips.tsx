@@ -23,11 +23,13 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { AddTripForm } from "@/components/trips/AddTripForm";
 import { OtherExpensesModal } from "@/components/trips/OtherExpensesModal";
 import { ExportModal } from "@/components/trips/ExportModal";
 import { EditTripForm } from "@/components/trips/EditTripForm";
 import { QuickEntryPanel } from "@/components/trips/QuickEntryPanel";
+import { TripCard } from "@/components/trips/TripCard";
 
 interface Trip {
   id: string;
@@ -294,6 +296,7 @@ const createColumns = (
 
 export default function DailyTrips() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [data, setData] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -735,12 +738,12 @@ export default function DailyTrips() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Daily Trips</h1>
           <p className="text-muted-foreground">Monitor and manage daily bus operations</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Button onClick={handleAddTrip} className="gap-2">
             <Plus className="w-4 h-4" />
             Add New Trip
@@ -769,7 +772,7 @@ export default function DailyTrips() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="flex-1">
               <Label>Start Date</Label>
               <Popover>
@@ -825,7 +828,7 @@ export default function DailyTrips() {
             <Button 
               onClick={importDriverAllocationData}
               disabled={importing || !startDate || !endDate}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               {importing ? (
                 <>
@@ -897,20 +900,52 @@ export default function DailyTrips() {
         </CardContent>
       </Card>
 
-      {/* Data Table */}
-      <Card>
-        <CardContent className="pt-6">
-          <DataTable
-            columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal, handleDeleteTripLocal, handleQuickEntryLocal)}
-            data={data}
-            searchKeys={["Bus No.", "Route No.", "Route", "Driver", "Conductor"]}
-            title="Daily Trips"
-            onExport={handleExport}
-            customSearch={customSearch}
-            customFilter={customFilter}
-          />
-        </CardContent>
-      </Card>
+      {/* Data Table or Card View */}
+      {isMobile ? (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">All Trips</h2>
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+          </div>
+          {filteredData.length > 0 ? (
+            filteredData.map((trip) => (
+              <TripCard
+                key={trip.id}
+                trip={trip}
+                onQuickEntry={handleQuickEntryLocal}
+                onViewDetails={handleViewDetailsLocal}
+                onEdit={handleEditTripLocal}
+                onViewExpenses={handleViewExpensesLocal}
+                onCancel={handleCancelTripLocal}
+                onDelete={handleDeleteTripLocal}
+              />
+            ))
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-center text-muted-foreground">
+                No trips found
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <DataTable
+              columns={createColumns(handleViewDetailsLocal, handleEditTripLocal, handleViewExpensesLocal, handleCancelTripLocal, handleDeleteTripLocal, handleQuickEntryLocal)}
+              data={data}
+              searchKeys={["Bus No.", "Route No.", "Route", "Driver", "Conductor"]}
+              title="Daily Trips"
+              onExport={handleExport}
+              customSearch={customSearch}
+              customFilter={customFilter}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modals */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
