@@ -19,26 +19,36 @@ interface QuickEntryPanelProps {
 }
 
 interface IncomeDetails {
-  daily_collection: number;
-  call_collection: number;
-  agent_collection: number;
-  luggage_collection: number;
-  missional: number;
+  bus_collection: number;
+  call_booking: number;
+  agent_booking: number;
+  luggage_income: number;
+  miscellaneous_income: number;
   others: number;
   others_description: string;
 }
 
 interface ExpenseDetails {
   fuel: number;
-  food: number;
-  salary: number;
-  runner: number;
-  police: number;
-  phone: number;
-  water: number;
-  parking: number;
-  toll: number;
   repair: number;
+  tyre_tube: number;
+  salary: number;
+  police: number;
+  food: number;
+  emission_fitness: number;
+  permits_renewal: number;
+  staff_accommodation: number;
+  highway_charges: number;
+  accident_compensation: number;
+  parking: number;
+  log_sheet: number;
+  vehicle_hire: number;
+  ntc: number;
+  runner: number;
+  short_misc: number;
+  temporary_permit: number;
+  body_wash: number;
+  legal_court: number;
   other: number;
   other_description: string;
 }
@@ -53,26 +63,36 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
   const [tripInfo, setTripInfo] = useState<any>(null);
 
   const [income, setIncome] = useState<IncomeDetails>({
-    daily_collection: 0,
-    call_collection: 0,
-    agent_collection: 0,
-    luggage_collection: 0,
-    missional: 0,
+    bus_collection: 0,
+    call_booking: 0,
+    agent_booking: 0,
+    luggage_income: 0,
+    miscellaneous_income: 0,
     others: 0,
     others_description: '',
   });
 
   const [expenses, setExpenses] = useState<ExpenseDetails>({
     fuel: 0,
-    food: 0,
-    salary: 0,
-    runner: 0,
-    police: 0,
-    phone: 0,
-    water: 0,
-    parking: 0,
-    toll: 0,
     repair: 0,
+    tyre_tube: 0,
+    salary: 0,
+    police: 0,
+    food: 0,
+    emission_fitness: 0,
+    permits_renewal: 0,
+    staff_accommodation: 0,
+    highway_charges: 0,
+    accident_compensation: 0,
+    parking: 0,
+    log_sheet: 0,
+    vehicle_hire: 0,
+    ntc: 0,
+    runner: 0,
+    short_misc: 0,
+    temporary_permit: 0,
+    body_wash: 0,
+    legal_court: 0,
     other: 0,
     other_description: '',
   });
@@ -143,35 +163,45 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
 
       setTripInfo(data);
 
-      // Load existing income details
+      // Load existing income details (with backward compatibility)
       if (data.income_details && typeof data.income_details === 'object') {
         const incomeData = data.income_details as any;
         setIncome({
-          daily_collection: Number(incomeData.daily_collection) || 0,
-          call_collection: Number(incomeData.call_collection) || 0,
-          agent_collection: Number(incomeData.agent_collection) || 0,
-          luggage_collection: Number(incomeData.luggage_collection) || 0,
-          missional: Number(incomeData.missional) || 0,
+          bus_collection: Number(incomeData.bus_collection || incomeData.daily_collection) || 0,
+          call_booking: Number(incomeData.call_booking || incomeData.call_collection) || 0,
+          agent_booking: Number(incomeData.agent_booking || incomeData.agent_collection) || 0,
+          luggage_income: Number(incomeData.luggage_income || incomeData.luggage_collection) || 0,
+          miscellaneous_income: Number(incomeData.miscellaneous_income || incomeData.missional) || 0,
           others: Number(incomeData.others) || 0,
           others_description: String(incomeData.others_description || ''),
         });
       }
 
-      // Load existing expense details
+      // Load existing expense details (with backward compatibility)
       if (data.other_expenses_details && typeof data.other_expenses_details === 'object') {
         const expenseData = data.other_expenses_details as any;
         setExpenses({
           fuel: Number(expenseData.fuel || data.fuel_cost || 0),
-          food: Number(expenseData.food) || 0,
-          salary: Number(expenseData.salary) || 0,
-          runner: Number(expenseData.runner) || 0,
-          police: Number(expenseData.police) || 0,
-          phone: Number(expenseData.phone) || 0,
-          water: Number(expenseData.water) || 0,
-          parking: Number(expenseData.parking) || 0,
-          toll: Number(expenseData.toll) || 0,
           repair: Number(expenseData.repair) || 0,
-          other: Number(expenseData.other) || 0,
+          tyre_tube: Number(expenseData.tyre_tube) || 0,
+          salary: Number(expenseData.salary) || 0,
+          police: Number(expenseData.police) || 0,
+          food: Number(expenseData.food) || 0,
+          emission_fitness: Number(expenseData.emission_fitness) || 0,
+          permits_renewal: Number(expenseData.permits_renewal) || 0,
+          staff_accommodation: Number(expenseData.staff_accommodation) || 0,
+          highway_charges: Number(expenseData.highway_charges || expenseData.toll) || 0,
+          accident_compensation: Number(expenseData.accident_compensation) || 0,
+          parking: Number(expenseData.parking) || 0,
+          log_sheet: Number(expenseData.log_sheet) || 0,
+          vehicle_hire: Number(expenseData.vehicle_hire) || 0,
+          ntc: Number(expenseData.ntc) || 0,
+          runner: Number(expenseData.runner) || 0,
+          short_misc: Number(expenseData.short_misc) || 0,
+          temporary_permit: Number(expenseData.temporary_permit) || 0,
+          body_wash: Number(expenseData.body_wash) || 0,
+          legal_court: Number(expenseData.legal_court) || 0,
+          other: Number(expenseData.other || expenseData.phone || expenseData.water) || 0,
           other_description: String(expenseData.other_description || ''),
         });
       }
@@ -189,11 +219,11 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
 
   const calculateTotalRevenue = () => {
     return (
-      income.daily_collection +
-      income.call_collection +
-      income.agent_collection +
-      income.luggage_collection +
-      income.missional +
+      income.bus_collection +
+      income.call_booking +
+      income.agent_booking +
+      income.luggage_income +
+      income.miscellaneous_income +
       income.others
     );
   };
@@ -201,15 +231,25 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
   const calculateTotalExpenses = () => {
     return (
       expenses.fuel +
-      expenses.food +
-      expenses.salary +
-      expenses.runner +
-      expenses.police +
-      expenses.phone +
-      expenses.water +
-      expenses.parking +
-      expenses.toll +
       expenses.repair +
+      expenses.tyre_tube +
+      expenses.salary +
+      expenses.police +
+      expenses.food +
+      expenses.emission_fitness +
+      expenses.permits_renewal +
+      expenses.staff_accommodation +
+      expenses.highway_charges +
+      expenses.accident_compensation +
+      expenses.parking +
+      expenses.log_sheet +
+      expenses.vehicle_hire +
+      expenses.ntc +
+      expenses.runner +
+      expenses.short_misc +
+      expenses.temporary_permit +
+      expenses.body_wash +
+      expenses.legal_court +
       expenses.other
     );
   };
@@ -362,65 +402,65 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
 
               <div className="space-y-3">
                 <div>
-                  <Label htmlFor="daily_collection">Daily Collection</Label>
+                  <Label htmlFor="bus_collection">Bus Collection</Label>
                   <Input
-                    id="daily_collection"
+                    id="bus_collection"
                     type="number"
-                    value={income.daily_collection}
+                    value={income.bus_collection}
                     onChange={(e) =>
-                      setIncome({ ...income, daily_collection: parseFloat(e.target.value) || 0 })
+                      setIncome({ ...income, bus_collection: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="call_collection">Call Collection</Label>
+                  <Label htmlFor="call_booking">Call Booking</Label>
                   <Input
-                    id="call_collection"
+                    id="call_booking"
                     type="number"
-                    value={income.call_collection}
+                    value={income.call_booking}
                     onChange={(e) =>
-                      setIncome({ ...income, call_collection: parseFloat(e.target.value) || 0 })
+                      setIncome({ ...income, call_booking: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="agent_collection">Agent Collection</Label>
+                  <Label htmlFor="agent_booking">Agent Booking</Label>
                   <Input
-                    id="agent_collection"
+                    id="agent_booking"
                     type="number"
-                    value={income.agent_collection}
+                    value={income.agent_booking}
                     onChange={(e) =>
-                      setIncome({ ...income, agent_collection: parseFloat(e.target.value) || 0 })
+                      setIncome({ ...income, agent_booking: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="luggage_collection">Luggage Collection</Label>
+                  <Label htmlFor="luggage_income">Luggage Income</Label>
                   <Input
-                    id="luggage_collection"
+                    id="luggage_income"
                     type="number"
-                    value={income.luggage_collection}
+                    value={income.luggage_income}
                     onChange={(e) =>
-                      setIncome({ ...income, luggage_collection: parseFloat(e.target.value) || 0 })
+                      setIncome({ ...income, luggage_income: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="missional">Missional</Label>
+                  <Label htmlFor="miscellaneous_income">Miscellaneous Income</Label>
                   <Input
-                    id="missional"
+                    id="miscellaneous_income"
                     type="number"
-                    value={income.missional}
+                    value={income.miscellaneous_income}
                     onChange={(e) =>
-                      setIncome({ ...income, missional: parseFloat(e.target.value) || 0 })
+                      setIncome({ ...income, miscellaneous_income: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0"
                   />
@@ -462,7 +502,7 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
 
               <div className="space-y-3">
                 <div>
-                  <Label htmlFor="fuel">Fuel</Label>
+                  <Label htmlFor="fuel">Fuel Expenses</Label>
                   <Input
                     id="fuel"
                     type="number"
@@ -473,7 +513,59 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
                 </div>
 
                 <div>
-                  <Label htmlFor="food">Food</Label>
+                  <Label htmlFor="repair">Bus Maintenance & Repair</Label>
+                  <Input
+                    id="repair"
+                    type="number"
+                    value={expenses.repair}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, repair: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="tyre_tube">Tyre & Tube Expenses</Label>
+                  <Input
+                    id="tyre_tube"
+                    type="number"
+                    value={expenses.tyre_tube}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, tyre_tube: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="salary">Wages - Drivers & Assistants</Label>
+                  <Input
+                    id="salary"
+                    type="number"
+                    value={expenses.salary}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, salary: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="police">Fines and Penalties</Label>
+                  <Input
+                    id="police"
+                    type="number"
+                    value={expenses.police}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, police: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="food">Staff Meals & Welfare</Label>
                   <Input
                     id="food"
                     type="number"
@@ -484,13 +576,117 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
                 </div>
 
                 <div>
-                  <Label htmlFor="salary">Salary</Label>
+                  <Label htmlFor="emission_fitness">Emission Reports/Fitness</Label>
                   <Input
-                    id="salary"
+                    id="emission_fitness"
                     type="number"
-                    value={expenses.salary}
+                    value={expenses.emission_fitness}
                     onChange={(e) =>
-                      setExpenses({ ...expenses, salary: parseFloat(e.target.value) || 0 })
+                      setExpenses({ ...expenses, emission_fitness: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="permits_renewal">Permits Renewal Charges</Label>
+                  <Input
+                    id="permits_renewal"
+                    type="number"
+                    value={expenses.permits_renewal}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, permits_renewal: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="staff_accommodation">Staff Accommodation</Label>
+                  <Input
+                    id="staff_accommodation"
+                    type="number"
+                    value={expenses.staff_accommodation}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, staff_accommodation: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="highway_charges">Highway Charges</Label>
+                  <Input
+                    id="highway_charges"
+                    type="number"
+                    value={expenses.highway_charges}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, highway_charges: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="accident_compensation">Accident Compensation</Label>
+                  <Input
+                    id="accident_compensation"
+                    type="number"
+                    value={expenses.accident_compensation}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, accident_compensation: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="parking">Parking Fee</Label>
+                  <Input
+                    id="parking"
+                    type="number"
+                    value={expenses.parking}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, parking: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="log_sheet">Log Sheet Charges</Label>
+                  <Input
+                    id="log_sheet"
+                    type="number"
+                    value={expenses.log_sheet}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, log_sheet: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="vehicle_hire">Vehicle Hire Charges</Label>
+                  <Input
+                    id="vehicle_hire"
+                    type="number"
+                    value={expenses.vehicle_hire}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, vehicle_hire: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="ntc">NTC</Label>
+                  <Input
+                    id="ntc"
+                    type="number"
+                    value={expenses.ntc}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, ntc: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0"
                   />
@@ -510,72 +706,52 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
                 </div>
 
                 <div>
-                  <Label htmlFor="police">Police</Label>
+                  <Label htmlFor="short_misc">Short - Miscellaneous</Label>
                   <Input
-                    id="police"
+                    id="short_misc"
                     type="number"
-                    value={expenses.police}
+                    value={expenses.short_misc}
                     onChange={(e) =>
-                      setExpenses({ ...expenses, police: parseFloat(e.target.value) || 0 })
+                      setExpenses({ ...expenses, short_misc: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="phone">Phone</Label>
+                  <Label htmlFor="temporary_permit">Temporary Permit</Label>
                   <Input
-                    id="phone"
+                    id="temporary_permit"
                     type="number"
-                    value={expenses.phone}
-                    onChange={(e) => setExpenses({ ...expenses, phone: parseFloat(e.target.value) || 0 })}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="water">Water</Label>
-                  <Input
-                    id="water"
-                    type="number"
-                    value={expenses.water}
-                    onChange={(e) => setExpenses({ ...expenses, water: parseFloat(e.target.value) || 0 })}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="parking">Parking</Label>
-                  <Input
-                    id="parking"
-                    type="number"
-                    value={expenses.parking}
+                    value={expenses.temporary_permit}
                     onChange={(e) =>
-                      setExpenses({ ...expenses, parking: parseFloat(e.target.value) || 0 })
+                      setExpenses({ ...expenses, temporary_permit: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="toll">Toll</Label>
+                  <Label htmlFor="body_wash">Body Wash and Service</Label>
                   <Input
-                    id="toll"
+                    id="body_wash"
                     type="number"
-                    value={expenses.toll}
-                    onChange={(e) => setExpenses({ ...expenses, toll: parseFloat(e.target.value) || 0 })}
+                    value={expenses.body_wash}
+                    onChange={(e) =>
+                      setExpenses({ ...expenses, body_wash: parseFloat(e.target.value) || 0 })
+                    }
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="repair">Repair</Label>
+                  <Label htmlFor="legal_court">Legal & Court Fee</Label>
                   <Input
-                    id="repair"
+                    id="legal_court"
                     type="number"
-                    value={expenses.repair}
+                    value={expenses.legal_court}
                     onChange={(e) =>
-                      setExpenses({ ...expenses, repair: parseFloat(e.target.value) || 0 })
+                      setExpenses({ ...expenses, legal_court: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0"
                   />
