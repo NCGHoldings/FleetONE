@@ -254,14 +254,14 @@ export function QuickEntryForm({
 
       {/* Scrollable Form Content */}
       <div className="flex-1 overflow-auto p-3 md:p-6 pb-32 md:pb-6">
-        <div className="max-w-6xl mx-auto space-y-4 md:space-y-6">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           {/* Revenue Section */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg md:text-xl">Revenue</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 gap-3 md:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="bus_collection" className="text-sm md:text-base">Bus Collection</Label>
                   <Input
@@ -338,7 +338,7 @@ export function QuickEntryForm({
               <CardTitle className="text-lg md:text-xl">Expenses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 gap-3 md:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="fuel" className="text-sm md:text-base">Fuel Expenses</Label>
                   <Input
