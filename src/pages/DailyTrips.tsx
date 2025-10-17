@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -292,6 +293,7 @@ const createColumns = (
 ];
 
 export default function DailyTrips() {
+  const navigate = useNavigate();
   const [data, setData] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -743,15 +745,14 @@ export default function DailyTrips() {
             <Plus className="w-4 h-4" />
             Add New Trip
           </Button>
-          <Button 
-            onClick={() => {
-              setSelectedTrip(null);
-              setShowQuickEntry(true);
-            }}
-            className="gap-2 bg-gradient-to-r from-green-600 to-blue-600"
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => navigate('/trips/quick-entry')}
+            className="gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:opacity-90"
           >
-            <Zap className="w-4 h-4" />
-            Quick Entry
+            <Zap className="w-5 h-5" />
+            Quick Entry Mode
           </Button>
         </div>
       </div>

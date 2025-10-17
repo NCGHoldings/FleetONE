@@ -49,6 +49,7 @@ import GlobalSchoolPayments from "./pages/GlobalSchoolPayments";
 import TotalDashboard from "./pages/TotalDashboard";
 import NSPDailySales from "./pages/NSPDailySales";
 import NSPSalesSummary from "./pages/NSPSalesSummary";
+import QuickTripsEntry from "./pages/QuickTripsEntry";
 
 const queryClient = new QueryClient();
 
@@ -114,6 +115,14 @@ const App = () => (
                   <AppLayout>
                     <DailyTrips />
                   </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/trips/quick-entry" 
+              element={
+                <ProtectedRoute>
+                  <QuickTripsEntry />
                 </ProtectedRoute>
               } 
             />
