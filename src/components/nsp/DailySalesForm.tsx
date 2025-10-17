@@ -78,7 +78,7 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
   };
 
   const calculateTyreSaleTotal = () => {
-    return tyreEntries.reduce((sum, item) => sum + item.total, 0);
+    return tyreEntries.reduce((sum, item) => sum + item.amount, 0);
   };
 
   const calculateTotal = () => {
@@ -228,11 +228,8 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
                   >
                     <div className="flex-1">
                       <p className="font-medium">{item.type}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {item.quantity} × Rs. {item.unitPrice.toLocaleString()} = 
-                        <span className="text-green-600 font-semibold ml-1">
-                          Rs. {item.total.toLocaleString()}
-                        </span>
+                      <p className="text-sm text-green-600 font-semibold">
+                        Rs. {item.amount.toLocaleString()}
                       </p>
                     </div>
                     <Button

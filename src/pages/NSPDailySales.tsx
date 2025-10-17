@@ -15,9 +15,7 @@ export interface OtherIncomeItem {
 
 export interface TyreEntry {
   type: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
+  amount: number;
 }
 
 export interface NSPSalesData {
@@ -58,7 +56,7 @@ const NSPDailySales = () => {
 
       if (checkError) throw checkError;
 
-      const tyreSaleTotal = data.tyre_entries.reduce((sum, item) => sum + item.total, 0);
+      const tyreSaleTotal = data.tyre_entries.reduce((sum, item) => sum + item.amount, 0);
 
       const salesData = {
         sale_date: data.sale_date.toISOString().split('T')[0],
@@ -121,11 +119,11 @@ const NSPDailySales = () => {
     message += `Outside sale     = ${formatCurrency(data.lss_outside_sale)}\n`;
     message += `Inside sale      = ${formatCurrency(data.lss_inside_sale)}\n\n`;
     
-    const tyreSaleTotal = data.tyre_entries.reduce((sum, item) => sum + item.total, 0);
+    const tyreSaleTotal = data.tyre_entries.reduce((sum, item) => sum + item.amount, 0);
     message += `Tyre sale        = ${formatCurrency(tyreSaleTotal)}\n`;
     if (data.tyre_entries.length > 0) {
       data.tyre_entries.forEach(tyre => {
-        message += `  ${tyre.type}: ${tyre.quantity} × ${formatCurrency(tyre.unitPrice)}\n`;
+        message += `  ${tyre.type}: ${formatCurrency(tyre.amount)}\n`;
       });
       message += `\n`;
     } else {

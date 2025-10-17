@@ -7,9 +7,7 @@ import { Plus } from "lucide-react";
 
 export interface TyreEntry {
   type: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
+  amount: number;
 }
 
 interface TyreSaleModalProps {
@@ -20,33 +18,26 @@ interface TyreSaleModalProps {
 
 export function TyreSaleModal({ open, onClose, onAdd }: TyreSaleModalProps) {
   const [type, setType] = useState("");
-  const [quantity, setQuantity] = useState<number>(0);
-  const [unitPrice, setUnitPrice] = useState<number>(0);
-
-  const calculateTotal = () => quantity * unitPrice;
+  const [amount, setAmount] = useState<number>(0);
 
   const handleSubmit = () => {
-    if (!type.trim() || quantity <= 0 || unitPrice <= 0) {
+    if (!type.trim() || amount <= 0) {
       return;
     }
 
     onAdd({
       type: type.trim(),
-      quantity: quantity,
-      unitPrice: unitPrice,
-      total: calculateTotal(),
+      amount: amount,
     });
 
     // Reset form
     setType("");
-    setQuantity(0);
-    setUnitPrice(0);
+    setAmount(0);
   };
 
   const handleClose = () => {
     setType("");
-    setQuantity(0);
-    setUnitPrice(0);
+    setAmount(0);
     onClose();
   };
 
@@ -56,7 +47,7 @@ export function TyreSaleModal({ open, onClose, onAdd }: TyreSaleModalProps) {
         <DialogHeader>
           <DialogTitle>Add Tyre Sale</DialogTitle>
           <DialogDescription>
-            Add tyre type, quantity and unit price
+            Add tyre type and total sale amount
           </DialogDescription>
         </DialogHeader>
 
@@ -73,39 +64,17 @@ export function TyreSaleModal({ open, onClose, onAdd }: TyreSaleModalProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity</Label>
+            <Label htmlFor="amount">Total Sale Amount (Rs.)</Label>
             <Input
-              id="quantity"
+              id="amount"
               type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
               placeholder="0"
-              className="h-12"
+              className="h-12 text-lg"
               min="0"
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="unitPrice">Unit Price (Rs.)</Label>
-            <Input
-              id="unitPrice"
-              type="number"
-              value={unitPrice}
-              onChange={(e) => setUnitPrice(Number(e.target.value))}
-              placeholder="0"
-              className="h-12"
-              min="0"
-            />
-          </div>
-
-          {quantity > 0 && unitPrice > 0 && (
-            <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
-              <div className="text-sm text-muted-foreground">Total Amount</div>
-              <div className="text-lg font-bold text-green-600">
-                Rs. {calculateTotal().toLocaleString()}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="flex gap-2">
@@ -114,7 +83,7 @@ export function TyreSaleModal({ open, onClose, onAdd }: TyreSaleModalProps) {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!type.trim() || quantity <= 0 || unitPrice <= 0}
+            disabled={!type.trim() || amount <= 0}
             className="flex-1"
           >
             <Plus className="h-4 w-4 mr-2" />
