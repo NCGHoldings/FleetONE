@@ -13,12 +13,18 @@ export interface OtherIncomeItem {
   amount: number;
 }
 
+export interface TyreEntry {
+  type: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
 export interface NSPSalesData {
   sale_date: Date;
   lss_outside_sale: number;
   lss_inside_sale: number;
-  tyre_sale: number;
-  tyre_quantity: string;
+  tyre_entries: TyreEntry[];
   pepiliyana_sale: number;
   other_income: OtherIncomeItem[];
   notes: string;
@@ -52,12 +58,14 @@ const NSPDailySales = () => {
 
       if (checkError) throw checkError;
 
+      const tyreSaleTotal = data.tyre_entries.reduce((sum, item) => sum + item.total, 0);
+
       const salesData = {
         sale_date: data.sale_date.toISOString().split('T')[0],
         lss_outside_sale: data.lss_outside_sale,
         lss_inside_sale: data.lss_inside_sale,
-        tyre_sale: data.tyre_sale,
-        tyre_quantity: data.tyre_quantity,
+        tyre_sale: tyreSaleTotal,
+        tyre_entries: data.tyre_entries as any,
         pepiliyana_sale: data.pepiliyana_sale,
         other_income: data.other_income as any,
         notes: data.notes,
@@ -112,9 +120,14 @@ const NSPDailySales = () => {
     message += `LSS Sale\n`;
     message += `Outside sale     = ${formatCurrency(data.lss_outside_sale)}\n`;
     message += `Inside sale      = ${formatCurrency(data.lss_inside_sale)}\n\n`;
-    message += `Tyre sale        = ${formatCurrency(data.tyre_sale)}\n`;
-    if (data.tyre_quantity) {
-      message += `${data.tyre_quantity}\n\n`;
+    
+    const tyreSaleTotal = data.tyre_entries.reduce((sum, item) => sum + item.total, 0);
+    message += `Tyre sale        = ${formatCurrency(tyreSaleTotal)}\n`;
+    if (data.tyre_entries.length > 0) {
+      data.tyre_entries.forEach(tyre => {
+        message += `  ${tyre.type}: ${tyre.quantity} × ${formatCurrency(tyre.unitPrice)}\n`;
+      });
+      message += `\n`;
     } else {
       message += `\n`;
     }
@@ -128,7 +141,7 @@ const NSPDailySales = () => {
       message += `\n`;
     }
 
-    const total = data.lss_outside_sale + data.lss_inside_sale + data.tyre_sale + 
+    const total = data.lss_outside_sale + data.lss_inside_sale + tyreSaleTotal + 
                   data.pepiliyana_sale + 
                   data.other_income.reduce((sum, item) => sum + item.amount, 0);
 

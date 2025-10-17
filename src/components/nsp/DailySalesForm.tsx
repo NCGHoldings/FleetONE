@@ -9,6 +9,7 @@ import { CalendarIcon, Plus, Trash2, Save } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { OtherIncomeModal } from "./OtherIncomeModal";
+import { TyreSaleModal, type TyreEntry } from "./TyreSaleModal";
 import type { NSPSalesData, OtherIncomeItem } from "@/pages/NSPDailySales";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -22,12 +23,12 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [lssOutsideSale, setLssOutsideSale] = useState<number>(0);
   const [lssInsideSale, setLssInsideSale] = useState<number>(0);
-  const [tyreSale, setTyreSale] = useState<number>(0);
-  const [tyreQuantity, setTyreQuantity] = useState<string>("");
+  const [tyreEntries, setTyreEntries] = useState<TyreEntry[]>([]);
   const [pepiliyanaSale, setPepiliyanaSale] = useState<number>(0);
   const [otherIncome, setOtherIncome] = useState<OtherIncomeItem[]>([]);
   const [notes, setNotes] = useState<string>("");
   const [showOtherIncomeModal, setShowOtherIncomeModal] = useState(false);
+  const [showTyreSaleModal, setShowTyreSaleModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Load existing data when date changes
@@ -49,8 +50,7 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
       if (data) {
         setLssOutsideSale(data.lss_outside_sale || 0);
         setLssInsideSale(data.lss_inside_sale || 0);
-        setTyreSale(data.tyre_sale || 0);
-        setTyreQuantity(data.tyre_quantity || "");
+        setTyreEntries(Array.isArray(data.tyre_entries) ? data.tyre_entries as unknown as TyreEntry[] : []);
         setPepiliyanaSale(data.pepiliyana_sale || 0);
         setOtherIncome(Array.isArray(data.other_income) ? data.other_income as unknown as OtherIncomeItem[] : []);
         setNotes(data.notes || "");
@@ -58,8 +58,7 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
         // Reset form for new entry
         setLssOutsideSale(0);
         setLssInsideSale(0);
-        setTyreSale(0);
-        setTyreQuantity("");
+        setTyreEntries([]);
         setPepiliyanaSale(0);
         setOtherIncome([]);
         setNotes("");
@@ -76,9 +75,23 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
     }
   };
 
+  const calculateTyreSaleTotal = () => {
+    return tyreEntries.reduce((sum, item) => sum + item.total, 0);
+  };
+
   const calculateTotal = () => {
+    const tyreSaleTotal = calculateTyreSaleTotal();
     const otherTotal = otherIncome.reduce((sum, item) => sum + item.amount, 0);
-    return lssOutsideSale + lssInsideSale + tyreSale + pepiliyanaSale + otherTotal;
+    return lssOutsideSale + lssInsideSale + tyreSaleTotal + pepiliyanaSale + otherTotal;
+  };
+
+  const handleAddTyre = (item: TyreEntry) => {
+    setTyreEntries([...tyreEntries, item]);
+    setShowTyreSaleModal(false);
+  };
+
+  const handleRemoveTyre = (index: number) => {
+    setTyreEntries(tyreEntries.filter((_, i) => i !== index));
   };
 
   const handleAddOtherIncome = (item: OtherIncomeItem) => {
@@ -105,8 +118,7 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
       sale_date: selectedDate,
       lss_outside_sale: lssOutsideSale,
       lss_inside_sale: lssInsideSale,
-      tyre_sale: tyreSale,
-      tyre_quantity: tyreQuantity,
+      tyre_entries: tyreEntries,
       pepiliyana_sale: pepiliyanaSale,
       other_income: otherIncome,
       notes: notes,
@@ -190,35 +202,58 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
 
           {/* Tyre Sales */}
           <div className="space-y-4 p-6 bg-green-50/50 dark:bg-green-950/20 border border-green-200/50 rounded-lg">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              Tyre Sales
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="tyre-sale">Tyre Sale</Label>
-                <Input
-                  id="tyre-sale"
-                  type="number"
-                  value={tyreSale}
-                  onChange={(e) => setTyreSale(Number(e.target.value))}
-                  placeholder="0"
-                  className="h-12 text-lg"
-                  min="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tyre-quantity">Description (e.g., Jiashun 6)</Label>
-                <Input
-                  id="tyre-quantity"
-                  type="text"
-                  value={tyreQuantity}
-                  onChange={(e) => setTyreQuantity(e.target.value)}
-                  placeholder="Jiashun 6"
-                  className="h-12"
-                />
-              </div>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                Tyre Sales
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTyreSaleModal(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Tyre
+              </Button>
             </div>
+
+            {tyreEntries.length > 0 ? (
+              <div className="space-y-2">
+                {tyreEntries.map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-lg border"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium">{item.type}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.quantity} × Rs. {item.unitPrice.toLocaleString()} = 
+                        <span className="text-green-600 font-semibold ml-1">
+                          Rs. {item.total.toLocaleString()}
+                        </span>
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveTyre(index)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border-2 border-green-500/50 mt-3">
+                  <span className="font-semibold">Total Tyre Sale:</span>
+                  <span className="text-lg font-bold text-green-600">
+                    Rs. {calculateTyreSaleTotal().toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No tyre sales added yet
+              </p>
+            )}
           </div>
 
           {/* Pepiliyana Sales */}
@@ -326,6 +361,12 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
           </div>
         </>
       )}
+
+      <TyreSaleModal
+        open={showTyreSaleModal}
+        onClose={() => setShowTyreSaleModal(false)}
+        onAdd={handleAddTyre}
+      />
 
       <OtherIncomeModal
         open={showOtherIncomeModal}
