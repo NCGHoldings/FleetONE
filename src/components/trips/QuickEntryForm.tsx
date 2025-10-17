@@ -566,26 +566,26 @@ export function QuickEntryForm({
         </div>
       </div>
 
-      {/* Sticky Footer with Summary and Actions - Mobile Optimized */}
-      <div className="fixed md:static bottom-0 left-0 right-0 border-t bg-card p-3 md:p-4 shadow-lg md:shadow-none">
+      {/* Sticky Footer with Summary and Actions - Compact */}
+      <div className="fixed md:static bottom-0 left-0 right-0 border-t bg-card p-2 md:p-3 shadow-lg md:shadow-none">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-3 gap-3 md:gap-8 mb-3 md:mb-4">
+          <div className="grid grid-cols-3 gap-2 md:gap-4 mb-2 md:mb-3">
             <div>
-              <p className="text-xs md:text-sm text-muted-foreground mb-1">Total Revenue</p>
-              <p className="text-base md:text-2xl font-bold text-green-600">
+              <p className="text-[10px] md:text-xs text-muted-foreground mb-0.5">Revenue</p>
+              <p className="text-sm md:text-lg font-bold text-green-600">
                 Rs {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
             </div>
             <div>
-              <p className="text-xs md:text-sm text-muted-foreground mb-1">Total Expenses</p>
-              <p className="text-base md:text-2xl font-bold text-red-600">
+              <p className="text-[10px] md:text-xs text-muted-foreground mb-0.5">Expenses</p>
+              <p className="text-sm md:text-lg font-bold text-red-600">
                 Rs {totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
             </div>
             <div>
-              <p className="text-xs md:text-sm text-muted-foreground mb-1">Net Profit</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground mb-0.5">Net Profit</p>
               <p className={cn(
-                "text-base md:text-2xl font-bold",
+                "text-sm md:text-lg font-bold",
                 netProfit >= 0 ? "text-green-600" : "text-red-600"
               )}>
                 Rs {netProfit.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
@@ -593,21 +593,21 @@ export function QuickEntryForm({
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:justify-end">
+          <div className="flex flex-col md:flex-row gap-2 md:justify-end">
             <Button
               variant="outline"
-              size="lg"
+              size="sm"
               onClick={() => handleSave(false)}
               disabled={saving}
-              className="w-full md:w-auto h-11 md:h-10"
+              className="w-full md:w-auto h-9"
             >
               {saving ? "Saving..." : "Save & Stay"}
             </Button>
             <Button
-              size="lg"
+              size="sm"
               onClick={() => handleSave(true)}
               disabled={saving}
-              className="w-full md:w-auto h-11 md:h-10"
+              className="w-full md:w-auto h-9"
             >
               {saving ? "Saving..." : "Save & Next Bus"}
             </Button>
