@@ -243,79 +243,79 @@ export function QuickEntryForm({
   return (
     <div className="h-full flex flex-col">
       {/* Scrollable Form Content */}
-      <div className="flex-1 overflow-auto p-3 md:p-4 pb-32 md:pb-6">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+      <div className="flex-1 overflow-auto p-2 md:p-3 pb-24 md:pb-6">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
           {/* Revenue Section */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg md:text-xl">Revenue</CardTitle>
+            <CardHeader className="p-3 md:p-4">
+              <CardTitle className="text-sm md:text-base">Revenue</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-3 md:gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="bus_collection" className="text-sm md:text-base">Bus Collection</Label>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="grid grid-cols-1 gap-2 md:gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="bus_collection" className="text-xs">Bus Collection</Label>
                   <Input
                     id="bus_collection"
                     type="number"
                     value={income.bus_collection || ''}
                     onChange={(e) => setIncome({ ...income, bus_collection: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="call_booking" className="text-sm md:text-base">Call Booking</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="call_booking" className="text-xs">Call Booking</Label>
                   <Input
                     id="call_booking"
                     type="number"
                     value={income.call_booking || ''}
                     onChange={(e) => setIncome({ ...income, call_booking: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="agent_booking" className="text-sm md:text-base">Agent Booking</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="agent_booking" className="text-xs">Agent Booking</Label>
                   <Input
                     id="agent_booking"
                     type="number"
                     value={income.agent_booking || ''}
                     onChange={(e) => setIncome({ ...income, agent_booking: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="luggage_income" className="text-sm md:text-base">Luggage Income</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="luggage_income" className="text-xs">Luggage Income</Label>
                   <Input
                     id="luggage_income"
                     type="number"
                     value={income.luggage_income || ''}
                     onChange={(e) => setIncome({ ...income, luggage_income: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="miscellaneous_income" className="text-sm md:text-base">Miscellaneous Income</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="miscellaneous_income" className="text-xs">Miscellaneous Income</Label>
                   <Input
                     id="miscellaneous_income"
                     type="number"
                     value={income.miscellaneous_income || ''}
                     onChange={(e) => setIncome({ ...income, miscellaneous_income: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="others" className="text-sm md:text-base">Others</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="others" className="text-xs">Others</Label>
                   <Input
                     id="others"
                     type="number"
                     value={income.others || ''}
                     onChange={(e) => setIncome({ ...income, others: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
               </div>
@@ -324,240 +324,240 @@ export function QuickEntryForm({
 
           {/* Expenses Section */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg md:text-xl">Expenses</CardTitle>
+            <CardHeader className="p-3 md:p-4">
+              <CardTitle className="text-sm md:text-base">Expenses</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fuel" className="text-sm md:text-base">Fuel Expenses</Label>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="fuel" className="text-xs">Fuel Expenses</Label>
                   <Input
                     id="fuel"
                     type="number"
                     value={expenses.fuel || ''}
                     onChange={(e) => setExpenses({ ...expenses, fuel: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="repair" className="text-sm md:text-base">Bus Maintenance & Repair</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="repair" className="text-xs">Bus Maintenance & Repair</Label>
                   <Input
                     id="repair"
                     type="number"
                     value={expenses.repair || ''}
                     onChange={(e) => setExpenses({ ...expenses, repair: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tyre_tube" className="text-sm md:text-base">Tyre & Tube</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="tyre_tube" className="text-xs">Tyre & Tube</Label>
                   <Input
                     id="tyre_tube"
                     type="number"
                     value={expenses.tyre_tube || ''}
                     onChange={(e) => setExpenses({ ...expenses, tyre_tube: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="salary" className="text-sm md:text-base">Wages - Drivers & Assistants</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="salary" className="text-xs">Wages - Drivers & Assistants</Label>
                   <Input
                     id="salary"
                     type="number"
                     value={expenses.salary || ''}
                     onChange={(e) => setExpenses({ ...expenses, salary: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="police" className="text-sm md:text-base">Fines and Penalties</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="police" className="text-xs">Fines and Penalties</Label>
                   <Input
                     id="police"
                     type="number"
                     value={expenses.police || ''}
                     onChange={(e) => setExpenses({ ...expenses, police: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="food" className="text-sm md:text-base">Staff Meals & Welfare</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="food" className="text-xs">Staff Meals & Welfare</Label>
                   <Input
                     id="food"
                     type="number"
                     value={expenses.food || ''}
                     onChange={(e) => setExpenses({ ...expenses, food: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="emission_fitness" className="text-sm md:text-base">Emission Reports/Fitness</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="emission_fitness" className="text-xs">Emission Reports/Fitness</Label>
                   <Input
                     id="emission_fitness"
                     type="number"
                     value={expenses.emission_fitness || ''}
                     onChange={(e) => setExpenses({ ...expenses, emission_fitness: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="permits_renewal" className="text-sm md:text-base">Permits Renewal Charges</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="permits_renewal" className="text-xs">Permits Renewal Charges</Label>
                   <Input
                     id="permits_renewal"
                     type="number"
                     value={expenses.permits_renewal || ''}
                     onChange={(e) => setExpenses({ ...expenses, permits_renewal: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="staff_accommodation" className="text-sm md:text-base">Staff Accommodation</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="staff_accommodation" className="text-xs">Staff Accommodation</Label>
                   <Input
                     id="staff_accommodation"
                     type="number"
                     value={expenses.staff_accommodation || ''}
                     onChange={(e) => setExpenses({ ...expenses, staff_accommodation: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="highway_charges" className="text-sm md:text-base">Highway Charges</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="highway_charges" className="text-xs">Highway Charges</Label>
                   <Input
                     id="highway_charges"
                     type="number"
                     value={expenses.highway_charges || ''}
                     onChange={(e) => setExpenses({ ...expenses, highway_charges: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="accident_compensation" className="text-sm md:text-base">Accident Compensation</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="accident_compensation" className="text-xs">Accident Compensation</Label>
                   <Input
                     id="accident_compensation"
                     type="number"
                     value={expenses.accident_compensation || ''}
                     onChange={(e) => setExpenses({ ...expenses, accident_compensation: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="parking" className="text-sm md:text-base">Parking Fee</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="parking" className="text-xs">Parking Fee</Label>
                   <Input
                     id="parking"
                     type="number"
                     value={expenses.parking || ''}
                     onChange={(e) => setExpenses({ ...expenses, parking: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="log_sheet" className="text-sm md:text-base">Log Sheet Charges</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="log_sheet" className="text-xs">Log Sheet Charges</Label>
                   <Input
                     id="log_sheet"
                     type="number"
                     value={expenses.log_sheet || ''}
                     onChange={(e) => setExpenses({ ...expenses, log_sheet: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vehicle_hire" className="text-sm md:text-base">Vehicle Hire Charges</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="vehicle_hire" className="text-xs">Vehicle Hire Charges</Label>
                   <Input
                     id="vehicle_hire"
                     type="number"
                     value={expenses.vehicle_hire || ''}
                     onChange={(e) => setExpenses({ ...expenses, vehicle_hire: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ntc" className="text-sm md:text-base">NTC</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="ntc" className="text-xs">NTC</Label>
                   <Input
                     id="ntc"
                     type="number"
                     value={expenses.ntc || ''}
                     onChange={(e) => setExpenses({ ...expenses, ntc: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="runner" className="text-sm md:text-base">Runner</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="runner" className="text-xs">Runner</Label>
                   <Input
                     id="runner"
                     type="number"
                     value={expenses.runner || ''}
                     onChange={(e) => setExpenses({ ...expenses, runner: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="short_misc" className="text-sm md:text-base">Short - Miscellaneous</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="short_misc" className="text-xs">Short - Miscellaneous</Label>
                   <Input
                     id="short_misc"
                     type="number"
                     value={expenses.short_misc || ''}
                     onChange={(e) => setExpenses({ ...expenses, short_misc: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="temporary_permit" className="text-sm md:text-base">Temporary Permit</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="temporary_permit" className="text-xs">Temporary Permit</Label>
                   <Input
                     id="temporary_permit"
                     type="number"
                     value={expenses.temporary_permit || ''}
                     onChange={(e) => setExpenses({ ...expenses, temporary_permit: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="body_wash" className="text-sm md:text-base">Body Wash and Service</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="body_wash" className="text-xs">Body Wash and Service</Label>
                   <Input
                     id="body_wash"
                     type="number"
                     value={expenses.body_wash || ''}
                     onChange={(e) => setExpenses({ ...expenses, body_wash: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="legal_court" className="text-sm md:text-base">Legal & Court Fee</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="legal_court" className="text-xs">Legal & Court Fee</Label>
                   <Input
                     id="legal_court"
                     type="number"
                     value={expenses.legal_court || ''}
                     onChange={(e) => setExpenses({ ...expenses, legal_court: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="other" className="text-sm md:text-base">Other</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="other" className="text-xs">Other</Label>
                   <Input
                     id="other"
                     type="number"
                     value={expenses.other || ''}
                     onChange={(e) => setExpenses({ ...expenses, other: safeParseNumber(e.target.value) })}
                     placeholder="0.00"
-                    className="h-9 text-base"
+                    className="h-8 text-xs"
                   />
                 </div>
               </div>
