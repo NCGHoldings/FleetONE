@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Fuel } from "lucide-react";
 
 interface QuickEntryFormProps {
   tripId: string;
@@ -27,7 +29,6 @@ interface IncomeDetails {
 
 interface ExpenseDetails {
   [key: string]: number;
-  fuel: number;
   repair: number;
   tyre_tube: number;
   salary: number;
@@ -60,6 +61,11 @@ export function QuickEntryForm({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Separate fuel tracking
+  const [fuelCost, setFuelCost] = useState(0);
+  const [dieselPrice, setDieselPrice] = useState(0);
+  const [distance, setDistance] = useState(0);
 
   const [income, setIncome] = useState<IncomeDetails>({
     bus_collection: 0,
@@ -71,7 +77,6 @@ export function QuickEntryForm({
   });
 
   const [expenses, setExpenses] = useState<ExpenseDetails>({
-    fuel: 0,
     repair: 0,
     tyre_tube: 0,
     salary: 0,
@@ -108,13 +113,40 @@ export function QuickEntryForm({
   const loadTripData = async () => {
     setLoading(true);
     try {
+      // Fetch diesel price from fuel_settings
+      const { data: fuelSettings } = await supabase
+        .from('fuel_settings')
+        .select('diesel_price_lkr_per_l')
+        .eq('is_default', true)
+        .single();
+      
+      if (fuelSettings) {
+        setDieselPrice(fuelSettings.diesel_price_lkr_per_l);
+      }
+
+      // Fetch trip data
       const { data, error } = await supabase
         .from('daily_trips')
-        .select('income_details, other_expenses_details')
+        .select('income_details, other_expenses_details, fuel_cost, diesel_price_per_liter, distance_km')
         .eq('id', tripId)
         .single();
 
       if (error) throw error;
+
+      // Load distance
+      if (data?.distance_km) {
+        setDistance(safeParseNumber(data.distance_km));
+      }
+
+      // Load fuel cost (from dedicated column, not from other_expenses_details)
+      if (data?.fuel_cost) {
+        setFuelCost(safeParseNumber(data.fuel_cost));
+      }
+
+      // Load diesel price used for this trip if available
+      if (data?.diesel_price_per_liter) {
+        setDieselPrice(safeParseNumber(data.diesel_price_per_liter));
+      }
 
       if (data?.income_details && typeof data.income_details === 'object' && !Array.isArray(data.income_details)) {
         const incomeData = data.income_details as any;
@@ -132,7 +164,6 @@ export function QuickEntryForm({
       if (data?.other_expenses_details && typeof data.other_expenses_details === 'object' && !Array.isArray(data.other_expenses_details)) {
         const expensesData = data.other_expenses_details as any;
         const parsedExpenses: ExpenseDetails = {
-          fuel: safeParseNumber(expensesData.fuel),
           repair: safeParseNumber(expensesData.repair),
           tyre_tube: safeParseNumber(expensesData.tyre_tube),
           salary: safeParseNumber(expensesData.salary),
@@ -171,14 +202,26 @@ export function QuickEntryForm({
     setSaving(true);
     try {
       const totalIncome = calculateTotal(income);
-      const totalExpenses = calculateTotal(expenses);
+      const totalOtherExpenses = calculateTotal(expenses);
+      
+      // Calculate fuel metrics
+      const fuelLiters = fuelCost > 0 && dieselPrice > 0 ? fuelCost / dieselPrice : 0;
+      const kmPerLiter = distance > 0 && fuelLiters > 0 ? distance / fuelLiters : 0;
+      
+      // Total expenses now includes fuel + other expenses
+      const totalExpenses = fuelCost + totalOtherExpenses;
       const netIncome = totalIncome - totalExpenses;
 
       console.log('💾 Saving Quick Entry Data:', {
         tripId,
         income_details: income,
         other_expenses_details: expenses,
+        fuel_cost: fuelCost,
+        fuel_liters: fuelLiters,
+        diesel_price_per_liter: dieselPrice,
+        km_per_liter: kmPerLiter,
         totalIncome,
+        totalOtherExpenses,
         totalExpenses,
         netIncome
       });
@@ -189,7 +232,15 @@ export function QuickEntryForm({
           income_details: income as any,
           other_expenses_details: expenses as any,
           income: totalIncome,
-          other_expenses: totalExpenses,
+          other_expenses: totalOtherExpenses,
+          
+          // Separate fuel tracking in dedicated columns
+          fuel_cost: fuelCost,
+          fuel_liters: fuelLiters,
+          diesel_price_per_liter: dieselPrice,
+          km_per_liter: kmPerLiter,
+          
+          // Total calculations
           total_expenses: totalExpenses,
           net_income: netIncome,
         })
@@ -208,7 +259,7 @@ export function QuickEntryForm({
       } else {
         toast({
           title: "Success",
-          description: `Saved: Income LKR ${totalIncome.toLocaleString()}, Expenses LKR ${totalExpenses.toLocaleString()}`,
+          description: `Saved: Income LKR ${totalIncome.toLocaleString()}, Total Expenses LKR ${totalExpenses.toLocaleString()} (Fuel: ${fuelCost.toLocaleString()}, Other: ${totalOtherExpenses.toLocaleString()})`,
         });
       }
 
@@ -229,7 +280,10 @@ export function QuickEntryForm({
   };
 
   const totalRevenue = calculateTotal(income);
-  const totalExpenses = calculateTotal(expenses);
+  const totalOtherExpenses = calculateTotal(expenses);
+  const fuelLiters = fuelCost > 0 && dieselPrice > 0 ? fuelCost / dieselPrice : 0;
+  const kmPerLiter = distance > 0 && fuelLiters > 0 ? distance / fuelLiters : 0;
+  const totalExpenses = fuelCost + totalOtherExpenses;
   const netProfit = totalRevenue - totalExpenses;
 
   if (loading) {
@@ -244,7 +298,76 @@ export function QuickEntryForm({
     <div className="h-full flex flex-col">
       {/* Scrollable Form Content */}
       <div className="flex-1 overflow-auto p-2 md:p-3 pb-24 md:pb-6">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+        <div className="max-w-6xl mx-auto space-y-3 md:space-y-4">
+          {/* Fuel Details Section - Full Width */}
+          <Card className="border-orange-200 dark:border-orange-800">
+            <CardHeader className="p-3 md:p-4">
+              <CardTitle className="text-sm md:text-base flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Fuel className="h-4 w-4" />
+                  Fuel Details
+                </span>
+                <Badge variant="outline" className="text-xs">
+                  Diesel Price: LKR {dieselPrice.toFixed(2)}/L
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="fuelCost" className="text-xs">Fuel Cost (LKR)</Label>
+                  <Input
+                    id="fuelCost"
+                    type="number"
+                    value={fuelCost || ''}
+                    onChange={(e) => setFuelCost(safeParseNumber(e.target.value))}
+                    placeholder="0.00"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="distance" className="text-xs">Distance (KM)</Label>
+                  <Input
+                    id="distance"
+                    type="number"
+                    value={distance || ''}
+                    disabled
+                    className="h-8 text-xs bg-muted"
+                  />
+                  <p className="text-[10px] text-muted-foreground">From trip record</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Efficiency</Label>
+                  <div className="h-8 px-3 flex items-center border rounded-md bg-muted text-xs font-medium">
+                    {fuelCost > 0 && dieselPrice > 0 ? (
+                      <span>
+                        {fuelLiters.toFixed(2)} L • {kmPerLiter > 0 ? `${kmPerLiter.toFixed(2)} Km/L` : 'N/A'}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Enter fuel cost</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {fuelCost > 0 && dieselPrice > 0 && (
+                <div className="mt-3 p-2 bg-orange-50 dark:bg-orange-950/20 rounded-lg text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Liters Used:</span>
+                    <span className="font-medium">{fuelLiters.toFixed(2)} L</span>
+                  </div>
+                  {distance > 0 && fuelLiters > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Fuel Efficiency:</span>
+                      <span className="font-medium text-green-600">{kmPerLiter.toFixed(2)} Km/L</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
           {/* Revenue Section */}
           <Card>
             <CardHeader className="p-3 md:p-4">
@@ -329,17 +452,6 @@ export function QuickEntryForm({
             </CardHeader>
             <CardContent className="p-3 md:p-4 pt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="fuel" className="text-xs">Fuel Expenses</Label>
-                  <Input
-                    id="fuel"
-                    type="number"
-                    value={expenses.fuel || ''}
-                    onChange={(e) => setExpenses({ ...expenses, fuel: safeParseNumber(e.target.value) })}
-                    placeholder="0.00"
-                    className="h-8 text-xs"
-                  />
-                </div>
                 <div className="space-y-1">
                   <Label htmlFor="repair" className="text-xs">Bus Maintenance & Repair</Label>
                   <Input
@@ -563,13 +675,14 @@ export function QuickEntryForm({
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       </div>
 
       {/* Sticky Footer with Summary and Actions - Ultra Compact */}
       <div className="fixed md:static bottom-0 left-0 right-0 border-t bg-card p-1.5 md:p-2 shadow-lg md:shadow-none">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-3 gap-1.5 md:gap-3 mb-1.5 md:mb-2">
+          <div className="grid grid-cols-4 gap-1.5 md:gap-3 mb-1.5 md:mb-2">
             <div>
               <p className="text-[9px] md:text-[10px] text-muted-foreground mb-0">Revenue</p>
               <p className="text-xs md:text-sm font-bold text-green-600">
@@ -577,9 +690,15 @@ export function QuickEntryForm({
               </p>
             </div>
             <div>
-              <p className="text-[9px] md:text-[10px] text-muted-foreground mb-0">Expenses</p>
+              <p className="text-[9px] md:text-[10px] text-muted-foreground mb-0">Fuel</p>
+              <p className="text-xs md:text-sm font-bold text-orange-600">
+                Rs {fuelCost.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] md:text-[10px] text-muted-foreground mb-0">Other Exp</p>
               <p className="text-xs md:text-sm font-bold text-red-600">
-                Rs {totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                Rs {totalOtherExpenses.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
             </div>
             <div>
