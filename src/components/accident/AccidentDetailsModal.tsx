@@ -147,17 +147,6 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
 
       if (!response.ok) {
         const errorData = await response.json();
-        
-        // Check for duplicate BL Number error
-        if (errorData.error?.includes('DUPLICATE_BL_NUMBER:')) {
-          const blNumber = errorData.error.split(':')[1];
-          toast.error(
-            `BL Number "${blNumber}" is already used by another accident record. Please use a different BL Number or leave it empty.`,
-            { duration: 6000 }
-          );
-          return;
-        }
-        
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 

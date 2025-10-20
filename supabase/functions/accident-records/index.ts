@@ -122,10 +122,6 @@ serve(async (req) => {
           .single();
 
         if (error) {
-          // Check for duplicate BL Number error
-          if (error.code === '23505' && error.message?.includes('accident_records_bl_number_key')) {
-            throw new Error(`DUPLICATE_BL_NUMBER:${body.bl_number || 'unknown'}`);
-          }
           throw error;
         }
 
@@ -182,10 +178,6 @@ serve(async (req) => {
           .single();
 
         if (error) {
-          // Check for duplicate BL Number error
-          if (error.code === '23505' && error.message?.includes('accident_records_bl_number_key')) {
-            throw new Error(`DUPLICATE_BL_NUMBER:${updateData.bl_number || 'unknown'}`);
-          }
           throw error;
         }
 
