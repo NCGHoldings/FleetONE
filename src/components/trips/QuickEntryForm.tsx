@@ -113,14 +113,15 @@ export function QuickEntryForm({
   const loadTripData = async () => {
     setLoading(true);
     try {
-      // Fetch diesel price from fuel_settings
+      // Fetch diesel price from fuel_settings (get the most recent one)
       const { data: fuelSettings } = await supabase
         .from('fuel_settings')
         .select('diesel_price_lkr_per_l')
-        .eq('is_default', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
       
-      if (fuelSettings) {
+      if (fuelSettings?.diesel_price_lkr_per_l) {
         setDieselPrice(fuelSettings.diesel_price_lkr_per_l);
       }
 
@@ -314,6 +315,18 @@ export function QuickEntryForm({
             </CardHeader>
             <CardContent className="p-3 md:p-4 pt-0">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="dieselPrice" className="text-xs">Diesel Price (LKR/L)</Label>
+                  <Input
+                    id="dieselPrice"
+                    type="number"
+                    value={dieselPrice || ''}
+                    onChange={(e) => setDieselPrice(safeParseNumber(e.target.value))}
+                    placeholder="0.00"
+                    className="h-8 text-xs"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Current rate per liter</p>
+                </div>
                 <div className="space-y-1">
                   <Label htmlFor="fuelCost" className="text-xs">Fuel Cost (LKR)</Label>
                   <Input
