@@ -69,6 +69,7 @@ const additionalChargeTypes = [
   { value: 'additional_fuel', label: 'Additional Fuel Costs' },
   { value: 'driver_charges', label: 'Driver Charges' },
   { value: 'additional_distance', label: 'Additional Distance/KM' },
+  { value: 'pass_through', label: 'Pass-Through Charge (No Cost)' },
   { value: 'refund', label: 'Refund/Adjustment' },
   { value: 'other', label: 'Other' }
 ];

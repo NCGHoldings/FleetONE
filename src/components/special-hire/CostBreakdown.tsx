@@ -146,9 +146,12 @@ export function CostBreakdown({ data }: Props) {
     : safeData.totalTripDistance;
   const calculatedMaintenanceCost = (distancePerBus * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   
-  // Calculate additional charges total with per-bus support
+  // Calculate additional charges total with per-bus support (exclude pass-through charges from expenses)
   const additionalChargesTotal = Array.isArray(data.additionalCharges) 
     ? data.additionalCharges.reduce((sum, charge) => {
+        // Skip pass-through charges in expense calculations
+        if (charge.type === 'pass_through') return sum;
+        
         const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
           ? charge.amount * charge.busesCount 
           : charge.amount;
@@ -359,6 +362,7 @@ export function CostBreakdown({ data }: Props) {
                        highway: 'Highway Charges',
                        additional_fuel: 'Additional Fuel Costs',
                        driver_charges: 'Driver Charges',
+                       pass_through: 'Pass-Through Charge',
                        other: charge.reason || 'Other'
                      };
                      
@@ -371,10 +375,18 @@ export function CostBreakdown({ data }: Props) {
                        ? ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`
                        : '';
                      
+                     // Add indicator for pass-through charges
+                     const isPassThrough = charge.type === 'pass_through';
+                     
                      return (
                        <div key={index} className="flex justify-between pl-4">
-                         <span>{displayLabel}{busInfo}</span>
-                         <span>LKR {effectiveAmount.toLocaleString()}</span>
+                         <span className={isPassThrough ? 'font-medium text-green-600' : ''}>
+                           {displayLabel}{busInfo}
+                           {isPassThrough && <span className="ml-2 text-xs">(Revenue Only)</span>}
+                         </span>
+                         <span className={isPassThrough ? 'text-green-600' : ''}>
+                           LKR {effectiveAmount.toLocaleString()}
+                         </span>
                        </div>
                      );
                    })}
@@ -474,39 +486,41 @@ export function CostBreakdown({ data }: Props) {
             </div>
             {(Array.isArray(data.additionalCharges) && data.additionalCharges.length > 0) && (
               <>
-                {data.additionalCharges.map((charge, index) => {
-                  const chargeTypeLabels = {
-                    permits: 'Permits Cost',
-                    highway: 'Highway Charges',
-                    additional_fuel: 'Additional Fuel Costs',
-                    driver_charges: 'Driver Charges',
-                    additional_distance: 'Additional Distance/KM',
-                    other: charge.reason || 'Other'
-                  };
-                  
-                  const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
-                    ? charge.amount * charge.busesCount 
-                    : charge.amount;
+                {data.additionalCharges
+                  .filter(charge => charge.type !== 'pass_through') // Exclude pass-through charges from deductions
+                  .map((charge, index) => {
+                    const chargeTypeLabels = {
+                      permits: 'Permits Cost',
+                      highway: 'Highway Charges',
+                      additional_fuel: 'Additional Fuel Costs',
+                      driver_charges: 'Driver Charges',
+                      additional_distance: 'Additional Distance/KM',
+                      other: charge.reason || 'Other'
+                    };
                     
-                  const displayLabel = chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type;
-                  
-                  let busInfo = '';
-                  if (charge.applyPerBus && charge.busesCount) {
-                    busInfo = ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`;
-                  }
-                  
-                  // Special display for distance-based charges
-                  if (charge.type === 'additional_distance' && charge.distance) {
-                    busInfo = ` (${charge.distance} KM × Rate)${busInfo}`;
-                  }
-                  
-                  return (
-                    <div key={index} className="flex justify-between">
-                      <span>{displayLabel}{busInfo}</span>
-                      <span>LKR {effectiveAmount.toLocaleString()}</span>
-                    </div>
-                  );
-                })}
+                    const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
+                      ? charge.amount * charge.busesCount 
+                      : charge.amount;
+                      
+                    const displayLabel = chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type;
+                    
+                    let busInfo = '';
+                    if (charge.applyPerBus && charge.busesCount) {
+                      busInfo = ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`;
+                    }
+                    
+                    // Special display for distance-based charges
+                    if (charge.type === 'additional_distance' && charge.distance) {
+                      busInfo = ` (${charge.distance} KM × Rate)${busInfo}`;
+                    }
+                    
+                    return (
+                      <div key={index} className="flex justify-between">
+                        <span>{displayLabel}{busInfo}</span>
+                        <span>LKR {effectiveAmount.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
               </>
             )}
             {safeData.otherExpenses.map((expense, index) => (
