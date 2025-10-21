@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, BarChart3, Copy, Check } from "lucide-react";
@@ -52,7 +53,7 @@ const NSPDailySales = () => {
       const { data: existing, error: checkError } = await supabase
         .from('nsp_daily_sales')
         .select('id')
-        .eq('sale_date', data.sale_date.toISOString().split('T')[0])
+        .eq('sale_date', format(data.sale_date, 'yyyy-MM-dd'))
         .maybeSingle();
 
       if (checkError) throw checkError;
@@ -60,7 +61,7 @@ const NSPDailySales = () => {
       const tyreSaleTotal = data.tyre_entries.reduce((sum, item) => sum + item.amount, 0);
 
       const salesData = {
-        sale_date: data.sale_date.toISOString().split('T')[0],
+        sale_date: format(data.sale_date, 'yyyy-MM-dd'),
         lss_outside_sale: data.lss_outside_sale,
         lss_inside_sale: data.lss_inside_sale,
         tyre_sale: tyreSaleTotal,

@@ -42,7 +42,7 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
       const { data, error } = await supabase
         .from('nsp_daily_sales')
         .select('*')
-        .eq('sale_date', date.toISOString().split('T')[0])
+        .eq('sale_date', format(date, 'yyyy-MM-dd'))
         .maybeSingle();
 
       if (error) throw error;
