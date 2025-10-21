@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,21 @@ export interface NSPSalesData {
 
 const NSPDailySales = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [lastSavedData, setLastSavedData] = useState<NSPSalesData | null>(null);
+  const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
+
+  // Check for edit parameters on mount
+  useEffect(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam) {
+      const parsedDate = new Date(dateParam + 'T00:00:00');
+      setInitialDate(parsedDate);
+    }
+  }, [searchParams]);
 
   const handleSave = async (data: NSPSalesData) => {
     if (!user) {
@@ -221,7 +232,7 @@ const NSPDailySales = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DailySalesForm onSave={handleSave} isSaving={isSaving} />
+          <DailySalesForm onSave={handleSave} isSaving={isSaving} initialDate={initialDate} />
         </CardContent>
       </Card>
     </div>

@@ -17,10 +17,11 @@ import { toast } from "@/hooks/use-toast";
 interface DailySalesFormProps {
   onSave: (data: NSPSalesData) => void;
   isSaving: boolean;
+  initialDate?: Date;
 }
 
-export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+export function DailySalesForm({ onSave, isSaving, initialDate }: DailySalesFormProps) {
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate || new Date());
   const [lssOutsideSale, setLssOutsideSale] = useState<number>(0);
   const [lssInsideSale, setLssInsideSale] = useState<number>(0);
   const [tyreEntries, setTyreEntries] = useState<TyreEntry[]>([]);
@@ -30,6 +31,13 @@ export function DailySalesForm({ onSave, isSaving }: DailySalesFormProps) {
   const [showOtherIncomeModal, setShowOtherIncomeModal] = useState(false);
   const [showTyreSaleModal, setShowTyreSaleModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Set initial date from prop if provided
+  useEffect(() => {
+    if (initialDate) {
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate]);
 
   // Load existing data when date changes
   useEffect(() => {
