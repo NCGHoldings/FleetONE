@@ -5014,6 +5014,122 @@ export type Database = {
           },
         ]
       }
+      yutong_invoice_documents: {
+        Row: {
+          created_at: string
+          document_status: string
+          file_name: string
+          file_path: string
+          file_size: number
+          generated_at: string
+          id: string
+          invoice_data: Json
+          invoice_record_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_status?: string
+          file_name: string
+          file_path: string
+          file_size: number
+          generated_at?: string
+          id?: string
+          invoice_data: Json
+          invoice_record_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_status?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          generated_at?: string
+          id?: string
+          invoice_data?: Json
+          invoice_record_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_invoice_documents_invoice_record_id_fkey"
+            columns: ["invoice_record_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_invoice_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_invoice_records: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          generated_at: string
+          generated_by: string | null
+          id: string
+          invoice_amount: number
+          invoice_date: string
+          invoice_no: string
+          invoice_type: string
+          notes: string | null
+          order_id: string
+          quotation_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          invoice_amount: number
+          invoice_date?: string
+          invoice_no: string
+          invoice_type?: string
+          notes?: string | null
+          order_id: string
+          quotation_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          invoice_amount?: number
+          invoice_date?: string
+          invoice_no?: string
+          invoice_type?: string
+          notes?: string | null
+          order_id?: string
+          quotation_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_invoice_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_invoice_records_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_invoices: {
         Row: {
           amount: number
@@ -5150,13 +5266,18 @@ export type Database = {
           actual_delivery_date: string | null
           balance_due: number | null
           bus_model: string
+          chassis_number: string | null
           color_scheme: string | null
+          country_of_origin: string | null
           created_at: string
           created_by: string | null
           current_phase: Database["public"]["Enums"]["yutong_order_phase"]
           customer_id: string | null
+          engine_capacity: number | null
+          engine_number: string | null
           engine_type: string | null
           expected_delivery_date: string | null
+          fuel_type: string | null
           gearbox_type: string | null
           id: string
           notes: string | null
@@ -5174,18 +5295,25 @@ export type Database = {
           total_paid: number | null
           unit_price: number
           updated_at: string
+          vehicle_condition: string | null
+          year_of_manufacture: number | null
         }
         Insert: {
           actual_delivery_date?: string | null
           balance_due?: number | null
           bus_model: string
+          chassis_number?: string | null
           color_scheme?: string | null
+          country_of_origin?: string | null
           created_at?: string
           created_by?: string | null
           current_phase?: Database["public"]["Enums"]["yutong_order_phase"]
           customer_id?: string | null
+          engine_capacity?: number | null
+          engine_number?: string | null
           engine_type?: string | null
           expected_delivery_date?: string | null
+          fuel_type?: string | null
           gearbox_type?: string | null
           id?: string
           notes?: string | null
@@ -5203,18 +5331,25 @@ export type Database = {
           total_paid?: number | null
           unit_price: number
           updated_at?: string
+          vehicle_condition?: string | null
+          year_of_manufacture?: number | null
         }
         Update: {
           actual_delivery_date?: string | null
           balance_due?: number | null
           bus_model?: string
+          chassis_number?: string | null
           color_scheme?: string | null
+          country_of_origin?: string | null
           created_at?: string
           created_by?: string | null
           current_phase?: Database["public"]["Enums"]["yutong_order_phase"]
           customer_id?: string | null
+          engine_capacity?: number | null
+          engine_number?: string | null
           engine_type?: string | null
           expected_delivery_date?: string | null
+          fuel_type?: string | null
           gearbox_type?: string | null
           id?: string
           notes?: string | null
@@ -5232,6 +5367,8 @@ export type Database = {
           total_paid?: number | null
           unit_price?: number
           updated_at?: string
+          vehicle_condition?: string | null
+          year_of_manufacture?: number | null
         }
         Relationships: [
           {
@@ -6670,6 +6807,10 @@ export type Database = {
       }
       generate_next_yutong_version_number: {
         Args: { p_parent_id: string }
+        Returns: string
+      }
+      generate_yutong_invoice_no: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       generate_yutong_order_no: {
