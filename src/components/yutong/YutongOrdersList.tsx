@@ -212,6 +212,17 @@ export function YutongOrdersList() {
             <Button 
               variant="outline" 
               size="sm"
+              onClick={() => {
+                setSelectedOrder(order);
+                setShowOrderDetails(true);
+              }}
+              title="Invoice Management"
+            >
+              <FileText className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
               title="Financial Details"
             >
               <CreditCard className="h-4 w-4" />

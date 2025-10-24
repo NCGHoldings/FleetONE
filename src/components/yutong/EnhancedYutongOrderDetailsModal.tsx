@@ -24,6 +24,7 @@ import {
 import { YutongOrder } from '@/hooks/useYutongOrderManagement';
 import { YutongOrderJourney } from './YutongOrderJourney';
 import { ProcessManagement } from './ProcessManagement';
+import { YutongOrderInvoiceGenerator } from './YutongOrderInvoiceGenerator';
 
 interface EnhancedYutongOrderDetailsModalProps {
   order: YutongOrder | null;
@@ -251,14 +252,10 @@ export function EnhancedYutongOrderDetailsModal({
 
           {/* Documents Tab */}
           <TabsContent value="documents" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Documents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Document management system coming soon...</p>
-              </CardContent>
-            </Card>
+            <YutongOrderInvoiceGenerator 
+              order={order}
+              onRefresh={onRefresh}
+            />
           </TabsContent>
 
           {/* Communication Tab */}
