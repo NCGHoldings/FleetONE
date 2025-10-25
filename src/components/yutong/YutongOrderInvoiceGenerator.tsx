@@ -87,6 +87,40 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     setLoadingInvoices(false);
   };
 
+  const validateInvoiceData = () => {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    
+    if (!quotation) {
+      errors.push('Quotation not found. Please link this order to a quotation.');
+      return { errors, warnings, canGenerate: false };
+    }
+    
+    // Check required fields
+    if (!quotation.customer_address?.trim()) {
+      errors.push('Customer address is required. Please edit the quotation and add the customer address.');
+    }
+    
+    if (!quotation.customer_name?.trim()) {
+      errors.push('Customer name is required in the quotation.');
+    }
+    
+    // Check optional fields (warnings only)
+    if (!quotation.seating_capacity?.trim()) {
+      warnings.push('Seating capacity not specified - will use "N/A" in invoice.');
+    }
+    
+    if (!quotation.attention_to?.trim()) {
+      warnings.push('Attention-to person not specified - will use customer name.');
+    }
+    
+    return { 
+      errors, 
+      warnings, 
+      canGenerate: errors.length === 0 
+    };
+  };
+
   const handleGenerateInvoice = async () => {
     if (!vehicleDetailsComplete) {
       toast.error('Please complete all vehicle details first');
@@ -99,22 +133,35 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       return;
     }
 
-    if (!quotation) {
-      toast.error('Failed to load quotation data');
+    // Validate invoice data with specific error messages
+    const validation = validateInvoiceData();
+    
+    if (!validation.canGenerate) {
+      // Show specific error messages
+      validation.errors.forEach(error => {
+        toast.error(error, { duration: 5000 });
+      });
       return;
     }
 
-    // Prepare invoice data
+    // Show warnings if any
+    if (validation.warnings.length > 0) {
+      validation.warnings.forEach(warning => {
+        toast.warning(warning, { duration: 4000 });
+      });
+    }
+
+    // Prepare invoice data with safe fallbacks
     const invoiceData: YutongOrderInvoiceData = {
       invoice_no: '', // Will be generated
       quotation_no: quotation.quotation_no || order.order_no,
       invoice_date: new Date().toISOString().split('T')[0],
       
       customer_name: quotation.customer_name || '',
-      company_name: quotation.company_name,
+      company_name: quotation.company_name || '',
       address: quotation.customer_address || '',
-      contact: quotation.customer_phone,
-      attn: quotation.attention_to,
+      contact: quotation.customer_phone || '',
+      attn: quotation.attention_to || quotation.customer_name || '',
       
       make: 'YUTONG',
       bus_model: order.bus_model,
@@ -143,8 +190,12 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     );
 
     if (result.success) {
+      toast.success('Invoice generated successfully');
       await loadData();
       if (onRefresh) onRefresh();
+    } else {
+      toast.error(result.error?.message || 'Failed to generate invoice');
+      console.error('Invoice generation error:', result.error);
     }
   };
 

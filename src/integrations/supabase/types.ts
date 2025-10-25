@@ -5774,6 +5774,7 @@ export type Database = {
       }
       yutong_quotations: {
         Row: {
+          attention_to: string | null
           body_colour: string | null
           bus_model: string
           bus_model_id: string | null
@@ -5807,6 +5808,7 @@ export type Database = {
           responsible_person_id: string | null
           seat_colour: string | null
           seat_headrest_logo: string | null
+          seating_capacity: string | null
           special_features: string | null
           status: string
           tax_registration_number: string | null
@@ -5819,6 +5821,7 @@ export type Database = {
           warranty_terms: string | null
         }
         Insert: {
+          attention_to?: string | null
           body_colour?: string | null
           bus_model: string
           bus_model_id?: string | null
@@ -5852,6 +5855,7 @@ export type Database = {
           responsible_person_id?: string | null
           seat_colour?: string | null
           seat_headrest_logo?: string | null
+          seating_capacity?: string | null
           special_features?: string | null
           status?: string
           tax_registration_number?: string | null
@@ -5864,6 +5868,7 @@ export type Database = {
           warranty_terms?: string | null
         }
         Update: {
+          attention_to?: string | null
           body_colour?: string | null
           bus_model?: string
           bus_model_id?: string | null
@@ -5897,6 +5902,7 @@ export type Database = {
           responsible_person_id?: string | null
           seat_colour?: string | null
           seat_headrest_logo?: string | null
+          seating_capacity?: string | null
           special_features?: string | null
           status?: string
           tax_registration_number?: string | null
@@ -6785,22 +6791,10 @@ export type Database = {
         Args: { p_business_hours?: number; p_start_date: string }
         Returns: string
       }
-      cleanup_old_rate_limits: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      create_admin_user: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      generate_customer_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_employee_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      cleanup_old_rate_limits: { Args: never; Returns: undefined }
+      create_admin_user: { Args: never; Returns: undefined }
+      generate_customer_code: { Args: never; Returns: string }
+      generate_employee_id: { Args: never; Returns: string }
       generate_next_version_number: {
         Args: { p_parent_id: string }
         Returns: string
@@ -6809,26 +6803,13 @@ export type Database = {
         Args: { p_parent_id: string }
         Returns: string
       }
-      generate_yutong_invoice_no: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_yutong_order_no: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_yutong_quotation_no: {
-        Args: Record<PropertyKey, never> | { quotation_date?: string }
-        Returns: string
-      }
-      generate_yutong_ticket_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_yutong_warranty_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_yutong_invoice_no: { Args: never; Returns: string }
+      generate_yutong_order_no: { Args: never; Returns: string }
+      generate_yutong_quotation_no:
+        | { Args: never; Returns: string }
+        | { Args: { quotation_date?: string }; Returns: string }
+      generate_yutong_ticket_number: { Args: never; Returns: string }
+      generate_yutong_warranty_number: { Args: never; Returns: string }
       get_user_page_permissions: {
         Args: { _user_id: string }
         Returns: {
