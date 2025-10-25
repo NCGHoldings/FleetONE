@@ -53,7 +53,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     order.chassis_number &&
     order.year_of_manufacture &&
     order.fuel_type &&
-    order.engine_capacity &&
+    order.engine_capacity != null &&
     order.color_scheme
   );
 
