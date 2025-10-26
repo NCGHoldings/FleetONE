@@ -324,24 +324,69 @@ ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
 </html>`;
 }
 
+async function loadImageAsBase64(url: string): Promise<string> {
+  try {
+    console.log('🖼️ Loading image:', url);
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn('⚠️ Failed to load image:', url);
+      return '';
+    }
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('❌ Error loading image:', url, error);
+    return '';
+  }
+}
+
 export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData): Promise<Blob> {
+  console.log('📄 Starting PDF generation for invoice:', data.invoice_no);
+  
+  // Pre-load images as base64
+  console.log('🖼️ Loading logo images...');
+  const [ncgLogo, yutongLogo] = await Promise.all([
+    loadImageAsBase64('/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png'),
+    loadImageAsBase64('/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png')
+  ]);
+  
+  if (!ncgLogo || !yutongLogo) {
+    console.warn('⚠️ Some logos failed to load, proceeding anyway...');
+  }
+  
   const htmlContent = generateYutongOrderInvoiceHTML(data);
   
+  // Replace image URLs with base64 data
+  const htmlWithEmbeddedImages = htmlContent
+    .replace('/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png', ncgLogo || '/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png')
+    .replace('/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png', yutongLogo || '/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png');
+  
   const container = document.createElement('div');
-  container.innerHTML = htmlContent;
+  container.innerHTML = htmlWithEmbeddedImages;
   container.style.position = 'absolute';
   container.style.left = '-9999px';
   document.body.appendChild(container);
 
   try {
+    console.log('🎨 Rendering HTML to canvas...');
     const canvas = await html2canvas(container, {
       scale: 2,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
+      logging: true
     });
+    
+    console.log('✅ Canvas rendered. Size:', canvas.width, 'x', canvas.height);
 
     const imgData = canvas.toDataURL('image/png');
+    console.log('🖼️ Converting canvas to image data...');
+    
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
@@ -349,9 +394,18 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
     const imgHeight = canvas.height;
     const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
     
+    console.log('📊 PDF dimensions:', { pdfWidth, pdfHeight, imgWidth, imgHeight, ratio });
+    
     pdf.addImage(imgData, 'PNG', 0, 0, imgWidth * ratio, imgHeight * ratio);
-    return pdf.output('blob');
+    const blob = pdf.output('blob');
+    
+    console.log('✅ PDF generated successfully. Blob size:', blob.size, 'bytes');
+    return blob;
+  } catch (error) {
+    console.error('❌ PDF generation failed:', error);
+    throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   } finally {
     document.body.removeChild(container);
+    console.log('🧹 Cleaned up temporary DOM elements');
   }
 }

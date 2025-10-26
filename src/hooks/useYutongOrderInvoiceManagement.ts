@@ -46,16 +46,25 @@ export function useYutongOrderInvoiceManagement() {
     orderId: string,
     quotationId: string
   ): Promise<{ success: boolean; invoice?: any; document?: any; error?: any }> => {
+    console.log('🚀 Starting invoice generation process...');
+    console.log('📋 Invoice Data:', invoiceData);
+    console.log('🔑 Order ID:', orderId, 'Quotation ID:', quotationId);
+    
     setIsLoading(true);
     
     try {
       // Generate invoice number
+      console.log('📝 Step 1: Generating invoice number...');
       const { data: invoiceNoData, error: invoiceNoError } = await supabase
         .rpc('generate_yutong_invoice_no');
       
-      if (invoiceNoError) throw invoiceNoError;
+      if (invoiceNoError) {
+        console.error('❌ Failed to generate invoice number:', invoiceNoError);
+        throw new Error(`Invoice number generation failed: ${invoiceNoError.message}`);
+      }
       
       const invoiceNo = invoiceNoData as string;
+      console.log('✅ Invoice number generated:', invoiceNo);
       
       // Update invoice data with generated number
       const fullInvoiceData = {
@@ -65,11 +74,15 @@ export function useYutongOrderInvoiceManagement() {
       };
       
       // Generate PDF
+      console.log('📄 Step 2: Generating PDF...');
       const pdfBlob = await generateYutongOrderInvoicePDF(fullInvoiceData);
+      console.log('✅ PDF generated successfully. Size:', pdfBlob.size, 'bytes');
       
       // Upload to storage
+      console.log('☁️ Step 3: Uploading to storage...');
       const fileName = `${invoiceNo}_draft.pdf`;
       const filePath = `yutong-invoices/${orderId}/${fileName}`;
+      console.log('📁 Upload path:', filePath);
       
       const { error: uploadError } = await supabase.storage
         .from('documents')
@@ -78,9 +91,14 @@ export function useYutongOrderInvoiceManagement() {
           upsert: true
         });
       
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('❌ Storage upload failed:', uploadError);
+        throw new Error(`Failed to upload PDF to storage: ${uploadError.message}`);
+      }
+      console.log('✅ PDF uploaded successfully');
       
       // Create invoice record
+      console.log('💾 Step 4: Creating invoice record...');
       const { data: invoice, error: invoiceError } = await supabase
         .from('yutong_invoice_records')
         .insert({
@@ -94,9 +112,14 @@ export function useYutongOrderInvoiceManagement() {
         .select()
         .single();
       
-      if (invoiceError) throw invoiceError;
+      if (invoiceError) {
+        console.error('❌ Failed to create invoice record:', invoiceError);
+        throw new Error(`Failed to create invoice record: ${invoiceError.message}`);
+      }
+      console.log('✅ Invoice record created:', invoice.id);
       
       // Create document record
+      console.log('📑 Step 5: Creating document record...');
       const { data: document, error: docError } = await supabase
         .from('yutong_invoice_documents')
         .insert({
@@ -110,14 +133,28 @@ export function useYutongOrderInvoiceManagement() {
         .select()
         .single();
       
-      if (docError) throw docError;
+      if (docError) {
+        console.error('❌ Failed to create document record:', docError);
+        throw new Error(`Failed to create document record: ${docError.message}`);
+      }
+      console.log('✅ Document record created:', document.id);
       
+      console.log('🎉 Invoice generation completed successfully!');
       toast.success('Draft invoice generated successfully');
       
       return { success: true, invoice, document };
     } catch (error: any) {
-      console.error('Error generating invoice:', error);
-      toast.error('Failed to generate invoice: ' + error.message);
+      console.error('❌ INVOICE GENERATION FAILED:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        stack: error.stack
+      });
+      
+      const errorMessage = error.message || 'Unknown error occurred';
+      toast.error('Failed to generate invoice: ' + errorMessage);
       return { success: false, error };
     } finally {
       setIsLoading(false);

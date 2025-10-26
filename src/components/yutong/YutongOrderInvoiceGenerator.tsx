@@ -122,21 +122,30 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
   };
 
   const handleGenerateInvoice = async () => {
+    console.log('🎬 Generate Invoice button clicked');
+    console.log('📦 Order data:', order);
+    console.log('📋 Quotation data:', quotation);
+    
     if (!vehicleDetailsComplete) {
+      console.warn('⚠️ Vehicle details incomplete');
       toast.error('Please complete all vehicle details first');
       setShowVehicleDataModal(true);
       return;
     }
 
     if (!order.quotation_id) {
+      console.error('❌ No quotation linked to this order');
       toast.error('No quotation linked to this order');
       return;
     }
 
+    console.log('✅ Pre-checks passed, validating invoice data...');
     // Validate invoice data with specific error messages
     const validation = validateInvoiceData();
+    console.log('📊 Validation result:', validation);
     
     if (!validation.canGenerate) {
+      console.error('❌ Validation failed:', validation.errors);
       // Show specific error messages
       validation.errors.forEach(error => {
         toast.error(error, { duration: 5000 });
@@ -146,11 +155,13 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
 
     // Show warnings if any
     if (validation.warnings.length > 0) {
+      console.warn('⚠️ Validation warnings:', validation.warnings);
       validation.warnings.forEach(warning => {
         toast.warning(warning, { duration: 4000 });
       });
     }
 
+    console.log('✅ Validation passed, preparing invoice data...');
     // Prepare invoice data with safe fallbacks
     const invoiceData: YutongOrderInvoiceData = {
       invoice_no: '', // Will be generated
@@ -182,20 +193,26 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       
       invoice_status: 'draft'
     };
+    
+    console.log('📋 Final invoice data prepared:', invoiceData);
+    console.log('🔄 Calling generateAndStoreDraftInvoice...');
 
     const result = await generateAndStoreDraftInvoice(
       invoiceData,
       order.id,
       order.quotation_id
     );
+    
+    console.log('📊 Invoice generation result:', result);
 
     if (result.success) {
+      console.log('✅ Invoice generated successfully!');
       toast.success('Invoice generated successfully');
       await loadData();
       if (onRefresh) onRefresh();
     } else {
+      console.error('❌ Invoice generation failed:', result.error);
       toast.error(result.error?.message || 'Failed to generate invoice');
-      console.error('Invoice generation error:', result.error);
     }
   };
 
