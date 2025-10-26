@@ -375,16 +375,17 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
   try {
     console.log('🎨 Rendering HTML to canvas...');
     const canvas = await html2canvas(container, {
-      scale: 2,
+      scale: 1.5, // Reduced from 2 to optimize file size
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
-      logging: true
+      logging: false // Disable verbose logging
     });
     
     console.log('✅ Canvas rendered. Size:', canvas.width, 'x', canvas.height);
 
-    const imgData = canvas.toDataURL('image/png');
+    // Use JPEG with compression for smaller file size
+    const imgData = canvas.toDataURL('image/jpeg', 0.85); // 85% quality
     console.log('🖼️ Converting canvas to image data...');
     
     const pdf = new jsPDF('p', 'mm', 'a4');
@@ -396,7 +397,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
     
     console.log('📊 PDF dimensions:', { pdfWidth, pdfHeight, imgWidth, imgHeight, ratio });
     
-    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth * ratio, imgHeight * ratio);
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth * ratio, imgHeight * ratio);
     const blob = pdf.output('blob');
     
     console.log('✅ PDF generated successfully. Blob size:', blob.size, 'bytes');

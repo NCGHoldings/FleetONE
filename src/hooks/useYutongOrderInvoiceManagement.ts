@@ -83,19 +83,29 @@ export function useYutongOrderInvoiceManagement() {
       const fileName = `${invoiceNo}_draft.pdf`;
       const filePath = `yutong-invoices/${orderId}/${fileName}`;
       console.log('📁 Upload path:', filePath);
+      console.log('📦 File size:', pdfBlob.size, 'bytes (', (pdfBlob.size / 1024 / 1024).toFixed(2), 'MB)');
       
-      const { error: uploadError } = await supabase.storage
+      // Add timeout to storage upload
+      const uploadPromise = supabase.storage
         .from('documents')
         .upload(filePath, pdfBlob, {
           contentType: 'application/pdf',
           upsert: true
         });
       
-      if (uploadError) {
-        console.error('❌ Storage upload failed:', uploadError);
-        throw new Error(`Failed to upload PDF to storage: ${uploadError.message}`);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Storage upload timeout after 30 seconds')), 30000)
+      );
+      
+      const uploadResult = await Promise.race([uploadPromise, timeoutPromise]) as any;
+      
+      console.log('📤 Upload completed, checking result...');
+      
+      if (uploadResult.error) {
+        console.error('❌ Storage upload failed:', uploadResult.error);
+        throw new Error(`Failed to upload PDF to storage: ${uploadResult.error.message}`);
       }
-      console.log('✅ PDF uploaded successfully');
+      console.log('✅ PDF uploaded successfully to:', uploadResult.data?.path || filePath);
       
       // Create invoice record
       console.log('💾 Step 4: Creating invoice record...');
