@@ -11,7 +11,7 @@ import { WheelTimePicker } from "@/components/ui/wheel-time-picker";
 import { CalendarIcon, CheckCircle, Send, Bus, Plus, X, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
+import { supabasePublic as supabase } from "@/integrations/supabase/public-client";
 import { useToast } from "@/hooks/use-toast";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { Alert, AlertDescription } from "@/components/ui/alert";

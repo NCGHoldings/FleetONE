@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { supabasePublic as supabase } from "@/integrations/supabase/public-client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, CheckCircle, Send } from "lucide-react";
 import { publicComplaintSchema } from "@/lib/validation";

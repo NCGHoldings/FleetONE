@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabasePublic as supabase } from "@/integrations/supabase/public-client";
 import { Badge } from "@/components/ui/badge";
 import { PublicPaymentDetails } from "@/components/school/PublicPaymentDetails";
 
