@@ -7,7 +7,7 @@ import { Download, Mail, Printer, CheckCircle, RefreshCw, FileText, PenTool } fr
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
-import { generateYutongOrderInvoiceHTML } from '@/lib/yutong-order-invoice-generator';
+import { generateYutongOrderInvoiceHTML, generateYutongOrderInvoicePDF } from '@/lib/yutong-order-invoice-generator';
 import { YutongInvoiceSignatureManager } from './YutongInvoiceSignatureManager';
 import { YutongOrderInvoicePreview } from './YutongOrderInvoicePreview';
 
@@ -38,20 +38,50 @@ export function YutongOrderInvoiceViewModal({
 
   const handleDownload = async () => {
     try {
-      const { data, error } = await supabase.storage
-        .from('documents')
-        .download(document.file_path);
+      toast.info('Generating invoice with latest signatures...');
       
-      if (error) throw error;
+      const { data: signatures } = await supabase
+        .from('yutong_invoice_signatures')
+        .select('*')
+        .eq('invoice_record_id', document.invoice_record_id)
+        .order('created_at', { ascending: true });
       
-      const url = URL.createObjectURL(data);
+      const preparedSig = signatures?.find(s => s.signature_role === 'prepared_by');
+      const approvedSig = signatures?.find(s => s.signature_role === 'approved_by');
+      const receivedSig = signatures?.find(s => s.signature_role === 'customer');
+      
+      const mergedData = {
+        ...document.invoice_data,
+        preparedBy: preparedSig ? {
+          approver_name: preparedSig.signer_name,
+          signature_data: preparedSig.signature_data,
+          signature_type: preparedSig.signature_type,
+          approval_date: preparedSig.signed_at
+        } : undefined,
+        approvedBy: approvedSig ? {
+          approver_name: approvedSig.signer_name,
+          signature_data: approvedSig.signature_data,
+          signature_type: approvedSig.signature_type,
+          approval_date: approvedSig.signed_at
+        } : undefined,
+        receivedBy: receivedSig ? {
+          approver_name: receivedSig.signer_name,
+          signature_data: receivedSig.signature_data,
+          signature_type: receivedSig.signature_type,
+          approval_date: receivedSig.signed_at
+        } : undefined
+      };
+      
+      const pdfBlob = await generateYutongOrderInvoicePDF(mergedData);
+      
+      const url = URL.createObjectURL(pdfBlob);
       const a = window.document.createElement('a');
       a.href = url;
-      a.download = document.file_name;
+      a.download = `${document.invoice_data.invoice_no}_with_signatures.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       
-      toast.success('Invoice downloaded successfully');
+      toast.success('Invoice downloaded with latest signatures!');
     } catch (error: any) {
       console.error('Error downloading invoice:', error);
       toast.error('Failed to download invoice');
@@ -87,15 +117,54 @@ export function YutongOrderInvoiceViewModal({
     }
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(invoiceHTML);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 250);
+  const handlePrint = async () => {
+    try {
+      const { data: signatures } = await supabase
+        .from('yutong_invoice_signatures')
+        .select('*')
+        .eq('invoice_record_id', document.invoice_record_id)
+        .order('created_at', { ascending: true });
+      
+      const preparedSig = signatures?.find(s => s.signature_role === 'prepared_by');
+      const approvedSig = signatures?.find(s => s.signature_role === 'approved_by');
+      const receivedSig = signatures?.find(s => s.signature_role === 'customer');
+      
+      const mergedData = {
+        ...document.invoice_data,
+        preparedBy: preparedSig ? {
+          approver_name: preparedSig.signer_name,
+          signature_data: preparedSig.signature_data,
+          signature_type: preparedSig.signature_type,
+          approval_date: preparedSig.signed_at
+        } : undefined,
+        approvedBy: approvedSig ? {
+          approver_name: approvedSig.signer_name,
+          signature_data: approvedSig.signature_data,
+          signature_type: approvedSig.signature_type,
+          approval_date: approvedSig.signed_at
+        } : undefined,
+        receivedBy: receivedSig ? {
+          approver_name: receivedSig.signer_name,
+          signature_data: receivedSig.signature_data,
+          signature_type: receivedSig.signature_type,
+          approval_date: receivedSig.signed_at
+        } : undefined
+      };
+      
+      const invoiceHTML = generateYutongOrderInvoiceHTML(mergedData);
+      
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(invoiceHTML);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      }
+    } catch (error) {
+      console.error('Error printing invoice:', error);
+      toast.error('Failed to print invoice');
     }
   };
 
