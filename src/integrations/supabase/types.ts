@@ -448,6 +448,44 @@ export type Database = {
         }
         Relationships: []
       }
+      companies: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          name: string
+          parent_company_id: string | null
+          sector: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          parent_company_id?: string | null
+          sector?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          parent_company_id?: string | null
+          sector?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_parent_company_id_fkey"
+            columns: ["parent_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_trips: {
         Row: {
           audit_log: Json | null
@@ -1046,6 +1084,33 @@ export type Database = {
           },
         ]
       }
+      frequency_rules: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean | null
+          params: Json
+          rule_type: Database["public"]["Enums"]["frequency_rule_type"]
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          is_active?: boolean | null
+          params?: Json
+          rule_type: Database["public"]["Enums"]["frequency_rule_type"]
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean | null
+          params?: Json
+          rule_type?: Database["public"]["Enums"]["frequency_rule_type"]
+        }
+        Relationships: []
+      }
       fuel_settings: {
         Row: {
           created_at: string | null
@@ -1081,6 +1146,237 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      governance_audit_log: {
+        Row: {
+          action: string
+          id: string
+          item_id: string | null
+          new_value: Json | null
+          occurrence_id: string | null
+          old_value: Json | null
+          performed_at: string
+          performed_by: string | null
+        }
+        Insert: {
+          action: string
+          id?: string
+          item_id?: string | null
+          new_value?: Json | null
+          occurrence_id?: string | null
+          old_value?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+        }
+        Update: {
+          action?: string
+          id?: string
+          item_id?: string | null
+          new_value?: Json | null
+          occurrence_id?: string | null
+          old_value?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governance_audit_log_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "governance_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "governance_audit_log_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "governance_occurrences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      governance_items: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          frequency_rule_id: string
+          id: string
+          is_active: boolean | null
+          location: string | null
+          notes: string | null
+          owner_email: string
+          owner_name: string
+          sbu_id: string | null
+          status: Database["public"]["Enums"]["governance_item_status"] | null
+          submission_rule_id: string | null
+          title: string
+          type: Database["public"]["Enums"]["governance_item_type"]
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          frequency_rule_id: string
+          id?: string
+          is_active?: boolean | null
+          location?: string | null
+          notes?: string | null
+          owner_email: string
+          owner_name: string
+          sbu_id?: string | null
+          status?: Database["public"]["Enums"]["governance_item_status"] | null
+          submission_rule_id?: string | null
+          title: string
+          type: Database["public"]["Enums"]["governance_item_type"]
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          frequency_rule_id?: string
+          id?: string
+          is_active?: boolean | null
+          location?: string | null
+          notes?: string | null
+          owner_email?: string
+          owner_name?: string
+          sbu_id?: string | null
+          status?: Database["public"]["Enums"]["governance_item_status"] | null
+          submission_rule_id?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["governance_item_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governance_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "governance_items_frequency_rule_id_fkey"
+            columns: ["frequency_rule_id"]
+            isOneToOne: false
+            referencedRelation: "frequency_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "governance_items_sbu_id_fkey"
+            columns: ["sbu_id"]
+            isOneToOne: false
+            referencedRelation: "sbus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "governance_items_submission_rule_id_fkey"
+            columns: ["submission_rule_id"]
+            isOneToOne: false
+            referencedRelation: "submission_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      governance_notifications: {
+        Row: {
+          id: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          occurrence_id: string
+          recipient_email: string
+          sent_at: string
+          status: Database["public"]["Enums"]["notification_status"] | null
+        }
+        Insert: {
+          id?: string
+          notification_type: Database["public"]["Enums"]["notification_type"]
+          occurrence_id: string
+          recipient_email: string
+          sent_at?: string
+          status?: Database["public"]["Enums"]["notification_status"] | null
+        }
+        Update: {
+          id?: string
+          notification_type?: Database["public"]["Enums"]["notification_type"]
+          occurrence_id?: string
+          recipient_email?: string
+          sent_at?: string
+          status?: Database["public"]["Enums"]["notification_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governance_notifications_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "governance_occurrences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      governance_occurrences: {
+        Row: {
+          attachments: Json | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by_engine_at: string | null
+          id: string
+          is_holiday_adjusted: boolean | null
+          item_id: string
+          manual_override: boolean | null
+          notes: string | null
+          original_rule_text: string | null
+          scheduled_date: string
+          status: Database["public"]["Enums"]["governance_item_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          attachments?: Json | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by_engine_at?: string | null
+          id?: string
+          is_holiday_adjusted?: boolean | null
+          item_id: string
+          manual_override?: boolean | null
+          notes?: string | null
+          original_rule_text?: string | null
+          scheduled_date: string
+          status?: Database["public"]["Enums"]["governance_item_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          attachments?: Json | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by_engine_at?: string | null
+          id?: string
+          is_holiday_adjusted?: boolean | null
+          item_id?: string
+          manual_override?: boolean | null
+          notes?: string | null
+          original_rule_text?: string | null
+          scheduled_date?: string
+          status?: Database["public"]["Enums"]["governance_item_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governance_occurrences_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "governance_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hire_rate_cards: {
         Row: {
@@ -1155,25 +1451,31 @@ export type Database = {
       }
       holidays: {
         Row: {
+          country: string | null
           created_at: string | null
           holiday_date: string
           holiday_name: string
           id: string
           is_recurring: boolean | null
+          type: string | null
         }
         Insert: {
+          country?: string | null
           created_at?: string | null
           holiday_date: string
           holiday_name: string
           id?: string
           is_recurring?: boolean | null
+          type?: string | null
         }
         Update: {
+          country?: string | null
           created_at?: string | null
           holiday_date?: string
           holiday_name?: string
           id?: string
           is_recurring?: boolean | null
+          type?: string | null
         }
         Relationships: []
       }
@@ -2340,6 +2642,41 @@ export type Database = {
           via_locations?: string[] | null
         }
         Relationships: []
+      }
+      sbus: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sbus_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       school_branches: {
         Row: {
@@ -3594,6 +3931,30 @@ export type Database = {
         }
         Relationships: []
       }
+      submission_rules: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          params: Json
+          rule_type: Database["public"]["Enums"]["submission_rule_type"]
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          params?: Json
+          rule_type: Database["public"]["Enums"]["submission_rule_type"]
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          params?: Json
+          rule_type?: Database["public"]["Enums"]["submission_rule_type"]
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           category: string | null
@@ -3925,6 +4286,35 @@ export type Database = {
           window_start?: string | null
         }
         Relationships: []
+      }
+      user_company_access: {
+        Row: {
+          can_edit: boolean | null
+          company_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          can_edit?: boolean | null
+          company_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          can_edit?: boolean | null
+          company_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_company_access_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_page_permissions: {
         Row: {
@@ -6884,6 +7274,23 @@ export type Database = {
         | "cancelled"
       feedback_rating: "1" | "2" | "3" | "4" | "5"
       fleet_status: "active" | "maintenance" | "idle" | "retired"
+      frequency_rule_type:
+        | "DAILY"
+        | "WEEKLY_BY_WEEKDAY"
+        | "BIWEEKLY_BY_WEEKDAY"
+        | "MONTHLY_BY_DAY"
+        | "MONTHLY_NTH_WEEKDAY"
+        | "MONTH_END"
+        | "RELATIVE_WINDOW"
+        | "ADHOC"
+      governance_item_status:
+        | "Planned"
+        | "Due"
+        | "Submitted"
+        | "Completed"
+        | "Skipped"
+        | "N/A"
+      governance_item_type: "REPORT" | "EVENT"
       handover_status: "scheduled" | "in_progress" | "completed" | "cancelled"
       inspection_status:
         | "pending"
@@ -6892,6 +7299,8 @@ export type Database = {
         | "failed"
         | "approved"
       maintenance_status: "pending" | "in_progress" | "completed" | "cancelled"
+      notification_status: "pending" | "sent" | "failed"
+      notification_type: "REMINDER_3_DAY" | "REMINDER_TODAY" | "OVERDUE"
       payment_status:
         | "pending_operations"
         | "pending_finance"
@@ -6939,6 +7348,13 @@ export type Database = {
         | "insurance_certificate"
         | "customs_declaration"
       shipping_method: "roro" | "container"
+      submission_rule_type:
+        | "SAME_AS_FREQUENCY"
+        | "FIXED_DAY_EACH_MONTH"
+        | "SAME_WEEKDAY"
+        | "FOLLOWING_MONTH_DAY_N"
+        | "INCLUDED_IN_OTHER"
+        | "NONE"
       ticket_priority: "low" | "medium" | "high" | "urgent"
       ticket_status:
         | "open"
@@ -7138,6 +7554,25 @@ export const Constants = {
       ],
       feedback_rating: ["1", "2", "3", "4", "5"],
       fleet_status: ["active", "maintenance", "idle", "retired"],
+      frequency_rule_type: [
+        "DAILY",
+        "WEEKLY_BY_WEEKDAY",
+        "BIWEEKLY_BY_WEEKDAY",
+        "MONTHLY_BY_DAY",
+        "MONTHLY_NTH_WEEKDAY",
+        "MONTH_END",
+        "RELATIVE_WINDOW",
+        "ADHOC",
+      ],
+      governance_item_status: [
+        "Planned",
+        "Due",
+        "Submitted",
+        "Completed",
+        "Skipped",
+        "N/A",
+      ],
+      governance_item_type: ["REPORT", "EVENT"],
       handover_status: ["scheduled", "in_progress", "completed", "cancelled"],
       inspection_status: [
         "pending",
@@ -7147,6 +7582,8 @@ export const Constants = {
         "approved",
       ],
       maintenance_status: ["pending", "in_progress", "completed", "cancelled"],
+      notification_status: ["pending", "sent", "failed"],
+      notification_type: ["REMINDER_3_DAY", "REMINDER_TODAY", "OVERDUE"],
       payment_status: [
         "pending_operations",
         "pending_finance",
@@ -7199,6 +7636,14 @@ export const Constants = {
         "customs_declaration",
       ],
       shipping_method: ["roro", "container"],
+      submission_rule_type: [
+        "SAME_AS_FREQUENCY",
+        "FIXED_DAY_EACH_MONTH",
+        "SAME_WEEKDAY",
+        "FOLLOWING_MONTH_DAY_N",
+        "INCLUDED_IN_OTHER",
+        "NONE",
+      ],
       ticket_priority: ["low", "medium", "high", "urgent"],
       ticket_status: [
         "open",
