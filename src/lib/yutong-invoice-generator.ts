@@ -134,24 +134,24 @@ export const generateYutongInvoiceHTML = (data: YutongInvoiceData): string => {
       </div>
 
       <!-- Bus Details Table -->
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; border: 1px solid #ddd;">
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; border: 2px solid #ddd; box-sizing: border-box;">
         <thead>
           <tr style="background: #f8f9fa;">
-            <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Bus Model</th>
-            <th style="border: 1px solid #ddd; padding: 12px; text-align: center;">Quantity</th>
-            <th style="border: 1px solid #ddd; padding: 12px; text-align: right;">Unit Price (LKR)</th>
-            <th style="border: 1px solid #ddd; padding: 12px; text-align: right;">Total (LKR)</th>
+            <th style="border: 1px solid #ddd; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd; padding: 12px; text-align: left; box-sizing: border-box;">Bus Model</th>
+            <th style="border: 1px solid #ddd; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd; padding: 12px; text-align: center; box-sizing: border-box;">Quantity</th>
+            <th style="border: 1px solid #ddd; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd; padding: 12px; text-align: right; box-sizing: border-box;">Unit Price (LKR)</th>
+            <th style="border: 1px solid #ddd; border-right: 2px solid #ddd; border-bottom: 1px solid #ddd; padding: 12px; text-align: right; box-sizing: border-box;">Total (LKR)</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="border: 1px solid #ddd; padding: 12px;">
+            <td style="border: 1px solid #ddd; border-right: 1px solid #ddd; border-bottom: 2px solid #ddd; padding: 12px; box-sizing: border-box;">
               <strong>${data.busModel}</strong>
               ${data.specialFeatures ? `<br><small style="color: #666;">${data.specialFeatures}</small>` : ''}
             </td>
-            <td style="border: 1px solid #ddd; padding: 12px; text-align: center;">${data.quantity}</td>
-            <td style="border: 1px solid #ddd; padding: 12px; text-align: right;">${data.unitPrice.toLocaleString()}</td>
-            <td style="border: 1px solid #ddd; padding: 12px; text-align: right; font-weight: bold;">${subtotal.toLocaleString()}</td>
+            <td style="border: 1px solid #ddd; border-right: 1px solid #ddd; border-bottom: 2px solid #ddd; padding: 12px; text-align: center; box-sizing: border-box;">${data.quantity}</td>
+            <td style="border: 1px solid #ddd; border-right: 1px solid #ddd; border-bottom: 2px solid #ddd; padding: 12px; text-align: right; box-sizing: border-box;">${data.unitPrice.toLocaleString()}</td>
+            <td style="border: 1px solid #ddd; border-right: 2px solid #ddd; border-bottom: 2px solid #ddd; padding: 12px; text-align: right; font-weight: bold; box-sizing: border-box;">${subtotal.toLocaleString()}</td>
           </tr>
         </tbody>
       </table>

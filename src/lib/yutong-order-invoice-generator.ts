@@ -166,12 +166,27 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   .details-table {
     width: 100%;
     border-collapse: collapse;
+    border: 2px solid #0b2f66;
   }
 
   .details-table td {
     border: 1px solid #0b2f66;
     padding: 7px 10px;
     font-size: 16px;
+    box-sizing: border-box;
+  }
+
+  .details-table tr td {
+    border-right: 1px solid #0b2f66;
+    border-bottom: 1px solid #0b2f66;
+  }
+
+  .details-table tr:last-child td {
+    border-bottom: 2px solid #0b2f66;
+  }
+
+  .details-table tr td:last-child {
+    border-right: 2px solid #0b2f66;
   }
 
   .details-table td:first-child {
