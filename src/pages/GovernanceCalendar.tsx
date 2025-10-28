@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Calendar, List, Filter, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { format, addMonths, subMonths, startOfMonth } from 'date-fns';
@@ -55,8 +54,7 @@ const GovernanceCalendar = () => {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <AppLayout>
-        <div className="flex h-[calc(100vh-8rem)] gap-4">
+      <div className="flex h-[calc(100vh-8rem)] gap-4">
           {/* Filters Sidebar */}
           {showFilters && <FilterSidebar onClose={() => setShowFilters(false)} />}
 
@@ -151,7 +149,6 @@ const GovernanceCalendar = () => {
           open={detailsModalOpen}
           onOpenChange={setDetailsModalOpen}
         />
-      </AppLayout>
     </TooltipProvider>
   );
 };
