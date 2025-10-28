@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { QuickEntryBusList } from "@/components/trips/QuickEntryBusList";
 import { QuickEntryForm } from "@/components/trips/QuickEntryForm";
+import { OCRImageUpload, ExtractedTripData } from "@/components/trips/OCRImageUpload";
 
 interface TripData {
   id: string;
@@ -36,6 +37,8 @@ export default function QuickTripsEntry() {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showBusList, setShowBusList] = useState(false);
+  const [extractedData, setExtractedData] = useState<ExtractedTripData[]>([]);
+  const [showOCRUpload, setShowOCRUpload] = useState(false);
 
   useEffect(() => {
     loadTripsForDate(selectedDate);
@@ -128,6 +131,67 @@ export default function QuickTripsEntry() {
     }
   };
 
+  const handleOCRDataExtracted = (data: ExtractedTripData[]) => {
+    setExtractedData(data);
+    
+    // Auto-match and apply data
+    data.forEach(async (extracted) => {
+      if (extracted.busNumber) {
+        const matchedTrip = trips.find(trip => 
+          trip.bus_no.replace(/[-\s]/g, '').toLowerCase() === 
+          extracted.busNumber?.replace(/[-\s]/g, '').toLowerCase()
+        );
+        
+        if (matchedTrip) {
+          await applyOCRDataToTrip(matchedTrip.id, extracted);
+          toast({
+            title: "Data Applied",
+            description: `Data from ${extracted.fileName} applied to bus ${matchedTrip.bus_no}`,
+          });
+        } else {
+          toast({
+            title: "No Match Found",
+            description: `Could not find trip for bus ${extracted.busNumber}`,
+            variant: "destructive",
+          });
+        }
+      }
+    });
+  };
+
+  const applyOCRDataToTrip = async (tripId: string, data: ExtractedTripData) => {
+    try {
+      const updates: any = {
+        income_details: data.income,
+        other_expenses_details: data.expenses,
+      };
+
+      // Calculate totals
+      const totalIncome = Object.values(data.income).reduce((sum, val) => sum + val, 0);
+      const totalExpenses = Object.values(data.expenses).reduce((sum, val) => sum + val, 0);
+
+      if (totalIncome > 0) updates.income = totalIncome;
+      if (totalExpenses > 0) updates.other_expenses = totalExpenses;
+
+      const { error } = await supabase
+        .from('daily_trips')
+        .update(updates)
+        .eq('id', tripId);
+
+      if (error) throw error;
+
+      // Reload trips to reflect changes
+      loadTripsForDate(selectedDate);
+    } catch (error) {
+      console.error('Error applying OCR data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to apply OCR data",
+        variant: "destructive",
+      });
+    }
+  };
+
   const selectedTrip = trips.find(t => t.id === selectedTripId);
   const completedCount = trips.filter(hasData).length;
 
@@ -163,31 +227,51 @@ export default function QuickTripsEntry() {
             </div>
           </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-full md:w-[240px] justify-start text-left font-normal",
-                  !selectedDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                <span className="truncate">
-                  {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={showOCRUpload ? "default" : "outline"}
+              onClick={() => setShowOCRUpload(!showOCRUpload)}
+              className="shrink-0"
+            >
+              {showOCRUpload ? "Hide" : "Upload"} Sheets
+            </Button>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full md:w-[240px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
+
+        {/* OCR Upload Section */}
+        {showOCRUpload && (
+          <div className="border-b bg-muted/30 p-4">
+            <OCRImageUpload
+              selectedDate={selectedDate}
+              onDataExtracted={handleOCRDataExtracted}
+            />
+          </div>
+        )}
       </div>
 
       {/* Main Content */}
