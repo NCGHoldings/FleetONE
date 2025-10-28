@@ -80,8 +80,8 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         // Extract text using OCR
         const ocrResult = await extractTextFromImage(image);
         
-        // Parse trip data from extracted text
-        const parsedData = parseTripData(ocrResult.text);
+        // Parse trip data from OCR result
+        const parsedData = parseTripData(ocrResult);
         
         // Map fields to Quick Entry format
         const { income, expenses, unmapped } = mapExtractedFields(
@@ -102,7 +102,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           income,
           expenses,
           unmapped,
-          rawText: ocrResult.text,
+          rawText: parsedData.rawText,
         });
       }
 

@@ -41,3 +41,6 @@ verify_jwt = true  # Requires authentication for verification
 
 [functions.driver-allocation-import]
 verify_jwt = true  # Requires authentication for import operations
+
+[functions.ocr-extract]
+verify_jwt = true  # Requires authentication for OCR processing

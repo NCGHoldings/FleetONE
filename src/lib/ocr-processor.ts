@@ -1,9 +1,13 @@
-import { createWorker } from 'tesseract.js';
+import { supabase } from '@/integrations/supabase/client';
+import { preprocessImage } from './image-preprocessor';
 
 export interface OCRResult {
-  text: string;
+  busNumber: string | null;
+  date: string | null;
+  income: Record<string, number>;
+  expenses: Record<string, number>;
   confidence: number;
-  words: any[];
+  rawData?: any;
 }
 
 export interface ParsedTripData {
@@ -16,103 +20,68 @@ export interface ParsedTripData {
 }
 
 /**
- * Extract text from image using Tesseract OCR
+ * Extract text from image using Lovable AI
  * Supports both English and Sinhala text
  */
 export async function extractTextFromImage(imageFile: File): Promise<OCRResult> {
-  const worker = await createWorker(['eng', 'sin']);
-  
-  await worker.setParameters({
-    tessedit_char_whitelist: '0123456789.,/-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzඅආඇඈඉඊඋඌඍඑඒඓඔඕඖකඛගඝඞචඡජඣඤඥඨඩඬණතථදධනපඵබභමයරලවසහළෆංඃ',
-  });
-  
-  const { data } = await worker.recognize(imageFile);
-  await worker.terminate();
-  
-  return {
-    text: data.text,
-    confidence: data.confidence,
-    words: data.words,
-  };
-}
+  try {
+    // Preprocess image for better accuracy
+    const preprocessedBase64 = await preprocessImage(imageFile, {
+      autoRotate: true,
+      enhanceContrast: true,
+      adjustBrightness: true,
+      maxWidth: 1920,
+      maxHeight: 1920,
+    });
 
-/**
- * Parse trip data from OCR text
- * Extracts bus number, date, and income/expense values
- */
-export function parseTripData(ocrText: string): ParsedTripData {
-  // Extract bus number (formats: NP-0748, NP 0748, NP0748)
-  const busNumberMatch = ocrText.match(/[A-Z]{2,3}[-\s]?\d{4}/i);
-  
-  // Extract date (formats: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY)
-  const dateMatch = ocrText.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
-  
-  // Extract all numbers from the text
-  const numberMatches = ocrText.match(/[\d,]+(?:\.\d+)?/g);
-  const extractedNumbers = numberMatches 
-    ? numberMatches.map(n => parseFloat(n.replace(/,/g, '')))
-    : [];
-  
-  // Parse income and expense sections
-  const { incomeFields, expenseFields } = parseFieldsFromText(ocrText, extractedNumbers);
-  
-  return {
-    busNumber: busNumberMatch?.[0]?.toUpperCase() || null,
-    date: dateMatch?.[0] || null,
-    extractedNumbers,
-    incomeFields,
-    expenseFields,
-    rawText: ocrText,
-  };
-}
+    // Call edge function for OCR processing
+    const { data, error } = await supabase.functions.invoke('ocr-extract', {
+      body: { imageBase64: preprocessedBase64 }
+    });
 
-/**
- * Parse income and expense fields from text
- * Uses position-based parsing to associate labels with values
- */
-function parseFieldsFromText(text: string, numbers: number[]): {
-  incomeFields: Record<string, number>;
-  expenseFields: Record<string, number>;
-} {
-  const incomeFields: Record<string, number> = {};
-  const expenseFields: Record<string, number> = {};
-  
-  // Split text into lines for line-by-line parsing
-  const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-  
-  let currentSection = 'unknown';
-  let numberIndex = 0;
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].toLowerCase();
-    
-    // Detect section headers
-    if (line.includes('income') || line.includes('ආදායම') || line.includes('revenue')) {
-      currentSection = 'income';
-      continue;
+    if (error) {
+      console.error('OCR extraction error:', error);
+      throw new Error(error.message || 'Failed to extract text from image');
     }
-    if (line.includes('expense') || line.includes('වියදම') || line.includes('විය') || line.includes('cost')) {
-      currentSection = 'expense';
-      continue;
+
+    if (!data) {
+      throw new Error('No data returned from OCR service');
     }
-    
-    // Extract field name and value from line
-    const numberInLine = line.match(/[\d,]+(?:\.\d+)?/g);
-    if (numberInLine && numberIndex < numbers.length) {
-      const fieldName = line.replace(/[\d,\.]+/g, '').trim();
-      const value = numbers[numberIndex];
-      
-      if (currentSection === 'income') {
-        incomeFields[fieldName] = value;
-      } else if (currentSection === 'expense') {
-        expenseFields[fieldName] = value;
-      }
-      
-      numberIndex++;
-    }
+
+    // Return structured data from AI
+    return {
+      busNumber: data.busNumber || null,
+      date: data.date || null,
+      income: data.income || {},
+      expenses: data.expenses || {},
+      confidence: data.confidence || 0.5,
+      rawData: data,
+    };
+  } catch (error) {
+    console.error('Error in extractTextFromImage:', error);
+    throw error;
   }
-  
-  return { incomeFields, expenseFields };
+}
+
+/**
+ * Parse trip data from OCR result
+ * Converts AI-extracted data to ParsedTripData format for compatibility
+ */
+export function parseTripData(ocrResult: OCRResult): ParsedTripData {
+  // Convert structured AI data to legacy format
+  const extractedNumbers = [
+    ...Object.values(ocrResult.income),
+    ...Object.values(ocrResult.expenses),
+  ].filter(n => n > 0);
+
+  return {
+    busNumber: ocrResult.busNumber,
+    date: ocrResult.date,
+    extractedNumbers,
+    incomeFields: ocrResult.income,
+    expenseFields: ocrResult.expenses,
+    rawText: JSON.stringify(ocrResult.rawData || {}, null, 2),
+  };
 }
 
 /**
