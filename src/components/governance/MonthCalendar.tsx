@@ -55,16 +55,33 @@ export const MonthCalendar = ({ currentDate, occurrences, onOccurrenceClick }: M
     return company;
   };
 
+  // Check if there are any occurrences at all
+  const hasAnyOccurrences = occurrences.length > 0;
+
   return (
     <div className="h-full flex flex-col">
-      {/* Week day headers */}
-      <div className="grid grid-cols-7 gap-2 mb-2">
-        {weekDays.map(day => (
-          <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
-            {day}
+      {!hasAnyOccurrences && (
+        <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-3">
+          <Calendar className="h-16 w-16 text-muted-foreground/40" />
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold">No Scheduled Occurrences</h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              The calendar is empty. Click the <strong>"Generate Schedule"</strong> button above to populate it with governance items.
+            </p>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {hasAnyOccurrences && (
+        <>
+          {/* Week day headers */}
+          <div className="grid grid-cols-7 gap-2 mb-2">
+            {weekDays.map(day => (
+              <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+                {day}
+              </div>
+            ))}
+          </div>
 
       {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-2 flex-1">
@@ -172,6 +189,8 @@ export const MonthCalendar = ({ currentDate, occurrences, onOccurrenceClick }: M
           );
         })}
       </div>
+        </>
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, List, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, List, Filter, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -11,6 +11,8 @@ import { ListView } from '@/components/governance/ListView';
 import { OccurrenceDetailsModal } from '@/components/governance/OccurrenceDetailsModal';
 import { FilterSidebar, useGovernanceFilters } from '@/components/governance/FilterSidebar';
 import { useGovernanceOccurrences, type GovernanceOccurrence } from '@/hooks/useGovernanceOccurrences';
+import { useScheduleGovernance } from '@/hooks/useScheduleGovernance';
+import { useAuth } from '@/hooks/useAuth';
 
 const GovernanceCalendar = () => {
   const [view, setView] = useState<'month' | 'list'>('month');
@@ -19,6 +21,8 @@ const GovernanceCalendar = () => {
   const [selectedOccurrence, setSelectedOccurrence] = useState<GovernanceOccurrence | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
 
+  const { hasRole } = useAuth();
+  const { generateSchedule, isGenerating } = useScheduleGovernance();
   const filters = useGovernanceFilters();
   
   const { data: occurrences = [], isLoading } = useGovernanceOccurrences({
@@ -29,6 +33,8 @@ const GovernanceCalendar = () => {
     categories: filters.selectedCategories,
     statuses: filters.selectedStatuses,
   });
+
+  const isAdmin = hasRole('super_admin') || hasRole('admin');
 
   const handlePrevMonth = () => {
     setCurrentDate(prev => subMonths(prev, 1));
@@ -84,18 +90,32 @@ const GovernanceCalendar = () => {
                 </span>
               </div>
 
-              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-                <TabsList>
-                  <TabsTrigger value="month">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Month
-                  </TabsTrigger>
-                  <TabsTrigger value="list">
-                    <List className="h-4 w-4 mr-2" />
-                    List
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    onClick={generateSchedule}
+                    disabled={isGenerating}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+                    {isGenerating ? 'Generating...' : 'Generate Schedule'}
+                  </Button>
+                )}
+                
+                <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+                  <TabsList>
+                    <TabsTrigger value="month">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Month
+                    </TabsTrigger>
+                    <TabsTrigger value="list">
+                      <List className="h-4 w-4 mr-2" />
+                      List
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
             </div>
 
             {/* Calendar Content */}
