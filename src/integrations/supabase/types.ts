@@ -6862,6 +6862,9 @@ export type Database = {
         | "mechanic"
         | "staff"
         | "finance"
+        | "governance_admin"
+        | "governance_manager"
+        | "governance_viewer"
       approval_status: "pending" | "approved" | "rejected"
       customs_status:
         | "draft"
@@ -7110,6 +7113,9 @@ export const Constants = {
         "mechanic",
         "staff",
         "finance",
+        "governance_admin",
+        "governance_manager",
+        "governance_viewer",
       ],
       approval_status: ["pending", "approved", "rejected"],
       customs_status: [
