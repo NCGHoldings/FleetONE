@@ -240,10 +240,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
 
   .bank-details {
     margin: 30px 35px 0;
-    padding: 20px;
-    background: #f8f9fa;
-    border: 2px solid #0b2f66;
-    border-radius: 8px;
+    padding: 20px 0;
   }
 
   .bank-details h3 {
@@ -261,20 +258,23 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
 
   .bank-details td {
     padding: 8px 12px;
-    border: 1px solid #ddd;
+    border: none;
+    border-bottom: 1px solid #e0e0e0;
   }
 
   .bank-details td:first-child {
     font-weight: 700;
-    background: #e8f6ff;
+    color: #0b2f66;
     width: 200px;
+  }
+
+  .bank-details tr:last-child td {
+    border-bottom: none;
   }
 
   .signatures-section {
     margin: 30px 35px 0;
-    padding: 20px;
-    border: 2px solid #0b2f66;
-    border-radius: 8px;
+    padding: 20px 0;
   }
 
   .signatures-section h3 {
@@ -289,16 +289,16 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   .signatures-grid {
     display: flex;
     justify-content: space-between;
-    gap: 20px;
+    gap: 40px;
   }
 
   .signature-box {
     flex: 1;
     text-align: center;
-    padding: 15px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    background: #f8f9fa;
+    padding: 15px 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
   }
 
   .signature-box .title {
@@ -337,7 +337,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   }
 
   .footer {
-    margin: 20px 35px 0;
+    margin: 40px 35px 0;
     padding: 20px;
     background: #0b2f66;
     color: white;
