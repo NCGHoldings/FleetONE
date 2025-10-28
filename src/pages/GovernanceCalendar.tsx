@@ -1,59 +1,56 @@
 import { useState } from 'react';
-import { Calendar, List, Filter } from 'lucide-react';
+import { Calendar, List, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
+import { format, addMonths, subMonths, startOfMonth } from 'date-fns';
+import { MonthCalendar } from '@/components/governance/MonthCalendar';
+import { ListView } from '@/components/governance/ListView';
+import { OccurrenceDetailsModal } from '@/components/governance/OccurrenceDetailsModal';
+import { FilterSidebar, useGovernanceFilters } from '@/components/governance/FilterSidebar';
+import { useGovernanceOccurrences, type GovernanceOccurrence } from '@/hooks/useGovernanceOccurrences';
 
 const GovernanceCalendar = () => {
-  const [view, setView] = useState<'month' | 'week' | 'day' | 'list'>('month');
+  const [view, setView] = useState<'month' | 'list'>('month');
   const [showFilters, setShowFilters] = useState(true);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedOccurrence, setSelectedOccurrence] = useState<GovernanceOccurrence | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+
+  const filters = useGovernanceFilters();
+  
+  const { data: occurrences = [], isLoading } = useGovernanceOccurrences({
+    currentDate,
+    companyIds: filters.selectedCompanies,
+    sbuIds: filters.selectedSBUs,
+    types: filters.selectedTypes,
+    categories: filters.selectedCategories,
+    statuses: filters.selectedStatuses,
+  });
+
+  const handlePrevMonth = () => {
+    setCurrentDate(prev => subMonths(prev, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(prev => addMonths(prev, 1));
+  };
+
+  const handleToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const handleOccurrenceClick = (occurrence: GovernanceOccurrence) => {
+    setSelectedOccurrence(occurrence);
+    setDetailsModalOpen(true);
+  };
 
   return (
     <AppLayout>
       <div className="flex h-[calc(100vh-8rem)] gap-4">
         {/* Filters Sidebar */}
-        {showFilters && (
-          <Card className="w-80 p-4 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Filters</h3>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setShowFilters(false)}
-              >
-                ×
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Company</label>
-                <p className="text-xs text-muted-foreground">Company filters will appear here</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block">SBU</label>
-                <p className="text-xs text-muted-foreground">SBU filters will appear here</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block">Type</label>
-                <p className="text-xs text-muted-foreground">Type filters (Report/Event) will appear here</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block">Category</label>
-                <p className="text-xs text-muted-foreground">Category filters will appear here</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block">Status</label>
-                <p className="text-xs text-muted-foreground">Status filters will appear here</p>
-              </div>
-            </div>
-          </Card>
-        )}
+        {showFilters && <FilterSidebar onClose={() => setShowFilters(false)} />}
 
         {/* Main Calendar Area */}
         <div className="flex-1 flex flex-col">
@@ -71,10 +68,18 @@ const GovernanceCalendar = () => {
                 </Button>
               )}
               
-              <Button variant="outline" size="sm">Today</Button>
-              <Button variant="outline" size="sm">← Prev</Button>
-              <Button variant="outline" size="sm">Next →</Button>
-              <span className="text-lg font-semibold ml-4">January 2025</span>
+              <Button variant="outline" size="sm" onClick={handleToday}>
+                Today
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePrevMonth}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleNextMonth}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <span className="text-lg font-semibold ml-4">
+                {format(startOfMonth(currentDate), 'MMMM yyyy')}
+              </span>
             </div>
 
             <Tabs value={view} onValueChange={(v) => setView(v as any)}>
@@ -83,8 +88,6 @@ const GovernanceCalendar = () => {
                   <Calendar className="h-4 w-4 mr-2" />
                   Month
                 </TabsTrigger>
-                <TabsTrigger value="week">Week</TabsTrigger>
-                <TabsTrigger value="day">Day</TabsTrigger>
                 <TabsTrigger value="list">
                   <List className="h-4 w-4 mr-2" />
                   List
@@ -94,24 +97,38 @@ const GovernanceCalendar = () => {
           </div>
 
           {/* Calendar Content */}
-          <Card className="flex-1 p-4">
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Governance Calendar</h3>
-                <p className="text-muted-foreground max-w-md">
-                  This is the foundation of the governance calendar system. 
-                  The calendar views, occurrence display, and interactive features 
-                  will be implemented next.
-                </p>
-                <p className="text-sm text-muted-foreground mt-4">
-                  Current view: <strong>{view.toUpperCase()}</strong>
-                </p>
+          <Card className="flex-1 p-4 overflow-auto">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-muted-foreground">Loading occurrences...</div>
               </div>
-            </div>
+            ) : (
+              <>
+                {view === 'month' && (
+                  <MonthCalendar
+                    currentDate={currentDate}
+                    occurrences={occurrences}
+                    onOccurrenceClick={handleOccurrenceClick}
+                  />
+                )}
+                {view === 'list' && (
+                  <ListView
+                    occurrences={occurrences}
+                    onOccurrenceClick={handleOccurrenceClick}
+                  />
+                )}
+              </>
+            )}
           </Card>
         </div>
       </div>
+
+      {/* Occurrence Details Modal */}
+      <OccurrenceDetailsModal
+        occurrence={selectedOccurrence}
+        open={detailsModalOpen}
+        onOpenChange={setDetailsModalOpen}
+      />
     </AppLayout>
   );
 };
