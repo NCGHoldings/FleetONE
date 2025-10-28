@@ -52,6 +52,7 @@ const mainItems = [
   { id: "insurance", title: "Insurance", url: "/insurance", icon: Shield },
   { id: "staff_management", title: "Staff Management", url: "/staff", icon: Users },
   { id: "staff_performance", title: "Staff Performance", url: "/staff-performance", icon: TrendingUp },
+  { id: "governance_calendar", title: "Governance Calendar", url: "/governance/calendar", icon: Calendar },
 ];
 
 const operationsItems = [
