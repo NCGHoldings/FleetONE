@@ -26,26 +26,23 @@ export function YutongOrderInvoicePreview({ invoiceRecordId, invoiceData }: Yuto
   const approvedSig = signatures.find(s => s.signature_role === 'approved_by');
   const receivedSig = signatures.find(s => s.signature_role === 'received_by');
 
-  // Merge signatures into invoice data
+  // Merge signatures into invoice data with correct field names for HTML generator
   const mergedInvoiceData = {
     ...invoiceData,
     preparedBy: preparedSig ? {
-      name: preparedSig.signer_name,
-      signature: preparedSig.signature_data,
-      signatureType: preparedSig.signature_type,
-      date: preparedSig.signed_at ? new Date(preparedSig.signed_at).toLocaleDateString() : undefined
+      approver_name: preparedSig.signer_name,
+      signature_data: preparedSig.signature_data,
+      approval_date: preparedSig.signed_at
     } : undefined,
     approvedBy: approvedSig ? {
-      name: approvedSig.signer_name,
-      signature: approvedSig.signature_data,
-      signatureType: approvedSig.signature_type,
-      date: approvedSig.signed_at ? new Date(approvedSig.signed_at).toLocaleDateString() : undefined
+      approver_name: approvedSig.signer_name,
+      signature_data: approvedSig.signature_data,
+      approval_date: approvedSig.signed_at
     } : undefined,
     receivedBy: receivedSig ? {
-      name: receivedSig.signer_name,
-      signature: receivedSig.signature_data,
-      signatureType: receivedSig.signature_type,
-      date: receivedSig.signed_at ? new Date(receivedSig.signed_at).toLocaleDateString() : undefined
+      approver_name: receivedSig.signer_name,
+      signature_data: receivedSig.signature_data,
+      approval_date: receivedSig.signed_at
     } : undefined
   };
 
