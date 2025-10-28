@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
 import { generateYutongOrderInvoiceHTML } from '@/lib/yutong-order-invoice-generator';
 import { YutongInvoiceSignatureManager } from './YutongInvoiceSignatureManager';
+import { YutongOrderInvoicePreview } from './YutongOrderInvoicePreview';
 
 interface YutongOrderInvoiceViewModalProps {
   isOpen: boolean;
@@ -24,10 +25,16 @@ export function YutongOrderInvoiceViewModal({
   onRefresh
 }: YutongOrderInvoiceViewModalProps) {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { isLoading, approveInvoice, regenerateInvoice } = useYutongOrderInvoiceManagement();
 
   const invoiceHTML = generateYutongOrderInvoiceHTML(document.invoice_data);
   const isDraft = document.document_status === 'draft';
+
+  const handleSignaturesUpdated = () => {
+    setRefreshKey(prev => prev + 1);
+    toast.success('Signatures updated. Invoice preview refreshed automatically.');
+  };
 
   const handleDownload = async () => {
     try {
@@ -201,15 +208,18 @@ export function YutongOrderInvoiceViewModal({
               </div>
             )}
             
-            <div className="border rounded-lg p-6 overflow-auto max-h-[calc(90vh-280px)] bg-background">
-              <div dangerouslySetInnerHTML={{ __html: invoiceHTML }} />
-            </div>
+            <YutongOrderInvoicePreview
+              key={refreshKey}
+              invoiceRecordId={document.invoice_record_id}
+              invoiceData={document.invoice_data}
+            />
           </TabsContent>
 
           <TabsContent value="signatures" className="space-y-4 max-h-[calc(90vh-280px)] overflow-auto">
             <YutongInvoiceSignatureManager
               invoiceRecordId={document.invoice_record_id}
               onSignaturesUpdated={() => {
+                handleSignaturesUpdated();
                 if (onRefresh) onRefresh();
               }}
             />
