@@ -66,43 +66,9 @@ export function useYutongOrderInvoiceManagement() {
       const invoiceNo = invoiceNoData as string;
       console.log('✅ Invoice number generated:', invoiceNo);
       
-      // Fetch signature data from quotation approvals
-      console.log('📝 Step 1.5: Fetching signature data from quotation...');
-      let signatureData = {};
-      if (quotationId) {
-        const { data: approvals } = await supabase
-          .from('document_approvals')
-          .select('*')
-          .eq('document_id', quotationId)
-          .order('created_at', { ascending: true });
-        
-        if (approvals && approvals.length > 0) {
-          console.log('✅ Found', approvals.length, 'approval signatures');
-          const prepared = approvals.find(a => a.approval_type === 'prepared_by');
-          const approved = approvals.find(a => a.approval_type === 'approved_by');
-          const customer = approvals.find(a => a.approval_type === 'received_by');
-          
-          signatureData = {
-            preparedBy: prepared ? {
-              approver_name: prepared.approver_name,
-              signature_data: prepared.signature_data,
-              approval_date: prepared.approval_date
-            } : undefined,
-            approvedBy: approved ? {
-              approver_name: approved.approver_name,
-              signature_data: approved.signature_data,
-              approval_date: approved.approval_date
-            } : undefined,
-            receivedBy: customer ? {
-              approver_name: customer.approver_name,
-              signature_data: customer.signature_data,
-              approval_date: customer.approval_date
-            } : undefined
-          };
-        } else {
-          console.log('⚠️ No signature approvals found for quotation');
-        }
-      }
+      // For draft invoices, signatures will be added later via signature manager
+      console.log('📝 Step 1.5: Invoice signatures will be managed separately');
+      const signatureData = {};
       
       // Update invoice data with generated number and signatures
       const fullInvoiceData = {
@@ -355,8 +321,48 @@ export function useYutongOrderInvoiceManagement() {
       
       if (docError) throw docError;
       
-      // Regenerate PDF
-      const pdfBlob = await generateYutongOrderInvoicePDF(document.invoice_data as unknown as YutongOrderInvoiceData);
+      // Fetch latest signatures from yutong_invoice_signatures table
+      let signatureData = {};
+      if (document.invoice_record_id) {
+        const { data: signatures } = await supabase
+          .from('yutong_invoice_signatures')
+          .select('*')
+          .eq('invoice_record_id', document.invoice_record_id)
+          .order('created_at', { ascending: true });
+        
+        if (signatures && signatures.length > 0) {
+          const prepared = signatures.find((s: any) => s.signature_role === 'prepared_by');
+          const approved = signatures.find((s: any) => s.signature_role === 'approved_by');
+          const customer = signatures.find((s: any) => s.signature_role === 'received_by');
+          
+          signatureData = {
+            preparedBy: prepared ? {
+              approver_name: prepared.signer_name,
+              signature_data: prepared.signature_data,
+              approval_date: prepared.signed_at
+            } : undefined,
+            approvedBy: approved ? {
+              approver_name: approved.signer_name,
+              signature_data: approved.signature_data,
+              approval_date: approved.signed_at
+            } : undefined,
+            receivedBy: customer ? {
+              approver_name: customer.signer_name,
+              signature_data: customer.signature_data,
+              approval_date: customer.signed_at
+            } : undefined
+          };
+        }
+      }
+      
+      // Merge invoice data with latest signatures
+      const updatedInvoiceData = {
+        ...(document.invoice_data as unknown as YutongOrderInvoiceData),
+        ...signatureData
+      };
+      
+      // Regenerate PDF with updated data
+      const pdfBlob = await generateYutongOrderInvoicePDF(updatedInvoiceData);
       
       // Re-upload with same path
       const { error: uploadError } = await supabase.storage
@@ -368,11 +374,12 @@ export function useYutongOrderInvoiceManagement() {
       
       if (uploadError) throw uploadError;
       
-      // Update document record
+      // Update document record with new data and file size
       const { error: updateError } = await supabase
         .from('yutong_invoice_documents')
         .update({
           file_size: pdfBlob.size,
+          invoice_data: updatedInvoiceData as any,
           updated_at: new Date().toISOString()
         })
         .eq('id', documentId);

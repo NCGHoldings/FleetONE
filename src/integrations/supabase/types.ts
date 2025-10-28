@@ -5520,6 +5520,45 @@ export type Database = {
           },
         ]
       }
+      yutong_invoice_signatures: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_record_id: string
+          signature_data: string
+          signature_role: string
+          signature_type: string
+          signed_at: string
+          signed_by: string | null
+          signer_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_record_id: string
+          signature_data: string
+          signature_role: string
+          signature_type: string
+          signed_at?: string
+          signed_by?: string | null
+          signer_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_record_id?: string
+          signature_data?: string
+          signature_role?: string
+          signature_type?: string
+          signed_at?: string
+          signed_by?: string | null
+          signer_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       yutong_invoices: {
         Row: {
           amount: number

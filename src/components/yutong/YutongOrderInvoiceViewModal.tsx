@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, Mail, Printer, CheckCircle, RefreshCw } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Download, Mail, Printer, CheckCircle, RefreshCw, FileText, PenTool } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
 import { generateYutongOrderInvoiceHTML } from '@/lib/yutong-order-invoice-generator';
+import { YutongInvoiceSignatureManager } from './YutongInvoiceSignatureManager';
 
 interface YutongOrderInvoiceViewModalProps {
   isOpen: boolean;
@@ -116,7 +118,7 @@ export function YutongOrderInvoiceViewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh]">
+      <DialogContent className="max-w-6xl max-h-[90vh]">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -180,15 +182,39 @@ export function YutongOrderInvoiceViewModal({
           </div>
         </DialogHeader>
 
-        {isDraft && (
-          <div className="bg-destructive/10 border border-destructive rounded-lg p-3 text-center">
-            <p className="text-destructive font-semibold">DRAFT INVOICE - NOT APPROVED</p>
-          </div>
-        )}
+        <Tabs defaultValue="preview" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="preview" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Invoice Preview
+            </TabsTrigger>
+            <TabsTrigger value="signatures" className="flex items-center gap-2">
+              <PenTool className="h-4 w-4" />
+              Manage Signatures
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="border rounded-lg p-6 overflow-auto max-h-[calc(90vh-200px)] bg-background">
-          <div dangerouslySetInnerHTML={{ __html: invoiceHTML }} />
-        </div>
+          <TabsContent value="preview" className="space-y-4">
+            {isDraft && (
+              <div className="bg-destructive/10 border border-destructive rounded-lg p-3 text-center">
+                <p className="text-destructive font-semibold">DRAFT INVOICE - NOT APPROVED</p>
+              </div>
+            )}
+            
+            <div className="border rounded-lg p-6 overflow-auto max-h-[calc(90vh-280px)] bg-background">
+              <div dangerouslySetInnerHTML={{ __html: invoiceHTML }} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="signatures" className="space-y-4 max-h-[calc(90vh-280px)] overflow-auto">
+            <YutongInvoiceSignatureManager
+              invoiceRecordId={document.invoice_record_id}
+              onSignaturesUpdated={() => {
+                if (onRefresh) onRefresh();
+              }}
+            />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
