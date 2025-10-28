@@ -54,7 +54,7 @@ export const ListView = ({ occurrences, onOccurrenceClick }: ListViewProps) => {
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  {occ.governance_item.type === 'report' ? (
+                  {occ.governance_item.type === 'REPORT' ? (
                     <FileText className="h-4 w-4 text-muted-foreground" />
                   ) : (
                     <Calendar className="h-4 w-4 text-muted-foreground" />

@@ -56,7 +56,7 @@ export const OccurrenceDetailsModal = ({ occurrence, open, onOpenChange }: Occur
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {occurrence.governance_item.type === 'report' ? <FileText className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
+            {occurrence.governance_item.type === 'REPORT' ? <FileText className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
             {occurrence.governance_item.title}
           </DialogTitle>
         </DialogHeader>
