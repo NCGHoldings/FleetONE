@@ -73,28 +73,15 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
     position: relative;
   }
 
-  .header-bar {
-    background: #0b2f66;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 22px 30px;
-    border-bottom: 5px solid #004080;
+  .header-section {
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
-  .header-bar .title {
-    font-size: 62px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-  }
-  .header-bar .logos {
-    display: flex;
-    gap: 28px;
-    align-items: center;
-  }
-  .header-bar .logos img {
-    height: 70px;
-    object-fit: contain;
+  
+  .header-image {
+    width: 100%;
+    display: block;
   }
 
   .section {
@@ -245,12 +232,8 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
 <body>
 ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
 <div class="invoice-page">
-  <div class="header-bar">
-    <div class="title">INVOICE</div>
-    <div class="logos">
-      <img src="/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png" alt="NCG Holdings">
-      <img src="/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png" alt="Yutong">
-    </div>
+  <div class="header-section">
+    <img src="/lovable-uploads/yutong-invoice-header.png" alt="Invoice Header" class="header-image">
   </div>
 
   <div class="section">
@@ -348,23 +331,19 @@ async function loadImageAsBase64(url: string): Promise<string> {
 export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData): Promise<Blob> {
   console.log('📄 Starting PDF generation for invoice:', data.invoice_no);
   
-  // Pre-load images as base64
-  console.log('🖼️ Loading logo images...');
-  const [ncgLogo, yutongLogo] = await Promise.all([
-    loadImageAsBase64('/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png'),
-    loadImageAsBase64('/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png')
-  ]);
+  // Pre-load header image as base64
+  console.log('🖼️ Loading header image...');
+  const headerImage = await loadImageAsBase64('/lovable-uploads/yutong-invoice-header.png');
   
-  if (!ncgLogo || !yutongLogo) {
-    console.warn('⚠️ Some logos failed to load, proceeding anyway...');
+  if (!headerImage) {
+    console.warn('⚠️ Header image failed to load, proceeding anyway...');
   }
   
   const htmlContent = generateYutongOrderInvoiceHTML(data);
   
-  // Replace image URLs with base64 data
+  // Replace image URL with base64 data
   const htmlWithEmbeddedImages = htmlContent
-    .replace('/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png', ncgLogo || '/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png')
-    .replace('/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png', yutongLogo || '/lovable-uploads/3c2cd2f4-030c-4441-bdcb-066c22aa3dfa.png');
+    .replace('/lovable-uploads/yutong-invoice-header.png', headerImage || '/lovable-uploads/yutong-invoice-header.png');
   
   const container = document.createElement('div');
   container.innerHTML = htmlWithEmbeddedImages;
