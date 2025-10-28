@@ -50,6 +50,7 @@ import TotalDashboard from "./pages/TotalDashboard";
 import NSPDailySales from "./pages/NSPDailySales";
 import NSPSalesSummary from "./pages/NSPSalesSummary";
 import QuickTripsEntry from "./pages/QuickTripsEntry";
+import GovernanceCalendar from "./pages/GovernanceCalendar";
 
 const queryClient = new QueryClient();
 
@@ -451,6 +452,17 @@ const App = () => (
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
                   <AppLayout>
                     <NSPSalesSummary />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/governance/calendar" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'governance_admin', 'governance_manager', 'governance_viewer']}>
+                  <AppLayout>
+                    <GovernanceCalendar />
                   </AppLayout>
                 </ProtectedRoute>
               } 

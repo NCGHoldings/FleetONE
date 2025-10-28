@@ -13,6 +13,7 @@ export type PageCategories = {
   business: PageItem[];
   yutong: PageItem[];
   nsp: PageItem[];
+  governance: PageItem[];
 };
 
 export const PAGES: PageCategories = {
@@ -50,6 +51,9 @@ export const PAGES: PageCategories = {
     { id: "nsp_daily_sales", title: "Daily Sales", url: "/nsp-daily-sales" },
     { id: "nsp_summary", title: "Summary & Reports", url: "/nsp-summary" },
   ],
+  governance: [
+    { id: "governance_calendar", title: "Governance Calendar", url: "/governance/calendar" },
+  ],
 };
 
 export const ALL_PAGES_FLAT: PageItem[] = [
@@ -58,4 +62,5 @@ export const ALL_PAGES_FLAT: PageItem[] = [
   ...PAGES.business,
   ...PAGES.yutong,
   ...PAGES.nsp,
+  ...PAGES.governance,
 ];
