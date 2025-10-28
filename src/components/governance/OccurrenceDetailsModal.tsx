@@ -80,12 +80,12 @@ export const OccurrenceDetailsModal = ({ occurrence, open, onOpenChange }: Occur
 
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
+          <div className="space-y-1">
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
                 Company
               </div>
-              <div className="font-medium">{occurrence.governance_item.companies.name}</div>
+              <div className="font-medium">{occurrence.governance_item.companies?.name}</div>
             </div>
 
             {occurrence.governance_item.sbus && (
@@ -94,7 +94,7 @@ export const OccurrenceDetailsModal = ({ occurrence, open, onOpenChange }: Occur
                   <Users className="h-4 w-4" />
                   SBU
                 </div>
-                <div className="font-medium">{occurrence.governance_item.sbus.name}</div>
+                <div className="font-medium">{occurrence.governance_item.sbus?.name}</div>
               </div>
             )}
 

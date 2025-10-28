@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { format, addMonths, subMonths, startOfMonth } from 'date-fns';
 import { MonthCalendar } from '@/components/governance/MonthCalendar';
 import { ListView } from '@/components/governance/ListView';
@@ -47,89 +48,91 @@ const GovernanceCalendar = () => {
   };
 
   return (
-    <AppLayout>
-      <div className="flex h-[calc(100vh-8rem)] gap-4">
-        {/* Filters Sidebar */}
-        {showFilters && <FilterSidebar onClose={() => setShowFilters(false)} />}
+    <TooltipProvider delayDuration={300}>
+      <AppLayout>
+        <div className="flex h-[calc(100vh-8rem)] gap-4">
+          {/* Filters Sidebar */}
+          {showFilters && <FilterSidebar onClose={() => setShowFilters(false)} />}
 
-        {/* Main Calendar Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Toolbar */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              {!showFilters && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setShowFilters(true)}
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Show Filters
+          {/* Main Calendar Area */}
+          <div className="flex-1 flex flex-col">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                {!showFilters && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowFilters(true)}
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Show Filters
+                  </Button>
+                )}
+                
+                <Button variant="outline" size="sm" onClick={handleToday}>
+                  Today
                 </Button>
-              )}
-              
-              <Button variant="outline" size="sm" onClick={handleToday}>
-                Today
-              </Button>
-              <Button variant="outline" size="sm" onClick={handlePrevMonth}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleNextMonth}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <span className="text-lg font-semibold ml-4">
-                {format(startOfMonth(currentDate), 'MMMM yyyy')}
-              </span>
+                <Button variant="outline" size="sm" onClick={handlePrevMonth}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleNextMonth}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <span className="text-lg font-semibold ml-4">
+                  {format(startOfMonth(currentDate), 'MMMM yyyy')}
+                </span>
+              </div>
+
+              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+                <TabsList>
+                  <TabsTrigger value="month">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Month
+                  </TabsTrigger>
+                  <TabsTrigger value="list">
+                    <List className="h-4 w-4 mr-2" />
+                    List
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
 
-            <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-              <TabsList>
-                <TabsTrigger value="month">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Month
-                </TabsTrigger>
-                <TabsTrigger value="list">
-                  <List className="h-4 w-4 mr-2" />
-                  List
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {/* Calendar Content */}
+            <Card className="flex-1 p-4 overflow-auto">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-muted-foreground">Loading occurrences...</div>
+                </div>
+              ) : (
+                <>
+                  {view === 'month' && (
+                    <MonthCalendar
+                      currentDate={currentDate}
+                      occurrences={occurrences}
+                      onOccurrenceClick={handleOccurrenceClick}
+                    />
+                  )}
+                  {view === 'list' && (
+                    <ListView
+                      occurrences={occurrences}
+                      onOccurrenceClick={handleOccurrenceClick}
+                    />
+                  )}
+                </>
+              )}
+            </Card>
           </div>
-
-          {/* Calendar Content */}
-          <Card className="flex-1 p-4 overflow-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-muted-foreground">Loading occurrences...</div>
-              </div>
-            ) : (
-              <>
-                {view === 'month' && (
-                  <MonthCalendar
-                    currentDate={currentDate}
-                    occurrences={occurrences}
-                    onOccurrenceClick={handleOccurrenceClick}
-                  />
-                )}
-                {view === 'list' && (
-                  <ListView
-                    occurrences={occurrences}
-                    onOccurrenceClick={handleOccurrenceClick}
-                  />
-                )}
-              </>
-            )}
-          </Card>
         </div>
-      </div>
 
-      {/* Occurrence Details Modal */}
-      <OccurrenceDetailsModal
-        occurrence={selectedOccurrence}
-        open={detailsModalOpen}
-        onOpenChange={setDetailsModalOpen}
-      />
-    </AppLayout>
+        {/* Occurrence Details Modal */}
+        <OccurrenceDetailsModal
+          occurrence={selectedOccurrence}
+          open={detailsModalOpen}
+          onOpenChange={setDetailsModalOpen}
+        />
+      </AppLayout>
+    </TooltipProvider>
   );
 };
 
