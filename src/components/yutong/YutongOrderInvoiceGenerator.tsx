@@ -87,18 +87,39 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     setLoadingInvoices(false);
   };
 
-  const validateInvoiceData = () => {
+  const validateInvoiceData = async () => {
     const errors: string[] = [];
     const warnings: string[] = [];
     
     if (!quotation) {
       errors.push('Quotation not found. Please link this order to a quotation.');
-      return { errors, warnings, canGenerate: false };
+      return { errors, warnings, canGenerate: false, customerAddress: null };
+    }
+    
+    let customerAddress = quotation.customer_address?.trim() || null;
+    
+    // If address is missing, try to fetch from customer profile
+    if (!customerAddress && quotation.customer_name) {
+      console.log('📍 Address missing in quotation, looking up customer profile...');
+      
+      const { data: customer } = await supabase
+        .from('yutong_customers')
+        .select('address')
+        .or(`name.ilike.%${quotation.customer_name}%,phone.eq.${quotation.customer_phone},email.eq.${quotation.customer_email}`)
+        .single();
+      
+      if (customer?.address) {
+        customerAddress = customer.address;
+        console.log('✅ Found customer address from profile:', customerAddress);
+        toast.info('Using customer address from profile');
+      } else {
+        console.warn('⚠️ No address found in customer profile either');
+      }
     }
     
     // Check required fields
-    if (!quotation.customer_address?.trim()) {
-      errors.push('Customer address is required. Please edit the quotation and add the customer address.');
+    if (!customerAddress) {
+      errors.push('Customer address is required. Please edit the quotation or customer profile to add the address.');
     }
     
     if (!quotation.customer_name?.trim()) {
@@ -117,7 +138,8 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     return { 
       errors, 
       warnings, 
-      canGenerate: errors.length === 0 
+      canGenerate: errors.length === 0,
+      customerAddress 
     };
   };
 
@@ -141,7 +163,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
 
     console.log('✅ Pre-checks passed, validating invoice data...');
     // Validate invoice data with specific error messages
-    const validation = validateInvoiceData();
+    const validation = await validateInvoiceData();
     console.log('📊 Validation result:', validation);
     
     if (!validation.canGenerate) {
@@ -170,7 +192,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       
       customer_name: quotation.customer_name || '',
       company_name: quotation.company_name || '',
-      address: quotation.customer_address || '',
+      address: validation.customerAddress || quotation.customer_address || '',
       contact: quotation.customer_phone || '',
       attn: quotation.attention_to || quotation.customer_name || '',
       
