@@ -66,9 +66,48 @@ export function useYutongOrderInvoiceManagement() {
       const invoiceNo = invoiceNoData as string;
       console.log('✅ Invoice number generated:', invoiceNo);
       
-      // Update invoice data with generated number
+      // Fetch signature data from quotation approvals
+      console.log('📝 Step 1.5: Fetching signature data from quotation...');
+      let signatureData = {};
+      if (quotationId) {
+        const { data: approvals } = await supabase
+          .from('document_approvals')
+          .select('*')
+          .eq('document_id', quotationId)
+          .order('created_at', { ascending: true });
+        
+        if (approvals && approvals.length > 0) {
+          console.log('✅ Found', approvals.length, 'approval signatures');
+          const prepared = approvals.find(a => a.approval_type === 'prepared_by');
+          const approved = approvals.find(a => a.approval_type === 'approved_by');
+          const customer = approvals.find(a => a.approval_type === 'received_by');
+          
+          signatureData = {
+            preparedBy: prepared ? {
+              approver_name: prepared.approver_name,
+              signature_data: prepared.signature_data,
+              approval_date: prepared.approval_date
+            } : undefined,
+            approvedBy: approved ? {
+              approver_name: approved.approver_name,
+              signature_data: approved.signature_data,
+              approval_date: approved.approval_date
+            } : undefined,
+            receivedBy: customer ? {
+              approver_name: customer.approver_name,
+              signature_data: customer.signature_data,
+              approval_date: customer.approval_date
+            } : undefined
+          };
+        } else {
+          console.log('⚠️ No signature approvals found for quotation');
+        }
+      }
+      
+      // Update invoice data with generated number and signatures
       const fullInvoiceData = {
         ...invoiceData,
+        ...signatureData,
         invoice_no: invoiceNo,
         invoice_status: 'draft' as const
       };

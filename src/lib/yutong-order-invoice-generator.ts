@@ -27,6 +27,21 @@ export interface YutongOrderInvoiceData {
   subtotal: number;
   total: number;
   invoice_status: 'draft' | 'approved';
+  preparedBy?: {
+    approver_name: string;
+    signature_data?: string;
+    approval_date: string;
+  };
+  approvedBy?: {
+    approver_name: string;
+    signature_data?: string;
+    approval_date: string;
+  };
+  receivedBy?: {
+    approver_name: string;
+    signature_data?: string;
+    approval_date: string;
+  };
 }
 
 export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): string {
@@ -223,6 +238,127 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
     padding: 12px 0;
   }
 
+  .bank-details {
+    margin: 30px 35px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border: 2px solid #0b2f66;
+    border-radius: 8px;
+  }
+
+  .bank-details h3 {
+    margin: 0 0 15px 0;
+    color: #0b2f66;
+    font-size: 18px;
+    border-bottom: 2px solid #0b2f66;
+    padding-bottom: 8px;
+  }
+
+  .bank-details table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .bank-details td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+  }
+
+  .bank-details td:first-child {
+    font-weight: 700;
+    background: #e8f6ff;
+    width: 200px;
+  }
+
+  .signatures-section {
+    margin: 30px 35px 0;
+    padding: 20px;
+    border: 2px solid #0b2f66;
+    border-radius: 8px;
+  }
+
+  .signatures-section h3 {
+    margin: 0 0 20px 0;
+    color: #0b2f66;
+    font-size: 18px;
+    text-align: center;
+    border-bottom: 2px solid #0b2f66;
+    padding-bottom: 10px;
+  }
+
+  .signatures-grid {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+  }
+
+  .signature-box {
+    flex: 1;
+    text-align: center;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: #f8f9fa;
+  }
+
+  .signature-box .title {
+    font-weight: 700;
+    font-size: 14px;
+    color: #0b2f66;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #0b2f66;
+    padding-bottom: 5px;
+  }
+
+  .signature-box .name {
+    font-size: 13px;
+    margin: 8px 0;
+  }
+
+  .signature-box .date {
+    font-size: 12px;
+    color: #666;
+    margin: 5px 0;
+  }
+
+  .signature-image {
+    max-width: 150px;
+    max-height: 60px;
+    margin: 10px 0;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .signature-line {
+    height: 60px;
+    border-bottom: 1px solid #333;
+    margin: 10px 20px;
+  }
+
+  .footer {
+    margin: 20px 35px 0;
+    padding: 20px;
+    background: #0b2f66;
+    color: white;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  .footer-item .icon {
+    font-weight: 700;
+    font-size: 16px;
+  }
+
   @media print {
     body { margin: 0; }
     .invoice-page { width: 100%; box-shadow: none; border: none; }
@@ -300,6 +436,86 @@ ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
         <div class="label">TOTAL</div>
         <div class="value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
       </div>
+    </div>
+  </div>
+
+  <!-- Bank Details -->
+  <div class="bank-details">
+    <h3>Payment Terms : Payment method - by Cheque or bank transfer</h3>
+    <table>
+      <tr>
+        <td>ACCOUNT NAME</td>
+        <td>NCG HOLDINGS (PRIVATE) LIMITED</td>
+      </tr>
+      <tr>
+        <td>ACCOUNT NUMBER</td>
+        <td>000310032026</td>
+      </tr>
+      <tr>
+        <td>BANK / BRANCH</td>
+        <td>SAMPATH BANK NUGEGODA</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Signatures Section -->
+  <div class="signatures-section">
+    <h3>Approvals & Signature</h3>
+    <div class="signatures-grid">
+      <div class="signature-box">
+        <div class="title">Prepared By</div>
+        ${data.preparedBy ? `
+          <div class="name">${data.preparedBy.approver_name}</div>
+          <div class="date">${new Date(data.preparedBy.approval_date).toLocaleDateString('en-GB')}</div>
+          ${data.preparedBy.signature_data ? `<img src="${data.preparedBy.signature_data}" alt="Signature" class="signature-image">` : '<div class="signature-line"></div>'}
+        ` : `
+          <div class="name">_________________</div>
+          <div class="date">_________________</div>
+          <div class="signature-line"></div>
+        `}
+      </div>
+      
+      <div class="signature-box">
+        <div class="title">Approved By</div>
+        ${data.approvedBy ? `
+          <div class="name">${data.approvedBy.approver_name}</div>
+          <div class="date">${new Date(data.approvedBy.approval_date).toLocaleDateString('en-GB')}</div>
+          ${data.approvedBy.signature_data ? `<img src="${data.approvedBy.signature_data}" alt="Signature" class="signature-image">` : '<div class="signature-line"></div>'}
+        ` : `
+          <div class="name">_________________</div>
+          <div class="date">_________________</div>
+          <div class="signature-line"></div>
+        `}
+      </div>
+      
+      <div class="signature-box">
+        <div class="title">Customer</div>
+        ${data.receivedBy ? `
+          <div class="name">${data.receivedBy.approver_name}</div>
+          <div class="date">${new Date(data.receivedBy.approval_date).toLocaleDateString('en-GB')}</div>
+          ${data.receivedBy.signature_data ? `<img src="${data.receivedBy.signature_data}" alt="Signature" class="signature-image">` : '<div class="signature-line"></div>'}
+        ` : `
+          <div class="name">_________________</div>
+          <div class="date">_________________</div>
+          <div class="signature-line"></div>
+        `}
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-item">
+      <span class="icon">📞</span>
+      <span>0770455981</span>
+    </div>
+    <div class="footer-item">
+      <span class="icon">📍</span>
+      <span>157 Y, Kabellawita, Weniweikola, Polgasowita</span>
+    </div>
+    <div class="footer-item">
+      <span class="icon">✉️</span>
+      <span>yutong@ncg.lk</span>
     </div>
   </div>
 </div>
