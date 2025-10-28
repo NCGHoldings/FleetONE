@@ -30,16 +30,19 @@ export interface YutongOrderInvoiceData {
   preparedBy?: {
     approver_name: string;
     signature_data?: string;
+    signature_type?: 'text' | 'drawing' | 'image';
     approval_date: string;
   };
   approvedBy?: {
     approver_name: string;
     signature_data?: string;
+    signature_type?: 'text' | 'drawing' | 'image';
     approval_date: string;
   };
   receivedBy?: {
     approver_name: string;
     signature_data?: string;
+    signature_type?: 'text' | 'drawing' | 'image';
     approval_date: string;
   };
 }
@@ -467,7 +470,11 @@ ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
         ${data.preparedBy ? `
           <div class="name">${data.preparedBy.approver_name}</div>
           <div class="date">${new Date(data.preparedBy.approval_date).toLocaleDateString('en-GB')}</div>
-          ${data.preparedBy.signature_data ? `<img src="${data.preparedBy.signature_data}" alt="Signature" class="signature-image">` : '<div class="signature-line"></div>'}
+          ${data.preparedBy.signature_data ? 
+            data.preparedBy.signature_type === 'text' 
+              ? `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; font-style: italic; padding: 10px 0;">${data.preparedBy.signature_data}</div>` 
+              : `<img src="${data.preparedBy.signature_data}" alt="Signature" class="signature-image">`
+            : '<div class="signature-line"></div>'}
         ` : `
           <div class="name">_________________</div>
           <div class="date">_________________</div>
@@ -480,7 +487,11 @@ ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
         ${data.approvedBy ? `
           <div class="name">${data.approvedBy.approver_name}</div>
           <div class="date">${new Date(data.approvedBy.approval_date).toLocaleDateString('en-GB')}</div>
-          ${data.approvedBy.signature_data ? `<img src="${data.approvedBy.signature_data}" alt="Signature" class="signature-image">` : '<div class="signature-line"></div>'}
+          ${data.approvedBy.signature_data ? 
+            data.approvedBy.signature_type === 'text' 
+              ? `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; font-style: italic; padding: 10px 0;">${data.approvedBy.signature_data}</div>` 
+              : `<img src="${data.approvedBy.signature_data}" alt="Signature" class="signature-image">`
+            : '<div class="signature-line"></div>'}
         ` : `
           <div class="name">_________________</div>
           <div class="date">_________________</div>
@@ -493,7 +504,11 @@ ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
         ${data.receivedBy ? `
           <div class="name">${data.receivedBy.approver_name}</div>
           <div class="date">${new Date(data.receivedBy.approval_date).toLocaleDateString('en-GB')}</div>
-          ${data.receivedBy.signature_data ? `<img src="${data.receivedBy.signature_data}" alt="Signature" class="signature-image">` : '<div class="signature-line"></div>'}
+          ${data.receivedBy.signature_data ? 
+            data.receivedBy.signature_type === 'text' 
+              ? `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; font-style: italic; padding: 10px 0;">${data.receivedBy.signature_data}</div>` 
+              : `<img src="${data.receivedBy.signature_data}" alt="Signature" class="signature-image">`
+            : '<div class="signature-line"></div>'}
         ` : `
           <div class="name">_________________</div>
           <div class="date">_________________</div>

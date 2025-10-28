@@ -32,16 +32,19 @@ export function YutongOrderInvoicePreview({ invoiceRecordId, invoiceData }: Yuto
     preparedBy: preparedSig ? {
       approver_name: preparedSig.signer_name,
       signature_data: preparedSig.signature_data,
+      signature_type: preparedSig.signature_type,
       approval_date: preparedSig.signed_at
     } : undefined,
     approvedBy: approvedSig ? {
       approver_name: approvedSig.signer_name,
       signature_data: approvedSig.signature_data,
+      signature_type: approvedSig.signature_type,
       approval_date: approvedSig.signed_at
     } : undefined,
     receivedBy: receivedSig ? {
       approver_name: receivedSig.signer_name,
       signature_data: receivedSig.signature_data,
+      signature_type: receivedSig.signature_type,
       approval_date: receivedSig.signed_at
     } : undefined
   };

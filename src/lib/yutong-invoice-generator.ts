@@ -26,16 +26,19 @@ export interface YutongInvoiceData {
   preparedBy?: {
     approver_name: string;
     signature_data?: string;
+    signature_type?: 'text' | 'drawing' | 'image';
     approval_date: string;
   };
   approvedBy?: {
     approver_name: string;
     signature_data?: string;
+    signature_type?: 'text' | 'drawing' | 'image';
     approval_date: string;
   };
   receivedBy?: {
     approver_name: string;
     signature_data?: string;
+    signature_type?: 'text' | 'drawing' | 'image';
     approval_date: string;
   };
 }
@@ -196,7 +199,11 @@ export const generateYutongInvoiceHTML = (data: YutongInvoiceData): string => {
             ${data.preparedBy ? `
               <div style="margin-bottom: 5px;">Name: ${data.preparedBy.approver_name}</div>
               <div style="margin-bottom: 5px;">Date: ${format(new Date(data.preparedBy.approval_date), 'dd/MM/yyyy')}</div>
-              ${data.preparedBy.signature_data ? `<img src="${data.preparedBy.signature_data}" alt="Signature" class="signature-image">` : '<div style="height: 30px;"></div>'}
+              ${data.preparedBy.signature_data ? 
+                data.preparedBy.signature_type === 'text' 
+                  ? `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; font-style: italic; padding: 10px 0;">${data.preparedBy.signature_data}</div>` 
+                  : `<img src="${data.preparedBy.signature_data}" alt="Signature" class="signature-image">`
+                : '<div style="height: 30px;"></div>'}
             ` : `
               <div style="margin-bottom: 5px;">Name: _________________</div>
               <div style="margin-bottom: 5px;">Date: _________________</div>
@@ -209,7 +216,11 @@ export const generateYutongInvoiceHTML = (data: YutongInvoiceData): string => {
             ${data.approvedBy ? `
               <div style="margin-bottom: 5px;">Name: ${data.approvedBy.approver_name}</div>
               <div style="margin-bottom: 5px;">Date: ${format(new Date(data.approvedBy.approval_date), 'dd/MM/yyyy')}</div>
-              ${data.approvedBy.signature_data ? `<img src="${data.approvedBy.signature_data}" alt="Signature" class="signature-image">` : '<div style="height: 30px;"></div>'}
+              ${data.approvedBy.signature_data ? 
+                data.approvedBy.signature_type === 'text' 
+                  ? `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; font-style: italic; padding: 10px 0;">${data.approvedBy.signature_data}</div>` 
+                  : `<img src="${data.approvedBy.signature_data}" alt="Signature" class="signature-image">`
+                : '<div style="height: 30px;"></div>'}
             ` : `
               <div style="margin-bottom: 5px;">Name: _________________</div>
               <div style="margin-bottom: 5px;">Date: _________________</div>
@@ -222,7 +233,11 @@ export const generateYutongInvoiceHTML = (data: YutongInvoiceData): string => {
             ${data.receivedBy ? `
               <div style="margin-bottom: 5px;">Name: ${data.receivedBy.approver_name}</div>
               <div style="margin-bottom: 5px;">Date: ${format(new Date(data.receivedBy.approval_date), 'dd/MM/yyyy')}</div>
-              ${data.receivedBy.signature_data ? `<img src="${data.receivedBy.signature_data}" alt="Signature" class="signature-image">` : '<div style="height: 30px;"></div>'}
+              ${data.receivedBy.signature_data ? 
+                data.receivedBy.signature_type === 'text' 
+                  ? `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; font-style: italic; padding: 10px 0;">${data.receivedBy.signature_data}</div>` 
+                  : `<img src="${data.receivedBy.signature_data}" alt="Signature" class="signature-image">`
+                : '<div style="height: 30px;"></div>'}
             ` : `
               <div style="margin-bottom: 5px;">Name: _________________</div>
               <div style="margin-bottom: 5px;">Date: _________________</div>
