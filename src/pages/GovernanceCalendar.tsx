@@ -56,7 +56,7 @@ const GovernanceCalendar = () => {
   return (
     <TooltipProvider delayDuration={300}>
       <AppLayout>
-        <div className="flex h-[calc(100vh-2rem)] gap-4">
+        <div className="flex h-[calc(100vh-8rem)] gap-4">
           {/* Filters Sidebar */}
           {showFilters && <FilterSidebar onClose={() => setShowFilters(false)} />}
 
