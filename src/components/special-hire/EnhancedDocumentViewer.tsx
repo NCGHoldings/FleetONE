@@ -70,6 +70,10 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   const handleApprovalsUpdate = async () => {
     console.log('🔄 Approval updated - reloading and regenerating document...');
     
+    // ALWAYS reload quotation data to get latest total_paid value
+    console.log('💰 Reloading quotation data to get latest payment totals...');
+    await loadQuotationData();
+    
     // Reload approvals from database
     const result = await getDocumentApprovals(document.id);
     if (result.success) {
@@ -82,12 +86,6 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
       }));
       setApprovals(typedApprovals);
       
-      // Ensure quotation data is loaded
-      if (!quotationData) {
-        console.log('⏳ Loading quotation data first...');
-        await loadQuotationData();
-      }
-      
       // Give a moment for state to update
       setTimeout(async () => {
         console.log('🚀 Starting document regeneration...');
@@ -98,6 +96,10 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
   };
 
   const regenerateDocumentWithSignatures = async () => {
+    // Reload quotation data as a safety net to ensure we have latest values
+    console.log('🔄 Reloading quotation data before regeneration...');
+    await loadQuotationData();
+    
     if (!quotationData) {
       console.error('❌ Missing quotation data');
       toast.error('Missing quotation data to regenerate document');
@@ -198,6 +200,20 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
                (quotation.total_additional_charges || 0) - 
                (quotation.discount_amount_lkr || 0);
       };
+
+      // Log invoice calculation for debugging
+      const totalAmount = calculateTotalAmount(quotationData);
+      const totalPaid = quotationData.total_paid || 0;
+      const expectedBalanceDue = totalAmount - totalPaid;
+      
+      console.log('💰 Invoice calculation:', {
+        totalAmount,
+        advancePaid: quotationData.advance_paid,
+        totalPaid,
+        discountAmount: quotationData.discount_amount_lkr,
+        expectedBalanceDue,
+        quotationNo: quotationData.quotation_no
+      });
 
       // Create invoice data with signatures
       const invoiceData: InvoiceData = {
