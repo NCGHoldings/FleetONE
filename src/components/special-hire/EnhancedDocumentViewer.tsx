@@ -217,7 +217,8 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         numberOfPassengers: quotationData.number_of_passengers,
         totalAmount: calculateTotalAmount(quotationData),
         advanceAmount: quotationData.advance_paid || 0,
-        paidAmount: paymentData?.amount || 0,
+        paidAmount: quotationData.total_paid || 0, // Use cumulative total of all approved payments
+        discountAmount: quotationData.discount_amount_lkr || 0,
         vehicleNo: quotationData.assigned_bus_no,
         driverName: quotationData.assigned_driver_name,
         conductorName: quotationData.assigned_conductor_name,
