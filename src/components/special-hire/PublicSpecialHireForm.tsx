@@ -11,7 +11,7 @@ import { WheelTimePicker } from "@/components/ui/wheel-time-picker";
 import { CalendarIcon, CheckCircle, Send, Bus, Plus, X, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { supabasePublic as supabase } from "@/integrations/supabase/public-client";
+import { createAnonymousClient } from "@/integrations/supabase/public-client";
 import { useToast } from "@/hooks/use-toast";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -74,7 +74,8 @@ export default function PublicSpecialHireForm() {
 
   const fetchBusTypes = async () => {
     try {
-      const { data, error } = await supabase
+      const anonClient = createAnonymousClient();
+      const { data, error } = await anonClient
         .from('bus_types')
         .select('id, name, capacity, features')
         .eq('is_active', true)
@@ -154,14 +155,9 @@ export default function PublicSpecialHireForm() {
         submission_status: 'pending'
       });
 
-      // CRITICAL: Force anonymous session before submission
-      console.log('Forcing anonymous session...');
-      await supabase.auth.signOut({ scope: 'local' });
-      
-      // Wait a moment for sign out to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      console.log('Creating submission with anonymous credentials...');
+      // Create a completely fresh anonymous client for this submission
+      console.log('Creating fresh anonymous client for submission...');
+      const anonClient = createAnonymousClient();
 
       // Combine pickup, intermediate places, and drop location
       const allLocations = [
@@ -170,7 +166,7 @@ export default function PublicSpecialHireForm() {
         formData.dropLocation
       ].join(' -> ');
 
-      const { data, error } = await supabase
+      const { data, error } = await anonClient
         .from('special_hire_submissions')
         .insert({
           company_name: formData.companyName || null,
@@ -213,15 +209,6 @@ export default function PublicSpecialHireForm() {
       console.error('Error details:', error?.details);
       console.error('Error hint:', error?.hint);
       
-      // Log session info to debug authentication issues
-      try {
-        const session = await supabase.auth.getSession();
-        const user = await supabase.auth.getUser();
-        console.error('Session info:', session);
-        console.error('User info:', user);
-      } catch (authError) {
-        console.error('Could not fetch auth info:', authError);
-      }
       console.error('============================');
       
       let errorMessage = 'Failed to submit request. Please try again.';

@@ -5,52 +5,23 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://wwjpdszkmtnzshbulkon.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3anBkc3prbXRuenNoYnVsa29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NTQxMjAsImV4cCI6MjA3MTUzMDEyMH0.EiNNdtKsKSmiBxnpMrLjiQ45jYuJWqijjK-hCkpw_y4";
 
-// Isolated storage adapter that only uses a separate namespace
-const isolatedStorage = {
-  getItem: (key: string) => {
-    // Only allow reading from isolated namespace
-    if (key.startsWith('sb-public-anon-')) {
-      return localStorage.getItem(key);
+// Create a completely fresh anonymous client for each use
+// This prevents any session pollution from authenticated tabs
+export const createAnonymousClient = () => {
+  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storage: undefined, // No storage at all - truly anonymous
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'anonymous-public-form',
+      }
     }
-    return null;
-  },
-  setItem: (key: string, value: string) => {
-    // Only write to isolated namespace
-    if (key.startsWith('sb-public-anon-')) {
-      localStorage.setItem(key, value);
-    }
-  },
-  removeItem: (key: string) => {
-    if (key.startsWith('sb-public-anon-')) {
-      localStorage.removeItem(key);
-    }
-  },
+  });
 };
 
-// Public client for anonymous access - completely isolated from authenticated sessions
-// Use this for public pages that should work in incognito mode
-export const supabasePublic = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false,
-    storage: isolatedStorage,
-    storageKey: 'sb-public-anon-auth',
-    flowType: 'implicit',
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'supabase-public-anonymous',
-      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
-    }
-  }
-});
-
-// Helper to ensure truly anonymous session
-export const ensureAnonymousSession = async () => {
-  try {
-    await supabasePublic.auth.signOut({ scope: 'local' });
-  } catch (error) {
-    console.log('Already anonymous or sign out not needed:', error);
-  }
-};
+// Default export for compatibility
+export const supabasePublic = createAnonymousClient();
