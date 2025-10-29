@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Truck, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -19,9 +20,11 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const captchaRef = useRef<HCaptcha>(null);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -39,10 +42,19 @@ export default function Auth() {
     setLoading(true);
     setError("");
 
+    if (!captchaToken) {
+      setError("Please complete the CAPTCHA verification");
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: {
+          captchaToken,
+        },
       });
 
       if (error) {
@@ -50,9 +62,13 @@ export default function Auth() {
           setError("Invalid email or password. Please check your credentials and try again.");
         } else if (error.message.includes("Email not confirmed")) {
           setError("Please check your email and click the confirmation link before signing in.");
+        } else if (error.message.includes("captcha")) {
+          setError("CAPTCHA verification failed. Please try again.");
         } else {
           setError(error.message);
         }
+        captchaRef.current?.resetCaptcha();
+        setCaptchaToken(null);
         return;
       }
 
@@ -67,6 +83,8 @@ export default function Auth() {
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Sign in error:", err);
+      captchaRef.current?.resetCaptcha();
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -195,7 +213,20 @@ export default function Auth() {
               </Alert>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <div className="flex justify-center">
+              <HCaptcha
+                ref={captchaRef}
+                sitekey={import.meta.env.VITE_HCAPTCHA_SITE_KEY || ""}
+                onVerify={(token) => setCaptchaToken(token)}
+                onExpire={() => setCaptchaToken(null)}
+                onError={() => {
+                  setError("CAPTCHA error occurred. Please try again.");
+                  setCaptchaToken(null);
+                }}
+              />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={loading || !captchaToken}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign In
             </Button>
