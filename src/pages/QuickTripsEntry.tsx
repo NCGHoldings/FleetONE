@@ -162,13 +162,13 @@ export default function QuickTripsEntry() {
   const applyOCRDataToTrip = async (tripId: string, data: ExtractedTripData) => {
     try {
       const updates: any = {
-        income_details: data.income,
-        other_expenses_details: data.expenses,
+        income_details: data.incomeFields,
+        other_expenses_details: data.expenseFields,
       };
 
       // Calculate totals
-      const totalIncome = Object.values(data.income).reduce((sum, val) => sum + val, 0);
-      const totalExpenses = Object.values(data.expenses).reduce((sum, val) => sum + val, 0);
+      const totalIncome = Object.values(data.incomeFields).reduce((sum, val) => sum + val, 0);
+      const totalExpenses = Object.values(data.expenseFields).reduce((sum, val) => sum + val, 0);
 
       if (totalIncome > 0) updates.income = totalIncome;
       if (totalExpenses > 0) updates.other_expenses = totalExpenses;

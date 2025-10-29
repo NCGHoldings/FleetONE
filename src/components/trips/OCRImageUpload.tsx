@@ -6,6 +6,8 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { extractTextFromImage, parseTripData } from '@/lib/ocr-processor';
 import { mapExtractedFields } from '@/lib/ocr-field-mapper';
+import { OCRExtractedDataCard } from './OCRExtractedDataCard';
+import { OCRBatchActions } from './OCRBatchActions';
 
 interface OCRImageUploadProps {
   selectedDate: Date;
@@ -16,12 +18,12 @@ export interface ExtractedTripData {
   id: string;
   fileName: string;
   imageUrl: string;
-  busNumber: string | null;
-  date: string | null;
+  busNumber: string;
+  date: string;
   confidence: number;
-  income: Record<string, number>;
-  expenses: Record<string, number>;
-  unmapped: { field: string; value: number; section: 'income' | 'expense' }[];
+  incomeFields: Record<string, number>;
+  expenseFields: Record<string, number>;
+  unmappedFields: { field: string; value: number; section: 'income' | 'expense' }[];
   rawText: string;
 }
 
@@ -96,12 +98,12 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           id: `${Date.now()}-${i}`,
           fileName: image.name,
           imageUrl,
-          busNumber: parsedData.busNumber,
-          date: parsedData.date,
+          busNumber: parsedData.busNumber || 'Unknown',
+          date: parsedData.date || new Date().toLocaleDateString(),
           confidence: ocrResult.confidence,
-          income,
-          expenses,
-          unmapped,
+          incomeFields: income,
+          expenseFields: expenses,
+          unmappedFields: unmapped,
           rawText: parsedData.rawText,
         });
       }
@@ -123,6 +125,48 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
     setExtractedData([]);
     setProgress(0);
   };
+
+  const handleApply = (data: ExtractedTripData) => {
+    onDataExtracted([data]);
+    toast.success(`Data for bus ${data.busNumber} has been applied to the form.`);
+  };
+
+  const handleApplyAll = () => {
+    const readyData = extractedData.filter(d => d.confidence >= 60);
+    if (readyData.length > 0) {
+      onDataExtracted(readyData);
+      toast.success(`${readyData.length} sheets applied to Quick Entry.`);
+    }
+  };
+
+  const handleDiscard = (index: number) => {
+    setExtractedData(prev => prev.filter((_, i) => i !== index));
+    toast.success("The extracted data has been removed.");
+  };
+
+  const handleView = () => {
+    toast.info("Scrolling to the trip form...");
+  };
+
+  const handleExportCSV = () => {
+    const csvContent = extractedData.map(data => {
+      const incomeEntries = Object.entries(data.incomeFields).map(([k, v]) => `${k}: ${v}`).join('; ');
+      const expenseEntries = Object.entries(data.expenseFields).map(([k, v]) => `${k}: ${v}`).join('; ');
+      return `${data.busNumber},${data.date},${incomeEntries},${expenseEntries}`;
+    }).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ocr-data-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    
+    toast.success("OCR data exported to CSV file.");
+  };
+
+  const readySheets = extractedData.filter(d => d.confidence >= 60).length;
+  const needsReviewSheets = extractedData.filter(d => d.confidence < 60).length;
 
   return (
     <Card>
@@ -232,71 +276,29 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           </>
         )}
 
-        {/* Extracted Data Preview */}
+        {/* Batch Actions & Extracted Data */}
         {extractedData.length > 0 && (
-          <div className="space-y-4 mt-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Extracted Data</h3>
-              <span className="text-sm text-muted-foreground">
-                {extractedData.length} sheet(s) processed
-              </span>
-            </div>
+          <>
+            <OCRBatchActions
+              totalSheets={extractedData.length}
+              readySheets={readySheets}
+              needsReviewSheets={needsReviewSheets}
+              onApplyAll={handleApplyAll}
+              onExportCSV={handleExportCSV}
+            />
             
             <div className="space-y-3">
-              {extractedData.map((data) => (
-                <Card key={data.id} className="bg-muted/50">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <img
-                        src={data.imageUrl}
-                        alt={data.fileName}
-                        className="w-20 h-20 object-cover rounded border"
-                      />
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium">{data.fileName}</p>
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            data.confidence > 80 
-                              ? 'bg-green-100 text-green-700'
-                              : data.confidence > 60
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}>
-                            {data.confidence.toFixed(0)}% confidence
-                          </span>
-                        </div>
-                        
-                        {data.busNumber && (
-                          <p className="text-sm">
-                            <span className="text-muted-foreground">Bus:</span>{' '}
-                            <span className="font-semibold">{data.busNumber}</span>
-                          </p>
-                        )}
-                        
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Income fields:</span>{' '}
-                            {Object.keys(data.income).length}
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Expense fields:</span>{' '}
-                            {Object.keys(data.expenses).length}
-                          </div>
-                        </div>
-                        
-                        {data.unmapped.length > 0 && (
-                          <div className="flex items-center gap-1 text-xs text-yellow-600">
-                            <AlertCircle className="h-3 w-3" />
-                            {data.unmapped.length} field(s) need manual mapping
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              {extractedData.map((data, index) => (
+                <OCRExtractedDataCard
+                  key={data.id}
+                  data={data}
+                  onApply={handleApply}
+                  onDiscard={() => handleDiscard(index)}
+                  onView={handleView}
+                />
               ))}
             </div>
-          </div>
+          </>
         )}
       </CardContent>
     </Card>
