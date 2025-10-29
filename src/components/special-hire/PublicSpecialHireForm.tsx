@@ -121,7 +121,6 @@ export default function PublicSpecialHireForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form data
     try {
       publicSpecialHireSchema.parse(formData);
     } catch (error) {
@@ -137,96 +136,58 @@ export default function PublicSpecialHireForm() {
     }
 
     setIsSubmitting(true);
-
     try {
-      console.log('Attempting to submit form data:', {
-        company_name: formData.companyName || null,
-        customer_name: formData.customerName,
-        customer_phone: formData.customerPhone,
-        customer_email: formData.customerEmail || null,
-        special_request: formData.specialRequest || null,
-        hire_type: formData.hireType,
-        number_of_buses: formData.numberOfBuses,
-        pickup_location: formData.pickupLocation,
-        drop_location: formData.dropLocation,
-        number_of_passengers: formData.numberOfPassengers,
-        pickup_datetime: formData.pickupDateTime?.toISOString(),
-        drop_datetime: formData.dropDateTime?.toISOString(),
-        submission_status: 'pending'
-      });
+      console.log('Submitting via edge function...');
+      
+      const allLocations = `${formData.pickupLocation}${formData.intermediatePlaces.filter(p => p.trim()).length > 0 ? ' → ' + formData.intermediatePlaces.filter(p => p.trim()).join(' → ') : ''} → ${formData.dropLocation}`;
+      const busTypeName = busTypes.find(bt => bt.id === formData.busTypeId)?.name || 'Not specified';
+      
+      const response = await fetch(
+        `https://wwjpdszkmtnzshbulkon.supabase.co/functions/v1/submit-special-hire`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3anBkc3prbXRuenNoYnVsa29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NTQxMjAsImV4cCI6MjA3MTUzMDEyMH0.EiNNdtKsKSmiBxnpMrLjiQ45jYuJWqijjK-hCkpw_y4`,
+          },
+          body: JSON.stringify({
+            company_name: formData.companyName || null,
+            customer_name: formData.customerName,
+            customer_phone: formData.customerPhone,
+            customer_email: formData.customerEmail || null,
+            special_request: `${formData.specialRequest || ''}\n\nBus Type: ${busTypeName}\nRoute: ${allLocations}`.trim(),
+            hire_type: formData.hireType,
+            number_of_buses: formData.numberOfBuses,
+            pickup_location: formData.pickupLocation,
+            drop_location: formData.dropLocation,
+            number_of_passengers: formData.numberOfPassengers,
+            pickup_datetime: formData.pickupDateTime.toISOString(),
+            drop_datetime: formData.dropDateTime.toISOString(),
+          }),
+        }
+      );
 
-      // Create a completely fresh anonymous client for this submission
-      console.log('Creating fresh anonymous client for submission...');
-      const anonClient = createAnonymousClient();
-
-      // Combine pickup, intermediate places, and drop location
-      const allLocations = [
-        formData.pickupLocation,
-        ...formData.intermediatePlaces.filter(place => place.trim() !== ''),
-        formData.dropLocation
-      ].join(' -> ');
-
-      const { data, error } = await anonClient
-        .from('special_hire_submissions')
-        .insert({
-          company_name: formData.companyName || null,
-          customer_name: formData.customerName,
-          customer_phone: formData.customerPhone,
-          customer_email: formData.customerEmail || null,
-          special_request: `${formData.specialRequest || ''}\n\nBus Type: ${busTypes.find(bt => bt.id === formData.busTypeId)?.name || 'Not specified'}\nRoute: ${allLocations}${formData.intermediatePlaces.length > 0 ? `\nIntermediate places: ${formData.intermediatePlaces.filter(p => p.trim()).join(', ')}` : ''}`.trim(),
-          hire_type: formData.hireType,
-          number_of_buses: formData.numberOfBuses,
-          pickup_location: formData.pickupLocation,
-          drop_location: formData.dropLocation,
-          number_of_passengers: formData.numberOfPassengers,
-          pickup_datetime: formData.pickupDateTime.toISOString(),
-          drop_datetime: formData.dropDateTime.toISOString(),
-          submission_status: 'pending'
-        })
-        .select('submission_no')
-        .single();
-
-      console.log('Supabase response:', { data, error });
-
-      if (error) {
-        console.error('Supabase error details:', error);
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Submission failed');
       }
 
-      setSubmissionId(data.submission_no);
+      const result = await response.json();
+      const submissionNo = result.data?.submission_no;
+
+      setSubmissionId(submissionNo);
       setSubmitted(true);
 
       toast({
         title: "Success",
-        description: `Special hire request submitted successfully! Reference: ${data.submission_no}`,
+        description: `Special hire request submitted successfully! Reference: ${submissionNo}`,
       });
 
     } catch (error: any) {
-      console.error('=== SUBMISSION ERROR DEBUG ===');
-      console.error('Error object:', error);
-      console.error('Error code:', error?.code);
-      console.error('Error message:', error?.message);
-      console.error('Error details:', error?.details);
-      console.error('Error hint:', error?.hint);
-      
-      console.error('============================');
-      
-      let errorMessage = 'Failed to submit request. Please try again.';
-      
-      // Provide specific error messages for common issues
-      if (error?.code === '42501' || error?.message?.includes('row-level security')) {
-        errorMessage = 'Permission denied. Please try opening this form in a private/incognito window or contact support.';
-      } else if (error?.code === '23505') {
-        errorMessage = 'A submission with this information already exists.';
-      } else if (error?.code === '23503') {
-        errorMessage = 'Invalid reference data. Please refresh the page and try again.';
-      } else if (error?.message) {
-        errorMessage = `Failed to submit: ${error.message}`;
-      }
-      
+      console.error('Submission error:', error);
       toast({
         title: "Submission Error",
-        description: errorMessage,
+        description: error.message || "Failed to submit request. Please try again.",
         variant: "destructive",
       });
     } finally {

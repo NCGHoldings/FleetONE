@@ -44,3 +44,6 @@ verify_jwt = true  # Requires authentication for import operations
 
 [functions.ocr-extract]
 verify_jwt = true  # Requires authentication for OCR processing
+
+[functions.submit-special-hire]
+verify_jwt = false  # Public: Used by public special hire form
