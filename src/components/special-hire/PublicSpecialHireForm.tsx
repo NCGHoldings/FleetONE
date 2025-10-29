@@ -196,17 +196,31 @@ export default function PublicSpecialHireForm() {
         description: `Special hire request submitted successfully! Reference: ${data.submission_no}`,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating submission:', error);
       console.error('Error details:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code
       });
+      
+      let errorMessage = 'Failed to submit request. Please try again.';
+      
+      // Provide specific error messages for common issues
+      if (error?.code === '42501' || error?.message?.includes('row-level security')) {
+        errorMessage = 'Permission denied. Please try opening this form in a private/incognito window or contact support.';
+      } else if (error?.code === '23505') {
+        errorMessage = 'A submission with this information already exists.';
+      } else if (error?.code === '23503') {
+        errorMessage = 'Invalid reference data. Please refresh the page and try again.';
+      } else if (error?.message) {
+        errorMessage = `Failed to submit: ${error.message}`;
+      }
+      
       toast({
-        title: "Error",
-        description: `Failed to submit request: ${error.message || 'Unknown error'}. Please try again.`,
+        title: "Submission Error",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

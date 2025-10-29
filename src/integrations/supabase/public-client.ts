@@ -5,12 +5,26 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://wwjpdszkmtnzshbulkon.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3anBkc3prbXRuenNoYnVsa29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NTQxMjAsImV4cCI6MjA3MTUzMDEyMH0.EiNNdtKsKSmiBxnpMrLjiQ45jYuJWqijjK-hCkpw_y4";
 
+// No-op storage adapter to prevent any session persistence
+const noOpStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
 // Public client for anonymous access - no session persistence
 // Use this for public pages that should work in incognito mode
 export const supabasePublic = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
-    detectSessionInUrl: false
+    detectSessionInUrl: false,
+    storage: noOpStorage,
+    storageKey: 'supabase-public-anon',
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-public-client'
+    }
   }
 });
