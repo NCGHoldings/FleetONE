@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { PageAccessGuard } from "./components/auth/PageAccessGuard";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -73,9 +74,11 @@ const App = () => (
               path="/" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <Dashboard />
-                  </AppLayout>
+                  <PageAccessGuard pageId="dashboard">
+                    <AppLayout>
+                      <Dashboard />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -103,9 +106,11 @@ const App = () => (
               path="/customers" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <CustomerManagement />
-                  </AppLayout>
+                  <PageAccessGuard pageId="customers">
+                    <AppLayout>
+                      <CustomerManagement />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -113,9 +118,11 @@ const App = () => (
               path="/trips" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <DailyTrips />
-                  </AppLayout>
+                  <PageAccessGuard pageId="daily_trips">
+                    <AppLayout>
+                      <DailyTrips />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -131,9 +138,11 @@ const App = () => (
               path="/fleet" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <FleetManagement />
-                  </AppLayout>
+                  <PageAccessGuard pageId="fleet_management">
+                    <AppLayout>
+                      <FleetManagement />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -155,9 +164,11 @@ const App = () => (
               path="/maintenance" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
-                  <AppLayout>
-                    <Maintenance />
-                  </AppLayout>
+                  <PageAccessGuard pageId="maintenance">
+                    <AppLayout>
+                      <Maintenance />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -167,9 +178,11 @@ const App = () => (
               path="/insurance" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <Insurance />
-                  </AppLayout>
+                  <PageAccessGuard pageId="insurance">
+                    <AppLayout>
+                      <Insurance />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -177,9 +190,11 @@ const App = () => (
               path="/permits" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <RoutePermits />
-                  </AppLayout>
+                  <PageAccessGuard pageId="route_permits">
+                    <AppLayout>
+                      <RoutePermits />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -187,9 +202,11 @@ const App = () => (
               path="/training" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <DriverTraining />
-                  </AppLayout>
+                  <PageAccessGuard pageId="driver_training">
+                    <AppLayout>
+                      <DriverTraining />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -197,9 +214,11 @@ const App = () => (
               path="/tracking" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <RealTimeTracking />
-                  </AppLayout>
+                  <PageAccessGuard pageId="real_time_tracking">
+                    <AppLayout>
+                      <RealTimeTracking />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -207,9 +226,11 @@ const App = () => (
               path="/allocation" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
-                  <AppLayout>
-                    <DriverAllocation />
-                  </AppLayout>
+                  <PageAccessGuard pageId="driver_allocation">
+                    <AppLayout>
+                      <DriverAllocation />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -217,9 +238,11 @@ const App = () => (
               path="/attendance" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
-                  <AppLayout>
-                    <StaffAttendancePayroll />
-                  </AppLayout>
+                  <PageAccessGuard pageId="staff_attendance">
+                    <AppLayout>
+                      <StaffAttendancePayroll />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -227,9 +250,11 @@ const App = () => (
           path="/special-hire" 
           element={
             <ProtectedRoute>
-              <AppLayout>
-                <SpecialHire />
-              </AppLayout>
+              <PageAccessGuard pageId="special_hire">
+                <AppLayout>
+                  <SpecialHire />
+                </AppLayout>
+              </PageAccessGuard>
             </ProtectedRoute>
           } 
         />
@@ -237,9 +262,11 @@ const App = () => (
           path="/school-bus-service" 
           element={
             <ProtectedRoute>
-              <AppLayout>
-                <SchoolBusService />
-              </AppLayout>
+              <PageAccessGuard pageId="school_bus_service">
+                <AppLayout>
+                  <SchoolBusService />
+                </AppLayout>
+              </PageAccessGuard>
             </ProtectedRoute>
           } 
         />
@@ -387,9 +414,11 @@ const App = () => (
               path="/documents" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <DocumentManager />
-                  </AppLayout>
+                  <PageAccessGuard pageId="document_manager">
+                    <AppLayout>
+                      <DocumentManager />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -397,9 +426,11 @@ const App = () => (
               path="/complaints" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
-                  <AppLayout>
-                    <Complaints />
-                  </AppLayout>
+                  <PageAccessGuard pageId="complaints">
+                    <AppLayout>
+                      <Complaints />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -407,9 +438,11 @@ const App = () => (
               path="/staff-performance" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
-                  <AppLayout>
-                    <StaffPerformance />
-                  </AppLayout>
+                  <PageAccessGuard pageId="staff_performance">
+                    <AppLayout>
+                      <StaffPerformance />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -428,9 +461,11 @@ const App = () => (
               path="/yutong-quotations" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <YutongQuotations />
-                  </AppLayout>
+                  <PageAccessGuard pageId="yutong_quotations">
+                    <AppLayout>
+                      <YutongQuotations />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -439,9 +474,11 @@ const App = () => (
               path="/nsp-daily-sales" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
-                  <AppLayout>
-                    <NSPDailySales />
-                  </AppLayout>
+                  <PageAccessGuard pageId="nsp_daily_sales">
+                    <AppLayout>
+                      <NSPDailySales />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -450,9 +487,11 @@ const App = () => (
               path="/nsp-summary" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
-                  <AppLayout>
-                    <NSPSalesSummary />
-                  </AppLayout>
+                  <PageAccessGuard pageId="nsp_summary">
+                    <AppLayout>
+                      <NSPSalesSummary />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
@@ -461,9 +500,11 @@ const App = () => (
               path="/governance/calendar" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'governance_admin', 'governance_manager', 'governance_viewer']}>
-                  <AppLayout>
-                    <GovernanceCalendar />
-                  </AppLayout>
+                  <PageAccessGuard pageId="governance_calendar">
+                    <AppLayout>
+                      <GovernanceCalendar />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />

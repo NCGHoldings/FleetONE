@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { PageItem } from "@/lib/pages";
+import { useAuth } from "./useAuth";
 
 export type PermissionMap = Record<string, boolean>; // pageId -> has_access
 
 export function usePagePermissions(targetUserId?: string) {
+  const { hasRole } = useAuth();
   const [permissions, setPermissions] = useState<PermissionMap>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const isSuperAdmin = hasRole('super_admin');
 
   const fetchPermissions = useCallback(async () => {
     if (!targetUserId) return;
@@ -38,11 +42,16 @@ export function usePagePermissions(targetUserId?: string) {
 
   const hasAccess = useCallback(
     (pageId: string) => {
-      // Default allow if no explicit permission set
+      // Super admins bypass all page restrictions when checking their own access
+      if (isSuperAdmin && !targetUserId) {
+        return true;
+      }
+      
+      // Zero-Trust: Deny by default if no explicit permission set
       const value = permissions[pageId];
-      return value === undefined ? true : !!value;
+      return value === undefined ? false : !!value;
     },
-    [permissions]
+    [permissions, isSuperAdmin, targetUserId]
   );
 
   const setAccess = useCallback((pageId: string, value: boolean) => {

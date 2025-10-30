@@ -9,12 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Users, UserPlus, Shield, Edit, Trash2, Lock } from "lucide-react";
+import { Users, UserPlus, Shield, Edit, Trash2, Lock, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { PageAccessModal } from "@/components/staff/PageAccessModal";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Profile {
   id: string;
@@ -337,6 +338,13 @@ export default function StaffManagement() {
               <DialogHeader>
                 <DialogTitle>Add New Staff Member</DialogTitle>
               </DialogHeader>
+              <Alert className="bg-warning/10 border-warning">
+                <AlertTriangle className="h-4 w-4 text-warning" />
+                <AlertTitle className="text-warning">Zero-Trust Security Active</AlertTitle>
+                <AlertDescription className="text-sm">
+                  New accounts have <strong>NO page access</strong> by default. You must explicitly grant permissions after creation.
+                </AlertDescription>
+              </Alert>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
