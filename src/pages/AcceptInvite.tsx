@@ -31,33 +31,28 @@ export default function AcceptInvite() {
       }
 
       try {
-        const { data, error: fetchError } = await supabase
-          .from("pending_invites")
-          .select("*")
-          .eq("invite_token", token)
-          .single();
+        // Use secure function to validate token (prevents enumeration attacks)
+        const { data, error: rpcError } = await supabase
+          .rpc("validate_invite_token", { p_token: token });
 
-        if (fetchError || !data) {
-          setError("Invitation not found");
+        if (rpcError) {
+          console.error("Error validating invite:", rpcError);
+          setError("Failed to validate invitation");
           setLoading(false);
           return;
         }
 
-        // Check if expired
-        if (new Date(data.expires_at) < new Date()) {
-          setError("This invitation has expired");
+        // Parse response with type safety
+        const response = data as { valid: boolean; message?: string; invite?: any };
+
+        // Check validation result
+        if (!response?.valid) {
+          setError(response?.message || "Invalid or expired invitation");
           setLoading(false);
           return;
         }
 
-        // Check if already accepted
-        if (data.status !== "pending") {
-          setError("This invitation has already been used");
-          setLoading(false);
-          return;
-        }
-
-        setInvite(data);
+        setInvite(response.invite);
       } catch (err) {
         console.error("Error validating invite:", err);
         setError("Failed to validate invitation");

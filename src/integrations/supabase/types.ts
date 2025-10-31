@@ -7324,6 +7324,7 @@ export type Database = {
         }
         Returns: Json
       }
+      validate_invite_token: { Args: { p_token: string }; Returns: Json }
       verify_admission_number: {
         Args: { p_admission_no: string }
         Returns: Json
