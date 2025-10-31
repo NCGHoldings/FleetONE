@@ -84,9 +84,9 @@ function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAcces
 export default function StaffManagement() {
   const { hasRole } = useAuth();
   const [staff, setStaff] = useState<Profile[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingStaff, setEditingStaff] = useState<Profile | null>(null);
   const [pageAccessOpen, setPageAccessOpen] = useState(false);
   const [pageAccessTarget, setPageAccessTarget] = useState<Profile | null>(null);
   
@@ -121,6 +121,15 @@ export default function StaffManagement() {
       })) || [];
 
       setStaff(staffData);
+
+      // Fetch pending invites
+      const { data: invites } = await supabase
+        .from('pending_invites')
+        .select('*')
+        .eq('status', 'pending')
+        .order('invited_at', { ascending: false });
+
+      setPendingInvites(invites || []);
     } catch (error) {
       console.error('Error fetching staff:', error);
       toast.error('Failed to load staff data');
@@ -133,56 +142,42 @@ export default function StaffManagement() {
     fetchStaff();
   }, []);
 
-  const handleCreateStaff = async () => {
+  const handleSendInvite = async () => {
     if (!isSuperAdmin) {
       toast.error('Access denied - Super Admin only');
       return;
     }
 
+    if (!email || !firstName || !lastName) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
     try {
-      // Create user with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password: 'TempPass123!', // Temporary password
-        email_confirm: true,
-        user_metadata: {
-          first_name: firstName,
-          last_name: lastName
-        }
+      const { data, error } = await supabase.functions.invoke('send-staff-invite', {
+        body: {
+          email,
+          firstName,
+          lastName,
+          phone,
+          initialRole: role,
+        },
       });
 
-      if (authError) throw authError;
+      if (error) throw error;
 
-      // Update profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: firstName,
-          last_name: lastName,
-          phone,
-          hire_date: new Date().toISOString().split('T')[0]
-        })
-        .eq('user_id', authData.user.id);
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
 
-      if (profileError) throw profileError;
-
-      // Assign role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: role as any
-        });
-
-      if (roleError) throw roleError;
-
-      toast.success('Staff member created successfully');
+      toast.success('Invitation sent successfully!');
       setIsDialogOpen(false);
       resetForm();
       fetchStaff();
     } catch (error: any) {
-      console.error('Error creating staff:', error);
-      toast.error(error.message || 'Failed to create staff member');
+      console.error('Error sending invite:', error);
+      toast.error(error.message || 'Failed to send invitation');
     }
   };
 
@@ -219,13 +214,29 @@ export default function StaffManagement() {
     }
   };
 
+  const handleCancelInvite = async (inviteId: string) => {
+    try {
+      const { error } = await supabase
+        .from('pending_invites')
+        .update({ status: 'cancelled' })
+        .eq('id', inviteId);
+
+      if (error) throw error;
+
+      toast.success('Invitation cancelled');
+      fetchStaff();
+    } catch (error: any) {
+      console.error('Error cancelling invite:', error);
+      toast.error('Failed to cancel invitation');
+    }
+  };
+
   const resetForm = () => {
     setFirstName("");
     setLastName("");
     setEmail("");
     setPhone("");
     setRole("staff");
-    setEditingStaff(null);
   };
 
   const columns: ColumnDef<Profile>[] = [
@@ -331,87 +342,90 @@ export default function StaffManagement() {
                   style={{ animationDelay: '0.2s' }}
                 >
                   <UserPlus className="h-4 w-4 mr-2 animate-pulse-subtle" />
-                  Add Staff Member
+                  Invite Staff Member
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add New Staff Member</DialogTitle>
-              </DialogHeader>
-              <Alert className="bg-warning/10 border-warning">
-                <AlertTriangle className="h-4 w-4 text-warning" />
-                <AlertTitle className="text-warning">Zero-Trust Security Active</AlertTitle>
-                <AlertDescription className="text-sm">
-                  New accounts have <strong>NO page access</strong> by default. You must explicitly grant permissions after creation.
-                </AlertDescription>
-              </Alert>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Invite New Staff Member</DialogTitle>
+                </DialogHeader>
+                <Alert className="bg-primary/10 border-primary">
+                  <Shield className="h-4 w-4 text-primary" />
+                  <AlertTitle className="text-primary">Secure Invite System</AlertTitle>
+                  <AlertDescription className="text-sm">
+                    User will receive an email invitation to set up their account securely.
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="firstName">First Name *</Label>
+                      <Input
+                        id="firstName"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="John"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="lastName">Last Name *</Label>
+                      <Input
+                        id="lastName"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Doe"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
                   <div>
-                    <Label htmlFor="firstName">First Name</Label>
+                    <Label htmlFor="email">Email *</Label>
                     <Input
-                      id="firstName"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="John"
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="john.doe@company.com"
+                      required
                     />
                   </div>
+                  
                   <div>
-                    <Label htmlFor="lastName">Last Name</Label>
+                    <Label htmlFor="phone">Phone</Label>
                     <Input
-                      id="lastName"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Doe"
+                      id="phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+94 77 123 4567"
                     />
                   </div>
+                  
+                  <div>
+                    <Label htmlFor="role">Initial Role *</Label>
+                    <Select value={role} onValueChange={setRole}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="staff">Staff</SelectItem>
+                        <SelectItem value="driver">Driver</SelectItem>
+                        <SelectItem value="conductor">Conductor</SelectItem>
+                        <SelectItem value="mechanic">Mechanic</SelectItem>
+                        <SelectItem value="supervisor">Supervisor</SelectItem>
+                        <SelectItem value="finance">Finance</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <Button onClick={handleSendInvite} className="w-full">
+                    Send Invitation
+                  </Button>
                 </div>
-                
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="john.doe@company.com"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+94 77 123 4567"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="role">Initial Role</Label>
-                  <Select value={role} onValueChange={setRole}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="staff">Staff</SelectItem>
-                      <SelectItem value="driver">Driver</SelectItem>
-                      <SelectItem value="conductor">Conductor</SelectItem>
-                      <SelectItem value="mechanic">Mechanic</SelectItem>
-                      <SelectItem value="supervisor">Supervisor</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <Button onClick={handleCreateStaff} className="w-full">
-                  Create Staff Member
-                </Button>
-              </div>
-            </DialogContent>
+              </DialogContent>
             </Dialog>
           )}
         </div>
@@ -484,6 +498,48 @@ export default function StaffManagement() {
           </div>
         </div>
       </div>
+
+      {/* Pending Invites */}
+      {isSuperAdmin && pendingInvites.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Invitations</CardTitle>
+            <CardDescription>
+              Staff members who have been invited but haven't accepted yet
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {pendingInvites.map((invite) => (
+                <div 
+                  key={invite.id} 
+                  className="flex items-center justify-between p-4 border rounded-lg bg-muted/30"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium">{invite.first_name} {invite.last_name}</p>
+                    <p className="text-sm text-muted-foreground">{invite.email}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="capitalize">
+                        {invite.initial_role.replace('_', ' ')}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        Expires: {new Date(invite.expires_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => handleCancelInvite(invite.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Staff Directory */}
       <Card>

@@ -11,6 +11,7 @@ import { PageAccessGuard } from "./components/auth/PageAccessGuard";
 
 // Pages
 import Auth from "./pages/Auth";
+import AcceptInvite from "./pages/AcceptInvite";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Dashboard from "./pages/Dashboard";
@@ -65,6 +66,7 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
+            <Route path="/accept-invite" element={<AcceptInvite />} />
             <Route path="/public/complaint" element={<PublicComplaint />} />
             <Route path="/public/special-hire" element={<PublicSpecialHire />} />
             <Route path="/public/receipt-upload" element={<PublicReceiptUpload />} />
