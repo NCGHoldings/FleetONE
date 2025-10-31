@@ -75,46 +75,63 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check for any existing invites for this email
-    const { data: existingInvites } = await supabaseClient
-      .from("pending_invites")
-      .select("*")
-      .eq("email", email);
+    // Upsert invite atomically to avoid unique constraint races
+    const token = `${crypto.randomUUID()}-${Math.random().toString(36).slice(2, 10)}`;
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Delete any existing invites (pending, expired, rejected, or accepted) to allow resending
-    if (existingInvites && existingInvites.length > 0) {
-      console.log(`Deleting ${existingInvites.length} existing invite(s) for ${email} to allow resending`);
-      const { error: deleteError } = await supabaseClient
-        .from("pending_invites")
-        .delete()
-        .eq("email", email);
-      
-      if (deleteError) {
-        console.error("Error deleting old invites:", deleteError);
-        throw new Error("Failed to clear old invites");
-      }
-    }
+    let invite: any = null;
+    let inviteError: any = null;
 
-    // Create new pending invite
-    const { data: invite, error: inviteError } = await supabaseClient
+    const upsertResp = await supabaseClient
       .from("pending_invites")
-      .insert({
-        email,
-        first_name: firstName,
-        last_name: lastName,
-        phone,
-        initial_role: initialRole,
-        invited_by: user.id,
-      })
+      .upsert(
+        {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          phone,
+          initial_role: initialRole,
+          invited_by: user.id,
+          invite_token: token,
+          status: "pending",
+          expires_at: expiresAt,
+        },
+        { onConflict: "email" }
+      )
       .select()
       .single();
+
+    invite = upsertResp.data;
+    inviteError = upsertResp.error;
+
+    // Fallback: if unique constraint still triggers due to race, perform an explicit update
+    if (inviteError && String(inviteError.message || '').includes('duplicate key value')) {
+      const updateResp = await supabaseClient
+        .from("pending_invites")
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          phone,
+          initial_role: initialRole,
+          invited_by: user.id,
+          invite_token: token,
+          status: "pending",
+          expires_at: expiresAt,
+        })
+        .eq("email", email)
+        .select()
+        .single();
+
+      invite = updateResp.data;
+      inviteError = updateResp.error;
+    }
 
     if (inviteError) throw inviteError;
 
     console.log("Invite created:", invite.id);
 
     // Generate invite link
-    const inviteUrl = `${req.headers.get("origin")}/accept-invite?token=${invite.invite_token}`;
+    const inviteUrl = `${req.headers.get("origin")}/accept-invite?token=${token}`;
 
     // Send email
     const emailResponse = await resend.emails.send({
