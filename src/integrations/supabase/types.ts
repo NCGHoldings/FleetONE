@@ -2099,6 +2099,54 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_invites: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          first_name: string
+          id: string
+          initial_role: string
+          invite_token: string
+          invited_at: string
+          invited_by: string | null
+          last_name: string
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          first_name: string
+          id?: string
+          initial_role?: string
+          invite_token?: string
+          invited_at?: string
+          invited_by?: string | null
+          last_name: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          first_name?: string
+          id?: string
+          initial_role?: string
+          invite_token?: string
+          invited_at?: string
+          invited_by?: string | null
+          last_name?: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           address: string | null
