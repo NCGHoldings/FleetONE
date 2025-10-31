@@ -75,17 +75,23 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if pending invite exists
-    const { data: existingInvite } = await supabaseClient
+    // Check for any existing invites (pending, expired, or rejected)
+    const { data: existingInvites } = await supabaseClient
       .from("pending_invites")
       .select("*")
-      .eq("email", email)
-      .eq("status", "pending")
-      .single();
+      .eq("email", email);
 
-    if (existingInvite) {
+    // If there's a valid pending invite that's not expired, don't allow resending
+    const validPendingInvite = existingInvites?.find(
+      inv => inv.status === "pending" && new Date(inv.expires_at) > new Date()
+    );
+
+    if (validPendingInvite) {
       return new Response(
-        JSON.stringify({ error: "Pending invite already exists for this email" }),
+        JSON.stringify({ 
+          error: "A valid pending invite already exists for this email",
+          expiresAt: validPendingInvite.expires_at
+        }),
         {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -93,7 +99,16 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Create pending invite
+    // Delete any old invites (expired, rejected, or accepted) to avoid unique constraint violation
+    if (existingInvites && existingInvites.length > 0) {
+      console.log(`Deleting ${existingInvites.length} old invite(s) for ${email}`);
+      await supabaseClient
+        .from("pending_invites")
+        .delete()
+        .eq("email", email);
+    }
+
+    // Create new pending invite
     const { data: invite, error: inviteError } = await supabaseClient
       .from("pending_invites")
       .insert({
