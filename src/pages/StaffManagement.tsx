@@ -85,6 +85,7 @@ export default function StaffManagement() {
   const { hasRole } = useAuth();
   const [staff, setStaff] = useState<Profile[]>([]);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [unauthorizedAccounts, setUnauthorizedAccounts] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [pageAccessOpen, setPageAccessOpen] = useState(false);
@@ -130,6 +131,12 @@ export default function StaffManagement() {
         .order('invited_at', { ascending: false });
 
       setPendingInvites(invites || []);
+
+      // Fetch unauthorized accounts (profiles with last_name = 'UNAUTHORIZED')
+      const unauthorizedProfiles = staffData.filter(
+        s => s.last_name === 'UNAUTHORIZED' && s.roles.length === 1 && s.roles[0] === 'staff'
+      );
+      setUnauthorizedAccounts(unauthorizedProfiles);
     } catch (error) {
       console.error('Error fetching staff:', error);
       toast.error('Failed to load staff data');
@@ -498,6 +505,53 @@ export default function StaffManagement() {
           </div>
         </div>
       </div>
+
+      {/* Unauthorized Accounts Alert */}
+      {isSuperAdmin && unauthorizedAccounts.length > 0 && (
+        <Card className="border-destructive">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <CardTitle className="text-destructive">Unauthorized Accounts ({unauthorizedAccounts.length})</CardTitle>
+            </div>
+            <CardDescription>
+              These accounts were created without valid invitations and have zero access
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {unauthorizedAccounts.map((profile) => (
+                <div 
+                  key={profile.user_id} 
+                  className="flex items-center justify-between p-4 border border-destructive/50 rounded-lg bg-destructive/5"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{profile.first_name}</p>
+                      <Badge variant="destructive" className="text-xs">UNAUTHORIZED</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{profile.email || 'No email'}</p>
+                    <span className="text-xs text-muted-foreground">
+                      Created: {new Date(profile.hire_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setPageAccessTarget(profile);
+                      setPageAccessOpen(true);
+                    }}
+                  >
+                    <Lock className="h-4 w-4 mr-2" />
+                    Manage Access
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pending Invites */}
       {isSuperAdmin && pendingInvites.length > 0 && (

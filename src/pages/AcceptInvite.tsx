@@ -86,13 +86,14 @@ export default function AcceptInvite() {
     setSubmitting(true);
 
     try {
-      // Create user account
+      // Create user account - database trigger will handle profile and role setup
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: invite.email,
         password: password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
+            invite_token: token,
             first_name: invite.first_name,
             last_name: invite.last_name,
           },
@@ -104,28 +105,6 @@ export default function AcceptInvite() {
       if (!authData.user) {
         throw new Error("Failed to create user account");
       }
-
-      // Update profile with phone if provided
-      if (invite.phone) {
-        await supabase
-          .from("profiles")
-          .update({ phone: invite.phone })
-          .eq("user_id", authData.user.id);
-      }
-
-      // Assign the initial role
-      await supabase
-        .from("user_roles")
-        .insert({
-          user_id: authData.user.id,
-          role: invite.initial_role,
-        });
-
-      // Mark invite as accepted
-      await supabase
-        .from("pending_invites")
-        .update({ status: "accepted" })
-        .eq("id", invite.id);
 
       toast.success("Account created successfully! Please check your email to confirm your account.");
 
