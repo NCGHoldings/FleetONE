@@ -103,9 +103,9 @@ export default function AcceptInvite() {
 
       toast.success("Account created successfully! Please check your email to confirm your account.");
 
-      // Redirect to auth page
+      // Redirect to welcome page
       setTimeout(() => {
-        navigate("/auth");
+        navigate("/");
       }, 2000);
     } catch (err: any) {
       console.error("Error accepting invite:", err);

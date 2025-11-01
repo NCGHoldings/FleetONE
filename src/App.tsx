@@ -12,6 +12,7 @@ import { PageAccessGuard } from "./components/auth/PageAccessGuard";
 // Pages
 import Auth from "./pages/Auth";
 import AcceptInvite from "./pages/AcceptInvite";
+import Welcome from "./pages/Welcome";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Dashboard from "./pages/Dashboard";
@@ -74,6 +75,14 @@ const App = () => (
             {/* Protected routes wrapped in AppLayout */}
             <Route 
               path="/" 
+              element={
+                <ProtectedRoute>
+                  <Welcome />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard" 
               element={
                 <ProtectedRoute>
                   <PageAccessGuard pageId="dashboard">

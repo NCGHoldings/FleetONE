@@ -21,7 +21,8 @@ import {
   Settings2,
   GraduationCap,
   ShoppingCart,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Home
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -44,7 +45,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePagePermissions } from "@/hooks/usePagePermissions";
 
 const mainItems = [
-  { id: "dashboard", title: "Dashboard", url: "/", icon: BarChart3 },
+  { id: "dashboard", title: "Dashboard", url: "/dashboard", icon: BarChart3 },
   { id: "customers", title: "Customers", url: "/customers", icon: DollarSign },
   { id: "daily_trips", title: "Daily Trips", url: "/trips", icon: Calendar },
   { id: "fleet_management", title: "Fleet Management", url: "/fleet", icon: Bus },
@@ -148,6 +149,22 @@ const visibleNSP = nspItems.filter((i) => hasAccess(i.id));
       </SidebarHeader>
 
       <SidebarContent className="py-4">
+        {/* Always visible Home link */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to="/" end className={getNavCls}>
+                    <Home className="w-5 h-5 transition-all duration-300" />
+                    {!collapsed && <span className="font-medium transition-all duration-300">Home</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         <SidebarGroup>
           <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
             <div className="w-2 h-2 bg-gradient-to-r from-primary to-accent rounded-full animate-pulse"></div>
