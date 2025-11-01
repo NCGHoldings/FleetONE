@@ -132,44 +132,64 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Generate invite link
     const inviteUrl = `${req.headers.get("origin")}/accept-invite?token=${inviteToken}`;
+    console.log("Invite URL generated:", inviteUrl);
 
-    // Send email
-    const emailResponse = await resend.emails.send({
-      from: "NCG Speed Transport <onboarding@resend.dev>",
-      to: [email],
-      subject: "You've been invited to NCG Speed Transport Management System",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #2563eb;">Welcome to NCG Speed Transport</h2>
-          <p>Hi ${firstName},</p>
-          <p>You've been invited to join the NCG Speed Transport Management System as a <strong>${initialRole}</strong>.</p>
-          <p>To accept your invitation and set up your account, please click the button below:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${inviteUrl}" 
-               style="background-color: #2563eb; color: white; padding: 12px 24px; 
-                      text-decoration: none; border-radius: 5px; display: inline-block;">
-              Accept Invitation
-            </a>
+    // Try to send email (but don't fail if email service is down)
+    let emailSent = false;
+    let emailError = null;
+    
+    try {
+      const emailResponse = await resend.emails.send({
+        from: "NCG Speed Transport <onboarding@resend.dev>",
+        to: [email],
+        subject: "You've been invited to NCG Speed Transport Management System",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2563eb;">Welcome to NCG Speed Transport</h2>
+            <p>Hi ${firstName},</p>
+            <p>You've been invited to join the NCG Speed Transport Management System as a <strong>${initialRole}</strong>.</p>
+            <p>To accept your invitation and set up your account, please click the button below:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${inviteUrl}" 
+                 style="background-color: #2563eb; color: white; padding: 12px 24px; 
+                        text-decoration: none; border-radius: 5px; display: inline-block;">
+                Accept Invitation
+              </a>
+            </div>
+            <p style="color: #666; font-size: 14px;">
+              This invitation will expire in 7 days. If you didn't expect this invitation, 
+              you can safely ignore this email.
+            </p>
+            <p style="color: #666; font-size: 12px; margin-top: 30px;">
+              Or copy and paste this link: <br/>
+              ${inviteUrl}
+            </p>
           </div>
-          <p style="color: #666; font-size: 14px;">
-            This invitation will expire in 7 days. If you didn't expect this invitation, 
-            you can safely ignore this email.
-          </p>
-          <p style="color: #666; font-size: 12px; margin-top: 30px;">
-            Or copy and paste this link: <br/>
-            ${inviteUrl}
-          </p>
-        </div>
-      `,
-    });
+        `,
+      });
 
-    console.log("Email sent:", emailResponse);
+      if (emailResponse.error) {
+        throw emailResponse.error;
+      }
+
+      console.log("Email sent successfully:", emailResponse);
+      emailSent = true;
+    } catch (emailErr: any) {
+      console.error("Failed to send email:", emailErr);
+      emailError = emailErr.message || "Email service temporarily unavailable";
+      // Don't throw - we'll still return success since the invite was created
+    }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Invitation sent successfully",
-        inviteId: invite.id 
+        message: emailSent 
+          ? "Invitation sent successfully" 
+          : "Invitation created. Please share the invite link manually.",
+        inviteId: invite.id,
+        inviteUrl: inviteUrl, // Include the invite URL in response
+        emailSent: emailSent,
+        emailError: emailError
       }),
       {
         status: 200,

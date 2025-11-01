@@ -178,7 +178,30 @@ export default function StaffManagement() {
         return;
       }
 
-      toast.success('Invitation sent successfully!');
+      // Check if email was sent successfully
+      if (data.emailSent) {
+        toast.success('Invitation email sent successfully!');
+      } else {
+        // Email failed, but invite was created - show the link
+        toast.warning(data.emailError || 'Email service unavailable', {
+          description: 'Invitation created. Please copy the link below and send it manually.',
+          duration: 10000,
+        });
+        
+        // Show invite link in a separate success toast with copy functionality
+        navigator.clipboard.writeText(data.inviteUrl).then(() => {
+          toast.info('Invite link copied to clipboard!', {
+            description: data.inviteUrl,
+            duration: 15000,
+          });
+        }).catch(() => {
+          toast.info('Invite Link (click to select)', {
+            description: data.inviteUrl,
+            duration: 15000,
+          });
+        });
+      }
+
       setIsDialogOpen(false);
       resetForm();
       fetchStaff();
