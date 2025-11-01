@@ -130,8 +130,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Invite created:", invite.id);
 
-    // Generate invite link
-    const inviteUrl = `${req.headers.get("origin")}/accept-invite?token=${inviteToken}`;
+    // Generate invite link with production domain
+    const inviteUrl = `https://ncg-fleetflow.lovable.app/accept-invite?token=${inviteToken}`;
     console.log("Invite URL generated:", inviteUrl);
 
     // Try to send email (but don't fail if email service is down)
