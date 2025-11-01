@@ -19,17 +19,32 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { QuotationModal } from './QuotationModal';
 
 interface PendingQuotation {
   id: string;
   quotation_no: string;
   customer_name: string;
   customer_phone: string;
+  customer_email?: string;
+  company_name?: string;
+  contact_number?: string;
   pickup_location: string;
   drop_location: string;
+  pickup_datetime?: string;
+  drop_datetime?: string;
+  number_of_buses?: number;
+  bus_type?: string;
+  seating_capacity?: number;
+  total_distance_km?: number;
   discount_percentage: number;
+  discount_amount_lkr?: number;
   gross_revenue: number;
   net_profit: number;
+  fuel_cost_fuel_only?: number;
+  hire_charge?: number;
+  extra_charges?: number;
+  commission_amount?: number;
   created_at: string;
   approval_status: 'pending' | 'approved' | 'rejected';
   approval_comments?: string;
@@ -52,6 +67,8 @@ export function AdminApprovalInterface({ onRefresh }: Props) {
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [approvalComments, setApprovalComments] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [previewQuotation, setPreviewQuotation] = useState<PendingQuotation | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const { toast } = useToast();
 
   const loadPendingQuotations = async () => {
@@ -85,6 +102,11 @@ export function AdminApprovalInterface({ onRefresh }: Props) {
     setApprovalAction(action);
     setApprovalComments('');
     setShowApprovalModal(true);
+  };
+
+  const handlePreviewQuotation = (quotation: PendingQuotation) => {
+    setPreviewQuotation(quotation);
+    setShowPreviewModal(true);
   };
 
   const processApproval = async () => {
@@ -173,13 +195,25 @@ export function AdminApprovalInterface({ onRefresh }: Props) {
     {
       accessorKey: "discount_percentage",
       header: "Discount",
-      cell: ({ row }) => (
-        <div className="text-center">
-          <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-            {row.getValue("discount_percentage")}%
-          </Badge>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const percentDiscount = row.original.discount_percentage || 0;
+        const fixedDiscount = row.original.discount_amount_lkr || 0;
+        
+        return (
+          <div className="text-center space-y-1">
+            {percentDiscount > 0 && (
+              <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                {percentDiscount}%
+              </Badge>
+            )}
+            {fixedDiscount > 0 && (
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                LKR {fixedDiscount.toLocaleString()}
+              </Badge>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "gross_revenue",
@@ -214,6 +248,16 @@ export function AdminApprovalInterface({ onRefresh }: Props) {
         const quotation = row.original;
         return (
           <div className="flex space-x-1">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handlePreviewQuotation(quotation)}
+              className="border-blue-600 text-blue-600 hover:bg-blue-50"
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              View PDF
+            </Button>
+            
             {quotation.approval_status === 'pending' && (
               <>
                 <Button 
@@ -319,6 +363,12 @@ export function AdminApprovalInterface({ onRefresh }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <QuotationModal
+        quotation={previewQuotation as any}
+        open={showPreviewModal}
+        onOpenChange={setShowPreviewModal}
+      />
     </>
   );
 }
