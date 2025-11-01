@@ -206,7 +206,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
   routeDescription += ` → ${parsedQuotation.drop_location}`;
 
   // Check if DRAFT watermark should be shown
-  const showDraftWatermark = parsedQuotation.approval_status === 'pending' && (parsedQuotation.discount_percentage || 0) > 0;
+  const showDraftWatermark = parsedQuotation.approval_status === 'pending' && 
+    ((parsedQuotation.discount_percentage || 0) > 0 || (parsedQuotation.discount_amount_lkr || 0) > 0);
 
   return (
     <div className={`bg-white text-black font-sans ${className}`} style={{ 
