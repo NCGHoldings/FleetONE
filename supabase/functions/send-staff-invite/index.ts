@@ -39,8 +39,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("No authorization header");
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    const authToken = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authToken);
 
     if (userError || !user) {
       throw new Error("Unauthorized");
@@ -76,7 +76,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Upsert invite atomically to avoid unique constraint races
-    const token = `${crypto.randomUUID()}-${Math.random().toString(36).slice(2, 10)}`;
+    const inviteToken = `${crypto.randomUUID()}-${Math.random().toString(36).slice(2, 10)}`;
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     let invite: any = null;
@@ -92,7 +92,7 @@ const handler = async (req: Request): Promise<Response> => {
           phone,
           initial_role: initialRole,
           invited_by: user.id,
-          invite_token: token,
+          invite_token: inviteToken,
           status: "pending",
           expires_at: expiresAt,
         },
@@ -114,7 +114,7 @@ const handler = async (req: Request): Promise<Response> => {
           phone,
           initial_role: initialRole,
           invited_by: user.id,
-          invite_token: token,
+          invite_token: inviteToken,
           status: "pending",
           expires_at: expiresAt,
         })
@@ -131,7 +131,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Invite created:", invite.id);
 
     // Generate invite link
-    const inviteUrl = `${req.headers.get("origin")}/accept-invite?token=${token}`;
+    const inviteUrl = `${req.headers.get("origin")}/accept-invite?token=${inviteToken}`;
 
     // Send email
     const emailResponse = await resend.emails.send({
