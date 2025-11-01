@@ -76,7 +76,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Upsert invite atomically to avoid unique constraint races
-    const inviteToken = `${crypto.randomUUID()}-${Math.random().toString(36).slice(2, 10)}`;
+    const inviteToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     let invite: any = null;
