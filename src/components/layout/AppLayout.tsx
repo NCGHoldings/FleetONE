@@ -2,6 +2,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Header } from "./Header";
 import { ThemeDecorations } from "../seasonal/ThemeDecorations";
+import { ThemeStyleInjector } from "../seasonal/ThemeStyleInjector";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   return (
     <SidebarProvider>
+      <ThemeStyleInjector />
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col">

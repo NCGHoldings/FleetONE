@@ -124,6 +124,11 @@ export default {
 				'logo-glow': {
 					'0%, 100%': { boxShadow: '0 0 5px hsl(var(--primary) / 0.3)' },
 					'50%': { boxShadow: '0 0 20px hsl(var(--primary) / 0.6)' }
+				},
+				'bounce-in': {
+					'0%': { transform: 'translateY(-100%) scale(0.8)', opacity: '0' },
+					'50%': { transform: 'translateY(10%) scale(1.05)' },
+					'100%': { transform: 'translateY(0) scale(1)', opacity: '1' }
 				}
 			},
 			animation: {
@@ -137,7 +142,8 @@ export default {
 				'bounce-subtle': 'bounce-subtle 2s ease-in-out infinite',
 				'bounce-notification': 'bounce-notification 2s ease-in-out infinite',
 				'wiggle': 'wiggle 1s ease-in-out infinite',
-				'logo-glow': 'logo-glow 2s ease-in-out infinite'
+				'logo-glow': 'logo-glow 2s ease-in-out infinite',
+				'bounce-in': 'bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
 			}
 		}
 	},

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { AddSeasonModal } from '@/components/seasonal/AddSeasonModal';
 import { useSeasonalThemeContext } from '@/components/seasonal/SeasonalThemeProvider';
 import { ThemeConfig } from '@/hooks/useSeasonalTheme';
+import { ThemeRefreshButton } from '@/components/seasonal/ThemeRefreshButton';
 import {
   Table,
   TableBody,
@@ -129,10 +130,13 @@ export default function SeasonalThemes() {
             Manage festive themes and seasonal decorations for your platform
           </p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Season
-        </Button>
+        <div className="flex gap-2">
+          <ThemeRefreshButton />
+          <Button onClick={() => setShowAddModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Season
+          </Button>
+        </div>
       </div>
 
       <div className="card-elevated p-6">

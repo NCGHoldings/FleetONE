@@ -12,10 +12,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
+import { useSeasonalThemeContext } from "../seasonal/SeasonalThemeProvider";
 
 export function Header() {
   const { user, userProfile, userRoles, signOut } = useAuth();
   const navigate = useNavigate();
+  const { activeTheme, isThemeActive } = useSeasonalThemeContext();
 
   const getInitials = (firstName?: string, lastName?: string) => {
     if (!firstName && !lastName) return "U";
@@ -36,8 +38,20 @@ export function Header() {
     await signOut();
   };
 
+  const headerStyle = isThemeActive && activeTheme?.theme_config.colors.headerOverlay
+    ? { background: activeTheme.theme_config.colors.headerOverlay }
+    : {};
+
   return (
-    <header className="h-16 border-b border-border/50 bg-gradient-to-r from-card/80 via-card/60 to-card/80 backdrop-blur-md flex items-center justify-between px-6 shadow-sm animate-slide-down">
+    <header 
+      className="h-16 border-b border-border/50 bg-gradient-to-r from-card/80 via-card/60 to-card/80 backdrop-blur-md flex items-center justify-between px-6 shadow-sm animate-slide-down transition-all duration-500"
+      style={headerStyle}
+    >
+      {isThemeActive && activeTheme?.theme_config.greeting && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-0 bg-gradient-to-r from-primary/90 to-accent/90 text-primary-foreground px-4 py-1 rounded-b-lg text-sm font-medium shadow-lg animate-bounce-in">
+          {activeTheme.theme_config.greeting}
+        </div>
+      )}
       <div className="flex items-center gap-4 flex-1">
         <div className="relative w-96 animate-scale-in">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 animate-pulse-subtle" />
