@@ -22,7 +22,8 @@ import {
   GraduationCap,
   ShoppingCart,
   FileSpreadsheet,
-  Home
+  Home,
+  Sparkles
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -53,7 +54,11 @@ const mainItems = [
   { id: "insurance", title: "Insurance", url: "/insurance", icon: Shield },
   { id: "staff_management", title: "Staff Management", url: "/staff", icon: Users },
   { id: "staff_performance", title: "Staff Performance", url: "/staff-performance", icon: TrendingUp },
+];
+
+const governanceItems = [
   { id: "governance_calendar", title: "Governance Calendar", url: "/governance/calendar", icon: Calendar },
+  { id: "seasonal_themes", title: "Seasonal Themes", url: "/seasonal-themes", icon: Sparkles },
 ];
 
 const operationsItems = [
@@ -132,6 +137,7 @@ const visibleOperations = operationsItems.filter((i) => hasAccess(i.id));
 const visibleBusiness = businessItems.filter((i) => hasAccess(i.id));
 const visibleYutong = yutongItems.filter((i) => hasAccess(i.id));
 const visibleNSP = nspItems.filter((i) => hasAccess(i.id));
+const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"} collapsible="icon">
@@ -269,6 +275,29 @@ const visibleNSP = nspItems.filter((i) => hasAccess(i.id));
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {visibleGovernance.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+              <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse"></div>
+              Governance
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+{visibleGovernance.map((item) => (
+  <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );

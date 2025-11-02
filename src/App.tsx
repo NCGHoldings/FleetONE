@@ -8,6 +8,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { PageAccessGuard } from "./components/auth/PageAccessGuard";
+import { SeasonalThemeProvider } from "./components/seasonal/SeasonalThemeProvider";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -54,6 +55,7 @@ import NSPDailySales from "./pages/NSPDailySales";
 import NSPSalesSummary from "./pages/NSPSalesSummary";
 import QuickTripsEntry from "./pages/QuickTripsEntry";
 import GovernanceCalendar from "./pages/GovernanceCalendar";
+import SeasonalThemes from "./pages/SeasonalThemes";
 
 const queryClient = new QueryClient();
 
@@ -63,7 +65,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <BrowserRouter>
+        <SeasonalThemeProvider>
+          <BrowserRouter>
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
@@ -520,10 +523,24 @@ const App = () => (
               } 
             />
             
+            <Route 
+              path="/seasonal-themes" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
+                  <PageAccessGuard pageId="seasonal_themes">
+                    <AppLayout>
+                      <SeasonalThemes />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+      </SeasonalThemeProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

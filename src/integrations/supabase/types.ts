@@ -3229,6 +3229,62 @@ export type Database = {
           },
         ]
       }
+      seasonal_themes: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_date: string
+          id: string
+          is_active: boolean | null
+          is_enabled: boolean | null
+          preview_image_url: string | null
+          priority: number | null
+          season_name: string
+          start_date: string
+          theme_config: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date: string
+          id?: string
+          is_active?: boolean | null
+          is_enabled?: boolean | null
+          preview_image_url?: string | null
+          priority?: number | null
+          season_name: string
+          start_date: string
+          theme_config?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string
+          id?: string
+          is_active?: boolean | null
+          is_enabled?: boolean | null
+          preview_image_url?: string | null
+          priority?: number | null
+          season_name?: string
+          start_date?: string
+          theme_config?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seasonal_themes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       service_master: {
         Row: {
           base_role: string | null
@@ -4030,6 +4086,36 @@ export type Database = {
           setting_value?: Json
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      theme_presets: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          is_system_preset: boolean | null
+          preset_name: string
+          preview_image_url: string | null
+          theme_config: Json
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          is_system_preset?: boolean | null
+          preset_name: string
+          preview_image_url?: string | null
+          theme_config: Json
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_system_preset?: boolean | null
+          preset_name?: string
+          preview_image_url?: string | null
+          theme_config?: Json
         }
         Relationships: []
       }
@@ -7313,6 +7399,7 @@ export type Database = {
         Args: { p_name: string }
         Returns: undefined
       }
+      update_active_seasonal_themes: { Args: never; Returns: undefined }
       update_trip_status_with_adjustments: {
         Args: {
           p_changed_by?: string
