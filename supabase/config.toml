@@ -1,1 +1,4 @@
 project_id = "wwjpdszkmtnzshbulkon"
+
+[functions.refresh-seasonal-themes]
+verify_jwt = false

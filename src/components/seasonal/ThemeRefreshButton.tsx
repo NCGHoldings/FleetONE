@@ -10,20 +10,28 @@ export const ThemeRefreshButton = () => {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      // Call the RPC function to update active themes
-      const { error } = await supabase.rpc('update_active_seasonal_themes');
+      // Call the edge function to update active themes
+      const { data, error } = await supabase.functions.invoke('refresh-seasonal-themes');
       
       if (error) throw error;
       
-      toast.success("Theme status refreshed successfully");
-      
-      // Reload the page to apply changes
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
+      if (data?.success) {
+        toast.success(data.message, {
+          description: `Activated ${data.activated_count} theme(s)`
+        });
+        
+        // Reload the page to apply changes
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      } else {
+        throw new Error(data?.error || 'Unknown error');
+      }
     } catch (error) {
       console.error('Error refreshing themes:', error);
-      toast.error("Failed to refresh theme status");
+      toast.error("Failed to refresh theme status", {
+        description: error.message
+      });
     } finally {
       setIsRefreshing(false);
     }
