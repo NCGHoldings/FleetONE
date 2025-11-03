@@ -54,6 +54,7 @@ export function ConfirmedTripsTable() {
   const [quotationDocuments, setQuotationDocuments] = useState<any[]>([]);
   const [advanceDetailsModalOpen, setAdvanceDetailsModalOpen] = useState(false);
   const [documentsData, setDocumentsData] = useState<Record<string, any[]>>({});
+  const [documentsModalOpen, setDocumentsModalOpen] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -455,12 +456,61 @@ export function ConfirmedTripsTable() {
     }));
   };
 
-  // Load all document statuses on mount
+  // Load document statuses - only for quotations not yet loaded
   useEffect(() => {
-    filteredTrips.forEach(trip => {
-      loadDocumentStatus(trip.id);
+    quotations.forEach(quotation => {
+      if (quotation.status === 'confirmed' && !documentsData[quotation.id]) {
+        loadDocumentStatus(quotation.id);
+      }
     });
-  }, [filteredTrips]);
+  }, [quotations]);
+
+  // Subscribe to realtime changes for documents and signatures
+  useEffect(() => {
+    const channel = supabase
+      .channel('document-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'document_storage'
+        },
+        (payload) => {
+          // Reload document status for affected quotation
+          if (payload.new && (payload.new as any).quotation_id) {
+            loadDocumentStatus((payload.new as any).quotation_id);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'document_approvals'
+        },
+        async (payload) => {
+          // Find quotation_id from document_id
+          if (payload.new && (payload.new as any).document_id) {
+            const { data } = await supabase
+              .from('document_storage')
+              .select('quotation_id')
+              .eq('id', (payload.new as any).document_id)
+              .single();
+            
+            if (data?.quotation_id) {
+              loadDocumentStatus(data.quotation_id);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Render email status badge
   const renderEmailStatusBadge = (emailStatus: string, readyToSend: boolean) => {
@@ -1092,7 +1142,7 @@ export function ConfirmedTripsTable() {
                   onClick={async () => {
                     await loadDocuments(trip.id);
                     setSelectedTrip(trip);
-                    // Always show documents modal, even if no documents found
+                    setDocumentsModalOpen(true);
                   }}
                 >
                   <FileCheck className="w-4 h-4 mr-2" />
@@ -1228,7 +1278,7 @@ export function ConfirmedTripsTable() {
       />
 
       {/* Document Management Modal */}
-      {selectedTrip && (
+      {documentsModalOpen && selectedTrip && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
             <CardHeader>
@@ -1237,6 +1287,7 @@ export function ConfirmedTripsTable() {
                 variant="outline" 
                 size="sm" 
                 onClick={() => {
+                  setDocumentsModalOpen(false);
                   setSelectedTrip(null);
                   setQuotationDocuments([]);
                 }}
