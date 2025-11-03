@@ -38,6 +38,13 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     console.log(`[${timestamp}] ✅ BREVO_API_KEY found, length:`, BREVO_API_KEY.length);
+    console.log(`[${timestamp}] 🔑 API key starts with:`, BREVO_API_KEY.substring(0, 10) + '...');
+    
+    // Validate API key format (Brevo REST API keys should start with 'xkeysib-')
+    if (!BREVO_API_KEY.startsWith('xkeysib-')) {
+      console.error(`[${timestamp}] ⚠️ WARNING: API key doesn't start with 'xkeysib-'. This might be an SMTP key instead of a REST API key.`);
+      console.error(`[${timestamp}] Please get a REST API key from: https://app.brevo.com/settings/keys/api`);
+    }
     
     const body = await req.json();
     console.log(`[${timestamp}] 📋 Request body keys:`, Object.keys(body));
