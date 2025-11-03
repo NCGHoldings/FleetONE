@@ -7,6 +7,7 @@ import { useSignatureManagement, type ApprovalData } from '@/hooks/useSignatureM
 import { useDocumentRegeneration } from '@/hooks/useDocumentRegeneration';
 import { useDocumentManagement } from '@/hooks/useDocumentManagement';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Pen, User, Calendar, Trash2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -34,7 +35,8 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
   
   const { getDocumentApprovals, deleteApproval, isLoading } = useSignatureManagement();
   const { regenerateDocumentWithSignatures, isRegenerating } = useDocumentRegeneration();
-  const { ensureDocumentExists } = useDocumentManagement();
+  const { ensureDocumentExists, checkAndAutoSendEmail } = useDocumentManagement();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadApprovals();
@@ -118,9 +120,17 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
     // Automatically regenerate PDF with new signatures
     if (quotationId) {
       toast.info('Updating PDF with new signature...');
-      const result = await regenerateDocumentWithSignatures(documentId, quotationId);
+      const result = await regenerateDocumentWithSignatures(actualDocumentId, quotationId);
       if (result.success) {
         toast.success('PDF updated with signature!');
+        
+        // Check if all signatures complete and auto-send email
+        const emailResult = await checkAndAutoSendEmail(actualDocumentId, quotationId);
+        if (emailResult.success) {
+          toast.success('✅ All signatures complete! Email sent automatically.');
+        } else if (emailResult.reason === 'no_email') {
+          toast.warning('⚠️ All signatures complete but no customer email found.');
+        }
       }
     } else {
       toast.success('Signature saved successfully');

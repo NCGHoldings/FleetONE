@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { 
   Eye, Download, Upload, Receipt, Users, UserPlus, Bus, Settings, ChevronDown, 
   Search, Filter, MoreHorizontal, MapPin, Calendar, DollarSign, TrendingUp,
-  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw, FileText
+  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw, FileText, Mail
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,6 +38,7 @@ export function ConfirmedTripsTable() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [documentFilter, setDocumentFilter] = useState('all');
   
   // Modal states
   const [selectedTrip, setSelectedTrip] = useState<QuotationWithPayments | null>(null);
@@ -52,6 +53,7 @@ export function ConfirmedTripsTable() {
   const [currentDocument, setCurrentDocument] = useState<any>(null);
   const [quotationDocuments, setQuotationDocuments] = useState<any[]>([]);
   const [advanceDetailsModalOpen, setAdvanceDetailsModalOpen] = useState(false);
+  const [documentsData, setDocumentsData] = useState<Record<string, any[]>>({});
   
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -123,6 +125,28 @@ export function ConfirmedTripsTable() {
       });
     }
 
+    // Apply document filter
+    if (documentFilter !== 'all') {
+      filtered = filtered.filter(trip => {
+        const docs = documentsData[trip.id] || [];
+        
+        switch (documentFilter) {
+          case 'email_sent':
+            return docs.some(d => d.email_status === 'sent');
+          case 'ready_to_send':
+            return docs.some(d => d.ready_to_send && d.email_status !== 'sent');
+          case 'no_email':
+            return docs.some(d => d.email_status === 'no_email');
+          case 'incomplete_signatures':
+            return docs.some(d => (d.document_approvals?.length || 0) < 3);
+          case 'no_documents':
+            return docs.length === 0;
+          default:
+            return true;
+        }
+      });
+    }
+
     // Apply date filter
     if (dateFilter !== 'all') {
       const now = new Date();
@@ -146,7 +170,7 @@ export function ConfirmedTripsTable() {
     }
 
     return filtered;
-  }, [quotations, searchQuery, statusFilter, paymentFilter, dateFilter]);
+  }, [quotations, searchQuery, statusFilter, paymentFilter, dateFilter, documentFilter, documentsData]);
 
   const calculateTotalAmount = (quotation: QuotationWithPayments) => {
     const hireAll = quotation.gross_revenue || 0;
@@ -395,6 +419,164 @@ export function ConfirmedTripsTable() {
     }
   };
 
+  // Fetch document signature status for a quotation
+  const fetchDocumentSignatureStatus = async (quotationId: string) => {
+    try {
+      const { data: documents } = await supabase
+        .from('document_storage')
+        .select(`
+          id,
+          document_type,
+          email_status,
+          ready_to_send,
+          email_sent_at,
+          document_approvals (
+            id,
+            approval_type,
+            approver_name,
+            user_id
+          )
+        `)
+        .eq('quotation_id', quotationId);
+      
+      return documents || [];
+    } catch (error) {
+      console.error('Error fetching document status:', error);
+      return [];
+    }
+  };
+
+  // Load document status for a quotation
+  const loadDocumentStatus = async (quotationId: string) => {
+    const docs = await fetchDocumentSignatureStatus(quotationId);
+    setDocumentsData(prev => ({
+      ...prev,
+      [quotationId]: docs
+    }));
+  };
+
+  // Load all document statuses on mount
+  useEffect(() => {
+    filteredTrips.forEach(trip => {
+      loadDocumentStatus(trip.id);
+    });
+  }, [filteredTrips]);
+
+  // Render email status badge
+  const renderEmailStatusBadge = (emailStatus: string, readyToSend: boolean) => {
+    if (emailStatus === 'sent') {
+      return (
+        <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          Email Sent
+        </Badge>
+      );
+    } else if (emailStatus === 'no_email') {
+      return (
+        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
+          <AlertCircle className="w-3 h-3 mr-1" />
+          No Email
+        </Badge>
+      );
+    } else if (readyToSend) {
+      return (
+        <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+          <Clock className="w-3 h-3 mr-1" />
+          Ready
+        </Badge>
+      );
+    } else {
+      return (
+        <Badge variant="secondary" className="bg-gray-100 text-gray-800 text-xs">
+          <XCircle className="w-3 h-3 mr-1" />
+          Not Sent
+        </Badge>
+      );
+    }
+  };
+
+  // Render signature status
+  const renderSignatureStatus = (approvals: any[]) => {
+    const preparedBy = approvals?.find(a => a.approval_type === 'prepared_by');
+    const checkedBy = approvals?.find(a => a.approval_type === 'checked_by');
+    const approvedBy = approvals?.find(a => a.approval_type === 'approved_by');
+    
+    const userSigned = approvals?.some(a => a.user_id === user?.id);
+    
+    return (
+      <div className="flex items-center gap-1">
+        {/* Prepared By indicator */}
+        <div 
+          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+            preparedBy 
+              ? 'bg-green-500 text-white' 
+              : 'bg-gray-200 text-gray-500'
+          }`}
+          title={preparedBy ? `Prepared by ${preparedBy.approver_name}` : 'Prepared By - Missing'}
+        >
+          P
+        </div>
+        
+        {/* Checked By indicator */}
+        <div 
+          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+            checkedBy 
+              ? 'bg-green-500 text-white' 
+              : 'bg-gray-200 text-gray-500'
+          }`}
+          title={checkedBy ? `Checked by ${checkedBy.approver_name}` : 'Checked By - Missing'}
+        >
+          C
+        </div>
+        
+        {/* Approved By indicator */}
+        <div 
+          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+            approvedBy 
+              ? 'bg-green-500 text-white' 
+              : 'bg-gray-200 text-gray-500'
+          }`}
+          title={approvedBy ? `Approved by ${approvedBy.approver_name}` : 'Approved By - Missing'}
+        >
+          A
+        </div>
+        
+        {/* Current user indicator */}
+        {userSigned && (
+          <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 text-xs">
+            You Signed
+          </Badge>
+        )}
+      </div>
+    );
+  };
+
+  // Render document status summary
+  const renderDocumentStatusSummary = (documents: any[]) => {
+    const salesReceipt = documents.find(d => d.document_type === 'sales_receipt');
+    const finalInvoice = documents.find(d => d.document_type === 'invoice');
+    
+    return (
+      <div className="space-y-1">
+        {salesReceipt && (
+          <div className="text-xs flex items-center gap-1">
+            <span className="font-medium">Receipt:</span>{' '}
+            {renderEmailStatusBadge(salesReceipt.email_status, salesReceipt.ready_to_send)}
+          </div>
+        )}
+        {finalInvoice && (
+          <div className="text-xs flex items-center gap-1">
+            <span className="font-medium">Invoice:</span>{' '}
+            {renderEmailStatusBadge(finalInvoice.email_status, finalInvoice.ready_to_send)}
+          </div>
+        )}
+        {!salesReceipt && !finalInvoice && (
+          <span className="text-xs text-muted-foreground">No documents</span>
+        )}
+      </div>
+    );
+  };
+
   // View document
   const handleViewDocument = async (document: any) => {
     setCurrentDocument(document);
@@ -612,6 +794,20 @@ export function ConfirmedTripsTable() {
                 <SelectItem value="past">Past</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select value={documentFilter} onValueChange={setDocumentFilter}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by documents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Documents</SelectItem>
+                <SelectItem value="email_sent">Email Sent</SelectItem>
+                <SelectItem value="ready_to_send">Ready (Not Sent)</SelectItem>
+                <SelectItem value="no_email">Missing Email</SelectItem>
+                <SelectItem value="incomplete_signatures">Incomplete Signatures</SelectItem>
+                <SelectItem value="no_documents">No Documents</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -635,7 +831,8 @@ export function ConfirmedTripsTable() {
                     <TableHead className="font-semibold">Vehicle Assignment</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold">Payment</TableHead>
-                    <TableHead className="font-semibold">Documents</TableHead>
+                    <TableHead className="font-semibold">Email Status</TableHead>
+                    <TableHead className="font-semibold">Signatures</TableHead>
                     <TableHead className="font-semibold">Financial</TableHead>
                     <TableHead className="font-semibold text-center">Actions</TableHead>
                   </TableRow>
@@ -748,23 +945,29 @@ export function ConfirmedTripsTable() {
                           </div>
                         </TableCell>
 
-                        {/* Documents Status */}
+                        {/* Email Status Column */}
                         <TableCell>
-                          <div className="space-y-1 text-xs">
-                            {approvedPayments.length > 0 ? (
-                              <div className="flex items-center space-x-1">
-                                <CheckCircle className="w-3 h-3 text-green-500" />
-                                <span className="text-green-600">Available</span>
-                              </div>
-                            ) : pendingFinancePayments.length > 0 ? (
-                              <div className="flex items-center space-x-1">
-                                <Clock className="w-3 h-3 text-yellow-500" />
-                                <span className="text-yellow-600">Draft</span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">None</span>
-                            )}
-                          </div>
+                          {documentsData[trip.id] ? (
+                            renderDocumentStatusSummary(documentsData[trip.id])
+                          ) : (
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => loadDocumentStatus(trip.id)}
+                              className="text-xs"
+                            >
+                              Load Status
+                            </Button>
+                          )}
+                        </TableCell>
+
+                        {/* Signatures Column */}
+                        <TableCell>
+                          {documentsData[trip.id]?.[0]?.document_approvals ? (
+                            renderSignatureStatus(documentsData[trip.id][0].document_approvals)
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No signatures</span>
+                          )}
                         </TableCell>
 
                         {/* Financial */}

@@ -666,6 +666,9 @@ export type Database = {
           document_data: string
           document_status: string
           document_type: string
+          email_sent_at: string | null
+          email_sent_by: string | null
+          email_status: string | null
           file_name: string
           file_size: number | null
           generated_at: string
@@ -674,6 +677,7 @@ export type Database = {
           payment_id: string | null
           payment_type: string
           quotation_id: string
+          ready_to_send: boolean | null
           updated_at: string
         }
         Insert: {
@@ -683,6 +687,9 @@ export type Database = {
           document_data: string
           document_status?: string
           document_type: string
+          email_sent_at?: string | null
+          email_sent_by?: string | null
+          email_status?: string | null
           file_name: string
           file_size?: number | null
           generated_at?: string
@@ -691,6 +698,7 @@ export type Database = {
           payment_id?: string | null
           payment_type: string
           quotation_id: string
+          ready_to_send?: boolean | null
           updated_at?: string
         }
         Update: {
@@ -700,6 +708,9 @@ export type Database = {
           document_data?: string
           document_status?: string
           document_type?: string
+          email_sent_at?: string | null
+          email_sent_by?: string | null
+          email_status?: string | null
           file_name?: string
           file_size?: number | null
           generated_at?: string
@@ -708,6 +719,7 @@ export type Database = {
           payment_id?: string | null
           payment_type?: string
           quotation_id?: string
+          ready_to_send?: boolean | null
           updated_at?: string
         }
         Relationships: [

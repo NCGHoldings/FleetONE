@@ -442,12 +442,129 @@ export const useDocumentManagement = () => {
     }
   };
 
+  const checkAndAutoSendEmail = async (
+    documentId: string,
+    quotationId: string
+  ) => {
+    try {
+      // 1. Fetch all signatures for this document
+      const { data: approvals, error: approvalsError } = await supabase
+        .from('document_approvals')
+        .select('*')
+        .eq('document_id', documentId);
+
+      if (approvalsError) throw approvalsError;
+
+      // 2. Check if all 3 signatures exist
+      const hasPreparedBy = approvals?.some(a => a.approval_type === 'prepared_by');
+      const hasCheckedBy = approvals?.some(a => a.approval_type === 'checked_by');
+      const hasApprovedBy = approvals?.some(a => a.approval_type === 'approved_by');
+
+      if (!hasPreparedBy || !hasCheckedBy || !hasApprovedBy) {
+        console.log('Not all signatures complete. Skipping auto-send.');
+        return { success: false, reason: 'incomplete_signatures' };
+      }
+
+      // 3. Fetch quotation to get customer email
+      const { data: quotation, error: quotationError } = await supabase
+        .from('special_hire_quotations')
+        .select('customer_email, customer_name, quotation_no')
+        .eq('id', quotationId)
+        .single();
+
+      if (quotationError) throw quotationError;
+
+      if (!quotation?.customer_email) {
+        console.log('No customer email. Marking document as ready but not sending.');
+        
+        // Update document with flag: ready_to_send = true
+        await supabase
+          .from('document_storage')
+          .update({ 
+            ready_to_send: true,
+            email_status: 'no_email' 
+          })
+          .eq('id', documentId);
+        
+        return { success: false, reason: 'no_email' };
+      }
+
+      // 4. Get document data
+      const { data: document } = await supabase
+        .from('document_storage')
+        .select('*')
+        .eq('id', documentId)
+        .single();
+
+      if (!document) {
+        throw new Error('Document not found');
+      }
+
+      const pdfBase64 = document.document_data;
+
+      // 5. Send email via edge function
+      const { error: emailError } = await supabase.functions.invoke('send-quotation-email', {
+        body: {
+          to: quotation.customer_email,
+          subject: `${document.document_type === 'sales_receipt' ? 'Sales Receipt' : 'Final Invoice'} - ${quotation.quotation_no}`,
+          html: `
+            <div style="font-family: Arial, sans-serif;">
+              <h2>NCG Express</h2>
+              <p>Dear ${quotation.customer_name},</p>
+              <p>Please find your ${document.document_type === 'sales_receipt' ? 'sales receipt' : 'final invoice'} attached.</p>
+              <p><strong>Quotation:</strong> ${quotation.quotation_no}</p>
+              <p>This document has been fully authorized and approved.</p>
+              <br>
+              <p>Best regards,<br>NCG Express Team</p>
+            </div>
+          `,
+          attachment: {
+            filename: `${document.document_type}_${quotation.quotation_no}.pdf`,
+            contentBase64: pdfBase64,
+            contentType: 'application/pdf'
+          }
+        }
+      });
+
+      if (emailError) throw emailError;
+
+      // 6. Update document status
+      await supabase
+        .from('document_storage')
+        .update({
+          email_status: 'sent',
+          email_sent_at: new Date().toISOString(),
+          email_sent_by: user?.id,
+          ready_to_send: true
+        })
+        .eq('id', documentId);
+
+      toast.success(`📧 Email sent automatically to ${quotation.customer_email}!`);
+      return { success: true };
+
+    } catch (error) {
+      console.error('Auto-send email error:', error);
+      
+      // Update document with failed status
+      await supabase
+        .from('document_storage')
+        .update({
+          email_status: 'failed',
+          ready_to_send: true
+        })
+        .eq('id', documentId);
+      
+      return { success: false, error };
+    }
+  };
+
   return {
     generateAndStoreDraftDocument,
     approveDocument,
     getDocumentsByQuotation,
     regenerateDocument,
     ensureDocumentExists,
+    checkAndAutoSendEmail,
     isLoading,
   };
 };
