@@ -62,10 +62,37 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
     toast.success('Sample template downloaded!');
   };
 
-  const validateDateFormat = (dateStr: string): boolean => {
-    // Accept DD/MM/YYYY or DD/MM/YY format
-    const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
-    return regex.test(dateStr);
+  const parseExcelDate = (dateValue: any): string | null => {
+    // If it's already a string in DD/MM/YYYY format
+    if (typeof dateValue === 'string') {
+      const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
+      if (regex.test(dateValue)) {
+        return dateValue; // Already correct format
+      }
+    }
+    
+    // If it's an Excel serial number
+    if (typeof dateValue === 'number') {
+      // Excel epoch starts at 1900-01-01 (with 1900 bug correction)
+      const excelEpoch = new Date(1899, 11, 30);
+      const date = new Date(excelEpoch.getTime() + dateValue * 86400000);
+      
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      
+      return `${day}/${month}/${year}`; // Return DD/MM/YYYY
+    }
+    
+    // If it's a Date object
+    if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+      const day = dateValue.getDate().toString().padStart(2, '0');
+      const month = (dateValue.getMonth() + 1).toString().padStart(2, '0');
+      const year = dateValue.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+    
+    return null; // Invalid format
   };
 
   const validateWhatsAppFormat = (whatsapp: string): boolean => {
@@ -85,7 +112,10 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { 
+          type: 'array',
+          cellDates: true  // Parse dates as Date objects
+        });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet);
 
@@ -105,9 +135,10 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
           if (!row['Date']) errors.push(`Row ${rowNum}: Missing Date`);
           if (!row['Time']) errors.push(`Row ${rowNum}: Missing Time`);
 
-          // Validate date format
-          if (row['Date'] && !validateDateFormat(String(row['Date']))) {
-            errors.push(`Row ${rowNum}: Invalid date format. Use DD/MM/YYYY (e.g., 01/10/2025)`);
+          // Parse and validate date format
+          const parsedDate = row['Date'] ? parseExcelDate(row['Date']) : null;
+          if (row['Date'] && !parsedDate) {
+            errors.push(`Row ${rowNum}: Invalid date format. Received: ${row['Date']}. Use DD/MM/YYYY or Excel date format`);
           }
 
           // Validate WhatsApp format (warning only, not blocking)
@@ -116,7 +147,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
           }
 
           // If no critical errors for this row, add to allocations
-          if (row['Bus No'] && row['Route No'] && row['Date']) {
+          if (row['Bus No'] && row['Route No'] && parsedDate) {
             allocations.push({
               busNo: String(row['Bus No']).trim(),
               routeNo: String(row['Route No']).trim(),
@@ -124,7 +155,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
               driverName: String(row['Driver'] || '').trim(),
               conductorName: String(row['Conductor'] || '').trim(),
               whatsapp: String(row['Whatsapp'] || '').trim(),
-              date: String(row['Date']).trim(),
+              date: parsedDate,
               time: String(row['Time'] || '').trim()
             });
           }
