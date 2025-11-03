@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "https://esm.sh/resend@2.1.0";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,29 +50,50 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Email subject is required');
     }
 
-    console.log(`[${timestamp}] 🔨 Building email data...`);
-    const emailData: any = {
-      from: "NCG Express <onboarding@resend.dev>",
-      to: [to],
+    console.log(`[${timestamp}] 🔨 Building email data for Brevo...`);
+    const brevoPayload: any = {
+      sender: {
+        name: "NCG Express",
+        email: "noreply@ncgexpress.com"
+      },
+      to: [
+        {
+          email: to,
+          name: to.split('@')[0]
+        }
+      ],
       subject,
-      text: text || "Please find your quotation attached.",
-      html: html || `<p>Please find your quotation attached.</p>`,
+      htmlContent: html || `<p>${text || 'Please find your quotation attached.'}</p>`,
     };
 
     if (attachment) {
-      emailData.attachments = [
+      brevoPayload.attachment = [
         {
-          filename: attachment.filename,
           content: attachment.contentBase64,
-          type: attachment.contentType,
+          name: attachment.filename
         }
       ];
       console.log(`[${timestamp}] 📎 Attachment added:`, attachment.filename);
     }
 
-    console.log(`[${timestamp}] 📤 Sending email via Resend...`);
-    const emailResponse = await resend.emails.send(emailData);
-    console.log(`[${timestamp}] 📬 Resend response:`, emailResponse);
+    console.log(`[${timestamp}] 📤 Sending email via Brevo...`);
+    const response = await fetch(BREVO_API_URL, {
+      method: "POST",
+      headers: {
+        "api-key": BREVO_API_KEY!,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(brevoPayload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error(`[${timestamp}] ❌ Brevo API error:`, errorData);
+      throw new Error(`Brevo API error: ${JSON.stringify(errorData)}`);
+    }
+
+    const emailResponse = await response.json();
+    console.log(`[${timestamp}] 📬 Brevo response:`, emailResponse);
 
     console.log(`[${timestamp}] ✅ === EMAIL SENT SUCCESSFULLY ===`);
     return new Response(JSON.stringify({
