@@ -755,7 +755,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
               >
                 <Calculator className="h-4 w-4" />
               </Button>
-              {quotation.status === 'draft' && (
+              {(quotation.status === 'draft' || quotation.status === 'sent') && (
                 <>
                   <Button 
                     variant="outline" 
