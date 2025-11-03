@@ -43,6 +43,10 @@ export default function DriverAllocation() {
   const [uploading, setUploading] = useState(false);
   const [editingAllocation, setEditingAllocation] = useState<AllocationRow | null>(null);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  
+  // Date range filter state
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
 
   const [buses, setBuses] = useState<any[]>([]);
   const [routes, setRoutes] = useState<any[]>([]);
@@ -146,7 +150,7 @@ export default function DriverAllocation() {
           end_time: r.end_time,
           status: r.status,
           bus_no: meta?.bus_no || buses.find(b => b.id === r.bus_id)?.bus_no,
-          route_no: meta?.route_no || routes.find(rt => rt.id === r.route_id)?.route_no,
+          route_no: routes.find(rt => rt.id === r.route_id)?.route_no || meta?.route_no,
           route_name: meta?.route || routes.find(rt => rt.id === r.route_id)?.route_name,
           driver_name: meta?.driver || nameOf(r.driver_id),
           conductor_name: meta?.conductor || nameOf(r.conductor_id),
@@ -939,6 +943,32 @@ export default function DriverAllocation() {
     buses.filter(b => form.bus_ids.includes(b.id)).map(b => b.bus_no).join(', '), [buses, form.bus_ids]
   );
 
+  // Filter allocations by date range
+  const filteredAllocations = useMemo(() => {
+    if (!filterStartDate && !filterEndDate) {
+      return allocations;
+    }
+    
+    return allocations.filter(allocation => {
+      const allocationDate = allocation.date;
+      
+      if (filterStartDate && allocationDate < filterStartDate) {
+        return false;
+      }
+      
+      if (filterEndDate && allocationDate > filterEndDate) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [allocations, filterStartDate, filterEndDate]);
+
+  const clearFilters = () => {
+    setFilterStartDate("");
+    setFilterEndDate("");
+  };
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -1246,7 +1276,45 @@ export default function DriverAllocation() {
           <CardDescription>Recent assignments</CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={allocations} searchKey="trip_id" />
+          <div className="space-y-4">
+            {/* Date Range Filter */}
+            <div className="flex flex-wrap items-end gap-4 p-4 border rounded-lg bg-muted/50">
+              <div className="flex-1 min-w-[200px]">
+                <Label htmlFor="filter-start-date">Start Date</Label>
+                <Input
+                  id="filter-start-date"
+                  type="date"
+                  value={filterStartDate}
+                  onChange={(e) => setFilterStartDate(e.target.value)}
+                  placeholder="From date"
+                />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <Label htmlFor="filter-end-date">End Date</Label>
+                <Input
+                  id="filter-end-date"
+                  type="date"
+                  value={filterEndDate}
+                  onChange={(e) => setFilterEndDate(e.target.value)}
+                  placeholder="To date"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={clearFilters}
+                  disabled={!filterStartDate && !filterEndDate}
+                >
+                  Clear Filters
+                </Button>
+                <Badge variant="secondary" className="h-10 px-4 flex items-center">
+                  {filteredAllocations.length} of {allocations.length} allocations
+                </Badge>
+              </div>
+            </div>
+            
+            <DataTable columns={columns} data={filteredAllocations} searchKey="trip_id" />
+          </div>
         </CardContent>
       </Card>
     </div>
