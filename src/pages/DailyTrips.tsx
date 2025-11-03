@@ -593,18 +593,50 @@ export default function DailyTrips() {
         return;
       }
 
-      // Check for existing trips to avoid duplicates
-      const existingTripIds = data.map(trip => trip.trip_no);
-      const newTrips = tripsToInsert.filter(trip => !existingTripIds.includes(trip.trip_no));
+      console.log(`Found ${allocations.length} allocations and ${tripsToInsert.length} valid trips to process`);
 
-      if (newTrips.length === 0) {
+      // Query database for existing trips in the selected date range using composite key
+      const { data: existingTrips, error: existingError } = await supabase
+        .from('daily_trips')
+        .select('trip_no, trip_date')
+        .gte('trip_date', formattedStartDate)
+        .lte('trip_date', formattedEndDate);
+
+      if (existingError) {
+        console.error('Error checking existing trips:', existingError);
         toast({
-          title: "Info",
-          description: "All trips from the selected date range already exist",
+          title: "Error",
+          description: "Failed to check for existing trips",
+          variant: "destructive",
         });
         setImporting(false);
         return;
       }
+
+      // Create a Set of existing trip keys (trip_no + trip_date)
+      const existingKeys = new Set(
+        existingTrips?.map(t => `${t.trip_no}_${t.trip_date}`) || []
+      );
+
+      console.log(`Found ${existingKeys.size} existing trips in database for this date range`);
+
+      // Filter out trips that already exist (same trip_no AND trip_date)
+      const newTrips = tripsToInsert.filter(
+        trip => !existingKeys.has(`${trip.trip_no}_${trip.trip_date}`)
+      );
+
+      const skippedCount = tripsToInsert.length - newTrips.length;
+
+      if (newTrips.length === 0) {
+        toast({
+          title: "Already Imported",
+          description: `All ${tripsToInsert.length} trips from ${format(startDate, 'MMM dd')} - ${format(endDate, 'MMM dd, yyyy')} already exist in Daily Trips`,
+        });
+        setImporting(false);
+        return;
+      }
+
+      console.log(`Importing ${newTrips.length} new trips, skipping ${skippedCount} duplicates`);
 
       // Handle null bus_id by creating a default bus record or using a placeholder
       const tripsWithValidBusId = await Promise.all(newTrips.map(async (trip) => {
@@ -649,8 +681,8 @@ export default function DailyTrips() {
       }
 
       toast({
-        title: "Success",
-        description: `Successfully imported ${newTrips.length} trips from driver allocations`,
+        title: "Import Successful",
+        description: `Imported ${newTrips.length} new trips from ${format(startDate, 'MMM dd')} - ${format(endDate, 'MMM dd, yyyy')}${skippedCount > 0 ? `. Skipped ${skippedCount} existing trips.` : ''}`,
       });
 
       // Refresh the trips list
