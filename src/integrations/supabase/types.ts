@@ -3357,6 +3357,147 @@ export type Database = {
         }
         Relationships: []
       }
+      special_hire_advance_details: {
+        Row: {
+          authorized_by_name: string | null
+          authorized_by_signature_data: string | null
+          authorized_by_signature_type: string | null
+          checked_by_name: string | null
+          checked_by_signature_data: string | null
+          checked_by_signature_type: string | null
+          conductor_contact: string | null
+          conductor_meal_allowance: number | null
+          conductor_name: string | null
+          conductor_salary: number | null
+          conductor_signature_data: string | null
+          conductor_signature_type: string | null
+          created_at: string | null
+          created_by: string | null
+          driver_contact: string
+          driver_highway_charges: number | null
+          driver_meal_allowance: number | null
+          driver_name: string
+          driver_other_charges: number | null
+          driver_salary: number | null
+          driver_signature_data: string | null
+          driver_signature_type: string | null
+          drop_location: string
+          hire_date: string
+          id: string
+          notes: string | null
+          number_of_days: number
+          payment_id: string | null
+          pdf_document_data: string | null
+          pdf_generated_at: string | null
+          pickup_location: string
+          prepared_by_name: string
+          prepared_by_signature_data: string | null
+          prepared_by_signature_type: string | null
+          quotation_id: string
+          quotation_no: string
+          status: string | null
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          authorized_by_name?: string | null
+          authorized_by_signature_data?: string | null
+          authorized_by_signature_type?: string | null
+          checked_by_name?: string | null
+          checked_by_signature_data?: string | null
+          checked_by_signature_type?: string | null
+          conductor_contact?: string | null
+          conductor_meal_allowance?: number | null
+          conductor_name?: string | null
+          conductor_salary?: number | null
+          conductor_signature_data?: string | null
+          conductor_signature_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          driver_contact: string
+          driver_highway_charges?: number | null
+          driver_meal_allowance?: number | null
+          driver_name: string
+          driver_other_charges?: number | null
+          driver_salary?: number | null
+          driver_signature_data?: string | null
+          driver_signature_type?: string | null
+          drop_location: string
+          hire_date: string
+          id?: string
+          notes?: string | null
+          number_of_days: number
+          payment_id?: string | null
+          pdf_document_data?: string | null
+          pdf_generated_at?: string | null
+          pickup_location: string
+          prepared_by_name: string
+          prepared_by_signature_data?: string | null
+          prepared_by_signature_type?: string | null
+          quotation_id: string
+          quotation_no: string
+          status?: string | null
+          total_amount: number
+          updated_at?: string | null
+        }
+        Update: {
+          authorized_by_name?: string | null
+          authorized_by_signature_data?: string | null
+          authorized_by_signature_type?: string | null
+          checked_by_name?: string | null
+          checked_by_signature_data?: string | null
+          checked_by_signature_type?: string | null
+          conductor_contact?: string | null
+          conductor_meal_allowance?: number | null
+          conductor_name?: string | null
+          conductor_salary?: number | null
+          conductor_signature_data?: string | null
+          conductor_signature_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          driver_contact?: string
+          driver_highway_charges?: number | null
+          driver_meal_allowance?: number | null
+          driver_name?: string
+          driver_other_charges?: number | null
+          driver_salary?: number | null
+          driver_signature_data?: string | null
+          driver_signature_type?: string | null
+          drop_location?: string
+          hire_date?: string
+          id?: string
+          notes?: string | null
+          number_of_days?: number
+          payment_id?: string | null
+          pdf_document_data?: string | null
+          pdf_generated_at?: string | null
+          pickup_location?: string
+          prepared_by_name?: string
+          prepared_by_signature_data?: string | null
+          prepared_by_signature_type?: string | null
+          quotation_id?: string
+          quotation_no?: string
+          status?: string | null
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_hire_advance_details_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_advance_details_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       special_hire_invoices: {
         Row: {
           amount: number

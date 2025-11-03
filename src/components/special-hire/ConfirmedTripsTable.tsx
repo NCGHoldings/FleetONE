@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { 
   Eye, Download, Upload, Receipt, Users, UserPlus, Bus, Settings, ChevronDown, 
   Search, Filter, MoreHorizontal, MapPin, Calendar, DollarSign, TrendingUp,
-  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw
+  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw, FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,6 +22,7 @@ import { TripDetailsModal } from './TripDetailsModal';
 import { useDocumentManagement } from '@/hooks/useDocumentManagement';
 import { DocumentViewer } from './DocumentViewer';
 import { InvoiceViewer } from './InvoiceViewer';
+import AdvanceDetailsModal from './AdvanceDetailsModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -50,6 +51,7 @@ export function ConfirmedTripsTable() {
   const [currentInvoiceData, setCurrentInvoiceData] = useState<InvoiceData | null>(null);
   const [currentDocument, setCurrentDocument] = useState<any>(null);
   const [quotationDocuments, setQuotationDocuments] = useState<any[]>([]);
+  const [advanceDetailsModalOpen, setAdvanceDetailsModalOpen] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -821,6 +823,16 @@ export function ConfirmedTripsTable() {
                                       <Settings className="w-4 h-4 mr-2" />
                                       Update Status
                                     </DropdownMenuItem>
+
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedTrip(trip);
+                                        setAdvanceDetailsModalOpen(true);
+                                      }}
+                                    >
+                                      <FileText className="w-4 h-4 mr-2" />
+                                      Advance Details Form
+                                    </DropdownMenuItem>
                                     
                                     <DropdownMenuSeparator />
                                   </>
@@ -1144,6 +1156,24 @@ export function ConfirmedTripsTable() {
           }}
           invoiceData={currentInvoiceData}
           onDownload={handleDownloadInvoice}
+        />
+      )}
+      {/* Advance Details Modal */}
+      {selectedTrip && (
+        <AdvanceDetailsModal
+          open={advanceDetailsModalOpen}
+          onClose={() => {
+            setAdvanceDetailsModalOpen(false);
+            refetch();
+          }}
+          quotation={{
+            id: selectedTrip.id,
+            quotation_no: selectedTrip.quotation_no,
+            pickup_date: selectedTrip.trip_start_date,
+            pickup_location: selectedTrip.pickup_location,
+            drop_location: selectedTrip.drop_location,
+            total_days: Math.ceil((new Date(selectedTrip.trip_end_date).getTime() - new Date(selectedTrip.trip_start_date).getTime()) / (1000 * 60 * 60 * 24)) || 1,
+          }}
         />
       )}
     </div>
