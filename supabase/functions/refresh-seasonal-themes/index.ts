@@ -29,7 +29,10 @@ Deno.serve(async (req) => {
     // First, set all themes to inactive
     const { error: deactivateError } = await supabaseClient
       .from('seasonal_themes')
-      .update({ is_active: false })
+      .update({ 
+        is_active: false,
+        updated_at: new Date().toISOString()
+      })
       .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all rows
 
     if (deactivateError) {
@@ -45,7 +48,10 @@ Deno.serve(async (req) => {
     // Then activate themes that should be active
     const { data: activatedThemes, error: activateError } = await supabaseClient
       .from('seasonal_themes')
-      .update({ is_active: true })
+      .update({ 
+        is_active: true,
+        updated_at: new Date().toISOString()
+      })
       .eq('is_enabled', true)
       .lte('start_date', currentDate)
       .gte('end_date', currentDate)
