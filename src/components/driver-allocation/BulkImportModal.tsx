@@ -68,6 +68,12 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
     return regex.test(dateStr);
   };
 
+  const validateWhatsAppFormat = (whatsapp: string): boolean => {
+    // Sri Lankan WhatsApp format: 10 digits starting with 0
+    const whatsappPattern = /^0\d{9}$/;
+    return whatsappPattern.test(whatsapp);
+  };
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0];
     if (!uploadedFile) return;
@@ -84,6 +90,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
         const jsonData = XLSX.utils.sheet_to_json(firstSheet);
 
         const errors: string[] = [];
+        const warnings: string[] = [];
         const allocations: AllocationData[] = [];
 
         jsonData.forEach((row: any, index: number) => {
@@ -103,6 +110,11 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
             errors.push(`Row ${rowNum}: Invalid date format. Use DD/MM/YYYY (e.g., 01/10/2025)`);
           }
 
+          // Validate WhatsApp format (warning only, not blocking)
+          if (row['Whatsapp'] && !validateWhatsAppFormat(String(row['Whatsapp']))) {
+            warnings.push(`Row ${rowNum}: WhatsApp number "${row['Whatsapp']}" may be invalid. Expected format: 0XXXXXXXXX (10 digits)`);
+          }
+
           // If no critical errors for this row, add to allocations
           if (row['Bus No'] && row['Route No'] && row['Date']) {
             allocations.push({
@@ -118,14 +130,17 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
           }
         });
 
-        setParseErrors(errors);
+        // Show all errors and warnings
+        const allMessages = [...errors, ...warnings];
+        setParseErrors(allMessages);
         setParsedData(allocations);
 
-        if (allocations.length > 0) {
-          toast.success(`Parsed ${allocations.length} allocations from Excel`);
-        }
         if (errors.length > 0) {
-          toast.warning(`Found ${errors.length} validation errors`);
+          toast.error(`Found ${allocations.length} allocations with ${errors.length} error(s)${warnings.length > 0 ? ` and ${warnings.length} warning(s)` : ''}`);
+        } else if (warnings.length > 0) {
+          toast.warning(`Parsed ${allocations.length} allocations with ${warnings.length} warning(s)`);
+        } else if (allocations.length > 0) {
+          toast.success(`Parsed ${allocations.length} allocations successfully`);
         }
       } catch (error) {
         console.error('Excel parsing error:', error);
@@ -142,7 +157,9 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
       return;
     }
 
-    if (parseErrors.length > 0) {
+    // Only block on actual errors, not warnings
+    const actualErrors = parseErrors.filter(msg => !msg.includes('may be invalid'));
+    if (actualErrors.length > 0) {
       toast.error('Please fix validation errors before importing');
       return;
     }
@@ -215,8 +232,13 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
               <li>• Optional column: <strong>Whatsapp</strong> (phone number)</li>
               <li>• Date format: <strong>DD/MM/YYYY</strong> (e.g., 01/10/2025 for October 1, 2025)</li>
               <li>• Time format: <strong>HH.MMam/pm</strong> (e.g., 10.30am, 5.30pm)</li>
+              <li>• WhatsApp format: <strong>0XXXXXXXXX</strong> (10 digits, e.g., 0702502294)</li>
               <li>• All fields are case-sensitive and must match exactly</li>
             </ul>
+            <div className="mt-2 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs">
+              <strong>Note:</strong> Route numbers from Excel will be used to find or create routes in the database. 
+              The system will automatically match routes by name or number.
+            </div>
           </div>
 
           {/* Download Template Button */}
@@ -316,7 +338,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
             </Button>
             <Button 
               onClick={handleBulkImport} 
-              disabled={isProcessing || parsedData.length === 0 || parseErrors.length > 0}
+              disabled={isProcessing || parsedData.length === 0 || parseErrors.some(msg => !msg.includes('may be invalid'))}
               className="flex items-center gap-2"
             >
               {isProcessing ? (

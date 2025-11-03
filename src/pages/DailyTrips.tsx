@@ -439,8 +439,12 @@ export default function DailyTrips() {
 
       // Transform the data to match our interface
       const transformedTrips: Trip[] = trips.map((trip: any) => {
-        // Parse notes field to get driver and conductor names
+        // Parse notes field to get additional metadata
         const notes = safeParseJSON(trip.notes);
+
+        // Fetch driver and conductor profiles for accurate names
+        const driverName = notes?.driver || 'N/A';
+        const conductorName = notes?.conductor || 'N/A';
 
         return {
           id: trip.id,
@@ -452,12 +456,13 @@ export default function DailyTrips() {
           bus_no: trip.buses?.bus_no || 'N/A',
           route_no: trip.routes?.route_no || 'N/A',
           route: trip.routes?.route_name || 'N/A',
-          driver_name: notes.driver,
-          conductor_name: notes.conductor,
-          whatsapp: trip.whatsapp,
+          driver_name: driverName,
+          conductor_name: conductorName,
+          whatsapp: trip.whatsapp, // Now correctly stores WhatsApp number from driver allocation
           trip_date: trip.trip_date,
           start_time: trip.start_time,
           end_time: trip.end_time,
+          time: notes?.time,
           odometer_start: trip.odometer_start,
           odometer_end: trip.odometer_end,
           distance_km: trip.distance_km || 0,
@@ -560,6 +565,9 @@ export default function DailyTrips() {
         .map(allocation => {
           const notes = safeParseJSON(allocation.notes);
           
+          // Extract WhatsApp from notes JSON (where edge function stores it)
+          const whatsappNumber = notes?.whatsapp || null;
+          
           return {
             trip_no: allocation.trip_id,
             bus_id: allocation.bus_id || null, // Allow null but mark as nullable
@@ -569,7 +577,7 @@ export default function DailyTrips() {
             trip_date: allocation.allocation_date,
             start_time: allocation.start_time || null,
             end_time: allocation.end_time || null,
-            whatsapp: allocation.whatsapp_sent ? 'sent' : null,
+            whatsapp: whatsappNumber, // Extract from notes JSON, not whatsapp_sent flag
             status: 'scheduled' as const,
             income: 0,
             fuel_cost: 0,

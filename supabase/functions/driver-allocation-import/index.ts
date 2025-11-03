@@ -209,7 +209,19 @@ serve(async (req) => {
         const tripNumber = (existingTrips?.length || 0) + 1
         const tripId = `T${dateStr}-${tripNumber.toString().padStart(4, '0')}`
 
-        // Create driver allocation
+        // Create driver allocation with comprehensive notes
+        const allocationNotes = JSON.stringify({
+          bus_no: busNo,
+          route_no: routeNo,
+          route: routeName,
+          driver: driverName,
+          conductor: conductorName,
+          whatsapp: whatsapp,
+          time: time,
+          import_source: 'excel_bulk_import',
+          import_timestamp: new Date().toISOString()
+        })
+
         const { data: newAllocation, error: allocationError } = await supabase
           .from('driver_allocations')
           .insert({
@@ -222,7 +234,7 @@ serve(async (req) => {
             start_time: timeFormatted,
             whatsapp_sent: false,
             status: 'scheduled',
-            notes: `Imported from Excel - ${routeName}`,
+            notes: allocationNotes,
             created_by: null // Will be set by frontend
           })
           .select()
@@ -230,7 +242,17 @@ serve(async (req) => {
 
         if (allocationError) throw allocationError
 
-        // Create corresponding daily trip
+        // Create corresponding daily trip with proper whatsapp field
+        const tripNotes = JSON.stringify({
+          bus_no: busNo,
+          route: routeName,
+          driver: driverName,
+          conductor: conductorName,
+          time: time,
+          import_source: 'driver_allocation',
+          allocation_id: newAllocation.id
+        })
+
         await supabase
           .from('daily_trips')
           .insert({
@@ -242,8 +264,8 @@ serve(async (req) => {
             conductor_id: conductor.user_id,
             start_time: timeFormatted,
             status: 'scheduled',
-            whatsapp: whatsapp || '',
-            notes: `Auto-created from driver allocation - ${routeName}`,
+            whatsapp: whatsapp || null,
+            notes: tripNotes,
             created_by: null
           })
 

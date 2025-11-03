@@ -142,6 +142,13 @@ export default function DriverAllocation() {
 
       const rows: AllocationRow[] = (data || []).map((r: any) => {
         const meta = safeParseJSON(r.notes);
+        
+        // PRIORITY: Get actual database values first, fallback to notes only if missing
+        const actualRoute = routes.find(rt => rt.id === r.route_id);
+        const actualBus = buses.find(b => b.id === r.bus_id);
+        const driver = people.find(p => p.user_id === r.driver_id);
+        const conductor = people.find(p => p.user_id === r.conductor_id);
+        
         return {
           id: r.id,
           trip_id: r.trip_id,
@@ -149,13 +156,18 @@ export default function DriverAllocation() {
           start_time: r.start_time,
           end_time: r.end_time,
           status: r.status,
-          bus_no: meta?.bus_no || buses.find(b => b.id === r.bus_id)?.bus_no,
-          route_no: routes.find(rt => rt.id === r.route_id)?.route_no || meta?.route_no,
-          route_name: meta?.route || routes.find(rt => rt.id === r.route_id)?.route_name,
-          driver_name: meta?.driver || nameOf(r.driver_id),
-          conductor_name: meta?.conductor || nameOf(r.conductor_id),
-          driver_phone: meta?.whatsapp || phoneOf(r.driver_id),
-          conductor_phone: phoneOf(r.conductor_id),
+          
+          // Display database values, not Excel notes
+          bus_no: actualBus?.bus_no || meta?.bus_no || 'N/A',
+          route_no: actualRoute?.route_no || meta?.route_no || 'N/A',
+          route_name: actualRoute?.route_name || meta?.route || 'N/A',
+          
+          // Use actual linked profiles first
+          driver_name: driver ? `${driver.first_name} ${driver.last_name}` : meta?.driver || 'N/A',
+          conductor_name: conductor ? `${conductor.first_name} ${conductor.last_name}` : meta?.conductor || 'N/A',
+          driver_phone: driver?.phone || meta?.whatsapp,
+          conductor_phone: conductor?.phone,
+          
           time: meta?.time,
         };
       });
