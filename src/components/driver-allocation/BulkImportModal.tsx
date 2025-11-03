@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import * as XLSX from 'xlsx';
+import { Upload, Download, FileSpreadsheet } from 'lucide-react';
 
 interface BulkImportModalProps {
   isOpen: boolean;
@@ -23,92 +27,126 @@ interface AllocationData {
 
 export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [parsedData, setParsedData] = useState<AllocationData[]>([]);
+  const [parseErrors, setParseErrors] = useState<string[]>([]);
 
-  // Pre-defined data from user's Excel
-  const predefinedData: AllocationData[] = [
-    {
-      busNo: 'NE 0746',
-      routeNo: '15',
-      routeName: 'Badulla to makumbura',
-      driverName: 'Jayashantha',
-      conductorName: 'Upul',
-      whatsapp: '0702502294',
-      date: '16/09/2025',
-      time: '10.30am'
-    },
-    {
-      busNo: 'NE 0762',
-      routeNo: '15',
-      routeName: 'Badulla to makumbura',
-      driverName: 'Mohan',
-      conductorName: 'Eranda',
-      whatsapp: '0768450468',
-      date: '17/09/2025',
-      time: '5.30pm'
-    },
-    {
-      busNo: 'NE 1184',
-      routeNo: '15',
-      routeName: 'makumbura to badulla',
-      driverName: 'Shantha',
-      conductorName: 'Eranda',
-      whatsapp: '0768450468',
-      date: '18/09/2025',
-      time: '10.30am'
-    },
-    {
-      busNo: 'NE 0746',
-      routeNo: '15',
-      routeName: 'makumbura to badulla',
-      driverName: 'Jayashantha',
-      conductorName: 'Upul',
-      whatsapp: '0702502294',
-      date: '19/09/2025',
-      time: '5.30pm'
-    },
-    {
-      busNo: 'NE 0746',
-      routeNo: '15',
-      routeName: 'Badulla to makumbura',
-      driverName: 'Indika',
-      conductorName: 'Kavinda',
-      whatsapp: '0702502294',
-      date: '20/09/2025',
-      time: '10.30am'
-    },
-    {
-      busNo: 'NE 0762',
-      routeNo: '15',
-      routeName: 'Badulla to makumbura',
-      driverName: 'Mohan',
-      conductorName: 'Eranda',
-      whatsapp: '0768450468',
-      date: '21/09/2025',
-      time: '5.30pm'
-    },
-    {
-      busNo: 'NE 0762',
-      routeNo: '15',
-      routeName: 'makumbura to badulla',
-      driverName: 'Mohan',
-      conductorName: 'Eranda',
-      whatsapp: '0768450468',
-      date: '22/09/2025',
-      time: '10.30am'
-    },
-    {
-      busNo: 'NE 0746',
-      routeNo: '15',
-      routeName: 'makumbura to badulla',
-      driverName: 'Indika',
-      conductorName: 'Kavinda',
-      whatsapp: '0702502294',
-      date: '23/09/2025',
-      time: '5.30pm'
-    }
-  ];
+  const downloadSampleTemplate = () => {
+    const sampleData = [
+      {
+        'Bus No': 'NE 0746',
+        'Route No': '15',
+        'Route Name': 'Badulla to makumbura',
+        'Driver': 'Jayashantha',
+        'Conductor': 'Upul',
+        'Whatsapp': '0702502294',
+        'Date': '01/10/2025',
+        'Time': '10.30am'
+      },
+      {
+        'Bus No': 'NE 0762',
+        'Route No': '15',
+        'Route Name': 'Badulla to makumbura',
+        'Driver': 'Mohan',
+        'Conductor': 'Eranda',
+        'Whatsapp': '0768450468',
+        'Date': '02/10/2025',
+        'Time': '5.30pm'
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Driver Allocations');
+    XLSX.writeFile(wb, 'driver_allocation_template.xlsx');
+    toast.success('Sample template downloaded!');
+  };
+
+  const validateDateFormat = (dateStr: string): boolean => {
+    // Accept DD/MM/YYYY or DD/MM/YY format
+    const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
+    return regex.test(dateStr);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const uploadedFile = event.target.files?.[0];
+    if (!uploadedFile) return;
+
+    setFile(uploadedFile);
+    setParseErrors([]);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+        const errors: string[] = [];
+        const allocations: AllocationData[] = [];
+
+        jsonData.forEach((row: any, index: number) => {
+          const rowNum = index + 2; // Excel row number (1-indexed + header)
+
+          // Validate required fields
+          if (!row['Bus No']) errors.push(`Row ${rowNum}: Missing Bus No`);
+          if (!row['Route No']) errors.push(`Row ${rowNum}: Missing Route No`);
+          if (!row['Route Name']) errors.push(`Row ${rowNum}: Missing Route Name`);
+          if (!row['Driver']) errors.push(`Row ${rowNum}: Missing Driver`);
+          if (!row['Conductor']) errors.push(`Row ${rowNum}: Missing Conductor`);
+          if (!row['Date']) errors.push(`Row ${rowNum}: Missing Date`);
+          if (!row['Time']) errors.push(`Row ${rowNum}: Missing Time`);
+
+          // Validate date format
+          if (row['Date'] && !validateDateFormat(String(row['Date']))) {
+            errors.push(`Row ${rowNum}: Invalid date format. Use DD/MM/YYYY (e.g., 01/10/2025)`);
+          }
+
+          // If no critical errors for this row, add to allocations
+          if (row['Bus No'] && row['Route No'] && row['Date']) {
+            allocations.push({
+              busNo: String(row['Bus No']).trim(),
+              routeNo: String(row['Route No']).trim(),
+              routeName: String(row['Route Name'] || '').trim(),
+              driverName: String(row['Driver'] || '').trim(),
+              conductorName: String(row['Conductor'] || '').trim(),
+              whatsapp: String(row['Whatsapp'] || '').trim(),
+              date: String(row['Date']).trim(),
+              time: String(row['Time'] || '').trim()
+            });
+          }
+        });
+
+        setParseErrors(errors);
+        setParsedData(allocations);
+
+        if (allocations.length > 0) {
+          toast.success(`Parsed ${allocations.length} allocations from Excel`);
+        }
+        if (errors.length > 0) {
+          toast.warning(`Found ${errors.length} validation errors`);
+        }
+      } catch (error) {
+        console.error('Excel parsing error:', error);
+        toast.error('Failed to parse Excel file. Please check the format.');
+      }
+    };
+
+    reader.readAsArrayBuffer(uploadedFile);
+  };
 
   const handleBulkImport = async () => {
+    if (parsedData.length === 0) {
+      toast.error('No data to import. Please upload an Excel file first.');
+      return;
+    }
+
+    if (parseErrors.length > 0) {
+      toast.error('Please fix validation errors before importing');
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -119,7 +157,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
           'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ allocations: predefinedData })
+        body: JSON.stringify({ allocations: parsedData })
       });
 
       if (!response.ok) {
@@ -139,6 +177,10 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
         }
         onSuccess();
         onClose();
+        // Reset state
+        setFile(null);
+        setParsedData([]);
+        setParseErrors([]);
       }
 
       if (result.errors.length > 0) {
@@ -156,58 +198,135 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Bulk Import Driver Allocations</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5" />
+            Bulk Import Driver Allocations from Excel
+          </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div className="bg-muted p-4 rounded-lg">
-            <h3 className="font-semibold mb-2">Preview Data ({predefinedData.length} allocations)</h3>
-            <div className="max-h-60 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2">Bus No</th>
-                    <th className="text-left p-2">Route</th>
-                    <th className="text-left p-2">Driver</th>
-                    <th className="text-left p-2">Conductor</th>
-                    <th className="text-left p-2">Date</th>
-                    <th className="text-left p-2">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {predefinedData.map((allocation, index) => (
-                    <tr key={index} className="border-b">
-                      <td className="p-2">{allocation.busNo}</td>
-                      <td className="p-2">{allocation.routeName}</td>
-                      <td className="p-2">{allocation.driverName}</td>
-                      <td className="p-2">{allocation.conductorName}</td>
-                      <td className="p-2">{allocation.date}</td>
-                      <td className="p-2">{allocation.time}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h4 className="font-semibold text-blue-900 mb-2">What will be created:</h4>
-            <ul className="text-blue-800 space-y-1">
-              <li>• 3 buses (NE 0746, NE 0762, NE 1184) - if they don't exist</li>
-              <li>• Route 15 with bidirectional paths - if they don't exist</li>
-              <li>• 7 staff members (4 drivers, 3 conductors) - if they don't exist</li>
-              <li>• 8 driver allocations with corresponding daily trips</li>
+        <div className="space-y-6">
+          {/* Instructions */}
+          <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+            <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Excel Format Instructions:</h4>
+            <ul className="text-blue-800 dark:text-blue-200 space-y-1 text-sm">
+              <li>• Required columns: <strong>Bus No, Route No, Route Name, Driver, Conductor, Date, Time</strong></li>
+              <li>• Optional column: <strong>Whatsapp</strong> (phone number)</li>
+              <li>• Date format: <strong>DD/MM/YYYY</strong> (e.g., 01/10/2025 for October 1, 2025)</li>
+              <li>• Time format: <strong>HH.MMam/pm</strong> (e.g., 10.30am, 5.30pm)</li>
+              <li>• All fields are case-sensitive and must match exactly</li>
             </ul>
           </div>
 
-          <div className="flex justify-end space-x-2">
+          {/* Download Template Button */}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={downloadSampleTemplate}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Download Sample Template
+            </Button>
+          </div>
+
+          {/* File Upload */}
+          <div className="space-y-2">
+            <Label htmlFor="excel-upload">Upload Excel File (.xlsx or .xls)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="excel-upload"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileUpload}
+                disabled={isProcessing}
+              />
+            </div>
+            {file && (
+              <p className="text-sm text-muted-foreground">
+                Selected: {file.name}
+              </p>
+            )}
+          </div>
+
+          {/* Parse Errors */}
+          {parseErrors.length > 0 && (
+            <div className="bg-destructive/10 border border-destructive/30 p-4 rounded-lg">
+              <h4 className="font-semibold text-destructive mb-2">Validation Errors ({parseErrors.length}):</h4>
+              <div className="max-h-40 overflow-y-auto space-y-1">
+                {parseErrors.map((error, index) => (
+                  <p key={index} className="text-sm text-destructive">• {error}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Preview Data */}
+          {parsedData.length > 0 && (
+            <div className="bg-muted/50 p-4 rounded-lg border">
+              <h3 className="font-semibold mb-3">Preview Data ({parsedData.length} allocations)</h3>
+              <div className="max-h-96 overflow-y-auto border rounded">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted sticky top-0">
+                    <tr className="border-b">
+                      <th className="text-left p-2 font-medium">Bus No</th>
+                      <th className="text-left p-2 font-medium">Route</th>
+                      <th className="text-left p-2 font-medium">Route Name</th>
+                      <th className="text-left p-2 font-medium">Driver</th>
+                      <th className="text-left p-2 font-medium">Conductor</th>
+                      <th className="text-left p-2 font-medium">Date</th>
+                      <th className="text-left p-2 font-medium">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedData.map((allocation, index) => (
+                      <tr key={index} className="border-b hover:bg-muted/50">
+                        <td className="p-2">{allocation.busNo}</td>
+                        <td className="p-2">{allocation.routeNo}</td>
+                        <td className="p-2">{allocation.routeName}</td>
+                        <td className="p-2">{allocation.driverName}</td>
+                        <td className="p-2">{allocation.conductorName}</td>
+                        <td className="p-2">{allocation.date}</td>
+                        <td className="p-2">{allocation.time}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* What Will Be Created */}
+          {parsedData.length > 0 && parseErrors.length === 0 && (
+            <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg border border-green-200 dark:border-green-800">
+              <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">Ready to Import:</h4>
+              <ul className="text-green-800 dark:text-green-200 space-y-1 text-sm">
+                <li>• {parsedData.length} driver allocations will be created</li>
+                <li>• New buses, routes, and staff members will be created automatically if they don't exist</li>
+                <li>• Each allocation will generate a corresponding daily trip entry</li>
+              </ul>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" onClick={onClose} disabled={isProcessing}>
               Cancel
             </Button>
-            <Button onClick={handleBulkImport} disabled={isProcessing}>
-              {isProcessing ? 'Processing...' : 'Import All Data'}
+            <Button 
+              onClick={handleBulkImport} 
+              disabled={isProcessing || parsedData.length === 0 || parseErrors.length > 0}
+              className="flex items-center gap-2"
+            >
+              {isProcessing ? (
+                <>Processing...</>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Import {parsedData.length} Allocations
+                </>
+              )}
             </Button>
           </div>
         </div>
