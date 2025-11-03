@@ -34,6 +34,7 @@ interface Holiday {
   holiday_date: string;
   holiday_name: string;
   type: string;
+  is_mercantile: boolean;
 }
 
 const WEEKDAY_MAP: Record<string, number> = {
@@ -45,31 +46,47 @@ function isWeekend(date: Date): boolean {
   return day === 0 || day === 6;
 }
 
-function isHolidayOrWeekend(date: Date, holidays: string[]): boolean {
+function isHolidayOrWeekend(date: Date, holidayDates: string[]): boolean {
   if (isWeekend(date)) return true;
   const dateStr = format(date, 'yyyy-MM-dd');
-  return holidays.includes(dateStr);
+  return holidayDates.includes(dateStr);
 }
 
-function rollBackToWorkingDay(date: Date, holidays: string[]): { date: Date; adjusted: boolean } {
+function rollBackToWorkingDay(
+  date: Date, 
+  holidayDates: string[], 
+  holidayData: Holiday[]
+): { date: Date; adjusted: boolean; reason?: string; originalDate?: Date } {
+  const originalDate = new Date(date);
   let adjustedDate = new Date(date);
   let wasAdjusted = false;
+  let reason = '';
 
-  while (isHolidayOrWeekend(adjustedDate, holidays)) {
+  while (isHolidayOrWeekend(adjustedDate, holidayDates)) {
+    const dateStr = format(adjustedDate, 'yyyy-MM-dd');
+    const holiday = holidayData.find(h => h.holiday_date === dateStr);
+    
+    if (holiday) {
+      reason = `Moved from ${format(originalDate, 'MMM dd')} due to ${holiday.holiday_name}${holiday.is_mercantile ? ' (Mercantile Holiday)' : ''}`;
+    } else if (isWeekend(adjustedDate)) {
+      reason = `Moved from ${format(originalDate, 'MMM dd')} (weekend)`;
+    }
+    
     adjustedDate.setDate(adjustedDate.getDate() - 1);
     wasAdjusted = true;
   }
 
-  return { date: adjustedDate, adjusted: wasAdjusted };
+  return { date: adjustedDate, adjusted: wasAdjusted, reason: wasAdjusted ? reason : undefined, originalDate: wasAdjusted ? originalDate : undefined };
 }
 
 function generateOccurrences(
   rule: FrequencyRule,
   startDate: Date,
   endDate: Date,
-  holidays: string[]
-): Array<{ date: Date; adjusted: boolean }> {
-  const occurrences: Array<{ date: Date; adjusted: boolean }> = [];
+  holidayDates: string[],
+  holidayData: Holiday[]
+): Array<{ date: Date; adjusted: boolean; reason?: string; originalDate?: Date }> {
+  const occurrences: Array<{ date: Date; adjusted: boolean; reason?: string; originalDate?: Date }> = [];
   const { rule_type, params } = rule;
 
   switch (rule_type) {
@@ -78,7 +95,7 @@ function generateOccurrences(
       let current = new Date(startDate);
       while (current <= endDate) {
         if (includeWeekends || !isWeekend(current)) {
-          occurrences.push(rollBackToWorkingDay(new Date(current), holidays));
+          occurrences.push(rollBackToWorkingDay(new Date(current), holidayDates, holidayData));
         }
         current.setDate(current.getDate() + 1);
       }
@@ -93,7 +110,7 @@ function generateOccurrences(
         current.setDate(current.getDate() + 1);
       }
       while (current <= endDate) {
-        occurrences.push(rollBackToWorkingDay(new Date(current), holidays));
+        occurrences.push(rollBackToWorkingDay(new Date(current), holidayDates, holidayData));
         current.setDate(current.getDate() + 7);
       }
       break;
@@ -108,7 +125,7 @@ function generateOccurrences(
       }
       while (current <= endDate) {
         if (current.getDay() === targetDay) {
-          occurrences.push(rollBackToWorkingDay(new Date(current), holidays));
+          occurrences.push(rollBackToWorkingDay(new Date(current), holidayDates, holidayData));
         }
         current.setDate(current.getDate() + 14);
       }
@@ -123,7 +140,7 @@ function generateOccurrences(
         const targetDay = Math.min(params.day, lastDay);
         const targetDate = new Date(current.getFullYear(), current.getMonth(), targetDay);
         if (targetDate >= startDate && targetDate <= endDate) {
-          occurrences.push(rollBackToWorkingDay(targetDate, holidays));
+          occurrences.push(rollBackToWorkingDay(targetDate, holidayDates, holidayData));
         }
         current = addMonths(current, 1);
       }
@@ -135,7 +152,7 @@ function generateOccurrences(
       while (current <= endDate) {
         const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
         if (monthEnd >= startDate && monthEnd <= endDate) {
-          occurrences.push(rollBackToWorkingDay(monthEnd, holidays));
+          occurrences.push(rollBackToWorkingDay(monthEnd, holidayDates, holidayData));
         }
         current = addMonths(current, 1);
       }
@@ -158,7 +175,7 @@ function generateOccurrences(
         if (weekdayOccurrences.length >= params.weekNumber) {
           const targetDate = weekdayOccurrences[params.weekNumber - 1];
           if (targetDate >= startDate && targetDate <= endDate) {
-            occurrences.push(rollBackToWorkingDay(targetDate, holidays));
+            occurrences.push(rollBackToWorkingDay(targetDate, holidayDates, holidayData));
           }
         }
         current = addMonths(current, 1);
@@ -178,7 +195,7 @@ function generateOccurrences(
         for (let day = windowStart; day <= windowEnd; day++) {
           const candidateDate = new Date(current.getFullYear(), current.getMonth(), day);
           if (candidateDate >= startDate && candidateDate <= endDate) {
-            if (!isHolidayOrWeekend(candidateDate, holidays)) {
+            if (!isHolidayOrWeekend(candidateDate, holidayDates)) {
               occurrences.push({ date: candidateDate, adjusted: false });
               found = true;
               break;
@@ -188,7 +205,7 @@ function generateOccurrences(
         if (!found) {
           const windowEndDate = new Date(current.getFullYear(), current.getMonth(), windowEnd);
           if (windowEndDate >= startDate && windowEndDate <= endDate) {
-            occurrences.push(rollBackToWorkingDay(windowEndDate, holidays));
+            occurrences.push(rollBackToWorkingDay(windowEndDate, holidayDates, holidayData));
           }
         }
         current = addMonths(current, 1);
@@ -220,14 +237,15 @@ Deno.serve(async (req) => {
     // Load holidays
     const { data: holidaysData, error: holidaysError } = await supabase
       .from('holidays')
-      .select('holiday_date, holiday_name, type')
+      .select('holiday_date, holiday_name, type, is_mercantile')
       .gte('holiday_date', format(startDate, 'yyyy-MM-dd'))
       .lte('holiday_date', format(endDate, 'yyyy-MM-dd'));
 
     if (holidaysError) throw holidaysError;
 
-    const holidays = (holidaysData || []).map((h: Holiday) => h.holiday_date);
-    console.log(`🏖️ Loaded ${holidays.length} holidays`);
+    const holidayData = (holidaysData || []) as Holiday[];
+    const holidayDates = holidayData.map((h: Holiday) => h.holiday_date);
+    console.log(`🏖️ Loaded ${holidayData.length} holidays`);
 
     // Load active governance items with their frequency rules
     const { data: items, error: itemsError } = await supabase
@@ -258,12 +276,12 @@ Deno.serve(async (req) => {
       console.log(`🔧 Generating occurrences for item ${item.id} with rule ${rule.rule_type}`);
 
       // Generate occurrences
-      const occurrences = generateOccurrences(rule, startDate, endDate, holidays);
+      const occurrences = generateOccurrences(rule, startDate, endDate, holidayDates, holidayData);
 
       console.log(`✅ Generated ${occurrences.length} occurrences for item ${item.id}`);
 
       // Upsert occurrences (don't override manual edits)
-      for (const { date, adjusted } of occurrences) {
+      for (const { date, adjusted, reason, originalDate } of occurrences) {
         const scheduledDate = format(date, 'yyyy-MM-dd');
         
         // Check if already exists with manual override
@@ -288,6 +306,8 @@ Deno.serve(async (req) => {
             scheduled_date: scheduledDate,
             original_rule_text: `${rule.description} (${rule.rule_type})`,
             is_holiday_adjusted: adjusted,
+            adjusted_reason: reason || null,
+            original_scheduled_date: originalDate ? format(originalDate, 'yyyy-MM-dd') : null,
             status: 'Planned',
             created_by_engine_at: new Date().toISOString(),
           }, {

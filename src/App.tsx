@@ -55,6 +55,7 @@ import NSPDailySales from "./pages/NSPDailySales";
 import NSPSalesSummary from "./pages/NSPSalesSummary";
 import QuickTripsEntry from "./pages/QuickTripsEntry";
 import GovernanceCalendar from "./pages/GovernanceCalendar";
+import HolidayManagement from "./pages/HolidayManagement";
 import SeasonalThemes from "./pages/SeasonalThemes";
 
 const queryClient = new QueryClient();
@@ -517,6 +518,19 @@ const App = () => (
                   <PageAccessGuard pageId="governance_calendar">
                     <AppLayout>
                       <GovernanceCalendar />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/governance/holidays" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'governance_admin']}>
+                  <PageAccessGuard pageId="governance_holidays">
+                    <AppLayout>
+                      <HolidayManagement />
                     </AppLayout>
                   </PageAccessGuard>
                 </ProtectedRoute>

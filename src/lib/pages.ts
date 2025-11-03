@@ -53,6 +53,7 @@ export const PAGES: PageCategories = {
   ],
   governance: [
     { id: "governance_calendar", title: "Governance Calendar", url: "/governance/calendar" },
+    { id: "governance_holidays", title: "Holiday Management", url: "/governance/holidays" },
     { id: "seasonal_themes", title: "Seasonal Themes", url: "/seasonal-themes" },
   ],
 };

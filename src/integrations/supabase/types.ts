@@ -210,6 +210,50 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_periods: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_date: string
+          id: string
+          is_active: boolean | null
+          name: string
+          start_date: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          start_date: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocked_periods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bus_loan_payments: {
         Row: {
           actual_payment_date: string | null
@@ -1333,6 +1377,7 @@ export type Database = {
       }
       governance_occurrences: {
         Row: {
+          adjusted_reason: string | null
           attachments: Json | null
           completed_at: string | null
           completed_by: string | null
@@ -1344,11 +1389,13 @@ export type Database = {
           manual_override: boolean | null
           notes: string | null
           original_rule_text: string | null
+          original_scheduled_date: string | null
           scheduled_date: string
           status: Database["public"]["Enums"]["governance_item_status"] | null
           updated_at: string
         }
         Insert: {
+          adjusted_reason?: string | null
           attachments?: Json | null
           completed_at?: string | null
           completed_by?: string | null
@@ -1360,11 +1407,13 @@ export type Database = {
           manual_override?: boolean | null
           notes?: string | null
           original_rule_text?: string | null
+          original_scheduled_date?: string | null
           scheduled_date: string
           status?: Database["public"]["Enums"]["governance_item_status"] | null
           updated_at?: string
         }
         Update: {
+          adjusted_reason?: string | null
           attachments?: Json | null
           completed_at?: string | null
           completed_by?: string | null
@@ -1376,6 +1425,7 @@ export type Database = {
           manual_override?: boolean | null
           notes?: string | null
           original_rule_text?: string | null
+          original_scheduled_date?: string | null
           scheduled_date?: string
           status?: Database["public"]["Enums"]["governance_item_status"] | null
           updated_at?: string
@@ -1468,6 +1518,7 @@ export type Database = {
           holiday_date: string
           holiday_name: string
           id: string
+          is_mercantile: boolean | null
           is_recurring: boolean | null
           type: string | null
         }
@@ -1477,6 +1528,7 @@ export type Database = {
           holiday_date: string
           holiday_name: string
           id?: string
+          is_mercantile?: boolean | null
           is_recurring?: boolean | null
           type?: string | null
         }
@@ -1486,6 +1538,7 @@ export type Database = {
           holiday_date?: string
           holiday_name?: string
           id?: string
+          is_mercantile?: boolean | null
           is_recurring?: boolean | null
           type?: string | null
         }

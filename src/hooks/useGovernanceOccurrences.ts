@@ -12,6 +12,7 @@ export interface GovernanceOccurrence {
   due_date: string | null;
   status: OccurrenceStatus;
   is_holiday_adjusted: boolean;
+  adjusted_reason: string | null;
   original_scheduled_date: string | null;
   notes: string | null;
   created_at: string;
