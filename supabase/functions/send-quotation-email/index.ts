@@ -31,6 +31,14 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Check if API key exists
+    if (!BREVO_API_KEY) {
+      console.error(`[${timestamp}] ❌ BREVO_API_KEY not found in environment variables`);
+      throw new Error('BREVO_API_KEY is not configured. Please add it in Supabase Edge Function secrets.');
+    }
+    
+    console.log(`[${timestamp}] ✅ BREVO_API_KEY found, length:`, BREVO_API_KEY.length);
+    
     const body = await req.json();
     console.log(`[${timestamp}] 📋 Request body keys:`, Object.keys(body));
     console.log(`[${timestamp}] 👤 Recipient:`, body.to);
