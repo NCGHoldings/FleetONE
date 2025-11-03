@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CalendarIcon, Download } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatDateDisplay } from "@/lib/utils";
 import { 
   getRevenueAccountCode, 
   getExpenseAccountCode, 
@@ -129,7 +129,7 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
     
     switch (key) {
       case 'trip_date':
-        return new Date(value).toLocaleDateString();
+        return formatDateDisplay(value);
       case 'income':
       case 'fuel_cost':
       case 'other_expenses':
@@ -206,7 +206,7 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
               rows.push([
                 trip.trip_no || '',
                 trip.bus_no || '',
-                format(new Date(trip.trip_date), 'yyyy-MM-dd'),
+                formatDateDisplay(trip.trip_date),
                 accountCode.code,
                 accountCode.name,
                 formatExportAmount(Number(amount)),
@@ -226,7 +226,7 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
               rows.push([
                 trip.trip_no || '',
                 trip.bus_no || '',
-                format(new Date(trip.trip_date), 'yyyy-MM-dd'),
+                formatDateDisplay(trip.trip_date),
                 accountCode.code,
                 accountCode.name,
                 formatExportAmount(Number(amount)),
@@ -262,7 +262,7 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
             const accountCode = getRevenueAccountCode(fieldName);
             if (accountCode) {
               rows.push([
-                format(new Date(trip.trip_date), 'yyyy-MM-dd'),
+                formatDateDisplay(trip.trip_date),
                 trip.trip_no || '',
                 trip.bus_no || '',
                 accountCode.code,
@@ -283,7 +283,7 @@ export function ExportModal({ isOpen, onClose, data }: ExportModalProps) {
             const accountCode = getExpenseAccountCode(fieldName);
             if (accountCode) {
               rows.push([
-                format(new Date(trip.trip_date), 'yyyy-MM-dd'),
+                formatDateDisplay(trip.trip_date),
                 trip.trip_no || '',
                 trip.bus_no || '',
                 accountCode.code,

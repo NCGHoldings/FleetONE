@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatDateDisplay } from "@/lib/utils";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
@@ -97,7 +97,7 @@ const createColumns = (
     header: "Date",
     cell: ({ row }) => {
       const date = row.getValue("trip_date") as string;
-      return new Date(date).toLocaleDateString();
+      return formatDateDisplay(date);
     },
   },
   {

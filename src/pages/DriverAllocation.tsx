@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Calendar, CheckCircle, MessageCircle, Plus, Send, ShieldAlert, Upload, Download, Edit, Trash2 } from "lucide-react";
 import * as XLSX from 'xlsx';
+import { formatDateDisplay } from "@/lib/utils";
 
 interface AllocationRow {
   id: string;
@@ -93,6 +94,10 @@ export default function DriverAllocation() {
     fetchAllocations();
   }, []);
 
+  useEffect(() => {
+    fetchAllocations();
+  }, [filterStartDate, filterEndDate]);
+
   const fetchLists = async () => {
     try {
       const [busesRes, routesRes, staffRes] = await Promise.all([
@@ -133,11 +138,21 @@ export default function DriverAllocation() {
   const fetchAllocations = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('driver_allocations')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .select('*');
+
+      // Apply date filters if set
+      if (filterStartDate) {
+        query = query.gte('allocation_date', filterStartDate);
+      }
+      if (filterEndDate) {
+        query = query.lte('allocation_date', filterEndDate);
+      }
+
+      const { data, error } = await query
+        .order('allocation_date', { ascending: false })
+        .limit(500);
       if (error) throw error;
 
       const rows: AllocationRow[] = (data || []).map((r: any) => {
@@ -748,7 +763,7 @@ export default function DriverAllocation() {
       'Route Name': row.route_name,
       'Driver': row.driver_name,
       'Conductor': row.conductor_name,
-      'Date': row.date,
+      'Date': formatDateDisplay(row.date),
       'Start Time': row.start_time,
       'End Time': row.end_time,
       'Status': row.status
@@ -906,7 +921,11 @@ export default function DriverAllocation() {
 
   const columns: ColumnDef<AllocationRow>[] = [
     { accessorKey: 'trip_id', header: 'Trip ID' },
-    { accessorKey: 'date', header: 'Date' },
+    { 
+      accessorKey: 'date', 
+      header: 'Date',
+      cell: ({ row }) => formatDateDisplay(row.getValue('date') as string)
+    },
     { accessorKey: 'bus_no', header: 'Bus No.' },
     { accessorKey: 'route_no', header: 'Route No.' },
     { accessorKey: 'route_name', header: 'Route' },
