@@ -53,6 +53,36 @@ export function useYutongOrderInvoiceManagement() {
     setIsLoading(true);
     
     try {
+      // Fetch verified payments for this order
+      const { data: verifiedPayments, error: paymentsError } = await supabase
+        .from('yutong_customer_payments')
+        .select('*')
+        .eq('order_id', orderId)
+        .eq('status', 'verified')
+        .order('payment_date', { ascending: true });
+
+      if (paymentsError) throw paymentsError;
+
+      // Calculate payment totals
+      const totalPaid = verifiedPayments?.reduce((sum, p) => sum + p.payment_amount, 0) || 0;
+      const balanceDue = invoiceData.total - totalPaid;
+
+      // Enrich invoice data with payment information
+      invoiceData = {
+        ...invoiceData,
+        paymentsReceived: verifiedPayments?.map(p => ({
+          payment_date: p.payment_date,
+          amount: p.payment_amount,
+          reference_no: p.payment_reference,
+          payment_method: p.payment_method,
+          verified_by: p.verified_by,
+          verified_at: p.verified_at
+        })) || [],
+        totalPaid,
+        balanceDue,
+        lastPaymentDate: verifiedPayments?.[verifiedPayments.length - 1]?.payment_date
+      };
+      
       // Generate invoice number
       console.log('📝 Step 1: Generating invoice number...');
       const { data: invoiceNoData, error: invoiceNoError } = await supabase
@@ -315,7 +345,12 @@ export function useYutongOrderInvoiceManagement() {
       // Get document with invoice data
       const { data: document, error: docError } = await supabase
         .from('yutong_invoice_documents')
-        .select('*')
+        .select(`
+          *,
+          yutong_invoice_records (
+            order_id
+          )
+        `)
         .eq('id', documentId)
         .single();
       
@@ -354,11 +389,45 @@ export function useYutongOrderInvoiceManagement() {
           };
         }
       }
+
+      // Fetch latest verified payments
+      const orderId = (document.yutong_invoice_records as any)?.order_id;
+      let paymentData = {};
       
-      // Merge invoice data with latest signatures
+      if (orderId) {
+        const { data: verifiedPayments, error: paymentsError } = await supabase
+          .from('yutong_customer_payments')
+          .select('*')
+          .eq('order_id', orderId)
+          .eq('status', 'verified')
+          .order('payment_date', { ascending: true });
+
+        if (!paymentsError && verifiedPayments) {
+          const invoiceTotal = (document.invoice_data as any)?.total || 0;
+          const totalPaid = verifiedPayments.reduce((sum, p) => sum + p.payment_amount, 0);
+          const balanceDue = invoiceTotal - totalPaid;
+
+          paymentData = {
+            paymentsReceived: verifiedPayments.map(p => ({
+              payment_date: p.payment_date,
+              amount: p.payment_amount,
+              reference_no: p.payment_reference,
+              payment_method: p.payment_method,
+              verified_by: p.verified_by,
+              verified_at: p.verified_at
+            })),
+            totalPaid,
+            balanceDue,
+            lastPaymentDate: verifiedPayments[verifiedPayments.length - 1]?.payment_date
+          };
+        }
+      }
+      
+      // Merge invoice data with latest signatures and payments
       const updatedInvoiceData = {
         ...(document.invoice_data as unknown as YutongOrderInvoiceData),
-        ...signatureData
+        ...signatureData,
+        ...paymentData
       };
       
       // Regenerate PDF with updated data

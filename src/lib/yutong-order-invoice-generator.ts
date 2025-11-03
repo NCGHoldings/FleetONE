@@ -27,6 +27,18 @@ export interface YutongOrderInvoiceData {
   subtotal: number;
   total: number;
   invoice_status: 'draft' | 'approved';
+  // Payment tracking
+  paymentsReceived?: Array<{
+    payment_date: string;
+    amount: number;
+    reference_no?: string;
+    payment_method?: string;
+    verified_by?: string;
+    verified_at?: string;
+  }>;
+  totalPaid?: number;
+  balanceDue?: number;
+  lastPaymentDate?: string;
   preparedBy?: {
     approver_name: string;
     signature_data?: string;
@@ -475,6 +487,64 @@ ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
       </tr>
     </table>
   </div>
+
+  ${data.paymentsReceived && data.paymentsReceived.length > 0 ? `
+  <!-- Payment History Section -->
+  <div class="bank-details">
+    <h3 style="background: #0b2f66; color: white; padding: 10px; margin: 0 0 15px 0; border-radius: 4px;">Payment History</h3>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+      <thead>
+        <tr style="background: #e8f6ff; border: 1px solid #0b2f66;">
+          <th style="padding: 10px; text-align: left; border: 1px solid #0b2f66; font-weight: 700;">Date</th>
+          <th style="padding: 10px; text-align: left; border: 1px solid #0b2f66; font-weight: 700;">Reference</th>
+          <th style="padding: 10px; text-align: left; border: 1px solid #0b2f66; font-weight: 700;">Method</th>
+          <th style="padding: 10px; text-align: right; border: 1px solid #0b2f66; font-weight: 700;">Amount (LKR)</th>
+          <th style="padding: 10px; text-align: center; border: 1px solid #0b2f66; font-weight: 700;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.paymentsReceived.map(payment => `
+          <tr style="background: #f9f9f9;">
+            <td style="padding: 8px; border: 1px solid #0b2f66;">${new Date(payment.payment_date).toLocaleDateString('en-GB')}</td>
+            <td style="padding: 8px; border: 1px solid #0b2f66;">${payment.reference_no || '-'}</td>
+            <td style="padding: 8px; border: 1px solid #0b2f66; text-transform: capitalize;">${payment.payment_method?.replace('_', ' ') || '-'}</td>
+            <td style="padding: 8px; text-align: right; border: 1px solid #0b2f66; font-weight: 600;">${payment.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+            <td style="padding: 8px; text-align: center; border: 1px solid #0b2f66;">
+              <span style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">VERIFIED</span>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    
+    <table style="width: 100%; border-collapse: collapse; background: #e8f6ff; border: 2px solid #0b2f66;">
+      <tr>
+        <td style="padding: 12px; font-weight: 700; border-bottom: 1px solid #0b2f66;">Invoice Total:</td>
+        <td style="padding: 12px; text-align: right; font-weight: 700; border-bottom: 1px solid #0b2f66;">LKR ${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+      </tr>
+      <tr style="color: #10b981;">
+        <td style="padding: 12px; font-weight: 700; border-bottom: 1px solid #0b2f66;">Total Paid:</td>
+        <td style="padding: 12px; text-align: right; font-weight: 700; border-bottom: 1px solid #0b2f66;">(LKR ${(data.totalPaid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })})</td>
+      </tr>
+      <tr style="background: #0b2f66; color: white;">
+        <td style="padding: 12px; font-weight: 700; font-size: 16px;">Balance Due:</td>
+        <td style="padding: 12px; text-align: right; font-weight: 700; font-size: 18px; color: #fbbf24;">LKR ${(data.balanceDue || data.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    </table>
+  </div>
+  ` : `
+  <!-- Payment Status (No Payments) -->
+  <div class="bank-details">
+    <div style="background: #fef3c7; border: 2px solid #f59e0b; padding: 20px; border-radius: 8px; margin-top: 20px;">
+      <h3 style="color: #92400e; margin: 0 0 10px 0; font-size: 18px;">Payment Status</h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+        <span style="font-weight: 700; color: #78350f; font-size: 16px;">Total Amount Due:</span>
+        <span style="font-weight: 700; color: #dc2626; font-size: 22px;">LKR ${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+      </div>
+      <p style="margin: 15px 0 0 0; font-size: 13px; color: #92400e;">No payments received yet. Please make payment as per the terms above.</p>
+    </div>
+  </div>
+  `}
 
   <!-- Signatures Section -->
   <div class="signatures-section">
