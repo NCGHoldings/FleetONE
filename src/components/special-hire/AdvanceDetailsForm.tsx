@@ -61,11 +61,7 @@ export default function AdvanceDetailsForm({
   }>({ open: false, field: '', title: '' });
 
   const [signatures, setSignatures] = useState<{
-    driver?: { data: string; type: string };
-    conductor?: { data: string; type: string };
     preparedBy?: { data: string; type: string };
-    checkedBy?: { data: string; type: string };
-    authorizedBy?: { data: string; type: string };
   }>({});
 
   const form = useForm<FormValues>({
@@ -91,11 +87,7 @@ export default function AdvanceDetailsForm({
   useEffect(() => {
     if (existingData) {
       setSignatures({
-        driver: existingData.driverSignature,
-        conductor: existingData.conductorSignature,
         preparedBy: existingData.preparedBySignature,
-        checkedBy: existingData.checkedBySignature,
-        authorizedBy: existingData.authorizedBySignature,
       });
     }
   }, [existingData]);
@@ -139,18 +131,14 @@ export default function AdvanceDetailsForm({
       driverSalary: parseFloat(values.driverSalary || '0'),
       driverHighwayCharges: parseFloat(values.driverHighwayCharges || '0'),
       driverOtherCharges: parseFloat(values.driverOtherCharges || '0'),
-      driverSignature: signatures.driver,
       conductorName: values.conductorName,
       conductorContact: values.conductorContact,
       conductorMealAllowance: parseFloat(values.conductorMealAllowance || '0'),
       conductorSalary: parseFloat(values.conductorSalary || '0'),
-      conductorSignature: signatures.conductor,
       preparedBy: values.preparedBy,
       preparedBySignature: signatures.preparedBy,
       checkedBy: values.checkedBy,
-      checkedBySignature: signatures.checkedBy,
       authorizedBy: values.authorizedBy,
-      authorizedBySignature: signatures.authorizedBy,
       totalAmount,
       notes: values.notes,
     };
@@ -282,21 +270,6 @@ export default function AdvanceDetailsForm({
                 )}
               />
             </div>
-            <div className="mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => openSignatureModal('driver', 'Driver Signature')}
-                disabled={disabled}
-              >
-                <FileSignature className="w-4 h-4 mr-2" />
-                {signatures.driver ? 'Update' : 'Add'} Driver Signature
-              </Button>
-              {signatures.driver && (
-                <span className="ml-2 text-sm text-green-600">✓ Signature captured</span>
-              )}
-            </div>
           </div>
 
           <Separator />
@@ -358,23 +331,6 @@ export default function AdvanceDetailsForm({
                 )}
               />
             </div>
-            {watchedValues.conductorName && (
-              <div className="mt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openSignatureModal('conductor', 'Conductor Signature')}
-                  disabled={disabled}
-                >
-                  <FileSignature className="w-4 h-4 mr-2" />
-                  {signatures.conductor ? 'Update' : 'Add'} Conductor Signature
-                </Button>
-                {signatures.conductor && (
-                  <span className="ml-2 text-sm text-green-600">✓ Signature captured</span>
-                )}
-              </div>
-            )}
           </div>
 
           <Separator />
@@ -427,24 +383,6 @@ export default function AdvanceDetailsForm({
                     </FormItem>
                   )}
                 />
-                {watchedValues.checkedBy && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => openSignatureModal('checkedBy', 'Checked By Signature')}
-                      disabled={disabled}
-                    >
-                      <FileSignature className="w-4 h-4 mr-2" />
-                      {signatures.checkedBy ? 'Update' : 'Add'} Signature
-                    </Button>
-                    {signatures.checkedBy && (
-                      <p className="text-sm text-green-600 mt-1">✓ Signature captured</p>
-                    )}
-                  </>
-                )}
               </div>
 
               <div>
@@ -461,24 +399,6 @@ export default function AdvanceDetailsForm({
                     </FormItem>
                   )}
                 />
-                {watchedValues.authorizedBy && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => openSignatureModal('authorizedBy', 'Authorized By Signature')}
-                      disabled={disabled}
-                    >
-                      <FileSignature className="w-4 h-4 mr-2" />
-                      {signatures.authorizedBy ? 'Update' : 'Add'} Signature
-                    </Button>
-                    {signatures.authorizedBy && (
-                      <p className="text-sm text-green-600 mt-1">✓ Signature captured</p>
-                    )}
-                  </>
-                )}
               </div>
             </div>
           </div>

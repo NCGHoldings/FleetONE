@@ -108,38 +108,38 @@ export function useAdvanceDetails() {
       const recordData = {
         quotation_id: data.quotationId,
         payment_id: data.paymentId,
-        quotation_no: data.quotationNo,
-        hire_date: data.hireDate ? new Date(data.hireDate).toISOString().split('T')[0] : undefined,
-        pickup_location: data.pickupLocation,
-        drop_location: data.dropLocation,
-        number_of_days: data.numberOfDays,
-        driver_name: data.driverName,
-        driver_contact: data.driverContact,
-        driver_meal_allowance: data.driverMealAllowance,
-        driver_salary: data.driverSalary,
-        driver_highway_charges: data.driverHighwayCharges,
-        driver_other_charges: data.driverOtherCharges,
-        driver_signature_data: data.driverSignature?.data,
-        driver_signature_type: data.driverSignature?.type,
-        conductor_name: data.conductorName,
-        conductor_contact: data.conductorContact,
+        quotation_no: data.quotationNo || '',
+        hire_date: data.hireDate ? new Date(data.hireDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        pickup_location: data.pickupLocation || '',
+        drop_location: data.dropLocation || '',
+        number_of_days: data.numberOfDays || 1,
+        driver_name: data.driverName || '',
+        driver_contact: data.driverContact || '',
+        driver_meal_allowance: data.driverMealAllowance || 0,
+        driver_salary: data.driverSalary || 0,
+        driver_highway_charges: data.driverHighwayCharges || 0,
+        driver_other_charges: data.driverOtherCharges || 0,
+        driver_signature_data: data.driverSignature?.data || null,
+        driver_signature_type: data.driverSignature?.type || null,
+        conductor_name: data.conductorName || null,
+        conductor_contact: data.conductorContact || null,
         conductor_meal_allowance: data.conductorMealAllowance || 0,
         conductor_salary: data.conductorSalary || 0,
-        conductor_signature_data: data.conductorSignature?.data,
-        conductor_signature_type: data.conductorSignature?.type,
-        prepared_by_name: data.preparedBy,
-        prepared_by_signature_data: data.preparedBySignature?.data,
-        prepared_by_signature_type: data.preparedBySignature?.type,
-        checked_by_name: data.checkedBy,
-        checked_by_signature_data: data.checkedBySignature?.data,
-        checked_by_signature_type: data.checkedBySignature?.type,
-        authorized_by_name: data.authorizedBy,
-        authorized_by_signature_data: data.authorizedBySignature?.data,
-        authorized_by_signature_type: data.authorizedBySignature?.type,
-        total_amount: data.totalAmount,
-        notes: data.notes,
+        conductor_signature_data: data.conductorSignature?.data || null,
+        conductor_signature_type: data.conductorSignature?.type || null,
+        prepared_by_name: data.preparedBy || '',
+        prepared_by_signature_data: data.preparedBySignature?.data || null,
+        prepared_by_signature_type: data.preparedBySignature?.type || null,
+        checked_by_name: data.checkedBy || null,
+        checked_by_signature_data: data.checkedBySignature?.data || null,
+        checked_by_signature_type: data.checkedBySignature?.type || null,
+        authorized_by_name: data.authorizedBy || null,
+        authorized_by_signature_data: data.authorizedBySignature?.data || null,
+        authorized_by_signature_type: data.authorizedBySignature?.type || null,
+        total_amount: data.totalAmount || 0,
+        notes: data.notes || null,
         status: data.status || 'draft',
-        pdf_document_data: data.pdfDocumentData,
+        pdf_document_data: data.pdfDocumentData || null,
         pdf_generated_at: data.pdfDocumentData ? new Date().toISOString() : null,
         created_by: user?.id,
       };
@@ -162,13 +162,17 @@ export function useAdvanceDetails() {
           .single();
       }
 
-      if (result.error) throw result.error;
+      if (result.error) {
+        console.error('Supabase error:', result.error);
+        throw result.error;
+      }
 
       toast.success(data.id ? 'Advance details updated successfully' : 'Advance details saved successfully');
       return { success: true, id: result.data.id };
     } catch (error) {
       console.error('Error saving advance details:', error);
-      toast.error('Failed to save advance details');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save advance details';
+      toast.error(errorMessage);
       return { success: false };
     } finally {
       setLoading(false);

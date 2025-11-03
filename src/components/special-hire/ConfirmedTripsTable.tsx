@@ -1169,10 +1169,12 @@ export function ConfirmedTripsTable() {
           quotation={{
             id: selectedTrip.id,
             quotation_no: selectedTrip.quotation_no,
-            pickup_date: selectedTrip.trip_start_date,
+            pickup_date: selectedTrip.pickup_datetime || new Date().toISOString(),
             pickup_location: selectedTrip.pickup_location,
             drop_location: selectedTrip.drop_location,
-            total_days: Math.ceil((new Date(selectedTrip.trip_end_date).getTime() - new Date(selectedTrip.trip_start_date).getTime()) / (1000 * 60 * 60 * 24)) || 1,
+            total_days: selectedTrip.pickup_datetime && selectedTrip.drop_datetime 
+              ? Math.ceil((new Date(selectedTrip.drop_datetime).getTime() - new Date(selectedTrip.pickup_datetime).getTime()) / (1000 * 60 * 60 * 24)) || 1
+              : 1,
           }}
         />
       )}

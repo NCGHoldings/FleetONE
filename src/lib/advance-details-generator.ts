@@ -37,25 +37,33 @@ export interface AdvanceDetailsData {
 
 export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: string): string {
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-GB');
+    return new Date(date).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
   };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: 'LKR',
       minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
   const renderSignature = (sig?: { data: string; type: string }) => {
-    if (!sig || !sig.data) return '<div style="height: 60px; border-bottom: 1px solid #9ca3af;"></div>';
+    if (!sig || !sig.data) {
+      return '<div style="height: 50px; border-bottom: 1px solid #000; margin-top: 30px;"></div>';
+    }
     
     if (sig.type === 'text') {
-      return `<div style="height: 60px; display: flex; align-items: center; border-bottom: 1px solid #9ca3af; font-family: 'Brush Script MT', cursive; font-size: 24px;">${sig.data}</div>`;
+      return `<div style="height: 50px; display: flex; align-items: flex-end; margin-top: 30px; font-family: 'Brush Script MT', cursive; font-size: 22px; border-bottom: 1px solid #000;">${sig.data}</div>`;
     }
-    return `<img src="${sig.data}" alt="Signature" style="max-height: 60px; max-width: 100%; object-fit: contain;" />`;
+    return `<div style="margin-top: 20px;"><img src="${sig.data}" alt="Signature" style="max-height: 50px; max-width: 200px; display: block;" /></div><div style="border-bottom: 1px solid #000; margin-top: 5px;"></div>`;
   };
+
+  const driverTotal = data.driverMealAllowance + data.driverSalary + data.driverHighwayCharges + data.driverOtherCharges;
+  const conductorTotal = data.conductorMealAllowance + data.conductorSalary;
 
   return `
     <!DOCTYPE html>
@@ -63,272 +71,293 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
     <head>
       <meta charset="UTF-8">
       <style>
-        @page { margin: 20mm; }
+        @page { 
+          size: A4;
+          margin: 15mm;
+        }
         body {
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          line-height: 1.6;
-          color: #1f2937;
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 20px;
+          font-family: Arial, sans-serif;
+          font-size: 11pt;
+          line-height: 1.4;
+          color: #000;
+          margin: 0;
+          padding: 0;
           background: white;
+        }
+        .document {
+          width: 210mm;
+          min-height: 297mm;
+          margin: 0 auto;
+          background: white;
+          padding: 20px;
+          box-sizing: border-box;
         }
         .header {
           text-align: center;
-          margin-bottom: 30px;
-          border-bottom: 3px solid #2563eb;
-          padding-bottom: 20px;
+          margin-bottom: 20px;
+          border-bottom: 2px solid #000;
+          padding-bottom: 15px;
         }
-        .logo {
-          max-width: 200px;
-          margin-bottom: 15px;
+        .header img {
+          max-height: 60px;
+          margin-bottom: 10px;
         }
-        .title {
-          font-size: 28px;
+        .header h1 {
+          margin: 5px 0;
+          font-size: 18pt;
           font-weight: bold;
-          color: #2563eb;
-          margin: 10px 0;
+          text-transform: uppercase;
         }
         .info-section {
-          background: #f9fafb;
-          padding: 15px;
-          border-radius: 8px;
           margin-bottom: 20px;
         }
-        .info-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 8px;
+        .info-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 15px;
         }
-        .info-label {
-          font-weight: 600;
-          color: #4b5563;
+        .info-table td {
+          padding: 5px 8px;
+          border: 1px solid #000;
+          font-size: 10pt;
+        }
+        .info-table td:first-child {
+          font-weight: bold;
+          width: 35%;
+          background: #f5f5f5;
         }
         .section-title {
-          font-size: 18px;
+          font-size: 12pt;
           font-weight: bold;
-          color: #2563eb;
-          margin: 25px 0 15px 0;
-          padding-bottom: 5px;
-          border-bottom: 2px solid #e5e7eb;
-        }
-        .details-box {
-          border: 2px solid #e5e7eb;
-          border-radius: 8px;
-          padding: 20px;
-          margin-bottom: 20px;
-          background: white;
-        }
-        .field-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 12px;
-        }
-        .field-label {
-          font-weight: 600;
-          color: #4b5563;
-          min-width: 180px;
-        }
-        .field-value {
-          text-align: right;
-          color: #1f2937;
-        }
-        .total-section {
-          background: #2563eb;
+          background: #000;
           color: white;
-          padding: 20px;
-          border-radius: 8px;
-          margin: 30px 0;
-          text-align: center;
+          padding: 8px 12px;
+          margin: 15px 0 10px 0;
+          text-transform: uppercase;
         }
-        .total-label {
-          font-size: 18px;
-          font-weight: 600;
-          margin-bottom: 5px;
+        .details-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 15px;
         }
-        .total-amount {
-          font-size: 32px;
+        .details-table td {
+          padding: 6px 10px;
+          border: 1px solid #000;
+          font-size: 10pt;
+        }
+        .details-table td:first-child {
+          font-weight: bold;
+          width: 45%;
+          background: #f9f9f9;
+        }
+        .details-table td:last-child {
+          text-align: right;
+        }
+        .total-row {
+          background: #e8e8e8;
+          font-weight: bold;
+          font-size: 11pt;
+        }
+        .grand-total {
+          background: #000;
+          color: white;
+          font-size: 12pt;
           font-weight: bold;
         }
-        .authorization-section {
-          display: flex;
-          justify-content: space-between;
+        .signatures {
           margin-top: 40px;
+          page-break-inside: avoid;
         }
-        .auth-box {
-          flex: 1;
-          margin: 0 10px;
-          border: 2px solid #e5e7eb;
-          border-radius: 8px;
-          padding: 15px;
+        .signature-row {
+          display: flex;
+          justify-content: space-around;
+          margin-top: 20px;
+        }
+        .signature-box {
+          width: 30%;
           text-align: center;
         }
-        .auth-title {
-          font-weight: 600;
-          color: #2563eb;
-          margin-bottom: 10px;
-          font-size: 14px;
-        }
-        .auth-name {
-          font-weight: 600;
-          margin: 10px 0;
-          min-height: 20px;
-        }
-        .auth-signature {
-          margin: 15px 0;
-          min-height: 60px;
-        }
-        .auth-date {
-          font-size: 12px;
-          color: #6b7280;
-          margin-top: 10px;
-        }
-        .notes {
-          margin-top: 30px;
-          padding: 15px;
-          background: #fef3c7;
-          border-left: 4px solid #f59e0b;
-          border-radius: 4px;
-        }
-        .notes-label {
-          font-weight: 600;
-          color: #92400e;
+        .signature-label {
+          font-weight: bold;
+          font-size: 10pt;
           margin-bottom: 5px;
+        }
+        .signature-name {
+          font-weight: bold;
+          margin-top: 10px;
+          font-size: 10pt;
+        }
+        .signature-date {
+          font-size: 9pt;
+          color: #666;
+          margin-top: 5px;
+        }
+        .notes-section {
+          margin-top: 20px;
+          padding: 10px;
+          border: 1px solid #000;
+          background: #fffbf0;
+          page-break-inside: avoid;
+        }
+        .notes-title {
+          font-weight: bold;
+          margin-bottom: 5px;
+        }
+        .footer {
+          margin-top: 30px;
+          text-align: center;
+          font-size: 9pt;
+          color: #666;
+          border-top: 1px solid #ccc;
+          padding-top: 10px;
         }
       </style>
     </head>
     <body>
-      <div class="header">
-        ${logoUrl ? `<img src="${logoUrl}" alt="NCG Express" class="logo" />` : '<div style="height: 60px;"></div>'}
-        <div class="title">ADVANCE PAYMENT DETAILS</div>
-      </div>
-
-      <div class="info-section">
-        <div class="info-row">
-          <span class="info-label">Quotation No:</span>
-          <span>${data.quotationNo}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Date of Hire:</span>
-          <span>${formatDate(data.hireDate)}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Number of Days:</span>
-          <span>${data.numberOfDays} ${data.numberOfDays === 1 ? 'Day' : 'Days'}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Pickup Location:</span>
-          <span>${data.pickupLocation}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Drop Location:</span>
-          <span>${data.dropLocation}</span>
-        </div>
-      </div>
-
-      <div class="section-title">DRIVER DETAILS</div>
-      <div class="details-box">
-        <div class="field-row">
-          <span class="field-label">Driver Name:</span>
-          <span class="field-value">${data.driverName}</span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Contact Number:</span>
-          <span class="field-value">${data.driverContact}</span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Meal Allowance:</span>
-          <span class="field-value">${formatCurrency(data.driverMealAllowance)}</span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Salary:</span>
-          <span class="field-value">${formatCurrency(data.driverSalary)}</span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Highway Charges:</span>
-          <span class="field-value">${formatCurrency(data.driverHighwayCharges)}</span>
-        </div>
-        <div class="field-row">
-          <span class="field-label">Other Charges:</span>
-          <span class="field-value">${formatCurrency(data.driverOtherCharges)}</span>
-        </div>
-        <div style="margin-top: 20px;">
-          <div class="field-label" style="margin-bottom: 10px;">Driver Signature:</div>
-          ${renderSignature(data.driverSignature)}
-        </div>
-      </div>
-
-      ${data.conductorName ? `
-        <div class="section-title">CONDUCTOR/ASSISTANT DETAILS</div>
-        <div class="details-box">
-          <div class="field-row">
-            <span class="field-label">Conductor Name:</span>
-            <span class="field-value">${data.conductorName}</span>
-          </div>
-          <div class="field-row">
-            <span class="field-label">Contact Number:</span>
-            <span class="field-value">${data.conductorContact || 'N/A'}</span>
-          </div>
-          <div class="field-row">
-            <span class="field-label">Meal Allowance:</span>
-            <span class="field-value">${formatCurrency(data.conductorMealAllowance)}</span>
-          </div>
-          <div class="field-row">
-            <span class="field-label">Salary:</span>
-            <span class="field-value">${formatCurrency(data.conductorSalary)}</span>
-          </div>
-          <div style="margin-top: 20px;">
-            <div class="field-label" style="margin-bottom: 10px;">Conductor Signature:</div>
-            ${renderSignature(data.conductorSignature)}
-          </div>
-        </div>
-      ` : ''}
-
-      <div class="total-section">
-        <div class="total-label">TOTAL AMOUNT</div>
-        <div class="total-amount">${formatCurrency(data.totalAmount)}</div>
-      </div>
-
-      <div class="section-title">AUTHORIZATION</div>
-      <div class="authorization-section">
-        <div class="auth-box">
-          <div class="auth-title">PREPARED BY</div>
-          <div class="auth-name">${data.preparedBy}</div>
-          <div class="auth-signature">
-            ${renderSignature(data.preparedBySignature)}
-          </div>
-          <div class="auth-date">${formatDate(new Date())}</div>
+      <div class="document">
+        <!-- Header -->
+        <div class="header">
+          ${logoUrl ? `<img src="${logoUrl}" alt="NCG Express" />` : ''}
+          <h1>Advance Payment Details</h1>
         </div>
 
-        ${data.checkedBy ? `
-          <div class="auth-box">
-            <div class="auth-title">CHECKED BY</div>
-            <div class="auth-name">${data.checkedBy}</div>
-            <div class="auth-signature">
-              ${renderSignature(data.checkedBySignature)}
-            </div>
-            <div class="auth-date">${formatDate(new Date())}</div>
-          </div>
+        <!-- Trip Information -->
+        <table class="info-table">
+          <tr>
+            <td>Quotation No.</td>
+            <td>${data.quotationNo}</td>
+          </tr>
+          <tr>
+            <td>Date of Hire</td>
+            <td>${formatDate(data.hireDate)}</td>
+          </tr>
+          <tr>
+            <td>Pickup Location</td>
+            <td>${data.pickupLocation}</td>
+          </tr>
+          <tr>
+            <td>Drop Location</td>
+            <td>${data.dropLocation}</td>
+          </tr>
+          <tr>
+            <td>Number of Days</td>
+            <td>${data.numberOfDays} ${data.numberOfDays === 1 ? 'Day' : 'Days'}</td>
+          </tr>
+        </table>
+
+        <!-- Driver Details -->
+        <div class="section-title">Driver Details</div>
+        <table class="details-table">
+          <tr>
+            <td>Driver Name</td>
+            <td>${data.driverName}</td>
+          </tr>
+          <tr>
+            <td>Contact Number</td>
+            <td>${data.driverContact}</td>
+          </tr>
+          <tr>
+            <td>Meal Allowance</td>
+            <td>LKR ${formatCurrency(data.driverMealAllowance)}</td>
+          </tr>
+          <tr>
+            <td>Salary</td>
+            <td>LKR ${formatCurrency(data.driverSalary)}</td>
+          </tr>
+          <tr>
+            <td>Highway Charges</td>
+            <td>LKR ${formatCurrency(data.driverHighwayCharges)}</td>
+          </tr>
+          <tr>
+            <td>Other Charges</td>
+            <td>LKR ${formatCurrency(data.driverOtherCharges)}</td>
+          </tr>
+          <tr class="total-row">
+            <td>Driver Total</td>
+            <td>LKR ${formatCurrency(driverTotal)}</td>
+          </tr>
+        </table>
+
+        <!-- Conductor Details (if applicable) -->
+        ${data.conductorName ? `
+        <div class="section-title">Conductor/Assistant Details</div>
+        <table class="details-table">
+          <tr>
+            <td>Conductor Name</td>
+            <td>${data.conductorName}</td>
+          </tr>
+          <tr>
+            <td>Contact Number</td>
+            <td>${data.conductorContact || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td>Meal Allowance</td>
+            <td>LKR ${formatCurrency(data.conductorMealAllowance)}</td>
+          </tr>
+          <tr>
+            <td>Salary</td>
+            <td>LKR ${formatCurrency(data.conductorSalary)}</td>
+          </tr>
+          <tr class="total-row">
+            <td>Conductor Total</td>
+            <td>LKR ${formatCurrency(conductorTotal)}</td>
+          </tr>
+        </table>
         ` : ''}
 
-        ${data.authorizedBy ? `
-          <div class="auth-box">
-            <div class="auth-title">AUTHORIZED BY</div>
-            <div class="auth-name">${data.authorizedBy}</div>
-            <div class="auth-signature">
-              ${renderSignature(data.authorizedBySignature)}
-            </div>
-            <div class="auth-date">${formatDate(new Date())}</div>
-          </div>
-        ` : ''}
-      </div>
+        <!-- Grand Total -->
+        <table class="details-table">
+          <tr class="grand-total">
+            <td>GRAND TOTAL</td>
+            <td>LKR ${formatCurrency(data.totalAmount)}</td>
+          </tr>
+        </table>
 
-      ${data.notes ? `
-        <div class="notes">
-          <div class="notes-label">Notes:</div>
+        <!-- Notes -->
+        ${data.notes ? `
+        <div class="notes-section">
+          <div class="notes-title">Notes:</div>
           <div>${data.notes}</div>
         </div>
-      ` : ''}
+        ` : ''}
+
+        <!-- Signatures -->
+        <div class="signatures">
+          <div class="section-title">Authorization</div>
+          <div class="signature-row">
+            <div class="signature-box">
+              <div class="signature-label">PREPARED BY</div>
+              ${renderSignature(data.preparedBySignature)}
+              <div class="signature-name">${data.preparedBy}</div>
+              <div class="signature-date">${formatDate(new Date())}</div>
+            </div>
+            
+            ${data.checkedBy ? `
+            <div class="signature-box">
+              <div class="signature-label">CHECKED BY</div>
+              <div style="height: 50px; border-bottom: 1px solid #000; margin-top: 30px;"></div>
+              <div class="signature-name">${data.checkedBy}</div>
+              <div class="signature-date">${formatDate(new Date())}</div>
+            </div>
+            ` : ''}
+            
+            ${data.authorizedBy ? `
+            <div class="signature-box">
+              <div class="signature-label">AUTHORIZED BY</div>
+              <div style="height: 50px; border-bottom: 1px solid #000; margin-top: 30px;"></div>
+              <div class="signature-name">${data.authorizedBy}</div>
+              <div class="signature-date">${formatDate(new Date())}</div>
+            </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+          <div>NCG Express - Transport Management System</div>
+          <div>Page 1 of 1</div>
+        </div>
+      </div>
     </body>
     </html>
   `;
