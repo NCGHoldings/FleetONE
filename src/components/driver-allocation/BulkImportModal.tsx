@@ -215,14 +215,39 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
 
       const result = await response.json();
       
+      console.log('Import result:', result);
+      
+      // Display row-by-row results
+      if (result.rowResults && result.rowResults.length > 0) {
+        const successRows = result.rowResults.filter((r: any) => r.status === 'success');
+        const failedRows = result.rowResults.filter((r: any) => r.status === 'failed');
+        
+        if (successRows.length > 0) {
+          toast.success(`Successfully imported ${successRows.length} allocations`);
+        }
+        
+        if (failedRows.length > 0) {
+          console.error('Failed rows:', failedRows);
+          failedRows.forEach((row: any) => {
+            toast.error(`Row ${row.row} failed: ${row.error}`, { duration: 8000 });
+          });
+        }
+      } else {
+        // Fallback to old result format
+        if (result.success > 0) {
+          toast.success(`Successfully imported ${result.success} driver allocations!`);
+        }
+      }
+      
+      // Show created entities summary
+      if (result.created?.buses.length > 0) {
+        toast.info(`Created ${result.created.buses.length} new buses`);
+      }
+      if (result.created?.staff.length > 0) {
+        toast.info(`Created ${result.created.staff.length} new staff members`);
+      }
+      
       if (result.success > 0) {
-        toast.success(`Successfully imported ${result.success} driver allocations!`);
-        if (result.created.buses.length > 0) {
-          toast.info(`Created ${result.created.buses.length} new buses`);
-        }
-        if (result.created.staff.length > 0) {
-          toast.info(`Created ${result.created.staff.length} new staff members`);
-        }
         onSuccess();
         onClose();
         // Reset state
@@ -231,9 +256,12 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
         setParseErrors([]);
       }
 
-      if (result.errors.length > 0) {
+      // Display general errors
+      if (result.errors && result.errors.length > 0) {
         console.error('Import errors:', result.errors);
-        toast.error(`${result.errors.length} errors occurred during import`);
+        result.errors.forEach((error: string) => {
+          toast.error(error, { duration: 8000 });
+        });
       }
 
     } catch (error: any) {

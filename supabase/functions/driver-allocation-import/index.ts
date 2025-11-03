@@ -25,6 +25,13 @@ serve(async (req) => {
     const results = {
       success: 0,
       errors: [] as string[],
+      rowResults: [] as Array<{
+        row: number;
+        status: 'success' | 'failed';
+        tripId?: string;
+        error?: string;
+        details?: string;
+      }>,
       created: {
         buses: [] as string[],
         routes: [] as string[],
@@ -34,7 +41,10 @@ serve(async (req) => {
     }
 
     // Process each allocation
-    for (const allocation of allocations) {
+    for (let i = 0; i < allocations.length; i++) {
+      const allocation = allocations[i];
+      const rowNum = i + 1;
+      
       try {
         const {
           busNo,
@@ -47,14 +57,18 @@ serve(async (req) => {
           time
         } = allocation
 
-        console.log(`Processing allocation:`, {
+        console.log(`\n========== Processing Row ${rowNum}/${allocations.length} ==========`)
+        console.log('Raw allocation data:', JSON.stringify({
           busNo,
           routeNo,
+          routeName,
           driverName,
           conductorName,
-          date: date, // Original date from frontend
+          whatsapp,
+          date: date, // This is the critical field
+          dateType: typeof date,
           time
-        })
+        }, null, 2))
 
         // Find or create bus
         let { data: bus } = await supabase
@@ -195,10 +209,16 @@ serve(async (req) => {
           results.created.staff.push(`${conductorName} (Conductor)`)
         }
 
-        // Parse date and time with robust validation
+        // Parse date with comprehensive validation and logging
+        console.log(`[Row ${rowNum}] Starting date parsing for: "${date}"`)
+        
         const dateParts = date.trim().split('/');
+        console.log(`[Row ${rowNum}] Date parts after split:`, dateParts)
+        
         if (dateParts.length !== 3) {
-          throw new Error(`Invalid date format: ${date}. Expected DD/MM/YYYY`);
+          const error = `Invalid date format: "${date}". Expected DD/MM/YYYY (e.g., 01/10/2025 or 1/10/2025)`;
+          console.error(`[Row ${rowNum}] ${error}`)
+          throw new Error(error);
         }
 
         const [day, month, year] = dateParts;
@@ -206,21 +226,29 @@ serve(async (req) => {
         const monthNum = parseInt(month);
         const yearNum = parseInt(year);
 
-        // Validate date components
+        console.log(`[Row ${rowNum}] Parsed numbers - Day: ${dayNum}, Month: ${monthNum}, Year: ${yearNum}`)
+
+        // Validate date components with detailed error messages
         if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
-          throw new Error(`Invalid day: ${day} in date ${date}`);
+          const error = `Invalid day: "${day}" (parsed as ${dayNum}). Must be 1-31`;
+          console.error(`[Row ${rowNum}] ${error}`)
+          throw new Error(error);
         }
         if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
-          throw new Error(`Invalid month: ${month} in date ${date}`);
+          const error = `Invalid month: "${month}" (parsed as ${monthNum}). Must be 1-12`;
+          console.error(`[Row ${rowNum}] ${error}`)
+          throw new Error(error);
         }
         if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
-          throw new Error(`Invalid year: ${year} in date ${date}`);
+          const error = `Invalid year: "${year}" (parsed as ${yearNum}). Must be 2000-2100`;
+          console.error(`[Row ${rowNum}] ${error}`)
+          throw new Error(error);
         }
 
         // Format as YYYY-MM-DD with zero-padding
         const allocationDate = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
         
-        console.log(`Date parsing: "${date}" -> "${allocationDate}"`)
+        console.log(`[Row ${rowNum}] ✓ Date parsing SUCCESS: "${date}" -> "${allocationDate}"`)
         
         // Parse time (convert 12-hour to 24-hour format)
         let [timePart, period] = time.split(/(?=[ap]m)/i)
@@ -302,13 +330,41 @@ serve(async (req) => {
 
         results.created.allocations.push(tripId)
         results.success++
+        
+        results.rowResults.push({
+          row: rowNum,
+          status: 'success',
+          tripId: tripId,
+          details: `Bus: ${busNo}, Date: ${allocationDate}, Driver: ${driverName}`
+        })
+        
+        console.log(`[Row ${rowNum}] ✓✓✓ ALLOCATION CREATED SUCCESSFULLY: ${tripId}\n`)
 
       } catch (error) {
-        console.error('Error processing allocation:', error)
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        results.errors.push(`Failed to process allocation: ${errorMessage}`)
+        const errorStack = error instanceof Error ? error.stack : undefined
+        
+        console.error(`[Row ${rowNum}] ✗✗✗ ALLOCATION FAILED:`, {
+          error: errorMessage,
+          stack: errorStack,
+          allocationData: allocation
+        })
+        
+        results.errors.push(`Row ${rowNum}: ${errorMessage}`)
+        results.rowResults.push({
+          row: rowNum,
+          status: 'failed',
+          error: errorMessage,
+          details: `Bus: ${allocation.busNo}, Date: ${allocation.date}, Driver: ${allocation.driverName}`
+        })
       }
     }
+    
+    console.log('\n========== BULK IMPORT COMPLETE ==========')
+    console.log(`Total processed: ${allocations.length}`)
+    console.log(`Successful: ${results.success}`)
+    console.log(`Failed: ${results.errors.length}`)
+    console.log('==========================================\n')
 
     return new Response(
       JSON.stringify(results),
