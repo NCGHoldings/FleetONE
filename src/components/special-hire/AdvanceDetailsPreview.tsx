@@ -41,7 +41,7 @@ export default function AdvanceDetailsPreview({ data, onDownload }: AdvanceDetai
     }
   };
 
-  const htmlContent = generateAdvanceDetailsHTML(data, '/lovable-uploads/yutong-invoice-header.png');
+  const htmlContent = generateAdvanceDetailsHTML(data, '/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png');
 
   return (
     <div className="space-y-4">

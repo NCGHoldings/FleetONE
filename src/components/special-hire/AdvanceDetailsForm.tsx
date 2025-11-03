@@ -62,6 +62,8 @@ export default function AdvanceDetailsForm({
 
   const [signatures, setSignatures] = useState<{
     preparedBy?: { data: string; type: string };
+    checkedBy?: { data: string; type: string };
+    authorizedBy?: { data: string; type: string };
   }>({});
 
   const form = useForm<FormValues>({
@@ -88,6 +90,8 @@ export default function AdvanceDetailsForm({
     if (existingData) {
       setSignatures({
         preparedBy: existingData.preparedBySignature,
+        checkedBy: existingData.checkedBySignature,
+        authorizedBy: existingData.authorizedBySignature,
       });
     }
   }, [existingData]);
@@ -138,7 +142,9 @@ export default function AdvanceDetailsForm({
       preparedBy: values.preparedBy,
       preparedBySignature: signatures.preparedBy,
       checkedBy: values.checkedBy,
+      checkedBySignature: signatures.checkedBy,
       authorizedBy: values.authorizedBy,
+      authorizedBySignature: signatures.authorizedBy,
       totalAmount,
       notes: values.notes,
     };
@@ -383,6 +389,20 @@ export default function AdvanceDetailsForm({
                     </FormItem>
                   )}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => openSignatureModal('checkedBy', 'Checked By Signature')}
+                  disabled={disabled}
+                >
+                  <FileSignature className="w-4 h-4 mr-2" />
+                  {signatures.checkedBy ? 'Update' : 'Add'} Signature
+                </Button>
+                {signatures.checkedBy && (
+                  <p className="text-sm text-green-600 mt-1">✓ Signature captured</p>
+                )}
               </div>
 
               <div>
@@ -399,6 +419,20 @@ export default function AdvanceDetailsForm({
                     </FormItem>
                   )}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => openSignatureModal('authorizedBy', 'Authorized By Signature')}
+                  disabled={disabled}
+                >
+                  <FileSignature className="w-4 h-4 mr-2" />
+                  {signatures.authorizedBy ? 'Update' : 'Add'} Signature
+                </Button>
+                {signatures.authorizedBy && (
+                  <p className="text-sm text-green-600 mt-1">✓ Signature captured</p>
+                )}
               </div>
             </div>
           </div>

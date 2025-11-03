@@ -93,20 +93,31 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
           box-sizing: border-box;
         }
         .header {
-          text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
           margin-bottom: 20px;
-          border-bottom: 2px solid #000;
+          border-bottom: 3px solid #1e40af;
           padding-bottom: 15px;
         }
         .header img {
-          max-height: 60px;
-          margin-bottom: 10px;
+          max-height: 80px;
+          max-width: 200px;
+        }
+        .header-title {
+          text-align: right;
         }
         .header h1 {
-          margin: 5px 0;
-          font-size: 18pt;
+          margin: 0 0 5px 0;
+          font-size: 24pt;
           font-weight: bold;
           text-transform: uppercase;
+          color: #1e40af;
+        }
+        .header-subtitle {
+          margin: 0;
+          font-size: 10pt;
+          color: #666;
         }
         .info-section {
           margin-bottom: 20px;
@@ -129,11 +140,12 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
         .section-title {
           font-size: 12pt;
           font-weight: bold;
-          background: #000;
+          background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
           color: white;
-          padding: 8px 12px;
-          margin: 15px 0 10px 0;
+          padding: 10px 15px;
+          margin: 20px 0 10px 0;
           text-transform: uppercase;
+          border-radius: 5px;
         }
         .details-table {
           width: 100%;
@@ -148,7 +160,10 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
         .details-table td:first-child {
           font-weight: bold;
           width: 45%;
-          background: #f9f9f9;
+          background: #f3f4f6;
+        }
+        .details-table tr:nth-child(even) td:first-child {
+          background: #e5e7eb;
         }
         .details-table td:last-child {
           text-align: right;
@@ -217,8 +232,11 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
       <div class="document">
         <!-- Header -->
         <div class="header">
-          ${logoUrl ? `<img src="${logoUrl}" alt="NCG Express" />` : ''}
-          <h1>Advance Payment Details</h1>
+          ${logoUrl ? `<img src="${logoUrl}" alt="NCG Express" />` : '<div style="width: 200px;"></div>'}
+          <div class="header-title">
+            <h1>Advance Payment Details</h1>
+            <p class="header-subtitle">NCG Express Transport Services</p>
+          </div>
         </div>
 
         <!-- Trip Information -->
@@ -335,7 +353,7 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
             ${data.checkedBy ? `
             <div class="signature-box">
               <div class="signature-label">CHECKED BY</div>
-              <div style="height: 50px; border-bottom: 1px solid #000; margin-top: 30px;"></div>
+              ${renderSignature(data.checkedBySignature)}
               <div class="signature-name">${data.checkedBy}</div>
               <div class="signature-date">${formatDate(new Date())}</div>
             </div>
@@ -344,7 +362,7 @@ export function generateAdvanceDetailsHTML(data: AdvanceDetailsData, logoUrl?: s
             ${data.authorizedBy ? `
             <div class="signature-box">
               <div class="signature-label">AUTHORIZED BY</div>
-              <div style="height: 50px; border-bottom: 1px solid #000; margin-top: 30px;"></div>
+              ${renderSignature(data.authorizedBySignature)}
               <div class="signature-name">${data.authorizedBy}</div>
               <div class="signature-date">${formatDate(new Date())}</div>
             </div>
