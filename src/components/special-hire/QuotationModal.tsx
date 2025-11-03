@@ -363,30 +363,51 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
   };
 
   const handleEmail = async () => {
+    console.log('📧 === EMAIL SEND STARTED (Modal) ===');
+    console.log('Quotation:', quotation?.quotation_no);
+    console.log('Customer Email:', quotation?.customer_email);
+
     if (!quotation?.customer_email) {
-      toast.error('No email address available for this customer');
+      toast.error("No email address", {
+        description: "This customer doesn't have an email address configured."
+      });
       return;
     }
 
     setIsEmailing(true);
+    const loadingToast = toast.loading("Sending email...", {
+      description: "Generating PDF and sending to customer"
+    });
+
     try {
+      // Step 1: Generate PDF
+      toast.loading("Generating PDF document...", { id: loadingToast });
+      console.log('📄 Generating PDF...');
       const pdfBase64 = await generatePDFBase64();
+      console.log('✅ PDF generated, size:', pdfBase64.length);
+
+      // Step 2: Prepare email data
       const date = new Date().toISOString().split('T')[0];
       const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
-      
       const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">NCG Express</h2>
           <p>Dear ${quotation.customer_name},</p>
           <p>Please find your quotation details attached.</p>
+          <p><strong>Quotation Number:</strong> ${quotation.quotation_no}</p>
+          <p><strong>Route:</strong> ${quotation.pickup_location} → ${quotation.drop_location}</p>
           <p>Thank you for choosing NCG Express.</p>
           <br>
           <p>Best regards,<br>NCG Express Team</p>
         </div>
       `;
 
-      const { error } = await supabase.functions.invoke('send-quotation-email', {
+      // Step 3: Send email
+      toast.loading("Sending email to customer...", { id: loadingToast });
+      console.log('📨 Invoking edge function...');
+      
+      const { data, error } = await supabase.functions.invoke('send-quotation-email', {
         body: {
           to: quotation.customer_email,
           subject,
@@ -399,12 +420,47 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
         }
       });
 
-      if (error) throw error;
+      console.log('Edge function response:', { data, error });
 
-      toast.success(`Quotation emailed successfully to ${quotation.customer_email}`);
+      if (error) {
+        console.error('❌ Edge function error:', error);
+        throw error;
+      }
+
+      // Step 4: Update status to 'sent'
+      console.log('✅ Updating status to sent...');
+      await supabase
+        .from('special_hire_quotations')
+        .update({ status: 'sent' })
+        .eq('id', quotation.id);
+
+      console.log('✅ === EMAIL SEND COMPLETED ===');
+      toast.success("Email sent successfully!", {
+        id: loadingToast,
+        description: `Quotation sent to ${quotation.customer_email}`
+      });
+      
+      // Close modal after successful send
+      setTimeout(() => onOpenChange(false), 1500);
+
     } catch (error: any) {
-      console.error('Error sending email:', error);
-      toast.error('Failed to send email: ' + (error.message || 'Unknown error'));
+      console.error('❌ === EMAIL SEND FAILED ===');
+      console.error('Error:', error);
+      
+      let errorDescription = error.message || 'Unknown error occurred';
+      
+      if (error.message?.includes('PDF')) {
+        errorDescription = 'Failed to generate PDF. Please try again.';
+      } else if (error.message?.includes('network')) {
+        errorDescription = 'Network error. Check your connection.';
+      } else if (error.message?.includes('Resend')) {
+        errorDescription = 'Email service error. Contact support.';
+      }
+      
+      toast.error("Failed to send email", {
+        id: loadingToast,
+        description: errorDescription
+      });
     } finally {
       setIsEmailing(false);
     }

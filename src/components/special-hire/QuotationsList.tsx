@@ -9,7 +9,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2, Loader2, Calculator } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { QuotationModal } from './QuotationModal';
 import { EditQuotationModal } from './EditQuotationModal';
 import { QuotationPreview } from './QuotationPreview';
@@ -127,7 +127,6 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
   const [emailingQuotationId, setEmailingQuotationId] = useState<string | null>(null);
-  const { toast } = useToast();
 
   const loadQuotations = async () => {
     try {
@@ -185,10 +184,8 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
       setQuotations(transformedData);
     } catch (error: any) {
       console.error('Error in loadQuotations:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load quotations",
-        variant: "destructive"
+      toast.error("Failed to load quotations", {
+        description: error.message || "Unknown error occurred"
       });
     } finally {
       setLoading(false);
@@ -258,15 +255,10 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
       await loadQuotations();
       onRefresh();
-      toast({
-        title: "Success",
-        description: `Quotation ${newStatus} successfully`
-      });
+      toast.success(`Quotation ${newStatus} successfully`);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
+      toast.error("Failed to update status", {
+        description: error.message
       });
     }
   };
@@ -349,10 +341,8 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
       setSelectedQuotation(transformedVersion as Quotation);
       setShowModal(true);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to load quotation version",
-        variant: "destructive"
+      toast.error("Failed to load quotation version", {
+        description: error.message
       });
     }
   };
@@ -367,36 +357,41 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
   };
 
   const generatePDFBase64 = async (quotation: Quotation): Promise<string> => {
-    // Create a temporary div to render the quotation
+    console.log('📄 Starting PDF generation for quotation:', quotation.quotation_no);
+    
     const tempDiv = document.createElement('div');
-    tempDiv.style.position = 'absolute';
-    tempDiv.style.left = '-9999px';
-    tempDiv.style.top = '-9999px';
-    tempDiv.style.width = '210mm';
-    tempDiv.style.background = 'white';
+    tempDiv.style.cssText = `
+      position: absolute;
+      left: -10000px;
+      top: 0;
+      width: 210mm;
+      background: white;
+      visibility: hidden;
+    `;
     document.body.appendChild(tempDiv);
 
-    // Import React and ReactDOM dynamically
     const React = await import('react');
     const ReactDOM = await import('react-dom/client');
 
     try {
-      // Create React element and render it
       const root = ReactDOM.createRoot(tempDiv);
       const quotationElement = React.createElement(QuotationPreview, { quotation });
       
       await new Promise<void>((resolve) => {
         root.render(quotationElement);
-        // Wait for render to complete
-        setTimeout(resolve, 1000);
+        setTimeout(resolve, 2000); // Give more time for rendering
       });
 
+      console.log('📸 Generating canvas from DOM...');
       const canvas = await html2canvas(tempDiv, {
-        scale: 2,
+        scale: 3, // Higher quality
         useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        logging: false
       });
+
+      console.log('✅ Canvas generated:', canvas.width, 'x', canvas.height);
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -405,49 +400,72 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
       const pdfHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      
       const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 0;
 
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth * ratio, imgHeight * ratio);
       
       root.unmount();
-      return pdf.output('datauristring').split(',')[1];
-    } finally {
       document.body.removeChild(tempDiv);
+      
+      const base64 = pdf.output('datauristring').split(',')[1];
+      console.log('✅ PDF generated successfully, size:', base64.length, 'bytes');
+      
+      return base64;
+    } catch (error) {
+      console.error('❌ PDF generation failed:', error);
+      document.body.removeChild(tempDiv);
+      throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleEmailQuotation = async (quotation: Quotation) => {
+    console.log('📧 === EMAIL SEND STARTED ===');
+    console.log('Quotation:', quotation.quotation_no);
+    console.log('Customer:', quotation.customer_name);
+    console.log('Email:', quotation.customer_email);
+
     if (!quotation.customer_email) {
-      toast({
-        title: "Error",
-        description: "No email address available for this customer",
-        variant: "destructive"
+      toast.error("No email address", {
+        description: "This customer doesn't have an email address. Please add one first."
       });
       return;
     }
 
     setEmailingQuotationId(quotation.id);
+    
+    const loadingToast = toast.loading("Sending email...", {
+      description: "Generating PDF and sending to customer"
+    });
+
     try {
+      // Step 1: Generate PDF
+      toast.loading("Generating PDF document...", { id: loadingToast });
+      console.log('📄 Step 1: Generating PDF...');
       const pdfBase64 = await generatePDFBase64(quotation);
+      console.log('✅ PDF generated, size:', pdfBase64.length);
+
+      // Step 2: Prepare email data
       const date = new Date().toISOString().split('T')[0];
       const filename = `Quotation_${quotation.quotation_no}_${date}.pdf`;
-      
       const subject = `Quotation ${quotation.quotation_no} - NCG Express`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">NCG Express</h2>
           <p>Dear ${quotation.customer_name},</p>
           <p>Please find your quotation details attached.</p>
+          <p><strong>Quotation Number:</strong> ${quotation.quotation_no}</p>
+          <p><strong>Route:</strong> ${quotation.pickup_location} → ${quotation.drop_location}</p>
           <p>Thank you for choosing NCG Express.</p>
           <br>
           <p>Best regards,<br>NCG Express Team</p>
         </div>
       `;
 
-      const { error } = await supabase.functions.invoke('send-quotation-email', {
+      // Step 3: Send email via edge function
+      toast.loading("Sending email to customer...", { id: loadingToast });
+      console.log('📨 Step 2: Invoking edge function...');
+      
+      const { data, error } = await supabase.functions.invoke('send-quotation-email', {
         body: {
           to: quotation.customer_email,
           subject,
@@ -460,21 +478,41 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
         }
       });
 
-      if (error) throw error;
+      console.log('Edge function response:', { data, error });
 
-      // Update status to sent
+      if (error) {
+        console.error('❌ Edge function error:', error);
+        throw error;
+      }
+
+      // Step 4: Update quotation status to 'sent'
+      console.log('✅ Step 3: Updating status...');
       await handleStatusUpdate(quotation.id, 'sent');
       
-      toast({
-        title: "Success",
-        description: `Quotation emailed successfully to ${quotation.customer_email}`
+      console.log('✅ === EMAIL SEND COMPLETED ===');
+      toast.success("Email sent successfully!", {
+        id: loadingToast,
+        description: `Quotation sent to ${quotation.customer_email}`
       });
+
     } catch (error: any) {
-      console.error('Error sending email:', error);
-      toast({
-        title: "Error",
-        description: 'Failed to send email: ' + (error.message || 'Unknown error'),
-        variant: "destructive"
+      console.error('❌ === EMAIL SEND FAILED ===');
+      console.error('Error:', error);
+      
+      let errorMessage = 'Failed to send email';
+      let errorDescription = error.message || 'Unknown error occurred';
+      
+      if (error.message?.includes('PDF generation')) {
+        errorDescription = 'Failed to generate PDF document. Please try again.';
+      } else if (error.message?.includes('network')) {
+        errorDescription = 'Network error. Please check your connection.';
+      } else if (error.message?.includes('Resend')) {
+        errorDescription = 'Email service error. Please contact support.';
+      }
+      
+      toast.error(errorMessage, {
+        id: loadingToast,
+        description: errorDescription
       });
     } finally {
       setEmailingQuotationId(null);
@@ -513,15 +551,10 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
       await loadQuotations();
       onRefresh();
-      toast({
-        title: "Success",
-        description: "Quotation deleted successfully"
-      });
+      toast.success("Quotation deleted successfully");
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
+      toast.error("Failed to delete quotation", {
+        description: error.message
       });
     }
   };
