@@ -19,7 +19,8 @@ serve(async (req) => {
     )
 
     const { allocations } = await req.json()
-    console.log('Processing allocations:', allocations)
+    console.log('Received bulk import request with', allocations.length, 'allocations')
+    console.log('First allocation sample:', JSON.stringify(allocations[0], null, 2))
 
     const results = {
       success: 0,
@@ -46,7 +47,14 @@ serve(async (req) => {
           time
         } = allocation
 
-        console.log('Processing allocation:', allocation)
+        console.log(`Processing allocation:`, {
+          busNo,
+          routeNo,
+          driverName,
+          conductorName,
+          date: date, // Original date from frontend
+          time
+        })
 
         // Find or create bus
         let { data: bus } = await supabase
@@ -187,9 +195,32 @@ serve(async (req) => {
           results.created.staff.push(`${conductorName} (Conductor)`)
         }
 
-        // Parse date and time
-        const [day, month, year] = date.split('/')
-        const allocationDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+        // Parse date and time with robust validation
+        const dateParts = date.trim().split('/');
+        if (dateParts.length !== 3) {
+          throw new Error(`Invalid date format: ${date}. Expected DD/MM/YYYY`);
+        }
+
+        const [day, month, year] = dateParts;
+        const dayNum = parseInt(day);
+        const monthNum = parseInt(month);
+        const yearNum = parseInt(year);
+
+        // Validate date components
+        if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
+          throw new Error(`Invalid day: ${day} in date ${date}`);
+        }
+        if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+          throw new Error(`Invalid month: ${month} in date ${date}`);
+        }
+        if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+          throw new Error(`Invalid year: ${year} in date ${date}`);
+        }
+
+        // Format as YYYY-MM-DD with zero-padding
+        const allocationDate = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
+        
+        console.log(`Date parsing: "${date}" -> "${allocationDate}"`)
         
         // Parse time (convert 12-hour to 24-hour format)
         let [timePart, period] = time.split(/(?=[ap]m)/i)
