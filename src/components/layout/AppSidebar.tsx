@@ -49,6 +49,7 @@ const mainItems = [
   { id: "dashboard", title: "Dashboard", url: "/dashboard", icon: BarChart3 },
   { id: "customers", title: "Customers", url: "/customers", icon: DollarSign },
   { id: "daily_trips", title: "Daily Trips", url: "/trips", icon: Calendar },
+  { id: "trips_analytics", title: "Trips Analytics", url: "/trips/analytics", icon: TrendingUp },
   { id: "fleet_management", title: "Fleet Management", url: "/fleet", icon: Bus },
   { id: "maintenance", title: "Maintenance", url: "/maintenance", icon: Wrench },
   { id: "insurance", title: "Insurance", url: "/insurance", icon: Shield },
