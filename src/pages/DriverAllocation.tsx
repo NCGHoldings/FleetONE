@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { BulkImportModal } from "@/components/driver-allocation/BulkImportModal";
+import { DataValidationPanel } from "@/components/trips/DataValidationPanel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -459,12 +460,37 @@ export default function DriverAllocation() {
 
   const findBusByNumber = (busNo: string) => {
     if (!busNo) return null;
-    const searchBus = busNo.toLowerCase().trim();
-    return buses.find(b => 
-      b.bus_no.toLowerCase() === searchBus ||
-      b.bus_no.toLowerCase().includes(searchBus) ||
-      searchBus.includes(b.bus_no.toLowerCase())
+    
+    // Clean and normalize the bus number
+    const searchBus = busNo.toUpperCase().trim()
+      .replace(/\s+/g, ' ')  // Normalize spaces
+      .replace(/^(BUS\s*#?\s*)/i, ''); // Remove "Bus #" prefix
+    
+    console.log('🔍 Searching for bus:', `"${busNo}"`, '→', `"${searchBus}"`);
+    
+    // Try exact match first
+    let bus = buses.find(b => 
+      b.bus_no.toUpperCase().replace(/\s+/g, ' ') === searchBus
     );
+    
+    if (bus) {
+      console.log('✅ Found exact bus match:', bus.bus_no);
+      return bus;
+    }
+    
+    // Try without spaces/dashes (NC6915 matches NC 6915 or NC-6915)
+    const normalized = searchBus.replace(/[-\s]/g, '');
+    bus = buses.find(b => 
+      b.bus_no.toUpperCase().replace(/[-\s]/g, '') === normalized
+    );
+    
+    if (bus) {
+      console.log('✅ Found normalized bus match:', bus.bus_no);
+      return bus;
+    }
+    
+    console.log('❌ Bus not found:', `"${busNo}"`, '| Available:', buses.slice(0, 5).map(b => b.bus_no).join(', '));
+    return null;
   };
 
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -652,13 +678,18 @@ export default function DriverAllocation() {
             end_time: time ? addHours(time, 8) : '18:00',
             status: 'confirmed',
             notes: JSON.stringify({
-              bus_no: busNo,
-              route_no: routeNo,
-              route: routeName,
-              driver: driverName,
-              conductor: conductorName,
-              whatsapp,
+              // Store ONLY validated database values, not Excel values
+              bus_no: foundBus?.bus_no || null,
+              route_no: foundRoute?.route_no || null,
+              route: foundRoute?.route_name || null,
+              driver: foundDriver ? `${foundDriver.first_name} ${foundDriver.last_name}` : null,
+              conductor: foundConductor ? `${foundConductor.first_name} ${foundConductor.last_name}` : null,
+              whatsapp: foundDriver?.phone || whatsapp,
               time: timeValue,
+              // Store original Excel values for reference
+              excel_bus: busNo !== foundBus?.bus_no ? busNo : null,
+              excel_route: routeName !== foundRoute?.route_name ? routeName : null,
+              excel_driver: driverName !== (foundDriver ? `${foundDriver.first_name} ${foundDriver.last_name}` : null) ? driverName : null,
               import_warnings: !foundBus || !foundDriver || !foundConductor ? 'Missing data' : null
             })
           });
@@ -1300,6 +1331,9 @@ export default function DriverAllocation() {
           </div>
         )}
       </div>
+
+      {/* Data Validation Panel */}
+      <DataValidationPanel />
 
       <Card>
         <CardHeader>
