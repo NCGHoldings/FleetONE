@@ -530,6 +530,123 @@ export type Database = {
           },
         ]
       }
+      daily_bus_expenses: {
+        Row: {
+          accident_compensation: number | null
+          body_wash: number | null
+          bus_id: string
+          created_at: string | null
+          created_by: string | null
+          diesel_price_per_liter: number | null
+          emission_fitness: number | null
+          expense_date: string
+          food: number | null
+          fuel_cost: number | null
+          fuel_liters: number | null
+          highway_charges: number | null
+          id: string
+          legal_court: number | null
+          log_sheet: number | null
+          notes: string | null
+          ntc: number | null
+          other: number | null
+          parking: number | null
+          permits_renewal: number | null
+          police: number | null
+          repair: number | null
+          runner: number | null
+          salary: number | null
+          short_misc: number | null
+          staff_accommodation: number | null
+          temporary_permit: number | null
+          total_daily_expenses: number | null
+          tyre_tube: number | null
+          updated_at: string | null
+          vehicle_hire: number | null
+        }
+        Insert: {
+          accident_compensation?: number | null
+          body_wash?: number | null
+          bus_id: string
+          created_at?: string | null
+          created_by?: string | null
+          diesel_price_per_liter?: number | null
+          emission_fitness?: number | null
+          expense_date: string
+          food?: number | null
+          fuel_cost?: number | null
+          fuel_liters?: number | null
+          highway_charges?: number | null
+          id?: string
+          legal_court?: number | null
+          log_sheet?: number | null
+          notes?: string | null
+          ntc?: number | null
+          other?: number | null
+          parking?: number | null
+          permits_renewal?: number | null
+          police?: number | null
+          repair?: number | null
+          runner?: number | null
+          salary?: number | null
+          short_misc?: number | null
+          staff_accommodation?: number | null
+          temporary_permit?: number | null
+          total_daily_expenses?: number | null
+          tyre_tube?: number | null
+          updated_at?: string | null
+          vehicle_hire?: number | null
+        }
+        Update: {
+          accident_compensation?: number | null
+          body_wash?: number | null
+          bus_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          diesel_price_per_liter?: number | null
+          emission_fitness?: number | null
+          expense_date?: string
+          food?: number | null
+          fuel_cost?: number | null
+          fuel_liters?: number | null
+          highway_charges?: number | null
+          id?: string
+          legal_court?: number | null
+          log_sheet?: number | null
+          notes?: string | null
+          ntc?: number | null
+          other?: number | null
+          parking?: number | null
+          permits_renewal?: number | null
+          police?: number | null
+          repair?: number | null
+          runner?: number | null
+          salary?: number | null
+          short_misc?: number | null
+          staff_accommodation?: number | null
+          temporary_permit?: number | null
+          total_daily_expenses?: number | null
+          tyre_tube?: number | null
+          updated_at?: string | null
+          vehicle_hire?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_bus_expenses_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_bus_expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       daily_trips: {
         Row: {
           audit_log: Json | null

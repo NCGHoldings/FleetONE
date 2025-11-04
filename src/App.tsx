@@ -58,6 +58,7 @@ import QuickTripsEntry from "./pages/QuickTripsEntry";
 import GovernanceCalendar from "./pages/GovernanceCalendar";
 import HolidayManagement from "./pages/HolidayManagement";
 import SeasonalThemes from "./pages/SeasonalThemes";
+import DailyBusExpenses from "./pages/DailyBusExpenses";
 
 const queryClient = new QueryClient();
 
@@ -158,6 +159,16 @@ const App = () => (
                     <AppLayout>
                       <TripsAnalytics />
                     </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/daily-bus-expenses" 
+              element={
+                <ProtectedRoute>
+                  <PageAccessGuard pageId="daily_trips">
+                    <DailyBusExpenses />
                   </PageAccessGuard>
                 </ProtectedRoute>
               } 
