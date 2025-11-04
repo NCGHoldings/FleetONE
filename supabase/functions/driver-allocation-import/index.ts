@@ -211,44 +211,71 @@ serve(async (req) => {
 
         // Parse date with comprehensive validation and logging
         console.log(`[Row ${rowNum}] Starting date parsing for: "${date}"`)
-        
-        const dateParts = date.trim().split('/');
-        console.log(`[Row ${rowNum}] Date parts after split:`, dateParts)
-        
-        if (dateParts.length !== 3) {
-          const error = `Invalid date format: "${date}". Expected DD/MM/YYYY (e.g., 01/10/2025 or 1/10/2025)`;
-          console.error(`[Row ${rowNum}] ${error}`)
-          throw new Error(error);
-        }
 
-        const [day, month, year] = dateParts;
-        const dayNum = parseInt(day);
-        const monthNum = parseInt(month);
-        const yearNum = parseInt(year);
+        let allocationDate: string;
 
-        console.log(`[Row ${rowNum}] Parsed numbers - Day: ${dayNum}, Month: ${monthNum}, Year: ${yearNum}`)
+        // Check if date is in long format: "01 October 2025"
+        const longDateRegex = /^(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})$/i;
+        const longMatch = date.trim().match(longDateRegex);
 
-        // Validate date components with detailed error messages
-        if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
-          const error = `Invalid day: "${day}" (parsed as ${dayNum}). Must be 1-31`;
-          console.error(`[Row ${rowNum}] ${error}`)
-          throw new Error(error);
-        }
-        if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
-          const error = `Invalid month: "${month}" (parsed as ${monthNum}). Must be 1-12`;
-          console.error(`[Row ${rowNum}] ${error}`)
-          throw new Error(error);
-        }
-        if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
-          const error = `Invalid year: "${year}" (parsed as ${yearNum}). Must be 2000-2100`;
-          console.error(`[Row ${rowNum}] ${error}`)
-          throw new Error(error);
-        }
+        if (longMatch) {
+          const day = parseInt(longMatch[1]);
+          const monthName = longMatch[2].toLowerCase();
+          const year = parseInt(longMatch[3]);
+          
+          const monthMap: Record<string, number> = {
+            'january': 1, 'february': 2, 'march': 3, 'april': 4,
+            'may': 5, 'june': 6, 'july': 7, 'august': 8,
+            'september': 9, 'october': 10, 'november': 11, 'december': 12
+          };
+          
+          const monthNum = monthMap[monthName];
+          
+          console.log(`[Row ${rowNum}] Long date parsed - Day: ${day}, Month: ${monthNum}, Year: ${year}`)
+          
+          // Validate components
+          if (day < 1 || day > 31) {
+            throw new Error(`Invalid day: ${day}. Must be 1-31`);
+          }
+          if (year < 2000 || year > 2100) {
+            throw new Error(`Invalid year: ${year}. Must be 2000-2100`);
+          }
+          
+          allocationDate = `${year}-${monthNum.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+          console.log(`[Row ${rowNum}] ✓ Date parsing SUCCESS: "${date}" -> "${allocationDate}"`)
+          
+        } else {
+          // Try DD/MM/YYYY format
+          const dateParts = date.trim().split('/');
+          console.log(`[Row ${rowNum}] Date parts after split:`, dateParts)
+          
+          if (dateParts.length !== 3) {
+            const error = `Invalid date format: "${date}". Expected DD/MM/YYYY (e.g., 01/10/2025) or long format (e.g., 01 October 2025)`;
+            console.error(`[Row ${rowNum}] ${error}`)
+            throw new Error(error);
+          }
 
-        // Format as YYYY-MM-DD with zero-padding
-        const allocationDate = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
-        
-        console.log(`[Row ${rowNum}] ✓ Date parsing SUCCESS: "${date}" -> "${allocationDate}"`)
+          const [day, month, year] = dateParts;
+          const dayNum = parseInt(day);
+          const monthNum = parseInt(month);
+          const yearNum = parseInt(year);
+
+          console.log(`[Row ${rowNum}] Parsed numbers - Day: ${dayNum}, Month: ${monthNum}, Year: ${yearNum}`)
+
+          // Validate date components
+          if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
+            throw new Error(`Invalid day: "${day}". Must be 1-31`);
+          }
+          if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+            throw new Error(`Invalid month: "${month}". Must be 1-12`);
+          }
+          if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+            throw new Error(`Invalid year: "${year}". Must be 2000-2100`);
+          }
+
+          allocationDate = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
+          console.log(`[Row ${rowNum}] ✓ Date parsing SUCCESS: "${date}" -> "${allocationDate}"`)
+        }
         
         // Parse time (convert 12-hour to 24-hour format)
         let [timePart, period] = time.split(/(?=[ap]m)/i)

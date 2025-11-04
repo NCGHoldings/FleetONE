@@ -40,7 +40,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
         'Driver': 'Jayashantha',
         'Conductor': 'Upul',
         'Whatsapp': '0702502294',
-        'Date': '01/10/2025',
+        'Date': '01 October 2025',
         'Time': '10.30am'
       },
       {
@@ -50,7 +50,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
         'Driver': 'Mohan',
         'Conductor': 'Eranda',
         'Whatsapp': '0768450468',
-        'Date': '02/10/2025',
+        'Date': '02 October 2025',
         'Time': '5.30pm'
       }
     ];
@@ -65,31 +65,53 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
   const parseExcelDate = (dateValue: any): string | null => {
     console.log('Parsing date value:', dateValue, 'Type:', typeof dateValue);
     
-    // If it's already a string in DD/MM/YYYY format
     if (typeof dateValue === 'string') {
-      const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
-      const match = dateValue.match(regex);
-      if (match) {
-        const day = match[1].padStart(2, '0');
-        const month = match[2].padStart(2, '0');
-        const year = match[3];
+      const trimmed = dateValue.trim();
+      
+      // Handle long date format: "01 October 2025" or "7 October 2025"
+      const longDateRegex = /^(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})$/i;
+      const longMatch = trimmed.match(longDateRegex);
+      
+      if (longMatch) {
+        const day = longMatch[1].padStart(2, '0');
+        const monthName = longMatch[2].toLowerCase();
+        const year = longMatch[3];
+        
+        const monthMap: Record<string, string> = {
+          'january': '01', 'february': '02', 'march': '03', 'april': '04',
+          'may': '05', 'june': '06', 'july': '07', 'august': '08',
+          'september': '09', 'october': '10', 'november': '11', 'december': '12'
+        };
+        
+        const month = monthMap[monthName];
+        console.log(`✅ Long date parsed: "${trimmed}" → ${day}/${month}/${year}`);
+        return `${day}/${month}/${year}`; // Return DD/MM/YYYY
+      }
+      
+      // Handle DD/MM/YYYY format
+      const shortDateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
+      const shortMatch = trimmed.match(shortDateRegex);
+      
+      if (shortMatch) {
+        const day = shortMatch[1].padStart(2, '0');
+        const month = shortMatch[2].padStart(2, '0');
+        const year = shortMatch[3];
         
         // Validate day and month ranges
         const dayNum = parseInt(day);
         const monthNum = parseInt(month);
         
         if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12) {
-          console.log(`✅ String date parsed: ${day}/${month}/${year}`);
-          return `${day}/${month}/${year}`; // Return DD/MM/YYYY
+          console.log(`✅ Short date parsed: ${day}/${month}/${year}`);
+          return `${day}/${month}/${year}`;
         } else {
           console.error(`❌ Invalid day/month: ${day}/${month}/${year}`);
         }
       }
     }
     
-    // If it's an Excel serial number (number between 1 and 100000)
+    // Handle Excel serial numbers
     if (typeof dateValue === 'number' && dateValue > 0 && dateValue < 100000) {
-      // Excel epoch starts at 1900-01-01 (with 1900 leap year bug)
       const excelEpoch = new Date(1899, 11, 30);
       const date = new Date(excelEpoch.getTime() + dateValue * 86400000);
       
@@ -98,10 +120,10 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
       const year = date.getFullYear();
       
       console.log(`✅ Excel serial ${dateValue} → ${day}/${month}/${year}`);
-      return `${day}/${month}/${year}`; // Return DD/MM/YYYY
+      return `${day}/${month}/${year}`;
     }
     
-    // If it's a Date object (shouldn't happen with cellDates: false, but just in case)
+    // Handle Date objects
     if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
       const day = dateValue.getDate().toString().padStart(2, '0');
       const month = (dateValue.getMonth() + 1).toString().padStart(2, '0');
@@ -111,7 +133,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
     }
     
     console.error('❌ Could not parse date:', dateValue);
-    return null; // Invalid format
+    return null;
   };
 
   const validateWhatsAppFormat = (whatsapp: string): boolean => {
@@ -158,7 +180,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
           // Parse and validate date format
           const parsedDate = row['Date'] ? parseExcelDate(row['Date']) : null;
           if (row['Date'] && !parsedDate) {
-            errors.push(`Row ${rowNum}: Invalid date format. Received: ${row['Date']}. Use DD/MM/YYYY or Excel date format`);
+            errors.push(`Row ${rowNum}: Invalid date format. Received: "${row['Date']}". Use DD/MM/YYYY (e.g., 01/10/2025) or long format (e.g., 01 October 2025)`);
           }
 
           // Validate WhatsApp format (warning only, not blocking)
@@ -309,7 +331,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
             <ul className="text-blue-800 dark:text-blue-200 space-y-1 text-sm">
               <li>• Required columns: <strong>Bus No, Route No, Route Name, Driver, Conductor, Date, Time</strong></li>
               <li>• Optional column: <strong>Whatsapp</strong> (phone number)</li>
-              <li>• Date format: <strong>DD/MM/YYYY</strong> (e.g., 01/10/2025 for October 1, 2025)</li>
+              <li>• Date format: <strong>DD/MM/YYYY</strong> (e.g., 01/10/2025) <strong>OR</strong> long format (e.g., 01 October 2025)</li>
               <li>• Time format: <strong>HH.MMam/pm</strong> (e.g., 10.30am, 5.30pm)</li>
               <li>• WhatsApp format: <strong>0XXXXXXXXX</strong> (10 digits, e.g., 0702502294)</li>
               <li>• All fields are case-sensitive and must match exactly</li>
