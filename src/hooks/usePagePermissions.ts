@@ -47,6 +47,11 @@ export function usePagePermissions(targetUserId?: string) {
         return true;
       }
       
+      // TEMPORARY: Allow all users to access trips_analytics until permissions are properly set
+      if (pageId === "trips_analytics") {
+        return true;
+      }
+      
       // Zero-Trust: Deny by default if no explicit permission set
       const value = permissions[pageId];
       return value === undefined ? false : !!value;
