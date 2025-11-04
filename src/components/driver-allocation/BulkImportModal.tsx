@@ -63,17 +63,33 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
   };
 
   const parseExcelDate = (dateValue: any): string | null => {
+    console.log('Parsing date value:', dateValue, 'Type:', typeof dateValue);
+    
     // If it's already a string in DD/MM/YYYY format
     if (typeof dateValue === 'string') {
       const regex = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
-      if (regex.test(dateValue)) {
-        return dateValue; // Already correct format
+      const match = dateValue.match(regex);
+      if (match) {
+        const day = match[1].padStart(2, '0');
+        const month = match[2].padStart(2, '0');
+        const year = match[3];
+        
+        // Validate day and month ranges
+        const dayNum = parseInt(day);
+        const monthNum = parseInt(month);
+        
+        if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12) {
+          console.log(`✅ String date parsed: ${day}/${month}/${year}`);
+          return `${day}/${month}/${year}`; // Return DD/MM/YYYY
+        } else {
+          console.error(`❌ Invalid day/month: ${day}/${month}/${year}`);
+        }
       }
     }
     
-    // If it's an Excel serial number
-    if (typeof dateValue === 'number') {
-      // Excel epoch starts at 1900-01-01 (with 1900 bug correction)
+    // If it's an Excel serial number (number between 1 and 100000)
+    if (typeof dateValue === 'number' && dateValue > 0 && dateValue < 100000) {
+      // Excel epoch starts at 1900-01-01 (with 1900 leap year bug)
       const excelEpoch = new Date(1899, 11, 30);
       const date = new Date(excelEpoch.getTime() + dateValue * 86400000);
       
@@ -81,17 +97,20 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       const year = date.getFullYear();
       
+      console.log(`✅ Excel serial ${dateValue} → ${day}/${month}/${year}`);
       return `${day}/${month}/${year}`; // Return DD/MM/YYYY
     }
     
-    // If it's a Date object
+    // If it's a Date object (shouldn't happen with cellDates: false, but just in case)
     if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
       const day = dateValue.getDate().toString().padStart(2, '0');
       const month = (dateValue.getMonth() + 1).toString().padStart(2, '0');
       const year = dateValue.getFullYear();
+      console.log(`✅ Date object parsed: ${day}/${month}/${year}`);
       return `${day}/${month}/${year}`;
     }
     
+    console.error('❌ Could not parse date:', dateValue);
     return null; // Invalid format
   };
 
@@ -114,7 +133,8 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { 
           type: 'array',
-          cellDates: true  // Parse dates as Date objects
+          cellDates: false,  // ✅ Keep dates as raw text values (no locale-dependent parsing)
+          raw: false         // ✅ Convert all cells to strings
         });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet);
