@@ -21,6 +21,7 @@ export const PAGES: PageCategories = {
     { id: "dashboard", title: "Dashboard", url: "/" },
     { id: "customers", title: "Customers", url: "/customers" },
     { id: "daily_trips", title: "Daily Trips", url: "/trips" },
+    { id: "trips_analytics", title: "Trips Analytics", url: "/trips/analytics" },
     { id: "fleet_management", title: "Fleet Management", url: "/fleet" },
     { id: "maintenance", title: "Maintenance", url: "/maintenance" },
     { id: "insurance", title: "Insurance", url: "/insurance" },

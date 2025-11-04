@@ -18,6 +18,7 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Dashboard from "./pages/Dashboard";
 import DailyTrips from "./pages/DailyTrips";
+import TripsAnalytics from "./pages/TripsAnalytics";
 import FleetManagement from "./pages/FleetManagement";
 import NotFound from "./pages/NotFound";
 import StaffManagement from "./pages/StaffManagement";
@@ -150,7 +151,19 @@ const App = () => (
               } 
             />
             <Route 
-              path="/fleet" 
+              path="/trips/analytics" 
+              element={
+                <ProtectedRoute>
+                  <PageAccessGuard pageId="trips_analytics">
+                    <AppLayout>
+                      <TripsAnalytics />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/fleet"
               element={
                 <ProtectedRoute>
                   <PageAccessGuard pageId="fleet_management">

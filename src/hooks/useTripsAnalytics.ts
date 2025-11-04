@@ -1,0 +1,333 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { startOfDay, endOfDay, subDays, differenceInDays } from 'date-fns';
+import { groupBy, sumBy, meanBy, maxBy, minBy, orderBy } from 'lodash';
+
+export interface AnalyticsFilters {
+  startDate: Date;
+  endDate: Date;
+  routes?: string[];
+  drivers?: string[];
+  conductors?: string[];
+  buses?: string[];
+  status?: string;
+}
+
+export interface TripData {
+  id: string;
+  trip_date: string;
+  bus_id: string;
+  route_id: string;
+  driver_id: string;
+  conductor_id: string;
+  start_time: string;
+  end_time: string;
+  distance_km: number;
+  income: number;
+  fuel_cost: number;
+  other_expenses: number;
+  total_expenses: number;
+  net_income: number;
+  km_per_liter: number;
+  status?: string;
+  odo_start?: number;
+  odo_end?: number;
+}
+
+export interface DriverStats {
+  driverId: string;
+  driverName: string;
+  totalTrips: number;
+  totalDistance: number;
+  totalIncome: number;
+  totalExpenses: number;
+  netIncome: number;
+  avgEfficiency: number;
+  completionRate: number;
+  rank: number;
+}
+
+export interface RouteStats {
+  routeNo: string;
+  routeName: string;
+  totalTrips: number;
+  totalDistance: number;
+  totalIncome: number;
+  totalExpenses: number;
+  netIncome: number;
+  avgEfficiency: number;
+  profitMargin: number;
+}
+
+export interface BusStats {
+  busNo: string;
+  totalTrips: number;
+  totalDistance: number;
+  currentOdo: number;
+  avgEfficiency: number;
+  totalIncome: number;
+  lastTripDate: string;
+  utilizationRate: number;
+}
+
+export interface Insight {
+  type: 'success' | 'warning' | 'error' | 'info';
+  title: string;
+  message: string;
+  action?: string;
+}
+
+export function useTripsAnalytics(filters: AnalyticsFilters) {
+  return useQuery({
+    queryKey: ['trips-analytics', filters],
+    queryFn: async () => {
+      const { data: trips, error } = await supabase
+        .from('daily_trips')
+        .select('*')
+        .gte('trip_date', filters.startDate.toISOString().split('T')[0])
+        .lte('trip_date', filters.endDate.toISOString().split('T')[0])
+        .order('trip_date', { ascending: false });
+
+      if (error) throw error;
+
+      // Apply additional filters
+      let filteredTrips = trips || [];
+      
+      if (filters.routes && filters.routes.length > 0) {
+        filteredTrips = filteredTrips.filter(t => filters.routes!.includes(t.route_id));
+      }
+      if (filters.drivers && filters.drivers.length > 0) {
+        filteredTrips = filteredTrips.filter(t => filters.drivers!.includes(t.driver_id));
+      }
+      if (filters.conductors && filters.conductors.length > 0) {
+        filteredTrips = filteredTrips.filter(t => filters.conductors!.includes(t.conductor_id));
+      }
+      if (filters.buses && filters.buses.length > 0) {
+        filteredTrips = filteredTrips.filter(t => filters.buses!.includes(t.bus_id));
+      }
+
+      return processAnalyticsData(filteredTrips, filters);
+    },
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+}
+
+function processAnalyticsData(trips: TripData[], filters: AnalyticsFilters) {
+  // Calculate overview metrics
+  const totalTrips = trips.length;
+  const totalDistance = sumBy(trips, 'distance_km');
+  const totalIncome = sumBy(trips, 'income');
+  const totalFuelCost = sumBy(trips, 'fuel_cost');
+  const totalOtherExpenses = sumBy(trips, 'other_expenses');
+  const totalExpenses = sumBy(trips, 'total_expenses');
+  const netProfit = sumBy(trips, 'net_income');
+  const avgEfficiency = meanBy(trips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0;
+  const activeBuses = new Set(trips.map(t => t.bus_id)).size;
+
+  // Calculate previous period for comparison
+  const daysInPeriod = differenceInDays(filters.endDate, filters.startDate) + 1;
+  const previousStartDate = subDays(filters.startDate, daysInPeriod);
+  const previousTrips = trips.filter(t => {
+    const tripDate = new Date(t.trip_date);
+    return tripDate >= previousStartDate && tripDate < filters.startDate;
+  });
+
+  const prevTotalIncome = sumBy(previousTrips, 'income');
+  const prevNetProfit = sumBy(previousTrips, 'net_income');
+  const prevTotalTrips = previousTrips.length;
+
+  const incomeChange = prevTotalIncome > 0 ? ((totalIncome - prevTotalIncome) / prevTotalIncome) * 100 : 0;
+  const profitChange = prevNetProfit > 0 ? ((netProfit - prevNetProfit) / prevNetProfit) * 100 : 0;
+  const tripsChange = prevTotalTrips > 0 ? ((totalTrips - prevTotalTrips) / prevTotalTrips) * 100 : 0;
+
+  // Driver statistics
+  const driverGroups = groupBy(trips, 'driver_id');
+  const driverStats: DriverStats[] = Object.keys(driverGroups).map(driver => {
+    const driverTrips = driverGroups[driver];
+    return {
+      driverId: driver,
+      driverName: driver,
+      totalTrips: driverTrips.length,
+      totalDistance: sumBy(driverTrips, 'distance_km'),
+      totalIncome: sumBy(driverTrips, 'income'),
+      totalExpenses: sumBy(driverTrips, 'total_expenses'),
+      netIncome: sumBy(driverTrips, 'net_income'),
+      avgEfficiency: meanBy(driverTrips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0,
+      completionRate: 100,
+      rank: 0
+    };
+  });
+
+  // Sort and rank drivers by net income
+  const rankedDrivers = orderBy(driverStats, ['netIncome'], ['desc']).map((d, idx) => ({
+    ...d,
+    rank: idx + 1
+  }));
+
+  // Route statistics
+  const routeGroups = groupBy(trips, 'route_id');
+  const routeStats: RouteStats[] = Object.keys(routeGroups).map(routeNo => {
+    const routeTrips = routeGroups[routeNo];
+    const income = sumBy(routeTrips, 'income');
+    const expenses = sumBy(routeTrips, 'total_expenses');
+    return {
+      routeNo,
+      routeName: routeNo,
+      totalTrips: routeTrips.length,
+      totalDistance: sumBy(routeTrips, 'distance_km'),
+      totalIncome: income,
+      totalExpenses: expenses,
+      netIncome: sumBy(routeTrips, 'net_income'),
+      avgEfficiency: meanBy(routeTrips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0,
+      profitMargin: income > 0 ? ((income - expenses) / income) * 100 : 0
+    };
+  });
+
+  // Bus statistics
+  const busGroups = groupBy(trips, 'bus_id');
+  const busStats: BusStats[] = Object.keys(busGroups).map(busId => {
+    const busTrips = orderBy(busGroups[busId], ['trip_date'], ['desc']);
+    return {
+      busNo: busId,
+      totalTrips: busTrips.length,
+      totalDistance: sumBy(busTrips, 'distance_km'),
+      currentOdo: busTrips[0]?.odo_end || 0,
+      avgEfficiency: meanBy(busTrips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0,
+      totalIncome: sumBy(busTrips, 'income'),
+      lastTripDate: busTrips[0]?.trip_date || '',
+      utilizationRate: (busTrips.length / totalTrips) * 100
+    };
+  });
+
+  // Generate insights
+  const insights = generateInsights({
+    trips,
+    driverStats: rankedDrivers,
+    routeStats,
+    busStats,
+    incomeChange,
+    profitChange,
+    avgEfficiency
+  });
+
+  // Time-based analysis
+  const tripsByHour = groupBy(trips, t => {
+    if (!t.start_time) return 'unknown';
+    const hour = parseInt(t.start_time.split(':')[0]);
+    return hour;
+  });
+
+  const tripsByDate = groupBy(trips, 'trip_date');
+  const dailyTrends = Object.keys(tripsByDate).map(date => ({
+    date,
+    trips: tripsByDate[date].length,
+    income: sumBy(tripsByDate[date], 'income'),
+    expenses: sumBy(tripsByDate[date], 'total_expenses'),
+    netIncome: sumBy(tripsByDate[date], 'net_income'),
+    distance: sumBy(tripsByDate[date], 'distance_km'),
+    avgEfficiency: meanBy(tripsByDate[date].filter(t => t.km_per_liter > 0), 'km_per_liter') || 0
+  }));
+
+  return {
+    overview: {
+      totalTrips,
+      totalDistance,
+      totalIncome,
+      totalFuelCost,
+      totalOtherExpenses,
+      totalExpenses,
+      netProfit,
+      avgEfficiency,
+      activeBuses,
+      profitMargin: totalIncome > 0 ? ((netProfit / totalIncome) * 100) : 0,
+      avgIncomePerTrip: totalTrips > 0 ? totalIncome / totalTrips : 0,
+      avgDistancePerTrip: totalTrips > 0 ? totalDistance / totalTrips : 0,
+      completionRate: 100,
+      incomeChange,
+      profitChange,
+      tripsChange
+    },
+    driverStats: rankedDrivers,
+    routeStats: orderBy(routeStats, ['totalIncome'], ['desc']),
+    busStats: orderBy(busStats, ['totalIncome'], ['desc']),
+    insights,
+    dailyTrends: orderBy(dailyTrends, ['date'], ['asc']),
+    tripsByHour,
+    expenseBreakdown: {
+      fuel: totalFuelCost,
+      other: totalOtherExpenses,
+      fuelPercentage: totalExpenses > 0 ? (totalFuelCost / totalExpenses) * 100 : 0,
+      otherPercentage: totalExpenses > 0 ? (totalOtherExpenses / totalExpenses) * 100 : 0
+    },
+    rawTrips: trips
+  };
+}
+
+function generateInsights(data: any): Insight[] {
+  const insights: Insight[] = [];
+
+  // Top performer
+  if (data.driverStats.length > 0) {
+    const topDriver = data.driverStats[0];
+    insights.push({
+      type: 'success',
+      title: 'Top Performer',
+      message: `${topDriver.driverName} generated ₨${topDriver.netIncome.toLocaleString()} net income with ${topDriver.totalTrips} trips at ${topDriver.avgEfficiency.toFixed(1)} km/L average`
+    });
+  }
+
+  // Revenue trend
+  if (data.incomeChange !== 0) {
+    insights.push({
+      type: data.incomeChange > 0 ? 'success' : 'warning',
+      title: 'Revenue Trend',
+      message: `Revenue ${data.incomeChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(data.incomeChange).toFixed(1)}% compared to previous period${data.incomeChange > 15 ? ' - Excellent performance!' : ''}`
+    });
+  }
+
+  // Low efficiency alert
+  const lowEfficiencyDrivers = data.driverStats.filter((d: DriverStats) => d.avgEfficiency > 0 && d.avgEfficiency < 9);
+  if (lowEfficiencyDrivers.length > 0) {
+    insights.push({
+      type: 'warning',
+      title: 'Low Efficiency Alert',
+      message: `${lowEfficiencyDrivers.length} driver${lowEfficiencyDrivers.length > 1 ? 's' : ''} below 9 km/L average - consider training or vehicle inspection`,
+      action: 'View Drivers'
+    });
+  }
+
+  // Top route
+  if (data.routeStats.length > 0) {
+    const topRoute = data.routeStats[0];
+    const routeShare = (topRoute.totalIncome / data.trips.reduce((sum: number, t: TripData) => sum + t.income, 0)) * 100;
+    insights.push({
+      type: 'info',
+      title: 'Top Revenue Route',
+      message: `${topRoute.routeName} generated ₨${topRoute.totalIncome.toLocaleString()} (${routeShare.toFixed(1)}% of total revenue) with ${topRoute.profitMargin.toFixed(1)}% profit margin`
+    });
+  }
+
+  // Negative profit alert
+  const negativeTrips = data.trips.filter((t: TripData) => t.net_income < 0);
+  if (negativeTrips.length > 0) {
+    insights.push({
+      type: 'error',
+      title: 'Negative Profit Alert',
+      message: `${negativeTrips.length} trips resulted in losses totaling ₨${Math.abs(sumBy(negativeTrips, 'net_income')).toLocaleString()}`,
+      action: 'View Loss-Making Trips'
+    });
+  }
+
+  // Fleet efficiency
+  if (data.avgEfficiency > 0) {
+    const status = data.avgEfficiency >= 12 ? 'Excellent' : data.avgEfficiency >= 10 ? 'Good' : 'Needs Improvement';
+    insights.push({
+      type: data.avgEfficiency >= 10 ? 'success' : 'info',
+      title: 'Fleet Fuel Efficiency',
+      message: `Average fleet efficiency is ${data.avgEfficiency.toFixed(1)} km/L - ${status}`
+    });
+  }
+
+  return insights;
+}
