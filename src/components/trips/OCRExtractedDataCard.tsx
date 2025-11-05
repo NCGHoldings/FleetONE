@@ -4,11 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Edit, CheckCircle, Eye, Trash2, Plus, Minus } from "lucide-react";
+import { ChevronDown, Edit, CheckCircle, Eye, Trash2, Plus, Minus, AlertCircle } from "lucide-react";
 import { SingleTrip, DailyExpenses } from "@/lib/ocr-processor";
-import { KNOWN_OCR_EXPENSE_KEYS } from "@/lib/ocr-expense-mapper";
+import { DB_EXPENSE_CATEGORIES, mapOCRExpensesToDB, DBExpenseFields, KNOWN_OCR_EXPENSE_KEYS } from "@/lib/ocr-expense-mapper";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ExtractedMultiTripData {
   fileName: string;
@@ -18,19 +18,37 @@ interface ExtractedMultiTripData {
   confidence: number;
   trips: SingleTrip[];
   daily_expenses: DailyExpenses;
+  mapped_expenses?: DBExpenseFields;
 }
 
 interface OCRExtractedDataCardProps {
   data: ExtractedMultiTripData;
-  onApply: (data: ExtractedMultiTripData) => void;
+  onApply: (data: ExtractedMultiTripData & { mapped_expenses: DBExpenseFields }) => void;
   onDiscard: () => void;
   onView: () => void;
+  savedExpensesTotal?: number;
 }
 
-export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCRExtractedDataCardProps) => {
+export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView, savedExpensesTotal }: OCRExtractedDataCardProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState(data);
+  
+  // Initialize mapped expenses from OCR data
+  const [mappedExpenses, setMappedExpenses] = useState<DBExpenseFields>(() => 
+    data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses)
+  );
+  
+  // Track unmapped OCR items
+  const [unmappedItems, setUnmappedItems] = useState<Record<string, number>>(() => {
+    const unmapped: Record<string, number> = {};
+    Object.entries(data.daily_expenses).forEach(([key, value]) => {
+      if (!KNOWN_OCR_EXPENSE_KEYS.includes(key) && value > 0) {
+        unmapped[key] = value;
+      }
+    });
+    return unmapped;
+  });
 
   const getConfidenceBadge = (confidence: number) => {
     const percent = Math.round(confidence * 100);
@@ -46,12 +64,12 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
     return "border-red-500/30";
   };
 
-  // Calculate totals
+  // Calculate totals using mapped expenses
   const totalRevenue = editedData.trips.reduce((sum, trip) => {
     return sum + Object.values(trip.income).reduce((s, v) => s + v, 0);
   }, 0);
 
-  const totalExpenses = Object.values(editedData.daily_expenses).reduce((sum, val) => sum + val, 0);
+  const totalExpenses = Object.values(mappedExpenses).reduce((sum, val) => sum + val, 0);
   const netProfit = totalRevenue - totalExpenses;
 
   const handleTripIncomeChange = (tripIndex: number, field: keyof SingleTrip['income'], value: number) => {
@@ -65,11 +83,29 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
     }));
   };
 
-  const handleExpenseChange = (field: keyof DailyExpenses, value: number) => {
-    setEditedData(prev => ({
+  const handleMappedExpenseChange = (field: keyof DBExpenseFields, value: number) => {
+    setMappedExpenses(prev => ({
       ...prev,
-      daily_expenses: { ...prev.daily_expenses, [field]: value }
+      [field]: value
     }));
+  };
+
+  const handleAllocateUnmapped = (unmappedKey: string, targetCategory: keyof DBExpenseFields) => {
+    const amount = unmappedItems[unmappedKey];
+    if (amount) {
+      // Add to mapped category
+      setMappedExpenses(prev => ({
+        ...prev,
+        [targetCategory]: prev[targetCategory] + amount
+      }));
+      
+      // Remove from unmapped
+      setUnmappedItems(prev => {
+        const newUnmapped = { ...prev };
+        delete newUnmapped[unmappedKey];
+        return newUnmapped;
+      });
+    }
   };
 
   const handleAddTrip = () => {
@@ -104,6 +140,7 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
 
   const handleCancel = () => {
     setEditedData(data);
+    setMappedExpenses(data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses));
     setIsEditing(false);
   };
 
@@ -121,31 +158,6 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
     luggage_income: "Luggage (ගමන් මල්)",
     special_income: "Special (විශේෂ)",
   };
-
-  const expenseLabels: Record<string, string> = {
-    fuel_cost: "Diesel (ඩීසල්)",
-    driver_salary: "Driver (රියදුරු)",
-    conductor_salary: "Conductor (කොන්දොස්තර)",
-    food: "Food (කෑම)",
-    parking: "Parking (යාත්රා)",
-    body_wash: "Body Wash (විදවණ)",
-    police: "Police (පොලීසිය)",
-    repair: "Repair (අළුත්වැඩියා)",
-    grease: "Grease (ග්‍රීස්)",
-    highway_toll: "Highway Toll (හයිවේ)",
-    phone: "Phone (දුරකථන)",
-    oil: "Oil (තෙල්)",
-    tyre_tube: "Tyre/Tube (ටයර්)",
-    labour: "Labour (කම්කරු)",
-    spare_parts: "Spare Parts (කොටස්)",
-    permit: "Permit (බලපත්‍ර)",
-    insurance: "Insurance (රක්ෂණ)",
-    other: "Other",
-  };
-  
-  // Find unmapped expense fields
-  const unmappedExpenses = Object.entries(editedData.daily_expenses)
-    .filter(([key, value]) => !KNOWN_OCR_EXPENSE_KEYS.includes(key) && value > 0);
 
   return (
     <Card className={`mb-4 border-2 ${getBorderColor(data.confidence)}`}>
@@ -172,6 +184,11 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
                   <span className={netProfit >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
                     📈 Net: Rs. {formatAmount(netProfit)}
                   </span>
+                  {savedExpensesTotal !== undefined && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-500">
+                      ✓ Saved • Rs. {formatAmount(savedExpensesTotal)}
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -275,37 +292,55 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
                   })}
                 </div>
 
-                {/* Daily Expenses Section */}
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-sm">💸 DAILY EXPENSES (Bus-level, One Entry)</h4>
+                {/* Daily Expenses Section with Mapped Categories */}
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm">💸 DAILY EXPENSES (21 Categories)</h4>
                   
-                  {/* Unmapped Fields Warning */}
-                  {unmappedExpenses.length > 0 && (
+                  {/* Unmapped OCR Items */}
+                  {Object.keys(unmappedItems).length > 0 && (
                     <Alert className="bg-yellow-50 dark:bg-yellow-950/20 border-yellow-500/50">
-                      <Info className="h-4 w-4 text-yellow-600" />
-                      <AlertDescription className="text-xs">
-                        <strong>Unmapped fields detected:</strong> {unmappedExpenses.map(([k]) => k).join(', ')}
-                        <br />
-                        These will be added to "Other" during save. Edit them below if needed.
+                      <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription className="space-y-2">
+                        <p className="text-xs font-semibold">⚠️ Unmapped OCR Items - Please Allocate:</p>
+                        <div className="space-y-2">
+                          {Object.entries(unmappedItems).map(([key, value]) => (
+                            <div key={key} className="flex items-center gap-2 text-xs">
+                              <span className="font-mono font-semibold min-w-[80px]">
+                                Rs. {formatAmount(value)}
+                              </span>
+                              <span className="text-muted-foreground flex-1">{key}</span>
+                              <Select onValueChange={(target) => handleAllocateUnmapped(key, target as keyof DBExpenseFields)}>
+                                <SelectTrigger className="h-7 text-xs w-[160px]">
+                                  <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {DB_EXPENSE_CATEGORIES.map(cat => (
+                                    <SelectItem key={cat.key} value={cat.key} className="text-xs">
+                                      {cat.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ))}
+                        </div>
                       </AlertDescription>
                     </Alert>
                   )}
                   
+                  {/* Mapped Expenses (21 DB categories) */}
                   <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
-                    <div className="space-y-1 text-xs">
-                      {Object.entries(editedData.daily_expenses).map(([key, value]) => {
-                        const isUnmapped = !KNOWN_OCR_EXPENSE_KEYS.includes(key);
+                    <div className="space-y-1 text-xs max-h-[300px] overflow-y-auto">
+                      {DB_EXPENSE_CATEGORIES.map(({ key, label }) => {
+                        const value = mappedExpenses[key as keyof DBExpenseFields];
                         return (value > 0 || isEditing) ? (
                           <div key={key} className="flex justify-between items-center">
-                            <span className={`text-muted-foreground ${isUnmapped ? 'text-yellow-600 font-semibold' : ''}`}>
-                              {expenseLabels[key] || key}
-                              {isUnmapped && ' ⚠️'}:
-                            </span>
+                            <span className="text-muted-foreground">{label}:</span>
                             {isEditing ? (
                               <Input
                                 type="number"
                                 value={value}
-                                onChange={(e) => handleExpenseChange(key as keyof DailyExpenses, Number(e.target.value))}
+                                onChange={(e) => handleMappedExpenseChange(key as keyof DBExpenseFields, Number(e.target.value))}
                                 className="h-6 w-24 text-xs text-right"
                               />
                             ) : (
@@ -364,9 +399,14 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
                       </Button>
-                      <Button onClick={() => onApply(editedData)} size="sm" className="flex-1">
+                      <Button 
+                        onClick={() => onApply({ ...editedData, mapped_expenses: mappedExpenses })} 
+                        size="sm" 
+                        className="flex-1"
+                        disabled={Object.keys(unmappedItems).length > 0}
+                      >
                         <CheckCircle className="h-4 w-4 mr-1" />
-                        Apply All Trips
+                        Apply All (Trips + Expenses)
                       </Button>
                       <Button onClick={onView} variant="outline" size="sm">
                         <Eye className="h-4 w-4 mr-1" />
