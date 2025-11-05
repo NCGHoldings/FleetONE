@@ -177,12 +177,41 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         }
       }
 
-      // 3. INSERT INDIVIDUAL TRIPS WITH THEIR REVENUE (not aggregated)
+      // 3. QUERY EXISTING TRIPS to find the highest trip number for this bus/date
+      const { data: existingTrips, error: queryError } = await supabase
+        .from('daily_trips')
+        .select('trip_no')
+        .eq('bus_id', busData.id)
+        .eq('trip_date', tripDate);
+
+      if (queryError) {
+        console.error('Error querying existing trips:', queryError);
+        toast.error(`Failed to query existing trips: ${queryError.message}`);
+        return;
+      }
+
+      // Find the highest trip number (e.g., "NE 0746-T3" -> 3)
+      let maxTripNumber = 0;
+      if (existingTrips && existingTrips.length > 0) {
+        existingTrips.forEach(trip => {
+          const match = trip.trip_no.match(/-T(\d+)$/);
+          if (match) {
+            const tripNum = parseInt(match[1], 10);
+            if (tripNum > maxTripNumber) {
+              maxTripNumber = tripNum;
+            }
+          }
+        });
+      }
+
+      console.log(`📊 Found ${existingTrips?.length || 0} existing trips. Max trip number: T${maxTripNumber}`);
+
+      // 4. INSERT INDIVIDUAL TRIPS WITH SEQUENTIAL UNIQUE TRIP NUMBERS
       const tripsToInsert = data.trips.map((trip, idx) => {
         const tripRevenue = Object.values(trip.income).reduce((s, v) => s + v, 0);
         
         return {
-          trip_no: `${busData.bus_no}-T${trip.trip_no || idx + 1}`,
+          trip_no: `${busData.bus_no}-T${maxTripNumber + idx + 1}`, // Sequential: T4, T5, T6...
           trip_date: tripDate,
           bus_id: busData.id,
           income: tripRevenue,
@@ -191,6 +220,8 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           odometer_end: trip.odometer_end || null,
         };
       });
+
+      console.log(`✅ Inserting ${tripsToInsert.length} new trips:`, tripsToInsert.map(t => t.trip_no).join(', '));
 
       const { data: insertedTrips, error: tripError } = await supabase
         .from('daily_trips')
@@ -203,8 +234,10 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         return;
       }
 
-      // 4. MAP OCR EXPENSES TO DB SCHEMA, then insert daily expenses
+      // 5. MAP OCR EXPENSES TO DB SCHEMA, then insert daily expenses
+      console.log('🔍 Raw OCR expenses:', data.daily_expenses);
       const mappedExpenses = mapOCRExpensesToDB(data.daily_expenses);
+      console.log('✅ Mapped expenses for DB:', mappedExpenses);
       const totalExpenses = Object.values(mappedExpenses).reduce((s, v) => s + v, 0);
       
       const { error: expenseError } = await supabase
@@ -228,9 +261,10 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       const totalRevenue = data.trips.reduce((sum, t) => 
         sum + Object.values(t.income).reduce((s, v) => s + v, 0), 0
       );
-
+      
+      const tripNumbers = tripsToInsert.map(t => t.trip_no).join(', ');
       toast.success(
-        `✅ Applied ${data.trips.length} trip(s) with Rs. ${totalRevenue.toLocaleString()} revenue + Rs. ${totalExpenses.toLocaleString()} expenses for ${busData.bus_no}`
+        `✅ Added trips ${tripNumbers} | Revenue: Rs. ${totalRevenue.toLocaleString()} | Expenses: Rs. ${totalExpenses.toLocaleString()}`
       );
       
       // 6. EMIT DATA TO TRIGGER UI REFRESH AND DATE SWITCH
