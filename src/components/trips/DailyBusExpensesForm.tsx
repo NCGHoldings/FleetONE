@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Save, Copy } from "lucide-react";
+import { ChevronDown, Save, Copy, Info } from "lucide-react";
 import { DailyBusExpense } from "@/hooks/useDailyBusExpenses";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -20,9 +20,11 @@ interface Props {
   date: Date;
   onSave: (expense: DailyBusExpense) => Promise<boolean>;
   existingExpense?: DailyBusExpense & { buses?: { bus_no: string } };
+  readOnly?: boolean;
+  initialBusId?: string;
 }
 
-export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
+export function DailyBusExpensesForm({ date, onSave, existingExpense, readOnly = false, initialBusId }: Props) {
   const [buses, setBuses] = useState<Bus[]>([]);
   const [selectedBusId, setSelectedBusId] = useState<string>("");
   const [tripCount, setTripCount] = useState(0);
@@ -58,6 +60,13 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
     fetchBuses();
   }, []);
 
+  // Auto-select initial bus if provided
+  useEffect(() => {
+    if (initialBusId && !selectedBusId) {
+      setSelectedBusId(initialBusId);
+    }
+  }, [initialBusId]);
+
   useEffect(() => {
     if (existingExpense) {
       setSelectedBusId(existingExpense.bus_id);
@@ -92,8 +101,51 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
   useEffect(() => {
     if (selectedBusId) {
       fetchTripCount();
+      // Auto-fetch expenses for this bus/date (for view-only mode)
+      fetchExpensesForBusDate();
     }
   }, [selectedBusId, date]);
+
+  const fetchExpensesForBusDate = async () => {
+    if (!selectedBusId) return;
+    
+    const dateStr = date.toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from("daily_bus_expenses")
+      .select("*")
+      .eq("bus_id", selectedBusId)
+      .eq("expense_date", dateStr)
+      .maybeSingle();
+
+    if (data && !error) {
+      console.log('📊 Auto-loaded expenses for view:', data);
+      setExpenses({
+        fuel_cost: data.fuel_cost || 0,
+        diesel_price_per_liter: data.diesel_price_per_liter || 350,
+        repair: data.repair || 0,
+        tyre_tube: data.tyre_tube || 0,
+        salary: data.salary || 0,
+        police: data.police || 0,
+        food: data.food || 0,
+        emission_fitness: data.emission_fitness || 0,
+        permits_renewal: data.permits_renewal || 0,
+        staff_accommodation: data.staff_accommodation || 0,
+        highway_charges: data.highway_charges || 0,
+        accident_compensation: data.accident_compensation || 0,
+        parking: data.parking || 0,
+        log_sheet: data.log_sheet || 0,
+        vehicle_hire: data.vehicle_hire || 0,
+        ntc: data.ntc || 0,
+        runner: data.runner || 0,
+        short_misc: data.short_misc || 0,
+        temporary_permit: data.temporary_permit || 0,
+        body_wash: data.body_wash || 0,
+        legal_court: data.legal_court || 0,
+        other: data.other || 0,
+        notes: data.notes || ""
+      });
+    }
+  };
 
   const fetchBuses = async () => {
     const { data } = await supabase
@@ -243,11 +295,17 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
 
   return (
     <Card className="p-6">
+      {readOnly && (
+        <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md flex items-center gap-2">
+          <Info className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">Auto-filled by OCR (View Only)</span>
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex items-end gap-4">
           <div className="flex-1">
             <Label>Bus Number</Label>
-            <Select value={selectedBusId} onValueChange={setSelectedBusId}>
+            <Select value={selectedBusId} onValueChange={setSelectedBusId} disabled={readOnly}>
               <SelectTrigger>
                 <SelectValue placeholder="Select bus" />
               </SelectTrigger>
@@ -265,10 +323,12 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
               Total Trips: <span className="font-semibold">{tripCount}</span>
             </div>
           )}
-          <Button type="button" variant="outline" onClick={copyPreviousDayExpenses}>
-            <Copy className="mr-2 h-4 w-4" />
-            Copy Previous Day
-          </Button>
+          {!readOnly && (
+            <Button type="button" variant="outline" onClick={copyPreviousDayExpenses}>
+              <Copy className="mr-2 h-4 w-4" />
+              Copy Previous Day
+            </Button>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -280,6 +340,7 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
                 type="number"
                 value={expenses.fuel_cost}
                 onChange={(e) => setExpenses({ ...expenses, fuel_cost: parseFloat(e.target.value) || 0 })}
+                disabled={readOnly}
               />
             </div>
             <div>
@@ -288,6 +349,7 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
                 type="number"
                 value={expenses.diesel_price_per_liter}
                 onChange={(e) => setExpenses({ ...expenses, diesel_price_per_liter: parseFloat(e.target.value) || 0 })}
+                disabled={readOnly}
               />
             </div>
             <div>
@@ -312,6 +374,7 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
                   type="number"
                   value={expenses[key as keyof typeof expenses] as number}
                   onChange={(e) => setExpenses({ ...expenses, [key]: parseFloat(e.target.value) || 0 })}
+                  disabled={readOnly}
                 />
               </div>
             ))}
@@ -351,6 +414,7 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
                     type="number"
                     value={expenses[key as keyof typeof expenses] as number}
                     onChange={(e) => setExpenses({ ...expenses, [key]: parseFloat(e.target.value) || 0 })}
+                    disabled={readOnly}
                   />
                 </div>
               ))}
@@ -364,6 +428,7 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
             value={expenses.notes}
             onChange={(e) => setExpenses({ ...expenses, notes: e.target.value })}
             placeholder="Any additional notes..."
+            disabled={readOnly}
           />
         </div>
 
@@ -371,10 +436,12 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense }: Props) {
           <div className="text-lg font-semibold">
             Total Daily Expenses: <span className="text-primary">Rs. {totalExpenses.toLocaleString()}</span>
           </div>
-          <Button type="submit">
-            <Save className="mr-2 h-4 w-4" />
-            Save Expenses
-          </Button>
+          {!readOnly && (
+            <Button type="submit">
+              <Save className="mr-2 h-4 w-4" />
+              Save Expenses
+            </Button>
+          )}
         </div>
       </form>
     </Card>

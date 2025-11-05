@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export interface DailyBusExpense {
   id?: string;
@@ -38,7 +39,8 @@ export function useDailyBusExpenses(date: Date) {
   const fetchExpenses = async () => {
     try {
       setLoading(true);
-      const dateStr = date.toISOString().split('T')[0];
+      // Use date-fns to avoid timezone issues
+      const dateStr = format(date, 'yyyy-MM-dd');
 
       const { data, error } = await supabase
         .from("daily_bus_expenses")
