@@ -149,11 +149,14 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
                   <span className="text-sm text-muted-foreground">• {data.date}</span>
                   {getConfidenceBadge(data.confidence)}
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  📊 {data.trips.length} trip{data.trips.length !== 1 ? 's' : ''} detected • 
-                  💰 Rs. {formatAmount(totalRevenue)} revenue • 
-                  💸 Rs. {formatAmount(totalExpenses)} expenses
-                </p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">
+                  <span>📊 {data.trips.length} trip{data.trips.length !== 1 ? 's' : ''}</span>
+                  <span>💰 Revenue: Rs. {formatAmount(totalRevenue)}</span>
+                  <span>💸 Expenses: Rs. {formatAmount(totalExpenses)}</span>
+                  <span className={netProfit >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                    📈 Net: Rs. {formatAmount(netProfit)}
+                  </span>
+                </div>
               </div>
             </div>
             <CollapsibleTrigger asChild>
@@ -183,10 +186,10 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
                   <p className="text-sm font-medium">📋 Bus {data.busNumber} • {data.date}</p>
                 </div>
 
-                {/* Trips Section */}
+                {/* Trips Section with Visual Breakdown */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-sm">📊 TRIPS ({editedData.trips.length})</h4>
+                    <h4 className="font-semibold text-sm">📊 TRIP REVENUE (Individual)</h4>
                     {isEditing && (
                       <Button onClick={handleAddTrip} size="sm" variant="outline">
                         <Plus className="h-3 w-3 mr-1" />
@@ -194,6 +197,20 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
                       </Button>
                     )}
                   </div>
+                  
+                  {/* Quick summary of all trips */}
+                  {!isEditing && editedData.trips.length > 1 && (
+                    <div className="flex gap-2 text-xs text-muted-foreground flex-wrap">
+                      {editedData.trips.map((trip, idx) => {
+                        const tripRev = Object.values(trip.income).reduce((s, v) => s + v, 0);
+                        return (
+                          <span key={idx} className="bg-primary/5 px-2 py-1 rounded">
+                            T{trip.trip_no}: Rs. {formatAmount(tripRev)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {editedData.trips.map((trip, tripIdx) => {
                     const tripRevenue = Object.values(trip.income).reduce((s, v) => s + v, 0);
@@ -244,8 +261,8 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
 
                 {/* Daily Expenses Section */}
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-sm">💸 DAILY EXPENSES (Applied to all trips)</h4>
-                  <div className="p-3 bg-destructive/5 rounded-lg border border-destructive/20">
+                  <h4 className="font-semibold text-sm">💸 DAILY EXPENSES (Bus-level, One Entry)</h4>
+                  <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
                     <div className="space-y-1 text-xs">
                       {Object.entries(editedData.daily_expenses).map(([key, value]) => (
                         value > 0 || isEditing ? (
@@ -267,11 +284,14 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
                         ) : null
                       ))}
                     </div>
-                    <div className="mt-2 pt-2 border-t border-destructive/20">
+                    <div className="mt-2 pt-2 border-t border-amber-500/20">
                       <div className="flex justify-between font-semibold text-sm">
-                        <span>Total Expenses:</span>
-                        <span className="font-mono">Rs. {formatAmount(totalExpenses)}</span>
+                        <span>Total Daily Expenses:</span>
+                        <span className="font-mono text-amber-700 dark:text-amber-400">Rs. {formatAmount(totalExpenses)}</span>
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ℹ️ Applied once per bus per day (not per trip)
+                      </p>
                     </div>
                   </div>
                 </div>

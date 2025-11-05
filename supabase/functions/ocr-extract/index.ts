@@ -26,7 +26,10 @@ CRITICAL: Look for a TABLE with numbered rows (usually 1, 2, 3, 4) showing diffe
 
 Extract:
 
-1. BUS NUMBER: Format XXXX or XX-XXXX (e.g., 0746, NE-0746, NP-0748)
+1. BUS NUMBER: Format varies (e.g., "NE 0746", "NE-0746", "NK1234")
+   - CRITICAL: Preserve the EXACT format from the image (spaces, hyphens, or no separator)
+   - DO NOT change the format - keep it exactly as written
+   - If unclear, prefer SPACE format: "NE 0746"
    - Look at the top of the sheet for bus registration number
 
 2. DATE: Format DD/MM/YYYY or දිනය

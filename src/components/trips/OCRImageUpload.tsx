@@ -138,36 +138,63 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
 
   const applyMultiTripData = async (data: ExtractedMultiTripData) => {
     try {
-      // 1. Validate bus number exists
-      const { data: busData, error: busError } = await supabase
-        .from('buses')
-        .select('id, bus_no')
-        .eq('bus_no', data.busNumber)
-        .single();
-
-      if (busError || !busData) {
-        toast.error(`Bus ${data.busNumber} not found in database. Please check the bus number.`);
+      // 1. Parse date first
+      const [day, month, year] = data.date.split('/');
+      if (!day || !month || !year) {
+        toast.error('Invalid date format');
         return;
       }
-
-      // 2. Parse date
-      const [day, month, year] = data.date.split('/');
       const tripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
-      // 3. Insert trips
-      const tripsToInsert = data.trips.map((trip, idx) => ({
-        trip_no: `${data.busNumber}-${trip.trip_no}`,
-        trip_date: tripDate,
-        bus_id: busData.id,
-        income: Object.values(trip.income).reduce((s, v) => s + v, 0),
-        income_details: trip.income as any,
-        odometer_start: trip.odometer_start || null,
-        odometer_end: trip.odometer_end || null,
-      }));
+      // 2. FLEXIBLE BUS NUMBER MATCHING - try exact match first, then alternative formats
+      let busQuery = supabase
+        .from('buses')
+        .select('id, bus_no')
+        .eq('bus_no', data.busNumber);
+      
+      let { data: busData, error: busError } = await busQuery.single();
 
-      const { error: tripError } = await supabase
+      // If exact match fails, try alternative formats (NE-0746 <-> NE 0746)
+      if (busError || !busData) {
+        const altBusNumber = data.busNumber.includes('-') 
+          ? data.busNumber.replace('-', ' ')
+          : data.busNumber.replace(' ', '-');
+        
+        const { data: altBusData, error: altError } = await supabase
+          .from('buses')
+          .select('id, bus_no')
+          .eq('bus_no', altBusNumber)
+          .single();
+        
+        if (!altError && altBusData) {
+          busData = altBusData;
+          console.log(`✅ Bus matched with alternative format: ${altBusNumber}`);
+        } else {
+          toast.error(`Bus not found. Tried: "${data.busNumber}" and "${altBusNumber}"`);
+          console.error('Bus lookup error:', busError, altError);
+          return;
+        }
+      }
+
+      // 3. INSERT INDIVIDUAL TRIPS WITH THEIR REVENUE (not aggregated)
+      const tripsToInsert = data.trips.map((trip, idx) => {
+        const tripRevenue = Object.values(trip.income).reduce((s, v) => s + v, 0);
+        
+        return {
+          trip_no: `${busData.bus_no}-T${trip.trip_no || idx + 1}`,
+          trip_date: tripDate,
+          bus_id: busData.id,
+          income: tripRevenue,
+          income_details: trip.income as any,
+          odometer_start: trip.odometer_start || null,
+          odometer_end: trip.odometer_end || null,
+        };
+      });
+
+      const { data: insertedTrips, error: tripError } = await supabase
         .from('daily_trips')
-        .insert(tripsToInsert);
+        .insert(tripsToInsert)
+        .select();
 
       if (tripError) {
         console.error('Trip insert error:', tripError);
@@ -175,13 +202,16 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         return;
       }
 
-      // 4. Insert or update daily expenses
+      // 4. INSERT DAILY EXPENSES (ONE entry per bus per day)
+      const totalExpenses = Object.values(data.daily_expenses).reduce((s, v) => s + v, 0);
+      
       const { error: expenseError } = await supabase
         .from('daily_bus_expenses')
         .upsert({
           expense_date: tripDate,
           bus_id: busData.id,
           ...data.daily_expenses,
+          total_expenses: totalExpenses,
         }, {
           onConflict: 'bus_id,expense_date'
         });
@@ -192,12 +222,20 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         return;
       }
 
-      toast.success(`✅ Applied ${data.trips.length} trip(s) for ${data.busNumber} with daily expenses`);
+      // 5. SUCCESS FEEDBACK
+      const totalRevenue = data.trips.reduce((sum, t) => 
+        sum + Object.values(t.income).reduce((s, v) => s + v, 0), 0
+      );
+
+      toast.success(
+        `✅ Applied ${data.trips.length} trip(s) with Rs. ${totalRevenue.toLocaleString()} revenue + Rs. ${totalExpenses.toLocaleString()} expenses for ${busData.bus_no}`
+      );
       
-      // Emit extracted date so parent can switch to it
+      // 6. EMIT DATA TO TRIGGER UI REFRESH AND DATE SWITCH
       onDataExtracted({
-        busNumber: data.busNumber,
+        busNumber: busData.bus_no, // Use actual DB bus number
         extractedDate: tripDate,
+        count: data.trips.length,
       });
     } catch (error) {
       console.error('Apply error:', error);

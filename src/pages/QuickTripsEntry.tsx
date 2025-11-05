@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CalendarIcon, ArrowLeft, Menu, Upload, Camera } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatDateDisplay } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -138,21 +138,37 @@ export default function QuickTripsEntry() {
     }
   };
 
-  const handleOCRDataExtracted = (data: { count?: number; extractedDate?: string; busNumber?: string }) => {
+  const handleOCRDataExtracted = async (data: { count?: number; extractedDate?: string; busNumber?: string }) => {
     // If OCR data includes a date, switch to that date
     if (data.extractedDate) {
       const newDate = new Date(data.extractedDate);
       setSelectedDate(newDate);
-      loadTripsForDate(newDate);
+      
+      // Load trips for the new date
+      await loadTripsForDate(newDate);
+      
+      // After loading, auto-select the first trip from the OCR-extracted bus
+      if (data.busNumber) {
+        setTimeout(() => {
+          setTrips(currentTrips => {
+            const busTrips = currentTrips.filter(t => t.bus_no === data.busNumber);
+            if (busTrips.length > 0) {
+              setSelectedTripId(busTrips[0].id);
+              console.log(`🎯 Auto-selected first trip for ${data.busNumber}`);
+            }
+            return currentTrips;
+          });
+        }, 500);
+      }
     } else {
       // Otherwise just refresh current date
-      loadTripsForDate(selectedDate);
+      await loadTripsForDate(selectedDate);
     }
     
     toast({
-      title: "🎉 Success!",
+      title: "🎉 Data Applied Successfully!",
       description: data.count 
-        ? `Added ${data.count} trip sheet${data.count > 1 ? 's' : ''} for ${data.extractedDate || 'selected date'}`
+        ? `${data.count} trip(s) added for ${data.busNumber} on ${formatDateDisplay(data.extractedDate || '')}`
         : `OCR data applied for ${data.busNumber || ''}`,
     });
   };
