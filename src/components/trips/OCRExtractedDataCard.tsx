@@ -33,11 +33,12 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView, savedEx
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState(data);
+  const [hasEdits, setHasEdits] = useState(false);
   
   // Initialize mapped expenses from OCR data
-  const [mappedExpenses, setMappedExpenses] = useState<DBExpenseFields>(() => 
-    data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses)
-  );
+  const initialMappedExpenses = data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses);
+  const [mappedExpenses, setMappedExpenses] = useState<DBExpenseFields>(() => initialMappedExpenses);
+  const [originalMappedExpenses] = useState<DBExpenseFields>(initialMappedExpenses);
   
   // Track unmapped OCR items
   const [unmappedItems, setUnmappedItems] = useState<Record<string, number>>(() => {
@@ -72,21 +73,23 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView, savedEx
   const totalExpenses = Object.values(mappedExpenses).reduce((sum, val) => sum + val, 0);
   const netProfit = totalRevenue - totalExpenses;
 
-  const handleTripIncomeChange = (tripIndex: number, field: keyof SingleTrip['income'], value: number) => {
-    setEditedData(prev => ({
-      ...prev,
-      trips: prev.trips.map((trip, idx) => 
-        idx === tripIndex 
-          ? { ...trip, income: { ...trip.income, [field]: value } }
-          : trip
-      )
-    }));
-  };
-
   const handleMappedExpenseChange = (field: keyof DBExpenseFields, value: number) => {
+    setHasEdits(true);
     setMappedExpenses(prev => ({
       ...prev,
       [field]: value
+    }));
+  };
+
+  const handleTripIncomeChange = (tripIndex: number, field: keyof SingleTrip['income'], value: number) => {
+    setHasEdits(true);
+    setEditedData(prev => ({
+      ...prev,
+      trips: prev.trips.map((trip, idx) =>
+        idx === tripIndex
+          ? { ...trip, income: { ...trip.income, [field]: value } }
+          : trip
+      )
     }));
   };
 
@@ -134,14 +137,30 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView, savedEx
     }
   };
 
-  const handleSave = () => {
+  const handleConfirmEdits = () => {
+    console.log('✏️ EDITS CONFIRMED - Ready to Apply');
+    console.log('  Original mapped expenses:', originalMappedExpenses);
+    console.log('  Edited mapped expenses:', mappedExpenses);
     setIsEditing(false);
   };
 
-  const handleCancel = () => {
+  const handleResetToOCR = () => {
+    console.log('↶ RESET TO OCR VALUES');
     setEditedData(data);
     setMappedExpenses(data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses));
+    setHasEdits(false);
     setIsEditing(false);
+  };
+
+  const handleApplyAll = () => {
+    console.log('🎯 APPLYING DATA TO DATABASE:');
+    console.log('  Bus:', editedData.busNumber, '| Date:', editedData.date);
+    console.log('  Original OCR expenses:', data.daily_expenses);
+    console.log('  Edited mapped expenses:', mappedExpenses);
+    console.log('  Edited trips:', editedData.trips);
+    console.log('  Has user edits:', hasEdits);
+    
+    onApply({ ...editedData, mapped_expenses: mappedExpenses });
   };
 
   const formatAmount = (amount: number) => {
@@ -332,19 +351,35 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView, savedEx
                   <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
                     <div className="space-y-1 text-xs max-h-[300px] overflow-y-auto">
                       {DB_EXPENSE_CATEGORIES.map(({ key, label }) => {
-                        const value = mappedExpenses[key as keyof DBExpenseFields];
-                        return (value > 0 || isEditing) ? (
+                        const currentValue = mappedExpenses[key as keyof DBExpenseFields];
+                        const originalValue = originalMappedExpenses[key as keyof DBExpenseFields];
+                        const hasChanged = hasEdits && currentValue !== originalValue;
+                        
+                        return (currentValue > 0 || isEditing) ? (
                           <div key={key} className="flex justify-between items-center">
                             <span className="text-muted-foreground">{label}:</span>
                             {isEditing ? (
                               <Input
                                 type="number"
-                                value={value}
+                                value={currentValue}
                                 onChange={(e) => handleMappedExpenseChange(key as keyof DBExpenseFields, Number(e.target.value))}
                                 className="h-6 w-24 text-xs text-right"
                               />
                             ) : (
-                              <span className="font-mono">{formatAmount(value)}</span>
+                              <span className="font-mono flex items-center gap-2">
+                                {hasChanged ? (
+                                  <>
+                                    <span className="text-muted-foreground line-through text-[10px]">
+                                      {formatAmount(originalValue)}
+                                    </span>
+                                    <span className="text-blue-600 dark:text-blue-400 font-semibold">
+                                      → {formatAmount(currentValue)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  formatAmount(currentValue)
+                                )}
+                              </span>
                             )}
                           </div>
                         ) : null;
@@ -386,24 +421,43 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView, savedEx
                 <div className="flex gap-2 pt-2">
                   {isEditing ? (
                     <>
-                      <Button onClick={handleSave} size="sm" className="flex-1">
-                        Save Changes
+                      <Button 
+                        onClick={handleConfirmEdits} 
+                        size="sm" 
+                        className="flex-1"
+                        title="Confirm your edits (does not save to database yet)"
+                      >
+                        ✓ Confirm Edits
                       </Button>
-                      <Button onClick={handleCancel} variant="outline" size="sm" className="flex-1">
-                        Cancel
+                      <Button 
+                        onClick={handleResetToOCR} 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        title="Reset all values to OCR extracted data"
+                      >
+                        ↶ Reset to OCR
                       </Button>
                     </>
                   ) : (
                     <>
+                      {hasEdits && (
+                        <Badge variant="secondary" className="mr-2">
+                          ✏️ Edited (Ready to Apply)
+                        </Badge>
+                      )}
                       <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
                       </Button>
                       <Button 
-                        onClick={() => onApply({ ...editedData, mapped_expenses: mappedExpenses })} 
+                        onClick={handleApplyAll} 
                         size="sm" 
                         className="flex-1"
                         disabled={Object.keys(unmappedItems).length > 0}
+                        title={Object.keys(unmappedItems).length > 0 
+                          ? "Please map all unmapped items before applying" 
+                          : "Save trips and expenses to database"}
                       >
                         <CheckCircle className="h-4 w-4 mr-1" />
                         Apply All (Trips + Expenses)
