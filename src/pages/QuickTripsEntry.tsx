@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { CalendarIcon, ArrowLeft, Menu } from "lucide-react";
+import { CalendarIcon, ArrowLeft, Menu, Upload, Camera } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,6 +43,13 @@ export default function QuickTripsEntry() {
   useEffect(() => {
     loadTripsForDate(selectedDate);
   }, [selectedDate]);
+
+  useEffect(() => {
+    // Auto-open OCR section if no trips have data
+    if (trips.length > 0 && !trips.some(hasData) && !showOCRUpload) {
+      setShowOCRUpload(true);
+    }
+  }, [trips]);
 
   const loadTripsForDate = async (date: Date) => {
     setLoading(true);
@@ -131,13 +138,13 @@ export default function QuickTripsEntry() {
     }
   };
 
-  const handleOCRDataExtracted = () => {
+  const handleOCRDataExtracted = (count?: number) => {
     // Simply refresh the trips to show newly added data
     loadTripsForDate(selectedDate);
     
     toast({
-      title: "Success",
-      description: "OCR data has been applied to trips",
+      title: "🎉 Success!",
+      description: count ? `Added ${count} trip sheet${count > 1 ? 's' : ''} successfully` : "OCR data has been applied to trips",
     });
   };
 
@@ -221,9 +228,21 @@ export default function QuickTripsEntry() {
             <Button
               variant={showOCRUpload ? "default" : "outline"}
               onClick={() => setShowOCRUpload(!showOCRUpload)}
-              className="shrink-0"
+              className="shrink-0 relative"
+              size={isMobile ? "default" : "lg"}
             >
-              {showOCRUpload ? "Hide" : "Upload"} Sheets
+              {isMobile ? (
+                <Camera className="mr-2 h-5 w-5" />
+              ) : (
+                <Upload className="mr-2 h-5 w-5" />
+              )}
+              {showOCRUpload ? "Hide" : isMobile ? "Quick Upload" : "📸 Upload Sheets"}
+              {!trips.some(hasData) && !showOCRUpload && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                </span>
+              )}
             </Button>
 
             <Popover>

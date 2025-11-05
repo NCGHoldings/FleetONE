@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Upload, X, Check, Loader2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Upload, X, Check, Loader2, Camera, CheckCircle2, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -9,10 +9,12 @@ import { OCRExtractedDataCard } from './OCRExtractedDataCard';
 import { OCRBatchActions } from './OCRBatchActions';
 import { supabase } from '@/integrations/supabase/client';
 import { SingleTrip, DailyExpenses } from '@/lib/ocr-processor';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface OCRImageUploadProps {
   selectedDate: Date;
-  onDataExtracted: () => void;
+  onDataExtracted: (count?: number) => void;
 }
 
 export interface ExtractedMultiTripData {
@@ -31,6 +33,11 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [extractedData, setExtractedData] = useState<ExtractedMultiTripData[]>([]);
+  const [processingStep, setProcessingStep] = useState<string>("");
+  const [showGuide, setShowGuide] = useState(true);
+  const isMobile = useIsMobile();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -74,12 +81,20 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
     try {
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
-        setProgress(((i + 1) / images.length) * 100);
-
-        toast.info(`Processing ${image.name}...`);
-
+        
+        setProcessingStep(`Step 1/4: Uploading ${image.name}...`);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        setProcessingStep("Step 2/4: Analyzing sheet structure...");
+        
         // Extract multi-trip data using OCR
         const ocrResult = await extractTextFromImage(image);
+        
+        setProcessingStep("Step 3/4: Extracting trip data...");
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        setProcessingStep("Step 4/4: Validating results...");
+        await new Promise(resolve => setTimeout(resolve, 200));
 
         // Create preview URL for image
         const imageUrl = URL.createObjectURL(image);
@@ -94,16 +109,20 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           trips: ocrResult.trips,
           daily_expenses: ocrResult.daily_expenses,
         });
+        
+        setProgress(((i + 1) / images.length) * 100);
+        setProcessingStep(`✓ Completed ${image.name}`);
       }
 
       setExtractedData(results);
-      toast.success(`Successfully processed ${results.length} sheet(s) with ${results.reduce((sum, r) => sum + r.trips.length, 0)} total trips`);
+      toast.success(`🎉 Successfully processed ${results.length} sheet(s) with ${results.reduce((sum, r) => sum + r.trips.length, 0)} total trips`);
     } catch (error) {
       console.error('OCR processing error:', error);
-      toast.error('Failed to process images. Please try again.');
+      toast.error('Failed to process images. Please ensure the image is clear and readable.');
     } finally {
       setProcessing(false);
       setProgress(0);
+      setProcessingStep("");
     }
   };
 
@@ -189,6 +208,9 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
     for (const data of readyData) {
       await applyMultiTripData(data);
     }
+    
+    const count = readyData.length;
+    onDataExtracted(count);
   };
 
   const handleDiscard = (index: number) => {
@@ -237,29 +259,114 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* How it Works Guide */}
+        {showGuide && (
+          <Collapsible open={showGuide} onOpenChange={setShowGuide}>
+            <Card className="bg-primary/5 border-primary/20">
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-sm">📸 How to Upload Trip Sheets</h3>
+                  </div>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent>
+                  <div className="space-y-2 text-xs text-muted-foreground">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                      <span>Take a clear photo of your filled trip sheet</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                      <span>Ensure all text is readable and not blurry</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                      <span>Sheet should show: Bus number, Date, Trip table, Daily expenses</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                      <span>Supports multiple sheets at once for faster processing</span>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Card>
+          </Collapsible>
+        )}
+
         {/* Upload Area */}
         {images.length === 0 ? (
-          <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer"
-            onClick={() => document.getElementById('file-input')?.click()}
-          >
-            <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground mb-2">
-              Drag and drop trip sheet images, or click to select
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Supports JPG, PNG • Multiple sheets allowed
-            </p>
-            <input
-              id="file-input"
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+          <div className="space-y-3">
+            {/* Mobile Camera Buttons */}
+            {isMobile && (
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="h-20 flex flex-col gap-2"
+                  variant="outline"
+                >
+                  <Camera className="h-6 w-6" />
+                  <span className="text-xs">Take Photo</span>
+                </Button>
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-20 flex flex-col gap-2"
+                  variant="outline"
+                >
+                  <Upload className="h-6 w-6" />
+                  <span className="text-xs">Choose from Gallery</span>
+                </Button>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+              </div>
+            )}
+
+            {/* Desktop/Fallback Upload Area */}
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              className="border-2 border-dashed border-primary/30 rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer bg-primary/5"
+              onClick={() => !isMobile && fileInputRef.current?.click()}
+            >
+              <Upload className="h-12 w-12 mx-auto mb-4 text-primary" />
+              <p className="text-sm font-medium mb-2">
+                {isMobile ? "Tap above to upload" : "Click to upload or drag and drop"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Supports multiple images for bulk processing
+              </p>
+              {!isMobile && (
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+              )}
+            </div>
           </div>
         ) : (
           <>
@@ -293,13 +400,31 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
 
             {/* Processing Progress */}
             {processing && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Processing images...</span>
-                  <span className="font-medium">{Math.round(progress)}%</span>
+              <Card className="p-4 bg-primary/5 border-primary/30">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <span className="font-medium">Processing your sheets...</span>
+                  </div>
+                  {processingStep && (
+                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                      {processingStep.includes("✓") ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                      ) : (
+                        <Loader2 className="h-4 w-4 animate-spin mt-0.5 shrink-0" />
+                      )}
+                      <span>{processingStep}</span>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="font-medium">{Math.round(progress)}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                  </div>
                 </div>
-                <Progress value={progress} />
-              </div>
+              </Card>
             )}
 
             {/* Action Buttons */}

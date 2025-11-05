@@ -31,9 +31,16 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
 
   const getConfidenceBadge = (confidence: number) => {
     const percent = Math.round(confidence * 100);
-    if (percent >= 80) return <Badge variant="default" className="bg-green-500">High: {percent}%</Badge>;
-    if (percent >= 60) return <Badge variant="default" className="bg-yellow-500">Medium: {percent}%</Badge>;
-    return <Badge variant="destructive">Low: {percent}%</Badge>;
+    if (percent >= 80) return <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">High: {percent}%</Badge>;
+    if (percent >= 60) return <Badge className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20">Medium: {percent}%</Badge>;
+    return <Badge variant="destructive" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20">Low: {percent}%</Badge>;
+  };
+
+  const getBorderColor = (confidence: number) => {
+    const percent = Math.round(confidence * 100);
+    if (percent >= 80) return "border-green-500/30";
+    if (percent >= 60) return "border-yellow-500/30";
+    return "border-red-500/30";
   };
 
   // Calculate totals
@@ -125,7 +132,7 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
   };
 
   return (
-    <Card className="mb-4">
+    <Card className={`mb-4 border-2 ${getBorderColor(data.confidence)}`}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
