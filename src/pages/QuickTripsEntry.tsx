@@ -138,13 +138,22 @@ export default function QuickTripsEntry() {
     }
   };
 
-  const handleOCRDataExtracted = (count?: number) => {
-    // Simply refresh the trips to show newly added data
-    loadTripsForDate(selectedDate);
+  const handleOCRDataExtracted = (data: { count?: number; extractedDate?: string; busNumber?: string }) => {
+    // If OCR data includes a date, switch to that date
+    if (data.extractedDate) {
+      const newDate = new Date(data.extractedDate);
+      setSelectedDate(newDate);
+      loadTripsForDate(newDate);
+    } else {
+      // Otherwise just refresh current date
+      loadTripsForDate(selectedDate);
+    }
     
     toast({
       title: "🎉 Success!",
-      description: count ? `Added ${count} trip sheet${count > 1 ? 's' : ''} successfully` : "OCR data has been applied to trips",
+      description: data.count 
+        ? `Added ${data.count} trip sheet${data.count > 1 ? 's' : ''} for ${data.extractedDate || 'selected date'}`
+        : `OCR data applied for ${data.busNumber || ''}`,
     });
   };
 

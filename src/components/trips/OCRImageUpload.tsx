@@ -14,7 +14,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 interface OCRImageUploadProps {
   selectedDate: Date;
-  onDataExtracted: (count?: number) => void;
+  onDataExtracted: (data: {
+    count?: number;
+    extractedDate?: string;
+    busNumber?: string;
+  }) => void;
 }
 
 export interface ExtractedMultiTripData {
@@ -189,7 +193,12 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       }
 
       toast.success(`✅ Applied ${data.trips.length} trip(s) for ${data.busNumber} with daily expenses`);
-      onDataExtracted();
+      
+      // Emit extracted date so parent can switch to it
+      onDataExtracted({
+        busNumber: data.busNumber,
+        extractedDate: tripDate,
+      });
     } catch (error) {
       console.error('Apply error:', error);
       toast.error('Failed to apply data');
@@ -205,12 +214,18 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
 
     toast.info(`Applying ${readyData.length} sheet(s)...`);
     
+    let lastExtractedDate = '';
     for (const data of readyData) {
       await applyMultiTripData(data);
+      // Keep track of last extracted date
+      const [day, month, year] = data.date.split('/');
+      lastExtractedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
     
-    const count = readyData.length;
-    onDataExtracted(count);
+    onDataExtracted({
+      count: readyData.length,
+      extractedDate: lastExtractedDate,
+    });
   };
 
   const handleDiscard = (index: number) => {
