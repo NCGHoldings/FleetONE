@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { QuickEntryBusList } from "@/components/trips/QuickEntryBusList";
 import { QuickEntryForm } from "@/components/trips/QuickEntryForm";
-import { OCRImageUpload, ExtractedTripData } from "@/components/trips/OCRImageUpload";
+import { OCRImageUpload, ExtractedMultiTripData } from "@/components/trips/OCRImageUpload";
 
 interface TripData {
   id: string;
@@ -37,7 +37,7 @@ export default function QuickTripsEntry() {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showBusList, setShowBusList] = useState(false);
-  const [extractedData, setExtractedData] = useState<ExtractedTripData[]>([]);
+  const [extractedData, setExtractedData] = useState<ExtractedMultiTripData[]>([]);
   const [showOCRUpload, setShowOCRUpload] = useState(false);
 
   useEffect(() => {
@@ -131,44 +131,34 @@ export default function QuickTripsEntry() {
     }
   };
 
-  const handleOCRDataExtracted = (data: ExtractedTripData[]) => {
-    setExtractedData(data);
+  const handleOCRDataExtracted = () => {
+    // Simply refresh the trips to show newly added data
+    loadTripsForDate(selectedDate);
     
-    // Auto-match and apply data
-    data.forEach(async (extracted) => {
-      if (extracted.busNumber) {
-        const matchedTrip = trips.find(trip => 
-          trip.bus_no.replace(/[-\s]/g, '').toLowerCase() === 
-          extracted.busNumber?.replace(/[-\s]/g, '').toLowerCase()
-        );
-        
-        if (matchedTrip) {
-          await applyOCRDataToTrip(matchedTrip.id, extracted);
-          toast({
-            title: "Data Applied",
-            description: `Data from ${extracted.fileName} applied to bus ${matchedTrip.bus_no}`,
-          });
-        } else {
-          toast({
-            title: "No Match Found",
-            description: `Could not find trip for bus ${extracted.busNumber}`,
-            variant: "destructive",
-          });
-        }
-      }
+    toast({
+      title: "Success",
+      description: "OCR data has been applied to trips",
     });
   };
 
-  const applyOCRDataToTrip = async (tripId: string, data: ExtractedTripData) => {
+  const applyOCRDataToTrip = async (tripId: string, data: ExtractedMultiTripData) => {
     try {
+      // For multi-trip OCR, we aggregate all trip incomes
+      const aggregatedIncome = data.trips.reduce((acc, trip) => {
+        Object.entries(trip.income).forEach(([key, value]) => {
+          acc[key] = (acc[key] || 0) + (value as number);
+        });
+        return acc;
+      }, {} as Record<string, number>);
+
       const updates: any = {
-        income_details: data.incomeFields,
-        other_expenses_details: data.expenseFields,
+        income_details: aggregatedIncome,
+        other_expenses_details: data.daily_expenses,
       };
 
       // Calculate totals
-      const totalIncome = Object.values(data.incomeFields).reduce((sum, val) => sum + val, 0);
-      const totalExpenses = Object.values(data.expenseFields).reduce((sum, val) => sum + val, 0);
+      const totalIncome = Object.values(aggregatedIncome).reduce((sum: number, val) => sum + (val as number), 0);
+      const totalExpenses = Object.values(data.daily_expenses).reduce((sum: number, val) => sum + (val as number), 0);
 
       if (totalIncome > 0) updates.income = totalIncome;
       if (totalExpenses > 0) updates.other_expenses = totalExpenses;

@@ -1,11 +1,38 @@
 import { supabase } from '@/integrations/supabase/client';
 import { preprocessImage } from './image-preprocessor';
 
+export interface TripIncome extends Record<string, number> {
+  bus_collection: number;
+  call_booking: number;
+  agent_booking: number;
+  luggage_income: number;
+  special_income: number;
+}
+
+export interface SingleTrip {
+  trip_no: number;
+  income: TripIncome;
+  odometer_start?: number;
+  odometer_end?: number;
+}
+
+export interface DailyExpenses extends Record<string, number> {
+  fuel_cost: number;
+  driver_salary: number;
+  conductor_salary: number;
+  food: number;
+  parking: number;
+  body_wash: number;
+  police: number;
+  repair: number;
+  other?: number;
+}
+
 export interface OCRResult {
   busNumber: string | null;
   date: string | null;
-  income: Record<string, number>;
-  expenses: Record<string, number>;
+  trips: SingleTrip[];
+  daily_expenses: DailyExpenses;
   confidence: number;
   rawData?: any;
 }
@@ -48,12 +75,29 @@ export async function extractTextFromImage(imageFile: File): Promise<OCRResult> 
       throw new Error('No data returned from OCR service');
     }
 
-    // Return structured data from AI
+    // Normalize bus number (0746 → NE-0746)
+    let normalizedBusNumber = data.busNumber || null;
+    if (normalizedBusNumber && !normalizedBusNumber.includes('-')) {
+      // If just numbers, assume NE prefix (can be customized)
+      normalizedBusNumber = `NE-${normalizedBusNumber}`;
+    }
+
+    // Return structured multi-trip data from AI
     return {
-      busNumber: data.busNumber || null,
+      busNumber: normalizedBusNumber,
       date: data.date || null,
-      income: data.income || {},
-      expenses: data.expenses || {},
+      trips: data.trips || [],
+      daily_expenses: data.daily_expenses || {
+        fuel_cost: 0,
+        driver_salary: 0,
+        conductor_salary: 0,
+        food: 0,
+        parking: 0,
+        body_wash: 0,
+        police: 0,
+        repair: 0,
+        other: 0,
+      },
       confidence: data.confidence || 0.5,
       rawData: data,
     };
@@ -68,18 +112,32 @@ export async function extractTextFromImage(imageFile: File): Promise<OCRResult> 
  * Converts AI-extracted data to ParsedTripData format for compatibility
  */
 export function parseTripData(ocrResult: OCRResult): ParsedTripData {
-  // Convert structured AI data to legacy format
-  const extractedNumbers = [
-    ...Object.values(ocrResult.income),
-    ...Object.values(ocrResult.expenses),
-  ].filter(n => n > 0);
+  // Aggregate all trip incomes for total
+  const allIncomeValues: number[] = [];
+  const aggregatedIncome: Record<string, number> = {
+    bus_collection: 0,
+    call_booking: 0,
+    agent_booking: 0,
+    luggage_income: 0,
+    special_income: 0,
+  };
+
+  ocrResult.trips.forEach(trip => {
+    Object.entries(trip.income).forEach(([key, value]) => {
+      aggregatedIncome[key] = (aggregatedIncome[key] || 0) + value;
+      allIncomeValues.push(value);
+    });
+  });
+
+  const expenseValues = Object.values(ocrResult.daily_expenses).filter(n => n > 0);
+  const extractedNumbers = [...allIncomeValues, ...expenseValues];
 
   return {
     busNumber: ocrResult.busNumber,
     date: ocrResult.date,
     extractedNumbers,
-    incomeFields: ocrResult.income,
-    expenseFields: ocrResult.expenses,
+    incomeFields: aggregatedIncome,
+    expenseFields: ocrResult.daily_expenses,
     rawText: JSON.stringify(ocrResult.rawData || {}, null, 2),
   };
 }

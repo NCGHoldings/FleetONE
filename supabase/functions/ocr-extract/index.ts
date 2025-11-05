@@ -20,56 +20,92 @@ serve(async (req) => {
 
     console.log('Starting OCR extraction with Lovable AI');
 
-    const prompt = `Analyze this handwritten Sri Lankan bus trip sheet and extract the following information:
+    const prompt = `Analyze this Sri Lankan bus trip sheet. This sheet contains MULTIPLE trips for ONE bus on ONE day.
 
-1. BUS NUMBER: Format XX-XXXX (e.g., NP-0748, WP-1234). Look for the bus registration number.
-2. DATE: Format DD/MM/YYYY or similar. Look for the trip date.
-3. INCOME SECTION (ආදායම / Revenue):
-   - බස්රථ / බස් රථ / bus collection / Bus Collection (Regular passenger income)
-   - ඇවිලා / ඇමතුම් / call booking / Call Booking (Phone bookings)
-   - ඒජන්ට් / agent booking / Agent Booking (Agent commissions)
-   - ගමන් මල් / luggage income / Luggage (Luggage fees)
-   - විශේෂ / special / Special (Special income)
-   
-4. EXPENSE SECTION (වියදම / Expenses):
-   - ඩීසල් / diesel / fuel (Fuel cost)
-   - රියදුරු / driver / Driver Salary (Driver payment)
-   - කොන්දොස්තර / conductor / Conductor Salary (Conductor payment)
+CRITICAL: Look for a TABLE with numbered rows (usually 1, 2, 3, 4) showing different trips.
+
+Extract:
+
+1. BUS NUMBER: Format XXXX or XX-XXXX (e.g., 0746, NE-0746, NP-0748)
+   - Look at the top of the sheet for bus registration number
+
+2. DATE: Format DD/MM/YYYY or දිනය
+   - Look for the date field at the top of the sheet
+
+3. TRIP TABLE (rows labeled 1, 2, 3, 4):
+   For EACH ROW that has data, extract:
+   - Trip number (1, 2, 3, or 4)
+   - Revenue fields for that specific trip:
+     * බස්රථ / බස් රථ / bus collection (Regular passenger income)
+     * ඇවිලා / ඇමතුම් / call booking (Phone bookings)
+     * ඒජන්ට් / agent booking (Agent commissions)
+     * ගමන් මල් / luggage (Luggage fees)
+     * විශේෂ / special (Special income)
+   - Odometer readings if visible:
+     * ආරම්භක / start odometer
+     * අවසාන / end odometer
+
+4. DAILY EXPENSES (වියදම් section - ONE SET for entire day):
+   - ඩීසල් / diesel (Total fuel cost for the day)
+   - රියදුරු / driver (Driver salary)
+   - කොන්දොස්තර / conductor (Conductor salary)
    - කෑම / food (Food expenses)
    - යාත්රා / parking (Parking fees)
    - විදවණ / body wash / wash (Vehicle wash)
-   - පොලීසිය / police / Police (Fines)
-   - අළුත්වැඩියා / repair / Repair (Repair costs)
+   - පොලීසිය / police (Fines/Police)
+   - අළුත්වැඩියා / repair (Repair costs)
+   - Other expenses if visible
 
 IMPORTANT INSTRUCTIONS:
-- Extract ALL numbers you see, even if handwritten
-- For each field, provide the numeric value (without currency symbols or commas)
-- If a field is not present or unclear, use null
-- Be very careful with bus numbers - they are critical for matching
-- Return ONLY valid JSON, no markdown or extra text
+- Extract ALL trips from the table rows
+- Revenue is PER TRIP (different for each row)
+- Expenses are ONCE for the whole day (not per trip)
+- Remove commas from numbers
+- If a field is empty/unclear, use 0
+- Return ONLY valid JSON, no markdown
 
-Return as JSON in this exact format:
+Return JSON in this exact format:
 {
-  "busNumber": "XX-XXXX",
-  "date": "DD/MM/YYYY",
-  "income": {
-    "bus_collection": 0,
-    "call_booking": 0,
-    "agent_booking": 0,
-    "luggage_income": 0,
-    "special_income": 0
-  },
-  "expenses": {
-    "fuel_cost": 0,
-    "salary": 0,
-    "conductor_salary": 0,
-    "food": 0,
-    "parking": 0,
-    "body_wash": 0,
+  "busNumber": "0746",
+  "date": "01/10/2025",
+  "trips": [
+    {
+      "trip_no": 1,
+      "income": {
+        "bus_collection": 87706,
+        "call_booking": 8520,
+        "agent_booking": 0,
+        "luggage_income": 0,
+        "special_income": 0
+      },
+      "odometer_start": 659214,
+      "odometer_end": 659588
+    },
+    {
+      "trip_no": 2,
+      "income": {
+        "bus_collection": 85140,
+        "call_booking": 8486,
+        "agent_booking": 0,
+        "luggage_income": 0,
+        "special_income": 0
+      },
+      "odometer_start": 659588,
+      "odometer_end": 659960
+    }
+  ],
+  "daily_expenses": {
+    "fuel_cost": 22500,
+    "driver_salary": 4000,
+    "conductor_salary": 800,
+    "food": 1500,
+    "parking": 500,
+    "body_wash": 400,
     "police": 0,
-    "repair": 0
+    "repair": 0,
+    "other": 0
   },
-  "confidence": 0.95
+  "confidence": 0.92
 }`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {

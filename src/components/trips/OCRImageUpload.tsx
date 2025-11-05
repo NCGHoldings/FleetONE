@@ -1,37 +1,36 @@
 import { useState } from 'react';
-import { Upload, X, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, X, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { extractTextFromImage, parseTripData } from '@/lib/ocr-processor';
-import { mapExtractedFields } from '@/lib/ocr-field-mapper';
+import { extractTextFromImage } from '@/lib/ocr-processor';
 import { OCRExtractedDataCard } from './OCRExtractedDataCard';
 import { OCRBatchActions } from './OCRBatchActions';
+import { supabase } from '@/integrations/supabase/client';
+import { SingleTrip, DailyExpenses } from '@/lib/ocr-processor';
 
 interface OCRImageUploadProps {
   selectedDate: Date;
-  onDataExtracted: (data: ExtractedTripData[]) => void;
+  onDataExtracted: () => void;
 }
 
-export interface ExtractedTripData {
+export interface ExtractedMultiTripData {
   id: string;
   fileName: string;
   imageUrl: string;
   busNumber: string;
   date: string;
   confidence: number;
-  incomeFields: Record<string, number>;
-  expenseFields: Record<string, number>;
-  unmappedFields: { field: string; value: number; section: 'income' | 'expense' }[];
-  rawText: string;
+  trips: SingleTrip[];
+  daily_expenses: DailyExpenses;
 }
 
 export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUploadProps) {
   const [images, setImages] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [extractedData, setExtractedData] = useState<ExtractedTripData[]>([]);
+  const [extractedData, setExtractedData] = useState<ExtractedMultiTripData[]>([]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -70,7 +69,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
 
     setProcessing(true);
     setProgress(0);
-    const results: ExtractedTripData[] = [];
+    const results: ExtractedMultiTripData[] = [];
 
     try {
       for (let i = 0; i < images.length; i++) {
@@ -79,17 +78,8 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
 
         toast.info(`Processing ${image.name}...`);
 
-        // Extract text using OCR
+        // Extract multi-trip data using OCR
         const ocrResult = await extractTextFromImage(image);
-        
-        // Parse trip data from OCR result
-        const parsedData = parseTripData(ocrResult);
-        
-        // Map fields to Quick Entry format
-        const { income, expenses, unmapped } = mapExtractedFields(
-          parsedData.incomeFields,
-          parsedData.expenseFields
-        );
 
         // Create preview URL for image
         const imageUrl = URL.createObjectURL(image);
@@ -98,19 +88,16 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           id: `${Date.now()}-${i}`,
           fileName: image.name,
           imageUrl,
-          busNumber: parsedData.busNumber || 'Unknown',
-          date: parsedData.date || new Date().toLocaleDateString(),
+          busNumber: ocrResult.busNumber || 'Unknown',
+          date: ocrResult.date || new Date().toLocaleDateString('en-GB'),
           confidence: ocrResult.confidence,
-          incomeFields: income,
-          expenseFields: expenses,
-          unmappedFields: unmapped,
-          rawText: parsedData.rawText,
+          trips: ocrResult.trips,
+          daily_expenses: ocrResult.daily_expenses,
         });
       }
 
       setExtractedData(results);
-      onDataExtracted(results);
-      toast.success(`Successfully processed ${results.length} image(s)`);
+      toast.success(`Successfully processed ${results.length} sheet(s) with ${results.reduce((sum, r) => sum + r.trips.length, 0)} total trips`);
     } catch (error) {
       console.error('OCR processing error:', error);
       toast.error('Failed to process images. Please try again.');
@@ -126,57 +113,127 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
     setProgress(0);
   };
 
-  const handleApply = (data: ExtractedTripData) => {
-    onDataExtracted([data]);
-    toast.success(`Data for bus ${data.busNumber} has been applied to the form.`);
+  const applyMultiTripData = async (data: ExtractedMultiTripData) => {
+    try {
+      // 1. Validate bus number exists
+      const { data: busData, error: busError } = await supabase
+        .from('buses')
+        .select('id, bus_no')
+        .eq('bus_no', data.busNumber)
+        .single();
+
+      if (busError || !busData) {
+        toast.error(`Bus ${data.busNumber} not found in database. Please check the bus number.`);
+        return;
+      }
+
+      // 2. Parse date
+      const [day, month, year] = data.date.split('/');
+      const tripDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      // 3. Insert trips
+      const tripsToInsert = data.trips.map((trip, idx) => ({
+        trip_no: `${data.busNumber}-${trip.trip_no}`,
+        trip_date: tripDate,
+        bus_id: busData.id,
+        income: Object.values(trip.income).reduce((s, v) => s + v, 0),
+        income_details: trip.income as any,
+        odometer_start: trip.odometer_start || null,
+        odometer_end: trip.odometer_end || null,
+      }));
+
+      const { error: tripError } = await supabase
+        .from('daily_trips')
+        .insert(tripsToInsert);
+
+      if (tripError) {
+        console.error('Trip insert error:', tripError);
+        toast.error('Failed to insert trips: ' + tripError.message);
+        return;
+      }
+
+      // 4. Insert or update daily expenses
+      const { error: expenseError } = await supabase
+        .from('daily_bus_expenses')
+        .upsert({
+          expense_date: tripDate,
+          bus_id: busData.id,
+          ...data.daily_expenses,
+        }, {
+          onConflict: 'bus_id,expense_date'
+        });
+
+      if (expenseError) {
+        console.error('Expense insert error:', expenseError);
+        toast.error('Failed to insert expenses: ' + expenseError.message);
+        return;
+      }
+
+      toast.success(`✅ Applied ${data.trips.length} trip(s) for ${data.busNumber} with daily expenses`);
+      onDataExtracted();
+    } catch (error) {
+      console.error('Apply error:', error);
+      toast.error('Failed to apply data');
+    }
   };
 
-  const handleApplyAll = () => {
-    const readyData = extractedData.filter(d => d.confidence >= 60);
-    if (readyData.length > 0) {
-      onDataExtracted(readyData);
-      toast.success(`${readyData.length} sheets applied to Quick Entry.`);
+  const handleApplyAll = async () => {
+    const readyData = extractedData.filter(d => d.confidence >= 0.6);
+    if (readyData.length === 0) {
+      toast.error('No sheets ready to apply (confidence too low)');
+      return;
+    }
+
+    toast.info(`Applying ${readyData.length} sheet(s)...`);
+    
+    for (const data of readyData) {
+      await applyMultiTripData(data);
     }
   };
 
   const handleDiscard = (index: number) => {
     setExtractedData(prev => prev.filter((_, i) => i !== index));
-    toast.success("The extracted data has been removed.");
+    toast.success("Sheet discarded");
   };
 
   const handleView = () => {
-    toast.info("Scrolling to the trip form...");
+    toast.info("Viewing sheet details");
   };
 
   const handleExportCSV = () => {
-    const csvContent = extractedData.map(data => {
-      const incomeEntries = Object.entries(data.incomeFields).map(([k, v]) => `${k}: ${v}`).join('; ');
-      const expenseEntries = Object.entries(data.expenseFields).map(([k, v]) => `${k}: ${v}`).join('; ');
-      return `${data.busNumber},${data.date},${incomeEntries},${expenseEntries}`;
-    }).join('\n');
+    const csvRows = ['Bus Number,Date,Trip No,Revenue,Fuel Cost,Total Expenses'];
     
+    extractedData.forEach(data => {
+      data.trips.forEach(trip => {
+        const revenue = Object.values(trip.income).reduce((s, v) => s + v, 0);
+        const totalExpenses = Object.values(data.daily_expenses).reduce((s, v) => s + v, 0);
+        csvRows.push(`${data.busNumber},${data.date},${trip.trip_no},${revenue},${data.daily_expenses.fuel_cost},${totalExpenses}`);
+      });
+    });
+    
+    const csvContent = csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ocr-data-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `ocr-multi-trip-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     
-    toast.success("OCR data exported to CSV file.");
+    toast.success("Exported to CSV");
   };
 
-  const readySheets = extractedData.filter(d => d.confidence >= 60).length;
-  const needsReviewSheets = extractedData.filter(d => d.confidence < 60).length;
+  const readySheets = extractedData.filter(d => d.confidence >= 0.6).length;
+  const needsReviewSheets = extractedData.filter(d => d.confidence < 0.6).length;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Upload className="h-5 w-5" />
-          Upload Trip Sheets (OCR)
+          Upload Trip Sheets (OCR - Multi-Trip)
         </CardTitle>
         <CardDescription>
-          Upload images of handwritten trip sheets. The system will automatically extract data and match to bus numbers.
+          Upload images of trip sheets. System will extract multiple trips and daily expenses automatically.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -190,10 +247,10 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           >
             <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-sm text-muted-foreground mb-2">
-              Drag and drop images here, or click to select
+              Drag and drop trip sheet images, or click to select
             </p>
             <p className="text-xs text-muted-foreground">
-              Supports JPG, PNG, HEIC • Multiple files allowed
+              Supports JPG, PNG • Multiple sheets allowed
             </p>
             <input
               id="file-input"
@@ -292,7 +349,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
                 <OCRExtractedDataCard
                   key={data.id}
                   data={data}
-                  onApply={handleApply}
+                  onApply={applyMultiTripData}
                   onDiscard={() => handleDiscard(index)}
                   onView={handleView}
                 />
