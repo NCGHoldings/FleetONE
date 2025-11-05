@@ -46,15 +46,44 @@ Extract:
      * අවසාන / end odometer
 
 4. DAILY EXPENSES (වියදම් section - ONE SET for entire day):
-   - ඩීසල් / diesel (Total fuel cost for the day)
-   - රියදුරු / driver (Driver salary)
-   - කොන්දොස්තර / conductor (Conductor salary)
-   - කෑම / food (Food expenses)
-   - යාත්රා / parking (Parking fees)
-   - විදවණ / body wash / wash (Vehicle wash)
-   - පොලීසිය / police (Fines/Police)
-   - අළුත්වැඩියා / repair (Repair costs)
-   - Other expenses if visible
+   
+   Common Sri Lankan bus expense categories (extract EXACT field names):
+   
+   FUEL & TRANSPORT:
+   - ඩීසල් / ඩිසල් / diesel / fuel (Total fuel cost) → "fuel_cost"
+   - අධිවේගී / හයිවේ / හයිවෙ / highway / toll / expressway (Highway tolls) → "highway_toll"
+   
+   STAFF COSTS:
+   - රියදුරු / ඩ්‍රයිවර් / driver (Driver salary) → "driver_salary"
+   - කොන්දොස්තර / රනර් / හෙල්පර් / conductor / runner / helper (Conductor/Helper) → "conductor_salary"
+   - කෑම / ආහාර / භෝජන / food / meals (Staff food ONLY) → "food"
+   
+   MAINTENANCE & REPAIRS:
+   - අළුත්වැඩියා / අළුත්වැඩ / repair / repairs (Repairs) → "repair"
+   - ග්‍රීස් / ග්රීස් මැද / grease / lubricant (Grease/Lubricant) → "grease"
+   - තෙල් / ඔයිල් / oil / engine oil (Engine oil) → "oil"
+   - ටයර් / ටයර / ටියුබ් / tyre / tire / tube (Tyre/Tube) → "tyre_tube"
+   - කම්මැලි / කම්කරු / වැඩ / labour / labor (Labour charges) → "labour"
+   - අමතර කොටස් / පාර්ට්ස් / parts / spares (Spare parts) → "spare_parts"
+   
+   SERVICES:
+   - විදවණ / සෝදනය / වොෂ් / wash / body wash (Vehicle wash) → "body_wash"
+   - යාත්රා / පාර්කින් / parking (Parking) → "parking"
+   
+   OFFICIAL & OTHER:
+   - පොලීසිය / පොලිස් / දඩ / police / fine (Police fines) → "police"
+   - බලපත්‍ර / පර්මිට් / permit / license (Permits/Licenses) → "permit"
+   - රක්ෂණ / insurance (Insurance) → "insurance"
+   - දුරකථන / ෆෝන් / phone / mobile (Phone/Communication) → "phone"
+   - Any other clear expense → "other"
+   
+CRITICAL MAPPING RULES TO AVOID MISTAKES:
+⚠️ "කෑම" or "ආහාර" or "food" → MUST map to "food" field (NOT driver_salary!)
+⚠️ "ග්‍රීස්" or "grease" → MUST map to "grease" field (NOT food!)
+⚠️ "හයිවේ" or "අධිවේගී" or "highway" → MUST map to "highway_toll" field (NOT other!)
+⚠️ "රනර්" or "කොන්දොස්තර" or "runner" → MUST map to "conductor_salary" field (NOT driver!)
+⚠️ Double-check each expense category - numbers are correct, focus on field names
+⚠️ If unsure about a category, include it in "other" with the detected label
 
 IMPORTANT INSTRUCTIONS:
 - Extract ALL trips from the table rows
@@ -62,6 +91,8 @@ IMPORTANT INSTRUCTIONS:
 - Expenses are ONCE for the whole day (not per trip)
 - Remove commas from numbers
 - If a field is empty/unclear, use 0
+- For each expense, include "detected_as" showing the exact text you saw
+- Map expense names carefully according to the rules above
 - Return ONLY valid JSON, no markdown
 
 Return JSON in this exact format:
@@ -95,15 +126,24 @@ Return JSON in this exact format:
     }
   ],
   "daily_expenses": {
-    "fuel_cost": 22500,
-    "driver_salary": 4000,
-    "conductor_salary": 800,
-    "food": 1500,
-    "parking": 500,
-    "body_wash": 400,
-    "police": 0,
-    "repair": 0,
-    "other": 0
+    "fuel_cost": {"amount": 22500, "detected_as": "ඩීසල්"},
+    "driver_salary": {"amount": 4000, "detected_as": "රියදුරු"},
+    "conductor_salary": {"amount": 800, "detected_as": "කොන්දොස්තර"},
+    "food": {"amount": 1500, "detected_as": "කෑම"},
+    "parking": {"amount": 500, "detected_as": "යාත්රා"},
+    "body_wash": {"amount": 400, "detected_as": "විදවණ"},
+    "highway_toll": {"amount": 3500, "detected_as": "හයිවේ"},
+    "grease": {"amount": 2250, "detected_as": "ග්‍රීස්"},
+    "tyre_tube": {"amount": 0, "detected_as": ""},
+    "oil": {"amount": 0, "detected_as": ""},
+    "labour": {"amount": 0, "detected_as": ""},
+    "spare_parts": {"amount": 0, "detected_as": ""},
+    "police": {"amount": 0, "detected_as": ""},
+    "repair": {"amount": 0, "detected_as": ""},
+    "permit": {"amount": 0, "detected_as": ""},
+    "insurance": {"amount": 0, "detected_as": ""},
+    "phone": {"amount": 0, "detected_as": ""},
+    "other": {"amount": 0, "detected_as": ""}
   },
   "confidence": 0.92
 }`;
