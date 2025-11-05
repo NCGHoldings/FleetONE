@@ -177,12 +177,13 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         }
       }
 
-      // 3. QUERY EXISTING TRIPS to find the highest trip number for this bus/date
+      // 3. QUERY EXISTING TRIPS for this bus/date to UPDATE them first
       const { data: existingTrips, error: queryError } = await supabase
         .from('daily_trips')
-        .select('trip_no')
+        .select('id, trip_no')
         .eq('bus_id', busData.id)
-        .eq('trip_date', tripDate);
+        .eq('trip_date', tripDate)
+        .order('created_at', { ascending: true });
 
       if (queryError) {
         console.error('Error querying existing trips:', queryError);
@@ -190,48 +191,84 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         return;
       }
 
-      // Find the highest trip number (e.g., "NE 0746-T3" -> 3)
-      let maxTripNumber = 0;
-      if (existingTrips && existingTrips.length > 0) {
-        existingTrips.forEach(trip => {
-          const match = trip.trip_no.match(/-T(\d+)$/);
-          if (match) {
-            const tripNum = parseInt(match[1], 10);
-            if (tripNum > maxTripNumber) {
-              maxTripNumber = tripNum;
+      console.log(`📊 Found ${existingTrips?.length || 0} existing trips for ${busData.bus_no} on ${tripDate}`);
+
+      // 4. UPDATE EXISTING TRIPS or INSERT NEW ONES
+      const updatedTripNos: string[] = [];
+      const insertedTripNos: string[] = [];
+      
+      // Helper to generate globally unique trip_no
+      const generateUniqueTripNo = async (busNo: string, date: string, startIdx: number) => {
+        const dateStr = date.replace(/-/g, ''); // YYYYMMDD
+        const prefix = `${busNo}-${dateStr}-T`;
+        
+        // Find max suffix for this prefix
+        const { data: existingWithPrefix } = await supabase
+          .from('daily_trips')
+          .select('trip_no')
+          .ilike('trip_no', `${prefix}%`);
+        
+        let maxNum = startIdx;
+        if (existingWithPrefix && existingWithPrefix.length > 0) {
+          existingWithPrefix.forEach(t => {
+            const match = t.trip_no.match(/T(\d+)$/);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (num > maxNum) maxNum = num;
             }
-          }
-        });
-      }
+          });
+        }
+        
+        return `${prefix}${maxNum + 1}`;
+      };
 
-      console.log(`📊 Found ${existingTrips?.length || 0} existing trips. Max trip number: T${maxTripNumber}`);
-
-      // 4. INSERT INDIVIDUAL TRIPS WITH SEQUENTIAL UNIQUE TRIP NUMBERS
-      const tripsToInsert = data.trips.map((trip, idx) => {
+      // Process each OCR trip
+      for (let i = 0; i < data.trips.length; i++) {
+        const trip = data.trips[i];
         const tripRevenue = Object.values(trip.income).reduce((s, v) => s + v, 0);
         
-        return {
-          trip_no: `${busData.bus_no}-T${maxTripNumber + idx + 1}`, // Sequential: T4, T5, T6...
-          trip_date: tripDate,
-          bus_id: busData.id,
-          income: tripRevenue,
-          income_details: trip.income as any,
-          odometer_start: trip.odometer_start || null,
-          odometer_end: trip.odometer_end || null,
-        };
-      });
-
-      console.log(`✅ Inserting ${tripsToInsert.length} new trips:`, tripsToInsert.map(t => t.trip_no).join(', '));
-
-      const { data: insertedTrips, error: tripError } = await supabase
-        .from('daily_trips')
-        .insert(tripsToInsert)
-        .select();
-
-      if (tripError) {
-        console.error('Trip insert error:', tripError);
-        toast.error('Failed to insert trips: ' + tripError.message);
-        return;
+        if (existingTrips && i < existingTrips.length) {
+          // UPDATE existing trip
+          const existingTrip = existingTrips[i];
+          const { error: updateError } = await supabase
+            .from('daily_trips')
+            .update({
+              income_details: trip.income,
+              income: tripRevenue,
+            })
+            .eq('id', existingTrip.id);
+          
+          if (updateError) {
+            console.error(`Error updating trip ${existingTrip.id}:`, updateError);
+            toast.error(`Failed to update trip: ${updateError.message}`);
+            return;
+          }
+          
+          updatedTripNos.push(existingTrip.trip_no);
+          console.log(`✏️ Updated existing trip: ${existingTrip.trip_no}`);
+        } else {
+          // INSERT new trip with globally unique trip_no
+          const uniqueTripNo = await generateUniqueTripNo(busData.bus_no, tripDate, i + 1);
+          
+          const { error: insertError } = await supabase
+            .from('daily_trips')
+            .insert({
+              trip_no: uniqueTripNo,
+              trip_date: tripDate,
+              bus_id: busData.id,
+              income: tripRevenue,
+              income_details: trip.income,
+            });
+          
+          if (insertError) {
+            console.error('Error inserting trip:', insertError);
+            toast.error(`Failed to insert trip: ${insertError.message}`);
+            return;
+          }
+          
+          insertedTripNos.push(uniqueTripNo);
+          console.log(`➕ Inserted new trip: ${uniqueTripNo}`);
+        }
       }
 
       // 5. MAP OCR EXPENSES TO DB SCHEMA, then insert daily expenses
@@ -262,9 +299,13 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         sum + Object.values(t.income).reduce((s, v) => s + v, 0), 0
       );
       
-      const tripNumbers = tripsToInsert.map(t => t.trip_no).join(', ');
+      const allTripNos = [...updatedTripNos, ...insertedTripNos];
+      const actionMsg = updatedTripNos.length > 0 
+        ? `Updated ${updatedTripNos.length} trip(s), Added ${insertedTripNos.length} new trip(s)`
+        : `Added ${insertedTripNos.length} trip(s)`;
+      
       toast.success(
-        `✅ Added trips ${tripNumbers} | Revenue: Rs. ${totalRevenue.toLocaleString()} | Expenses: Rs. ${totalExpenses.toLocaleString()}`
+        `✅ ${actionMsg}: ${allTripNos.join(', ')} | Revenue: Rs. ${totalRevenue.toLocaleString()} | Expenses: Rs. ${totalExpenses.toLocaleString()}`
       );
       
       // 6. EMIT DATA TO TRIGGER UI REFRESH AND DATE SWITCH

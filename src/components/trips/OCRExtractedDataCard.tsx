@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Edit, CheckCircle, Eye, Trash2, Plus, Minus } from "lucide-react";
 import { SingleTrip, DailyExpenses } from "@/lib/ocr-processor";
+import { KNOWN_OCR_EXPENSE_KEYS } from "@/lib/ocr-expense-mapper";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 
 interface ExtractedMultiTripData {
   fileName: string;
@@ -128,8 +131,21 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
     body_wash: "Body Wash (විදවණ)",
     police: "Police (පොලීසිය)",
     repair: "Repair (අළුත්වැඩියා)",
+    grease: "Grease (ග්‍රීස්)",
+    highway_toll: "Highway Toll (හයිවේ)",
+    phone: "Phone (දුරකථන)",
+    oil: "Oil (තෙල්)",
+    tyre_tube: "Tyre/Tube (ටයර්)",
+    labour: "Labour (කම්කරු)",
+    spare_parts: "Spare Parts (කොටස්)",
+    permit: "Permit (බලපත්‍ර)",
+    insurance: "Insurance (රක්ෂණ)",
     other: "Other",
   };
+  
+  // Find unmapped expense fields
+  const unmappedExpenses = Object.entries(editedData.daily_expenses)
+    .filter(([key, value]) => !KNOWN_OCR_EXPENSE_KEYS.includes(key) && value > 0);
 
   return (
     <Card className={`mb-4 border-2 ${getBorderColor(data.confidence)}`}>
@@ -262,13 +278,28 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
                 {/* Daily Expenses Section */}
                 <div className="space-y-2">
                   <h4 className="font-semibold text-sm">💸 DAILY EXPENSES (Bus-level, One Entry)</h4>
+                  
+                  {/* Unmapped Fields Warning */}
+                  {unmappedExpenses.length > 0 && (
+                    <Alert className="bg-yellow-50 dark:bg-yellow-950/20 border-yellow-500/50">
+                      <Info className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription className="text-xs">
+                        <strong>Unmapped fields detected:</strong> {unmappedExpenses.map(([k]) => k).join(', ')}
+                        <br />
+                        These will be added to "Other" during save. Edit them below if needed.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
                   <div className="p-3 bg-amber-500/5 rounded-lg border border-amber-500/20">
                     <div className="space-y-1 text-xs">
-                      {Object.entries(editedData.daily_expenses).map(([key, value]) => (
-                        value > 0 || isEditing ? (
+                      {Object.entries(editedData.daily_expenses).map(([key, value]) => {
+                        const isUnmapped = !KNOWN_OCR_EXPENSE_KEYS.includes(key);
+                        return (value > 0 || isEditing) ? (
                           <div key={key} className="flex justify-between items-center">
-                            <span className="text-muted-foreground">
-                              {expenseLabels[key] || key}:
+                            <span className={`text-muted-foreground ${isUnmapped ? 'text-yellow-600 font-semibold' : ''}`}>
+                              {expenseLabels[key] || key}
+                              {isUnmapped && ' ⚠️'}:
                             </span>
                             {isEditing ? (
                               <Input
@@ -281,8 +312,8 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView }: OCREx
                               <span className="font-mono">{formatAmount(value)}</span>
                             )}
                           </div>
-                        ) : null
-                      ))}
+                        ) : null;
+                      })}
                     </div>
                     <div className="mt-2 pt-2 border-t border-amber-500/20">
                       <div className="flex justify-between font-semibold text-sm">

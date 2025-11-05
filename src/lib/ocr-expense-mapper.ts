@@ -1,3 +1,25 @@
+// Known OCR expense field keys that we explicitly map
+export const KNOWN_OCR_EXPENSE_KEYS = [
+  'fuel_cost',
+  'driver_salary',
+  'conductor_salary',
+  'food',
+  'parking',
+  'body_wash',
+  'police',
+  'repair',
+  'grease',
+  'highway_toll',
+  'phone',
+  'oil',
+  'tyre_tube',
+  'labour',
+  'spare_parts',
+  'permit',
+  'insurance',
+  'other'
+];
+
 export interface OCRExpenseFields {
   fuel_cost?: number;
   driver_salary?: number;
@@ -45,6 +67,13 @@ export interface DBExpenseFields {
 }
 
 export function mapOCRExpensesToDB(ocrExpenses: OCRExpenseFields): DBExpenseFields {
+  // Calculate sum of any unknown/unmapped fields to add to 'other'
+  const unknownSum = Object.entries(ocrExpenses)
+    .filter(([key]) => !KNOWN_OCR_EXPENSE_KEYS.includes(key))
+    .reduce((sum, [, value]) => sum + (value || 0), 0);
+  
+  console.log('🔍 Unknown OCR expense fields sum:', unknownSum);
+  
   return {
     // Direct mappings
     fuel_cost: ocrExpenses.fuel_cost || 0,
@@ -76,7 +105,7 @@ export function mapOCRExpensesToDB(ocrExpenses: OCRExpenseFields): DBExpenseFiel
     temporary_permit: 0,
     legal_court: 0,
     
-    // Other expenses
-    other: ocrExpenses.other || 0,
+    // Other expenses + any unmapped fields
+    other: (ocrExpenses.other || 0) + unknownSum,
   };
 }
