@@ -83,17 +83,29 @@ CRITICAL MAPPING RULES TO AVOID MISTAKES:
 ⚠️ "හයිවේ" or "අධිවේගී" or "highway" → MUST map to "highway_toll" field (NOT other!)
 ⚠️ "රනර්" or "කොන්දොස්තර" or "runner" → MUST map to "conductor_salary" field (NOT driver!)
 ⚠️ Double-check each expense category - numbers are correct, focus on field names
-⚠️ If unsure about a category, include it in "other" with the detected label
+⚠️ If unsure about a category, include it in "other" with the value
+
+CRITICAL NUMBER FORMAT RULES FOR SRI LANKAN NUMBERS:
+⚠️ COMMA (,) is the THOUSAND SEPARATOR in Sri Lankan format
+⚠️ ALL amounts are WHOLE NUMBERS with NO decimals or cents
+⚠️ When you see "106,520" → interpret as 106520 (one hundred six thousand five hundred twenty)
+⚠️ When you see "8,312" → interpret as 8312 (eight thousand three hundred twelve)
+⚠️ When you see "2,500" → interpret as 2500 (two thousand five hundred)
+⚠️ NEVER treat comma as decimal point
+⚠️ Remove ALL commas from numbers before returning them
+⚠️ Examples:
+   * Sheet shows "106,520" → Return 106520 in JSON
+   * Sheet shows "8,312" → Return 8312 in JSON
+   * Sheet shows "50,000" → Return 50000 in JSON
 
 IMPORTANT INSTRUCTIONS:
 - Extract ALL trips from the table rows
 - Revenue is PER TRIP (different for each row)
 - Expenses are ONCE for the whole day (not per trip)
-- Remove commas from numbers
 - If a field is empty/unclear, use 0
-- For each expense, include "detected_as" showing the exact text you saw
 - Map expense names carefully according to the rules above
 - Return ONLY valid JSON, no markdown
+- All expense amounts should be simple numbers (not objects)
 
 Return JSON in this exact format:
 {
@@ -103,8 +115,8 @@ Return JSON in this exact format:
     {
       "trip_no": 1,
       "income": {
-        "bus_collection": 87706,
-        "call_booking": 8520,
+        "bus_collection": 106520,
+        "call_booking": 8312,
         "agent_booking": 0,
         "luggage_income": 0,
         "special_income": 0
@@ -126,24 +138,24 @@ Return JSON in this exact format:
     }
   ],
   "daily_expenses": {
-    "fuel_cost": {"amount": 22500, "detected_as": "ඩීසල්"},
-    "driver_salary": {"amount": 4000, "detected_as": "රියදුරු"},
-    "conductor_salary": {"amount": 800, "detected_as": "කොන්දොස්තර"},
-    "food": {"amount": 1500, "detected_as": "කෑම"},
-    "parking": {"amount": 500, "detected_as": "යාත්රා"},
-    "body_wash": {"amount": 400, "detected_as": "විදවණ"},
-    "highway_toll": {"amount": 3500, "detected_as": "හයිවේ"},
-    "grease": {"amount": 2250, "detected_as": "ග්‍රීස්"},
-    "tyre_tube": {"amount": 0, "detected_as": ""},
-    "oil": {"amount": 0, "detected_as": ""},
-    "labour": {"amount": 0, "detected_as": ""},
-    "spare_parts": {"amount": 0, "detected_as": ""},
-    "police": {"amount": 0, "detected_as": ""},
-    "repair": {"amount": 0, "detected_as": ""},
-    "permit": {"amount": 0, "detected_as": ""},
-    "insurance": {"amount": 0, "detected_as": ""},
-    "phone": {"amount": 0, "detected_as": ""},
-    "other": {"amount": 0, "detected_as": ""}
+    "fuel_cost": 22500,
+    "driver_salary": 4000,
+    "conductor_salary": 800,
+    "food": 1500,
+    "parking": 500,
+    "body_wash": 400,
+    "highway_toll": 3500,
+    "grease": 2250,
+    "tyre_tube": 0,
+    "oil": 0,
+    "labour": 0,
+    "spare_parts": 0,
+    "police": 0,
+    "repair": 0,
+    "permit": 0,
+    "insurance": 0,
+    "phone": 0,
+    "other": 0
   },
   "confidence": 0.92
 }`;
@@ -199,11 +211,14 @@ Return JSON in this exact format:
     const content = data.choices[0].message.content;
     
     console.log('OCR extraction successful');
+    console.log('Raw AI response:', content);
     
     // Parse the JSON response
     let extractedData;
     try {
       extractedData = JSON.parse(content);
+      console.log('First trip bus_collection:', extractedData.trips?.[0]?.income?.bus_collection);
+      console.log('Daily fuel_cost:', extractedData.daily_expenses?.fuel_cost);
     } catch (e) {
       console.error('Failed to parse AI response:', content);
       throw new Error('Invalid JSON response from AI');
