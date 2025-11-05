@@ -74,6 +74,8 @@ export const fieldMappings: Record<string, string> = {
   'අලුත්වැඩියා': 'repair',
   'අළුත්වැඩ': 'repair',
   'රිපෙයාර්': 'repair',
+  'ග්‍රීස් ගැසීම': 'repair',      // Greasing service
+  'ග්රීස් ගැසීම': 'repair',       // Alternative spelling
   'කම්මැලි': 'labour',
   'කම්කරු': 'labour',
   'කම්හල': 'labour',

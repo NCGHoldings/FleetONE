@@ -82,6 +82,9 @@ CRITICAL MAPPING RULES TO AVOID MISTAKES:
 ⚠️ "ග්‍රීස්" or "grease" → MUST map to "grease" field (NOT food!)
 ⚠️ "හයිවේ" or "අධිවේගී" or "highway" → MUST map to "highway_toll" field (NOT other!)
 ⚠️ "රනර්" or "කොන්දොස්තර" or "runner" → MUST map to "conductor_salary" field (NOT driver!)
+⚠️ "ග්‍රීස් ගැසීම" or "greasing service" → MUST map to "repair" field (service work, NOT material)
+⚠️ "ග්‍රීස්" alone (material purchase) → maps to "grease" field
+⚠️ "ආහාර" → maps to "food" field (same as "කෑම")
 ⚠️ Double-check each expense category - numbers are correct, focus on field names
 ⚠️ If unsure about a category, include it in "other" with the value
 
