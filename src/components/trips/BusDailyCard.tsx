@@ -242,7 +242,7 @@ export function BusDailyCard({ summary }: BusDailyCardProps) {
                 variant="outline"
                 size="sm"
                 className="flex-1"
-                onClick={() => navigate(`/quick-trips-entry?date=${summary.date}`)}
+                onClick={() => navigate(`/trips/quick-entry?date=${summary.date}`)}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Trip

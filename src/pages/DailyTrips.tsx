@@ -58,7 +58,7 @@ export default function DailyTrips() {
                 </PopoverContent>
               </Popover>
 
-              <Button onClick={() => navigate('/quick-trips-entry')}>
+              <Button onClick={() => navigate('/trips/quick-entry')}>
                 <Plus className="mr-2 h-4 w-4" />
                 Quick Entry
               </Button>
@@ -107,7 +107,7 @@ export default function DailyTrips() {
             <p className="text-lg text-muted-foreground mb-4">
               No trips found for {format(selectedDate, "PPP")}
             </p>
-            <Button onClick={() => navigate('/quick-trips-entry')}>
+            <Button onClick={() => navigate('/trips/quick-entry')}>
               <Plus className="mr-2 h-4 w-4" />
               Add First Trip
             </Button>

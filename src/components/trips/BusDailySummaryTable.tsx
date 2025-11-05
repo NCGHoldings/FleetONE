@@ -57,7 +57,7 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
     return (
       <div className="text-center py-12 text-muted-foreground">
         <p className="text-lg mb-2">No trips found for this date</p>
-        <Button onClick={() => navigate('/quick-trips-entry')}>
+        <Button onClick={() => navigate('/trips/quick-entry')}>
           <Plus className="mr-2 h-4 w-4" />
           Add Trips
         </Button>
@@ -155,7 +155,7 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Daily Expenses
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => navigate(`/quick-trips-entry?bus=${summary.bus_id}&date=${summary.date}`)}>
+                        <DropdownMenuItem onClick={() => navigate(`/trips/quick-entry?bus=${summary.bus_id}&date=${summary.date}`)}>
                           <Plus className="mr-2 h-4 w-4" />
                           Add Trip
                         </DropdownMenuItem>
@@ -234,7 +234,7 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => navigate(`/quick-trips-entry?date=${summary.date}`)}
+                      onClick={() => navigate(`/trips/quick-entry?date=${summary.date}`)}
                     >
                       Quick Entry
                     </Button>
