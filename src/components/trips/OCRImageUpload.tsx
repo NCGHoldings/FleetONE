@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SingleTrip, DailyExpenses } from '@/lib/ocr-processor';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { mapOCRExpensesToDB } from '@/lib/ocr-expense-mapper';
 
 interface OCRImageUploadProps {
   selectedDate: Date;
@@ -202,16 +203,17 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         return;
       }
 
-      // 4. INSERT DAILY EXPENSES (ONE entry per bus per day)
-      const totalExpenses = Object.values(data.daily_expenses).reduce((s, v) => s + v, 0);
+      // 4. MAP OCR EXPENSES TO DB SCHEMA, then insert daily expenses
+      const mappedExpenses = mapOCRExpensesToDB(data.daily_expenses);
+      const totalExpenses = Object.values(mappedExpenses).reduce((s, v) => s + v, 0);
       
       const { error: expenseError } = await supabase
         .from('daily_bus_expenses')
         .upsert({
           expense_date: tripDate,
           bus_id: busData.id,
-          ...data.daily_expenses,
-          total_expenses: totalExpenses,
+          ...mappedExpenses,
+          total_daily_expenses: totalExpenses,
         }, {
           onConflict: 'bus_id,expense_date'
         });

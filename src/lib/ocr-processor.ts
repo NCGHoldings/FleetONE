@@ -18,13 +18,22 @@ export interface SingleTrip {
 
 export interface DailyExpenses extends Record<string, number> {
   fuel_cost: number;
-  driver_salary: number;
-  conductor_salary: number;
+  driver_salary: number; // Separate for OCR extraction
+  conductor_salary: number; // Separate for OCR extraction
   food: number;
   parking: number;
   body_wash: number;
   police: number;
   repair: number;
+  grease?: number; // Optional OCR field
+  highway_toll?: number; // Optional OCR field (maps to highway_charges)
+  phone?: number; // Optional OCR field (maps to short_misc)
+  oil?: number; // Optional OCR field
+  tyre_tube?: number; // Optional OCR field
+  labour?: number; // Optional OCR field
+  spare_parts?: number; // Optional OCR field
+  permit?: number; // Optional OCR field
+  insurance?: number; // Optional OCR field
   other?: number;
 }
 

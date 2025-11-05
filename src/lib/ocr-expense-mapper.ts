@@ -1,0 +1,82 @@
+export interface OCRExpenseFields {
+  fuel_cost?: number;
+  driver_salary?: number;
+  conductor_salary?: number;
+  food?: number;
+  parking?: number;
+  body_wash?: number;
+  police?: number;
+  repair?: number;
+  grease?: number;
+  highway_toll?: number;
+  phone?: number;
+  oil?: number;
+  tyre_tube?: number;
+  labour?: number;
+  spare_parts?: number;
+  permit?: number;
+  insurance?: number;
+  other?: number;
+  [key: string]: number | undefined;
+}
+
+export interface DBExpenseFields {
+  fuel_cost: number;
+  salary: number; // Combined driver + conductor
+  food: number;
+  parking: number;
+  body_wash: number;
+  police: number;
+  repair: number;
+  tyre_tube: number;
+  emission_fitness: number;
+  permits_renewal: number;
+  staff_accommodation: number;
+  highway_charges: number;
+  accident_compensation: number;
+  log_sheet: number;
+  vehicle_hire: number;
+  ntc: number;
+  runner: number;
+  short_misc: number;
+  temporary_permit: number;
+  legal_court: number;
+  other: number;
+}
+
+export function mapOCRExpensesToDB(ocrExpenses: OCRExpenseFields): DBExpenseFields {
+  return {
+    // Direct mappings
+    fuel_cost: ocrExpenses.fuel_cost || 0,
+    food: ocrExpenses.food || 0,
+    parking: ocrExpenses.parking || 0,
+    body_wash: ocrExpenses.body_wash || 0,
+    police: ocrExpenses.police || 0,
+    
+    // CRITICAL: Combine driver_salary + conductor_salary into salary
+    salary: (ocrExpenses.driver_salary || 0) + (ocrExpenses.conductor_salary || 0),
+    
+    // Combine repair + grease into repair field
+    repair: (ocrExpenses.repair || 0) + (ocrExpenses.grease || 0),
+    
+    // Field name mappings
+    highway_charges: ocrExpenses.highway_toll || 0,
+    short_misc: ocrExpenses.phone || 0,
+    tyre_tube: ocrExpenses.tyre_tube || 0,
+    
+    // Fields not typically extracted by OCR (default to 0)
+    emission_fitness: 0,
+    permits_renewal: ocrExpenses.permit || 0,
+    staff_accommodation: 0,
+    accident_compensation: 0,
+    log_sheet: 0,
+    vehicle_hire: 0,
+    ntc: 0,
+    runner: 0,
+    temporary_permit: 0,
+    legal_court: 0,
+    
+    // Other expenses
+    other: ocrExpenses.other || 0,
+  };
+}
