@@ -49,7 +49,6 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
   const [progress, setProgress] = useState(0);
   const [extractedData, setExtractedData] = useState<ExtractedMultiTripData[]>([]);
   const [processingStep, setProcessingStep] = useState<string>("");
-  const [showGuide, setShowGuide] = useState(true);
   const [manualDate, setManualDate] = useState<Date>(selectedDate); // Manual date selection
   const isMobile = useIsMobile();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -489,46 +488,6 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* How it Works Guide */}
-        {showGuide && (
-          <Collapsible open={showGuide} onOpenChange={setShowGuide}>
-            <Card className="bg-primary/5 border-primary/20">
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <Info className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold text-sm">📸 How to Upload Trip Sheets</h3>
-                  </div>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </CollapsibleTrigger>
-                </div>
-                <CollapsibleContent>
-                  <div className="space-y-2 text-xs text-muted-foreground">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                      <span>Take a clear photo of your filled trip sheet</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                      <span>Ensure all text is readable and not blurry</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                      <span>Sheet should show: Bus number, Date, Trip table, Daily expenses</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                      <span>Supports multiple sheets at once for faster processing</span>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </div>
-            </Card>
-          </Collapsible>
-        )}
 
         {/* Upload Area */}
         {images.length === 0 ? (
