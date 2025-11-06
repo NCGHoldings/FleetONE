@@ -211,21 +211,28 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
         return;
       }
 
-      // Prepare trip entries
+      // Prepare trip entries with correct schema
       const tripEntries = tripsToImport.map(alloc => ({
         trip_date: alloc.allocation_date,
         trip_no: alloc.trip_id,
         bus_id: alloc.bus_id,
         route_id: alloc.route_id,
+        driver_id: null,
+        conductor_id: null,
         start_time: alloc.start_time,
         end_time: alloc.end_time,
-        start_odo: null,
-        end_odo: null,
+        odometer_start: null,
+        odometer_end: null,
         distance_km: 0,
         income: 0,
-        diesel_liters: null,
-        driver_name: alloc.driver_name,
-        conductor_name: alloc.conductor_name,
+        fuel_liters: null,
+        status: 'scheduled' as const,
+        notes: JSON.stringify({
+          driver: alloc.driver_name,
+          conductor: alloc.conductor_name,
+          imported_from_allocation: true,
+          allocation_id: alloc.id
+        })
       }));
 
       const { data, error: insertError } = await supabase
