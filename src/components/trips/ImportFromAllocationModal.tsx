@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,37 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
   const [allocations, setAllocations] = useState<AllocationPreview[]>([]);
   const [existingTripCount, setExistingTripCount] = useState(0);
   const [importMode, setImportMode] = useState<"skip" | "overwrite">("skip");
+  const [buses, setBuses] = useState<any[]>([]);
+  const [routes, setRoutes] = useState<any[]>([]);
+
+  // Safe JSON parsing helper
+  const safeParseJSON = (str?: string) => {
+    try {
+      return str ? JSON.parse(str) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  // Fetch buses and routes on mount
+  useEffect(() => {
+    if (isOpen) {
+      fetchBusesAndRoutes();
+    }
+  }, [isOpen]);
+
+  const fetchBusesAndRoutes = async () => {
+    try {
+      const [busesRes, routesRes] = await Promise.all([
+        supabase.from('buses').select('id, bus_no'),
+        supabase.from('routes').select('id, route_no, route_name')
+      ]);
+      setBuses(busesRes.data || []);
+      setRoutes(routesRes.data || []);
+    } catch (error) {
+      console.error('Error fetching buses and routes:', error);
+    }
+  };
 
   const handleDateRangeChange = async (range: DateRange | undefined) => {
     setDateRange(range);
@@ -51,22 +82,10 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
       const startDate = format(range.from, 'yyyy-MM-dd');
       const endDate = format(range.to, 'yyyy-MM-dd');
 
-      // Fetch driver allocations
+      // Fetch driver allocations with simple select
       const { data: allocationsData, error: allocError } = await supabase
         .from('driver_allocations')
-        .select(`
-          id,
-          allocation_date,
-          trip_id,
-          start_time,
-          end_time,
-          bus_id,
-          route_id,
-          buses!driver_allocations_bus_id_fkey(bus_no),
-          routes!driver_allocations_route_id_fkey(route_no, route_name),
-          driver:staff!driver_allocations_driver_id_fkey(name),
-          conductor:staff_driver_allocations_conductor_id_fkey(name)
-        `)
+        .select('*')
         .gte('allocation_date', startDate)
         .lte('allocation_date', endDate)
         .eq('status', 'confirmed')
@@ -89,19 +108,28 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
 
       setExistingTripCount(existingTrips?.length || 0);
 
-      const formatted = allocationsData?.map((alloc: any) => ({
-        id: alloc.id,
-        allocation_date: alloc.allocation_date,
-        bus_no: alloc.buses?.bus_no || 'N/A',
-        route_name: `${alloc.routes?.route_no || ''} - ${alloc.routes?.route_name || 'N/A'}`,
-        driver_name: alloc.driver?.name || 'N/A',
-        conductor_name: alloc.conductor?.name || 'N/A',
-        start_time: alloc.start_time,
-        end_time: alloc.end_time,
-        bus_id: alloc.bus_id,
-        route_id: alloc.route_id,
-        trip_id: alloc.trip_id,
-      })) || [];
+      const formatted = allocationsData?.map((alloc: any) => {
+        // Parse notes to get driver/conductor info
+        const notes = safeParseJSON(alloc.notes);
+        
+        // Match bus and route from separate queries
+        const bus = buses.find(b => b.id === alloc.bus_id);
+        const route = routes.find(r => r.id === alloc.route_id);
+        
+        return {
+          id: alloc.id,
+          allocation_date: alloc.allocation_date,
+          bus_no: bus?.bus_no || notes.bus_no || 'N/A',
+          route_name: route ? `${route.route_no} - ${route.route_name}` : notes.route || 'N/A',
+          driver_name: notes.driver || notes.excel_driver || 'N/A',
+          conductor_name: notes.conductor || notes.excel_conductor || 'N/A',
+          start_time: alloc.start_time,
+          end_time: alloc.end_time,
+          bus_id: alloc.bus_id,
+          route_id: alloc.route_id,
+          trip_id: alloc.trip_id,
+        };
+      }) || [];
 
       setAllocations(formatted);
       toast.success(`Found ${formatted.length} allocations`);
