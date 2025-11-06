@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
@@ -12,14 +12,12 @@ import { BusDailyCard } from "@/components/trips/BusDailyCard";
 import { FleetDailySummary } from "@/components/trips/FleetDailySummary";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ImportFromAllocationModal } from "@/components/trips/ImportFromAllocationModal";
 
 export default function DailyTrips() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<"table" | "cards">(isMobile ? "cards" : "table");
-  const [showImportModal, setShowImportModal] = useState(false);
   
   const { busSummaries, fleetSummary, loading, refetch } = useDailyBusGroupedTrips(selectedDate);
 
@@ -59,14 +57,6 @@ export default function DailyTrips() {
                   />
                 </PopoverContent>
               </Popover>
-
-              <Button 
-                variant="outline"
-                onClick={() => setShowImportModal(true)}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Import from Allocations
-              </Button>
 
               <Button onClick={() => navigate('/trips/quick-entry')}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -146,12 +136,6 @@ export default function DailyTrips() {
           </>
         )}
       </div>
-
-      <ImportFromAllocationModal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onSuccess={refetch}
-      />
     </div>
   );
 }
