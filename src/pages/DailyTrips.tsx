@@ -13,11 +13,14 @@ import { FleetDailySummary } from "@/components/trips/FleetDailySummary";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportFromAllocationModal } from "@/components/trips/ImportFromAllocationModal";
+import type { DateRange } from "react-day-picker";
 
 export default function DailyTrips() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [viewMode, setViewMode] = useState<"table" | "cards">(isMobile ? "cards" : "table");
   const [showImportModal, setShowImportModal] = useState(false);
   
@@ -39,46 +42,83 @@ export default function DailyTrips() {
             <div className="flex items-center gap-2 flex-wrap">
               {/* Date Navigation */}
               <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setSelectedDate(subDays(selectedDate, 1))}
-                  title="Previous Day"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
+                {dateMode === "single" && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setSelectedDate(subDays(selectedDate, 1))}
+                    title="Previous Day"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                )}
                 
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full md:w-[240px] justify-start text-left font-normal",
-                        !selectedDate && "text-muted-foreground"
+                        "w-full md:w-[260px] justify-start text-left font-normal",
+                        (!selectedDate && dateMode === "single") && "text-muted-foreground",
+                        (!dateRange && dateMode === "range") && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                      {dateMode === "single" ? (
+                        selectedDate ? format(selectedDate, "PPP") : "Pick a date"
+                      ) : (
+                        dateRange?.from ? (
+                          dateRange.to ? (
+                            `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}`
+                          ) : (
+                            format(dateRange.from, "PP")
+                          )
+                        ) : (
+                          "Pick date range"
+                        )
+                      )}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => date && setSelectedDate(date)}
-                      initialFocus
-                    />
+                    <div className="p-3 border-b">
+                      <Tabs value={dateMode} onValueChange={(v) => setDateMode(v as "single" | "range")}>
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="single">Single Date</TabsTrigger>
+                          <TabsTrigger value="range">Date Range</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </div>
+                    {dateMode === "single" ? (
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => date && setSelectedDate(date)}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    ) : (
+                      <Calendar
+                        mode="range"
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    )}
                   </PopoverContent>
                 </Popover>
 
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setSelectedDate(addDays(selectedDate, 1))}
-                  title="Next Day"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                {dateMode === "single" && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setSelectedDate(addDays(selectedDate, 1))}
+                    title="Next Day"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
 
               <Button 
