@@ -16,11 +16,39 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Trash2, Eye, ArrowLeft } from "lucide-react";
+import { 
+  Calendar as CalendarIcon, 
+  Trash2, 
+  Eye, 
+  ArrowLeft,
+  Fuel,
+  Wrench,
+  CircleDollarSign,
+  Users,
+  Utensils,
+  ParkingCircle,
+  MapPin,
+  FileText,
+  ShieldCheck,
+  FileCheck,
+  Home,
+  AlertCircle,
+  ScrollText,
+  Building,
+  Scale,
+  ClipboardList,
+  Droplets,
+  ChevronDown,
+  ChevronUp,
+  Waves
+} from "lucide-react";
 import { format } from "date-fns";
 import { DailyBusExpensesForm } from "@/components/trips/DailyBusExpensesForm";
 import { useDailyBusExpenses } from "@/hooks/useDailyBusExpenses";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function DailyBusExpenses() {
   const [searchParams] = useSearchParams();
@@ -145,18 +173,8 @@ export default function DailyBusExpenses() {
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Expenses</div>
-                          <div className="text-2xl font-bold text-primary">
-                            Rs. {(
-                              (expense.fuel_cost || 0) +
-                              (expense.repair || 0) +
-                              (expense.tyre_tube || 0) +
-                              (expense.salary || 0) +
-                              (expense.police || 0) +
-                              (expense.food || 0) +
-                              (expense.parking || 0) +
-                              (expense.highway_charges || 0) +
-                              (expense.other || 0)
-                            ).toLocaleString()}
+                           <div className="text-3xl font-bold text-primary">
+                            Rs. {((expense as any).total_daily_expenses || 0).toLocaleString()}
                           </div>
                         </div>
                         {!isViewOnly && (
@@ -187,106 +205,131 @@ export default function DailyBusExpenses() {
                   </CardHeader>
                   
                   <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {/* Fuel Cost */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg">⛽</span>
-                          </div>
-                          <span className="font-medium">Fuel Cost</span>
-                        </div>
-                        <span className="font-bold text-lg">Rs. {(expense.fuel_cost || 0).toLocaleString()}</span>
-                      </div>
+                    <Tabs defaultValue="all" className="w-full">
+                      <TabsList className="grid w-full grid-cols-5 mb-6">
+                        <TabsTrigger value="all">All</TabsTrigger>
+                        <TabsTrigger value="operational">Operational</TabsTrigger>
+                        <TabsTrigger value="staff">Staff</TabsTrigger>
+                        <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+                        <TabsTrigger value="administrative">Admin</TabsTrigger>
+                      </TabsList>
 
-                      {/* Repair */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg">🔧</span>
-                          </div>
-                          <span className="font-medium">Repair</span>
-                        </div>
-                        <span className="font-bold text-lg">Rs. {(expense.repair || 0).toLocaleString()}</span>
-                      </div>
+                      <TabsContent value="all" className="space-y-6">
+                        {/* Operational Expenses */}
+                        <ExpenseSection
+                          title="Operational Expenses"
+                          color="blue"
+                          expenses={[
+                            { icon: Fuel, label: "Fuel Cost", value: expense.fuel_cost },
+                            { icon: ParkingCircle, label: "Parking", value: expense.parking },
+                            { icon: MapPin, label: "Highway Charges", value: expense.highway_charges },
+                          ]}
+                        />
 
-                      {/* Tyre/Tube */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg">🛞</span>
-                          </div>
-                          <span className="font-medium">Tyre/Tube</span>
-                        </div>
-                        <span className="font-bold text-lg">Rs. {(expense.tyre_tube || 0).toLocaleString()}</span>
-                      </div>
+                        {/* Staff Expenses */}
+                        <ExpenseSection
+                          title="Staff Expenses"
+                          color="green"
+                          expenses={[
+                            { icon: CircleDollarSign, label: "Salary", value: expense.salary },
+                            { icon: Utensils, label: "Food", value: expense.food },
+                            { icon: Users, label: "Runner", value: expense.runner },
+                            { icon: Home, label: "Staff Accommodation", value: expense.staff_accommodation },
+                          ]}
+                        />
 
-                      {/* Salary */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg">💰</span>
-                          </div>
-                          <span className="font-medium">Salary</span>
-                        </div>
-                        <span className="font-bold text-lg">Rs. {(expense.salary || 0).toLocaleString()}</span>
-                      </div>
+                        {/* Maintenance */}
+                        <ExpenseSection
+                          title="Maintenance"
+                          color="orange"
+                          expenses={[
+                            { icon: Wrench, label: "Repair", value: expense.repair },
+                            { icon: CircleDollarSign, label: "Tyre/Tube", value: expense.tyre_tube },
+                            { icon: Waves, label: "Body Wash", value: expense.body_wash },
+                          ]}
+                        />
 
-                      {/* Police */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg">🚔</span>
-                          </div>
-                          <span className="font-medium">Police</span>
-                        </div>
-                        <span className="font-bold text-lg">Rs. {(expense.police || 0).toLocaleString()}</span>
-                      </div>
+                        {/* Administrative */}
+                        <ExpenseSection
+                          title="Administrative"
+                          color="purple"
+                          expenses={[
+                            { icon: ShieldCheck, label: "Police", value: expense.police },
+                            { icon: FileCheck, label: "Emission/Fitness", value: expense.emission_fitness },
+                            { icon: FileText, label: "Permits Renewal", value: expense.permits_renewal },
+                            { icon: ScrollText, label: "Log Sheet", value: expense.log_sheet },
+                            { icon: Building, label: "NTC", value: expense.ntc },
+                            { icon: Scale, label: "Legal/Court", value: expense.legal_court },
+                            { icon: ClipboardList, label: "Temporary Permit", value: expense.temporary_permit },
+                          ]}
+                        />
 
-                      {/* Food */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg">🍽️</span>
-                          </div>
-                          <span className="font-medium">Food</span>
-                        </div>
-                        <span className="font-bold text-lg">Rs. {(expense.food || 0).toLocaleString()}</span>
-                      </div>
+                        {/* Other */}
+                        <ExpenseSection
+                          title="Other Expenses"
+                          color="gray"
+                          expenses={[
+                            { icon: AlertCircle, label: "Accident Compensation", value: expense.accident_compensation },
+                            { icon: Building, label: "Vehicle Hire", value: expense.vehicle_hire },
+                            { icon: Droplets, label: "Short/Misc", value: expense.short_misc },
+                            { icon: FileText, label: "Other", value: expense.other },
+                          ]}
+                        />
+                      </TabsContent>
 
-                      {/* Parking */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg">🅿️</span>
-                          </div>
-                          <span className="font-medium">Parking</span>
-                        </div>
-                        <span className="font-bold text-lg">Rs. {(expense.parking || 0).toLocaleString()}</span>
-                      </div>
+                      <TabsContent value="operational">
+                        <ExpenseSection
+                          title="Operational Expenses"
+                          color="blue"
+                          expenses={[
+                            { icon: Fuel, label: "Fuel Cost", value: expense.fuel_cost },
+                            { icon: ParkingCircle, label: "Parking", value: expense.parking },
+                            { icon: MapPin, label: "Highway Charges", value: expense.highway_charges },
+                          ]}
+                        />
+                      </TabsContent>
 
-                      {/* Highway Charges */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg">🛣️</span>
-                          </div>
-                          <span className="font-medium">Highway Charges</span>
-                        </div>
-                        <span className="font-bold text-lg">Rs. {(expense.highway_charges || 0).toLocaleString()}</span>
-                      </div>
+                      <TabsContent value="staff">
+                        <ExpenseSection
+                          title="Staff Expenses"
+                          color="green"
+                          expenses={[
+                            { icon: CircleDollarSign, label: "Salary", value: expense.salary },
+                            { icon: Utensils, label: "Food", value: expense.food },
+                            { icon: Users, label: "Runner", value: expense.runner },
+                            { icon: Home, label: "Staff Accommodation", value: expense.staff_accommodation },
+                          ]}
+                        />
+                      </TabsContent>
 
-                      {/* Other */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg">📝</span>
-                          </div>
-                          <span className="font-medium">Other</span>
-                        </div>
-                        <span className="font-bold text-lg">Rs. {(expense.other || 0).toLocaleString()}</span>
-                      </div>
-                    </div>
+                      <TabsContent value="maintenance">
+                        <ExpenseSection
+                          title="Maintenance"
+                          color="orange"
+                          expenses={[
+                            { icon: Wrench, label: "Repair", value: expense.repair },
+                            { icon: CircleDollarSign, label: "Tyre/Tube", value: expense.tyre_tube },
+                            { icon: Waves, label: "Body Wash", value: expense.body_wash },
+                          ]}
+                        />
+                      </TabsContent>
+
+                      <TabsContent value="administrative">
+                        <ExpenseSection
+                          title="Administrative"
+                          color="purple"
+                          expenses={[
+                            { icon: ShieldCheck, label: "Police", value: expense.police },
+                            { icon: FileCheck, label: "Emission/Fitness", value: expense.emission_fitness },
+                            { icon: FileText, label: "Permits Renewal", value: expense.permits_renewal },
+                            { icon: ScrollText, label: "Log Sheet", value: expense.log_sheet },
+                            { icon: Building, label: "NTC", value: expense.ntc },
+                            { icon: Scale, label: "Legal/Court", value: expense.legal_court },
+                            { icon: ClipboardList, label: "Temporary Permit", value: expense.temporary_permit },
+                          ]}
+                        />
+                      </TabsContent>
+                    </Tabs>
 
                     {expense.notes && (
                       <div className="mt-4 p-3 rounded-lg bg-muted/30 border-l-4 border-primary">
@@ -307,5 +350,99 @@ export default function DailyBusExpenses() {
         </div>
       </div>
     </AppLayout>
+  );
+}
+
+// Helper component for expense sections
+interface ExpenseSectionProps {
+  title: string;
+  color: "blue" | "green" | "orange" | "purple" | "gray";
+  expenses: Array<{
+    icon: React.ElementType;
+    label: string;
+    value?: number;
+  }>;
+}
+
+function ExpenseSection({ title, color, expenses }: ExpenseSectionProps) {
+  const [isOpen, setIsOpen] = useState(true);
+  
+  const colorClasses = {
+    blue: {
+      badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+      icon: "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400",
+      border: "border-blue-200 dark:border-blue-800"
+    },
+    green: {
+      badge: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+      icon: "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400",
+      border: "border-green-200 dark:border-green-800"
+    },
+    orange: {
+      badge: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+      icon: "bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-400",
+      border: "border-orange-200 dark:border-orange-800"
+    },
+    purple: {
+      badge: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+      icon: "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-400",
+      border: "border-purple-200 dark:border-purple-800"
+    },
+    gray: {
+      badge: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+      icon: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+      border: "border-gray-200 dark:border-gray-700"
+    }
+  };
+
+  const sectionTotal = expenses.reduce((sum, exp) => sum + (exp.value || 0), 0);
+  const hasExpenses = sectionTotal > 0;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className={`border rounded-lg ${colorClasses[color].border}`}>
+      <CollapsibleTrigger className="w-full">
+        <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
+          <div className="flex items-center gap-3">
+            <h3 className="font-semibold text-lg">{title}</h3>
+            <Badge className={colorClasses[color].badge}>
+              Rs. {sectionTotal.toLocaleString()}
+            </Badge>
+          </div>
+          {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+        </div>
+      </CollapsibleTrigger>
+      
+      <CollapsibleContent>
+        <div className="p-4 pt-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {expenses.map((expense, idx) => {
+              const Icon = expense.icon;
+              const value = expense.value || 0;
+              
+              return (
+                <div
+                  key={idx}
+                  className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
+                    value > 0 
+                      ? 'bg-card hover:shadow-md' 
+                      : 'bg-muted/30 opacity-60'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg ${colorClasses[color].icon} flex items-center justify-center`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span className="font-medium text-sm">{expense.label}</span>
+                  </div>
+                  <span className={`font-bold ${value > 0 ? 'text-lg' : 'text-base text-muted-foreground'}`}>
+                    Rs. {value.toLocaleString()}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
