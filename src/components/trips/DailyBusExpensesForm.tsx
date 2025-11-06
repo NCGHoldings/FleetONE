@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Save, Copy, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, Save, Copy, Info, Plus } from "lucide-react";
 import { DailyBusExpense } from "@/hooks/useDailyBusExpenses";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -30,6 +30,7 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense, readOnly =
   const [selectedBusId, setSelectedBusId] = useState<string>("");
   const [tripCount, setTripCount] = useState(0);
   const [isOtherExpanded, setIsOtherExpanded] = useState(false);
+  const [isFormExpanded, setIsFormExpanded] = useState(false);
 
   const [expenses, setExpenses] = useState<Omit<DailyBusExpense, 'expense_date' | 'bus_id'>>({
     fuel_cost: 0,
@@ -297,14 +298,44 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense, readOnly =
     : 0;
 
   return (
-    <Card className="p-6">
-      {readOnly && (
-        <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md flex items-center gap-2">
-          <Info className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Auto-filled by OCR (View Only)</span>
+    <Card>
+      <Collapsible open={isFormExpanded} onOpenChange={setIsFormExpanded}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-3">
+            <Plus className="h-5 w-5 text-primary" />
+            <div>
+              <h3 className="font-semibold text-lg">Add Daily Bus Expenses</h3>
+              <p className="text-sm text-muted-foreground">
+                {isFormExpanded ? "Fill in the form to record expenses" : "Click to expand and add expenses"}
+              </p>
+            </div>
+          </div>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm">
+              {isFormExpanded ? (
+                <>
+                  <ChevronUp className="h-4 w-4 mr-2" />
+                  Minimize
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  Expand Form
+                </>
+              )}
+            </Button>
+          </CollapsibleTrigger>
         </div>
-      )}
-      <form onSubmit={handleSubmit} className="space-y-6">
+
+        <CollapsibleContent>
+          <div className="p-6">
+            {readOnly && (
+              <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Auto-filled by OCR (View Only)</span>
+              </div>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex items-end gap-4">
           <div className="flex-1">
             <Label>Bus Number</Label>
@@ -447,6 +478,9 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense, readOnly =
           )}
         </div>
       </form>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }
