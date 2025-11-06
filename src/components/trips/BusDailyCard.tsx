@@ -215,7 +215,14 @@ export function BusDailyCard({ summary }: BusDailyCardProps) {
 
                       <div>
                         <div className="text-muted-foreground">Revenue</div>
-                        <div className="font-medium">{formatCurrency(trip.income)}</div>
+                        <div className="font-medium flex items-center gap-2">
+                          {formatCurrency(trip.income)}
+                          {trip.income === 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              Awaiting Entry
+                            </Badge>
+                          )}
+                        </div>
                       </div>
 
                       <div>

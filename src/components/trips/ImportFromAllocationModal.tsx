@@ -142,63 +142,115 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
   };
 
   const handleImport = async () => {
-    if (!allocations.length) {
-      toast.error('No allocations to import');
+    if (allocations.length === 0 || !dateRange?.from || !dateRange?.to) {
+      toast.error("Please select a date range and ensure allocations exist");
       return;
     }
 
     setIsLoading(true);
     try {
-      const tripEntries = allocations.map(alloc => ({
-        trip_no: alloc.trip_id,
-        trip_date: alloc.allocation_date,
-        bus_id: alloc.bus_id,
-        route_id: alloc.route_id,
-        start_time: alloc.start_time,
-        end_time: alloc.end_time,
-        income: 0,
-        distance_km: 0,
-        notes: JSON.stringify({
-          driver: alloc.driver_name,
-          conductor: alloc.conductor_name,
-          imported_from_allocation: true,
-          allocation_id: alloc.id
-        })
-      }));
+      const startDate = format(dateRange.from, 'yyyy-MM-dd');
+      const endDate = format(dateRange.to, 'yyyy-MM-dd');
 
+      // Pre-import validation: Filter out allocations with null bus_id
+      const validAllocations = allocations.filter(a => a.bus_id);
+      const invalidAllocations = allocations.filter(a => !a.bus_id);
+
+      if (invalidAllocations.length > 0) {
+        const busNumbers = invalidAllocations.map(a => a.bus_no).join(', ');
+        toast.warning(
+          `${invalidAllocations.length} allocation${invalidAllocations.length > 1 ? 's' : ''} skipped due to missing bus assignment (${busNumbers}). Please assign buses in Driver Allocation page first.`,
+          { duration: 6000 }
+        );
+      }
+
+      if (validAllocations.length === 0) {
+        toast.error('No valid allocations to import. All allocations require bus assignment.');
+        setIsLoading(false);
+        return;
+      }
+
+      // If overwrite mode, delete existing trips first
       if (importMode === 'overwrite' && existingTripCount > 0) {
-        // Delete existing trips in the date range first
-        const startDate = format(dateRange!.from!, 'yyyy-MM-dd');
-        const endDate = format(dateRange!.to!, 'yyyy-MM-dd');
+        const tripNos = validAllocations.map(a => a.trip_id);
         
         const { error: deleteError } = await supabase
           .from('daily_trips')
           .delete()
           .gte('trip_date', startDate)
-          .lte('trip_date', endDate);
+          .lte('trip_date', endDate)
+          .in('trip_no', tripNos);
 
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          console.error('Error deleting existing trips:', deleteError);
+          toast.error('Failed to delete existing trips');
+          setIsLoading(false);
+          return;
+        }
       }
 
-      // Insert new trips
-      const { data, error } = await supabase
+      // Check which trips already exist by trip_no AND trip_date
+      const { data: existingTrips } = await supabase
+        .from('daily_trips')
+        .select('trip_no, trip_date')
+        .gte('trip_date', startDate)
+        .lte('trip_date', endDate);
+
+      const existingTripKeys = new Set(
+        existingTrips?.map(t => `${t.trip_date}_${t.trip_no}`) || []
+      );
+
+      // Filter out existing trips if in skip mode
+      const tripsToImport = importMode === 'skip'
+        ? validAllocations.filter(a => !existingTripKeys.has(`${a.allocation_date}_${a.trip_id}`))
+        : validAllocations;
+
+      if (tripsToImport.length === 0) {
+        toast.info('All trips already exist. Change to "Overwrite" mode to replace them.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Prepare trip entries
+      const tripEntries = tripsToImport.map(alloc => ({
+        trip_date: alloc.allocation_date,
+        trip_no: alloc.trip_id,
+        bus_id: alloc.bus_id,
+        route_id: alloc.route_id,
+        start_time: alloc.start_time,
+        end_time: alloc.end_time,
+        start_odo: null,
+        end_odo: null,
+        distance_km: 0,
+        income: 0,
+        diesel_liters: null,
+        driver_name: alloc.driver_name,
+        conductor_name: alloc.conductor_name,
+      }));
+
+      const { data, error: insertError } = await supabase
         .from('daily_trips')
         .insert(tripEntries)
         .select();
 
-      if (error) {
-        // If it's a unique constraint error and we're in skip mode, that's expected
-        if (error.code === '23505' && importMode === 'skip') {
-          const importedCount = allocations.length - existingTripCount;
-          toast.success(`Imported ${importedCount} trips, skipped ${existingTripCount} existing`);
-        } else {
-          throw error;
-        }
-      } else {
-        toast.success(`Successfully imported ${data?.length || allocations.length} trips`);
+      if (insertError) {
+        console.error('Error inserting trips:', insertError);
+        toast.error(`Import failed: ${insertError.message}`);
+        setIsLoading(false);
+        return;
       }
 
-      onSuccess();
+      const importedCount = data?.length || 0;
+      const skippedCount = validAllocations.length - importedCount;
+      
+      toast.success(
+        `Successfully imported ${importedCount} trip${importedCount !== 1 ? 's' : ''}` +
+        (skippedCount > 0 ? `, skipped ${skippedCount} existing` : '') +
+        (invalidAllocations.length > 0 ? `. ${invalidAllocations.length} require bus assignment` : ''),
+        { duration: 5000 }
+      );
+      
+      onSuccess?.();
       onClose();
       
       // Reset state
@@ -207,7 +259,7 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
       setExistingTripCount(0);
     } catch (error: any) {
       console.error('Import error:', error);
-      toast.error(`Import failed: ${error.message}`);
+      toast.error('Failed to import trips');
     } finally {
       setIsLoading(false);
     }
