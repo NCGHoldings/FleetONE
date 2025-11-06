@@ -4,11 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Edit, CheckCircle, Eye, Trash2, Plus, Minus, AlertCircle } from "lucide-react";
+import { ChevronDown, Edit, CheckCircle, Eye, Trash2, Plus, Minus, AlertCircle, AlertTriangle } from "lucide-react";
 import { SingleTrip, DailyExpenses } from "@/lib/ocr-processor";
 import { DB_EXPENSE_CATEGORIES, mapOCRExpensesToDB, DBExpenseFields, KNOWN_OCR_EXPENSE_KEYS } from "@/lib/ocr-expense-mapper";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format, parseISO, differenceInDays } from "date-fns";
 
 interface ExtractedMultiTripData {
   fileName: string;
@@ -23,13 +24,14 @@ interface ExtractedMultiTripData {
 
 interface OCRExtractedDataCardProps {
   data: ExtractedMultiTripData;
+  actualSaveDate: string; // The date that will be used for saving (YYYY-MM-DD)
   onApply: (data: ExtractedMultiTripData & { mapped_expenses: DBExpenseFields }) => void;
   onDiscard: () => void;
   onView: () => void;
   savedExpensesTotal?: number;
 }
 
-export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView, savedExpensesTotal }: OCRExtractedDataCardProps) => {
+export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard, onView, savedExpensesTotal }: OCRExtractedDataCardProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState(data);
@@ -193,7 +195,40 @@ export const OCRExtractedDataCard = ({ data, onApply, onDiscard, onView, savedEx
                 <p className="text-sm font-medium text-muted-foreground">{data.fileName}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-2xl font-bold">🚌 {data.busNumber}</span>
-                  <span className="text-sm text-muted-foreground">• {data.date}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      Sheet: <span className="line-through">{data.date}</span>
+                    </span>
+                    <span className="text-xs">→</span>
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                      Save to: {format(parseISO(actualSaveDate), 'MMM d, yyyy')}
+                    </span>
+                    {(() => {
+                      // Check if dates differ significantly
+                      try {
+                        const ocrDateParts = data.date.split(/[/-]/);
+                        if (ocrDateParts.length === 3) {
+                          const [first, second, third] = ocrDateParts.map(p => parseInt(p, 10));
+                          let ocrYear = third > 99 ? third : 2000 + third;
+                          const daysDiff = Math.abs(differenceInDays(
+                            parseISO(actualSaveDate),
+                            new Date(ocrYear, second - 1, first)
+                          ));
+                          if (daysDiff > 7) {
+                            return (
+                              <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 text-[10px]">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Date Override
+                              </Badge>
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        // Ignore date parsing errors
+                      }
+                      return null;
+                    })()}
+                  </div>
                   {getConfidenceBadge(data.confidence)}
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">

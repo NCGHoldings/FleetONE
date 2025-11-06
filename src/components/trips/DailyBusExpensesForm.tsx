@@ -10,6 +10,7 @@ import { ChevronDown, Save, Copy, Info } from "lucide-react";
 import { DailyBusExpense } from "@/hooks/useDailyBusExpenses";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface Bus {
   id: string;
@@ -109,7 +110,7 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense, readOnly =
   const fetchExpensesForBusDate = async () => {
     if (!selectedBusId) return;
     
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = format(date, 'yyyy-MM-dd'); // Fix: Use format instead of toISOString
     const { data, error } = await supabase
       .from("daily_bus_expenses")
       .select("*")
@@ -118,7 +119,9 @@ export function DailyBusExpensesForm({ date, onSave, existingExpense, readOnly =
       .maybeSingle();
 
     if (data && !error) {
-      console.log('📊 Auto-loaded expenses for view:', data);
+      console.log(`📊 Fetching expenses for bus ${selectedBusId} on ${dateStr}`);
+      console.log('   Query result:', data);
+      console.log('   Fuel cost from DB:', data.fuel_cost);
       setExpenses({
         fuel_cost: data.fuel_cost || 0,
         diesel_price_per_liter: data.diesel_price_per_liter || 350,

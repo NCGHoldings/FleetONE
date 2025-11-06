@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, Check, Loader2, Camera, CheckCircle2, Info } from 'lucide-react';
+import { Upload, X, Check, Loader2, Camera, CheckCircle2, Info, CalendarIcon, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -13,64 +13,13 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { mapOCRExpensesToDB } from '@/lib/ocr-expense-mapper';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
-/**
- * Robust date parser for OCR dates
- * Handles formats like: 25/10/08, 25-10-08, 08/10/25
- * Returns YYYY-MM-DD format
- */
-const parseOcrDate = (dateStr: string): string => {
-  if (!dateStr) return new Date().toISOString().split('T')[0];
-  
-  // Clean the input
-  const cleaned = dateStr.trim().replace(/\s+/g, '');
-  const parts = cleaned.split(/[/-]/);
-  
-  if (parts.length !== 3) return new Date().toISOString().split('T')[0];
-  
-  let [first, second, third] = parts.map(p => parseInt(p, 10));
-  
-  // Detect format: if first > 12, it's day-first (DD/MM/YY or DD/MM/YYYY)
-  // if third > 31, it's year-last (MM/DD/YYYY or DD/MM/YYYY)
-  let day: number, month: number, year: number;
-  
-  if (third > 31) {
-    // Format: MM/DD/YYYY or DD/MM/YYYY
-    year = third;
-    if (first > 12) {
-      // DD/MM/YYYY
-      day = first;
-      month = second;
-    } else {
-      // MM/DD/YYYY (assume DD/MM if ambiguous since sheets use DD/MM)
-      day = first;
-      month = second;
-    }
-  } else {
-    // Format: DD/MM/YY or YY/MM/DD
-    if (first > 31) {
-      // YY/MM/DD (unlikely but handle it)
-      year = first > 99 ? first : 2000 + first;
-      month = second;
-      day = third;
-    } else {
-      // DD/MM/YY (most common for trip sheets)
-      day = first;
-      month = second;
-      year = third > 99 ? third : 2000 + third;
-    }
-  }
-  
-  // Validate
-  if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
-    console.warn(`Invalid date parts: ${day}/${month}/${year} from "${dateStr}"`);
-    return new Date().toISOString().split('T')[0];
-  }
-  
-  const normalized = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  console.log(`📅 Parsed OCR date: "${dateStr}" -> ${normalized}`);
-  return normalized;
-};
+// Note: parseOcrDate function removed - using manual date selection instead
 
 interface OCRImageUploadProps {
   selectedDate: Date;
@@ -101,6 +50,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
   const [extractedData, setExtractedData] = useState<ExtractedMultiTripData[]>([]);
   const [processingStep, setProcessingStep] = useState<string>("");
   const [showGuide, setShowGuide] = useState(true);
+  const [manualDate, setManualDate] = useState<Date>(selectedDate); // Manual date selection
   const isMobile = useIsMobile();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -201,9 +151,9 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
 
   const applyMultiTripData = async (data: ExtractedMultiTripData & { mapped_expenses: import('@/lib/ocr-expense-mapper').DBExpenseFields }) => {
     try {
-      // 1. Parse date using robust parser
-      const tripDate = parseOcrDate(data.date);
-      console.log(`🔄 Processing OCR data for date: ${data.date} -> ${tripDate}`);
+      // 1. Use manually selected date (ignore OCR date)
+      const tripDate = format(manualDate, 'yyyy-MM-dd');
+      console.log(`🔄 Processing OCR data - Sheet date: ${data.date} | Saving to: ${tripDate}`);
 
       // 2. FLEXIBLE BUS NUMBER MATCHING - try exact match first, then alternative formats
       let busQuery = supabase
@@ -363,7 +313,8 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
 
       const mappedExpenses = data.mapped_expenses;
       console.log('📥 RECEIVED DATA FOR UPSERT:');
-      console.log('  Bus:', busData.bus_no, '| Date:', tripDate);
+      console.log('  Bus:', busData.bus_no, '| Manually Selected Date:', tripDate);
+      console.log('  OCR Sheet Date:', data.date);
       console.log('  data.mapped_expenses:', mappedExpenses);
       console.log('  Breakdown:', Object.entries(mappedExpenses)
         .filter(([_, v]) => v > 0)
@@ -482,8 +433,8 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         mapped_expenses: data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses)
       };
       await applyMultiTripData(dataWithExpenses);
-      // Keep track of last extracted date using robust parser
-      lastExtractedDate = parseOcrDate(data.date);
+      // Use manually selected date
+      lastExtractedDate = format(manualDate, 'yyyy-MM-dd');
     }
     
     onDataExtracted({
@@ -753,6 +704,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
             <OCRExtractedDataCard
               key={data.id}
               data={data}
+              actualSaveDate={format(manualDate, 'yyyy-MM-dd')}
               onApply={applyMultiTripData}
               onDiscard={() => handleDiscard(index)}
               onView={handleView}
