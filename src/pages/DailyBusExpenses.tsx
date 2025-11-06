@@ -139,47 +139,17 @@ export default function DailyBusExpenses() {
           ) : (
             <div className="grid gap-4">
               {displayedExpenses.map((expense) => (
-                <Card key={expense.id}>
-                  <CardContent className="p-4">
+                <Card key={expense.id} className="overflow-hidden">
+                  <CardHeader className="bg-muted/50 pb-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="font-semibold text-lg">{expense.buses.bus_no}</div>
-                        <div className="grid grid-cols-4 gap-4 mt-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Fuel:</span>{" "}
-                            <span className="font-medium">Rs. {expense.fuel_cost?.toLocaleString()}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Food:</span>{" "}
-                            <span className="font-medium">Rs. {expense.food?.toLocaleString()}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Parking:</span>{" "}
-                            <span className="font-medium">Rs. {expense.parking?.toLocaleString()}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Other:</span>{" "}
-                            <span className="font-medium">
-                              Rs. {(
-                                (expense.repair || 0) +
-                                (expense.tyre_tube || 0) +
-                                (expense.police || 0) +
-                                (expense.highway_charges || 0) +
-                                (expense.other || 0)
-                              ).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                        {expense.notes && (
-                          <div className="text-sm text-muted-foreground mt-2">
-                            <span className="font-medium">Notes:</span> {expense.notes}
-                          </div>
-                        )}
+                      <div>
+                        <CardTitle className="text-xl">{expense.buses.bus_no}</CardTitle>
+                        <CardDescription>{format(date, "EEEE, MMMM d, yyyy")}</CardDescription>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="text-sm text-muted-foreground">Total</div>
-                          <div className="text-xl font-bold text-primary">
+                          <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Expenses</div>
+                          <div className="text-2xl font-bold text-primary">
                             Rs. {(
                               (expense.fuel_cost || 0) +
                               (expense.repair || 0) +
@@ -193,29 +163,146 @@ export default function DailyBusExpenses() {
                             ).toLocaleString()}
                           </div>
                         </div>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Expense Record?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete the expense record for {expense.buses.bus_no} on {format(date, "PPP")}.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => expense.id && deleteExpense(expense.id)}>
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        {!isViewOnly && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="hover:bg-destructive/10 hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Expense Record?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete the expense record for {expense.buses.bus_no} on {format(date, "PPP")}.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => expense.id && deleteExpense(expense.id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </div>
+                  </CardHeader>
+                  
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {/* Fuel Cost */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg">⛽</span>
+                          </div>
+                          <span className="font-medium">Fuel Cost</span>
+                        </div>
+                        <span className="font-bold text-lg">Rs. {(expense.fuel_cost || 0).toLocaleString()}</span>
+                      </div>
+
+                      {/* Repair */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg">🔧</span>
+                          </div>
+                          <span className="font-medium">Repair</span>
+                        </div>
+                        <span className="font-bold text-lg">Rs. {(expense.repair || 0).toLocaleString()}</span>
+                      </div>
+
+                      {/* Tyre/Tube */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg">🛞</span>
+                          </div>
+                          <span className="font-medium">Tyre/Tube</span>
+                        </div>
+                        <span className="font-bold text-lg">Rs. {(expense.tyre_tube || 0).toLocaleString()}</span>
+                      </div>
+
+                      {/* Salary */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg">💰</span>
+                          </div>
+                          <span className="font-medium">Salary</span>
+                        </div>
+                        <span className="font-bold text-lg">Rs. {(expense.salary || 0).toLocaleString()}</span>
+                      </div>
+
+                      {/* Police */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg">🚔</span>
+                          </div>
+                          <span className="font-medium">Police</span>
+                        </div>
+                        <span className="font-bold text-lg">Rs. {(expense.police || 0).toLocaleString()}</span>
+                      </div>
+
+                      {/* Food */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg">🍽️</span>
+                          </div>
+                          <span className="font-medium">Food</span>
+                        </div>
+                        <span className="font-bold text-lg">Rs. {(expense.food || 0).toLocaleString()}</span>
+                      </div>
+
+                      {/* Parking */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg">🅿️</span>
+                          </div>
+                          <span className="font-medium">Parking</span>
+                        </div>
+                        <span className="font-bold text-lg">Rs. {(expense.parking || 0).toLocaleString()}</span>
+                      </div>
+
+                      {/* Highway Charges */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg">🛣️</span>
+                          </div>
+                          <span className="font-medium">Highway Charges</span>
+                        </div>
+                        <span className="font-bold text-lg">Rs. {(expense.highway_charges || 0).toLocaleString()}</span>
+                      </div>
+
+                      {/* Other */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg">📝</span>
+                          </div>
+                          <span className="font-medium">Other</span>
+                        </div>
+                        <span className="font-bold text-lg">Rs. {(expense.other || 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {expense.notes && (
+                      <div className="mt-4 p-3 rounded-lg bg-muted/30 border-l-4 border-primary">
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">📌</span>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm text-muted-foreground mb-1">Notes</div>
+                            <p className="text-sm">{expense.notes}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
