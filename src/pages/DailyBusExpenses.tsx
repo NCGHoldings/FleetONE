@@ -40,7 +40,11 @@ import {
   Droplets,
   ChevronDown,
   ChevronUp,
-  Waves
+  Waves,
+  LayoutGrid,
+  Table as TableIcon,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import { format } from "date-fns";
 import { DailyBusExpensesForm } from "@/components/trips/DailyBusExpensesForm";
@@ -49,12 +53,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExpensesTableView } from "@/components/trips/ExpensesTableView";
 
 export default function DailyBusExpenses() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [date, setDate] = useState<Date>(new Date());
-  const { expenses, loading, saveExpense, deleteExpense } = useDailyBusExpenses(date);
+  const { expenses, loading, saveExpense, deleteExpense, refetch } = useDailyBusExpenses(date);
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [expandAll, setExpandAll] = useState(false);
   
   // Check if we're in view-only mode from OCR
   const queryDate = searchParams.get('date');
@@ -76,6 +83,11 @@ export default function DailyBusExpenses() {
     ? expenses.filter(exp => exp.bus_id === queryBusId)
     : expenses;
 
+  // Calculate summary statistics
+  const totalExpenses = displayedExpenses.reduce((sum, exp) => sum + ((exp as any).total_daily_expenses || 0), 0);
+  const busCount = displayedExpenses.length;
+  const avgExpense = busCount > 0 ? totalExpenses / busCount : 0;
+
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
@@ -89,7 +101,7 @@ export default function DailyBusExpenses() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           
-          <div className="flex-1 flex items-center justify-between">
+          <div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold">Daily Bus Operating Expenses</h1>
               <p className="text-muted-foreground mt-1">
@@ -97,24 +109,96 @@ export default function DailyBusExpenses() {
               </p>
             </div>
 
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(date, "PPP")}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => d && setDate(d)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(date, "PPP")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(d) => d && setDate(d)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {!isViewOnly && (
+                <>
+                  <div className="flex gap-2 border-l pl-2">
+                    <Button
+                      variant={viewMode === "table" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setViewMode("table")}
+                    >
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Table
+                    </Button>
+                    <Button
+                      variant={viewMode === "cards" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setViewMode("cards")}
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-2" />
+                      Cards
+                    </Button>
+                  </div>
+
+                  {viewMode === "cards" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setExpandAll(!expandAll)}
+                    >
+                      {expandAll ? <Minimize2 className="h-4 w-4 mr-2" /> : <Maximize2 className="h-4 w-4 mr-2" />}
+                      {expandAll ? "Collapse All" : "Expand All"}
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Summary Statistics */}
+        {!isViewOnly && displayedExpenses.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Total Buses</CardDescription>
+                <CardTitle className="text-3xl">{busCount}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Total Expenses</CardDescription>
+                <CardTitle className="text-3xl">
+                  {new Intl.NumberFormat('en-LK', {
+                    style: 'currency',
+                    currency: 'LKR',
+                    minimumFractionDigits: 0,
+                  }).format(totalExpenses)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Average per Bus</CardDescription>
+                <CardTitle className="text-3xl">
+                  {new Intl.NumberFormat('en-LK', {
+                    style: 'currency',
+                    currency: 'LKR',
+                    minimumFractionDigits: 0,
+                  }).format(avgExpense)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+        )}
 
         {isViewOnly && (
           <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
@@ -159,6 +243,16 @@ export default function DailyBusExpenses() {
               {isViewOnly 
                 ? "No OCR expenses found for this bus/date. Please check if expenses were saved correctly."
                 : "No expenses recorded for this date"}
+            </Card>
+          ) : viewMode === "table" && !isViewOnly ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Expenses Overview</CardTitle>
+                <CardDescription>Click the eye icon to view detailed breakdown</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ExpensesTableView expenses={displayedExpenses} onRefresh={refetch} />
+              </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4">
@@ -219,6 +313,7 @@ export default function DailyBusExpenses() {
                         <ExpenseSection
                           title="Operational Expenses"
                           color="blue"
+                          isExpanded={expandAll}
                           expenses={[
                             { icon: Fuel, label: "Fuel Cost", value: expense.fuel_cost },
                             { icon: ParkingCircle, label: "Parking", value: expense.parking },
@@ -230,6 +325,7 @@ export default function DailyBusExpenses() {
                         <ExpenseSection
                           title="Staff Expenses"
                           color="green"
+                          isExpanded={expandAll}
                           expenses={[
                             { icon: CircleDollarSign, label: "Salary", value: expense.salary },
                             { icon: Utensils, label: "Food", value: expense.food },
@@ -242,6 +338,7 @@ export default function DailyBusExpenses() {
                         <ExpenseSection
                           title="Maintenance"
                           color="orange"
+                          isExpanded={expandAll}
                           expenses={[
                             { icon: Wrench, label: "Repair", value: expense.repair },
                             { icon: CircleDollarSign, label: "Tyre/Tube", value: expense.tyre_tube },
@@ -253,6 +350,7 @@ export default function DailyBusExpenses() {
                         <ExpenseSection
                           title="Administrative"
                           color="purple"
+                          isExpanded={expandAll}
                           expenses={[
                             { icon: ShieldCheck, label: "Police", value: expense.police },
                             { icon: FileCheck, label: "Emission/Fitness", value: expense.emission_fitness },
@@ -268,6 +366,7 @@ export default function DailyBusExpenses() {
                         <ExpenseSection
                           title="Other Expenses"
                           color="gray"
+                          isExpanded={expandAll}
                           expenses={[
                             { icon: AlertCircle, label: "Accident Compensation", value: expense.accident_compensation },
                             { icon: Building, label: "Vehicle Hire", value: expense.vehicle_hire },
@@ -281,6 +380,7 @@ export default function DailyBusExpenses() {
                         <ExpenseSection
                           title="Operational Expenses"
                           color="blue"
+                          isExpanded={true}
                           expenses={[
                             { icon: Fuel, label: "Fuel Cost", value: expense.fuel_cost },
                             { icon: ParkingCircle, label: "Parking", value: expense.parking },
@@ -293,6 +393,7 @@ export default function DailyBusExpenses() {
                         <ExpenseSection
                           title="Staff Expenses"
                           color="green"
+                          isExpanded={true}
                           expenses={[
                             { icon: CircleDollarSign, label: "Salary", value: expense.salary },
                             { icon: Utensils, label: "Food", value: expense.food },
@@ -306,6 +407,7 @@ export default function DailyBusExpenses() {
                         <ExpenseSection
                           title="Maintenance"
                           color="orange"
+                          isExpanded={true}
                           expenses={[
                             { icon: Wrench, label: "Repair", value: expense.repair },
                             { icon: CircleDollarSign, label: "Tyre/Tube", value: expense.tyre_tube },
@@ -318,6 +420,7 @@ export default function DailyBusExpenses() {
                         <ExpenseSection
                           title="Administrative"
                           color="purple"
+                          isExpanded={true}
                           expenses={[
                             { icon: ShieldCheck, label: "Police", value: expense.police },
                             { icon: FileCheck, label: "Emission/Fitness", value: expense.emission_fitness },
@@ -357,6 +460,7 @@ export default function DailyBusExpenses() {
 interface ExpenseSectionProps {
   title: string;
   color: "blue" | "green" | "orange" | "purple" | "gray";
+  isExpanded: boolean;
   expenses: Array<{
     icon: React.ElementType;
     label: string;
@@ -364,9 +468,14 @@ interface ExpenseSectionProps {
   }>;
 }
 
-function ExpenseSection({ title, color, expenses }: ExpenseSectionProps) {
-  const [isOpen, setIsOpen] = useState(true);
+function ExpenseSection({ title, color, isExpanded, expenses }: ExpenseSectionProps) {
+  const [isOpen, setIsOpen] = useState(false);
   
+  // Sync with parent expandAll state
+  useEffect(() => {
+    setIsOpen(isExpanded);
+  }, [isExpanded]);
+
   const colorClasses = {
     blue: {
       badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
@@ -408,39 +517,27 @@ function ExpenseSection({ title, color, expenses }: ExpenseSectionProps) {
               Rs. {sectionTotal.toLocaleString()}
             </Badge>
           </div>
-          {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          <div className="flex items-center gap-2">
+            {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </div>
         </div>
       </CollapsibleTrigger>
       
       <CollapsibleContent>
-        <div className="p-4 pt-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {expenses.map((expense, idx) => {
-              const Icon = expense.icon;
-              const value = expense.value || 0;
-              
-              return (
-                <div
-                  key={idx}
-                  className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
-                    value > 0 
-                      ? 'bg-card hover:shadow-md' 
-                      : 'bg-muted/30 opacity-60'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg ${colorClasses[color].icon} flex items-center justify-center`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span className="font-medium text-sm">{expense.label}</span>
+        <div className="p-4 pt-0 space-y-2">
+          {expenses.map((expense) => (
+            expense.value && expense.value > 0 ? (
+              <div key={expense.label} className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-md ${colorClasses[color].icon}`}>
+                    <expense.icon className="h-4 w-4" />
                   </div>
-                  <span className={`font-bold ${value > 0 ? 'text-lg' : 'text-base text-muted-foreground'}`}>
-                    Rs. {value.toLocaleString()}
-                  </span>
+                  <span className="font-medium">{expense.label}</span>
                 </div>
-              );
-            })}
-          </div>
+                <span className="font-semibold tabular-nums">Rs. {expense.value.toLocaleString()}</span>
+              </div>
+            ) : null
+          ))}
         </div>
       </CollapsibleContent>
     </Collapsible>
