@@ -83,6 +83,14 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
     }));
   };
 
+  const handleBusNumberChange = (value: string) => {
+    setHasEdits(true);
+    setEditedData(prev => ({
+      ...prev,
+      busNumber: value
+    }));
+  };
+
   const handleTripIncomeChange = (tripIndex: number, field: keyof SingleTrip['income'], value: number) => {
     setHasEdits(true);
     setEditedData(prev => ({
@@ -194,7 +202,20 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
               <div className="flex-1">
                 <p className="text-sm font-medium text-muted-foreground">{data.fileName}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-2xl font-bold">🚌 {data.busNumber}</span>
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">🚌</span>
+                      <Input
+                        type="text"
+                        value={editedData.busNumber}
+                        onChange={(e) => handleBusNumberChange(e.target.value.toUpperCase())}
+                        className="h-8 w-32 text-lg font-bold"
+                        placeholder="Bus Number"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-2xl font-bold">🚌 {editedData.busNumber}</span>
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">
                       Sheet: <span className="line-through">{data.date}</span>
