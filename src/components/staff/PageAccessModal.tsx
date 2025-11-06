@@ -31,6 +31,8 @@ export function PageAccessModal({ open, onOpenChange, userId, userName }: PageAc
     { key: 'operations', label: 'Operations', items: PAGES.operations },
     { key: 'business', label: 'Business', items: PAGES.business },
     { key: 'yutong', label: 'Yutong Sales', items: PAGES.yutong },
+    { key: 'governance', label: 'Governance', items: PAGES.governance },
+    { key: 'nsp', label: 'NSP', items: PAGES.nsp },
   ]), []);
 
   const toggleAll = (items: PageItem[], value: boolean) => {
