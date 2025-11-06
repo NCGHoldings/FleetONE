@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Trash2, Eye } from "lucide-react";
-import { format } from "date-fns";
-import { DailyBusExpensesForm } from "@/components/trips/DailyBusExpensesForm";
-import { useDailyBusExpenses } from "@/hooks/useDailyBusExpenses";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,9 +11,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarIcon, Trash2, Eye, ArrowLeft } from "lucide-react";
+import { format } from "date-fns";
+import { DailyBusExpensesForm } from "@/components/trips/DailyBusExpensesForm";
+import { useDailyBusExpenses } from "@/hooks/useDailyBusExpenses";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DailyBusExpenses() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [date, setDate] = useState<Date>(new Date());
   const { expenses, loading, saveExpense, deleteExpense } = useDailyBusExpenses(date);
   
@@ -50,30 +51,41 @@ export default function DailyBusExpenses() {
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Daily Bus Operating Expenses</h1>
-            <p className="text-muted-foreground mt-1">
-              Track expenses per bus per day - fuel, repairs, and operating costs
-            </p>
-          </div>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="hover:bg-muted"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          
+          <div className="flex-1 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Daily Bus Operating Expenses</h1>
+              <p className="text-muted-foreground mt-1">
+                Track expenses per bus per day - fuel, repairs, and operating costs
+              </p>
+            </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(date, "PPP")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(d) => d && setDate(d)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(date, "PPP")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => d && setDate(d)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {isViewOnly && (
