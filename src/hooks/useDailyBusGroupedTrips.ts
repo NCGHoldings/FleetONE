@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export interface Trip {
   id: string;
@@ -105,7 +106,9 @@ export function useDailyBusGroupedTrips(selectedDate: Date) {
   const fetchGroupedData = async () => {
     try {
       setLoading(true);
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      console.log('📅 Querying Daily Trips for date:', dateStr);
 
       // Fetch trips for the date
       const { data: tripsData, error: tripsError } = await supabase
@@ -140,6 +143,9 @@ export function useDailyBusGroupedTrips(selectedDate: Date) {
         .eq('expense_date', dateStr);
 
       if (expensesError) throw expensesError;
+      
+      console.log('📊 Found trips:', tripsData?.length || 0);
+      console.log('💰 Found expenses:', expensesData?.length || 0);
 
       // Group trips by bus_id
       const groupedByBus = new Map<string, any[]>();
@@ -252,6 +258,13 @@ export function useDailyBusGroupedTrips(selectedDate: Date) {
       fleet.fleet_avg_efficiency = efficiencies.length > 0 
         ? efficiencies.reduce((sum, e) => sum + e, 0) / efficiencies.length 
         : 0;
+
+      console.log('✅ Fleet Summary:', {
+        buses: summaries.length,
+        totalRevenue: fleet.total_revenue,
+        totalExpenses: fleet.total_expenses,
+        profit: fleet.fleet_profit
+      });
 
       setBusSummaries(summaries);
       setFleetSummary(fleet);

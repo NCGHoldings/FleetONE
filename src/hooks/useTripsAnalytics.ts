@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfDay, endOfDay, subDays, differenceInDays } from 'date-fns';
+import { startOfDay, endOfDay, subDays, differenceInDays, format } from 'date-fns';
 import { groupBy, sumBy, meanBy, maxBy, minBy, orderBy } from 'lodash';
 
 export interface AnalyticsFilters {
@@ -84,8 +84,8 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
       const { data: trips, error } = await supabase
         .from('daily_trips')
         .select('*')
-        .gte('trip_date', filters.startDate.toISOString().split('T')[0])
-        .lte('trip_date', filters.endDate.toISOString().split('T')[0])
+        .gte('trip_date', format(filters.startDate, 'yyyy-MM-dd'))
+        .lte('trip_date', format(filters.endDate, 'yyyy-MM-dd'))
         .order('trip_date', { ascending: false });
 
       if (error) throw error;
