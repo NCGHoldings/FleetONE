@@ -91,26 +91,10 @@ export default function DailyBusExpenses() {
         )}
 
         {!isViewOnly && (
-          <>
-            <Card className="bg-primary/5 border-primary/20">
-              <CardHeader>
-                <CardTitle>💡 How It Works</CardTitle>
-                <CardDescription>
-                  Enter expenses once per bus per day. The system will automatically distribute costs across all trips for accurate profitability analysis.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div>✅ <strong>Revenue:</strong> Track per trip (entered in Quick Entry or Add Trip)</div>
-                <div>✅ <strong>Expenses:</strong> Track per bus per day (enter here)</div>
-                <div>✅ <strong>Analytics:</strong> System calculates profit per trip using distance-weighted allocation</div>
-              </CardContent>
-            </Card>
-
-            <DailyBusExpensesForm
-              date={date}
-              onSave={saveExpense}
-            />
-          </>
+          <DailyBusExpensesForm
+            date={date}
+            onSave={saveExpense}
+          />
         )}
 
         {isViewOnly && queryBusId && (
