@@ -12,6 +12,17 @@ interface RevenueTrendChartProps {
 }
 
 export default function RevenueTrendChart({ data }: RevenueTrendChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Revenue vs Expenses Trend</h3>
+        <div className="flex items-center justify-center h-[350px]">
+          <p className="text-muted-foreground text-sm">No data available for the selected period</p>
+        </div>
+      </Card>
+    );
+  }
+
   const chartData = data.map(d => ({
     ...d,
     date: format(new Date(d.date), 'MMM dd')

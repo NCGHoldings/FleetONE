@@ -8,6 +8,17 @@ interface RoutePerformanceChartProps {
 }
 
 export default function RoutePerformanceChart({ data, limit = 10 }: RoutePerformanceChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Top {limit} Routes by Performance</h3>
+        <div className="flex items-center justify-center h-[400px]">
+          <p className="text-muted-foreground text-sm">No route data available</p>
+        </div>
+      </Card>
+    );
+  }
+
   const topRoutes = data.slice(0, limit);
 
   return (

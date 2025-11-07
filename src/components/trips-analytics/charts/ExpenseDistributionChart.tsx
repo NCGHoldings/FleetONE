@@ -4,19 +4,46 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 interface ExpenseDistributionChartProps {
   data: {
     fuel: number;
+    toll: number;
+    repair: number;
+    driverSalary: number;
+    conductorSalary: number;
     other: number;
   };
 }
 
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))'];
+const COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(var(--chart-6))'
+];
 
 export default function ExpenseDistributionChart({ data }: ExpenseDistributionChartProps) {
   const chartData = [
-    { name: 'Fuel Cost', value: data.fuel },
-    { name: 'Other Expenses', value: data.other }
-  ];
+    { name: 'Fuel', value: data.fuel },
+    { name: 'Toll', value: data.toll },
+    { name: 'Repairs', value: data.repair },
+    { name: 'Driver Salaries', value: data.driverSalary },
+    { name: 'Conductor Salaries', value: data.conductorSalary },
+    { name: 'Other', value: data.other }
+  ].filter(item => item.value > 0);
 
-  const total = data.fuel + data.other;
+  const total = data.fuel + data.toll + data.repair + data.driverSalary + data.conductorSalary + data.other;
+
+  if (total === 0 || chartData.length === 0) {
+    return (
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Expense Breakdown</h3>
+        <div className="flex flex-col items-center justify-center h-[350px] text-center">
+          <p className="text-muted-foreground text-sm">No expense data available</p>
+          <p className="text-muted-foreground text-xs mt-2">Add expenses in Daily Bus Expenses to see the breakdown</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6">
@@ -47,17 +74,18 @@ export default function ExpenseDistributionChart({ data }: ExpenseDistributionCh
           />
         </PieChart>
       </ResponsiveContainer>
-      <div className="mt-4 grid grid-cols-2 gap-4 text-center">
-        <div>
-          <p className="text-sm text-muted-foreground">Fuel Cost</p>
-          <p className="text-2xl font-bold text-foreground">₨{data.fuel.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground">{((data.fuel / total) * 100).toFixed(1)}%</p>
-        </div>
-        <div>
-          <p className="text-sm text-muted-foreground">Other Expenses</p>
-          <p className="text-2xl font-bold text-foreground">₨{data.other.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground">{((data.other / total) * 100).toFixed(1)}%</p>
-        </div>
+      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+        {chartData.map((item, index) => (
+          <div key={item.name}>
+            <p className="text-xs text-muted-foreground">{item.name}</p>
+            <p className="text-lg font-bold text-foreground">₨{item.value.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">{((item.value / total) * 100).toFixed(1)}%</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 pt-4 border-t text-center">
+        <p className="text-sm text-muted-foreground">Total Expenses</p>
+        <p className="text-2xl font-bold text-foreground">₨{total.toLocaleString()}</p>
       </div>
     </Card>
   );

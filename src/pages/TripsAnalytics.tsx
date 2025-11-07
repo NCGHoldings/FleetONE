@@ -13,6 +13,7 @@ import EfficiencyChart from '@/components/trips-analytics/charts/EfficiencyChart
 import DriverComparisonChart from '@/components/trips-analytics/charts/DriverComparisonChart';
 import RoutePerformanceChart from '@/components/trips-analytics/charts/RoutePerformanceChart';
 import ExpenseDistributionChart from '@/components/trips-analytics/charts/ExpenseDistributionChart';
+import DataQualityAlert from '@/components/trips-analytics/DataQualityAlert';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -72,6 +73,12 @@ export default function TripsAnalytics() {
 
       {/* Filter Panel */}
       <FilterPanel onFilterChange={handleFilterChange} />
+
+      {/* Data Quality Alert */}
+      <DataQualityAlert 
+        tripsWithExpenses={analytics.tripsWithExpenses || 0}
+        totalTrips={analytics.overview.totalTrips}
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

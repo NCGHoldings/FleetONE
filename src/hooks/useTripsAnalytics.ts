@@ -124,6 +124,52 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
 }
 
 function processAnalyticsData(trips: TripData[], expenses: any[], filters: AnalyticsFilters) {
+  // Handle empty data
+  if (!trips || trips.length === 0) {
+    return {
+      overview: {
+        totalTrips: 0,
+        totalDistance: 0,
+        totalIncome: 0,
+        totalFuelCost: 0,
+        totalOtherExpenses: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        avgEfficiency: 0,
+        activeBuses: 0,
+        profitMargin: 0,
+        avgIncomePerTrip: 0,
+        avgDistancePerTrip: 0,
+        completionRate: 0,
+        incomeChange: 0,
+        profitChange: 0,
+        tripsChange: 0
+      },
+      driverStats: [],
+      routeStats: [],
+      busStats: [],
+      insights: [],
+      dailyTrends: [],
+      tripsByHour: {},
+      expenseBreakdown: {
+        fuel: 0,
+        toll: 0,
+        repair: 0,
+        driverSalary: 0,
+        conductorSalary: 0,
+        other: 0,
+        fuelPercentage: 0,
+        tollPercentage: 0,
+        repairPercentage: 0,
+        driverSalaryPercentage: 0,
+        conductorSalaryPercentage: 0,
+        otherPercentage: 0
+      },
+      rawTrips: [],
+      tripsWithExpenses: 0
+    };
+  }
+
   // Create expense map by bus_id and date for quick lookup
   const expenseMap = new Map();
   expenses.forEach(exp => {
@@ -298,6 +344,12 @@ function processAnalyticsData(trips: TripData[], expenses: any[], filters: Analy
     };
   });
 
+  // Calculate trips with expense data for data quality indicator
+  const tripsWithExpenses = trips.filter(t => {
+    const key = `${t.bus_id}_${t.trip_date}`;
+    return expenseMap.has(key);
+  }).length;
+
   return {
     overview: {
       totalTrips,
@@ -337,7 +389,8 @@ function processAnalyticsData(trips: TripData[], expenses: any[], filters: Analy
       conductorSalaryPercentage: totalExpenses > 0 ? (totalConductorSalary / totalExpenses) * 100 : 0,
       otherPercentage: totalExpenses > 0 ? (totalOtherExpenses / totalExpenses) * 100 : 0
     },
-    rawTrips: trips
+    rawTrips: trips,
+    tripsWithExpenses
   };
 }
 

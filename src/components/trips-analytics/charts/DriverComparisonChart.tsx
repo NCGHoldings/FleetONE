@@ -8,6 +8,17 @@ interface DriverComparisonChartProps {
 }
 
 export default function DriverComparisonChart({ data, limit = 10 }: DriverComparisonChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Top {limit} Drivers by Net Income</h3>
+        <div className="flex items-center justify-center h-[400px]">
+          <p className="text-muted-foreground text-sm">No driver data available</p>
+        </div>
+      </Card>
+    );
+  }
+
   const topDrivers = data.slice(0, limit);
 
   return (

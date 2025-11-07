@@ -10,6 +10,17 @@ interface EfficiencyChartProps {
 }
 
 export default function EfficiencyChart({ data }: EfficiencyChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Fuel Efficiency Trend (km/L)</h3>
+        <div className="flex items-center justify-center h-[350px]">
+          <p className="text-muted-foreground text-sm">No efficiency data available</p>
+        </div>
+      </Card>
+    );
+  }
+
   const chartData = data.map(d => ({
     ...d,
     date: format(new Date(d.date), 'MMM dd')
