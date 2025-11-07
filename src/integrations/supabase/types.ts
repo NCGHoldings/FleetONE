@@ -2835,6 +2835,7 @@ export type Database = {
           end_location: string
           estimated_duration_minutes: number | null
           fare_amount: number | null
+          gl_code: string | null
           id: string
           is_active: boolean | null
           route_name: string
@@ -2849,6 +2850,7 @@ export type Database = {
           end_location: string
           estimated_duration_minutes?: number | null
           fare_amount?: number | null
+          gl_code?: string | null
           id?: string
           is_active?: boolean | null
           route_name: string
@@ -2863,6 +2865,7 @@ export type Database = {
           end_location?: string
           estimated_duration_minutes?: number | null
           fare_amount?: number | null
+          gl_code?: string | null
           id?: string
           is_active?: boolean | null
           route_name?: string

@@ -9,6 +9,7 @@ export interface Trip {
   trip_date: string;
   route_id: string;
   route_name?: string;
+  route_gl_code?: string;
   driver_name?: string;
   conductor_name?: string;
   income: number;
@@ -147,7 +148,7 @@ export function useDailyBusGroupedTrips(
           end_time,
           notes,
           buses:bus_id(bus_no),
-          routes:route_id(route_name)
+          routes:route_id(route_name, route_no, gl_code)
         `)
         .order('bus_id')
         .order('trip_date')
@@ -199,6 +200,7 @@ export function useDailyBusGroupedTrips(
           trip_date: trip.trip_date,
           route_id: trip.route_id,
           route_name: trip.routes?.route_name || 'N/A',
+          route_gl_code: trip.routes?.gl_code || trip.routes?.route_no || trip.route_id.substring(0, 8),
           driver_name: notes.driver || 'N/A',
           conductor_name: notes.conductor || 'N/A',
           income: trip.income || 0,

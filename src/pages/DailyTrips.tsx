@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
@@ -15,6 +15,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportFromAllocationModal } from "@/components/trips/ImportFromAllocationModal";
 import { GLExportModal } from "@/components/trips/GLExportModal";
+import { RouteGLCodesAdmin } from "@/components/trips/RouteGLCodesAdmin";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { DateRange } from "react-day-picker";
 
 export default function DailyTrips() {
@@ -26,6 +28,7 @@ export default function DailyTrips() {
   const [viewMode, setViewMode] = useState<"table" | "cards">(isMobile ? "cards" : "table");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showGLExportModal, setShowGLExportModal] = useState(false);
+  const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
   
   const { busSummaries, fleetSummary, loading, refetch } = useDailyBusGroupedTrips(
     dateMode === "single" ? selectedDate : null,
@@ -146,6 +149,15 @@ export default function DailyTrips() {
                 Export GL
               </Button>
 
+              <Button 
+                variant="outline"
+                onClick={() => setShowRouteGLAdmin(true)}
+                title="Manage Route GL Codes"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Route GL Codes
+              </Button>
+
               <Button onClick={() => navigate('/trips/quick-entry')}>
                 <Plus className="mr-2 h-4 w-4" />
                 Quick Entry
@@ -258,6 +270,17 @@ export default function DailyTrips() {
         selectedDate={selectedDate}
         dateRange={dateRange}
       />
+
+      <Sheet open={showRouteGLAdmin} onOpenChange={setShowRouteGLAdmin}>
+        <SheetContent side="right" className="w-full sm:max-w-[800px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Route GL Codes Management</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6">
+            <RouteGLCodesAdmin />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
