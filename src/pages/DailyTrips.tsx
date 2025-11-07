@@ -137,7 +137,8 @@ export default function DailyTrips() {
                 onClick={() => setShowImportModal(true)}
               >
                 <Upload className="mr-2 h-4 w-4" />
-                Import from Allocations
+                <span className="hidden sm:inline">Import from Allocations</span>
+                <span className="sm:hidden">Import</span>
               </Button>
 
               <Button 
@@ -146,21 +147,24 @@ export default function DailyTrips() {
                 disabled={!busSummaries.length}
               >
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
-                Export GL
+                <span className="hidden sm:inline">Export GL</span>
+                <span className="sm:hidden">GL</span>
               </Button>
 
               <Button 
                 variant="outline"
                 onClick={() => setShowRouteGLAdmin(true)}
-                title="Manage Route GL Codes"
+                className="bg-secondary/50"
               >
                 <Settings className="mr-2 h-4 w-4" />
-                Route GL Codes
+                <span className="hidden sm:inline">Route Codes</span>
+                <span className="sm:hidden">Codes</span>
               </Button>
 
               <Button onClick={() => navigate('/trips/quick-entry')}>
                 <Plus className="mr-2 h-4 w-4" />
-                Quick Entry
+                <span className="hidden sm:inline">Quick Entry</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             </div>
           </div>
