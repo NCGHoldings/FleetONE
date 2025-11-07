@@ -20,7 +20,7 @@ import {
   RefreshCw,
   Database
 } from "lucide-react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 
 interface ExcelColumn {
   excelColumn: string;

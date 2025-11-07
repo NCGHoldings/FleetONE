@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Upload, Download, FileSpreadsheet, CheckCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 
 interface RoutePermitImportProps {
   onImportComplete: () => void;

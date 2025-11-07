@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import { Upload, Download, FileSpreadsheet } from 'lucide-react';
 
 interface BulkImportModalProps {

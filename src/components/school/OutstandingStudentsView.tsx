@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 
 interface Student {
   id: string;
