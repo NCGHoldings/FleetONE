@@ -68,7 +68,8 @@ export function RouteGLCodesAdmin() {
   };
 
   const handleSave = async (routeId: string) => {
-    const value = editValue.trim().toUpperCase();
+    // Normalize: remove spaces and convert to uppercase
+    const value = editValue.trim().replace(/\s+/g, '').toUpperCase();
     
     // Validation
     if (value && (value.length > 20 || !/^[A-Z0-9\-]+$/.test(value))) {
@@ -89,7 +90,7 @@ export function RouteGLCodesAdmin() {
         r.id === routeId ? { ...r, gl_code: value || null } : r
       ));
       setEditingId(null);
-      toast.success('GL Code updated');
+      toast.success(`GL Code saved: ${value}`);
     } catch (error: any) {
       console.error('Error updating GL code:', error);
       toast.error('Failed to update GL code');
@@ -177,8 +178,8 @@ export function RouteGLCodesAdmin() {
                       <Input
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value.toUpperCase())}
-                        placeholder="e.g., COL-BAD"
-                        maxLength={20}
+                        placeholder="e.g., COL-BAD or COL - BAD"
+                        maxLength={25}
                         className="h-8 w-full"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleSave(route.id);
@@ -271,6 +272,7 @@ export function RouteGLCodesAdmin() {
           <p><strong>Guidelines:</strong></p>
           <ul className="list-disc list-inside space-y-1 ml-2">
             <li>Max 20 characters</li>
+            <li>Spaces will be automatically removed (COL - BAD → COL-BAD)</li>
             <li>Use uppercase letters, numbers, and hyphens only</li>
             <li>Keep codes short and meaningful (e.g., COL-BAD, KAN-GAL)</li>
             <li>Click "Apply" (✨) to use auto-suggested codes</li>
