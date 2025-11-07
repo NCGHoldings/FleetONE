@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Download, TrendingUp, DollarSign, Fuel, Bus, Users, Route, Calendar } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Download, TrendingUp, DollarSign, Fuel, Bus, Users, Route, Calendar, AlertCircle } from 'lucide-react';
 import { subDays } from 'date-fns';
 import { useTripsAnalytics } from '@/hooks/useTripsAnalytics';
 import KPICard from '@/components/trips-analytics/KPICard';
@@ -25,7 +26,7 @@ export default function TripsAnalytics() {
   });
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
-  const { data: analytics, isLoading } = useTripsAnalytics(dateRange);
+  const { data: analytics, isLoading, error } = useTripsAnalytics(dateRange);
 
   const handleFilterChange = (filters: any) => {
     setDateRange({
@@ -33,6 +34,20 @@ export default function TripsAnalytics() {
       endDate: filters.endDate
     });
   };
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Failed to Load Analytics</AlertTitle>
+          <AlertDescription>
+            {error.message || 'An error occurred while loading trip analytics data'}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -91,14 +91,17 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
 
       if (tripsError) throw tripsError;
 
-      // Fetch expenses data
-      const { data: expenses, error: expensesError } = await supabase
-        .from('daily_bus_expenses')
-        .select('*, buses(bus_number)')
-        .gte('expense_date', format(filters.startDate, 'yyyy-MM-dd'))
-        .lte('expense_date', format(filters.endDate, 'yyyy-MM-dd'));
+    // Fetch expenses data - remove buses join to avoid errors
+    const { data: expenses, error: expensesError } = await supabase
+      .from('daily_bus_expenses')
+      .select('*')
+      .gte('expense_date', format(filters.startDate, 'yyyy-MM-dd'))
+      .lte('expense_date', format(filters.endDate, 'yyyy-MM-dd'));
 
-      if (expensesError) throw expensesError;
+      // Don't throw on expense errors - continue with trips data only
+      if (expensesError) {
+        console.warn('Could not fetch expenses, continuing with trips data only:', expensesError);
+      }
 
       // Apply additional filters
       let filteredTrips = trips || [];
@@ -116,14 +119,19 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         filteredTrips = filteredTrips.filter(t => filters.buses!.includes(t.bus_id));
       }
 
-      return processAnalyticsData(filteredTrips, expenses || [], filters);
+      return processAnalyticsData(filteredTrips, expenses || [], filters, !!expensesError);
     },
     staleTime: 30000,
     refetchInterval: 60000,
   });
 }
 
-function processAnalyticsData(trips: TripData[], expenses: any[], filters: AnalyticsFilters) {
+function processAnalyticsData(
+  trips: TripData[], 
+  expenses: any[], 
+  filters: AnalyticsFilters,
+  expensesUnavailable: boolean = false
+) {
   // Handle empty data
   if (!trips || trips.length === 0) {
     return {
