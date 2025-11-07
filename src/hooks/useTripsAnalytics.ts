@@ -163,14 +163,14 @@ function processAnalyticsData(
         fuel: 0,
         toll: 0,
         repair: 0,
-        driverSalary: 0,
-        conductorSalary: 0,
+        salaries: 0,
+        permits: 0,
         other: 0,
         fuelPercentage: 0,
         tollPercentage: 0,
         repairPercentage: 0,
-        driverSalaryPercentage: 0,
-        conductorSalaryPercentage: 0,
+        salariesPercentage: 0,
+        permitsPercentage: 0,
         otherPercentage: 0
       },
       rawTrips: [],
@@ -199,15 +199,29 @@ function processAnalyticsData(
   const totalDistance = sumBy(trips, 'distance_km');
   const totalIncome = sumBy(trips, 'income');
   
-  // Calculate total expenses from daily_bus_expenses
+  // Calculate total expenses from daily_bus_expenses using correct column names
   const totalFuelCost = sumBy(expenses, 'fuel_cost') || 0;
-  const totalTollCost = sumBy(expenses, 'toll_cost') || 0;
-  const totalRepairCost = sumBy(expenses, 'repair_cost') || 0;
-  const totalDriverSalary = sumBy(expenses, 'driver_salary') || 0;
-  const totalConductorSalary = sumBy(expenses, 'conductor_salary') || 0;
-  const totalOtherExpenses = sumBy(expenses, 'other_expenses') || 0;
+  const totalTollCost = sumBy(expenses, 'highway_charges') || 0;
+  const totalRepairCost = (sumBy(expenses, 'repair') || 0) + (sumBy(expenses, 'tyre_tube') || 0);
+  const totalSalaries = sumBy(expenses, 'salary') || 0;
+  const totalPermitsLegal = (sumBy(expenses, 'permits_renewal') || 0) + 
+                           (sumBy(expenses, 'temporary_permit') || 0) + 
+                           (sumBy(expenses, 'legal_court') || 0) + 
+                           (sumBy(expenses, 'ntc') || 0) + 
+                           (sumBy(expenses, 'emission_fitness') || 0);
+  const totalOtherExpenses = (sumBy(expenses, 'other') || 0) + 
+                            (sumBy(expenses, 'food') || 0) + 
+                            (sumBy(expenses, 'parking') || 0) + 
+                            (sumBy(expenses, 'body_wash') || 0) + 
+                            (sumBy(expenses, 'runner') || 0) + 
+                            (sumBy(expenses, 'police') || 0) + 
+                            (sumBy(expenses, 'log_sheet') || 0) + 
+                            (sumBy(expenses, 'accident_compensation') || 0) + 
+                            (sumBy(expenses, 'staff_accommodation') || 0) + 
+                            (sumBy(expenses, 'vehicle_hire') || 0) + 
+                            (sumBy(expenses, 'short_misc') || 0);
   const totalExpenses = totalFuelCost + totalTollCost + totalRepairCost + 
-                       totalDriverSalary + totalConductorSalary + totalOtherExpenses;
+                       totalSalaries + totalPermitsLegal + totalOtherExpenses;
   
   const netProfit = totalIncome - totalExpenses;
   const avgEfficiency = meanBy(trips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0;
@@ -387,14 +401,14 @@ function processAnalyticsData(
       fuel: totalFuelCost,
       toll: totalTollCost,
       repair: totalRepairCost,
-      driverSalary: totalDriverSalary,
-      conductorSalary: totalConductorSalary,
+      salaries: totalSalaries,
+      permits: totalPermitsLegal,
       other: totalOtherExpenses,
       fuelPercentage: totalExpenses > 0 ? (totalFuelCost / totalExpenses) * 100 : 0,
       tollPercentage: totalExpenses > 0 ? (totalTollCost / totalExpenses) * 100 : 0,
       repairPercentage: totalExpenses > 0 ? (totalRepairCost / totalExpenses) * 100 : 0,
-      driverSalaryPercentage: totalExpenses > 0 ? (totalDriverSalary / totalExpenses) * 100 : 0,
-      conductorSalaryPercentage: totalExpenses > 0 ? (totalConductorSalary / totalExpenses) * 100 : 0,
+      salariesPercentage: totalExpenses > 0 ? (totalSalaries / totalExpenses) * 100 : 0,
+      permitsPercentage: totalExpenses > 0 ? (totalPermitsLegal / totalExpenses) * 100 : 0,
       otherPercentage: totalExpenses > 0 ? (totalOtherExpenses / totalExpenses) * 100 : 0
     },
     rawTrips: trips,

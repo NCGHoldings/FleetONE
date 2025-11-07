@@ -6,8 +6,8 @@ interface ExpenseDistributionChartProps {
     fuel: number;
     toll: number;
     repair: number;
-    driverSalary: number;
-    conductorSalary: number;
+    salaries: number;
+    permits: number;
     other: number;
   };
 }
@@ -24,14 +24,14 @@ const COLORS = [
 export default function ExpenseDistributionChart({ data }: ExpenseDistributionChartProps) {
   const chartData = [
     { name: 'Fuel', value: data.fuel },
-    { name: 'Toll', value: data.toll },
-    { name: 'Repairs', value: data.repair },
-    { name: 'Driver Salaries', value: data.driverSalary },
-    { name: 'Conductor Salaries', value: data.conductorSalary },
-    { name: 'Other', value: data.other }
+    { name: 'Toll/Highway', value: data.toll },
+    { name: 'Repairs & Tyres', value: data.repair },
+    { name: 'Salaries', value: data.salaries },
+    { name: 'Permits & Legal', value: data.permits },
+    { name: 'Other Expenses', value: data.other }
   ].filter(item => item.value > 0);
 
-  const total = data.fuel + data.toll + data.repair + data.driverSalary + data.conductorSalary + data.other;
+  const total = data.fuel + data.toll + data.repair + data.salaries + data.permits + data.other;
 
   if (total === 0 || chartData.length === 0) {
     return (
