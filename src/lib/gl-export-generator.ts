@@ -141,9 +141,44 @@ export function generateGLRows(options: GLExportOptions): GLRow[] {
 }
 
 export function exportToExcel(rows: GLRow[], date: Date): void {
-  const worksheetData = [
-    ['G/L Acct/BP Code', 'G/L Acct/BP Name', 'Debit', 'Credit', 'Ref. 1', 'SBU', 'Route', 'Bus'],
-    ...rows.map(row => [
+  const workbook = XLSX.utils.book_new();
+  const worksheet: XLSX.WorkSheet = {};
+  
+  // Define color palette for bus separators
+  const busColors = ['E3F2FD', 'E8F5E9', 'FFF9C4', 'FFE0B2', 'F3E5F5'];
+  const busColorMap = new Map<string, number>();
+  let busIndex = 0;
+  let currentBus = '';
+  
+  // Header row (row 0)
+  const headers = ['G/L Acct/BP Code', 'G/L Acct/BP Name', 'Debit', 'Credit', 'Ref. 1', 'SBU', 'Route', 'Bus'];
+  headers.forEach((header, colIdx) => {
+    const cellAddress = XLSX.utils.encode_cell({ r: 0, c: colIdx });
+    worksheet[cellAddress] = {
+      v: header,
+      t: 's',
+      s: {
+        font: { bold: true },
+        alignment: { horizontal: 'center' }
+      }
+    };
+  });
+  
+  // Data rows (starting from row 1)
+  rows.forEach((row, rowIdx) => {
+    const excelRow = rowIdx + 1; // +1 because header is row 0
+    const isFirstRowOfBus = row.bus !== currentBus;
+    
+    if (isFirstRowOfBus) {
+      // Track new bus and assign color
+      if (!busColorMap.has(row.bus)) {
+        busColorMap.set(row.bus, busIndex % busColors.length);
+        busIndex++;
+      }
+      currentBus = row.bus;
+    }
+    
+    const rowData = [
       row.glCode,
       row.glName,
       row.debit,
@@ -152,10 +187,35 @@ export function exportToExcel(rows: GLRow[], date: Date): void {
       row.sbu,
       row.route,
       row.bus,
-    ]),
-  ];
-
-  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    ];
+    
+    rowData.forEach((value, colIdx) => {
+      const cellAddress = XLSX.utils.encode_cell({ r: excelRow, c: colIdx });
+      const cell: XLSX.CellObject = {
+        v: value,
+        t: typeof value === 'number' ? 'n' : 's',
+      };
+      
+      // Apply background color to first row of each bus
+      if (isFirstRowOfBus) {
+        const colorIndex = busColorMap.get(row.bus)!;
+        cell.s = {
+          fill: {
+            fgColor: { rgb: busColors[colorIndex] }
+          }
+        };
+      }
+      
+      worksheet[cellAddress] = cell;
+    });
+  });
+  
+  // Set worksheet range
+  const range = {
+    s: { r: 0, c: 0 },
+    e: { r: rows.length, c: 7 }
+  };
+  worksheet['!ref'] = XLSX.utils.encode_range(range);
   
   // Set column widths
   worksheet['!cols'] = [
@@ -168,10 +228,9 @@ export function exportToExcel(rows: GLRow[], date: Date): void {
     { wch: 15 }, // Route
     { wch: 12 }, // Bus
   ];
-
-  const workbook = XLSX.utils.book_new();
+  
   XLSX.utils.book_append_sheet(workbook, worksheet, 'GL Export');
-
+  
   const fileName = `GL_Export_${format(date, 'yyyy-MM-dd')}_${Date.now()}.xlsx`;
   XLSX.writeFile(workbook, fileName);
 }
