@@ -10,6 +10,7 @@ import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
 import { BusDailySummaryTable } from "@/components/trips/BusDailySummaryTable";
 import { BusDailyCard } from "@/components/trips/BusDailyCard";
 import { FleetDailySummary } from "@/components/trips/FleetDailySummary";
+import { DailyBreakdownView } from "@/components/trips/DailyBreakdownView";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportFromAllocationModal } from "@/components/trips/ImportFromAllocationModal";
@@ -204,6 +205,14 @@ export default function DailyTrips() {
                 summary={fleetSummary} 
                 date={selectedDate}
                 dateRange={dateMode === "range" ? dateRange : undefined}
+              />
+            )}
+
+            {/* Day-by-Day Breakdown for Date Ranges */}
+            {dateMode === "range" && dateRange?.from && dateRange?.to && (
+              <DailyBreakdownView 
+                summaries={busSummaries} 
+                dateRange={{ from: dateRange.from, to: dateRange.to }} 
               />
             )}
 
