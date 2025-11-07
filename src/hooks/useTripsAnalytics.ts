@@ -81,14 +81,24 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
   return useQuery({
     queryKey: ['trips-analytics', filters],
     queryFn: async () => {
-      const { data: trips, error } = await supabase
+      // Fetch trips data
+      const { data: trips, error: tripsError } = await supabase
         .from('daily_trips')
         .select('*')
         .gte('trip_date', format(filters.startDate, 'yyyy-MM-dd'))
         .lte('trip_date', format(filters.endDate, 'yyyy-MM-dd'))
         .order('trip_date', { ascending: false });
 
-      if (error) throw error;
+      if (tripsError) throw tripsError;
+
+      // Fetch expenses data
+      const { data: expenses, error: expensesError } = await supabase
+        .from('daily_bus_expenses')
+        .select('*, buses(bus_number)')
+        .gte('expense_date', format(filters.startDate, 'yyyy-MM-dd'))
+        .lte('expense_date', format(filters.endDate, 'yyyy-MM-dd'));
+
+      if (expensesError) throw expensesError;
 
       // Apply additional filters
       let filteredTrips = trips || [];
@@ -106,22 +116,46 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         filteredTrips = filteredTrips.filter(t => filters.buses!.includes(t.bus_id));
       }
 
-      return processAnalyticsData(filteredTrips, filters);
+      return processAnalyticsData(filteredTrips, expenses || [], filters);
     },
     staleTime: 30000,
     refetchInterval: 60000,
   });
 }
 
-function processAnalyticsData(trips: TripData[], filters: AnalyticsFilters) {
+function processAnalyticsData(trips: TripData[], expenses: any[], filters: AnalyticsFilters) {
+  // Create expense map by bus_id and date for quick lookup
+  const expenseMap = new Map();
+  expenses.forEach(exp => {
+    const key = `${exp.bus_id}_${exp.expense_date}`;
+    const totalExpense = (exp.fuel_cost || 0) + 
+                        (exp.toll_cost || 0) + 
+                        (exp.repair_cost || 0) + 
+                        (exp.driver_salary || 0) + 
+                        (exp.conductor_salary || 0) + 
+                        (exp.other_expenses || 0);
+    expenseMap.set(key, {
+      ...exp,
+      total: totalExpense
+    });
+  });
+
   // Calculate overview metrics
   const totalTrips = trips.length;
   const totalDistance = sumBy(trips, 'distance_km');
   const totalIncome = sumBy(trips, 'income');
-  const totalFuelCost = sumBy(trips, 'fuel_cost');
-  const totalOtherExpenses = sumBy(trips, 'other_expenses');
-  const totalExpenses = sumBy(trips, 'total_expenses');
-  const netProfit = sumBy(trips, 'net_income');
+  
+  // Calculate total expenses from daily_bus_expenses
+  const totalFuelCost = sumBy(expenses, 'fuel_cost') || 0;
+  const totalTollCost = sumBy(expenses, 'toll_cost') || 0;
+  const totalRepairCost = sumBy(expenses, 'repair_cost') || 0;
+  const totalDriverSalary = sumBy(expenses, 'driver_salary') || 0;
+  const totalConductorSalary = sumBy(expenses, 'conductor_salary') || 0;
+  const totalOtherExpenses = sumBy(expenses, 'other_expenses') || 0;
+  const totalExpenses = totalFuelCost + totalTollCost + totalRepairCost + 
+                       totalDriverSalary + totalConductorSalary + totalOtherExpenses;
+  
+  const netProfit = totalIncome - totalExpenses;
   const avgEfficiency = meanBy(trips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0;
   const activeBuses = new Set(trips.map(t => t.bus_id)).size;
 
@@ -141,18 +175,30 @@ function processAnalyticsData(trips: TripData[], filters: AnalyticsFilters) {
   const profitChange = prevNetProfit > 0 ? ((netProfit - prevNetProfit) / prevNetProfit) * 100 : 0;
   const tripsChange = prevTotalTrips > 0 ? ((totalTrips - prevTotalTrips) / prevTotalTrips) * 100 : 0;
 
-  // Driver statistics
+  // Driver statistics with expense mapping
   const driverGroups = groupBy(trips, 'driver_id');
   const driverStats: DriverStats[] = Object.keys(driverGroups).map(driver => {
     const driverTrips = driverGroups[driver];
+    const driverIncome = sumBy(driverTrips, 'income');
+    
+    // Calculate driver expenses from expense map
+    let driverExpenses = 0;
+    driverTrips.forEach(trip => {
+      const key = `${trip.bus_id}_${trip.trip_date}`;
+      const expenseData = expenseMap.get(key);
+      if (expenseData) {
+        driverExpenses += expenseData.total / driverTrips.filter(t => t.bus_id === trip.bus_id && t.trip_date === trip.trip_date).length;
+      }
+    });
+    
     return {
       driverId: driver,
       driverName: driver,
       totalTrips: driverTrips.length,
       totalDistance: sumBy(driverTrips, 'distance_km'),
-      totalIncome: sumBy(driverTrips, 'income'),
-      totalExpenses: sumBy(driverTrips, 'total_expenses'),
-      netIncome: sumBy(driverTrips, 'net_income'),
+      totalIncome: driverIncome,
+      totalExpenses: driverExpenses,
+      netIncome: driverIncome - driverExpenses,
       avgEfficiency: meanBy(driverTrips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0,
       completionRate: 100,
       rank: 0
@@ -165,22 +211,33 @@ function processAnalyticsData(trips: TripData[], filters: AnalyticsFilters) {
     rank: idx + 1
   }));
 
-  // Route statistics
+  // Route statistics with expense mapping
   const routeGroups = groupBy(trips, 'route_id');
   const routeStats: RouteStats[] = Object.keys(routeGroups).map(routeNo => {
     const routeTrips = routeGroups[routeNo];
     const income = sumBy(routeTrips, 'income');
-    const expenses = sumBy(routeTrips, 'total_expenses');
+    
+    // Calculate route expenses from expense map
+    let routeExpenses = 0;
+    routeTrips.forEach(trip => {
+      const key = `${trip.bus_id}_${trip.trip_date}`;
+      const expenseData = expenseMap.get(key);
+      if (expenseData) {
+        routeExpenses += expenseData.total / routeTrips.filter(t => t.bus_id === trip.bus_id && t.trip_date === trip.trip_date).length;
+      }
+    });
+    
+    const netIncome = income - routeExpenses;
     return {
       routeNo,
       routeName: routeNo,
       totalTrips: routeTrips.length,
       totalDistance: sumBy(routeTrips, 'distance_km'),
       totalIncome: income,
-      totalExpenses: expenses,
-      netIncome: sumBy(routeTrips, 'net_income'),
+      totalExpenses: routeExpenses,
+      netIncome: netIncome,
       avgEfficiency: meanBy(routeTrips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0,
-      profitMargin: income > 0 ? ((income - expenses) / income) * 100 : 0
+      profitMargin: income > 0 ? ((netIncome / income) * 100) : 0
     };
   });
 
@@ -219,15 +276,27 @@ function processAnalyticsData(trips: TripData[], filters: AnalyticsFilters) {
   });
 
   const tripsByDate = groupBy(trips, 'trip_date');
-  const dailyTrends = Object.keys(tripsByDate).map(date => ({
-    date,
-    trips: tripsByDate[date].length,
-    income: sumBy(tripsByDate[date], 'income'),
-    expenses: sumBy(tripsByDate[date], 'total_expenses'),
-    netIncome: sumBy(tripsByDate[date], 'net_income'),
-    distance: sumBy(tripsByDate[date], 'distance_km'),
-    avgEfficiency: meanBy(tripsByDate[date].filter(t => t.km_per_liter > 0), 'km_per_liter') || 0
-  }));
+  const expensesByDate = groupBy(expenses, 'expense_date');
+  
+  const dailyTrends = Object.keys(tripsByDate).map(date => {
+    const dayTrips = tripsByDate[date];
+    const dayExpenses = expensesByDate[date] || [];
+    const dayTotalExpenses = sumBy(dayExpenses, exp => 
+      (exp.fuel_cost || 0) + (exp.toll_cost || 0) + (exp.repair_cost || 0) + 
+      (exp.driver_salary || 0) + (exp.conductor_salary || 0) + (exp.other_expenses || 0)
+    );
+    const dayIncome = sumBy(dayTrips, 'income');
+    
+    return {
+      date,
+      trips: dayTrips.length,
+      income: dayIncome,
+      expenses: dayTotalExpenses,
+      netIncome: dayIncome - dayTotalExpenses,
+      distance: sumBy(dayTrips, 'distance_km'),
+      avgEfficiency: meanBy(dayTrips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0
+    };
+  });
 
   return {
     overview: {
@@ -256,8 +325,16 @@ function processAnalyticsData(trips: TripData[], filters: AnalyticsFilters) {
     tripsByHour,
     expenseBreakdown: {
       fuel: totalFuelCost,
+      toll: totalTollCost,
+      repair: totalRepairCost,
+      driverSalary: totalDriverSalary,
+      conductorSalary: totalConductorSalary,
       other: totalOtherExpenses,
       fuelPercentage: totalExpenses > 0 ? (totalFuelCost / totalExpenses) * 100 : 0,
+      tollPercentage: totalExpenses > 0 ? (totalTollCost / totalExpenses) * 100 : 0,
+      repairPercentage: totalExpenses > 0 ? (totalRepairCost / totalExpenses) * 100 : 0,
+      driverSalaryPercentage: totalExpenses > 0 ? (totalDriverSalary / totalExpenses) * 100 : 0,
+      conductorSalaryPercentage: totalExpenses > 0 ? (totalConductorSalary / totalExpenses) * 100 : 0,
       otherPercentage: totalExpenses > 0 ? (totalOtherExpenses / totalExpenses) * 100 : 0
     },
     rawTrips: trips
