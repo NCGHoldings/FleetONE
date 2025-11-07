@@ -172,7 +172,9 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
               {/* Expanded Trip Details */}
               <CollapsibleContent>
                 <div className="border-t bg-muted/30 p-4">
-                  <h4 className="font-semibold mb-3">Trip Details for {summary.bus_no} on {format(new Date(summary.date), "PPP")}</h4>
+                  <h4 className="font-semibold mb-3">
+                    Trip Details for {summary.bus_no} {summary.date.includes('to') ? `(${summary.date})` : `on ${format(new Date(summary.date), "PPP")}`}
+                  </h4>
                   
                   <div className="space-y-3">
                     {allocatedExpenses.map((trip, idx) => (

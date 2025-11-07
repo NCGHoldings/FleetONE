@@ -153,7 +153,7 @@ export function BusDailyCard({ summary }: BusDailyCardProps) {
         <SheetContent side="bottom" className="h-[80vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
-              {summary.bus_no} - {format(new Date(summary.date), "PPP")}
+              {summary.bus_no} - {summary.date.includes('to') ? summary.date : format(new Date(summary.date), "PPP")}
             </SheetTitle>
           </SheetHeader>
 
