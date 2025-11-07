@@ -15,6 +15,9 @@ import DriverComparisonChart from '@/components/trips-analytics/charts/DriverCom
 import RoutePerformanceChart from '@/components/trips-analytics/charts/RoutePerformanceChart';
 import ExpenseDistributionChart from '@/components/trips-analytics/charts/ExpenseDistributionChart';
 import DataQualityAlert from '@/components/trips-analytics/DataQualityAlert';
+import TimeBasedAnalysis from '@/components/trips-analytics/TimeBasedAnalysis';
+import AIInsightsPanel from '@/components/trips-analytics/AIInsightsPanel';
+import ComparisonDashboard from '@/components/trips-analytics/ComparisonDashboard';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -155,14 +158,64 @@ export default function TripsAnalytics() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="time">Time</TabsTrigger>
+          <TabsTrigger value="comparison">Compare</TabsTrigger>
+          <TabsTrigger value="ai-insights">AI Insights</TabsTrigger>
           <TabsTrigger value="routes">Routes</TabsTrigger>
           <TabsTrigger value="drivers">Drivers</TabsTrigger>
           <TabsTrigger value="buses">Buses</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
         </TabsList>
+
+        {/* Time-Based Analysis Tab */}
+        <TabsContent value="time" className="space-y-6">
+          <TimeBasedAnalysis
+            startDate={dateRange.startDate}
+            endDate={dateRange.endDate}
+            branchId={undefined}
+          />
+        </TabsContent>
+
+        {/* Comparison Dashboard Tab */}
+        <TabsContent value="comparison" className="space-y-6">
+          <ComparisonDashboard
+            drivers={analytics.driverStats.map(d => ({
+              id: d.driverId,
+              name: d.driverName,
+              income: d.totalIncome,
+              expenses: d.totalExpenses,
+              netProfit: d.netIncome,
+              trips: d.totalTrips,
+              efficiency: d.avgEfficiency,
+            }))}
+            routes={analytics.routeStats.map(r => ({
+              id: r.routeNo,
+              name: r.routeName,
+              income: r.totalIncome,
+              expenses: r.totalExpenses,
+              netProfit: r.netIncome,
+              trips: r.totalTrips,
+              efficiency: 0,
+            }))}
+            buses={analytics.busStats.map(b => ({
+              id: b.busNo,
+              name: b.busNo,
+              income: b.totalIncome,
+              expenses: b.totalExpenses,
+              netProfit: b.netIncome,
+              trips: b.totalTrips,
+              efficiency: b.avgEfficiency,
+            }))}
+          />
+        </TabsContent>
+
+        {/* AI Insights Tab */}
+        <TabsContent value="ai-insights" className="space-y-6">
+          <AIInsightsPanel analyticsData={analytics} />
+        </TabsContent>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
