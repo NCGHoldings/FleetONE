@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
@@ -14,6 +14,7 @@ import { DailyBreakdownView } from "@/components/trips/DailyBreakdownView";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImportFromAllocationModal } from "@/components/trips/ImportFromAllocationModal";
+import { GLExportModal } from "@/components/trips/GLExportModal";
 import type { DateRange } from "react-day-picker";
 
 export default function DailyTrips() {
@@ -24,6 +25,7 @@ export default function DailyTrips() {
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [viewMode, setViewMode] = useState<"table" | "cards">(isMobile ? "cards" : "table");
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showGLExportModal, setShowGLExportModal] = useState(false);
   
   const { busSummaries, fleetSummary, loading, refetch } = useDailyBusGroupedTrips(
     dateMode === "single" ? selectedDate : null,
@@ -135,6 +137,15 @@ export default function DailyTrips() {
                 Import from Allocations
               </Button>
 
+              <Button 
+                variant="outline"
+                onClick={() => setShowGLExportModal(true)}
+                disabled={!busSummaries.length}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export GL
+              </Button>
+
               <Button onClick={() => navigate('/trips/quick-entry')}>
                 <Plus className="mr-2 h-4 w-4" />
                 Quick Entry
@@ -238,6 +249,14 @@ export default function DailyTrips() {
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
         onSuccess={refetch}
+      />
+
+      <GLExportModal
+        open={showGLExportModal}
+        onOpenChange={setShowGLExportModal}
+        busSummaries={busSummaries}
+        selectedDate={selectedDate}
+        dateRange={dateRange}
       />
     </div>
   );
