@@ -94,24 +94,43 @@ export interface FleetSummary {
   needs_attention?: BusDailySummary;
 }
 
-export function useDailyBusGroupedTrips(selectedDate: Date) {
+export function useDailyBusGroupedTrips(
+  selectedDate: Date | null,
+  dateRange?: { from: Date; to: Date } | undefined
+) {
   const [busSummaries, setBusSummaries] = useState<BusDailySummary[]>([]);
   const [fleetSummary, setFleetSummary] = useState<FleetSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchGroupedData();
-  }, [selectedDate]);
+    if (selectedDate || (dateRange?.from && dateRange?.to)) {
+      fetchGroupedData();
+    }
+  }, [selectedDate, dateRange?.from, dateRange?.to]);
 
   const fetchGroupedData = async () => {
     try {
       setLoading(true);
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      console.log('📅 Querying Daily Trips for date:', dateStr);
+      // Determine if we're querying by single date or range
+      let fromDateStr: string;
+      let toDateStr: string;
+      let isRangeQuery = false;
 
-      // Fetch trips for the date
-      const { data: tripsData, error: tripsError } = await supabase
+      if (dateRange?.from && dateRange?.to) {
+        fromDateStr = format(dateRange.from, 'yyyy-MM-dd');
+        toDateStr = format(dateRange.to, 'yyyy-MM-dd');
+        isRangeQuery = true;
+        console.log('📅 Querying Daily Trips for range:', fromDateStr, 'to', toDateStr);
+      } else if (selectedDate) {
+        fromDateStr = toDateStr = format(selectedDate, 'yyyy-MM-dd');
+        console.log('📅 Querying Daily Trips for date:', fromDateStr);
+      } else {
+        return;
+      }
+
+      // Build trips query
+      let tripsQuery = supabase
         .from('daily_trips')
         .select(`
           id,
@@ -130,24 +149,39 @@ export function useDailyBusGroupedTrips(selectedDate: Date) {
           buses:bus_id(bus_no),
           routes:route_id(route_name)
         `)
-        .eq('trip_date', dateStr)
         .order('bus_id')
+        .order('trip_date')
         .order('start_time');
 
+      // Apply date filter
+      if (isRangeQuery) {
+        tripsQuery = tripsQuery.gte('trip_date', fromDateStr).lte('trip_date', toDateStr);
+      } else {
+        tripsQuery = tripsQuery.eq('trip_date', fromDateStr);
+      }
+
+      const { data: tripsData, error: tripsError } = await tripsQuery;
       if (tripsError) throw tripsError;
 
-      // Fetch daily bus expenses for the date
-      const { data: expensesData, error: expensesError } = await supabase
+      // Build expenses query
+      let expensesQuery = supabase
         .from('daily_bus_expenses')
-        .select('*')
-        .eq('expense_date', dateStr);
+        .select('*');
 
+      // Apply date filter
+      if (isRangeQuery) {
+        expensesQuery = expensesQuery.gte('expense_date', fromDateStr).lte('expense_date', toDateStr);
+      } else {
+        expensesQuery = expensesQuery.eq('expense_date', fromDateStr);
+      }
+
+      const { data: expensesData, error: expensesError } = await expensesQuery;
       if (expensesError) throw expensesError;
       
       console.log('📊 Found trips:', tripsData?.length || 0);
       console.log('💰 Found expenses:', expensesData?.length || 0);
 
-      // Group trips by bus_id
+      // Group trips by bus_id (and date if range query)
       const groupedByBus = new Map<string, any[]>();
       
       (tripsData || []).forEach((trip: any) => {
@@ -177,10 +211,67 @@ export function useDailyBusGroupedTrips(selectedDate: Date) {
         });
       });
 
-      // Create expense lookup map
-      const expenseMap = new Map<string, DailyBusExpense>();
+      // Create expense lookup map (aggregate expenses for range queries)
+      const expenseMap = new Map<string, any>();
       (expensesData || []).forEach((expense: any) => {
-        expenseMap.set(expense.bus_id, expense);
+        const busId = expense.bus_id;
+        if (isRangeQuery) {
+          // Aggregate expenses for the same bus across multiple days
+          if (!expenseMap.has(busId)) {
+            expenseMap.set(busId, {
+              id: expense.id,
+              expense_date: `${fromDateStr} to ${toDateStr}`,
+              fuel_cost: 0,
+              diesel_price_per_liter: expense.diesel_price_per_liter,
+              repair: 0,
+              tyre_tube: 0,
+              salary: 0,
+              police: 0,
+              food: 0,
+              emission_fitness: 0,
+              permits_renewal: 0,
+              staff_accommodation: 0,
+              highway_charges: 0,
+              accident_compensation: 0,
+              parking: 0,
+              log_sheet: 0,
+              vehicle_hire: 0,
+              ntc: 0,
+              runner: 0,
+              short_misc: 0,
+              temporary_permit: 0,
+              body_wash: 0,
+              legal_court: 0,
+              other: 0,
+              total_daily_expenses: 0,
+            });
+          }
+          const agg = expenseMap.get(busId);
+          agg.fuel_cost += expense.fuel_cost || 0;
+          agg.repair += expense.repair || 0;
+          agg.tyre_tube += expense.tyre_tube || 0;
+          agg.salary += expense.salary || 0;
+          agg.police += expense.police || 0;
+          agg.food += expense.food || 0;
+          agg.emission_fitness += expense.emission_fitness || 0;
+          agg.permits_renewal += expense.permits_renewal || 0;
+          agg.staff_accommodation += expense.staff_accommodation || 0;
+          agg.highway_charges += expense.highway_charges || 0;
+          agg.accident_compensation += expense.accident_compensation || 0;
+          agg.parking += expense.parking || 0;
+          agg.log_sheet += expense.log_sheet || 0;
+          agg.vehicle_hire += expense.vehicle_hire || 0;
+          agg.ntc += expense.ntc || 0;
+          agg.runner += expense.runner || 0;
+          agg.short_misc += expense.short_misc || 0;
+          agg.temporary_permit += expense.temporary_permit || 0;
+          agg.body_wash += expense.body_wash || 0;
+          agg.legal_court += expense.legal_court || 0;
+          agg.other += expense.other || 0;
+          agg.total_daily_expenses += expense.total_daily_expenses || 0;
+        } else {
+          expenseMap.set(busId, expense);
+        }
       });
 
       // Calculate summaries for each bus
@@ -214,7 +305,7 @@ export function useDailyBusGroupedTrips(selectedDate: Date) {
         summaries.push({
           bus_id: busId,
           bus_no: busNo,
-          date: dateStr,
+          date: isRangeQuery ? `${fromDateStr} to ${toDateStr}` : fromDateStr,
           trip_count: trips.length,
           trips: trips,
           total_revenue: totalRevenue,

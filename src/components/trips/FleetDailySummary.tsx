@@ -3,13 +3,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FleetSummary } from "@/hooks/useDailyBusGroupedTrips";
 import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
 interface FleetDailySummaryProps {
   summary: FleetSummary;
   date: Date;
+  dateRange?: DateRange;
 }
 
-export function FleetDailySummary({ summary, date }: FleetDailySummaryProps) {
+export function FleetDailySummary({ summary, date, dateRange }: FleetDailySummaryProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
@@ -19,11 +21,20 @@ export function FleetDailySummary({ summary, date }: FleetDailySummaryProps) {
     }).format(amount);
   };
 
+  const getDateLabel = () => {
+    if (dateRange?.from && dateRange?.to) {
+      return `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}`;
+    }
+    return format(date, "PPPP");
+  };
+
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold">Daily Summary</h2>
-        <p className="text-muted-foreground">{format(date, "PPPP")}</p>
+        <h2 className="text-2xl font-bold">
+          {dateRange?.from && dateRange?.to ? "Range Summary" : "Daily Summary"}
+        </h2>
+        <p className="text-muted-foreground">{getDateLabel()}</p>
       </div>
 
       {/* Key Metrics Grid */}

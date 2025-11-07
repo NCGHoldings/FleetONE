@@ -24,7 +24,12 @@ export default function DailyTrips() {
   const [viewMode, setViewMode] = useState<"table" | "cards">(isMobile ? "cards" : "table");
   const [showImportModal, setShowImportModal] = useState(false);
   
-  const { busSummaries, fleetSummary, loading, refetch } = useDailyBusGroupedTrips(selectedDate);
+  const { busSummaries, fleetSummary, loading, refetch } = useDailyBusGroupedTrips(
+    dateMode === "single" ? selectedDate : null,
+    dateMode === "range" && dateRange?.from && dateRange?.to 
+      ? { from: dateRange.from, to: dateRange.to } 
+      : undefined
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -176,18 +181,30 @@ export default function DailyTrips() {
         ) : busSummaries.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-lg text-muted-foreground mb-4">
-              No trips found for {format(selectedDate, "PPP")}
+              {dateMode === "single" ? (
+                <>No trips found for {format(selectedDate, "PPP")}</>
+              ) : dateRange?.from && dateRange?.to ? (
+                <>No trips found from {format(dateRange.from, "PP")} to {format(dateRange.to, "PP")}</>
+              ) : (
+                <>Select a date range to view trips</>
+              )}
             </p>
-            <Button onClick={() => navigate('/trips/quick-entry')}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add First Trip
-            </Button>
+            {dateMode === "single" && (
+              <Button onClick={() => navigate('/trips/quick-entry')}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add First Trip
+              </Button>
+            )}
           </div>
         ) : (
           <>
             {/* Fleet Summary */}
             {fleetSummary && (
-              <FleetDailySummary summary={fleetSummary} date={selectedDate} />
+              <FleetDailySummary 
+                summary={fleetSummary} 
+                date={selectedDate}
+                dateRange={dateMode === "range" ? dateRange : undefined}
+              />
             )}
 
             {/* Bus Summaries */}
