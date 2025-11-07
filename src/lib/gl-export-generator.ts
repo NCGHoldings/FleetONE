@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import { format } from 'date-fns';
 import type { BusDailySummary } from '@/hooks/useDailyBusGroupedTrips';
 
@@ -232,7 +232,7 @@ export function exportToExcel(rows: GLRow[], date: Date): void {
   XLSX.utils.book_append_sheet(workbook, worksheet, 'GL Export');
   
   const fileName = `GL_Export_${format(date, 'yyyy-MM-dd')}_${Date.now()}.xlsx`;
-  XLSX.writeFile(workbook, fileName);
+  XLSX.writeFile(workbook, fileName, { cellStyles: true });
 }
 
 export function calculateGLSummary(rows: GLRow[]): {
