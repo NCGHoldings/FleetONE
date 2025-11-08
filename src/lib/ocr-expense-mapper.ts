@@ -42,6 +42,7 @@ export const KNOWN_OCR_EXPENSE_KEYS = [
   'spare_parts',
   'permit',
   'insurance',
+  'runner',
   'other'
 ];
 
@@ -153,7 +154,7 @@ export function mapOCRExpensesToDB(ocrExpenses: OCRExpenseFields): DBExpenseFiel
     log_sheet: 0,
     vehicle_hire: 0,
     ntc: 0,
-    runner: 0,
+    runner: ocrExpenses.runner || 0,
     temporary_permit: 0,
     legal_court: 0,
     
