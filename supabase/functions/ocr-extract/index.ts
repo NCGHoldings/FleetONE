@@ -219,14 +219,35 @@ Return JSON in this exact format:
     console.log('OCR extraction successful');
     console.log('Raw AI response:', content);
     
-    // Parse the JSON response
+    // Parse the JSON response - handle markdown code blocks if present
     let extractedData;
     try {
-      extractedData = JSON.parse(content);
+      // Strip markdown code blocks if present (```json ... ``` or ``` ... ```)
+      let cleanContent = content.trim();
+      
+      // Remove leading ```json or ``` 
+      if (cleanContent.startsWith('```json')) {
+        cleanContent = cleanContent.slice(7);
+      } else if (cleanContent.startsWith('```')) {
+        cleanContent = cleanContent.slice(3);
+      }
+      
+      // Remove trailing ```
+      if (cleanContent.endsWith('```')) {
+        cleanContent = cleanContent.slice(0, -3);
+      }
+      
+      // Trim again after removing markers
+      cleanContent = cleanContent.trim();
+      
+      console.log('Cleaned content (first 200 chars):', cleanContent.substring(0, 200));
+      
+      extractedData = JSON.parse(cleanContent);
       console.log('First trip bus_collection:', extractedData.trips?.[0]?.income?.bus_collection);
       console.log('Daily fuel_cost:', extractedData.daily_expenses?.fuel_cost);
     } catch (e) {
       console.error('Failed to parse AI response:', content);
+      console.error('Parse error:', e);
       throw new Error('Invalid JSON response from AI');
     }
 
