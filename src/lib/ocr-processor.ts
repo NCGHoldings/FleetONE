@@ -20,6 +20,7 @@ export interface DailyExpenses extends Record<string, number> {
   fuel_cost: number;
   driver_salary: number; // Separate for OCR extraction
   conductor_salary: number; // Separate for OCR extraction
+  runner?: number; // Optional OCR field for runner allowance
   food: number;
   parking: number;
   body_wash: number;

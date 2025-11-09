@@ -56,10 +56,11 @@ Extract:
    - ඩීසල් / ඩිසල් / diesel / fuel (Total fuel cost) → "fuel_cost"
    - අධිවේගී / හයිවේ / හයිවෙ / highway / toll / expressway (Highway tolls) → "highway_toll"
    
-   STAFF COSTS:
-   - රියදුරු / ඩ්‍රයිවර් / driver (Driver salary) → "driver_salary"
-   - කොන්දොස්තර / රනර් / හෙල්පර් / conductor / runner / helper (Conductor/Helper) → "conductor_salary"
-   - කෑම / ආහාර / භෝජන / food / meals (Staff food ONLY) → "food"
+    STAFF COSTS:
+    - රියදුරු / ඩ්‍රයිවර් / driver (Driver salary) → "driver_salary"
+    - කොන්දොස්තර / හෙල්පර් / conductor / helper (Conductor/Helper) → "conductor_salary"
+    - රනර් / runner (Runner allowance) → "runner"
+    - කෑම / ආහාර / භෝජන / food / meals / STAFF MEALS & WELFARE (Staff food ONLY) → "food"
    
    MAINTENANCE & REPAIRS:
    - අළුත්වැඩියා / අළුත්වැඩ / repair / repairs (Repairs) → "repair"
@@ -81,13 +82,13 @@ Extract:
    - Any other clear expense → "other"
    
 CRITICAL MAPPING RULES TO AVOID MISTAKES:
-⚠️ "කෑම" or "ආහාර" or "food" → MUST map to "food" field (NOT driver_salary!)
+⚠️ "කෑම" or "ආහාර" or "food" or "STAFF MEALS & WELFARE" → MUST map to "food" field (NOT driver_salary!)
+⚠️ "රනර්" or "runner" → MUST map to "runner" field (NOT conductor_salary or driver_salary!)
+⚠️ "කොන්දොස්තර" or "conductor" → MUST map to "conductor_salary" field (NOT driver!)
 ⚠️ "ග්‍රීස්" or "grease" → MUST map to "grease" field (NOT food!)
 ⚠️ "හයිවේ" or "අධිවේගී" or "highway" → MUST map to "highway_toll" field (NOT other!)
-⚠️ "රනර්" or "කොන්දොස්තර" or "runner" → MUST map to "conductor_salary" field (NOT driver!)
 ⚠️ "ග්‍රීස් ගැසීම" or "greasing service" → MUST map to "repair" field (service work, NOT material)
 ⚠️ "ග්‍රීස්" alone (material purchase) → maps to "grease" field
-⚠️ "ආහාර" → maps to "food" field (same as "කෑම")
 ⚠️ Double-check each expense category - numbers are correct, focus on field names
 ⚠️ If unsure about a category, include it in "other" with the value
 
@@ -147,6 +148,7 @@ Return JSON in this exact format:
     "fuel_cost": 22500,
     "driver_salary": 4000,
     "conductor_salary": 800,
+    "runner": 500,
     "food": 1500,
     "parking": 500,
     "body_wash": 400,
@@ -243,8 +245,34 @@ Return JSON in this exact format:
       console.log('Cleaned content (first 200 chars):', cleanContent.substring(0, 200));
       
       extractedData = JSON.parse(cleanContent);
+      
+      // Log extracted expense breakdown for debugging
+      const expenses = extractedData.daily_expenses || {};
+      console.log('Expense breakdown:');
+      console.log('  driver_salary:', expenses.driver_salary);
+      console.log('  conductor_salary:', expenses.conductor_salary);
+      console.log('  runner:', expenses.runner);
+      console.log('  food:', expenses.food);
+      console.log('  fuel_cost:', expenses.fuel_cost);
+      
+      // Normalize variations to standard fields
+      if (expenses.runner_allowance) {
+        expenses.runner = (expenses.runner || 0) + expenses.runner_allowance;
+        delete expenses.runner_allowance;
+        console.log('  Normalized runner_allowance into runner');
+      }
+      if (expenses.helpers) {
+        expenses.conductor_salary = (expenses.conductor_salary || 0) + expenses.helpers;
+        delete expenses.helpers;
+        console.log('  Normalized helpers into conductor_salary');
+      }
+      if (expenses.assistant) {
+        expenses.conductor_salary = (expenses.conductor_salary || 0) + expenses.assistant;
+        delete expenses.assistant;
+        console.log('  Normalized assistant into conductor_salary');
+      }
+      
       console.log('First trip bus_collection:', extractedData.trips?.[0]?.income?.bus_collection);
-      console.log('Daily fuel_cost:', extractedData.daily_expenses?.fuel_cost);
     } catch (e) {
       console.error('Failed to parse AI response:', content);
       console.error('Parse error:', e);
