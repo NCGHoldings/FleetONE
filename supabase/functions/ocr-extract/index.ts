@@ -146,10 +146,10 @@ Return JSON in this exact format:
   ],
   "daily_expenses": {
     "fuel_cost": 22500,
-    "driver_salary": 4000,
-    "conductor_salary": 800,
-    "runner": 500,
-    "food": 1500,
+    "driver_salary": 0,
+    "conductor_salary": 0,
+    "runner": 700,
+    "food": 4000,
     "parking": 500,
     "body_wash": 400,
     "highway_toll": 3500,
@@ -270,6 +270,29 @@ Return JSON in this exact format:
         expenses.conductor_salary = (expenses.conductor_salary || 0) + expenses.assistant;
         delete expenses.assistant;
         console.log('  Normalized assistant into conductor_salary');
+      }
+      
+      // Handle stray "salary" key (if model returns it generically)
+      if (typeof expenses.salary === 'number' && expenses.salary > 0) {
+        if (!expenses.food || expenses.food === 0) {
+          expenses.food = (expenses.food || 0) + expenses.salary;
+          console.log('  Moved generic salary to food:', expenses.salary);
+        } else {
+          expenses.other = (expenses.other || 0) + expenses.salary;
+          console.log('  Moved generic salary to other:', expenses.salary);
+        }
+        delete expenses.salary;
+      }
+      
+      // Apply heuristic: Move small driver_salary to food when it's likely misclassified
+      const ds = expenses.driver_salary || 0;
+      const cs = expenses.conductor_salary || 0;
+      const fd = expenses.food || 0;
+      
+      if (fd === 0 && ds > 0 && cs === 0 && ds <= 6000) {
+        expenses.food = ds;
+        expenses.driver_salary = 0;
+        console.log('  Heuristic applied: moved driver_salary to food (amount:', ds, ')');
       }
       
       console.log('First trip bus_collection:', extractedData.trips?.[0]?.income?.bus_collection);
