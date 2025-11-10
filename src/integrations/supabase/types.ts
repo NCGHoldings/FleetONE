@@ -186,6 +186,118 @@ export type Database = {
         }
         Relationships: []
       }
+      accounts_payable: {
+        Row: {
+          account_id: string | null
+          amount: number
+          balance: number
+          created_at: string
+          due_date: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          notes: string | null
+          paid_amount: number
+          status: Database["public"]["Enums"]["ar_ap_status"]
+          updated_at: string
+          vendor_name: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          balance: number
+          created_at?: string
+          due_date: string
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          notes?: string | null
+          paid_amount?: number
+          status?: Database["public"]["Enums"]["ar_ap_status"]
+          updated_at?: string
+          vendor_name: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          balance?: number
+          created_at?: string
+          due_date?: string
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          notes?: string | null
+          paid_amount?: number
+          status?: Database["public"]["Enums"]["ar_ap_status"]
+          updated_at?: string
+          vendor_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_payable_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounts_receivable: {
+        Row: {
+          account_id: string | null
+          amount: number
+          balance: number
+          created_at: string
+          customer_name: string
+          due_date: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          notes: string | null
+          received_amount: number
+          status: Database["public"]["Enums"]["ar_ap_status"]
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          balance: number
+          created_at?: string
+          customer_name: string
+          due_date: string
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          notes?: string | null
+          received_amount?: number
+          status?: Database["public"]["Enums"]["ar_ap_status"]
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          balance?: number
+          created_at?: string
+          customer_name?: string
+          due_date?: string
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          notes?: string | null
+          received_amount?: number
+          status?: Database["public"]["Enums"]["ar_ap_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_receivable_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_name_suggestions: {
         Row: {
           created_at: string
@@ -491,6 +603,53 @@ export type Database = {
           year?: number
         }
         Relationships: []
+      }
+      chart_of_accounts: {
+        Row: {
+          account_code: string
+          account_name: string
+          account_type: Database["public"]["Enums"]["account_type"]
+          created_at: string
+          current_balance: number
+          description: string | null
+          id: string
+          is_active: boolean
+          parent_account_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_code: string
+          account_name: string
+          account_type: Database["public"]["Enums"]["account_type"]
+          created_at?: string
+          current_balance?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          parent_account_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_code?: string
+          account_name?: string
+          account_type?: Database["public"]["Enums"]["account_type"]
+          created_at?: string
+          current_balance?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          parent_account_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chart_of_accounts_parent_account_id_fkey"
+            columns: ["parent_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       companies: {
         Row: {
@@ -1257,6 +1416,39 @@ export type Database = {
           },
         ]
       }
+      financial_periods: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          end_date: string
+          id: string
+          is_closed: boolean
+          period_name: string
+          start_date: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          end_date: string
+          id?: string
+          is_closed?: boolean
+          period_name: string
+          start_date: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          end_date?: string
+          id?: string
+          is_closed?: boolean
+          period_name?: string
+          start_date?: string
+        }
+        Relationships: []
+      }
       frequency_rules: {
         Row: {
           created_at: string
@@ -1736,6 +1928,99 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      journal_entries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          entry_date: string
+          entry_number: string
+          id: string
+          posted_at: string | null
+          posted_by: string | null
+          reference: string | null
+          status: Database["public"]["Enums"]["journal_status"]
+          total_credit: number
+          total_debit: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description: string
+          entry_date: string
+          entry_number: string
+          id?: string
+          posted_at?: string | null
+          posted_by?: string | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["journal_status"]
+          total_credit?: number
+          total_debit?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          entry_date?: string
+          entry_number?: string
+          id?: string
+          posted_at?: string | null
+          posted_by?: string | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["journal_status"]
+          total_credit?: number
+          total_debit?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      journal_entry_lines: {
+        Row: {
+          account_id: string
+          created_at: string
+          credit: number
+          debit: number
+          description: string | null
+          id: string
+          journal_entry_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          credit?: number
+          debit?: number
+          description?: string | null
+          id?: string
+          journal_entry_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          credit?: number
+          debit?: number
+          description?: string | null
+          id?: string
+          journal_entry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entry_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entry_lines_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -7684,6 +7969,7 @@ export type Database = {
       create_admin_user: { Args: never; Returns: undefined }
       generate_customer_code: { Args: never; Returns: string }
       generate_employee_id: { Args: never; Returns: string }
+      generate_journal_entry_number: { Args: never; Returns: string }
       generate_next_version_number: {
         Args: { p_parent_id: string }
         Returns: string
@@ -7744,6 +8030,7 @@ export type Database = {
       }
     }
     Enums: {
+      account_type: "asset" | "liability" | "equity" | "revenue" | "expense"
       app_role:
         | "super_admin"
         | "admin"
@@ -7757,6 +8044,7 @@ export type Database = {
         | "governance_manager"
         | "governance_viewer"
       approval_status: "pending" | "approved" | "rejected"
+      ar_ap_status: "unpaid" | "partial" | "paid" | "overdue"
       customs_status:
         | "draft"
         | "submitted"
@@ -7799,6 +8087,7 @@ export type Database = {
         | "completed"
         | "failed"
         | "approved"
+      journal_status: "draft" | "posted" | "void"
       maintenance_status: "pending" | "in_progress" | "completed" | "cancelled"
       notification_status: "pending" | "sent" | "failed"
       notification_type: "REMINDER_3_DAY" | "REMINDER_TODAY" | "OVERDUE"
@@ -8021,6 +8310,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_type: ["asset", "liability", "equity", "revenue", "expense"],
       app_role: [
         "super_admin",
         "admin",
@@ -8035,6 +8325,7 @@ export const Constants = {
         "governance_viewer",
       ],
       approval_status: ["pending", "approved", "rejected"],
+      ar_ap_status: ["unpaid", "partial", "paid", "overdue"],
       customs_status: [
         "draft",
         "submitted",
@@ -8082,6 +8373,7 @@ export const Constants = {
         "failed",
         "approved",
       ],
+      journal_status: ["draft", "posted", "void"],
       maintenance_status: ["pending", "in_progress", "completed", "cancelled"],
       notification_status: ["pending", "sent", "failed"],
       notification_type: ["REMINDER_3_DAY", "REMINDER_TODAY", "OVERDUE"],

@@ -11,6 +11,7 @@ export type PageCategories = {
   main: PageItem[];
   operations: PageItem[];
   business: PageItem[];
+  finance: PageItem[];
   yutong: PageItem[];
   nsp: PageItem[];
   governance: PageItem[];
@@ -43,6 +44,9 @@ export const PAGES: PageCategories = {
     { id: "document_manager", title: "Document Manager", url: "/documents" },
     { id: "feedback", title: "Feedback", url: "/feedback" },
   ],
+  finance: [
+    { id: "accounting", title: "Accounting & GL", url: "/accounting" },
+  ],
   yutong: [
     { id: "yutong_quotations", title: "Quotations", url: "/yutong-quotations" },
     { id: "yutong_bus_models", title: "Bus Models", url: "/yutong-quotations?tab=bus-models" },
@@ -63,6 +67,7 @@ export const ALL_PAGES_FLAT: PageItem[] = [
   ...PAGES.main,
   ...PAGES.operations,
   ...PAGES.business,
+  ...PAGES.finance,
   ...PAGES.yutong,
   ...PAGES.nsp,
   ...PAGES.governance,
