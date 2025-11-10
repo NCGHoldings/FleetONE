@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield } from "lucide-react";
+import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -238,6 +239,26 @@ export default function Settings() {
               <p className="text-sm text-muted-foreground">
                 Multi-language support coming soon
               </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Admin Features */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5" />
+              Admin Features
+            </CardTitle>
+            <CardDescription>Administrative tools and access management</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2">
+              <Label>Accounting Module Access</Label>
+              <p className="text-sm text-muted-foreground mb-2">
+                Grant accounting access to all super_admin, admin, and finance users
+              </p>
+              <GrantAccessButton />
             </div>
           </CardContent>
         </Card>

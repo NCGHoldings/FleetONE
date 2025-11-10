@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,54 +11,78 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Use service role key to bypass RLS
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify the requester is a super_admin
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Check if user is super_admin
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'super_admin');
+
+    if (!roles || roles.length === 0) {
+      return new Response(JSON.stringify({ error: 'Forbidden - Super Admin access required' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Get all users with super_admin, admin, or finance roles
-    const { data: userRoles, error: rolesError } = await supabaseClient
+    const { data: usersWithRoles, error: rolesError } = await supabase
       .from('user_roles')
-      .select('user_id, role')
+      .select('user_id')
       .in('role', ['super_admin', 'admin', 'finance']);
 
     if (rolesError) throw rolesError;
 
-    // Get unique user IDs
-    const uniqueUserIds = [...new Set(userRoles?.map(ur => ur.user_id) || [])];
+    const uniqueUserIds = [...new Set(usersWithRoles.map(r => r.user_id))];
 
-    console.log(`Granting accounting access to ${uniqueUserIds.length} users`);
-
-    // Grant accounting page access to each user
-    const grants = uniqueUserIds.map(userId => ({
+    // Grant accounting access to all these users
+    const permissionsToInsert = uniqueUserIds.map(userId => ({
       user_id: userId,
       page_identifier: 'accounting',
       has_access: true,
-      granted_by: userId
+      granted_by: user.id,
     }));
 
-    const { data: grantedPermissions, error: permError } = await supabaseClient
+    const { data: grantedPermissions, error: permError } = await supabase
       .from('user_page_permissions')
-      .upsert(grants, {
+      .upsert(permissionsToInsert, {
         onConflict: 'user_id,page_identifier',
-        ignoreDuplicates: false
+        ignoreDuplicates: false,
       })
       .select();
 
     if (permError) throw permError;
 
+    console.log(`✅ Granted accounting access to ${uniqueUserIds.length} users`);
+
     return new Response(
-      JSON.stringify({
-        success: true,
+      JSON.stringify({ 
+        success: true, 
         message: `Granted accounting access to ${uniqueUserIds.length} users`,
-        granted: grantedPermissions?.length || 0
+        granted_count: uniqueUserIds.length 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -67,7 +91,10 @@ Deno.serve(async (req) => {
     console.error('Error granting accounting access:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
