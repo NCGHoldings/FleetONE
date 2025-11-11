@@ -66,6 +66,8 @@ export interface BusStats {
   currentOdo: number;
   avgEfficiency: number;
   totalIncome: number;
+  totalExpenses: number;
+  netIncome: number;
   lastTripDate: string;
   utilizationRate: number;
 }
@@ -309,19 +311,33 @@ function processAnalyticsData(
     };
   });
 
-  // Bus statistics
+  // Bus statistics with expense mapping
   const busGroups = groupBy(trips, 'bus_id');
   const busStats: BusStats[] = Object.keys(busGroups).map(busId => {
     const busTrips = orderBy(busGroups[busId], ['trip_date'], ['desc']);
+    const busIncome = sumBy(busTrips, 'income') || 0;
+    
+    // Calculate bus expenses from expense map
+    let busExpenses = 0;
+    busTrips.forEach(trip => {
+      const key = `${trip.bus_id}_${trip.trip_date}`;
+      const expenseData = expenseMap.get(key);
+      if (expenseData) {
+        busExpenses += expenseData.total;
+      }
+    });
+    
     return {
       busNo: busId,
       totalTrips: busTrips.length,
-      totalDistance: sumBy(busTrips, 'distance_km'),
+      totalDistance: sumBy(busTrips, 'distance_km') || 0,
       currentOdo: busTrips[0]?.odo_end || 0,
       avgEfficiency: meanBy(busTrips.filter(t => t.km_per_liter > 0), 'km_per_liter') || 0,
-      totalIncome: sumBy(busTrips, 'income'),
+      totalIncome: busIncome,
+      totalExpenses: busExpenses,
+      netIncome: busIncome - busExpenses,
       lastTripDate: busTrips[0]?.trip_date || '',
-      utilizationRate: (busTrips.length / totalTrips) * 100
+      utilizationRate: totalTrips > 0 ? (busTrips.length / totalTrips) * 100 : 0
     };
   });
 
