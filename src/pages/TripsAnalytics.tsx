@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Download, TrendingUp, DollarSign, Fuel, Bus, Users, Route, Calendar, AlertCircle } from 'lucide-react';
 import { subDays } from 'date-fns';
 import { useTripsAnalytics } from '@/hooks/useTripsAnalytics';
-import KPICard from '@/components/trips-analytics/KPICard';
-import FilterPanel from '@/components/trips-analytics/FilterPanel';
+import AnimatedKPICard from '@/components/trips-analytics/AnimatedKPICard';
+import AdvancedFilterPanel from '@/components/trips-analytics/AdvancedFilterPanel';
 import InsightsPanel from '@/components/trips-analytics/InsightsPanel';
 import ExportDialog from '@/components/trips-analytics/ExportDialog';
 import RevenueTrendChart from '@/components/trips-analytics/charts/RevenueTrendChart';
@@ -18,12 +18,21 @@ import DataQualityAlert from '@/components/trips-analytics/DataQualityAlert';
 import TimeBasedAnalysis from '@/components/trips-analytics/TimeBasedAnalysis';
 import AIInsightsPanel from '@/components/trips-analytics/AIInsightsPanel';
 import ComparisonDashboard from '@/components/trips-analytics/ComparisonDashboard';
+import WaterfallChart from '@/components/trips-analytics/charts/WaterfallChart';
+import RadarComparisonChart from '@/components/trips-analytics/charts/RadarComparisonChart';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { motion } from 'framer-motion';
 
 export default function TripsAnalytics() {
-  const [dateRange, setDateRange] = useState({
+  const [dateRange, setDateRange] = useState<{
+    startDate: Date;
+    endDate: Date;
+    routes?: string[];
+    drivers?: string[];
+    buses?: string[];
+  }>({
     startDate: subDays(new Date(), 30),
     endDate: new Date()
   });
@@ -34,9 +43,25 @@ export default function TripsAnalytics() {
   const handleFilterChange = (filters: any) => {
     setDateRange({
       startDate: filters.startDate,
-      endDate: filters.endDate
+      endDate: filters.endDate,
+      routes: filters.routes,
+      drivers: filters.drivers,
+      buses: filters.buses
     });
   };
+
+  // Extract unique values for filters
+  const { availableRoutes, availableDrivers, availableBuses } = useMemo(() => {
+    if (!analytics?.rawTrips) {
+      return { availableRoutes: [], availableDrivers: [], availableBuses: [] };
+    }
+    
+    return {
+      availableRoutes: [...new Set(analytics.rawTrips.map(t => t.route_id).filter(Boolean))],
+      availableDrivers: [...new Set(analytics.rawTrips.map(t => t.driver_id).filter(Boolean))],
+      availableBuses: [...new Set(analytics.rawTrips.map(t => t.bus_id).filter(Boolean))]
+    };
+  }, [analytics]);
 
   if (error) {
     return (
@@ -73,24 +98,33 @@ export default function TripsAnalytics() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+      >
         <div>
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
             <TrendingUp className="w-8 h-8 text-primary" />
-            Daily Trips Analytics
+            Advanced Trip Analytics
           </h1>
           <p className="text-muted-foreground mt-1">
-            Comprehensive insights and performance analysis
+            Enterprise-grade insights with predictive analytics and visualizations
           </p>
         </div>
         <Button onClick={() => setExportDialogOpen(true)}>
           <Download className="w-4 h-4 mr-2" />
           Export Report
         </Button>
-      </div>
+      </motion.div>
 
-      {/* Filter Panel */}
-      <FilterPanel onFilterChange={handleFilterChange} />
+      {/* Advanced Filter Panel */}
+      <AdvancedFilterPanel 
+        onFilterChange={handleFilterChange}
+        availableRoutes={availableRoutes}
+        availableDrivers={availableDrivers}
+        availableBuses={availableBuses}
+      />
 
       {/* Data Quality Alert */}
       <DataQualityAlert 
@@ -98,61 +132,66 @@ export default function TripsAnalytics() {
         totalTrips={analytics.overview.totalTrips}
       />
 
-      {/* KPI Cards */}
+      {/* Animated KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
+        <AnimatedKPICard
           title="Total Trips"
           value={analytics.overview.totalTrips}
           icon={Calendar}
           trend={analytics.overview.tripsChange}
           trendLabel="vs last period"
+          color={analytics.overview.tripsChange > 0 ? 'success' : analytics.overview.tripsChange < 0 ? 'warning' : 'default'}
         />
-        <KPICard
+        <AnimatedKPICard
           title="Total Distance"
           value={`${analytics.overview.totalDistance.toFixed(0)} km`}
           subtitle={`Avg ${analytics.overview.avgDistancePerTrip.toFixed(1)} km/trip`}
           icon={Route}
         />
-        <KPICard
+        <AnimatedKPICard
           title="Total Revenue"
           value={analytics.overview.totalIncome}
           format="currency"
           icon={DollarSign}
           trend={analytics.overview.incomeChange}
           trendLabel="vs last period"
+          color={analytics.overview.incomeChange > 0 ? 'success' : analytics.overview.incomeChange < 0 ? 'error' : 'default'}
         />
-        <KPICard
+        <AnimatedKPICard
           title="Net Profit"
           value={analytics.overview.netProfit}
           format="currency"
           icon={TrendingUp}
           trend={analytics.overview.profitChange}
           trendLabel="vs last period"
+          color={analytics.overview.netProfit > 0 ? 'success' : 'error'}
         />
-        <KPICard
+        <AnimatedKPICard
           title="Total Expenses"
           value={analytics.overview.totalExpenses}
           format="currency"
           subtitle={`${analytics.overview.profitMargin.toFixed(1)}% profit margin`}
           icon={DollarSign}
         />
-        <KPICard
+        <AnimatedKPICard
           title="Fuel Efficiency"
           value={`${analytics.overview.avgEfficiency.toFixed(2)} km/L`}
           subtitle="Fleet average"
           icon={Fuel}
+          color={analytics.overview.avgEfficiency >= 12 ? 'success' : analytics.overview.avgEfficiency >= 10 ? 'default' : 'warning'}
         />
-        <KPICard
+        <AnimatedKPICard
           title="Active Buses"
           value={analytics.overview.activeBuses}
           subtitle="In operation"
           icon={Bus}
         />
-        <KPICard
+        <AnimatedKPICard
           title="Completion Rate"
           value={analytics.overview.completionRate}
           format="percentage"
           icon={Users}
+          color="success"
         />
       </div>
 
@@ -181,35 +220,68 @@ export default function TripsAnalytics() {
 
         {/* Comparison Dashboard Tab */}
         <TabsContent value="comparison" className="space-y-6">
-          <ComparisonDashboard
-            drivers={analytics.driverStats.map(d => ({
-              id: d.driverId,
-              name: d.driverName,
-              income: d.totalIncome,
-              expenses: d.totalExpenses,
-              netProfit: d.netIncome,
-              trips: d.totalTrips,
-              efficiency: d.avgEfficiency,
-            }))}
-            routes={analytics.routeStats.map(r => ({
-              id: r.routeNo,
-              name: r.routeName,
-              income: r.totalIncome,
-              expenses: r.totalExpenses,
-              netProfit: r.netIncome,
-              trips: r.totalTrips,
-              efficiency: 0,
-            }))}
-            buses={analytics.busStats.map(b => ({
-              id: b.busNo,
-              name: b.busNo,
-              income: b.totalIncome,
-              expenses: b.totalExpenses,
-              netProfit: b.netIncome,
-              trips: b.totalTrips,
-              efficiency: b.avgEfficiency,
-            }))}
-          />
+          <div className="grid gap-6">
+            {/* Radar Charts for Multi-Dimensional Comparison */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <RadarComparisonChart
+                title="Top Drivers Performance"
+                description="Multi-dimensional comparison of top 5 drivers"
+                items={analytics.driverStats.map(d => ({
+                  id: d.driverId,
+                  name: d.driverName,
+                  income: d.totalIncome,
+                  expenses: d.totalExpenses,
+                  trips: d.totalTrips,
+                  efficiency: d.avgEfficiency,
+                }))}
+                type="drivers"
+              />
+              <RadarComparisonChart
+                title="Top Routes Performance"
+                description="Multi-dimensional comparison of top 5 routes"
+                items={analytics.routeStats.map(r => ({
+                  id: r.routeNo,
+                  name: r.routeName,
+                  income: r.totalIncome,
+                  expenses: r.totalExpenses,
+                  trips: r.totalTrips,
+                  efficiency: r.avgEfficiency,
+                }))}
+                type="routes"
+              />
+            </div>
+
+            {/* Side-by-Side Comparison */}
+            <ComparisonDashboard
+              drivers={analytics.driverStats.map(d => ({
+                id: d.driverId,
+                name: d.driverName,
+                income: d.totalIncome,
+                expenses: d.totalExpenses,
+                netProfit: d.netIncome,
+                trips: d.totalTrips,
+                efficiency: d.avgEfficiency,
+              }))}
+              routes={analytics.routeStats.map(r => ({
+                id: r.routeNo,
+                name: r.routeName,
+                income: r.totalIncome,
+                expenses: r.totalExpenses,
+                netProfit: r.netIncome,
+                trips: r.totalTrips,
+                efficiency: 0,
+              }))}
+              buses={analytics.busStats.map(b => ({
+                id: b.busNo,
+                name: b.busNo,
+                income: b.totalIncome,
+                expenses: b.totalExpenses,
+                netProfit: b.netIncome,
+                trips: b.totalTrips,
+                efficiency: b.avgEfficiency,
+              }))}
+            />
+          </div>
         </TabsContent>
 
         {/* AI Insights Tab */}
@@ -219,6 +291,22 @@ export default function TripsAnalytics() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Waterfall Chart */}
+          <WaterfallChart
+            title="Profit Waterfall Analysis"
+            description="Visual breakdown showing how income flows to net profit"
+            data={{
+              totalIncome: analytics.overview.totalIncome,
+              fuelCost: analytics.expenseBreakdown.fuel,
+              tollCost: analytics.expenseBreakdown.toll,
+              repairCost: analytics.expenseBreakdown.repair,
+              salaries: analytics.expenseBreakdown.salaries,
+              permits: analytics.expenseBreakdown.permits,
+              otherExpenses: analytics.expenseBreakdown.other,
+              netProfit: analytics.overview.netProfit
+            }}
+          />
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               <RevenueTrendChart data={analytics.dailyTrends} />
