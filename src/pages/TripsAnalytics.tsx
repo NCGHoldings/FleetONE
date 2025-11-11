@@ -95,6 +95,32 @@ export default function TripsAnalytics() {
 
   if (!analytics) return null;
 
+  // Show empty state if no trips found
+  if (analytics.overview.totalTrips === 0) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold">Trip Analytics</h1>
+        </div>
+        <AdvancedFilterPanel
+          onFilterChange={handleFilterChange}
+          availableRoutes={availableRoutes}
+          availableDrivers={availableDrivers}
+          availableBuses={availableBuses}
+        />
+        <Card className="mt-6 p-12">
+          <div className="text-center space-y-4">
+            <TrendingUp className="h-16 w-16 mx-auto text-muted-foreground opacity-50" />
+            <h3 className="text-xl font-semibold">No Trips Found</h3>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              No trip data available for the selected period. Try expanding your date range or adjusting your filters.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -514,13 +540,13 @@ export default function TripsAnalytics() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Cost per Trip</span>
                     <span className="font-semibold">
-                      ₨{(analytics.overview.totalExpenses / analytics.overview.totalTrips).toFixed(0)}
+                      ₨{analytics.overview.totalTrips > 0 ? (analytics.overview.totalExpenses / analytics.overview.totalTrips).toFixed(0) : '0'}
                     </span>
                   </div>
                   <div className="flex justify-between mt-2">
                     <span className="text-muted-foreground">Cost per Kilometer</span>
                     <span className="font-semibold">
-                      ₨{(analytics.overview.totalExpenses / analytics.overview.totalDistance).toFixed(2)}
+                      ₨{analytics.overview.totalDistance > 0 ? (analytics.overview.totalExpenses / analytics.overview.totalDistance).toFixed(2) : '0.00'}
                     </span>
                   </div>
                 </div>

@@ -50,7 +50,28 @@ export default function WaterfallChart({ title = "Profit Waterfall Analysis", de
     };
   });
 
-  const maxValue = Math.max(...chartData.map(d => Math.max(d.start, d.end)));
+  const rawMax = Math.max(...chartData.map(d => Math.max(d.start, d.end)), 0);
+  
+  // Handle empty or zero data
+  if (rawMax <= 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {title}
+          </CardTitle>
+          {description && <CardDescription>{description}</CardDescription>}
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            No data available for waterfall analysis
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  const maxValue = rawMax;
   const chartHeight = 400;
   const barWidth = 60;
   const gap = 40;
