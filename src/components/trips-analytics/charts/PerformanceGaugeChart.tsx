@@ -18,15 +18,15 @@ export default function PerformanceGaugeChart({
   title,
 }: PerformanceGaugeChartProps) {
   const getColor = (score: number) => {
-    if (score >= 75) return "text-green-600 dark:text-green-400";
-    if (score >= 50) return "text-yellow-600 dark:text-yellow-400";
-    return "text-red-600 dark:text-red-400";
+    if (score >= 75) return "text-emerald-600 dark:text-emerald-400";
+    if (score >= 50) return "text-amber-600 dark:text-amber-400";
+    return "text-rose-600 dark:text-rose-400";
   };
 
   const getGaugeColor = (score: number) => {
-    if (score >= 75) return "stroke-green-600 dark:stroke-green-400";
-    if (score >= 50) return "stroke-yellow-600 dark:stroke-yellow-400";
-    return "stroke-red-600 dark:stroke-red-400";
+    if (score >= 75) return "stroke-emerald-500";
+    if (score >= 50) return "stroke-amber-500";
+    return "stroke-rose-500";
   };
 
   const winner = score1 > score2 ? 1 : score2 > score1 ? 2 : 0;
@@ -42,8 +42,8 @@ export default function PerformanceGaugeChart({
           cx="64"
           cy="64"
           r={radius}
-          className="stroke-muted"
-          strokeWidth="8"
+          className="stroke-slate-200 dark:stroke-slate-700"
+          strokeWidth="10"
           fill="none"
         />
         <motion.circle
@@ -51,7 +51,7 @@ export default function PerformanceGaugeChart({
           cy="64"
           r={radius}
           className={getGaugeColor(score)}
-          strokeWidth="8"
+          strokeWidth="10"
           fill="none"
           strokeLinecap="round"
           initial={{ strokeDashoffset: circumference }}

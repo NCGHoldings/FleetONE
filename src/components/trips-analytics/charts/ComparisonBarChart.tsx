@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { COMPARISON_COLORS } from "@/lib/comparison-colors";
 
 interface ComparisonBarChartProps {
   name1: string;
@@ -68,8 +69,8 @@ export default function ComparisonBarChart({
               formatter={(value: number) => [`₹${value.toLocaleString()}`, '']}
             />
             <Legend />
-            <Bar dataKey={name1} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            <Bar dataKey={name2} fill="hsl(var(--secondary))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey={name1} fill={COMPARISON_COLORS.entity1.primary} radius={[4, 4, 0, 0]} />
+            <Bar dataKey={name2} fill={COMPARISON_COLORS.entity2.primary} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

@@ -101,7 +101,7 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         .from('daily_trips')
         .select(`
           *,
-          buses!inner(registration_number),
+          buses(registration_number),
           routes(route_no, route_name),
           profiles!driver_id(first_name, last_name)
         `)
@@ -361,7 +361,12 @@ function processAnalyticsData(
     });
     
     const busInfo = busTrips[0]?.buses;
-    const busRegistration = busInfo?.registration_number || busId;
+    const busRegistration = busInfo?.registration_number || 'Unknown Bus';
+    
+    // Log warning if bus registration is missing
+    if (!busInfo?.registration_number && busId) {
+      console.warn(`Missing bus registration for bus_id: ${busId}`);
+    }
     
     return {
       busNo: busRegistration,

@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
+import { COMPARISON_COLORS } from "@/lib/comparison-colors";
 
 interface ComparisonMetricCardProps {
   title: string;
@@ -65,12 +66,12 @@ export default function ComparisonMetricCard({
                 </div>
                 <span className="text-sm font-semibold">{format(value1)}</span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${percent1}%` }}
                   transition={{ duration: 0.6, delay: 0.1 }}
-                  className={`h-full ${winner === 1 ? 'bg-primary' : 'bg-primary/60'}`}
+                  className={`h-full ${winner === 1 ? 'bg-blue-600' : 'bg-blue-400'}`}
                 />
               </div>
             </div>
@@ -84,12 +85,12 @@ export default function ComparisonMetricCard({
                 </div>
                 <span className="text-sm font-semibold">{format(value2)}</span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${percent2}%` }}
                   transition={{ duration: 0.6, delay: 0.2 }}
-                  className={`h-full ${winner === 2 ? 'bg-secondary' : 'bg-secondary/60'}`}
+                  className={`h-full ${winner === 2 ? 'bg-purple-600' : 'bg-purple-400'}`}
                 />
               </div>
             </div>

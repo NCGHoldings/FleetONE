@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
+import { COMPARISON_COLORS } from "@/lib/comparison-colors";
 
 interface ComparisonHeatMapProps {
   name1: string;
@@ -23,13 +24,16 @@ export default function ComparisonHeatMap({
     return value1 / max;
   };
 
-  const getColorClass = (intensity: number, winner: boolean) => {
-    if (!winner) return "bg-muted/50";
-    if (intensity >= 0.8) return "bg-green-600 dark:bg-green-400";
-    if (intensity >= 0.6) return "bg-green-500 dark:bg-green-500";
-    if (intensity >= 0.4) return "bg-yellow-500 dark:bg-yellow-500";
-    if (intensity >= 0.2) return "bg-orange-500 dark:bg-orange-500";
-    return "bg-red-500 dark:bg-red-500";
+  const getColorClass = (intensity: number, isEntity1: boolean) => {
+    const baseColor = isEntity1 ? 'blue' : 'purple';
+    
+    if (intensity > 0.7) {
+      return `bg-${baseColor}-600 dark:bg-${baseColor}-500 text-white`;
+    }
+    if (intensity > 0.4) {
+      return `bg-${baseColor}-400 dark:bg-${baseColor}-600 text-white`;
+    }
+    return `bg-${baseColor}-300 dark:bg-${baseColor}-700 text-white`;
   };
 
   return (
@@ -55,23 +59,19 @@ export default function ComparisonHeatMap({
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: idx * 0.05 }}
-                    className={`p-3 rounded-lg ${getColorClass(intensity1, winner1)} transition-colors`}
+                    className={`p-4 rounded-lg text-center transition-all ${getColorClass(intensity1, true)} ${winner1 ? 'ring-2 ring-yellow-400 shadow-lg' : ''}`}
                   >
-                    <div className="text-xs font-medium text-white/90">{name1}</div>
-                    <div className="text-sm font-bold text-white">
-                      {metric.format(metric.value1)}
-                    </div>
+                    <div className="font-semibold text-lg">{metric.format(metric.value1)}</div>
+                    {winner1 && <div className="text-xs mt-1 opacity-90">Winner</div>}
                   </motion.div>
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: idx * 0.05 + 0.05 }}
-                    className={`p-3 rounded-lg ${getColorClass(intensity2, winner2)} transition-colors`}
+                    transition={{ delay: idx * 0.05 + 0.025 }}
+                    className={`p-4 rounded-lg text-center transition-all ${getColorClass(intensity2, false)} ${winner2 ? 'ring-2 ring-yellow-400 shadow-lg' : ''}`}
                   >
-                    <div className="text-xs font-medium text-white/90">{name2}</div>
-                    <div className="text-sm font-bold text-white">
-                      {metric.format(metric.value2)}
-                    </div>
+                    <div className="font-semibold text-lg">{metric.format(metric.value2)}</div>
+                    {winner2 && <div className="text-xs mt-1 opacity-90">Winner</div>}
                   </motion.div>
                 </div>
               </div>

@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeftRight, DollarSign, TrendingDown, TrendingUp, Gauge } from "lucide-react";
+import { ArrowLeftRight, DollarSign, TrendingDown, TrendingUp, Gauge, Trophy } from "lucide-react";
+import { motion } from "framer-motion";
+import { COMPARISON_COLORS } from "@/lib/comparison-colors";
 import ComparisonMetricCard from "./charts/ComparisonMetricCard";
 import ComparisonBarChart from "./charts/ComparisonBarChart";
 import ComparisonLineChart from "./charts/ComparisonLineChart";
@@ -265,40 +267,45 @@ export default function ComparisonDashboard({
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-          <div className="space-y-1">
-            <div className="text-sm font-medium text-muted-foreground">Comparing</div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-base">{item1.name}</Badge>
-              <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-              <Badge variant="outline" className="text-base">{item2.name}</Badge>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-6 mb-6"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="text-sm text-slate-600 dark:text-slate-400 mb-1">Entity 1</h3>
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{item1.name}</p>
+              <Badge className="mt-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700">
+                Score: {score1.toFixed(1)}
+              </Badge>
+            </div>
+            
+            <div className="mx-8 text-4xl font-bold text-slate-400 dark:text-slate-600">VS</div>
+            
+            <div className="flex-1 text-right">
+              <h3 className="text-sm text-slate-600 dark:text-slate-400 mb-1">Entity 2</h3>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{item2.name}</p>
+              <Badge className="mt-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-300 dark:border-purple-700">
+                Score: {score2.toFixed(1)}
+              </Badge>
             </div>
           </div>
-          <div className="space-y-1">
-            <div className="text-sm font-medium text-muted-foreground">Overall Winner</div>
-            <div className="flex items-center gap-2">
-              {score1 > score2 ? (
-                <>
-                  <Badge className="text-base">{item1.name}</Badge>
-                  <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  <span className="text-sm text-muted-foreground">
-                    ({score1} vs {score2} score)
-                  </span>
-                </>
+
+          <div className="mt-6 pt-6 border-t border-slate-300 dark:border-slate-700 flex items-center justify-center gap-3">
+            <Trophy className="h-6 w-6 text-yellow-500" />
+            <span className="text-lg font-semibold">
+              Winner: {score1 > score2 ? (
+                <span className="text-blue-600 dark:text-blue-400">{item1.name}</span>
               ) : score2 > score1 ? (
-                <>
-                  <Badge className="text-base">{item2.name}</Badge>
-                  <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  <span className="text-sm text-muted-foreground">
-                    ({score2} vs {score1} score)
-                  </span>
-                </>
+                <span className="text-purple-600 dark:text-purple-400">{item2.name}</span>
               ) : (
-                <Badge variant="outline" className="text-base">Tie</Badge>
+                <span className="text-slate-600 dark:text-slate-400">Tie</span>
               )}
-            </div>
+            </span>
+            <Trophy className="h-6 w-6 text-yellow-500" />
           </div>
-        </div>
+        </motion.div>
 
         {/* Tabbed Comparison Views */}
         <Tabs defaultValue="overview" className="w-full">

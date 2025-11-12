@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { COMPARISON_COLORS } from "@/lib/comparison-colors";
 
 interface ComparisonLineChartProps {
   name1: string;
@@ -57,16 +58,18 @@ export default function ComparisonLineChart({
             <Line 
               type="monotone" 
               dataKey={name1} 
-              stroke="hsl(var(--primary))" 
-              strokeWidth={2}
-              dot={{ fill: 'hsl(var(--primary))' }}
+              stroke={COMPARISON_COLORS.entity1.primary}
+              strokeWidth={3}
+              dot={{ fill: COMPARISON_COLORS.entity1.primary, r: 5 }}
+              activeDot={{ r: 7 }}
             />
             <Line 
               type="monotone" 
               dataKey={name2} 
-              stroke="hsl(var(--secondary))" 
-              strokeWidth={2}
-              dot={{ fill: 'hsl(var(--secondary))' }}
+              stroke={COMPARISON_COLORS.entity2.primary}
+              strokeWidth={3}
+              dot={{ fill: COMPARISON_COLORS.entity2.primary, r: 5 }}
+              activeDot={{ r: 7 }}
             />
           </LineChart>
         </ResponsiveContainer>
