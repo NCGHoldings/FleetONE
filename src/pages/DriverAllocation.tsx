@@ -173,14 +173,14 @@ export default function DriverAllocation() {
           end_time: r.end_time,
           status: r.status,
           
-          // Display database values, not Excel notes
-          bus_no: actualBus?.bus_no || meta?.bus_no || 'N/A',
-          route_no: actualRoute?.route_no || meta?.route_no || 'N/A',
-          route_name: actualRoute?.route_name || meta?.route || 'N/A',
+          // DISPLAY EXCEL VALUES: Show what user uploaded, not database IDs
+          bus_no: actualBus?.bus_no || meta?.excel_bus_no || meta?.bus_no || 'N/A',
+          route_no: meta?.excel_route_no || actualRoute?.route_no || meta?.route_no || 'N/A',
+          route_name: meta?.excel_route_name || actualRoute?.route_name || meta?.route || 'N/A',
           
-          // Use actual linked profiles first
-          driver_name: driver ? `${driver.first_name} ${driver.last_name}` : meta?.driver || 'N/A',
-          conductor_name: conductor ? `${conductor.first_name} ${conductor.last_name}` : meta?.conductor || 'N/A',
+          // Use actual linked profiles first, then Excel names
+          driver_name: driver ? `${driver.first_name} ${driver.last_name}` : meta?.excel_driver || meta?.driver || 'N/A',
+          conductor_name: conductor ? `${conductor.first_name} ${conductor.last_name}` : meta?.excel_conductor || meta?.conductor || 'N/A',
           driver_phone: driver?.phone || meta?.whatsapp,
           conductor_phone: conductor?.phone,
           
@@ -678,19 +678,21 @@ export default function DriverAllocation() {
             end_time: time ? addHours(time, 8) : '18:00',
             status: 'confirmed',
             notes: JSON.stringify({
-              // Store ONLY validated database values, not Excel values
+              // Store BOTH database and Excel values for proper display
               bus_no: foundBus?.bus_no || null,
+              excel_bus_no: busNo, // Always store Excel value
               route_no: foundRoute?.route_no || null,
+              excel_route_no: routeNo, // Always store Excel route number
               route: foundRoute?.route_name || null,
+              excel_route_name: routeName, // Always store Excel route name
               driver: foundDriver ? `${foundDriver.first_name} ${foundDriver.last_name}` : null,
+              excel_driver: driverName, // Always store Excel driver name
               conductor: foundConductor ? `${foundConductor.first_name} ${foundConductor.last_name}` : null,
+              excel_conductor: conductorName, // Always store Excel conductor name
               whatsapp: foundDriver?.phone || whatsapp,
               time: timeValue,
-              // Store original Excel values for reference
-              excel_bus: busNo !== foundBus?.bus_no ? busNo : null,
-              excel_route: routeName !== foundRoute?.route_name ? routeName : null,
-              excel_driver: driverName !== (foundDriver ? `${foundDriver.first_name} ${foundDriver.last_name}` : null) ? driverName : null,
-              import_warnings: !foundBus || !foundDriver || !foundConductor ? 'Missing data' : null
+              import_warnings: !foundBus || !foundDriver || !foundConductor ? 'Missing data' : null,
+              import_timestamp: new Date().toISOString()
             })
           });
         });

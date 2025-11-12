@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx-js-style';
-import { Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
+import { ImportValidationReport } from './ImportValidationReport';
+import type { ValidationRow } from './ImportValidationReport';
 
 interface BulkImportModalProps {
   isOpen: boolean;
@@ -30,6 +33,10 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<AllocationData[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
+  const [validationResults, setValidationResults] = useState<ValidationRow[]>([]);
+  const [showValidation, setShowValidation] = useState(false);
+  const [autoCreateMissing, setAutoCreateMissing] = useState(true);
+  const [isValidating, setIsValidating] = useState(false);
 
   const downloadSampleTemplate = () => {
     const sampleData = [
@@ -224,16 +231,155 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
     reader.readAsArrayBuffer(uploadedFile);
   };
 
+  const validateDataAgainstDatabase = async () => {
+    if (parsedData.length === 0) {
+      toast.error('No data to validate');
+      return;
+    }
+
+    setIsValidating(true);
+    setShowValidation(false);
+
+    try {
+      // Fetch existing data from database
+      const [busesResult, routesResult, staffResult] = await Promise.all([
+        supabase.from('buses').select('id, bus_no'),
+        supabase.from('routes').select('id, route_no, route_name'),
+        supabase.from('profiles').select('user_id, first_name, last_name')
+      ]);
+
+      const buses = busesResult.data || [];
+      const routes = routesResult.data || [];
+      const staff = staffResult.data || [];
+
+      const validationResults: ValidationRow[] = parsedData.map((allocation, index) => {
+        const rowNumber = index + 2; // Excel row (1-indexed + header)
+        
+        // Check bus
+        const busFound = buses.find(b => b.bus_no === allocation.busNo);
+        const busCheck = {
+          status: busFound ? 'found' : (autoCreateMissing ? 'will_create' : 'not_found'),
+          message: busFound 
+            ? `✓ Bus "${allocation.busNo}" exists in database` 
+            : autoCreateMissing
+              ? `Will create new bus "${allocation.busNo}"`
+              : `❌ Bus "${allocation.busNo}" not found in database`
+        };
+
+        // Check route (by route_no OR route_name)
+        const routeFound = routes.find(r => 
+          r.route_no === allocation.routeNo || 
+          r.route_name?.toLowerCase().includes(allocation.routeName?.toLowerCase())
+        );
+        const routeCheck = {
+          status: routeFound ? 'found' : (autoCreateMissing ? 'will_create' : 'not_found'),
+          message: routeFound 
+            ? `✓ Route "${allocation.routeNo}" → "${routeFound.route_name}"` 
+            : autoCreateMissing
+              ? `Will create new route "${allocation.routeNo} - ${allocation.routeName}"`
+              : `❌ Route "${allocation.routeNo}" not found`
+        };
+
+        // Check driver
+        const driverFound = staff.find(s => 
+          s.first_name?.toLowerCase() === allocation.driverName?.toLowerCase()
+        );
+        const driverCheck = {
+          status: driverFound ? 'found' : (autoCreateMissing ? 'will_create' : 'not_found'),
+          message: driverFound 
+            ? `✓ Driver "${allocation.driverName}" exists` 
+            : autoCreateMissing
+              ? `Will create new driver profile for "${allocation.driverName}"`
+              : `❌ Driver "${allocation.driverName}" not found`
+        };
+
+        // Check conductor
+        const conductorFound = staff.find(s => 
+          s.first_name?.toLowerCase() === allocation.conductorName?.toLowerCase()
+        );
+        const conductorCheck = {
+          status: conductorFound ? 'found' : (autoCreateMissing ? 'will_create' : 'not_found'),
+          message: conductorFound 
+            ? `✓ Conductor "${allocation.conductorName}" exists` 
+            : autoCreateMissing
+              ? `Will create new conductor profile for "${allocation.conductorName}"`
+              : `❌ Conductor "${allocation.conductorName}" not found`
+        };
+
+        // Validate date format
+        const dateValid = allocation.date && /^\d{2}\/\d{2}\/\d{4}$/.test(allocation.date);
+        const dateCheck = {
+          status: dateValid ? 'valid' : 'invalid',
+          message: dateValid ? `✓ Valid date: ${allocation.date}` : `❌ Invalid date format: ${allocation.date}`
+        };
+
+        // Validate WhatsApp (optional)
+        const whatsappValid = !allocation.whatsapp || /^0\d{9}$/.test(allocation.whatsapp);
+        const whatsappCheck = {
+          status: allocation.whatsapp ? (whatsappValid ? 'valid' : 'invalid') : 'missing',
+          message: allocation.whatsapp 
+            ? whatsappValid 
+              ? `✓ Valid WhatsApp: ${allocation.whatsapp}` 
+              : `⚠ Invalid WhatsApp format: ${allocation.whatsapp}`
+            : 'No WhatsApp number provided (optional)'
+        };
+
+        // Determine overall row status
+        let rowStatus: 'valid' | 'warning' | 'error' = 'valid';
+        
+        if (!dateValid || (!autoCreateMissing && (!busFound || !routeFound || !driverFound || !conductorFound))) {
+          rowStatus = 'error';
+        } else if (!busFound || !routeFound || !driverFound || !conductorFound || !whatsappValid) {
+          rowStatus = 'warning';
+        }
+
+        return {
+          rowNumber,
+          status: rowStatus,
+          data: allocation,
+          checks: {
+            bus: busCheck as any,
+            route: routeCheck as any,
+            driver: driverCheck as any,
+            conductor: conductorCheck as any,
+            date: dateCheck as any,
+            whatsapp: whatsappCheck as any
+          }
+        };
+      });
+
+      setValidationResults(validationResults);
+      setShowValidation(true);
+      
+      const errorCount = validationResults.filter(r => r.status === 'error').length;
+      const warningCount = validationResults.filter(r => r.status === 'warning').length;
+      
+      if (errorCount > 0) {
+        toast.error(`Validation complete: ${errorCount} error(s) found`);
+      } else if (warningCount > 0) {
+        toast.success(`Validation complete: ${warningCount} warning(s)`);
+      } else {
+        toast.success('✓ All rows validated successfully!');
+      }
+      
+    } catch (error: any) {
+      console.error('Validation error:', error);
+      toast.error('Failed to validate data: ' + error.message);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
   const handleBulkImport = async () => {
     if (parsedData.length === 0) {
       toast.error('No data to import. Please upload an Excel file first.');
       return;
     }
 
-    // Only block on actual errors, not warnings
-    const actualErrors = parseErrors.filter(msg => !msg.includes('may be invalid'));
-    if (actualErrors.length > 0) {
-      toast.error('Please fix validation errors before importing');
+    // Check validation results for errors
+    const errorRows = validationResults.filter(r => r.status === 'error');
+    if (errorRows.length > 0 && !autoCreateMissing) {
+      toast.error(`Cannot import: ${errorRows.length} row(s) have critical errors`);
       return;
     }
 
@@ -247,7 +393,10 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
           'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ allocations: parsedData })
+        body: JSON.stringify({ 
+          allocations: parsedData,
+          autoCreateMissing: autoCreateMissing 
+        })
       });
 
       if (!response.ok) {
@@ -296,6 +445,8 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
         setFile(null);
         setParsedData([]);
         setParseErrors([]);
+        setValidationResults([]);
+        setShowValidation(false);
       }
 
       // Display general errors
@@ -316,17 +467,25 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5" />
-            Bulk Import Driver Allocations from Excel
+            {showValidation ? 'Import Validation Report' : 'Bulk Import Driver Allocations from Excel'}
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
-          {/* Instructions */}
-          <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+          {showValidation ? (
+            // Validation Report View
+            <ImportValidationReport 
+              validationResults={validationResults}
+              autoCreateEnabled={autoCreateMissing}
+            />
+          ) : (
+            <>
+              {/* Instructions */}
+              <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
             <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Excel Format Instructions:</h4>
             <ul className="text-blue-800 dark:text-blue-200 space-y-1 text-sm">
               <li>• Required columns: <strong>Bus No, Route No, Route Name, Driver, Conductor, Date, Time</strong></li>
@@ -420,39 +579,67 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
             </div>
           )}
 
-          {/* What Will Be Created */}
-          {parsedData.length > 0 && parseErrors.length === 0 && (
-            <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg border border-green-200 dark:border-green-800">
-              <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">Ready to Import:</h4>
-              <ul className="text-green-800 dark:text-green-200 space-y-1 text-sm">
-                <li>• {parsedData.length} driver allocations will be created</li>
-                <li>• New buses, routes, and staff members will be created automatically if they don't exist</li>
-                <li>• Each allocation will generate a corresponding daily trip entry</li>
-              </ul>
+          {/* Auto-Create Option */}
+          {parsedData.length > 0 && (
+            <div className="flex items-center space-x-2 p-4 border rounded-lg">
+              <Checkbox 
+                id="auto-create"
+                checked={autoCreateMissing}
+                onCheckedChange={(checked) => setAutoCreateMissing(checked as boolean)}
+              />
+              <div className="flex-1">
+                <label htmlFor="auto-create" className="text-sm font-medium cursor-pointer">
+                  Automatically create missing buses, routes, drivers, and conductors
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  If disabled, import will fail for rows with missing data. If enabled, new profiles will be created with default values.
+                </p>
+              </div>
             </div>
           )}
-
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={onClose} disabled={isProcessing}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleBulkImport} 
-              disabled={isProcessing || parsedData.length === 0 || parseErrors.some(msg => !msg.includes('may be invalid'))}
-              className="flex items-center gap-2"
-            >
-              {isProcessing ? (
-                <>Processing...</>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  Import {parsedData.length} Allocations
-                </>
-              )}
-            </Button>
-          </div>
+            </>
+          )}
         </div>
+
+        {/* Footer with Action Buttons */}
+        <DialogFooter className="border-t pt-4">
+          {showValidation ? (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowValidation(false)}
+                disabled={isProcessing}
+              >
+                ← Back to Upload
+              </Button>
+              <Button 
+                onClick={handleBulkImport}
+                disabled={isProcessing || validationResults.filter(r => r.status === 'error').length > 0}
+                className="gap-2"
+              >
+                {isProcessing ? 'Importing...' : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Import {parsedData.length} Allocations
+                  </>
+                )}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose} disabled={isProcessing}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={validateDataAgainstDatabase}
+                disabled={isValidating || parsedData.length === 0}
+                className="gap-2"
+              >
+                {isValidating ? 'Validating...' : 'Validate & Preview →'}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

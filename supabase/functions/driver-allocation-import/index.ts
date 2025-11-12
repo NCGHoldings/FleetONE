@@ -18,8 +18,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { allocations } = await req.json()
+    const { allocations, autoCreateMissing = true } = await req.json()
     console.log('Received bulk import request with', allocations.length, 'allocations')
+    console.log('Auto-create missing entities:', autoCreateMissing)
     console.log('First allocation sample:', JSON.stringify(allocations[0], null, 2))
 
     const results = {
@@ -78,6 +79,10 @@ serve(async (req) => {
           .single()
 
         if (!bus) {
+          if (!autoCreateMissing) {
+            throw new Error(`Bus "${busNo}" not found in database. Enable auto-create to create it automatically.`)
+          }
+          
           const { data: newBus, error: busError } = await supabase
             .from('buses')
             .insert({
@@ -105,6 +110,10 @@ serve(async (req) => {
           .single()
 
         if (!route) {
+          if (!autoCreateMissing) {
+            throw new Error(`Route "${routeNo}" not found in database. Enable auto-create to create it automatically.`)
+          }
+          
           const { data: newRoute, error: routeError } = await supabase
             .from('routes')
             .insert({
@@ -131,6 +140,10 @@ serve(async (req) => {
           .single()
 
         if (!driver) {
+          if (!autoCreateMissing) {
+            throw new Error(`Driver "${driverName}" not found in database. Enable auto-create to create automatically.`)
+          }
+          
           // Create a placeholder user_id for the driver
           const driverId = crypto.randomUUID()
           
@@ -139,8 +152,8 @@ serve(async (req) => {
             .insert({
               user_id: driverId,
               first_name: driverName.trim(),
-              last_name: 'Driver',
-              phone: '0701234567',
+              last_name: '',
+              phone: '0000000000',
               status: 'active',
               hire_date: new Date().toISOString().split('T')[0],
               employee_id: `DRV-${Date.now()}`
@@ -150,9 +163,7 @@ serve(async (req) => {
 
           if (driverError) {
             console.error('Driver creation error:', driverError)
-            // Skip this allocation if we can't create the driver
-            results.errors.push(`Failed to create driver ${driverName}: ${driverError.message}`)
-            continue
+            throw new Error(`Failed to create driver ${driverName}: ${driverError.message}`)
           }
 
           // Assign driver role
@@ -175,6 +186,10 @@ serve(async (req) => {
           .single()
 
         if (!conductor) {
+          if (!autoCreateMissing) {
+            throw new Error(`Conductor "${conductorName}" not found in database. Enable auto-create to create automatically.`)
+          }
+          
           const conductorId = crypto.randomUUID()
           
           const { data: newConductor, error: conductorError } = await supabase
@@ -182,8 +197,8 @@ serve(async (req) => {
             .insert({
               user_id: conductorId,
               first_name: conductorName.trim(),
-              last_name: 'Conductor',
-              phone: whatsapp || '0701234567',
+              last_name: '',
+              phone: whatsapp || '0000000000',
               status: 'active',
               hire_date: new Date().toISOString().split('T')[0],
               employee_id: `CON-${Date.now()}`
@@ -193,8 +208,7 @@ serve(async (req) => {
 
           if (conductorError) {
             console.error('Conductor creation error:', conductorError)
-            results.errors.push(`Failed to create conductor ${conductorName}: ${conductorError.message}`)
-            continue
+            throw new Error(`Failed to create conductor ${conductorName}: ${conductorError.message}`)
           }
 
           // Assign conductor role
@@ -297,15 +311,22 @@ serve(async (req) => {
 
         // Create driver allocation with comprehensive notes
         const allocationNotes = JSON.stringify({
-          bus_no: busNo,
-          route_no: routeNo,
-          route: routeName,
-          driver: driverName,
-          conductor: conductorName,
+          // Store BOTH database and Excel values for proper display
+          bus_no: bus ? busNo : null,
+          excel_bus_no: busNo,
+          route_no: route ? routeNo : null,
+          excel_route_no: routeNo,
+          route: route ? routeName : null,
+          excel_route_name: routeName,
+          driver: driver ? driverName : null,
+          excel_driver: driverName,
+          conductor: conductor ? conductorName : null,
+          excel_conductor: conductorName,
           whatsapp: whatsapp,
           time: time,
           import_source: 'excel_bulk_import',
-          import_timestamp: new Date().toISOString()
+          import_timestamp: new Date().toISOString(),
+          auto_created: autoCreateMissing
         })
 
         const { data: newAllocation, error: allocationError } = await supabase
