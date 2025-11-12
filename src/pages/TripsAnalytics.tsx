@@ -20,6 +20,8 @@ import AIInsightsPanel from '@/components/trips-analytics/AIInsightsPanel';
 import ComparisonDashboard from '@/components/trips-analytics/ComparisonDashboard';
 import WaterfallChart from '@/components/trips-analytics/charts/WaterfallChart';
 import RadarComparisonChart from '@/components/trips-analytics/charts/RadarComparisonChart';
+import SankeyFlowChart from '@/components/trips-analytics/charts/SankeyFlowChart';
+import CircularRevenueChart from '@/components/trips-analytics/charts/CircularRevenueChart';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -344,10 +346,10 @@ const handleFilterChange = useCallback((filters: any) => {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Waterfall Chart */}
-          <WaterfallChart
-            title="Profit Waterfall Analysis"
-            description="Visual breakdown showing how income flows to net profit"
+          {/* Sankey Flow Diagram - Full Width */}
+          <SankeyFlowChart
+            title="Financial Flow Visualization"
+            description="Complete flow from total revenue through all expense categories to net profit"
             data={{
               totalIncome: analytics.overview.totalIncome,
               fuelCost: analytics.expenseBreakdown.fuel,
@@ -359,6 +361,35 @@ const handleFilterChange = useCallback((filters: any) => {
               netProfit: analytics.overview.netProfit
             }}
           />
+
+          {/* Waterfall & Circular Revenue in 2-column grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <WaterfallChart
+              title="Profit Waterfall Analysis"
+              description="Step-by-step breakdown from income to profit"
+              data={{
+                totalIncome: analytics.overview.totalIncome,
+                fuelCost: analytics.expenseBreakdown.fuel,
+                tollCost: analytics.expenseBreakdown.toll,
+                repairCost: analytics.expenseBreakdown.repair,
+                salaries: analytics.expenseBreakdown.salaries,
+                permits: analytics.expenseBreakdown.permits,
+                otherExpenses: analytics.expenseBreakdown.other,
+                netProfit: analytics.overview.netProfit
+              }}
+            />
+            
+            <CircularRevenueChart
+              title="Top Routes Revenue"
+              description="Revenue distribution by route performance"
+              data={analytics.routeStats.map(r => ({
+                name: r.routeName,
+                value: r.totalIncome,
+                id: r.routeNo
+              }))}
+              type="routes"
+            />
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">

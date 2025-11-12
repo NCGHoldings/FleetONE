@@ -72,21 +72,34 @@ export default function WaterfallChart({ title = "Profit Waterfall Analysis", de
   }
   
   const maxValue = rawMax;
-  const chartHeight = 400;
-  const barWidth = 60;
-  const gap = 40;
+  const chartHeight = 500; // Increased from 400
+  const barWidth = 80; // Increased from 60
+  const gap = 50; // Increased from 40
   const totalWidth = chartData.length * (barWidth + gap);
 
   const getBarColor = (type: string) => {
     switch (type) {
       case 'positive':
-        return 'hsl(var(--chart-1))';
+        return '#3b82f6'; // Blue
       case 'negative':
-        return 'hsl(var(--chart-5))';
+        return '#a855f7'; // Purple
       case 'total':
-        return 'hsl(var(--primary))';
+        return '#10b981'; // Emerald
       default:
-        return 'hsl(var(--muted))';
+        return '#6b7280'; // Gray
+    }
+  };
+  
+  const getBarGradient = (type: string) => {
+    switch (type) {
+      case 'positive':
+        return 'url(#blueGradient)';
+      case 'negative':
+        return 'url(#purpleGradient)';
+      case 'total':
+        return 'url(#emeraldGradient)';
+      default:
+        return '#6b7280';
     }
   };
 
@@ -105,6 +118,25 @@ export default function WaterfallChart({ title = "Profit Waterfall Analysis", de
             height={chartHeight + 100}
             className="mx-auto"
           >
+            {/* Define Gradients */}
+            <defs>
+              <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity="1" />
+                <stop offset="100%" stopColor="#60a5fa" stopOpacity="1" />
+              </linearGradient>
+              <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#a855f7" stopOpacity="1" />
+                <stop offset="100%" stopColor="#c084fc" stopOpacity="1" />
+              </linearGradient>
+              <linearGradient id="emeraldGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="1" />
+                <stop offset="100%" stopColor="#34d399" stopOpacity="1" />
+              </linearGradient>
+              <filter id="shadow">
+                <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity="0.2" />
+              </filter>
+            </defs>
+            
             {/* Gridlines */}
             {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => (
               <g key={i}>
@@ -164,9 +196,10 @@ export default function WaterfallChart({ title = "Profit Waterfall Analysis", de
                     }}
                     x={x}
                     width={barWidth}
-                    fill={getBarColor(item.type)}
-                    rx="4"
-                    className="hover:opacity-80 transition-opacity cursor-pointer"
+                    fill={getBarGradient(item.type)}
+                    rx="8"
+                    filter="url(#shadow)"
+                    className="hover:opacity-90 transition-opacity cursor-pointer"
                   />
 
                   {/* Value label on bar */}
@@ -175,13 +208,28 @@ export default function WaterfallChart({ title = "Profit Waterfall Analysis", de
                     animate={{ opacity: 1 }}
                     transition={{ delay: index * 0.1 + 0.3 }}
                     x={x + barWidth / 2}
-                    y={y - 10}
-                    fontSize="12"
-                    fontWeight="600"
+                    y={y - 12}
+                    fontSize="14"
+                    fontWeight="700"
                     fill="hsl(var(--foreground))"
                     textAnchor="middle"
                   >
                     ₨{(Math.abs(item.value) / 1000).toFixed(0)}k
+                  </motion.text>
+                  
+                  {/* Percentage label */}
+                  <motion.text
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: index * 0.1 + 0.4 }}
+                    x={x + barWidth / 2}
+                    y={y - 28}
+                    fontSize="11"
+                    fontWeight="600"
+                    fill={getBarColor(item.type)}
+                    textAnchor="middle"
+                  >
+                    {((Math.abs(item.value) / data.totalIncome) * 100).toFixed(1)}%
                   </motion.text>
 
                   {/* Icon */}
@@ -213,8 +261,9 @@ export default function WaterfallChart({ title = "Profit Waterfall Analysis", de
                   <text
                     x={x + barWidth / 2}
                     y={chartHeight + 20}
-                    fontSize="11"
-                    fill="hsl(var(--muted-foreground))"
+                    fontSize="12"
+                    fontWeight="600"
+                    fill="hsl(var(--foreground))"
                     textAnchor="middle"
                     transform={`rotate(-45, ${x + barWidth / 2}, ${chartHeight + 20})`}
                   >

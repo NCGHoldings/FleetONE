@@ -47,3 +47,30 @@ export const COMPARISON_COLORS = {
     border: 'border-blue-200 dark:border-blue-800',
   },
 } as const;
+
+// Financial visualization colors for Sankey and other charts
+export const FINANCIAL_COLORS = {
+  income: {
+    primary: '#3b82f6',
+    dark: '#2563eb',
+    gradient: ['#3b82f6', '#60a5fa'],
+  },
+  expenses: {
+    primary: '#a855f7',
+    dark: '#9333ea',
+    gradient: ['#a855f7', '#c084fc'],
+  },
+  profit: {
+    primary: '#10b981',
+    dark: '#059669',
+    gradient: ['#10b981', '#34d399'],
+  },
+  categories: {
+    fuel: '#f59e0b',
+    highway: '#ef4444',
+    repair: '#8b5cf6',
+    salary: '#06b6d4',
+    permits: '#ec4899',
+    other: '#6b7280',
+  }
+} as const;
