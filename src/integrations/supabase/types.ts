@@ -689,6 +689,77 @@ export type Database = {
           },
         ]
       }
+      conductor_submissions: {
+        Row: {
+          applied_at: string | null
+          applied_to_trip_id: string | null
+          bus_number: string | null
+          conductor_name: string
+          conductor_phone: string
+          created_at: string | null
+          id: string
+          image_url: string
+          ocr_data: Json | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status:
+            | Database["public"]["Enums"]["conductor_submission_status"]
+            | null
+          submission_code: string
+          trip_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_to_trip_id?: string | null
+          bus_number?: string | null
+          conductor_name: string
+          conductor_phone: string
+          created_at?: string | null
+          id?: string
+          image_url: string
+          ocr_data?: Json | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?:
+            | Database["public"]["Enums"]["conductor_submission_status"]
+            | null
+          submission_code: string
+          trip_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          applied_to_trip_id?: string | null
+          bus_number?: string | null
+          conductor_name?: string
+          conductor_phone?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string
+          ocr_data?: Json | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?:
+            | Database["public"]["Enums"]["conductor_submission_status"]
+            | null
+          submission_code?: string
+          trip_date?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conductor_submissions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       daily_bus_expenses: {
         Row: {
           accident_compensation: number | null
@@ -813,16 +884,19 @@ export type Database = {
           conductor_id: string | null
           created_at: string
           created_by: string | null
+          data_source: Database["public"]["Enums"]["data_source_type"] | null
           diesel_price_per_liter: number | null
           distance_km: number | null
           driver_id: string | null
           end_time: string | null
+          entry_deadline_exceeded: boolean | null
           fuel_cost: number | null
           fuel_liters: number | null
           id: string
           income: number | null
           income_details: Json | null
           km_per_liter: number | null
+          late_entry_request_id: string | null
           net_income: number | null
           notes: string | null
           odometer_end: number | null
@@ -845,16 +919,19 @@ export type Database = {
           conductor_id?: string | null
           created_at?: string
           created_by?: string | null
+          data_source?: Database["public"]["Enums"]["data_source_type"] | null
           diesel_price_per_liter?: number | null
           distance_km?: number | null
           driver_id?: string | null
           end_time?: string | null
+          entry_deadline_exceeded?: boolean | null
           fuel_cost?: number | null
           fuel_liters?: number | null
           id?: string
           income?: number | null
           income_details?: Json | null
           km_per_liter?: number | null
+          late_entry_request_id?: string | null
           net_income?: number | null
           notes?: string | null
           odometer_end?: number | null
@@ -877,16 +954,19 @@ export type Database = {
           conductor_id?: string | null
           created_at?: string
           created_by?: string | null
+          data_source?: Database["public"]["Enums"]["data_source_type"] | null
           diesel_price_per_liter?: number | null
           distance_km?: number | null
           driver_id?: string | null
           end_time?: string | null
+          entry_deadline_exceeded?: boolean | null
           fuel_cost?: number | null
           fuel_liters?: number | null
           id?: string
           income?: number | null
           income_details?: Json | null
           km_per_liter?: number | null
+          late_entry_request_id?: string | null
           net_income?: number | null
           notes?: string | null
           odometer_end?: number | null
@@ -923,6 +1003,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_trips_late_entry_request_id_fkey"
+            columns: ["late_entry_request_id"]
+            isOneToOne: false
+            referencedRelation: "late_entry_requests"
             referencedColumns: ["id"]
           },
           {
@@ -2021,6 +2108,60 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "journal_entries"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      late_entry_requests: {
+        Row: {
+          created_at: string | null
+          id: string
+          reason: string
+          requested_by: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["late_entry_status"] | null
+          trip_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          reason: string
+          requested_by: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["late_entry_status"] | null
+          trip_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          reason?: string
+          requested_by?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["late_entry_status"] | null
+          trip_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "late_entry_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "late_entry_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -7978,6 +8119,7 @@ export type Database = {
         Args: { p_parent_id: string }
         Returns: string
       }
+      generate_submission_code: { Args: never; Returns: string }
       generate_yutong_invoice_no: { Args: never; Returns: string }
       generate_yutong_order_no: { Args: never; Returns: string }
       generate_yutong_quotation_no:
@@ -8045,6 +8187,13 @@ export type Database = {
         | "governance_viewer"
       approval_status: "pending" | "approved" | "rejected"
       ar_ap_status: "unpaid" | "partial" | "paid" | "overdue"
+      conductor_submission_status:
+        | "pending"
+        | "processing"
+        | "reviewed"
+        | "approved"
+        | "rejected"
+        | "applied"
       customs_status:
         | "draft"
         | "submitted"
@@ -8055,6 +8204,7 @@ export type Database = {
         | "cleared"
         | "held"
         | "rejected"
+      data_source_type: "manual" | "ocr" | "conductor_portal" | "import"
       delivery_status:
         | "pending"
         | "scheduled"
@@ -8088,6 +8238,7 @@ export type Database = {
         | "failed"
         | "approved"
       journal_status: "draft" | "posted" | "void"
+      late_entry_status: "pending" | "approved" | "rejected"
       maintenance_status: "pending" | "in_progress" | "completed" | "cancelled"
       notification_status: "pending" | "sent" | "failed"
       notification_type: "REMINDER_3_DAY" | "REMINDER_TODAY" | "OVERDUE"
@@ -8326,6 +8477,14 @@ export const Constants = {
       ],
       approval_status: ["pending", "approved", "rejected"],
       ar_ap_status: ["unpaid", "partial", "paid", "overdue"],
+      conductor_submission_status: [
+        "pending",
+        "processing",
+        "reviewed",
+        "approved",
+        "rejected",
+        "applied",
+      ],
       customs_status: [
         "draft",
         "submitted",
@@ -8337,6 +8496,7 @@ export const Constants = {
         "held",
         "rejected",
       ],
+      data_source_type: ["manual", "ocr", "conductor_portal", "import"],
       delivery_status: [
         "pending",
         "scheduled",
@@ -8374,6 +8534,7 @@ export const Constants = {
         "approved",
       ],
       journal_status: ["draft", "posted", "void"],
+      late_entry_status: ["pending", "approved", "rejected"],
       maintenance_status: ["pending", "in_progress", "completed", "cancelled"],
       notification_status: ["pending", "sent", "failed"],
       notification_type: ["REMINDER_3_DAY", "REMINDER_TODAY", "OVERDUE"],
