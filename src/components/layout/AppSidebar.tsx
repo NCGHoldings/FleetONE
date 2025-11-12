@@ -73,8 +73,18 @@ const operationsItems = [
   { id: "staff_attendance", title: "Staff Attendance", url: "/attendance", icon: Calendar },
   { id: "school_bus_service", title: "School Bus Service", url: "/school-bus-service", icon: GraduationCap },
   { id: "complaints", title: "Complaints", url: "/complaints", icon: AlertTriangle },
-  { id: "conductor_submissions", title: "Conductor Submissions", url: "/trips/conductor-submissions", icon: Upload },
-  { id: "late_entry_requests", title: "Late Entry Requests", url: "/trips/late-entry-requests", icon: Clock },
+  {
+    id: "conductor_submissions",
+    title: "Conductor Submissions",
+    url: "/trips/conductor-submissions",
+    icon: Upload,
+  },
+  {
+    id: "late_entry_requests",
+    title: "Late Entry Requests",
+    url: "/trips/late-entry-requests",
+    icon: Clock,
+  },
 ];
 
 const businessItems = [

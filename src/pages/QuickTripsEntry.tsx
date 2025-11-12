@@ -44,7 +44,15 @@ export default function QuickTripsEntry() {
   const [showOCRUpload, setShowOCRUpload] = useState(false);
   const [showLateEntryModal, setShowLateEntryModal] = useState(false);
   const [existingRequest, setExistingRequest] = useState<any>(null);
-  const { checkDeadlineStatus, checkExistingRequest, requestLateEntry } = useDataEntryDeadline();
+
+  const {
+    deadlineHours,
+    enforcementEnabled,
+    checkDeadlineStatus,
+    checkExistingRequest,
+    requestLateEntry
+  } = useDataEntryDeadline();
+
   const deadlineStatus = checkDeadlineStatus(selectedDate);
 
   useEffect(() => {

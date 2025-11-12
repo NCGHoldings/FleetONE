@@ -8,14 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
 
 export default function Settings() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -366,11 +368,20 @@ export default function Settings() {
           <div className="grid gap-6 max-w-2xl">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  Data Entry Deadline
+                <CardTitle className="flex items-center justify-between">
+                  Data Entry Deadline Settings
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/trips/late-entry-requests')}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    Review Requests
+                  </Button>
                 </CardTitle>
-                <CardDescription>Configure deadline enforcement for daily trip data entry</CardDescription>
+                <CardDescription>
+                  Configure deadline enforcement for trip data entry. Users must enter data within the specified timeframe or request approval.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <DataEntrySettings />
@@ -383,11 +394,20 @@ export default function Settings() {
           <div className="grid gap-6 max-w-2xl">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <QrCode className="w-5 h-5" />
-                  Conductor Upload QR Code
+                <CardTitle className="flex items-center justify-between">
+                  <span>QR Code Generator</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/trips/conductor-submissions')}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    View Submissions
+                  </Button>
                 </CardTitle>
-                <CardDescription>Generate QR code for conductors to upload trip sheets</CardDescription>
+                <CardDescription>
+                  Generate and share QR codes for conductor trip sheet uploads. Conductors can scan this code to quickly access the upload portal.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ConductorSubmissionQRGenerator />

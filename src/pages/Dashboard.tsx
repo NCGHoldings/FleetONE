@@ -19,6 +19,8 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { DataEntryControlWidget } from "@/components/dashboard/DataEntryControlWidget";
 
 // Mock data for demonstration
 const revenueData = [
@@ -43,31 +45,8 @@ const recentAlerts = [
 ];
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const [pendingConductorSubmissions, setPendingConductorSubmissions] = useState(0);
-  const [pendingLateRequests, setPendingLateRequests] = useState(0);
-
-  useEffect(() => {
-    loadPendingCounts();
-  }, []);
-
-  const loadPendingCounts = async () => {
-    // Load pending conductor submissions
-    const { count: conductorCount } = await supabase
-      .from('conductor_submissions')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending');
-
-    setPendingConductorSubmissions(conductorCount || 0);
-
-    // Load pending late entry requests
-    const { count: lateCount } = await supabase
-      .from('late_entry_requests')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending');
-
-    setPendingLateRequests(lateCount || 0);
-  };
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -158,6 +137,11 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Data Entry Control Widget */}
+      {isAdmin && (
+        <DataEntryControlWidget />
+      )}
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Chart */}
@@ -232,56 +216,10 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Data Entry Control Row */}
-      {(pendingConductorSubmissions > 0 || pendingLateRequests > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {pendingConductorSubmissions > 0 && (
-            <Card className="card-elevated border-warning/50">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Upload className="w-5 h-5 text-warning" />
-                    Conductor Submissions
-                  </div>
-                  <Badge variant="default" className="bg-warning">
-                    {pendingConductorSubmissions} Pending
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {pendingConductorSubmissions} conductor trip sheet{pendingConductorSubmissions !== 1 ? 's' : ''} awaiting review
-                </p>
-                <Button onClick={() => navigate('/trips/conductor-submissions')} className="w-full">
-                  Review Submissions
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {pendingLateRequests > 0 && (
-            <Card className="card-elevated border-destructive/50">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-destructive" />
-                    Late Entry Requests
-                  </div>
-                  <Badge variant="destructive">
-                    {pendingLateRequests} Pending
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {pendingLateRequests} late entry request{pendingLateRequests !== 1 ? 's' : ''} awaiting approval
-                </p>
-                <Button onClick={() => navigate('/trips/late-entry-requests')} className="w-full" variant="destructive">
-                  Review Requests
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+      {/* Data Entry Control Widget */}
+      {isAdmin && (
+        <div className="col-span-1 md:col-span-2 lg:col-span-4">
+          <DataEntryControlWidget />
         </div>
       )}
 
