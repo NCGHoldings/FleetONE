@@ -180,9 +180,17 @@ export default function AdvancedFilterPanel({
     localStorage.setItem('trip-analytics-presets', JSON.stringify(updatedPresets));
   };
 
-  useEffect(() => {
-    emitFilters();
-  }, [selectedRoutes, selectedDrivers, selectedBuses]);
+// Fire once on mount
+useEffect(() => {
+  emitFilters();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+// Debounce frequent filter changes
+useEffect(() => {
+  const id = setTimeout(() => emitFilters(), 250);
+  return () => clearTimeout(id);
+}, [selectedRoutes, selectedDrivers, selectedBuses]);
 
   const activeFilterCount = selectedRoutes.length + selectedDrivers.length + selectedBuses.length;
 

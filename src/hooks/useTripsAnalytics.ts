@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfDay, endOfDay, subDays, differenceInDays, format } from 'date-fns';
-import { groupBy, sumBy, meanBy, maxBy, minBy, orderBy } from 'lodash';
+import { groupBy, sumBy, meanBy, orderBy } from 'lodash';
 
 export interface AnalyticsFilters {
   startDate: Date;
@@ -80,25 +81,34 @@ export interface Insight {
 }
 
 export function useTripsAnalytics(filters: AnalyticsFilters) {
-  return useQuery({
-    queryKey: ['trips-analytics', filters],
+  const stableKey = {
+    startDate: format(filters.startDate, 'yyyy-MM-dd'),
+    endDate: format(filters.endDate, 'yyyy-MM-dd'),
+    routes: (filters.routes ?? []).slice().sort(),
+    drivers: (filters.drivers ?? []).slice().sort(),
+    buses: (filters.buses ?? []).slice().sort(),
+    status: filters.status ?? null,
+  };
+
+  return useQuery<ReturnType<typeof processAnalyticsData>, Error>({
+    queryKey: ['trips-analytics', stableKey],
     queryFn: async () => {
       // Fetch trips data
       const { data: trips, error: tripsError } = await supabase
         .from('daily_trips')
         .select('*')
-        .gte('trip_date', format(filters.startDate, 'yyyy-MM-dd'))
-        .lte('trip_date', format(filters.endDate, 'yyyy-MM-dd'))
+        .gte('trip_date', stableKey.startDate)
+        .lte('trip_date', stableKey.endDate)
         .order('trip_date', { ascending: false });
 
       if (tripsError) throw tripsError;
 
-    // Fetch expenses data - remove buses join to avoid errors
-    const { data: expenses, error: expensesError } = await supabase
-      .from('daily_bus_expenses')
-      .select('*')
-      .gte('expense_date', format(filters.startDate, 'yyyy-MM-dd'))
-      .lte('expense_date', format(filters.endDate, 'yyyy-MM-dd'));
+      // Fetch expenses data - remove buses join to avoid errors
+      const { data: expenses, error: expensesError } = await supabase
+        .from('daily_bus_expenses')
+        .select('*')
+        .gte('expense_date', stableKey.startDate)
+        .lte('expense_date', stableKey.endDate);
 
       // Don't throw on expense errors - continue with trips data only
       if (expensesError) {
@@ -108,22 +118,27 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
       // Apply additional filters
       let filteredTrips = trips || [];
       
-      if (filters.routes && filters.routes.length > 0) {
-        filteredTrips = filteredTrips.filter(t => filters.routes!.includes(t.route_id));
+      if (stableKey.routes && stableKey.routes.length > 0) {
+        filteredTrips = filteredTrips.filter(t => stableKey.routes!.includes(t.route_id));
       }
-      if (filters.drivers && filters.drivers.length > 0) {
-        filteredTrips = filteredTrips.filter(t => filters.drivers!.includes(t.driver_id));
+      if (stableKey.drivers && stableKey.drivers.length > 0) {
+        filteredTrips = filteredTrips.filter(t => stableKey.drivers!.includes(t.driver_id));
       }
-      if (filters.conductors && filters.conductors.length > 0) {
-        filteredTrips = filteredTrips.filter(t => filters.conductors!.includes(t.conductor_id));
+      if ((filters as any).conductors && (filters as any).conductors.length > 0) {
+        filteredTrips = filteredTrips.filter(t => (filters as any).conductors!.includes(t.conductor_id));
       }
-      if (filters.buses && filters.buses.length > 0) {
-        filteredTrips = filteredTrips.filter(t => filters.buses!.includes(t.bus_id));
+      if (stableKey.buses && stableKey.buses.length > 0) {
+        filteredTrips = filteredTrips.filter(t => stableKey.buses!.includes(t.bus_id));
       }
 
       return processAnalyticsData(filteredTrips, expenses || [], filters, !!expensesError);
     },
-    staleTime: 30000,
+    staleTime: 120000,
+    gcTime: 600000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    retry: 1,
+    // Keep periodic background updates without UI flicker
     refetchInterval: 60000,
   });
 }

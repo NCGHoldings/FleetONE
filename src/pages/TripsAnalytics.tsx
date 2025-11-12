@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -40,15 +40,42 @@ export default function TripsAnalytics() {
 
   const { data: analytics, isLoading, error } = useTripsAnalytics(dateRange);
 
-  const handleFilterChange = (filters: any) => {
-    setDateRange({
-      startDate: filters.startDate,
-      endDate: filters.endDate,
-      routes: filters.routes,
-      drivers: filters.drivers,
-      buses: filters.buses
+const handleFilterChange = useCallback((filters: any) => {
+    setDateRange((prev) => {
+      const prevStart = prev.startDate instanceof Date ? prev.startDate.getTime() : 0;
+      const prevEnd = prev.endDate instanceof Date ? prev.endDate.getTime() : 0;
+      const nextStart = filters.startDate instanceof Date ? filters.startDate.getTime() : 0;
+      const nextEnd = filters.endDate instanceof Date ? filters.endDate.getTime() : 0;
+
+      const sameDates = prevStart === nextStart && prevEnd === nextEnd;
+      const eq = (a?: string[], b?: string[]) => {
+        if (!a && !b) return true;
+        if (!a || !b) return false;
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+          if (a[i] !== b[i]) return false;
+        }
+        return true;
+      };
+
+      if (
+        sameDates &&
+        eq(prev.routes, filters.routes) &&
+        eq(prev.drivers, filters.drivers) &&
+        eq(prev.buses, filters.buses)
+      ) {
+        return prev;
+      }
+
+      return {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        routes: filters.routes,
+        drivers: filters.drivers,
+        buses: filters.buses,
+      };
     });
-  };
+  }, []);
 
   // Extract unique values for filters
   const { availableRoutes, availableDrivers, availableBuses } = useMemo(() => {
@@ -95,7 +122,7 @@ export default function TripsAnalytics() {
 
   if (!analytics) return null;
 
-  // Show empty state if no trips found
+// Show empty state if no trips found
   if (analytics.overview.totalTrips === 0) {
     return (
       <div className="container mx-auto p-6">
