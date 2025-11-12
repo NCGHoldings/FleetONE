@@ -33,6 +33,9 @@ export interface TripData {
   status?: string;
   odo_start?: number;
   odo_end?: number;
+  buses?: { registration_number: string };
+  routes?: { route_no: string; route_name: string };
+  profiles?: { first_name: string; last_name: string };
 }
 
 export interface DriverStats {
@@ -93,10 +96,15 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
   return useQuery<ReturnType<typeof processAnalyticsData>, Error>({
     queryKey: ['trips-analytics', stableKey],
     queryFn: async () => {
-      // Fetch trips data
+      // Fetch trips data with related tables
       const { data: trips, error: tripsError } = await supabase
         .from('daily_trips')
-        .select('*')
+        .select(`
+          *,
+          buses!inner(registration_number),
+          routes(route_no, route_name),
+          profiles!driver_id(first_name, last_name)
+        `)
         .gte('trip_date', stableKey.startDate)
         .lte('trip_date', stableKey.endDate)
         .order('trip_date', { ascending: false });
@@ -276,9 +284,14 @@ function processAnalyticsData(
       }
     });
     
+    const driverProfile = driverTrips[0]?.profiles;
+    const driverName = driverProfile 
+      ? `${driverProfile.first_name} ${driverProfile.last_name}`.trim() 
+      : 'Unknown Driver';
+    
     return {
       driverId: driver,
-      driverName: driver,
+      driverName: driverName,
       totalTrips: driverTrips.length,
       totalDistance: sumBy(driverTrips, 'distance_km'),
       totalIncome: driverIncome,
@@ -313,9 +326,14 @@ function processAnalyticsData(
     });
     
     const netIncome = income - routeExpenses;
+    const routeInfo = routeTrips[0]?.routes;
+    const displayRouteName = routeInfo 
+      ? `${routeInfo.route_no} - ${routeInfo.route_name}` 
+      : routeNo;
+    
     return {
       routeNo,
-      routeName: routeNo,
+      routeName: displayRouteName,
       totalTrips: routeTrips.length,
       totalDistance: sumBy(routeTrips, 'distance_km'),
       totalIncome: income,
@@ -342,8 +360,11 @@ function processAnalyticsData(
       }
     });
     
+    const busInfo = busTrips[0]?.buses;
+    const busRegistration = busInfo?.registration_number || busId;
+    
     return {
-      busNo: busId,
+      busNo: busRegistration,
       totalTrips: busTrips.length,
       totalDistance: sumBy(busTrips, 'distance_km') || 0,
       currentOdo: busTrips[0]?.odo_end || 0,
