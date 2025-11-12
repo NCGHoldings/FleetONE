@@ -7,9 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
+import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
+import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -92,7 +95,18 @@ export default function Settings() {
         <p className="text-muted-foreground">Manage your account settings and preferences</p>
       </div>
 
-      <div className="grid gap-6 max-w-2xl">
+      <Tabs defaultValue="account" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
+          <TabsTrigger value="account">Account</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="display">Display</TabsTrigger>
+          <TabsTrigger value="admin">Admin</TabsTrigger>
+          <TabsTrigger value="data-entry">Data Entry</TabsTrigger>
+          <TabsTrigger value="qr-codes">QR Codes</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="account" className="space-y-6 mt-6">
+          <div className="grid gap-6 max-w-2xl">
         {/* Account Security */}
         <Card>
           <CardHeader>
@@ -212,6 +226,85 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+          </div>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-6 mt-6">
+          <div className="grid gap-6 max-w-2xl">
+        {/* Notification Preferences */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="w-5 h-5" />
+              Notification Preferences
+            </CardTitle>
+            <CardDescription>Choose what notifications you want to receive</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Email Notifications</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receive notifications via email
+                </p>
+              </div>
+              <Switch
+                checked={preferences.emailNotifications}
+                onCheckedChange={() => handlePreferenceChange("emailNotifications")}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Push Notifications</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receive push notifications in the browser
+                </p>
+              </div>
+              <Switch
+                checked={preferences.pushNotifications}
+                onCheckedChange={() => handlePreferenceChange("pushNotifications")}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Payment Reminders</Label>
+                <p className="text-sm text-muted-foreground">
+                  Get reminders about upcoming payments
+                </p>
+              </div>
+              <Switch
+                checked={preferences.paymentReminders}
+                onCheckedChange={() => handlePreferenceChange("paymentReminders")}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Trip Updates</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receive updates about trip status changes
+                </p>
+              </div>
+              <Switch
+                checked={preferences.tripUpdates}
+                onCheckedChange={() => handlePreferenceChange("tripUpdates")}
+              />
+            </div>
+          </CardContent>
+        </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="display" className="space-y-6 mt-6">
+          <div className="grid gap-6 max-w-2xl">
         {/* Display Preferences */}
         <Card>
           <CardHeader>
@@ -242,7 +335,11 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
+          </div>
+        </TabsContent>
 
+        <TabsContent value="admin" className="space-y-6 mt-6">
+          <div className="grid gap-6 max-w-2xl">
         {/* Admin Features */}
         <Card>
           <CardHeader>
@@ -262,7 +359,43 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="data-entry" className="space-y-6 mt-6">
+          <div className="grid gap-6 max-w-2xl">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Data Entry Deadline
+                </CardTitle>
+                <CardDescription>Configure deadline enforcement for daily trip data entry</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DataEntrySettings />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="qr-codes" className="space-y-6 mt-6">
+          <div className="grid gap-6 max-w-2xl">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <QrCode className="w-5 h-5" />
+                  Conductor Upload QR Code
+                </CardTitle>
+                <CardDescription>Generate QR code for conductors to upload trip sheets</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ConductorSubmissionQRGenerator />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

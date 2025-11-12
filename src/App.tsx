@@ -43,6 +43,9 @@ import StaffPerformance from "./pages/StaffPerformance";
 import PublicComplaint from "./pages/PublicComplaint";
 import PublicSpecialHire from "./pages/PublicSpecialHire";
 import PublicReceiptUpload from "./pages/PublicReceiptUpload";
+import PublicConductorUpload from "./pages/PublicConductorUpload";
+import { ConductorSubmissionsReview } from "./components/trips/ConductorSubmissionsReview";
+import { LateEntryApprovalInterface } from "./components/trips/LateEntryApprovalInterface";
 import SchoolImportPage from "./pages/SchoolImportPage";
 import CustomerManagement from "./pages/CustomerManagement";
 import AddStudentForm from "./pages/AddStudentForm";
@@ -78,6 +81,7 @@ const App = () => (
             <Route path="/public/complaint" element={<PublicComplaint />} />
             <Route path="/public/special-hire" element={<PublicSpecialHire />} />
             <Route path="/public/receipt-upload" element={<PublicReceiptUpload />} />
+            <Route path="/public/conductor-upload" element={<PublicConductorUpload />} />
             
             {/* Protected routes wrapped in AppLayout */}
             <Route 
@@ -149,6 +153,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <QuickTripsEntry />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/trips/conductor-submissions" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
+                  <PageAccessGuard pageId="conductor_submissions">
+                    <AppLayout>
+                      <ConductorSubmissionsReview />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/trips/late-entry-requests" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
+                  <PageAccessGuard pageId="late_entry_requests">
+                    <AppLayout>
+                      <LateEntryApprovalInterface />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />

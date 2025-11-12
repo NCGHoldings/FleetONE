@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { CalendarIcon, ArrowLeft, Menu, Upload, Camera } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CalendarIcon, ArrowLeft, Menu, Upload, Camera, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { cn, formatDateDisplay } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +14,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { QuickEntryBusList } from "@/components/trips/QuickEntryBusList";
 import { QuickEntryForm } from "@/components/trips/QuickEntryForm";
 import { OCRImageUpload, ExtractedMultiTripData } from "@/components/trips/OCRImageUpload";
+import { useDataEntryDeadline } from "@/hooks/useDataEntryDeadline";
+import { LateEntryRequestModal } from "@/components/trips/LateEntryRequestModal";
 
 interface TripData {
   id: string;
@@ -39,10 +42,20 @@ export default function QuickTripsEntry() {
   const [showBusList, setShowBusList] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedMultiTripData[]>([]);
   const [showOCRUpload, setShowOCRUpload] = useState(false);
+  const [showLateEntryModal, setShowLateEntryModal] = useState(false);
+  const [existingRequest, setExistingRequest] = useState<any>(null);
+  const { checkDeadlineStatus, checkExistingRequest, requestLateEntry } = useDataEntryDeadline();
+  const deadlineStatus = checkDeadlineStatus(selectedDate);
 
   useEffect(() => {
     loadTripsForDate(selectedDate);
+    checkForExistingRequest();
   }, [selectedDate]);
+
+  const checkForExistingRequest = async () => {
+    const request = await checkExistingRequest(selectedDate);
+    setExistingRequest(request);
+  };
 
   useEffect(() => {
     // Auto-open OCR section if no trips have data
@@ -297,6 +310,38 @@ export default function QuickTripsEntry() {
           </div>
         </div>
 
+        {/* Deadline Warning */}
+        {!deadlineStatus.canEnter && (
+          <div className="border-b bg-warning/10 p-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Data entry deadline exceeded by {deadlineStatus.hoursExceeded} hours. 
+                {existingRequest ? (
+                  existingRequest.status === 'pending' ? (
+                    <span className="ml-2 font-medium">Late entry request pending approval.</span>
+                  ) : existingRequest.status === 'approved' ? (
+                    <span className="ml-2 font-medium text-success">Late entry approved! You can now enter data.</span>
+                  ) : (
+                    <span className="ml-2 font-medium">Late entry request rejected.</span>
+                  )
+                ) : (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="ml-2"
+                      onClick={() => setShowLateEntryModal(true)}
+                    >
+                      Request Approval
+                    </Button>
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
         {/* OCR Upload Section */}
         {showOCRUpload && (
           <div className="border-b bg-muted/30 p-4">
@@ -307,6 +352,23 @@ export default function QuickTripsEntry() {
           </div>
         )}
       </div>
+
+      {/* Late Entry Request Modal */}
+      <LateEntryRequestModal
+        open={showLateEntryModal}
+        onOpenChange={setShowLateEntryModal}
+        tripDate={selectedDate}
+        hoursExceeded={deadlineStatus.hoursExceeded}
+        deadline={deadlineStatus.deadline}
+        onSubmit={async (reason) => {
+          const success = await requestLateEntry(selectedDate, reason);
+          if (success) {
+            setShowLateEntryModal(false);
+            checkForExistingRequest();
+          }
+        }}
+        existingRequest={existingRequest}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
