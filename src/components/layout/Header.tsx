@@ -1,5 +1,5 @@
-import { Bell, Search, User, Settings, LogOut, ChevronRight } from "lucide-react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { Bell, Search, User, Settings, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,15 +13,11 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useSeasonalThemeContext } from "../seasonal/SeasonalThemeProvider";
-import { getBreadcrumbs } from "@/lib/route-names";
 
 export function Header() {
   const { user, userProfile, userRoles, signOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const { activeTheme, isThemeActive } = useSeasonalThemeContext();
-  
-  const breadcrumbs = getBreadcrumbs(location.pathname);
 
   const getInitials = (firstName?: string, lastName?: string) => {
     if (!firstName && !lastName) return "U";
@@ -56,42 +52,11 @@ export function Header() {
           {activeTheme.theme_config.greeting}
         </div>
       )}
-      <div className="flex items-center gap-6 flex-1">
-        {/* Breadcrumb Navigation */}
-        <nav className="flex items-center gap-2 text-sm animate-slide-in" aria-label="Breadcrumb">
-          {breadcrumbs.map((crumb, index) => {
-            const isLast = index === breadcrumbs.length - 1;
-            const Icon = crumb.icon;
-            
-            return (
-              <div key={crumb.path} className="flex items-center gap-2">
-                {index > 0 && (
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                )}
-                {isLast ? (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
-                    {Icon && <Icon className="w-4 h-4 text-primary" />}
-                    <span className="font-semibold text-primary">{crumb.name}</span>
-                  </div>
-                ) : (
-                  <Link
-                    to={crumb.path}
-                    className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-all duration-200"
-                  >
-                    {Icon && <Icon className="w-4 h-4" />}
-                    <span>{crumb.name}</span>
-                  </Link>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-
-        {/* Search Bar - Hidden on smaller screens */}
-        <div className="relative w-80 animate-scale-in hidden lg:block ml-auto">
+      <div className="flex items-center gap-4 flex-1">
+        <div className="relative w-96 animate-scale-in">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 animate-pulse-subtle" />
           <Input 
-            placeholder="Search..." 
+            placeholder="Search trips, buses, staff..." 
             className="pl-10 bg-gradient-to-r from-muted/30 to-muted/60 border-border/50 focus:bg-gradient-to-r focus:from-primary/5 focus:to-accent/5 transition-all duration-300 hover:shadow-md focus:shadow-primary/20"
           />
         </div>
