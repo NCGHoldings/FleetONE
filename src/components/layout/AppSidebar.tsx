@@ -145,11 +145,18 @@ export function AppSidebar() {
     }
   };
 
-const isActive = (path: string) => currentPath === path;
-const getNavCls = ({ isActive }: { isActive: boolean }) =>
-  isActive 
-    ? "bg-gradient-to-r from-primary to-primary-hover text-primary-foreground font-medium shadow-primary animate-pulse-subtle" 
-    : "hover:bg-accent/10 text-sidebar-foreground hover:text-primary hover:bg-gradient-to-r hover:from-accent/5 hover:to-primary/5 transition-all duration-300 ease-out hover:shadow-sm hover:scale-[1.02]";
+  const isActive = (path: string) => {
+    // Exact match or starts with path (for sub-routes)
+    return currentPath === path || 
+           (path !== '/' && currentPath.startsWith(path + '/'));
+  };
+  
+  const getNavCls = (itemUrl: string) => {
+    const active = isActive(itemUrl);
+    return active 
+      ? "bg-gradient-to-r from-primary/20 via-primary/15 to-accent/20 text-primary font-semibold shadow-lg border-l-4 border-primary animate-pulse-subtle relative before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary/5 before:to-transparent before:animate-shimmer" 
+      : "hover:bg-accent/10 text-sidebar-foreground hover:text-primary transition-all duration-200";
+  };
 
 // Filter items based on user-specific page permissions (default allow)
 const visibleMain = mainItems.filter((i) => hasAccess(i.id));
@@ -182,9 +189,16 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <NavLink to="/" end className={getNavCls}>
-                    <Home className="w-5 h-5 transition-all duration-300" />
+                  <NavLink 
+                    to="/" 
+                    className={() => getNavCls('/')}
+                    end
+                  >
+                    <Home className={`w-5 h-5 transition-all duration-200 ${isActive('/') ? 'text-primary scale-110' : ''}`} />
                     {!collapsed && <span className="font-medium transition-all duration-300">Home</span>}
+                    {!collapsed && isActive('/') && (
+                      <div className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    )}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -202,9 +216,15 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 {visibleMain.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
-      <NavLink to={item.url} end className={getNavCls}>
-        <item.icon className="w-5 h-5 transition-all duration-300" />
+      <NavLink 
+        to={item.url} 
+        className={() => getNavCls(item.url)}
+      >
+        <item.icon className={`w-5 h-5 transition-all duration-200 ${isActive(item.url) ? 'text-primary scale-110' : ''}`} />
         {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+        {!collapsed && isActive(item.url) && (
+          <div className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+        )}
       </NavLink>
     </SidebarMenuButton>
   </SidebarMenuItem>
@@ -223,9 +243,15 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 {visibleOperations.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
-      <NavLink to={item.url} className={getNavCls}>
-        <item.icon className="w-5 h-5 transition-all duration-300" />
+      <NavLink 
+        to={item.url} 
+        className={() => getNavCls(item.url)}
+      >
+        <item.icon className={`w-5 h-5 transition-all duration-200 ${isActive(item.url) ? 'text-primary scale-110' : ''}`} />
         {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+        {!collapsed && isActive(item.url) && (
+          <div className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+        )}
       </NavLink>
     </SidebarMenuButton>
   </SidebarMenuItem>
@@ -244,9 +270,15 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 {visibleBusiness.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
-      <NavLink to={item.url} className={getNavCls}>
-        <item.icon className="w-5 h-5 transition-all duration-300" />
+      <NavLink 
+        to={item.url} 
+        className={() => getNavCls(item.url)}
+      >
+        <item.icon className={`w-5 h-5 transition-all duration-200 ${isActive(item.url) ? 'text-primary scale-110' : ''}`} />
         {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+        {!collapsed && isActive(item.url) && (
+          <div className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+        )}
       </NavLink>
     </SidebarMenuButton>
   </SidebarMenuItem>
@@ -265,9 +297,15 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 {visibleYutong.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
-      <NavLink to={item.url} className={getNavCls}>
-        <item.icon className="w-5 h-5 transition-all duration-300" />
+      <NavLink 
+        to={item.url} 
+        className={() => getNavCls(item.url)}
+      >
+        <item.icon className={`w-5 h-5 transition-all duration-200 ${isActive(item.url) ? 'text-primary scale-110' : ''}`} />
         {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+        {!collapsed && isActive(item.url) && (
+          <div className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+        )}
       </NavLink>
     </SidebarMenuButton>
   </SidebarMenuItem>
@@ -287,9 +325,15 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 {visibleFinance.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
-      <NavLink to={item.url} className={getNavCls}>
-        <item.icon className="w-5 h-5 transition-all duration-300" />
+      <NavLink 
+        to={item.url} 
+        className={() => getNavCls(item.url)}
+      >
+        <item.icon className={`w-5 h-5 transition-all duration-200 ${isActive(item.url) ? 'text-primary scale-110' : ''}`} />
         {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+        {!collapsed && isActive(item.url) && (
+          <div className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+        )}
       </NavLink>
     </SidebarMenuButton>
   </SidebarMenuItem>
@@ -309,9 +353,15 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 {visibleNSP.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
-      <NavLink to={item.url} className={getNavCls}>
-        <item.icon className="w-5 h-5 transition-all duration-300" />
+      <NavLink 
+        to={item.url} 
+        className={() => getNavCls(item.url)}
+      >
+        <item.icon className={`w-5 h-5 transition-all duration-200 ${isActive(item.url) ? 'text-primary scale-110' : ''}`} />
         {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+        {!collapsed && isActive(item.url) && (
+          <div className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+        )}
       </NavLink>
     </SidebarMenuButton>
   </SidebarMenuItem>
@@ -331,9 +381,15 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 {visibleGovernance.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
-      <NavLink to={item.url} className={getNavCls}>
-        <item.icon className="w-5 h-5 transition-all duration-300" />
+      <NavLink 
+        to={item.url} 
+        className={() => getNavCls(item.url)}
+      >
+        <item.icon className={`w-5 h-5 transition-all duration-200 ${isActive(item.url) ? 'text-primary scale-110' : ''}`} />
         {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+        {!collapsed && isActive(item.url) && (
+          <div className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+        )}
       </NavLink>
     </SidebarMenuButton>
   </SidebarMenuItem>
