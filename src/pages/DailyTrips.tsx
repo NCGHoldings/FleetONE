@@ -23,18 +23,35 @@ export default function DailyTrips() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [viewMode, setViewMode] = useState<"table" | "cards">(isMobile ? "cards" : "table");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showGLExportModal, setShowGLExportModal] = useState(false);
   const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
   
+  // Validate and prepare date range for hook
+  const validDateRange = dateMode === "range" && dateRange?.from && dateRange?.to
+    ? { from: dateRange.from, to: dateRange.to }
+    : undefined;
+
+  // Debug logging
+  console.log('🔍 DEBUG: DailyTrips Component State:', {
+    dateMode,
+    selectedDate: selectedDate?.toISOString(),
+    dateRange: {
+      from: dateRange?.from?.toISOString(),
+      to: dateRange?.to?.toISOString(),
+    },
+    validDateRange: {
+      from: validDateRange?.from?.toISOString(),
+      to: validDateRange?.to?.toISOString(),
+    },
+  });
+  
   const { busSummaries, fleetSummary, loading, refetch } = useDailyBusGroupedTrips(
     dateMode === "single" ? selectedDate : null,
-    dateMode === "range" && dateRange?.from && dateRange?.to 
-      ? { from: dateRange.from, to: dateRange.to } 
-      : undefined
+    validDateRange
   );
 
   return (
