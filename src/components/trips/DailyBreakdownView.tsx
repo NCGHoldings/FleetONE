@@ -37,9 +37,30 @@ export function DailyBreakdownView({ summaries, dateRange }: DailyBreakdownViewP
   });
 
   // Populate with actual trip data
+  console.log('🔍 DEBUG: DailyBreakdownView Processing:', {
+    summariesCount: summaries.length,
+    dateRangeFrom: format(dateRange.from, 'yyyy-MM-dd'),
+    dateRangeTo: format(dateRange.to, 'yyyy-MM-dd'),
+    totalDays: allDays.length,
+  });
+
   summaries.forEach(summary => {
+    console.log(`Processing bus ${summary.bus_no}:`, {
+      totalTrips: summary.trips.length,
+      trips: summary.trips.map(t => ({ 
+        trip_no: t.trip_no,
+        date: t.trip_date, 
+        income: t.income 
+      })),
+    });
+
     summary.trips.forEach(trip => {
       const breakdown = dailyBreakdowns.get(trip.trip_date);
+      console.log(`Adding trip ${trip.trip_no} to ${trip.trip_date}:`, {
+        breakdownExists: !!breakdown,
+        currentTripCount: breakdown?.tripCount || 0,
+      });
+      
       if (breakdown) {
         breakdown.tripCount++;
         breakdown.revenue += trip.income || 0;
@@ -47,8 +68,19 @@ export function DailyBreakdownView({ summaries, dateRange }: DailyBreakdownViewP
         
         const busCount = breakdown.buses.get(summary.bus_no) || 0;
         breakdown.buses.set(summary.bus_no, busCount + 1);
+      } else {
+        console.warn(`⚠️ Trip date ${trip.trip_date} not in breakdown map!`);
       }
     });
+  });
+
+  console.log('📊 Final breakdown data:', {
+    totalBreakdowns: dailyBreakdowns.size,
+    breakdowns: Array.from(dailyBreakdowns.entries()).map(([date, data]) => ({
+      date,
+      tripCount: data.tripCount,
+      buses: data.buses.size,
+    })),
   });
 
   // Calculate statistics

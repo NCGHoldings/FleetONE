@@ -122,11 +122,23 @@ export function useDailyBusGroupedTrips(
         fromDateStr = format(dateRange.from, 'yyyy-MM-dd');
         toDateStr = format(dateRange.to, 'yyyy-MM-dd');
         isRangeQuery = true;
-        console.log('📅 Querying Daily Trips for range:', fromDateStr, 'to', toDateStr);
+        console.log('🔍 DEBUG: Date Range Query Details:', {
+          isRangeQuery,
+          fromDateStr,
+          toDateStr,
+          dateRangeFrom: dateRange?.from,
+          dateRangeTo: dateRange?.to,
+          fromDate: dateRange.from.toISOString(),
+          toDate: dateRange.to.toISOString(),
+        });
       } else if (selectedDate) {
         fromDateStr = toDateStr = format(selectedDate, 'yyyy-MM-dd');
-        console.log('📅 Querying Daily Trips for date:', fromDateStr);
+        console.log('🔍 DEBUG: Single Date Query:', {
+          selectedDate,
+          dateStr: fromDateStr,
+        });
       } else {
+        console.warn('⚠️ No date or date range provided');
         return;
       }
 
@@ -161,8 +173,41 @@ export function useDailyBusGroupedTrips(
         tripsQuery = tripsQuery.eq('trip_date', fromDateStr);
       }
 
+      const queryStartTime = performance.now();
       const { data: tripsData, error: tripsError } = await tripsQuery;
-      if (tripsError) throw tripsError;
+      const queryEndTime = performance.now();
+      
+      console.log(`⏱️ Query took ${(queryEndTime - queryStartTime).toFixed(2)}ms`);
+      
+      if (tripsError) {
+        console.error('❌ Trips query error:', tripsError);
+        throw tripsError;
+      }
+
+      // Data integrity check
+      console.log('📊 DEBUG: Query Results:', {
+        tripsCount: tripsData?.length || 0,
+        firstTrip: tripsData?.[0],
+        lastTrip: tripsData?.[tripsData.length - 1],
+        uniqueDates: [...new Set(tripsData?.map(t => t.trip_date) || [])],
+        uniqueBuses: [...new Set(tripsData?.map(t => t.buses?.bus_no) || [])],
+      });
+
+      // Verify date spread
+      if (tripsData && tripsData.length > 0) {
+        const dateSpread = {
+          min: Math.min(...tripsData.map(t => new Date(t.trip_date).getTime())),
+          max: Math.max(...tripsData.map(t => new Date(t.trip_date).getTime())),
+        };
+        console.log('📅 Date spread in results:', {
+          from: new Date(dateSpread.min).toISOString().split('T')[0],
+          to: new Date(dateSpread.max).toISOString().split('T')[0],
+          expectedFrom: fromDateStr,
+          expectedTo: toDateStr,
+        });
+      } else {
+        console.warn('⚠️ No trips found in database for this date range!');
+      }
 
       // Build expenses query
       let expensesQuery = supabase
@@ -182,11 +227,25 @@ export function useDailyBusGroupedTrips(
       console.log('📊 Found trips:', tripsData?.length || 0);
       console.log('💰 Found expenses:', expensesData?.length || 0);
 
+      // Debug trip distribution by date
+      if (isRangeQuery && tripsData && tripsData.length > 0) {
+        const tripsByDate = new Map<string, number>();
+        tripsData.forEach(trip => {
+          const date = trip.trip_date;
+          tripsByDate.set(date, (tripsByDate.get(date) || 0) + 1);
+        });
+        console.log('📅 Trip distribution by date:', Object.fromEntries(tripsByDate));
+      }
+
       // Group trips by bus_id (and date if range query)
       const groupedByBus = new Map<string, any[]>();
       
       (tripsData || []).forEach((trip: any) => {
         const busId = trip.bus_id;
+        const tripDate = trip.trip_date;
+        
+        console.log(`Processing trip ${trip.trip_no} for date ${tripDate}, bus ${trip.buses?.bus_no}`);
+        
         if (!groupedByBus.has(busId)) {
           groupedByBus.set(busId, []);
         }
@@ -211,6 +270,16 @@ export function useDailyBusGroupedTrips(
           start_time: trip.start_time,
           end_time: trip.end_time,
         });
+      });
+
+      // Log grouped data
+      console.log('📦 Grouped trips by bus:', {
+        busCount: groupedByBus.size,
+        buses: Array.from(groupedByBus.entries()).map(([busId, trips]) => ({
+          busId: busId.substring(0, 8),
+          tripCount: trips.length,
+          dates: [...new Set(trips.map(t => t.trip_date))],
+        })),
       });
 
       // Create expense lookup map (aggregate expenses for range queries)
