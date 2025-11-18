@@ -4111,12 +4111,14 @@ export type Database = {
       }
       special_hire_invoices: {
         Row: {
+          adjustment_id: string | null
           amount: number
           approved_at: string | null
           approved_by: string | null
           created_at: string
           generated_at: string
           generated_by: string | null
+          has_adjustments: boolean | null
           id: string
           invoice_no: string
           invoice_type: string
@@ -4125,12 +4127,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          adjustment_id?: string | null
           amount: number
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
           generated_at?: string
           generated_by?: string | null
+          has_adjustments?: boolean | null
           id?: string
           invoice_no: string
           invoice_type: string
@@ -4139,12 +4143,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          adjustment_id?: string | null
           amount?: number
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
           generated_at?: string
           generated_by?: string | null
+          has_adjustments?: boolean | null
           id?: string
           invoice_no?: string
           invoice_type?: string
@@ -4153,6 +4159,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "special_hire_invoices_adjustment_id_fkey"
+            columns: ["adjustment_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_trip_adjustments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "special_hire_invoices_quotation_id_fkey"
             columns: ["quotation_id"]
@@ -4690,6 +4703,83 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "special_hire_submissions_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      special_hire_trip_adjustments: {
+        Row: {
+          actual_km_traveled: number | null
+          additional_expenses: Json | null
+          adjusted_at: string | null
+          adjusted_by: string | null
+          adjustment_amount: number | null
+          adjustment_status: string | null
+          advance_already_paid: number | null
+          balance_due: number | null
+          created_at: string | null
+          extra_km: number | null
+          extra_km_charge_per_km: number | null
+          extra_km_total_charge: number | null
+          final_trip_amount: number | null
+          id: string
+          notes: string | null
+          original_quotation_amount: number | null
+          original_quoted_km: number | null
+          quotation_id: string
+          total_additional_expenses: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_km_traveled?: number | null
+          additional_expenses?: Json | null
+          adjusted_at?: string | null
+          adjusted_by?: string | null
+          adjustment_amount?: number | null
+          adjustment_status?: string | null
+          advance_already_paid?: number | null
+          balance_due?: number | null
+          created_at?: string | null
+          extra_km?: number | null
+          extra_km_charge_per_km?: number | null
+          extra_km_total_charge?: number | null
+          final_trip_amount?: number | null
+          id?: string
+          notes?: string | null
+          original_quotation_amount?: number | null
+          original_quoted_km?: number | null
+          quotation_id: string
+          total_additional_expenses?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_km_traveled?: number | null
+          additional_expenses?: Json | null
+          adjusted_at?: string | null
+          adjusted_by?: string | null
+          adjustment_amount?: number | null
+          adjustment_status?: string | null
+          advance_already_paid?: number | null
+          balance_due?: number | null
+          created_at?: string | null
+          extra_km?: number | null
+          extra_km_charge_per_km?: number | null
+          extra_km_total_charge?: number | null
+          final_trip_amount?: number | null
+          id?: string
+          notes?: string | null
+          original_quotation_amount?: number | null
+          original_quoted_km?: number | null
+          quotation_id?: string
+          total_additional_expenses?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_hire_trip_adjustments_quotation_id_fkey"
             columns: ["quotation_id"]
             isOneToOne: false
             referencedRelation: "special_hire_quotations"
