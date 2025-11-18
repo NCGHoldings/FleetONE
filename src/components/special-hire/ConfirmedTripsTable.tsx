@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { 
   Eye, Download, Upload, Receipt, Users, UserPlus, Bus, Settings, ChevronDown, 
   Search, Filter, MoreHorizontal, MapPin, Calendar, DollarSign, TrendingUp,
-  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw, FileText, Mail
+  Clock, CheckCircle, XCircle, AlertCircle, Phone, Building, RefreshCw, CreditCard, FileCheck, RotateCcw, FileText, Mail, Calculator
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +23,7 @@ import { useDocumentManagement } from '@/hooks/useDocumentManagement';
 import { DocumentViewer } from './DocumentViewer';
 import { InvoiceViewer } from './InvoiceViewer';
 import AdvanceDetailsModal from './AdvanceDetailsModal';
+import { PostTripAdjustmentModal } from './PostTripAdjustmentModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -55,6 +56,8 @@ export function ConfirmedTripsTable() {
   const [advanceDetailsModalOpen, setAdvanceDetailsModalOpen] = useState(false);
   const [documentsData, setDocumentsData] = useState<Record<string, any[]>>({});
   const [documentsModalOpen, setDocumentsModalOpen] = useState(false);
+  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+  const [adjustmentsData, setAdjustmentsData] = useState<Record<string, any>>({});
   
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -64,6 +67,27 @@ export function ConfirmedTripsTable() {
   // Check user roles
   const isFinanceUser = hasRole('finance') || hasRole('admin') || hasRole('super_admin');
   const isOperationsUser = hasRole('admin') || hasRole('super_admin') || hasRole('supervisor');
+
+  // Load adjustments data for all quotations
+  const loadAdjustmentData = async (quotationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('special_hire_trip_adjustments')
+        .select('*')
+        .eq('quotation_id', quotationId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
+        setAdjustmentsData(prev => ({ ...prev, [quotationId]: data }));
+      }
+    } catch (error) {
+      console.error('Error loading adjustment data:', error);
+    }
+  };
 
   // Filter quotations based on search and filters
   const filteredTrips = useMemo(() => {
@@ -172,6 +196,13 @@ export function ConfirmedTripsTable() {
 
     return filtered;
   }, [quotations, searchQuery, statusFilter, paymentFilter, dateFilter, documentFilter, documentsData]);
+
+  // Load adjustments for all visible trips
+  useEffect(() => {
+    if (filteredTrips.length > 0) {
+      filteredTrips.forEach(trip => loadAdjustmentData(trip.id));
+    }
+  }, [filteredTrips]);
 
   const calculateTotalAmount = (quotation: QuotationWithPayments) => {
     const hireAll = quotation.gross_revenue || 0;
@@ -1086,6 +1117,23 @@ export function ConfirmedTripsTable() {
                                       <FileText className="w-4 h-4 mr-2" />
                                       Advance Details Form
                                     </DropdownMenuItem>
+
+                                    {(trip.trip_status === 'confirmed' || trip.trip_status === 'completed') && (
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setSelectedTrip(trip);
+                                          setAdjustmentModalOpen(true);
+                                        }}
+                                      >
+                                        <Calculator className="w-4 h-4 mr-2" />
+                                        Post-Trip Adjustment
+                                        {adjustmentsData[trip.id] && (
+                                          <Badge variant="outline" className="ml-2 text-xs">
+                                            {adjustmentsData[trip.id].adjustment_status}
+                                          </Badge>
+                                        )}
+                                      </DropdownMenuItem>
+                                    )}
                                     
                                     <DropdownMenuSeparator />
                                   </>
@@ -1429,6 +1477,30 @@ export function ConfirmedTripsTable() {
             total_days: selectedTrip.pickup_datetime && selectedTrip.drop_datetime 
               ? Math.ceil((new Date(selectedTrip.drop_datetime).getTime() - new Date(selectedTrip.pickup_datetime).getTime()) / (1000 * 60 * 60 * 24)) || 1
               : 1,
+          }}
+        />
+      )}
+
+      {/* Post-Trip Adjustment Modal */}
+      {selectedTrip && (
+        <PostTripAdjustmentModal
+          open={adjustmentModalOpen}
+          onOpenChange={(open) => {
+            setAdjustmentModalOpen(open);
+            if (!open) {
+              loadAdjustmentData(selectedTrip.id);
+              refetch();
+            }
+          }}
+          quotationId={selectedTrip.id}
+          quotationNo={selectedTrip.quotation_no}
+          customerName={selectedTrip.customer_name}
+          originalAmount={calculateTotalAmount(selectedTrip)}
+          originalKm={(selectedTrip as any).total_distance_km || 0}
+          advancePaid={selectedTrip.advance_paid || 0}
+          onAdjustmentSaved={() => {
+            loadAdjustmentData(selectedTrip.id);
+            refetch();
           }}
         />
       )}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, CheckCircle, XCircle, AlertCircle, DollarSign } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertCircle, DollarSign, Calculator } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface TimelineEvent {
@@ -17,6 +17,8 @@ interface TripStatusTimelineProps {
   events: TimelineEvent[];
   refundAmount?: number;
   refundStatus?: string;
+  adjustmentStatus?: string;
+  adjustmentAmount?: number;
 }
 
 const STATUS_CONFIG = {
@@ -29,7 +31,7 @@ const STATUS_CONFIG = {
   no_bus_allocated: { icon: AlertCircle, color: 'bg-orange-500', label: 'No Bus Allocated' },
 };
 
-export function TripStatusTimeline({ currentStatus, events, refundAmount, refundStatus }: TripStatusTimelineProps) {
+export function TripStatusTimeline({ currentStatus, events, refundAmount, refundStatus, adjustmentStatus, adjustmentAmount }: TripStatusTimelineProps) {
   const getStatusConfig = (status: string) => STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.quotation;
 
   return (
@@ -37,6 +39,21 @@ export function TripStatusTimeline({ currentStatus, events, refundAmount, refund
       <CardContent className="p-4">
         <div className="space-y-4">
           <h4 className="font-semibold text-sm">Trip Status Timeline</h4>
+          
+          {adjustmentStatus && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <Calculator className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">Post-Trip Adjustment</span>
+                <Badge variant="outline" className="ml-auto">{adjustmentStatus}</Badge>
+              </div>
+              {adjustmentAmount && adjustmentAmount !== 0 && (
+                <p className="text-xs text-blue-700 mt-2">
+                  Adjustment Amount: LKR {adjustmentAmount.toLocaleString()}
+                </p>
+              )}
+            </div>
+          )}
           
           <div className="space-y-3">
             {events.map((event, index) => {
