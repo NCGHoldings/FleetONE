@@ -50,6 +50,8 @@ interface TripDetailsModalProps {
   onViewInvoice: (type: 'advance' | 'final') => void;
   onDownloadInvoice: (type: 'advance' | 'final') => void;
   onViewPaymentProof: (proofUrl: string) => void;
+  adjustmentStatus?: string;
+  adjustmentAmount?: number;
 }
 
 export function TripDetailsModal({
@@ -59,6 +61,8 @@ export function TripDetailsModal({
   onViewInvoice,
   onDownloadInvoice,
   onViewPaymentProof,
+  adjustmentStatus,
+  adjustmentAmount,
 }: TripDetailsModalProps) {
   if (!trip) return null;
 
@@ -211,6 +215,8 @@ export function TripDetailsModal({
               events={timelineEvents}
               refundAmount={trip.refund_amount}
               refundStatus={trip.refund_status}
+              adjustmentStatus={adjustmentStatus}
+              adjustmentAmount={adjustmentAmount}
             />
           </div>
 
