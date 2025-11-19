@@ -28,6 +28,14 @@ interface PaymentConfirmationModalProps {
     discount_amount_lkr?: number;
     total_additional_charges?: number;
   };
+  adjustmentData?: {
+    extra_km?: number;
+    extra_km_charge_per_km?: number;
+    extra_km_total_charge?: number;
+    additional_expenses?: Array<{ description: string; amount: number }>;
+    total_additional_expenses?: number;
+    notes?: string;
+  };
   loading?: boolean;
 }
 
@@ -48,6 +56,7 @@ export const PaymentConfirmationModal = ({
   onClose, 
   onConfirm, 
   quotationData,
+  adjustmentData,
   loading = false 
 }: PaymentConfirmationModalProps) => {
   const { user } = useAuth();
@@ -61,7 +70,12 @@ export const PaymentConfirmationModal = ({
     const base = hireAll + fuelAll + commission + additional - discount;
     const adjustmentPct = quotationData.percentage_adjustment || 0;
     const adjustmentAmount = base * (adjustmentPct / 100);
-    return Math.round(base + adjustmentAmount);
+    
+    // Add post-trip adjustments if present
+    const extraKmCharge = adjustmentData?.extra_km_total_charge || 0;
+    const additionalExpenses = adjustmentData?.total_additional_expenses || 0;
+    
+    return Math.round(base + adjustmentAmount + extraKmCharge + additionalExpenses);
   };
 
   const finalTotal = calculateFinalTotal();
@@ -187,6 +201,47 @@ export const PaymentConfirmationModal = ({
                   </>
                 )}
               </div>
+              
+              {/* Post-Trip Adjustments Summary */}
+              {adjustmentData && (adjustmentData.extra_km_total_charge || adjustmentData.total_additional_expenses) && (
+                <div className="mt-4 pt-4 border-t">
+                  <div className="text-xs font-semibold text-primary mb-2">POST-TRIP ADJUSTMENTS</div>
+                  <div className="space-y-2 text-xs">
+                    {adjustmentData.extra_km && adjustmentData.extra_km !== 0 && (
+                      <div className="flex justify-between items-center p-2 bg-yellow-50 rounded">
+                        <span className="text-muted-foreground">
+                          Extra KM: {adjustmentData.extra_km > 0 ? '+' : ''}{adjustmentData.extra_km} km 
+                          × LKR {(adjustmentData.extra_km_charge_per_km || 0).toLocaleString()}/km
+                        </span>
+                        <span className="font-medium">
+                          +LKR {(adjustmentData.extra_km_total_charge || 0).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {adjustmentData.additional_expenses && adjustmentData.additional_expenses.length > 0 && (
+                      <div className="p-2 bg-pink-50 rounded space-y-1">
+                        <div className="text-muted-foreground font-medium">Additional Expenses:</div>
+                        {adjustmentData.additional_expenses.map((exp, idx) => (
+                          <div key={idx} className="flex justify-between text-xs pl-2">
+                            <span className="text-muted-foreground">• {exp.description}</span>
+                            <span>LKR {exp.amount.toLocaleString()}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between font-medium pt-1 border-t mt-1">
+                          <span>Total Additional:</span>
+                          <span>+LKR {(adjustmentData.total_additional_expenses || 0).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center p-2 bg-blue-50 rounded font-semibold">
+                      <span>Total Adjustments:</span>
+                      <span className="text-primary">
+                        +LKR {((adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

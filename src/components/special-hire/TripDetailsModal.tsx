@@ -52,6 +52,11 @@ interface TripDetailsModalProps {
   onViewPaymentProof: (proofUrl: string) => void;
   adjustmentStatus?: string;
   adjustmentAmount?: number;
+  adjustmentData?: {
+    extra_km?: number;
+    extra_km_total_charge?: number;
+    total_additional_expenses?: number;
+  };
 }
 
 export function TripDetailsModal({
@@ -63,6 +68,7 @@ export function TripDetailsModal({
   onViewPaymentProof,
   adjustmentStatus,
   adjustmentAmount,
+  adjustmentData,
 }: TripDetailsModalProps) {
   if (!trip) return null;
 
@@ -228,6 +234,7 @@ export function TripDetailsModal({
               balanceDue={trip.balance_due}
               payments={trip.payments}
               invoices={trip.invoices}
+              adjustmentData={adjustmentData}
               onViewInvoice={onViewInvoice}
               onDownloadInvoice={onDownloadInvoice}
               onViewPaymentProof={onViewPaymentProof}

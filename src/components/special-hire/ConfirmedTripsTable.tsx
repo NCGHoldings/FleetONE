@@ -1265,6 +1265,14 @@ export function ConfirmedTripsTable() {
             discount_amount_lkr: selectedTrip.discount_amount_lkr,
             total_additional_charges: selectedTrip.total_additional_charges,
           }}
+          adjustmentData={adjustmentsData[selectedTrip.id] ? {
+            extra_km: adjustmentsData[selectedTrip.id].extra_km,
+            extra_km_charge_per_km: adjustmentsData[selectedTrip.id].extra_km_charge_per_km,
+            extra_km_total_charge: adjustmentsData[selectedTrip.id].extra_km_total_charge,
+            additional_expenses: adjustmentsData[selectedTrip.id].additional_expenses,
+            total_additional_expenses: adjustmentsData[selectedTrip.id].total_additional_expenses,
+            notes: adjustmentsData[selectedTrip.id].notes,
+          } : undefined}
           loading={loading}
         />
       )}
@@ -1340,6 +1348,16 @@ export function ConfirmedTripsTable() {
           },
           total_amount: calculateTotalAmount(selectedTrip),
         } : null}
+        adjustmentStatus={selectedTrip ? adjustmentsData[selectedTrip.id]?.adjustment_status : undefined}
+        adjustmentAmount={selectedTrip ? (
+          (adjustmentsData[selectedTrip.id]?.extra_km_total_charge || 0) + 
+          (adjustmentsData[selectedTrip.id]?.total_additional_expenses || 0)
+        ) : undefined}
+        adjustmentData={selectedTrip && adjustmentsData[selectedTrip.id] ? {
+          extra_km: adjustmentsData[selectedTrip.id].extra_km,
+          extra_km_total_charge: adjustmentsData[selectedTrip.id].extra_km_total_charge,
+          total_additional_expenses: adjustmentsData[selectedTrip.id].total_additional_expenses,
+        } : undefined}
         onViewInvoice={(type) => selectedTrip && viewInvoice(selectedTrip)}
         onDownloadInvoice={(type) => handleDownloadInvoice()}
         onViewPaymentProof={(url) => window.open(url, '_blank')}
