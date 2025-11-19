@@ -31,6 +31,11 @@ interface PaymentTimelineProps {
   balanceDue: number;
   payments: PaymentInfo[];
   invoices: InvoiceInfo[];
+  adjustmentData?: {
+    extra_km?: number;
+    extra_km_total_charge?: number;
+    total_additional_expenses?: number;
+  };
   onViewInvoice: (type: 'advance' | 'final') => void;
   onDownloadInvoice: (type: 'advance' | 'final') => void;
   onViewPaymentProof: (proofUrl: string) => void;
@@ -43,6 +48,7 @@ export function PaymentTimeline({
   balanceDue = 0, 
   payments = [], 
   invoices = [],
+  adjustmentData,
   onViewInvoice,
   onDownloadInvoice,
   onViewPaymentProof,
@@ -125,6 +131,23 @@ export function PaymentTimeline({
             </div>
           </div>
         </div>
+
+        {/* Post-Trip Adjustment Badge */}
+        {adjustmentData && (adjustmentData.extra_km_total_charge || adjustmentData.total_additional_expenses) && (
+          <div className="bg-blue-50 border border-blue-200 rounded p-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-blue-900">Post-Trip Adjustments Applied</span>
+              <span className="font-semibold text-blue-700">
+                +LKR {((adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0)).toLocaleString()}
+              </span>
+            </div>
+            {adjustmentData.extra_km && adjustmentData.extra_km !== 0 && (
+              <div className="text-xs text-blue-700 mt-1">
+                Extra KM: {adjustmentData.extra_km > 0 ? '+' : ''}{adjustmentData.extra_km} km
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Payment Status */}
         <div className="flex items-center justify-center space-x-2">
