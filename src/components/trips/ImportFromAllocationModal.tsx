@@ -201,22 +201,184 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
         })
       );
 
-      const validAllocations = allocationsWithMatching.filter((a: any) => a.bus_id);
-      const invalidAllocations = allocationsWithMatching.filter((a: any) => !a.bus_id);
+      let validAllocations = allocationsWithMatching.filter((a: any) => a.bus_id);
+      let invalidAllocations = allocationsWithMatching.filter((a: any) => !a.bus_id);
 
+      // Auto-create missing buses
       if (invalidAllocations.length > 0) {
-        const busNumbers = invalidAllocations.map((a: any) => a.bus_no).join(', ');
+        console.log(`🔧 Auto-creating ${invalidAllocations.length} missing buses...`);
+        
+        // Collect unique missing bus numbers
+        const missingBusNumbers = Array.from(
+          new Set(
+            invalidAllocations
+              .map((a: any) => a.notes?.excel_bus_no)
+              .filter(Boolean)
+          )
+        );
+
+        const busMap = new Map<string, { id: string; bus_no: string }>();
+        const createdBuses: string[] = [];
+
+        // Create missing buses
+        for (const busNo of missingBusNumbers) {
+          const normalized = busNo.replace(/\s+/g, '').toUpperCase();
+          
+          // Double check if bus exists
+          const { data: existingBus } = await supabase
+            .from('buses')
+            .select('id, bus_no')
+            .ilike('bus_no', normalized)
+            .maybeSingle();
+
+          if (existingBus) {
+            busMap.set(normalized, existingBus);
+          } else {
+            // Create new bus
+            const { data: newBus, error: busError } = await supabase
+              .from('buses')
+              .insert({
+                bus_no: busNo,
+                type: 'Regular',
+                model: 'Imported Bus',
+                year: new Date().getFullYear(),
+                capacity: 40,
+                status: 'active',
+              })
+              .select('id, bus_no')
+              .maybeSingle();
+
+            if (newBus && !busError) {
+              busMap.set(normalized, newBus);
+              createdBuses.push(busNo);
+              console.log(`✅ Created bus: ${busNo}`);
+            } else {
+              console.error(`❌ Failed to create bus ${busNo}:`, busError);
+            }
+          }
+        }
+
+        // Update invalidAllocations with new bus_ids
+        const fixedAllocations = invalidAllocations.map((a: any) => {
+          const excelBusNo = a.notes?.excel_bus_no;
+          const key = excelBusNo?.replace(/\s+/g, '').toUpperCase();
+          const busInfo = key ? busMap.get(key) : null;
+
+          if (busInfo) {
+            return {
+              ...a,
+              bus_id: busInfo.id,
+              bus_no: busInfo.bus_no,
+              has_warnings: true,
+            };
+          }
+          return a;
+        });
+
+        // Rebuild allocations list
+        validAllocations = [...validAllocations, ...fixedAllocations.filter((a: any) => a.bus_id)];
+        invalidAllocations = fixedAllocations.filter((a: any) => !a.bus_id);
+
+        if (createdBuses.length > 0) {
+          toast.success(
+            `Auto-created ${createdBuses.length} missing bus(es): ${createdBuses.join(', ')}`,
+            { duration: 6000 }
+          );
+        }
+      }
+
+      // Auto-create missing routes (optional but recommended)
+      const allocationsWithoutRoute = validAllocations.filter((a: any) => !a.route_id && a.notes?.excel_route_no);
+      if (allocationsWithoutRoute.length > 0) {
+        console.log(`🔧 Auto-creating ${allocationsWithoutRoute.length} missing routes...`);
+        
+        const missingRoutes = Array.from(
+          new Set(
+            allocationsWithoutRoute.map((a: any) => ({
+              route_no: a.notes?.excel_route_no,
+              route_name: a.notes?.excel_route_name,
+            }))
+          )
+        );
+
+        const routeMap = new Map<string, string>();
+        const createdRoutes: string[] = [];
+
+        for (const routeInfo of missingRoutes) {
+          if (!routeInfo.route_no) continue;
+
+          // Check if route exists
+          const { data: existingRoute } = await supabase
+            .from('routes')
+            .select('id, route_no')
+            .eq('route_no', routeInfo.route_no)
+            .maybeSingle();
+
+          if (existingRoute) {
+            routeMap.set(routeInfo.route_no, existingRoute.id);
+          } else {
+            // Create new route
+            const routeParts = (routeInfo.route_name || '').split(' - ');
+            const { data: newRoute, error: routeError } = await supabase
+              .from('routes')
+              .insert({
+                route_no: routeInfo.route_no,
+                route_name: routeInfo.route_name || `Route ${routeInfo.route_no}`,
+                start_location: routeParts[0] || 'Unknown',
+                end_location: routeParts[1] || 'Unknown',
+                distance_km: 0,
+                estimated_duration_minutes: 0,
+              })
+              .select('id, route_no')
+              .maybeSingle();
+
+            if (newRoute && !routeError) {
+              routeMap.set(routeInfo.route_no, newRoute.id);
+              createdRoutes.push(routeInfo.route_no);
+              console.log(`✅ Created route: ${routeInfo.route_no}`);
+            } else {
+              console.error(`❌ Failed to create route ${routeInfo.route_no}:`, routeError);
+            }
+          }
+        }
+
+        // Update allocations with route_ids
+        validAllocations = validAllocations.map((a: any) => {
+          if (!a.route_id && a.notes?.excel_route_no) {
+            const routeId = routeMap.get(a.notes.excel_route_no);
+            if (routeId) {
+              return { ...a, route_id: routeId };
+            }
+          }
+          return a;
+        });
+
+        if (createdRoutes.length > 0) {
+          toast.success(
+            `Auto-created ${createdRoutes.length} missing route(s): ${createdRoutes.join(', ')}`,
+            { duration: 6000 }
+          );
+        }
+      }
+
+      // Final validation
+      if (invalidAllocations.length > 0) {
+        const busNumbers = invalidAllocations
+          .map((a: any) => a.notes?.excel_bus_no || 'Unknown')
+          .join(', ');
         toast.warning(
-          `${invalidAllocations.length} allocation(s) will be skipped due to missing bus (${busNumbers}). These need bus assignment.`,
+          `${invalidAllocations.length} allocation(s) still missing bus info: ${busNumbers}`,
           { duration: 6000 }
         );
       }
 
       if (validAllocations.length === 0) {
-        toast.error('No valid allocations to import. All require bus assignment.');
+        toast.error('No valid allocations to import after auto-creation attempts.');
         setIsLoading(false);
         return;
       }
+
+      console.log(`✅ Final: ${validAllocations.length} valid allocations ready to import`);
 
       // If overwrite mode, delete existing trips first
       if (importMode === 'overwrite' && existingTripCount > 0) {
@@ -302,11 +464,13 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
       const importedCount = data?.length || 0;
       const skippedCount = validAllocations.length - importedCount;
       
+      console.log(`✅ Import complete: ${importedCount} trips imported`);
+      
       toast.success(
-        `Successfully imported ${importedCount} trip${importedCount !== 1 ? 's' : ''}` +
-        (skippedCount > 0 ? `, skipped ${skippedCount} existing` : '') +
-        (invalidAllocations.length > 0 ? `. ${invalidAllocations.length} require bus assignment` : ''),
-        { duration: 5000 }
+        `Successfully imported ${importedCount} trip${importedCount !== 1 ? 's' : ''}!` +
+        (skippedCount > 0 ? ` (${skippedCount} skipped - already exist)` : '') +
+        (invalidAllocations.length > 0 ? ` Warning: ${invalidAllocations.length} still need manual bus assignment` : ''),
+        { duration: 6000 }
       );
       
       onSuccess?.();
