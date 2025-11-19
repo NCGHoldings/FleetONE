@@ -3968,6 +3968,252 @@ export type Database = {
         }
         Relationships: []
       }
+      sinotruck_customers: {
+        Row: {
+          address: string | null
+          company_name: string | null
+          contact_number: string | null
+          created_at: string | null
+          customer_code: string
+          customer_name: string
+          customer_type: string | null
+          email: string | null
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          company_name?: string | null
+          contact_number?: string | null
+          created_at?: string | null
+          customer_code: string
+          customer_name: string
+          customer_type?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_name?: string | null
+          contact_number?: string | null
+          created_at?: string | null
+          customer_code?: string
+          customer_name?: string
+          customer_type?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      sinotruck_quotation_signatures: {
+        Row: {
+          id: string
+          quotation_id: string | null
+          signature_data: string
+          signature_role: string
+          signature_type: string
+          signed_at: string | null
+          signed_by: string | null
+          signer_name: string
+        }
+        Insert: {
+          id?: string
+          quotation_id?: string | null
+          signature_data: string
+          signature_role: string
+          signature_type?: string
+          signed_at?: string | null
+          signed_by?: string | null
+          signer_name: string
+        }
+        Update: {
+          id?: string
+          quotation_id?: string | null
+          signature_data?: string
+          signature_role?: string
+          signature_type?: string
+          signed_at?: string | null
+          signed_by?: string | null
+          signer_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_quotation_signatures_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sinotruck_quotations: {
+        Row: {
+          capacity_kw: number
+          charger_capacity_kw: number | null
+          charger_price: number | null
+          condition: string
+          contact_number: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_address: string | null
+          customer_id: string | null
+          customer_name: string
+          id: string
+          is_active_version: boolean | null
+          parent_quotation_id: string | null
+          payment_terms: string | null
+          quantity: number
+          quotation_date: string
+          quotation_no: string
+          status: string | null
+          terms_and_conditions: Json | null
+          total_price: number
+          truck_model_id: string | null
+          truck_model_name: string
+          unit_price: number
+          updated_at: string | null
+          valid_until: string | null
+          version_number: string | null
+          year: number
+        }
+        Insert: {
+          capacity_kw: number
+          charger_capacity_kw?: number | null
+          charger_price?: number | null
+          condition: string
+          contact_number?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_address?: string | null
+          customer_id?: string | null
+          customer_name: string
+          id?: string
+          is_active_version?: boolean | null
+          parent_quotation_id?: string | null
+          payment_terms?: string | null
+          quantity?: number
+          quotation_date?: string
+          quotation_no: string
+          status?: string | null
+          terms_and_conditions?: Json | null
+          total_price: number
+          truck_model_id?: string | null
+          truck_model_name: string
+          unit_price: number
+          updated_at?: string | null
+          valid_until?: string | null
+          version_number?: string | null
+          year: number
+        }
+        Update: {
+          capacity_kw?: number
+          charger_capacity_kw?: number | null
+          charger_price?: number | null
+          condition?: string
+          contact_number?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_address?: string | null
+          customer_id?: string | null
+          customer_name?: string
+          id?: string
+          is_active_version?: boolean | null
+          parent_quotation_id?: string | null
+          payment_terms?: string | null
+          quantity?: number
+          quotation_date?: string
+          quotation_no?: string
+          status?: string | null
+          terms_and_conditions?: Json | null
+          total_price?: number
+          truck_model_id?: string | null
+          truck_model_name?: string
+          unit_price?: number
+          updated_at?: string | null
+          valid_until?: string | null
+          version_number?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_quotations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_quotations_parent_quotation_id_fkey"
+            columns: ["parent_quotation_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_quotations_truck_model_id_fkey"
+            columns: ["truck_model_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_truck_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sinotruck_truck_models: {
+        Row: {
+          base_price: number
+          capacity_kw: number
+          charger_capacity_kw: number | null
+          charger_price: number | null
+          condition: string
+          created_at: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          model_name: string
+          specifications: Json | null
+          truck_name: string
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          base_price: number
+          capacity_kw: number
+          charger_capacity_kw?: number | null
+          charger_price?: number | null
+          condition?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          model_name: string
+          specifications?: Json | null
+          truck_name: string
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          base_price?: number
+          capacity_kw?: number
+          charger_capacity_kw?: number | null
+          charger_price?: number | null
+          condition?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          model_name?: string
+          specifications?: Json | null
+          truck_name?: string
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
       special_hire_advance_details: {
         Row: {
           authorized_by_name: string | null
@@ -8209,6 +8455,8 @@ export type Database = {
         Args: { p_parent_id: string }
         Returns: string
       }
+      generate_sinotruck_customer_code: { Args: never; Returns: string }
+      generate_sinotruck_quotation_no: { Args: never; Returns: string }
       generate_submission_code: { Args: never; Returns: string }
       generate_yutong_invoice_no: { Args: never; Returns: string }
       generate_yutong_order_no: { Args: never; Returns: string }

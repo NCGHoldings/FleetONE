@@ -13,6 +13,7 @@ export type PageCategories = {
   business: PageItem[];
   finance: PageItem[];
   yutong: PageItem[];
+  sinotruck: PageItem[];
   nsp: PageItem[];
   governance: PageItem[];
 };
@@ -52,6 +53,11 @@ export const PAGES: PageCategories = {
     { id: "yutong_bus_models", title: "Bus Models", url: "/yutong-quotations?tab=bus-models" },
     { id: "yutong_addons", title: "Add-ons", url: "/yutong-quotations?tab=addons" },
   ],
+  sinotruck: [
+    { id: "sinotruck_quotations", title: "Quotations", url: "/sinotruck-quotations" },
+    { id: "sinotruck_truck_models", title: "Truck Models", url: "/sinotruck-quotations?tab=truck-models" },
+    { id: "sinotruck_customers", title: "Customers", url: "/sinotruck-quotations?tab=customers" },
+  ],
   nsp: [
     { id: "nsp_daily_sales", title: "Daily Sales", url: "/nsp-daily-sales" },
     { id: "nsp_summary", title: "Summary & Reports", url: "/nsp-summary" },
@@ -69,6 +75,7 @@ export const ALL_PAGES_FLAT: PageItem[] = [
   ...PAGES.business,
   ...PAGES.finance,
   ...PAGES.yutong,
+  ...PAGES.sinotruck,
   ...PAGES.nsp,
   ...PAGES.governance,
 ];
