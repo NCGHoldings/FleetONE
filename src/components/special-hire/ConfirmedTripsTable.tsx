@@ -696,8 +696,18 @@ export function ConfirmedTripsTable() {
         return;
       }
 
+      // Fetch adjustment data if available
+      const { data: adjustment } = await supabase
+        .from('special_hire_trip_adjustments')
+        .select('*')
+        .eq('quotation_id', quotation.id)
+        .eq('adjustment_status', 'finalized')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       // Fallback to old invoice generation if no stored documents
-      const invoiceData = {
+      const invoiceData: InvoiceData = {
         invoiceNo: `INV-${Date.now()}`,
         invoiceType: 'balance' as const,
         quotationNo: quotation.quotation_no,
@@ -719,6 +729,16 @@ export function ConfirmedTripsTable() {
         vehicleNo: quotation.assigned_bus_no,
         driverName: quotation.assigned_driver_name,
         conductorName: quotation.assigned_conductor_name,
+        // Include adjustment data if available
+        hasAdjustments: !!adjustment,
+        originalQuotedKm: adjustment?.original_quoted_km,
+        actualKmTraveled: adjustment?.actual_km_traveled,
+        extraKm: adjustment?.extra_km,
+        extraKmChargePerKm: adjustment?.extra_km_charge_per_km,
+        extraKmTotalCharge: adjustment?.extra_km_total_charge,
+        additionalExpenses: (adjustment?.additional_expenses as any[]) || [],
+        totalAdditionalExpenses: adjustment?.total_additional_expenses,
+        adjustmentNotes: adjustment?.notes,
       };
 
       setCurrentInvoiceData(invoiceData);

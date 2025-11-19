@@ -149,6 +149,32 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         return;
       }
 
+      // Fetch adjustment data if this is a balance invoice
+      let adjustmentData = null;
+      if (document.payment_type === 'balance') {
+        console.log('📊 Fetching adjustment data for quotation:', document.quotation_id);
+        const { data: adjustment, error: adjError } = await supabase
+          .from('special_hire_trip_adjustments')
+          .select('*')
+          .eq('quotation_id', document.quotation_id)
+          .eq('adjustment_status', 'finalized')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!adjError && adjustment) {
+          adjustmentData = adjustment;
+          const expenses = adjustment.additional_expenses as any[] || [];
+          console.log('✅ Adjustment data loaded:', {
+            extraKm: adjustment.extra_km,
+            extraKmCharge: adjustment.extra_km_total_charge,
+            additionalExpenses: expenses.length
+          });
+        } else {
+          console.log('ℹ️ No finalized adjustment found for this trip');
+        }
+      }
+
       // Prepare approval signatures with validation and proper date formatting
       const approvalSignatures: any = {};
       let signatureCount = 0;
@@ -215,7 +241,7 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         quotationNo: quotationData.quotation_no
       });
 
-      // Create invoice data with signatures
+      // Create invoice data with signatures and adjustments
       const invoiceData: InvoiceData = {
         invoiceNo: `UPDATED-${document.payment_type.toUpperCase()}-${Date.now()}`,
         invoiceType: document.payment_type as 'advance' | 'balance',
@@ -233,13 +259,24 @@ export const EnhancedDocumentViewer: React.FC<EnhancedDocumentViewerProps> = ({
         numberOfPassengers: quotationData.number_of_passengers,
         totalAmount: calculateTotalAmount(quotationData),
         advanceAmount: quotationData.advance_paid || 0,
-        paidAmount: quotationData.total_paid || 0, // Use cumulative total of all approved payments
+        paidAmount: quotationData.total_paid || 0,
         discountAmount: quotationData.discount_amount_lkr || 0,
         vehicleNo: quotationData.assigned_bus_no,
         driverName: quotationData.assigned_driver_name,
         conductorName: quotationData.assigned_conductor_name,
         invoice_status: 'approved',
         document_type: document.document_type as 'sales_receipt' | 'invoice',
+        // Include adjustment data if available
+        hasAdjustments: !!adjustmentData,
+        originalQuotedKm: adjustmentData?.original_quoted_km,
+        actualKmTraveled: adjustmentData?.actual_km_traveled,
+        extraKm: adjustmentData?.extra_km,
+        extraKmChargePerKm: adjustmentData?.extra_km_charge_per_km,
+        extraKmTotalCharge: adjustmentData?.extra_km_total_charge,
+        additionalExpenses: (adjustmentData?.additional_expenses as any[]) || [],
+        totalAdditionalExpenses: adjustmentData?.total_additional_expenses,
+        adjustmentNotes: adjustmentData?.notes,
+        // Signatures
         preparedBy: approvalSignatures.prepared_by,
         approvedBy: approvalSignatures.approved_by,
         checkedBy: approvalSignatures.checked_by,
