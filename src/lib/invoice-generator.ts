@@ -37,6 +37,20 @@ export interface InvoiceData {
   // Enhanced fields for the multi-step workflow
   invoice_status?: 'draft' | 'approved';
   document_type?: 'sales_receipt' | 'invoice';
+  // Post-trip adjustment fields
+  hasAdjustments?: boolean;
+  originalQuotedKm?: number;
+  actualKmTraveled?: number;
+  extraKm?: number;
+  extraKmChargePerKm?: number;
+  extraKmTotalCharge?: number;
+  additionalExpenses?: Array<{
+    description: string;
+    amount: number;
+    category: string;
+  }>;
+  totalAdditionalExpenses?: number;
+  adjustmentNotes?: string;
   // Approval signatures
   preparedBy?: ApprovalSignature;
   checkedBy?: ApprovalSignature;
@@ -285,9 +299,51 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
           <!-- Summary -->
           <table style="width: 100%; max-width: 300px; float: right; border-collapse: collapse; margin-top: 12px; font-size: 14px;">
             <tr>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Original Quote Amount</td>
+              <td style="border: 1px solid #ddd; padding: 8px;">${subTotal.toLocaleString()}.00</td>
+            </tr>
+            ${data.hasAdjustments && data.extraKm && data.extraKm !== 0 ? `
+            <tr style="background: #fff9e6;">
+              <td style="border: 1px solid #ddd; padding: 8px; font-size: 12px;" colspan="2">
+                <strong>Extra KM Adjustment:</strong><br>
+                Quoted: ${data.originalQuotedKm || 0} km | Actual: ${data.actualKmTraveled || 0} km<br>
+                Extra: ${data.extraKm > 0 ? '+' : ''}${data.extraKm} km × LKR ${(data.extraKmChargePerKm || 0).toLocaleString()}/km
+              </td>
+            </tr>
+            <tr style="background: #fff9e6;">
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Extra KM Charge</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${(data.extraKmTotalCharge || 0).toLocaleString()}.00</td>
+            </tr>
+            ` : ''}
+            ${data.hasAdjustments && data.additionalExpenses && data.additionalExpenses.length > 0 ? `
+            <tr style="background: #ffe6f0;">
+              <td style="border: 1px solid #ddd; padding: 6px; font-size: 12px;" colspan="2">
+                <strong>Additional Expenses:</strong><br>
+                ${data.additionalExpenses.map(exp => 
+                  `• ${exp.description}: LKR ${exp.amount.toLocaleString()}.00`
+                ).join('<br>')}
+              </td>
+            </tr>
+            <tr style="background: #ffe6f0;">
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Total Additional Expenses</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${(data.totalAdditionalExpenses || 0).toLocaleString()}.00</td>
+            </tr>
+            ` : ''}
+            ${data.hasAdjustments ? `
+            <tr style="background: #e6f7ff;">
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Total Adjustments</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">+${((data.extraKmTotalCharge || 0) + (data.totalAdditionalExpenses || 0)).toLocaleString()}.00</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; background: #f5f5f5;">Adjusted Sub-Total</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; background: #f5f5f5;">${(subTotal + (data.extraKmTotalCharge || 0) + (data.totalAdditionalExpenses || 0)).toLocaleString()}.00</td>
+            </tr>
+            ` : `
+            <tr>
               <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Sub-Total</td>
               <td style="border: 1px solid #ddd; padding: 8px;">${subTotal.toLocaleString()}.00</td>
             </tr>
+            `}
             <tr>
               <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Discount</td>
               <td style="border: 1px solid #ddd; padding: 8px;">${discount.toLocaleString()}.00</td>
@@ -301,10 +357,16 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
               <td style="border: 1px solid #ddd; padding: 8px;">${totalPaid.toLocaleString()}.00</td>
             </tr>
             <tr>
-              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">Balance Due</td>
-              <td style="border: 1px solid #ddd; padding: 8px;">${balanceDue.toLocaleString()}.00</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; background: #e8f5e9;">Balance Due</td>
+              <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; background: #e8f5e9;">${balanceDue.toLocaleString()}.00</td>
             </tr>
           </table>
+          ${data.hasAdjustments && data.adjustmentNotes ? `
+          <div style="clear: both; margin-top: 15px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+            <strong>Adjustment Notes:</strong><br>
+            ${data.adjustmentNotes}
+          </div>
+          ` : ''}
 
           <!-- Payment Info & Terms - Keep Together on Page 1 -->
           <div class="keep-together" style="margin-top: 20px; font-size: 13px; clear: both;">
