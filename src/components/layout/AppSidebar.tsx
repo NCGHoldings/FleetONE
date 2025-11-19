@@ -100,6 +100,12 @@ const yutongItems = [
   { id: "yutong_addons", title: "Add-ons", url: "/yutong-quotations?tab=addons", icon: Package },
 ];
 
+const sinotruckItems = [
+  { id: "sinotruck_quotations", title: "Quotations", url: "/sinotruck-quotations", icon: FileText },
+  { id: "sinotruck_truck_models", title: "Truck Models", url: "/sinotruck-quotations?tab=truck-models", icon: Truck },
+  { id: "sinotruck_customers", title: "Customers", url: "/sinotruck-quotations?tab=customers", icon: Users },
+];
+
 const nspItems = [
   { id: "nsp_daily_sales", title: "Daily Sales", url: "/nsp-daily-sales", icon: ShoppingCart },
   { id: "nsp_summary", title: "Summary & Reports", url: "/nsp-summary", icon: FileSpreadsheet },
@@ -157,6 +163,7 @@ const visibleOperations = operationsItems.filter((i) => hasAccess(i.id));
 const visibleBusiness = businessItems.filter((i) => hasAccess(i.id));
 const visibleFinance = financeItems.filter((i) => hasAccess(i.id));
 const visibleYutong = yutongItems.filter((i) => hasAccess(i.id));
+const visibleSinotruck = sinotruckItems.filter((i) => hasAccess(i.id));
 const visibleNSP = nspItems.filter((i) => hasAccess(i.id));
 const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 
@@ -263,6 +270,27 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
           <SidebarGroupContent>
             <SidebarMenu>
 {visibleYutong.map((item) => (
+  <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-full animate-pulse"></div>
+            Sinotruck Operations
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+{visibleSinotruck.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
       <NavLink to={item.url} className={getNavCls}>

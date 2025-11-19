@@ -38,6 +38,7 @@ import SchoolPayments from "./pages/SchoolPayments";
 import ReceiptUpload from "./pages/ReceiptUpload";
 import SchoolReports from "./pages/SchoolReports";
 import YutongQuotations from "./pages/YutongQuotations";
+import SinotruckQuotations from "./pages/SinotruckQuotations";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
 import PublicComplaint from "./pages/PublicComplaint";
@@ -539,6 +540,19 @@ const App = () => (
             />
             
             <Route 
+              path="/sinotruck-quotations" 
+              element={
+                <ProtectedRoute>
+                  <PageAccessGuard pageId="sinotruck_quotations">
+                    <AppLayout>
+                      <SinotruckQuotations />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route
               path="/nsp-daily-sales" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
