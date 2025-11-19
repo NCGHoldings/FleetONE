@@ -109,30 +109,46 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
       setExistingTripCount(existingTrips?.length || 0);
 
       const formatted = allocationsData?.map((alloc: any) => {
-        // Parse notes to get driver/conductor info
+        // Parse notes to get Excel data and fallback info
         const notes = safeParseJSON(alloc.notes);
         
         // Match bus and route from separate queries
         const bus = buses.find(b => b.id === alloc.bus_id);
         const route = routes.find(r => r.id === alloc.route_id);
         
+        // Smart fallback: use Excel data from notes if IDs are missing
+        const busNo = bus?.bus_no || notes.excel_bus_no || notes.bus_no || 'N/A';
+        const routeDisplay = route 
+          ? `${route.route_no} - ${route.route_name}` 
+          : notes.excel_route_name || notes.route || 'N/A';
+        
         return {
           id: alloc.id,
           allocation_date: alloc.allocation_date,
-          bus_no: bus?.bus_no || notes.bus_no || 'N/A',
-          route_name: route ? `${route.route_no} - ${route.route_name}` : notes.route || 'N/A',
-          driver_name: notes.driver || notes.excel_driver || 'N/A',
-          conductor_name: notes.conductor || notes.excel_conductor || 'N/A',
+          bus_no: busNo,
+          route_name: routeDisplay,
+          driver_name: notes.excel_driver || notes.driver || 'N/A',
+          conductor_name: notes.excel_conductor || notes.conductor || 'N/A',
           start_time: alloc.start_time,
           end_time: alloc.end_time,
           bus_id: alloc.bus_id,
           route_id: alloc.route_id,
           trip_id: alloc.trip_id,
+          has_warnings: !alloc.bus_id || !alloc.route_id,
+          notes: notes
         };
       }) || [];
 
       setAllocations(formatted);
-      toast.success(`Found ${formatted.length} allocations`);
+      
+      const withWarnings = formatted.filter((a: any) => a.has_warnings).length;
+      if (withWarnings > 0) {
+        toast.warning(`Found ${formatted.length} allocations (${withWarnings} need bus/route assignment)`, {
+          duration: 5000
+        });
+      } else {
+        toast.success(`Found ${formatted.length} allocations`);
+      }
     } catch (error: any) {
       console.error('Error fetching allocations:', error);
       toast.error('Failed to fetch allocations');
@@ -152,20 +168,52 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Pre-import validation: Filter out allocations with null bus_id
-      const validAllocations = allocations.filter(a => a.bus_id);
-      const invalidAllocations = allocations.filter(a => !a.bus_id);
+      // Smart matching for allocations without bus_id
+      const allocationsWithMatching = await Promise.all(
+        allocations.map(async (alloc: any) => {
+          if (!alloc.bus_id && alloc.notes?.excel_bus_no) {
+            // Try to find bus by number (with normalization)
+            const busNo = alloc.notes.excel_bus_no.replace(/\s+/g, '').toUpperCase();
+            const { data: matchedBus } = await supabase
+              .from('buses')
+              .select('id, bus_no')
+              .ilike('bus_no', busNo)
+              .maybeSingle();
+            
+            if (matchedBus) {
+              return { ...alloc, bus_id: matchedBus.id, bus_no: matchedBus.bus_no };
+            }
+          }
+          if (!alloc.route_id && alloc.notes?.excel_route_no) {
+            // Try to find route by number or name
+            const { data: matchedRoute } = await supabase
+              .from('routes')
+              .select('id, route_no, route_name')
+              .or(`route_no.eq.${alloc.notes.excel_route_no},route_name.ilike.%${alloc.notes.excel_route_name}%`)
+              .limit(1)
+              .maybeSingle();
+            
+            if (matchedRoute) {
+              return { ...alloc, route_id: matchedRoute.id };
+            }
+          }
+          return alloc;
+        })
+      );
+
+      const validAllocations = allocationsWithMatching.filter((a: any) => a.bus_id);
+      const invalidAllocations = allocationsWithMatching.filter((a: any) => !a.bus_id);
 
       if (invalidAllocations.length > 0) {
-        const busNumbers = invalidAllocations.map(a => a.bus_no).join(', ');
+        const busNumbers = invalidAllocations.map((a: any) => a.bus_no).join(', ');
         toast.warning(
-          `${invalidAllocations.length} allocation${invalidAllocations.length > 1 ? 's' : ''} skipped due to missing bus assignment (${busNumbers}). Please assign buses in Driver Allocation page first.`,
+          `${invalidAllocations.length} allocation(s) will be skipped due to missing bus (${busNumbers}). These need bus assignment.`,
           { duration: 6000 }
         );
       }
 
       if (validAllocations.length === 0) {
-        toast.error('No valid allocations to import. All allocations require bus assignment.');
+        toast.error('No valid allocations to import. All require bus assignment.');
         setIsLoading(false);
         return;
       }
@@ -211,12 +259,12 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
         return;
       }
 
-      // Prepare trip entries with correct schema
-      const tripEntries = tripsToImport.map(alloc => ({
+      // Prepare trip entries with correct schema and notes from allocation
+      const tripEntries = tripsToImport.map((alloc: any) => ({
         trip_date: alloc.allocation_date,
         trip_no: alloc.trip_id,
         bus_id: alloc.bus_id,
-        route_id: alloc.route_id,
+        route_id: alloc.route_id || null,
         driver_id: null,
         conductor_id: null,
         start_time: alloc.start_time,
@@ -227,11 +275,15 @@ export function ImportFromAllocationModal({ isOpen, onClose, onSuccess }: Import
         income: 0,
         fuel_liters: null,
         status: 'scheduled' as const,
+        data_source: 'import' as const,
         notes: JSON.stringify({
           driver: alloc.driver_name,
           conductor: alloc.conductor_name,
-          imported_from_allocation: true,
-          allocation_id: alloc.id
+          imported_from: 'driver_allocation',
+          import_date: new Date().toISOString(),
+          original_bus_no: alloc.notes?.excel_bus_no || alloc.bus_no,
+          original_route: alloc.notes?.excel_route_name || alloc.route_name,
+          has_warnings: alloc.has_warnings || false
         })
       }));
 
