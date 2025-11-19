@@ -17,6 +17,7 @@ import { ImportFromAllocationModal } from "@/components/trips/ImportFromAllocati
 import { GLExportModal } from "@/components/trips/GLExportModal";
 import { RouteGLCodesAdmin } from "@/components/trips/RouteGLCodesAdmin";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 
 export default function DailyTrips() {
@@ -63,7 +64,7 @@ export default function DailyTrips() {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">Daily Trips</h1>
               <p className="text-sm text-muted-foreground">
-                Manage and track your daily bus operations
+                Manage and track your daily bus operations • {fleetSummary?.total_trips ?? 0} trip{(fleetSummary?.total_trips ?? 0) !== 1 ? 's' : ''} found
               </p>
             </div>
 
@@ -281,7 +282,11 @@ export default function DailyTrips() {
       <ImportFromAllocationModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onSuccess={refetch}
+        onSuccess={() => {
+          console.log('✅ Import completed. Refetching daily trips data...');
+          refetch();
+          toast.success('Daily trips data refreshed!', { duration: 2000 });
+        }}
       />
 
       <GLExportModal
