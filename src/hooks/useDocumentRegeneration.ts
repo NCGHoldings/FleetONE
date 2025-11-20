@@ -56,6 +56,20 @@ export const useDocumentRegeneration = () => {
 
       const totalApprovedPaid = allPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
+      // Fetch adjustment data for balance invoices
+      let adjustmentData = null;
+      if (existingDoc.document_type === 'invoice' && existingDoc.payment_type === 'balance') {
+        const { data: adjustment } = await supabase
+          .from('special_hire_trip_adjustments')
+          .select('*')
+          .eq('quotation_id', quotationId)
+          .eq('adjustment_status', 'finalized')
+          .maybeSingle();
+        
+        adjustmentData = adjustment;
+        console.log('Adjustment data for regeneration:', adjustmentData);
+      }
+
       // Fetch current signatures for the document
       const { data: signatures } = await supabase
         .from('document_approvals')
@@ -97,6 +111,22 @@ export const useDocumentRegeneration = () => {
       // For balance/full invoices, use the sum of all approved payments
       const paidAmount = isAdvanceDoc ? (paymentData?.amount || 0) : totalApprovedPaid;
 
+      // Check if we have adjustment data (for balance invoices)
+      const hasAdjustments = adjustmentData !== null;
+
+      console.log('Regenerating document:', {
+        documentType: existingDoc.document_type,
+        paymentType: existingDoc.payment_type,
+        hasAdjustments,
+        totalAmount: hasAdjustments ? adjustmentData.original_quotation_amount : calculateTotalAmount(quotationData),
+        paidAmount,
+        adjustmentData: adjustmentData ? {
+          original_quotation_amount: adjustmentData.original_quotation_amount,
+          extra_km_total_charge: adjustmentData.extra_km_total_charge,
+          balance_due: adjustmentData.balance_due
+        } : null
+      });
+
       // Create invoice data with fresh signatures
       const invoiceData: InvoiceData = {
         invoiceNo: `UPDATED-${existingDoc.payment_type.toUpperCase()}-${Date.now()}`,
@@ -113,7 +143,12 @@ export const useDocumentRegeneration = () => {
         busType: 'Standard Bus',
         numberOfBuses: quotationData.number_of_buses,
         numberOfPassengers: quotationData.number_of_passengers,
-        totalAmount: calculateTotalAmount(quotationData),
+        
+        // Use original_quotation_amount from adjustments if available, otherwise calculate
+        totalAmount: hasAdjustments 
+          ? (adjustmentData.original_quotation_amount || calculateTotalAmount(quotationData))
+          : calculateTotalAmount(quotationData),
+        
         advanceAmount: quotationData.advance_paid || 0,
         paidAmount,
         vehicleNo: quotationData.assigned_bus_no,
@@ -121,6 +156,18 @@ export const useDocumentRegeneration = () => {
         conductorName: quotationData.assigned_conductor_name,
         invoice_status: existingDoc.document_status as 'draft' | 'approved',
         document_type: existingDoc.document_type as 'sales_receipt' | 'invoice',
+        
+        // Include adjustment data if this is a balance invoice
+        ...(hasAdjustments ? {
+          hasAdjustments: true,
+          extraKm: adjustmentData.extra_km || 0,
+          extraKmChargePerKm: adjustmentData.extra_km_charge_per_km || 0,
+          extraKmTotalCharge: adjustmentData.extra_km_total_charge || 0,
+          additionalExpenses: adjustmentData.additional_expenses || [],
+          totalAdditionalExpenses: adjustmentData.total_additional_expenses || 0,
+          adjustmentNotes: adjustmentData.notes || '',
+        } : {}),
+        
         ...signatureMap
       };
 
