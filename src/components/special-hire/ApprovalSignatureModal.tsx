@@ -35,16 +35,21 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
   );
   const [nameSuggestions, setNameSuggestions] = useState<NameSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [signatureTab, setSignatureTab] = useState<'draw' | 'upload' | 'none'>('draw');
+  const [signatureTab, setSignatureTab] = useState<'profile' | 'draw' | 'upload' | 'none'>('profile');
   const [uploadedSignature, setUploadedSignature] = useState<string | null>(null);
   const [previewSignature, setPreviewSignature] = useState<string | null>(null);
+  const [profileSignature, setProfileSignature] = useState<{
+    data: string | null;
+    type: string | null;
+  }>({ data: null, type: null });
   
   const signatureCanvasRef = useRef<SignatureCanvasRef>(null);
-  const { isLoading, saveApproval, getNameSuggestions } = useSignatureManagement();
+  const { isLoading, saveApproval, getNameSuggestions, getProfileSignature } = useSignatureManagement();
 
   useEffect(() => {
     if (isOpen) {
       loadNameSuggestions();
+      loadProfileSignature();
       // Load existing signature for preview
       if (existingApproval?.signature_data) {
         setPreviewSignature(existingApproval.signature_data);
@@ -57,9 +62,14 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
       // Reset state when modal closes
       setUploadedSignature(null);
       setPreviewSignature(null);
-      setSignatureTab('draw');
+      setSignatureTab('profile');
     }
   }, [isOpen, existingApproval]);
+
+  const loadProfileSignature = async () => {
+    const signature = await getProfileSignature();
+    setProfileSignature({ data: signature.signature_data, type: signature.signature_type });
+  };
 
   const loadNameSuggestions = async () => {
     const suggestions = await getNameSuggestions();
@@ -151,21 +161,32 @@ export const ApprovalSignatureModal: React.FC<ApprovalSignatureModalProps> = ({
 
   const handleSave = async () => {
     if (!approverName.trim()) {
-      toast.error('Please enter approver name');
-      return;
-    }
-
-    if (!documentId) {
-      toast.error('Document ID is missing. Cannot save signature.');
+      toast.error('Approver name is required');
       return;
     }
 
     let signatureData: string | undefined;
-    
-    if (signatureTab === 'draw' && signatureCanvasRef.current && !signatureCanvasRef.current.isEmpty()) {
-      signatureData = signatureCanvasRef.current.toDataURL('image/png');
-    } else if (signatureTab === 'upload' && uploadedSignature) {
+
+    if (signatureTab === 'profile') {
+      if (!profileSignature.data) {
+        toast.error('No profile signature found. Please use another method or add signature to your profile.');
+        return;
+      }
+      signatureData = profileSignature.data;
+    } else if (signatureTab === 'draw') {
+      if (signatureCanvasRef.current?.isEmpty()) {
+        toast.error('Please draw a signature');
+        return;
+      }
+      signatureData = signatureCanvasRef.current?.toDataURL();
+    } else if (signatureTab === 'upload') {
+      if (!uploadedSignature) {
+        toast.error('Please upload a signature image');
+        return;
+      }
       signatureData = uploadedSignature;
+    } else if (signatureTab === 'none') {
+      signatureData = undefined;
     }
 
     const approvalData: ApprovalData = {

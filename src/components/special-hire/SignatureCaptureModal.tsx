@@ -41,18 +41,31 @@ export const SignatureCaptureModal: React.FC<SignatureCaptureModalProps> = ({
   const [approvalDate, setApprovalDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const { saveApproval, getNameSuggestions, isLoading } = useSignatureManagement();
+  const [activeTab, setActiveTab] = useState<'profile' | 'draw'>('profile');
+  const [profileSignature, setProfileSignature] = useState<{
+    data: string | null;
+    type: string | null;
+  }>({ data: null, type: null });
+  const { saveApproval, getNameSuggestions, isLoading, getProfileSignature } = useSignatureManagement();
 
   useEffect(() => {
     if (isOpen) {
       loadNameSuggestions();
-      initializeCanvas();
+      loadProfileSignature();
+      if (activeTab === 'draw') {
+        initializeCanvas();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, activeTab]);
 
   const loadNameSuggestions = async () => {
     const suggestions = await getNameSuggestions();
     setNameSuggestions(suggestions.map(s => s.name));
+  };
+
+  const loadProfileSignature = async () => {
+    const signature = await getProfileSignature();
+    setProfileSignature({ data: signature.signature_data, type: signature.signature_type });
   };
 
   const initializeCanvas = () => {
@@ -152,7 +165,17 @@ export const SignatureCaptureModal: React.FC<SignatureCaptureModalProps> = ({
       return;
     }
 
-    const signatureData = getSignatureData();
+    let signatureData: string | undefined;
+
+    if (activeTab === 'profile') {
+      if (!profileSignature.data) {
+        toast.error('No profile signature found. Please draw a signature or add one to your profile.');
+        return;
+      }
+      signatureData = profileSignature.data;
+    } else {
+      signatureData = getSignatureData();
+    }
     
     const signatureApprovalData = {
       document_id: documentId,

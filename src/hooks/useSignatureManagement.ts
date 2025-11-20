@@ -206,11 +206,65 @@ export const useSignatureManagement = () => {
     }
   }, []);
 
+  // Get profile signature (reusable across all documents)
+  const getProfileSignature = useCallback(async (): Promise<{ 
+    signature_data: string | null; 
+    signature_type: string | null;
+  }> => {
+    try {
+      if (!user) return { signature_data: null, signature_type: null };
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('signature_data, signature_type')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+      return data || { signature_data: null, signature_type: null };
+    } catch (error) {
+      console.error('Error fetching profile signature:', error);
+      return { signature_data: null, signature_type: null };
+    }
+  }, [user]);
+
+  // Save profile signature for reuse
+  const saveProfileSignature = useCallback(async (
+    signatureData: string,
+    signatureType: 'drawing' | 'text' | 'image'
+  ): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          signature_data: signatureData,
+          signature_type: signatureType
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast.success('Signature saved to your profile');
+      return true;
+    } catch (error) {
+      console.error('Error saving profile signature:', error);
+      toast.error('Failed to save signature to profile');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
   return {
     isLoading,
     saveApproval,
     getDocumentApprovals,
     deleteApproval,
     getNameSuggestions,
+    getProfileSignature,
+    saveProfileSignature
   };
 };
