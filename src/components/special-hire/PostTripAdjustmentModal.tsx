@@ -28,7 +28,9 @@ import {
   Save,
   CheckCircle,
   AlertCircle,
+  FileText,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   usePostTripAdjustment,
   type AdditionalExpense,
@@ -47,6 +49,7 @@ interface PostTripAdjustmentModalProps {
   advancePaid: number;
   defaultKmRate?: number;
   onAdjustmentSaved?: () => void;
+  onRequestInvoiceGeneration?: () => void;
 }
 
 export const PostTripAdjustmentModal = ({
@@ -60,6 +63,7 @@ export const PostTripAdjustmentModal = ({
   advancePaid,
   defaultKmRate = 300,
   onAdjustmentSaved,
+  onRequestInvoiceGeneration,
 }: PostTripAdjustmentModalProps) => {
   const {
     loading,
@@ -86,6 +90,7 @@ export const PostTripAdjustmentModal = ({
     final_trip_amount: originalAmount,
     balance_due: originalAmount - advancePaid,
   });
+  const [adjustmentFinalized, setAdjustmentFinalized] = useState(false);
 
   // Load existing adjustment
   useEffect(() => {
@@ -174,12 +179,19 @@ export const PostTripAdjustmentModal = ({
   };
 
   const handleFinalize = async () => {
-    const { data, error } = await finalizeAdjustment(
-      buildAdjustment("finalized")
-    );
+    const adjustment = buildAdjustment("finalized");
+    const { data, error } = await finalizeAdjustment(adjustment);
     if (!error) {
+      setAdjustmentFinalized(true);
       onAdjustmentSaved?.();
-      onOpenChange(false);
+      toast.success('Adjustment finalized successfully!');
+    }
+  };
+
+  const handleProceedToInvoice = () => {
+    onOpenChange(false);
+    if (onRequestInvoiceGeneration) {
+      onRequestInvoiceGeneration();
     }
   };
 
@@ -468,28 +480,48 @@ export const PostTripAdjustmentModal = ({
         </Card>
 
         {/* Action Buttons */}
-        <div className="flex gap-3 justify-end">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={handleSaveDraft}
-            disabled={loading || !hasAdjustments}
-            className="gap-2"
-          >
-            <Save className="h-4 w-4" />
-            Save as Draft
-          </Button>
-          <Button
-            onClick={handleFinalize}
-            disabled={loading || !hasAdjustments}
-            className="gap-2"
-          >
-            <CheckCircle className="h-4 w-4" />
-            Finalize & Generate Invoice
-          </Button>
-        </div>
+        {!adjustmentFinalized ? (
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleSaveDraft}
+              disabled={loading || !hasAdjustments}
+              className="gap-2"
+            >
+              <Save className="h-4 w-4" />
+              Save as Draft
+            </Button>
+            <Button
+              onClick={handleFinalize}
+              disabled={loading || !hasAdjustments}
+              className="gap-2"
+            >
+              <CheckCircle className="h-4 w-4" />
+              Finalize Adjustment
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                Adjustment finalized successfully! You can now generate and send the balance invoice to the customer.
+              </AlertDescription>
+            </Alert>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+              <Button onClick={handleProceedToInvoice} className="gap-2">
+                <FileText className="h-4 w-4" />
+                Next: Generate Invoice
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

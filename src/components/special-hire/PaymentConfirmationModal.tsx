@@ -15,6 +15,7 @@ interface PaymentConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (paymentData: PaymentConfirmationData) => void;
+  onGenerateInvoiceRequest?: () => void;
   quotationData: {
     quotation_no: string;
     customer_name: string;
@@ -36,6 +37,7 @@ interface PaymentConfirmationModalProps {
     total_additional_expenses?: number;
     notes?: string;
   };
+  balanceInvoiceSent?: boolean;
   loading?: boolean;
 }
 
@@ -54,12 +56,15 @@ export interface PaymentConfirmationData {
 export const PaymentConfirmationModal = ({ 
   isOpen, 
   onClose, 
-  onConfirm, 
+  onConfirm,
+  onGenerateInvoiceRequest,
   quotationData,
   adjustmentData,
+  balanceInvoiceSent = false,
   loading = false 
 }: PaymentConfirmationModalProps) => {
   const { user } = useAuth();
+  const [workflowMode, setWorkflowMode] = useState<'generate_invoice' | 'confirm_payment'>('confirm_payment');
   // Calculate final total to match quotation preview
   const calculateFinalTotal = () => {
     const hireAll = quotationData.gross_revenue || 0;
@@ -164,14 +169,69 @@ export const PaymentConfirmationModal = ({
     });
   };
 
+  const handleGenerateInvoice = () => {
+    onClose();
+    if (onGenerateInvoiceRequest) {
+      onGenerateInvoiceRequest();
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Confirm Payment & Trip Assignment</DialogTitle>
+          <DialogTitle>
+            {adjustmentData && !balanceInvoiceSent 
+              ? 'Choose Action: Invoice or Payment' 
+              : 'Confirm Payment & Trip Assignment'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Workflow Selection - Only show if adjustments exist and invoice not sent yet */}
+          {adjustmentData && !balanceInvoiceSent && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="pt-6">
+                <h3 className="font-semibold mb-4">What would you like to do?</h3>
+                <RadioGroup value={workflowMode} onValueChange={(val) => setWorkflowMode(val as any)}>
+                  <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                    <RadioGroupItem value="generate_invoice" id="generate_invoice" />
+                    <div className="flex-1">
+                      <Label htmlFor="generate_invoice" className="font-medium cursor-pointer">
+                        Generate & Send Invoice to Customer
+                      </Label>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Customer hasn't paid yet. Generate balance invoice showing adjustments and send to customer.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                    <RadioGroupItem value="confirm_payment" id="confirm_payment" />
+                    <div className="flex-1">
+                      <Label htmlFor="confirm_payment" className="font-medium cursor-pointer">
+                        Confirm Payment Received
+                      </Label>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Customer already paid. Record the payment details and close this trip.
+                      </p>
+                    </div>
+                  </div>
+                </RadioGroup>
+                
+                {workflowMode === 'generate_invoice' && (
+                  <div className="mt-4 pt-4 border-t">
+                    <Button onClick={handleGenerateInvoice} className="w-full">
+                      Proceed to Generate Invoice
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Only show payment form if in confirm_payment mode OR no adjustments OR invoice already sent */}
+          {(workflowMode === 'confirm_payment' || !adjustmentData || balanceInvoiceSent) && (
+            <>
           {/* Quotation Summary */}
           <Card>
             <CardContent className="pt-6">
@@ -397,6 +457,8 @@ export const PaymentConfirmationModal = ({
               {loading ? 'Processing...' : 'Confirm Payment'}
             </Button>
           </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

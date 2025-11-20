@@ -9,6 +9,10 @@ import { format } from 'date-fns';
 import { TripStatusTimeline } from './TripStatusTimeline';
 import { PaymentTimeline } from './PaymentTimeline';
 import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
+import { PostTripAdjustmentModal } from './PostTripAdjustmentModal';
+import { PaymentConfirmationModal } from './PaymentConfirmationModal';
+import { usePostTripAdjustment } from '@/hooks/usePostTripAdjustment';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TripDetailsModalProps {
   open: boolean;
@@ -58,6 +62,7 @@ interface TripDetailsModalProps {
     extra_km?: number;
     extra_km_total_charge?: number;
     total_additional_expenses?: number;
+    balance_invoice_document_id?: string;
   };
 }
 
@@ -72,7 +77,28 @@ export function TripDetailsModal({
   adjustmentAmount,
   adjustmentData,
 }: TripDetailsModalProps) {
-  const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false);
+  // Modal state
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
+  const [isBalanceInvoiceModalOpen, setIsBalanceInvoiceModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const { getAdjustment } = usePostTripAdjustment();
+  const [localAdjustmentData, setLocalAdjustmentData] = useState<any>(null);
+
+  const fetchAdjustmentData = async () => {
+    if (trip?.quotation_id) {
+      const { data } = await getAdjustment(trip.quotation_id);
+      setLocalAdjustmentData(data);
+    }
+  };
+
+  const calculateTotalAmount = () => {
+    if (!trip?.quotation) return 0;
+    const hireAll = trip.quotation.gross_revenue || 0;
+    const fuelAll = trip.quotation.fuel_cost_fuel_only || 0;
+    const commission = trip.quotation.commission_pass_through_amount || 0;
+    const discount = trip.quotation.discount_amount_lkr || 0;
+    return Math.round(hireAll + fuelAll + commission - discount);
+  };
 
   if (!trip) return null;
 
@@ -249,47 +275,83 @@ export function TripDetailsModal({
 
       {/* Generate Balance Invoice Modal */}
       {adjustmentData && adjustmentStatus === 'finalized' && trip.quotation && (
-        <GenerateBalanceInvoiceModal
-          open={generateInvoiceOpen}
-          onOpenChange={setGenerateInvoiceOpen}
-          quotationData={{
-            id: trip.quotation_id,
-            quotation_no: trip.quotation.quotation_no,
-            customer_name: trip.quotation.customer_name,
-            customer_phone: trip.quotation.customer_phone,
-            customer_email: trip.quotation.customer_email,
-            company_name: trip.quotation.company_name,
-            pickup_location: trip.quotation.pickup_location,
-            drop_location: trip.quotation.drop_location,
-            pickup_datetime: trip.quotation.pickup_datetime,
-            drop_datetime: trip.quotation.drop_datetime,
-            bus_type: 'Standard Bus', // Default value
-            number_of_buses: trip.quotation.number_of_buses,
-            number_of_passengers: trip.quotation.number_of_passengers,
-            gross_revenue: trip.quotation.gross_revenue,
-            fuel_cost_fuel_only: trip.quotation.fuel_cost_fuel_only,
-            commission_pass_through_amount: trip.quotation.commission_pass_through_amount,
-            discount_amount_lkr: trip.quotation.discount_amount_lkr,
-            advance_paid: trip.advance_paid,
-            balance_due: trip.balance_due,
-            driver_name: trip.driver_name,
-            conductor_name: trip.conductor_name,
-            bus_no: trip.bus_no,
-          }}
-          adjustmentData={{
-            id: '', // Will be populated from database
-            extra_km: adjustmentData.extra_km,
-            extra_km_rate: 0, // Default rate
-            extra_km_total_charge: adjustmentData.extra_km_total_charge,
-            additional_expenses: [],
-            total_additional_expenses: adjustmentData.total_additional_expenses,
-            adjustment_notes: '',
-          }}
-          onInvoiceGenerated={() => {
-            setGenerateInvoiceOpen(false);
-            // Optionally refresh data
-          }}
-        />
+        <>
+          <GenerateBalanceInvoiceModal
+            open={isBalanceInvoiceModalOpen}
+            onOpenChange={setIsBalanceInvoiceModalOpen}
+            quotationData={{
+              id: trip.quotation_id,
+              quotation_no: trip.quotation.quotation_no,
+              customer_name: trip.quotation.customer_name,
+              customer_phone: trip.quotation.customer_phone,
+              customer_email: trip.quotation.customer_email,
+              company_name: trip.quotation.company_name,
+              pickup_location: trip.quotation.pickup_location,
+              drop_location: trip.quotation.drop_location,
+              pickup_datetime: trip.quotation.pickup_datetime,
+              drop_datetime: trip.quotation.drop_datetime,
+              bus_type: 'Standard Bus',
+              number_of_buses: trip.quotation.number_of_buses,
+              number_of_passengers: trip.quotation.number_of_passengers,
+              gross_revenue: trip.quotation.gross_revenue,
+              fuel_cost_fuel_only: trip.quotation.fuel_cost_fuel_only,
+              commission_pass_through_amount: trip.quotation.commission_pass_through_amount,
+              discount_amount_lkr: trip.quotation.discount_amount_lkr,
+              advance_paid: trip.advance_paid,
+              balance_due: trip.balance_due,
+              driver_name: trip.driver_name,
+              conductor_name: trip.conductor_name,
+              bus_no: trip.bus_no,
+            }}
+            adjustmentData={{
+              id: '',
+              extra_km: adjustmentData.extra_km,
+              extra_km_rate: 0,
+              extra_km_total_charge: adjustmentData.extra_km_total_charge,
+              additional_expenses: [],
+              total_additional_expenses: adjustmentData.total_additional_expenses,
+              adjustment_notes: '',
+            }}
+            onInvoiceGenerated={() => {
+              setIsBalanceInvoiceModalOpen(false);
+              fetchAdjustmentData();
+            }}
+          />
+
+          <PostTripAdjustmentModal
+            open={isAdjustmentModalOpen}
+            onOpenChange={setIsAdjustmentModalOpen}
+            quotationId={trip.quotation_id}
+            quotationNo={trip.quotation.quotation_no}
+            customerName={trip.quotation.customer_name}
+            originalAmount={calculateTotalAmount()}
+            originalKm={0}
+            advancePaid={trip.advance_paid || 0}
+            defaultKmRate={300}
+            onAdjustmentSaved={fetchAdjustmentData}
+            onRequestInvoiceGeneration={() => setIsBalanceInvoiceModalOpen(true)}
+          />
+
+          <PaymentConfirmationModal
+            isOpen={isPaymentModalOpen}
+            onClose={() => setIsPaymentModalOpen(false)}
+            onConfirm={(paymentData) => {
+              setIsPaymentModalOpen(false);
+            }}
+            onGenerateInvoiceRequest={() => setIsBalanceInvoiceModalOpen(true)}
+            quotationData={{
+              quotation_no: trip.quotation.quotation_no,
+              customer_name: trip.quotation.customer_name,
+              gross_revenue: trip.quotation.gross_revenue || 0,
+              advance_paid: trip.advance_paid || 0,
+              fuel_cost_fuel_only: trip.quotation.fuel_cost_fuel_only || 0,
+              commission_pass_through_amount: trip.quotation.commission_pass_through_amount || 0,
+              discount_amount_lkr: trip.quotation.discount_amount_lkr || 0,
+            }}
+            adjustmentData={localAdjustmentData}
+            balanceInvoiceSent={!!adjustmentData?.balance_invoice_document_id}
+          />
+        </>
       )}
     </Dialog>
   );
