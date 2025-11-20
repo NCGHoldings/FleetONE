@@ -68,13 +68,10 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const [isLoading, setIsLoading] = useState(false);
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [invoiceStatus, setInvoiceStatus] = useState<'draft' | 'sent_to_customer' | 'payment_pending' | 'paid'>('draft');
-  const [activeTab, setActiveTab] = useState('preview');
   const [companyLogo, setCompanyLogo] = useState<string>('');
-  const [signatures, setSignatures] = useState<{
-    preparedBy?: ApprovalSignature;
-    checkedBy?: ApprovalSignature;
-    approvedBy?: ApprovalSignature;
-  }>({});
+  
+  // This modal is specifically for customer-facing balance invoices
+  const isCustomerInvoice = true;
 
   useEffect(() => {
     fetchCompanyLogo();
@@ -106,36 +103,6 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       if (existingInvoice && !error) {
         setDocumentId(existingInvoice.id);
         setInvoiceStatus((existingInvoice.invoice_status || 'draft') as typeof invoiceStatus);
-        
-        // Load existing signatures
-        const { data: sigData } = await supabase
-          .from('document_approvals')
-          .select('*')
-          .eq('document_id', existingInvoice.id);
-
-        if (sigData && sigData.length > 0) {
-          const preparedBy = sigData.find(s => s.approval_type === 'prepared_by');
-          const checkedBy = sigData.find(s => s.approval_type === 'checked_by');
-          const approvedBy = sigData.find(s => s.approval_type === 'approved_by');
-
-          setSignatures({
-            preparedBy: preparedBy ? {
-              approver_name: preparedBy.approver_name,
-              signature_data: preparedBy.signature_data || undefined,
-              approval_date: format(new Date(preparedBy.approval_date), 'yyyy-MM-dd')
-            } : undefined,
-            checkedBy: checkedBy ? {
-              approver_name: checkedBy.approver_name,
-              signature_data: checkedBy.signature_data || undefined,
-              approval_date: format(new Date(checkedBy.approval_date), 'yyyy-MM-dd')
-            } : undefined,
-            approvedBy: approvedBy ? {
-              approver_name: approvedBy.approver_name,
-              signature_data: approvedBy.signature_data || undefined,
-              approval_date: format(new Date(approvedBy.approval_date), 'yyyy-MM-dd')
-            } : undefined,
-          });
-        }
       }
     } catch (error) {
       console.error('Error checking existing invoice:', error);
@@ -148,7 +115,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     return baseBalance + adjustmentTotal;
   };
 
-  const generateInvoiceData = (): InvoiceData => {
+  const generateInvoiceData = (options?: { forCustomer?: boolean }): InvoiceData => {
     const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
     const finalBalance = calculateFinalBalance();
 
@@ -177,6 +144,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       conductorName: quotationData.conductor_name,
       invoice_status: invoiceStatus === 'draft' ? 'draft' : 'approved',
       document_type: 'invoice',
+      forCustomer: options?.forCustomer ?? isCustomerInvoice,
       hasAdjustments: true,
       extraKm: adjustmentData.extra_km,
       extraKmChargePerKm: adjustmentData.extra_km_rate,
@@ -184,9 +152,6 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       additionalExpenses: adjustmentData.additional_expenses,
       totalAdditionalExpenses: adjustmentData.total_additional_expenses,
       adjustmentNotes: adjustmentData.adjustment_notes,
-      preparedBy: signatures.preparedBy,
-      checkedBy: signatures.checkedBy,
-      approvedBy: signatures.approvedBy,
     };
   };
 
@@ -264,11 +229,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const handleDownloadPDF = async () => {
     try {
       setIsLoading(true);
-      // If invoice has been sent to customer, use clean version
-      const invoiceData = {
-        ...generateInvoiceData(),
-        forCustomer: invoiceStatus === 'sent_to_customer',
-      };
+      const invoiceData = generateInvoiceData({ forCustomer: isCustomerInvoice });
       await generateInvoicePDF(invoiceData);
       toast.success('Invoice downloaded successfully');
     } catch (error) {
