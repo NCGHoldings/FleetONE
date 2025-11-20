@@ -264,7 +264,11 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const handleDownloadPDF = async () => {
     try {
       setIsLoading(true);
-      const invoiceData = generateInvoiceData();
+      // If invoice has been sent to customer, use clean version
+      const invoiceData = {
+        ...generateInvoiceData(),
+        forCustomer: invoiceStatus === 'sent_to_customer',
+      };
       await generateInvoicePDF(invoiceData);
       toast.success('Invoice downloaded successfully');
     } catch (error) {
@@ -289,8 +293,11 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
         await handleSaveDraft();
       }
 
-      // Generate PDF content
-      const invoiceData = generateInvoiceData();
+      // Generate PDF content with forCustomer flag (no signatures, no draft text)
+      const invoiceData = {
+        ...generateInvoiceData(),
+        forCustomer: true,
+      };
       const pdfBlob = await generateInvoicePDF(invoiceData);
       
       // Convert blob to base64
