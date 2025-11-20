@@ -221,6 +221,21 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             .signature-section { page-break-inside: avoid; }
             .keep-together { page-break-inside: avoid; }
           }
+          .adjustments-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+          }
+          .adjustment-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 8px 0;
+            background: white;
+            border-radius: 4px;
+          }
         </style>
         
         <div class="invoice-container" style="width: 100%; max-width: 800px; margin: auto; border: 1px solid #ddd; padding: 15px; box-sizing: border-box;">
