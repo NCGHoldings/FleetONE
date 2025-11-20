@@ -31,54 +31,12 @@ export const SinotruckQuotationPreview = forwardRef<HTMLDivElement, SinotruckQuo
 
     return (
       <div ref={ref} className="bg-white page" style={{ width: '210mm', minHeight: '297mm', padding: '0', margin: '0' }}>
-        {/* Header with Diagonal Green Banner and Logos Inside */}
-        <div 
-          className="relative flex items-center justify-between px-10"
-          style={{ 
-            backgroundColor: '#6B8E23',
-            height: '120px',
-            clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0 100%)'
-          }}
-        >
-          {/* Left: QUOTATION text */}
-          <h1 
-            className="text-white font-bold"
-            style={{ 
-              fontSize: '56px', 
-              letterSpacing: '0.05em',
-              lineHeight: '1'
-            }}
-          >
-            QUOTATION
-          </h1>
-
-          {/* Center: NCG Holdings Logo - Absolutely centered */}
-          <div 
-            className="absolute left-1/2 top-1/2 flex items-center gap-2"
-            style={{ transform: 'translate(-50%, -50%)' }}
-          >
-            <div className="text-blue-900 text-4xl font-bold">✊</div>
-            <div className="text-left">
-              <div 
-                className="text-blue-900 font-bold"
-                style={{ fontSize: '28px', letterSpacing: '0.1em', lineHeight: '1' }}
-              >
-                NCG
-              </div>
-              <div 
-                className="text-blue-900"
-                style={{ fontSize: '12px', letterSpacing: '0.2em', marginTop: '-2px' }}
-              >
-                HOLDINGS
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Sinotruk Logo */}
+        {/* Header */}
+        <div className="page-header" style={{ marginBottom: '20px' }}>
           <img 
-            src="/lovable-uploads/sinotruck-logo.png" 
-            alt="Sinotruk Logo" 
-            style={{ height: '80px', width: 'auto', objectFit: 'contain' }}
+            src="/lovable-uploads/sinotruck-quotation-header.png"
+            alt="Quotation Header - NCG Holdings & Sinotruck"
+            style={{ width: '100%', height: 'auto', display: 'block' }}
           />
         </div>
 
