@@ -4163,53 +4163,208 @@ export type Database = {
           },
         ]
       }
+      sinotruck_truck_model_images: {
+        Row: {
+          caption: string | null
+          created_at: string | null
+          display_order: number | null
+          id: string
+          image_url: string
+          is_primary: boolean | null
+          truck_model_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          image_url: string
+          is_primary?: boolean | null
+          truck_model_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          image_url?: string
+          is_primary?: boolean | null
+          truck_model_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_truck_model_images_truck_model_id_fkey"
+            columns: ["truck_model_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_truck_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sinotruck_truck_models: {
         Row: {
+          abs_system: boolean | null
           base_price: number
+          body_dimensions: string | null
+          body_type: string | null
+          body_volume: string | null
+          cabin_features: string[] | null
+          cabin_model: string | null
+          cameras: string | null
           capacity_kw: number
           charger_capacity_kw: number | null
           charger_price: number | null
+          clutch_type: string | null
           condition: string
           created_at: string | null
+          curb_weight: string | null
+          displacement: string | null
+          drive_configuration: string | null
+          driver_seat_type: string | null
+          emission_standard: string | null
+          engine_model: string | null
+          engine_type: string | null
+          front_axle_capacity: string | null
+          fuel_tank_capacity: string | null
+          fuel_type: string | null
+          gears: string | null
+          gps_tracking: boolean | null
+          gradeability: string | null
+          gvw_gcw: string | null
+          horsepower: string | null
           id: string
           image_url: string | null
           is_active: boolean | null
+          max_speed: string | null
           model_name: string
+          multimedia_system: string | null
+          overall_dimensions: string | null
+          payload_capacity: string | null
+          rear_axle_capacity: string | null
+          rim_type: string | null
+          seating_capacity: string | null
+          special_features: Json | null
           specifications: Json | null
+          suspension_type: string | null
+          torque: string | null
+          transmission_model: string | null
+          transmission_type: string | null
           truck_name: string
+          turning_radius: string | null
+          tyre_quantity: string | null
+          tyre_size: string | null
           updated_at: string | null
+          wheelbase: string | null
           year: number
         }
         Insert: {
+          abs_system?: boolean | null
           base_price: number
+          body_dimensions?: string | null
+          body_type?: string | null
+          body_volume?: string | null
+          cabin_features?: string[] | null
+          cabin_model?: string | null
+          cameras?: string | null
           capacity_kw: number
           charger_capacity_kw?: number | null
           charger_price?: number | null
+          clutch_type?: string | null
           condition?: string
           created_at?: string | null
+          curb_weight?: string | null
+          displacement?: string | null
+          drive_configuration?: string | null
+          driver_seat_type?: string | null
+          emission_standard?: string | null
+          engine_model?: string | null
+          engine_type?: string | null
+          front_axle_capacity?: string | null
+          fuel_tank_capacity?: string | null
+          fuel_type?: string | null
+          gears?: string | null
+          gps_tracking?: boolean | null
+          gradeability?: string | null
+          gvw_gcw?: string | null
+          horsepower?: string | null
           id?: string
           image_url?: string | null
           is_active?: boolean | null
+          max_speed?: string | null
           model_name: string
+          multimedia_system?: string | null
+          overall_dimensions?: string | null
+          payload_capacity?: string | null
+          rear_axle_capacity?: string | null
+          rim_type?: string | null
+          seating_capacity?: string | null
+          special_features?: Json | null
           specifications?: Json | null
+          suspension_type?: string | null
+          torque?: string | null
+          transmission_model?: string | null
+          transmission_type?: string | null
           truck_name: string
+          turning_radius?: string | null
+          tyre_quantity?: string | null
+          tyre_size?: string | null
           updated_at?: string | null
+          wheelbase?: string | null
           year: number
         }
         Update: {
+          abs_system?: boolean | null
           base_price?: number
+          body_dimensions?: string | null
+          body_type?: string | null
+          body_volume?: string | null
+          cabin_features?: string[] | null
+          cabin_model?: string | null
+          cameras?: string | null
           capacity_kw?: number
           charger_capacity_kw?: number | null
           charger_price?: number | null
+          clutch_type?: string | null
           condition?: string
           created_at?: string | null
+          curb_weight?: string | null
+          displacement?: string | null
+          drive_configuration?: string | null
+          driver_seat_type?: string | null
+          emission_standard?: string | null
+          engine_model?: string | null
+          engine_type?: string | null
+          front_axle_capacity?: string | null
+          fuel_tank_capacity?: string | null
+          fuel_type?: string | null
+          gears?: string | null
+          gps_tracking?: boolean | null
+          gradeability?: string | null
+          gvw_gcw?: string | null
+          horsepower?: string | null
           id?: string
           image_url?: string | null
           is_active?: boolean | null
+          max_speed?: string | null
           model_name?: string
+          multimedia_system?: string | null
+          overall_dimensions?: string | null
+          payload_capacity?: string | null
+          rear_axle_capacity?: string | null
+          rim_type?: string | null
+          seating_capacity?: string | null
+          special_features?: Json | null
           specifications?: Json | null
+          suspension_type?: string | null
+          torque?: string | null
+          transmission_model?: string | null
+          transmission_type?: string | null
           truck_name?: string
+          turning_radius?: string | null
+          tyre_quantity?: string | null
+          tyre_size?: string | null
           updated_at?: string | null
+          wheelbase?: string | null
           year?: number
         }
         Relationships: []
