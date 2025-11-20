@@ -193,14 +193,28 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     try {
       setIsLoading(true);
       const invoiceData = generateInvoiceData();
-      const htmlContent = generateInvoiceHTML(invoiceData);
+      
+      // Generate PDF and convert to base64
+      const pdfBlob = await generateInvoicePDF(invoiceData);
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+
+      // Convert to base64 (chunked approach for large files)
+      let base64String = '';
+      const chunkSize = 1024;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        base64String += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      const base64Data = btoa(base64String);
       
       const invoiceRecord = {
         quotation_id: quotationData.id,
         payment_type: 'balance',
         document_type: 'invoice',
-        document_data: htmlContent,
+        document_data: base64Data,
         file_name: `${invoiceData.invoiceNo}.pdf`,
+        file_size: uint8Array.length,
         document_status: 'draft',
         invoice_status: 'draft',
         generated_by: user?.id,
@@ -233,6 +247,11 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
       setInvoiceStatus('draft');
       toast.success('Invoice draft saved successfully');
+      
+      // Trigger callback to refresh parent components
+      if (onInvoiceGenerated) {
+        onInvoiceGenerated();
+      }
     } catch (error) {
       console.error('Error saving draft:', error);
       toast.error('Failed to save invoice draft');
@@ -305,6 +324,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           .from('document_storage')
           .update({ 
             invoice_status: 'sent_to_customer',
+            email_status: 'sent',
             email_sent_at: new Date().toISOString(),
             email_sent_by: user?.id,
           })
