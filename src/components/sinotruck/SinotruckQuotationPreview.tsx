@@ -31,38 +31,54 @@ export const SinotruckQuotationPreview = forwardRef<HTMLDivElement, SinotruckQuo
 
     return (
       <div ref={ref} className="bg-white page" style={{ width: '210mm', minHeight: '297mm', padding: '0', margin: '0' }}>
-        {/* Header with Diagonal Green Banner */}
-        <div className="relative" style={{ 
-          backgroundColor: '#7FA827', 
-          height: '100px',
-          clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          paddingLeft: '40px'
-        }}>
-          <h1 className="text-white text-5xl font-bold tracking-wide">QUOTATION</h1>
-        </div>
+        {/* Header with Diagonal Green Banner and Logos Inside */}
+        <div 
+          className="relative flex items-center justify-between px-10"
+          style={{ 
+            backgroundColor: '#6B8E23',
+            height: '120px',
+            clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0 100%)'
+          }}
+        >
+          {/* Left: QUOTATION text */}
+          <h1 
+            className="text-white font-bold"
+            style={{ 
+              fontSize: '56px', 
+              letterSpacing: '0.05em',
+              lineHeight: '1'
+            }}
+          >
+            QUOTATION
+          </h1>
 
-        {/* Logo and Branding Section */}
-        <div className="absolute top-4 right-8 flex items-center gap-4">
-          <div className="text-center">
-            <div className="flex items-center gap-2">
-              <div className="text-blue-900">
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="currentColor">
-                  <path d="M20 2L2 12v8l18 10 18-10v-8L20 2zm0 4l14 7.8-14 7.8-14-7.8L20 6z"/>
-                </svg>
+          {/* Center: NCG Holdings Logo - Absolutely centered */}
+          <div 
+            className="absolute left-1/2 top-1/2 flex items-center gap-2"
+            style={{ transform: 'translate(-50%, -50%)' }}
+          >
+            <div className="text-blue-900 text-4xl font-bold">✊</div>
+            <div className="text-left">
+              <div 
+                className="text-blue-900 font-bold"
+                style={{ fontSize: '28px', letterSpacing: '0.1em', lineHeight: '1' }}
+              >
+                NCG
               </div>
-              <div className="text-left">
-                <div className="text-2xl font-bold text-blue-900 tracking-wider">NCG</div>
-                <div className="text-xs text-blue-900 tracking-widest">HOLDINGS</div>
+              <div 
+                className="text-blue-900"
+                style={{ fontSize: '12px', letterSpacing: '0.2em', marginTop: '-2px' }}
+              >
+                HOLDINGS
               </div>
             </div>
           </div>
-          
+
+          {/* Right: Sinotruk Logo */}
           <img 
             src="/lovable-uploads/sinotruck-logo.png" 
             alt="Sinotruk Logo" 
-            className="h-16 w-16 object-contain"
+            style={{ height: '80px', width: 'auto', objectFit: 'contain' }}
           />
         </div>
 
