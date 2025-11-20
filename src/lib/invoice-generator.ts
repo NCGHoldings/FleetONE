@@ -37,6 +37,7 @@ export interface InvoiceData {
   // Enhanced fields for the multi-step workflow
   invoice_status?: 'draft' | 'approved';
   document_type?: 'sales_receipt' | 'invoice';
+  forCustomer?: boolean; // Flag to generate clean invoice for customer (no signatures, no draft text)
   // Post-trip adjustment fields
   hasAdjustments?: boolean;
   originalQuotedKm?: number;
@@ -62,7 +63,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
   const isSalesReceipt = data.document_type === 'sales_receipt' || isAdvanceInvoice;
   const currentDate = format(new Date(), 'dd/MM/yyyy');
   const companyLogo = data.companyLogo || '/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png';
-  const isDraft = data.invoice_status === 'draft';
+  const isDraft = data.invoice_status === 'draft' && !data.forCustomer;
   const documentTitle = isSalesReceipt ? 'SALES RECEIPT' : 'INVOICE';
 
   // Enhanced draft watermark styles matching quotation design
@@ -401,10 +402,11 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 
           <!-- Footer for Page 1 -->
           <div style="margin-top: 15px; padding-top: 10px; text-align: center; font-size: 12px; border-top: 1px solid #ddd;">
-            Page 1 of 2<br>
+            ${!data.forCustomer ? 'Page 1 of 2<br>' : ''}
             NCG Express Transport Management System
           </div>
 
+          ${!data.forCustomer ? `
           <!-- Page Break Before Signatures -->
           <div class="page-break"></div>
 
@@ -459,6 +461,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
               NCG Express Transport Management System
             </div>
           </div>
+          ` : ''}
         </div>
       </div>
     `;
