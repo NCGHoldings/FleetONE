@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Mail, Download, FileText, CheckCircle, Clock, Send } from 'lucide-react';
-import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData, type ApprovalSignature } from '@/lib/invoice-generator';
-import { DocumentSignatureManager } from './DocumentSignatureManager';
+import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -312,11 +310,6 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     }
   };
 
-  const handleSignatureUpdated = () => {
-    // Reload signatures
-    checkExistingInvoice();
-  };
-
   const getStatusBadge = () => {
     const statusConfig = {
       draft: { label: 'Draft', variant: 'secondary' as const, icon: FileText },
@@ -352,118 +345,77 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           </div>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="preview">Invoice Preview</TabsTrigger>
-            <TabsTrigger value="signatures">Manage Signatures</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="preview" className="space-y-4">
-            {/* Financial Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Financial Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="overflow-y-auto max-h-[70vh] space-y-4">
+          {/* Financial Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Financial Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="text-muted-foreground">Original Balance Due</div>
+                  <div className="font-semibold">LKR {quotationData.balance_due.toLocaleString()}</div>
+                </div>
+                {adjustmentData.extra_km_total_charge && adjustmentData.extra_km_total_charge > 0 && (
                   <div>
-                    <div className="text-muted-foreground">Original Balance Due</div>
-                    <div className="font-semibold">LKR {quotationData.balance_due.toLocaleString()}</div>
-                  </div>
-                  {adjustmentData.extra_km_total_charge && adjustmentData.extra_km_total_charge > 0 && (
-                    <div>
-                      <div className="text-muted-foreground">Extra Kilometers</div>
-                      <div className="font-semibold text-orange-600">
-                        + LKR {adjustmentData.extra_km_total_charge.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        ({adjustmentData.extra_km} km × LKR {adjustmentData.extra_km_rate})
-                      </div>
+                    <div className="text-muted-foreground">Extra Kilometers</div>
+                    <div className="font-semibold text-orange-600">
+                      + LKR {adjustmentData.extra_km_total_charge.toLocaleString()}
                     </div>
-                  )}
-                  {adjustmentData.total_additional_expenses && adjustmentData.total_additional_expenses > 0 && (
-                    <div>
-                      <div className="text-muted-foreground">Additional Expenses</div>
-                      <div className="font-semibold text-orange-600">
-                        + LKR {adjustmentData.total_additional_expenses.toLocaleString()}
-                      </div>
+                    <div className="text-xs text-muted-foreground">
+                      ({adjustmentData.extra_km} km × LKR {adjustmentData.extra_km_rate})
                     </div>
-                  )}
-                </div>
-                <Separator />
-                <div className="flex justify-between items-center">
-                  <div className="text-lg font-bold">Final Balance Due</div>
-                  <div className="text-2xl font-bold text-primary">
-                    LKR {finalBalance.toLocaleString()}
                   </div>
+                )}
+                {adjustmentData.total_additional_expenses && adjustmentData.total_additional_expenses > 0 && (
+                  <div>
+                    <div className="text-muted-foreground">Additional Expenses</div>
+                    <div className="font-semibold text-orange-600">
+                      + LKR {adjustmentData.total_additional_expenses.toLocaleString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center">
+                <div className="text-lg font-bold">Final Balance Due</div>
+                <div className="text-2xl font-bold text-primary">
+                  LKR {finalBalance.toLocaleString()}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Invoice HTML Preview */}
-            <Card>
-              <CardContent className="p-6">
-                <div
-                  className="invoice-preview border rounded-lg p-4 bg-white"
-                  dangerouslySetInnerHTML={{ __html: generateInvoiceHTML(invoiceData) }}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={handleSaveDraft}
-                disabled={isLoading}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Save as Draft
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleDownloadPDF}
-                disabled={isLoading}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Download PDF
-              </Button>
-              <Button
-                onClick={handleEmailToCustomer}
-                disabled={isLoading || !quotationData.customer_email}
-              >
-                <Mail className="w-4 h-4 mr-2" />
-                Email to Customer
-              </Button>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="signatures" className="space-y-4">
-            {documentId ? (
-              <DocumentSignatureManager
-                documentId={documentId}
-                quotationId={quotationData.id}
-                documentStatus={invoiceStatus === 'draft' ? 'draft' : 'approved'}
-                onSignatureUpdated={handleSignatureUpdated}
+          {/* Invoice HTML Preview */}
+          <Card>
+            <CardContent className="p-6">
+              <div
+                className="invoice-preview border rounded-lg p-4 bg-white"
+                dangerouslySetInnerHTML={{ __html: generateInvoiceHTML(invoiceData) }}
               />
-            ) : (
-              <Card>
-                <CardContent className="p-6 text-center text-muted-foreground">
-                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Please save the invoice as a draft first to manage signatures.</p>
-                  <Button
-                    variant="outline"
-                    onClick={handleSaveDraft}
-                    disabled={isLoading}
-                    className="mt-4"
-                  >
-                    Save as Draft
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDownloadPDF}
+              disabled={isLoading}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
+            </Button>
+            <Button
+              onClick={handleEmailToCustomer}
+              disabled={isLoading || !quotationData.customer_email}
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              Email to Customer
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
