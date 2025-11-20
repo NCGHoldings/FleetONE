@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { QuotationModal } from './QuotationModal';
 import { EditQuotationModal } from './EditQuotationModal';
+import { SpecialHireExportModal } from './SpecialHireExportModal';
 import { QuotationPreview } from './QuotationPreview';
 import { QuotationVersionIndicator } from './QuotationVersionIndicator';
 import jsPDF from 'jspdf';
@@ -125,6 +126,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
   const [emailingQuotationId, setEmailingQuotationId] = useState<string | null>(null);
 
@@ -991,7 +993,16 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
       <Card>
         <CardHeader>
-          <CardTitle>Quotations ({filteredQuotations.length})</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Quotations ({filteredQuotations.length})</CardTitle>
+            <Button 
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export to Excel
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -1018,6 +1029,12 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
           onUpdate={handleEditSubmit}
         />
       )}
+
+      <SpecialHireExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        data={quotations}
+      />
     </>
   );
 }
