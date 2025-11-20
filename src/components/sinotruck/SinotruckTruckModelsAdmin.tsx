@@ -78,6 +78,7 @@ export function SinotruckTruckModelsAdmin() {
   const [imageManagerOpen, setImageManagerOpen] = useState(false);
   const [managingModelId, setManagingModelId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [imageCountsMap, setImageCountsMap] = useState<Record<string, {count: number, primaryImage?: string}>>({});
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -105,6 +106,26 @@ export function SinotruckTruckModelsAdmin() {
 
       if (error) throw error;
       setTruckModels(data || []);
+
+      // Fetch image counts and primary images for each model
+      const imageCounts: Record<string, {count: number, primaryImage?: string}> = {};
+      
+      for (const model of data || []) {
+        const { data: images } = await supabase
+          .from('sinotruck_truck_model_images')
+          .select('image_url, is_primary')
+          .eq('truck_model_id', model.id)
+          .order('display_order', { ascending: true });
+        
+        const primaryImage = images?.find(img => img.is_primary)?.image_url || images?.[0]?.image_url;
+        
+        imageCounts[model.id] = {
+          count: images?.length || 0,
+          primaryImage: primaryImage
+        };
+      }
+      
+      setImageCountsMap(imageCounts);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -197,6 +218,12 @@ export function SinotruckTruckModelsAdmin() {
     setImageManagerOpen(true);
   };
 
+  const handleImageManagerClose = () => {
+    setImageManagerOpen(false);
+    setManagingModelId(null);
+    loadTruckModels(); // Refresh to get updated images
+  };
+
   const filteredModels = truckModels.filter(model =>
     model.truck_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     model.model_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -240,84 +267,105 @@ export function SinotruckTruckModelsAdmin() {
           ) : filteredModels.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No truck models found</p>
           ) : (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredModels.map((model) => (
-                <Card key={model.id} className="hover:shadow-md transition-shadow">
+                <Card key={model.id} className="overflow-hidden">
+                  {/* Large image section at top */}
+                  <div className="relative aspect-video bg-muted">
+                    {imageCountsMap[model.id]?.primaryImage ? (
+                      <img
+                        src={imageCountsMap[model.id].primaryImage!}
+                        alt={model.truck_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <Truck className="h-12 w-12 text-muted-foreground" />
+                      </div>
+                    )}
+                    {imageCountsMap[model.id]?.count > 0 && (
+                      <Badge className="absolute top-2 left-2 bg-black/60 text-white">
+                        <Images className="h-3 w-3 mr-1" />
+                        {imageCountsMap[model.id].count}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {/* Card content below image */}
                   <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0">
-                        <div className="w-24 h-24 bg-muted rounded flex items-center justify-center">
-                          <Truck className="h-12 w-12 text-muted-foreground" />
-                        </div>
+                    <div className="space-y-2">
+                      {/* Title and Active badge */}
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-lg">{model.truck_name}</h3>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          model.is_active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {model.is_active ? 'Active' : 'Inactive'}
+                        </span>
                       </div>
                       
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-semibold text-lg">{model.truck_name}</h3>
-                            <p className="text-sm text-muted-foreground">Model: {model.model_name}</p>
-                            <div className="flex gap-2 mt-2">
-                              <Badge variant={model.body_type === 'Cargo' ? 'default' : 'secondary'}>
-                                {model.body_type}
-                              </Badge>
-                              <Badge variant="outline">{model.drive_configuration || 'N/A'}</Badge>
-                              <Badge variant="outline">{model.horsepower || 'N/A'}</Badge>
-                              <Badge variant={model.is_active ? 'default' : 'secondary'}>
-                                {model.is_active ? 'Active' : 'Inactive'}
-                              </Badge>
-                            </div>
-                          </div>
-                          
-                          <div className="text-right">
-                            <p className="text-lg font-bold">
-                              LKR {new Intl.NumberFormat('en-US').format(model.base_price)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{model.year}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2 mt-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewProfile(model)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View Profile
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleManageImages(model.id)}
-                          >
-                            <Images className="h-4 w-4 mr-1" />
-                            Manage Images
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(model)}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDuplicate(model)}
-                          >
-                            <Copy className="h-4 w-4 mr-1" />
-                            Duplicate
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDelete(model.id)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </Button>
-                        </div>
+                      {/* Specifications */}
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p><span className="font-medium">Model:</span> {model.model_name}</p>
+                        <p><span className="font-medium">Type:</span> {model.body_type}</p>
+                        <p><span className="font-medium">Config:</span> {model.drive_configuration || 'N/A'}</p>
+                        <p><span className="font-medium">Power:</span> {model.horsepower || 'N/A'}</p>
+                        <p><span className="font-medium">Year:</span> {model.year}</p>
+                        <p><span className="font-medium">Condition:</span> {model.condition}</p>
+                      </div>
+                      
+                      {/* Price */}
+                      <div className="text-lg font-bold text-primary">
+                        LKR {model.base_price.toLocaleString()}
+                      </div>
+                      
+                      {/* Action buttons in grid */}
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          onClick={() => handleViewProfile(model)}
+                          className="col-span-2"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={() => handleManageImages(model.id)}
+                          className="col-span-2"
+                        >
+                          <Images className="h-4 w-4 mr-1" />
+                          Manage Images
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleEdit(model)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleDuplicate(model)}
+                        >
+                          <Copy className="h-4 w-4 mr-1" />
+                          Duplicate
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          onClick={() => handleDelete(model.id)}
+                          className="col-span-2"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -1046,10 +1094,7 @@ export function SinotruckTruckModelsAdmin() {
           truckModelId={managingModelId}
           truckModelName={truckModels.find(m => m.id === managingModelId)?.truck_name || ''}
           isOpen={imageManagerOpen}
-          onClose={() => {
-            setImageManagerOpen(false);
-            setManagingModelId(null);
-          }}
+          onClose={handleImageManagerClose}
           onUpdate={loadTruckModels}
         />
       )}
