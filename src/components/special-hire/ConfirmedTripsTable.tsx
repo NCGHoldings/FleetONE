@@ -24,6 +24,7 @@ import { DocumentViewer } from './DocumentViewer';
 import { InvoiceViewer } from './InvoiceViewer';
 import AdvanceDetailsModal from './AdvanceDetailsModal';
 import { PostTripAdjustmentModal } from './PostTripAdjustmentModal';
+import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -58,6 +59,8 @@ export function ConfirmedTripsTable() {
   const [documentsModalOpen, setDocumentsModalOpen] = useState(false);
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
   const [adjustmentsData, setAdjustmentsData] = useState<Record<string, any>>({});
+  const [balanceInvoiceModalOpen, setBalanceInvoiceModalOpen] = useState(false);
+  const [selectedAdjustment, setSelectedAdjustment] = useState<any | null>(null);
   
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -1274,6 +1277,74 @@ export function ConfirmedTripsTable() {
             notes: adjustmentsData[selectedTrip.id].notes,
           } : undefined}
           loading={loading}
+          onGenerateInvoiceRequest={() => {
+            const adj = adjustmentsData[selectedTrip.id];
+            if (!adj || adj.adjustment_status !== 'finalized') {
+              toast.error('Please finalize post-trip adjustments before generating the balance invoice.');
+              return;
+            }
+            setSelectedAdjustment(adj);
+            setPaymentModalOpen(false);
+            setBalanceInvoiceModalOpen(true);
+          }}
+          balanceInvoiceSent={!!adjustmentsData[selectedTrip.id]?.balance_invoice_document_id}
+        />
+      )}
+
+      {balanceInvoiceModalOpen && selectedTrip && selectedAdjustment && (
+        <GenerateBalanceInvoiceModal
+          open={balanceInvoiceModalOpen}
+          onOpenChange={(open) => {
+            setBalanceInvoiceModalOpen(open);
+            if (!open) {
+              setSelectedAdjustment(null);
+            }
+          }}
+          quotationData={{
+            id: selectedTrip.id,
+            quotation_no: selectedTrip.quotation_no,
+            customer_name: selectedTrip.customer_name,
+            customer_phone: selectedTrip.customer_phone || '',
+            customer_email: selectedTrip.customer_email,
+            company_name: selectedTrip.company_name,
+            pickup_location: selectedTrip.pickup_location,
+            drop_location: selectedTrip.drop_location,
+            pickup_datetime: selectedTrip.pickup_datetime,
+            drop_datetime: selectedTrip.drop_datetime,
+            bus_type: 'Standard Bus',
+            number_of_buses: selectedTrip.number_of_buses,
+            number_of_passengers: selectedTrip.number_of_passengers,
+            gross_revenue: selectedTrip.gross_revenue,
+            fuel_cost_fuel_only: selectedTrip.fuel_cost_fuel_only,
+            commission_pass_through_amount: selectedTrip.commission_pass_through_amount,
+            discount_amount_lkr: selectedTrip.discount_amount_lkr,
+            advance_paid: selectedTrip.advance_paid || 0,
+            balance_due: selectedTrip.balance_due || 0,
+            driver_name: selectedTrip.assigned_driver_name,
+            conductor_name: selectedTrip.assigned_conductor_name,
+            bus_no: selectedTrip.assigned_bus_no,
+          }}
+          adjustmentData={{
+            id: selectedAdjustment.id,
+            extra_km: selectedAdjustment.extra_km || 0,
+            extra_km_rate: selectedAdjustment.extra_km_charge_per_km || 0,
+            extra_km_total_charge: selectedAdjustment.extra_km_total_charge || 0,
+            additional_expenses: selectedAdjustment.additional_expenses || [],
+            total_additional_expenses: selectedAdjustment.total_additional_expenses || 0,
+            adjustment_notes: selectedAdjustment.notes || '',
+          }}
+          onInvoiceGenerated={async () => {
+            setBalanceInvoiceModalOpen(false);
+            setSelectedAdjustment(null);
+            
+            // Refresh documents and adjustments
+            await loadDocumentStatus(selectedTrip.id);
+            const docsResult = await getDocumentsByQuotation(selectedTrip.id);
+            if (docsResult.success) {
+              setQuotationDocuments(docsResult.documents || []);
+            }
+            await loadAdjustmentData(selectedTrip.id);
+          }}
         />
       )}
 
