@@ -20,7 +20,54 @@ export const SinotruckQuotationsList = ({ onRefresh }: SinotruckQuotationsListPr
 
   useEffect(() => {
     loadQuotations();
-  }, []);
+
+    // Set up real-time subscription for quotation changes
+    const channel = supabase
+      .channel('sinotruck-quotations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sinotruck_quotations'
+        },
+        (payload) => {
+          console.log('New Sinotruck quotation created:', payload);
+          loadQuotations();
+          onRefresh();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'sinotruck_quotations'
+        },
+        (payload) => {
+          console.log('Sinotruck quotation updated:', payload);
+          loadQuotations();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'sinotruck_quotations'
+        },
+        (payload) => {
+          console.log('Sinotruck quotation deleted:', payload);
+          loadQuotations();
+          onRefresh();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [onRefresh]);
 
   const loadQuotations = async () => {
     try {
