@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -84,12 +84,22 @@ export function TripDetailsModal({
   const { getAdjustment } = usePostTripAdjustment();
   const [localAdjustmentData, setLocalAdjustmentData] = useState<any>(null);
 
+  // Fetch adjustment data when modal opens or quotation changes
+  useEffect(() => {
+    if (open && trip?.quotation_id) {
+      fetchAdjustmentData();
+    }
+  }, [open, trip?.quotation_id]);
+
   const fetchAdjustmentData = async () => {
     if (trip?.quotation_id) {
       const { data } = await getAdjustment(trip.quotation_id);
       setLocalAdjustmentData(data);
     }
   };
+
+  // Use effective adjustment that prioritizes local data over props
+  const effectiveAdjustment = localAdjustmentData || adjustmentData || null;
 
   const calculateTotalAmount = () => {
     if (!trip?.quotation) return 0;
@@ -274,7 +284,10 @@ export function TripDetailsModal({
       </DialogContent>
 
       {/* Generate Balance Invoice Modal */}
-      {adjustmentData && adjustmentStatus === 'finalized' && trip.quotation && (
+      {effectiveAdjustment && 
+       (effectiveAdjustment.adjustment_status === 'finalized' || 
+        effectiveAdjustment.adjustment_status === 'invoiced') && 
+       trip.quotation && (
         <>
           <GenerateBalanceInvoiceModal
             open={isBalanceInvoiceModalOpen}
@@ -304,13 +317,13 @@ export function TripDetailsModal({
               bus_no: trip.bus_no,
             }}
             adjustmentData={{
-              id: '',
-              extra_km: adjustmentData.extra_km,
-              extra_km_rate: 0,
-              extra_km_total_charge: adjustmentData.extra_km_total_charge,
-              additional_expenses: [],
-              total_additional_expenses: adjustmentData.total_additional_expenses,
-              adjustment_notes: '',
+              id: effectiveAdjustment.id || '',
+              extra_km: effectiveAdjustment.extra_km || 0,
+              extra_km_rate: effectiveAdjustment.extra_km_charge_per_km || 0,
+              extra_km_total_charge: effectiveAdjustment.extra_km_total_charge || 0,
+              additional_expenses: effectiveAdjustment.additional_expenses || [],
+              total_additional_expenses: effectiveAdjustment.total_additional_expenses || 0,
+              adjustment_notes: effectiveAdjustment.notes || '',
             }}
             onInvoiceGenerated={() => {
               setIsBalanceInvoiceModalOpen(false);
@@ -338,7 +351,10 @@ export function TripDetailsModal({
             onConfirm={(paymentData) => {
               setIsPaymentModalOpen(false);
             }}
-            onGenerateInvoiceRequest={() => setIsBalanceInvoiceModalOpen(true)}
+            onGenerateInvoiceRequest={() => {
+              setIsPaymentModalOpen(false);
+              setIsBalanceInvoiceModalOpen(true);
+            }}
             quotationData={{
               quotation_no: trip.quotation.quotation_no,
               customer_name: trip.quotation.customer_name,
@@ -348,8 +364,8 @@ export function TripDetailsModal({
               commission_pass_through_amount: trip.quotation.commission_pass_through_amount || 0,
               discount_amount_lkr: trip.quotation.discount_amount_lkr || 0,
             }}
-            adjustmentData={localAdjustmentData}
-            balanceInvoiceSent={!!adjustmentData?.balance_invoice_document_id}
+            adjustmentData={effectiveAdjustment}
+            balanceInvoiceSent={!!effectiveAdjustment?.balance_invoice_document_id}
           />
         </>
       )}
