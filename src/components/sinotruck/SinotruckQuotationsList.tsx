@@ -8,6 +8,9 @@ import { Search, Eye, Download, Mail, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { SinotruckQuotationViewModal } from './SinotruckQuotationViewModal';
+import { SinotruckInvoiceGenerator } from './SinotruckInvoiceGenerator';
+import { SinotruckEditQuotationModal } from './SinotruckEditQuotationModal';
 
 interface SinotruckQuotationsListProps {
   onRefresh: () => void;
@@ -17,6 +20,10 @@ export const SinotruckQuotationsList = ({ onRefresh }: SinotruckQuotationsListPr
   const [quotations, setQuotations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedQuotation, setSelectedQuotation] = useState<any | null>(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [invoiceGeneratorOpen, setInvoiceGeneratorOpen] = useState(false);
 
   useEffect(() => {
     loadQuotations();
@@ -78,6 +85,7 @@ export const SinotruckQuotationsList = ({ onRefresh }: SinotruckQuotationsListPr
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      console.log('Loaded quotations:', data);
       setQuotations(data || []);
     } catch (error: any) {
       console.error("Error loading quotations:", error);
@@ -85,6 +93,25 @@ export const SinotruckQuotationsList = ({ onRefresh }: SinotruckQuotationsListPr
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewQuotation = (quotation: any) => {
+    setSelectedQuotation(quotation);
+    setViewModalOpen(true);
+  };
+
+  const handleEditQuotation = (quotation: any) => {
+    setSelectedQuotation(quotation);
+    setEditModalOpen(true);
+  };
+
+  const handleGenerateInvoice = (quotation: any) => {
+    setSelectedQuotation(quotation);
+    setInvoiceGeneratorOpen(true);
+  };
+
+  const handleSendEmail = (quotation: any) => {
+    toast.info("Email functionality coming soon");
   };
 
   const handleDelete = async (id: string) => {
@@ -182,18 +209,30 @@ export const SinotruckQuotationsList = ({ onRefresh }: SinotruckQuotationsListPr
                   <TableCell>{quotation.truck_model_name}</TableCell>
                   <TableCell>{quotation.quantity}</TableCell>
                   <TableCell className="text-right font-semibold">
-                    ${quotation.total_price.toLocaleString()}
+                    LKR {quotation.total_price.toLocaleString()}
                   </TableCell>
                   <TableCell>{getStatusBadge(quotation.status)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="ghost">
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => handleViewQuotation(quotation)}
+                      >
                         <Eye className="w-4 h-4" />
                       </Button>
-                      <Button size="sm" variant="ghost">
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => handleGenerateInvoice(quotation)}
+                      >
                         <Download className="w-4 h-4" />
                       </Button>
-                      <Button size="sm" variant="ghost">
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => handleSendEmail(quotation)}
+                      >
                         <Mail className="w-4 h-4" />
                       </Button>
                       <Button
@@ -212,6 +251,56 @@ export const SinotruckQuotationsList = ({ onRefresh }: SinotruckQuotationsListPr
           </TableBody>
         </Table>
       </div>
+
+      {/* Modals */}
+      {selectedQuotation && (
+        <>
+          <SinotruckQuotationViewModal
+            isOpen={viewModalOpen}
+            onClose={() => {
+              setViewModalOpen(false);
+              setSelectedQuotation(null);
+            }}
+            quotation={selectedQuotation}
+            onEdit={() => {
+              setViewModalOpen(false);
+              setEditModalOpen(true);
+            }}
+            onGenerateInvoice={() => {
+              setViewModalOpen(false);
+              setInvoiceGeneratorOpen(true);
+            }}
+            onDelete={async () => {
+              await handleDelete(selectedQuotation.id);
+              setViewModalOpen(false);
+              setSelectedQuotation(null);
+            }}
+            onRefresh={loadQuotations}
+          />
+
+          <SinotruckInvoiceGenerator
+            isOpen={invoiceGeneratorOpen}
+            onClose={() => {
+              setInvoiceGeneratorOpen(false);
+              setSelectedQuotation(null);
+            }}
+            quotation={selectedQuotation}
+          />
+
+          <SinotruckEditQuotationModal
+            isOpen={editModalOpen}
+            onClose={() => {
+              setEditModalOpen(false);
+              setSelectedQuotation(null);
+            }}
+            quotation={selectedQuotation}
+            onUpdate={() => {
+              loadQuotations();
+              onRefresh();
+            }}
+          />
+        </>
+      )}
     </Card>
   );
 };
