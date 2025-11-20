@@ -1081,6 +1081,7 @@ export type Database = {
           generated_at: string
           generated_by: string | null
           id: string
+          invoice_status: string | null
           payment_id: string | null
           payment_type: string
           quotation_id: string
@@ -1102,6 +1103,7 @@ export type Database = {
           generated_at?: string
           generated_by?: string | null
           id?: string
+          invoice_status?: string | null
           payment_id?: string | null
           payment_type: string
           quotation_id: string
@@ -1123,6 +1125,7 @@ export type Database = {
           generated_at?: string
           generated_by?: string | null
           id?: string
+          invoice_status?: string | null
           payment_id?: string | null
           payment_type?: string
           quotation_id?: string
@@ -5121,6 +5124,7 @@ export type Database = {
           adjustment_status: string | null
           advance_already_paid: number | null
           balance_due: number | null
+          balance_invoice_document_id: string | null
           created_at: string | null
           extra_km: number | null
           extra_km_charge_per_km: number | null
@@ -5143,6 +5147,7 @@ export type Database = {
           adjustment_status?: string | null
           advance_already_paid?: number | null
           balance_due?: number | null
+          balance_invoice_document_id?: string | null
           created_at?: string | null
           extra_km?: number | null
           extra_km_charge_per_km?: number | null
@@ -5165,6 +5170,7 @@ export type Database = {
           adjustment_status?: string | null
           advance_already_paid?: number | null
           balance_due?: number | null
+          balance_invoice_document_id?: string | null
           created_at?: string | null
           extra_km?: number | null
           extra_km_charge_per_km?: number | null
@@ -5179,6 +5185,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "special_hire_trip_adjustments_balance_invoice_document_id_fkey"
+            columns: ["balance_invoice_document_id"]
+            isOneToOne: false
+            referencedRelation: "document_storage"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "special_hire_trip_adjustments_quotation_id_fkey"
             columns: ["quotation_id"]

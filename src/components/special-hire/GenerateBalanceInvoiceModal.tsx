@@ -1,0 +1,481 @@
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Mail, Download, FileText, CheckCircle, Clock, Send } from 'lucide-react';
+import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData, type ApprovalSignature } from '@/lib/invoice-generator';
+import { DocumentSignatureManager } from './DocumentSignatureManager';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+
+interface GenerateBalanceInvoiceModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  quotationData: {
+    id: string;
+    quotation_no: string;
+    customer_name: string;
+    customer_phone: string;
+    customer_email?: string;
+    company_name?: string;
+    pickup_location: string;
+    drop_location: string;
+    pickup_datetime: string;
+    drop_datetime: string;
+    bus_type: string;
+    number_of_buses: number;
+    number_of_passengers: number;
+    gross_revenue: number;
+    fuel_cost_fuel_only?: number;
+    commission_pass_through_amount?: number;
+    discount_amount_lkr?: number;
+    advance_paid: number;
+    balance_due: number;
+    driver_name?: string;
+    conductor_name?: string;
+    bus_no?: string;
+  };
+  adjustmentData: {
+    id: string;
+    extra_km?: number;
+    extra_km_rate?: number;
+    extra_km_total_charge?: number;
+    additional_expenses?: Array<{
+      description: string;
+      amount: number;
+      category: string;
+    }>;
+    total_additional_expenses?: number;
+    adjustment_notes?: string;
+  };
+  onInvoiceGenerated?: () => void;
+}
+
+export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalProps> = ({
+  open,
+  onOpenChange,
+  quotationData,
+  adjustmentData,
+  onInvoiceGenerated,
+}) => {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [invoiceStatus, setInvoiceStatus] = useState<'draft' | 'sent_to_customer' | 'payment_pending' | 'paid'>('draft');
+  const [activeTab, setActiveTab] = useState('preview');
+  const [companyLogo, setCompanyLogo] = useState<string>('');
+  const [signatures, setSignatures] = useState<{
+    preparedBy?: ApprovalSignature;
+    checkedBy?: ApprovalSignature;
+    approvedBy?: ApprovalSignature;
+  }>({});
+
+  useEffect(() => {
+    fetchCompanyLogo();
+    if (open && quotationData.id && adjustmentData.id) {
+      checkExistingInvoice();
+    }
+  }, [open, quotationData.id, adjustmentData.id]);
+
+  const fetchCompanyLogo = async () => {
+    try {
+      // Use default logo - company_logo column doesn't exist on profiles
+      setCompanyLogo('/lovable-uploads/52e834c4-cfda-4ea3-9da7-aac1f23e1162.png');
+    } catch (error) {
+      console.error('Error fetching company logo:', error);
+    }
+  };
+
+  const checkExistingInvoice = async () => {
+    try {
+      // Check if invoice already exists for this adjustment
+      const { data: existingInvoice, error } = await supabase
+        .from('document_storage')
+        .select('id, invoice_status, document_data')
+        .eq('quotation_id', quotationData.id)
+        .eq('document_type', 'invoice')
+        .eq('payment_type', 'balance')
+        .maybeSingle();
+
+      if (existingInvoice && !error) {
+        setDocumentId(existingInvoice.id);
+        setInvoiceStatus((existingInvoice.invoice_status || 'draft') as typeof invoiceStatus);
+        
+        // Load existing signatures
+        const { data: sigData } = await supabase
+          .from('document_approvals')
+          .select('*')
+          .eq('document_id', existingInvoice.id);
+
+        if (sigData && sigData.length > 0) {
+          const preparedBy = sigData.find(s => s.approval_type === 'prepared_by');
+          const checkedBy = sigData.find(s => s.approval_type === 'checked_by');
+          const approvedBy = sigData.find(s => s.approval_type === 'approved_by');
+
+          setSignatures({
+            preparedBy: preparedBy ? {
+              approver_name: preparedBy.approver_name,
+              signature_data: preparedBy.signature_data || undefined,
+              approval_date: format(new Date(preparedBy.approval_date), 'yyyy-MM-dd')
+            } : undefined,
+            checkedBy: checkedBy ? {
+              approver_name: checkedBy.approver_name,
+              signature_data: checkedBy.signature_data || undefined,
+              approval_date: format(new Date(checkedBy.approval_date), 'yyyy-MM-dd')
+            } : undefined,
+            approvedBy: approvedBy ? {
+              approver_name: approvedBy.approver_name,
+              signature_data: approvedBy.signature_data || undefined,
+              approval_date: format(new Date(approvedBy.approval_date), 'yyyy-MM-dd')
+            } : undefined,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error checking existing invoice:', error);
+    }
+  };
+
+  const calculateFinalBalance = () => {
+    const baseBalance = quotationData.balance_due;
+    const adjustmentTotal = (adjustmentData.extra_km_total_charge || 0) + (adjustmentData.total_additional_expenses || 0);
+    return baseBalance + adjustmentTotal;
+  };
+
+  const generateInvoiceData = (): InvoiceData => {
+    const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
+    const finalBalance = calculateFinalBalance();
+
+    return {
+      invoiceNo,
+      invoiceType: 'balance',
+      quotationNo: quotationData.quotation_no,
+      customerName: quotationData.customer_name,
+      customerPhone: quotationData.customer_phone,
+      customerEmail: quotationData.customer_email,
+      companyName: quotationData.company_name,
+      pickupLocation: quotationData.pickup_location,
+      dropLocation: quotationData.drop_location,
+      pickupDate: new Date(quotationData.pickup_datetime),
+      dropDate: new Date(quotationData.drop_datetime),
+      busType: quotationData.bus_type,
+      numberOfBuses: quotationData.number_of_buses,
+      numberOfPassengers: quotationData.number_of_passengers,
+      totalAmount: quotationData.gross_revenue + (quotationData.fuel_cost_fuel_only || 0) + (quotationData.commission_pass_through_amount || 0) - (quotationData.discount_amount_lkr || 0),
+      advanceAmount: quotationData.advance_paid,
+      balanceAmount: finalBalance,
+      paidAmount: quotationData.advance_paid,
+      companyLogo,
+      vehicleNo: quotationData.bus_no,
+      driverName: quotationData.driver_name,
+      conductorName: quotationData.conductor_name,
+      invoice_status: invoiceStatus === 'draft' ? 'draft' : 'approved',
+      document_type: 'invoice',
+      hasAdjustments: true,
+      extraKm: adjustmentData.extra_km,
+      extraKmChargePerKm: adjustmentData.extra_km_rate,
+      extraKmTotalCharge: adjustmentData.extra_km_total_charge,
+      additionalExpenses: adjustmentData.additional_expenses,
+      totalAdditionalExpenses: adjustmentData.total_additional_expenses,
+      adjustmentNotes: adjustmentData.adjustment_notes,
+      preparedBy: signatures.preparedBy,
+      checkedBy: signatures.checkedBy,
+      approvedBy: signatures.approvedBy,
+    };
+  };
+
+  const handleSaveDraft = async () => {
+    try {
+      setIsLoading(true);
+      const invoiceData = generateInvoiceData();
+      const htmlContent = generateInvoiceHTML(invoiceData);
+      
+      const invoiceRecord = {
+        quotation_id: quotationData.id,
+        payment_type: 'balance',
+        document_type: 'invoice',
+        document_data: htmlContent,
+        file_name: `${invoiceData.invoiceNo}.pdf`,
+        document_status: 'draft',
+        invoice_status: 'draft',
+        generated_by: user?.id,
+        generated_at: new Date().toISOString(),
+      };
+
+      if (documentId) {
+        // Update existing
+        await supabase
+          .from('document_storage')
+          .update(invoiceRecord)
+          .eq('id', documentId);
+      } else {
+        // Insert new
+        const { data, error } = await supabase
+          .from('document_storage')
+          .insert(invoiceRecord)
+          .select()
+          .single();
+
+        if (error) throw error;
+        setDocumentId(data.id);
+
+        // Link invoice to adjustment
+        await supabase
+          .from('special_hire_trip_adjustments')
+          .update({ balance_invoice_document_id: data.id })
+          .eq('id', adjustmentData.id);
+      }
+
+      setInvoiceStatus('draft');
+      toast.success('Invoice draft saved successfully');
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast.error('Failed to save invoice draft');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      setIsLoading(true);
+      const invoiceData = generateInvoiceData();
+      await generateInvoicePDF(invoiceData);
+      toast.success('Invoice downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast.error('Failed to download invoice');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailToCustomer = async () => {
+    if (!quotationData.customer_email) {
+      toast.error('Customer email is not available');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // First save the invoice if not already saved
+      if (!documentId) {
+        await handleSaveDraft();
+      }
+
+      // Generate PDF content
+      const invoiceData = generateInvoiceData();
+      const pdfBlob = await generateInvoicePDF(invoiceData);
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve(base64);
+        };
+        reader.readAsDataURL(pdfBlob);
+      });
+      
+      const pdfBase64 = await base64Promise;
+
+      // Call edge function to send email
+      const { error } = await supabase.functions.invoke('send-balance-invoice-email', {
+        body: {
+          quotationNo: quotationData.quotation_no,
+          customerEmail: quotationData.customer_email,
+          customerName: quotationData.customer_name,
+          balanceDue: calculateFinalBalance(),
+          invoiceNo: invoiceData.invoiceNo,
+          pdfBase64,
+        },
+      });
+
+      if (error) throw error;
+
+      // Update invoice status
+      if (documentId) {
+        await supabase
+          .from('document_storage')
+          .update({ 
+            invoice_status: 'sent_to_customer',
+            email_sent_at: new Date().toISOString(),
+            email_sent_by: user?.id,
+          })
+          .eq('id', documentId);
+
+        setInvoiceStatus('sent_to_customer');
+      }
+
+      toast.success(`Invoice emailed successfully to ${quotationData.customer_email}`);
+      onInvoiceGenerated?.();
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Failed to send invoice email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignatureUpdated = () => {
+    // Reload signatures
+    checkExistingInvoice();
+  };
+
+  const getStatusBadge = () => {
+    const statusConfig = {
+      draft: { label: 'Draft', variant: 'secondary' as const, icon: FileText },
+      sent_to_customer: { label: 'Sent to Customer', variant: 'default' as const, icon: Send },
+      payment_pending: { label: 'Payment Pending', variant: 'outline' as const, icon: Clock },
+      paid: { label: 'Paid', variant: 'default' as const, icon: CheckCircle },
+    };
+
+    const config = statusConfig[invoiceStatus];
+    const Icon = config.icon;
+
+    return (
+      <Badge variant={config.variant} className="gap-1">
+        <Icon className="w-3 h-3" />
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const invoiceData = generateInvoiceData();
+  const finalBalance = calculateFinalBalance();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Generate Balance Invoice
+            </DialogTitle>
+            {getStatusBadge()}
+          </div>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="preview">Invoice Preview</TabsTrigger>
+            <TabsTrigger value="signatures">Manage Signatures</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="preview" className="space-y-4">
+            {/* Financial Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Financial Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Original Balance Due</div>
+                    <div className="font-semibold">LKR {quotationData.balance_due.toLocaleString()}</div>
+                  </div>
+                  {adjustmentData.extra_km_total_charge && adjustmentData.extra_km_total_charge > 0 && (
+                    <div>
+                      <div className="text-muted-foreground">Extra Kilometers</div>
+                      <div className="font-semibold text-orange-600">
+                        + LKR {adjustmentData.extra_km_total_charge.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        ({adjustmentData.extra_km} km × LKR {adjustmentData.extra_km_rate})
+                      </div>
+                    </div>
+                  )}
+                  {adjustmentData.total_additional_expenses && adjustmentData.total_additional_expenses > 0 && (
+                    <div>
+                      <div className="text-muted-foreground">Additional Expenses</div>
+                      <div className="font-semibold text-orange-600">
+                        + LKR {adjustmentData.total_additional_expenses.toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <div className="text-lg font-bold">Final Balance Due</div>
+                  <div className="text-2xl font-bold text-primary">
+                    LKR {finalBalance.toLocaleString()}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Invoice HTML Preview */}
+            <Card>
+              <CardContent className="p-6">
+                <div
+                  className="invoice-preview border rounded-lg p-4 bg-white"
+                  dangerouslySetInnerHTML={{ __html: generateInvoiceHTML(invoiceData) }}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={handleSaveDraft}
+                disabled={isLoading}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Save as Draft
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDownloadPDF}
+                disabled={isLoading}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button
+                onClick={handleEmailToCustomer}
+                disabled={isLoading || !quotationData.customer_email}
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                Email to Customer
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="signatures" className="space-y-4">
+            {documentId ? (
+              <DocumentSignatureManager
+                documentId={documentId}
+                quotationId={quotationData.id}
+                documentStatus={invoiceStatus === 'draft' ? 'draft' : 'approved'}
+                onSignatureUpdated={handleSignatureUpdated}
+              />
+            ) : (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Please save the invoice as a draft first to manage signatures.</p>
+                  <Button
+                    variant="outline"
+                    onClick={handleSaveDraft}
+                    disabled={isLoading}
+                    className="mt-4"
+                  >
+                    Save as Draft
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+};

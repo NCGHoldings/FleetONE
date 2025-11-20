@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Calendar, Users, Bus, Phone, Mail, Building } from 'lucide-react';
+import { MapPin, Calendar, Users, Bus, Phone, Mail, Building, FileText, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import { TripStatusTimeline } from './TripStatusTimeline';
 import { PaymentTimeline } from './PaymentTimeline';
+import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 
 interface TripDetailsModalProps {
   open: boolean;
@@ -70,6 +72,8 @@ export function TripDetailsModal({
   adjustmentAmount,
   adjustmentData,
 }: TripDetailsModalProps) {
+  const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false);
+
   if (!trip) return null;
 
   const timelineEvents = [
@@ -242,6 +246,51 @@ export function TripDetailsModal({
           </div>
         </div>
       </DialogContent>
+
+      {/* Generate Balance Invoice Modal */}
+      {adjustmentData && adjustmentStatus === 'finalized' && trip.quotation && (
+        <GenerateBalanceInvoiceModal
+          open={generateInvoiceOpen}
+          onOpenChange={setGenerateInvoiceOpen}
+          quotationData={{
+            id: trip.quotation_id,
+            quotation_no: trip.quotation.quotation_no,
+            customer_name: trip.quotation.customer_name,
+            customer_phone: trip.quotation.customer_phone,
+            customer_email: trip.quotation.customer_email,
+            company_name: trip.quotation.company_name,
+            pickup_location: trip.quotation.pickup_location,
+            drop_location: trip.quotation.drop_location,
+            pickup_datetime: trip.quotation.pickup_datetime,
+            drop_datetime: trip.quotation.drop_datetime,
+            bus_type: 'Standard Bus', // Default value
+            number_of_buses: trip.quotation.number_of_buses,
+            number_of_passengers: trip.quotation.number_of_passengers,
+            gross_revenue: trip.quotation.gross_revenue,
+            fuel_cost_fuel_only: trip.quotation.fuel_cost_fuel_only,
+            commission_pass_through_amount: trip.quotation.commission_pass_through_amount,
+            discount_amount_lkr: trip.quotation.discount_amount_lkr,
+            advance_paid: trip.advance_paid,
+            balance_due: trip.balance_due,
+            driver_name: trip.driver_name,
+            conductor_name: trip.conductor_name,
+            bus_no: trip.bus_no,
+          }}
+          adjustmentData={{
+            id: '', // Will be populated from database
+            extra_km: adjustmentData.extra_km,
+            extra_km_rate: 0, // Default rate
+            extra_km_total_charge: adjustmentData.extra_km_total_charge,
+            additional_expenses: [],
+            total_additional_expenses: adjustmentData.total_additional_expenses,
+            adjustment_notes: '',
+          }}
+          onInvoiceGenerated={() => {
+            setGenerateInvoiceOpen(false);
+            // Optionally refresh data
+          }}
+        />
+      )}
     </Dialog>
   );
 }
