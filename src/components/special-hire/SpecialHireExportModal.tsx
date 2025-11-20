@@ -11,6 +11,7 @@ import { CalendarIcon, Download } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import * as XLSX from 'xlsx-js-style';
 
 interface Quotation {
   id: string;
@@ -238,7 +239,7 @@ export function SpecialHireExportModal({ isOpen, onClose, data }: SpecialHireExp
     }
   };
 
-  const exportToCSV = () => {
+  const exportToExcel = () => {
     // Filter by date range
     let processedData = filterDataByDateRange(data);
     
@@ -256,41 +257,59 @@ export function SpecialHireExportModal({ isOpen, onClose, data }: SpecialHireExp
       return;
     }
     
-    // Create CSV header
-    const headers = selectedColumns.map(col => col.label);
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
     
-    // Create CSV rows
-    const rows = processedData.map(quotation => 
+    // Create header row with styling
+    const headers = selectedColumns.map(col => ({
+      v: col.label,
+      t: 's',
+      s: {
+        font: { bold: true },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        fill: { fgColor: { rgb: 'FFFFFF' } }
+      }
+    }));
+    
+    // Create data rows with alternating colors
+    const rows = processedData.map((quotation, rowIdx) => 
       selectedColumns.map(col => {
         const value = formatValue(quotation[col.key], col.key);
-        // Escape commas and quotes in CSV
-        return value.toString().includes(',') ? `"${value.replace(/"/g, '""')}"` : value;
+        return {
+          v: value,
+          t: 's',
+          s: rowIdx % 2 === 1 ? {
+            fill: { fgColor: { rgb: 'E3F2FD' } } // Light blue for odd rows
+          } : {
+            fill: { fgColor: { rgb: 'FFFFFF' } } // White for even rows
+          }
+        };
       })
     );
     
-    // Combine headers and rows
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
+    // Combine headers and data
+    const wsData = [headers, ...rows];
     
-    downloadCSV(csvContent, `special_hire_quotations_${format(new Date(), 'yyyy-MM-dd')}`);
-  };
-
-  const downloadCSV = (csvContent: string, filename: string) => {
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    // Create worksheet from data
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
     
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}.csv`);
-    link.style.visibility = 'hidden';
+    // Set column widths
+    ws['!cols'] = selectedColumns.map(col => {
+      if (col.key === 'quotation_no') return { wch: 15 };
+      if (col.key.includes('date') || col.key.includes('datetime')) return { wch: 20 };
+      if (col.key.includes('location') || col.key.includes('name') || col.key.includes('description')) return { wch: 30 };
+      if (col.key.includes('phone') || col.key.includes('email')) return { wch: 25 };
+      return { wch: 15 };
+    });
     
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Quotations');
     
-    toast.success('Export completed successfully');
+    // Generate filename and download
+    const filename = `special_hire_quotations_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    
+    toast.success('Excel file exported successfully');
     onClose();
   };
 
@@ -541,7 +560,7 @@ export function SpecialHireExportModal({ isOpen, onClose, data }: SpecialHireExp
               Cancel
             </Button>
             <Button 
-              onClick={exportToCSV} 
+              onClick={exportToExcel} 
               disabled={selectedCount === 0 || filteredCount === 0}
             >
               <Download className="w-4 h-4 mr-2" />
