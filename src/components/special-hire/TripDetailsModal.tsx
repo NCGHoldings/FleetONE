@@ -102,6 +102,12 @@ export function TripDetailsModal({
   const effectiveAdjustment = localAdjustmentData || adjustmentData || null;
 
   const calculateTotalAmount = () => {
+    // Use original_quotation_amount from adjustment if available
+    if (effectiveAdjustment?.original_quotation_amount) {
+      return effectiveAdjustment.original_quotation_amount;
+    }
+    
+    // Otherwise calculate from quotation fields
     if (!trip?.quotation) return 0;
     const hireAll = trip.quotation.gross_revenue || 0;
     const fuelAll = trip.quotation.fuel_cost_fuel_only || 0;
@@ -306,12 +312,13 @@ export function TripDetailsModal({
               bus_type: 'Standard Bus',
               number_of_buses: trip.quotation.number_of_buses,
               number_of_passengers: trip.quotation.number_of_passengers,
+              original_quotation_amount: effectiveAdjustment?.original_quotation_amount || 0,
               gross_revenue: trip.quotation.gross_revenue,
               fuel_cost_fuel_only: trip.quotation.fuel_cost_fuel_only,
               commission_pass_through_amount: trip.quotation.commission_pass_through_amount,
               discount_amount_lkr: trip.quotation.discount_amount_lkr,
               advance_paid: trip.advance_paid,
-              balance_due: trip.balance_due,
+              balance_due: effectiveAdjustment?.balance_due || trip.balance_due,
               driver_name: trip.driver_name,
               conductor_name: trip.conductor_name,
               bus_no: trip.bus_no,

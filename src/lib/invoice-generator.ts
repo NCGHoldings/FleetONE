@@ -203,7 +203,13 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     // Use improved NCG Invoice format for balance payments
     const discount = data.discountAmount || 0;
     const subTotal = data.totalAmount;
-    const priceAfterDiscount = subTotal - discount;
+    
+    // Add adjustments to sub-total before applying discount
+    const adjustmentTotal = (data.extraKmTotalCharge || 0) + (data.totalAdditionalExpenses || 0);
+    const adjustedSubTotal = subTotal + adjustmentTotal;
+    
+    // Apply discount to adjusted amount
+    const priceAfterDiscount = adjustedSubTotal - discount;
     const previousAdvance = data.advanceAmount || 0; // kept for reference
     const totalPaid = data.paidAmount || 0;
     const balanceDue = priceAfterDiscount - totalPaid;
