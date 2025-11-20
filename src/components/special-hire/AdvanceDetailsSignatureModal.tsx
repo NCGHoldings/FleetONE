@@ -21,15 +21,47 @@ export default function AdvanceDetailsSignatureModal({
 }: AdvanceDetailsSignatureModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'drawing' | 'text' | 'image'>('drawing');
+  const [activeTab, setActiveTab] = useState<'profile' | 'drawing' | 'text' | 'image'>('profile');
   const [textSignature, setTextSignature] = useState('');
   const [imageSignature, setImageSignature] = useState<string | null>(null);
+  const [profileSignature, setProfileSignature] = useState<{
+    data: string | null;
+    type: string | null;
+  }>({ data: null, type: null });
 
   useEffect(() => {
-    if (open && activeTab === 'drawing') {
-      initializeCanvas();
+    if (open) {
+      loadProfileSignature();
+      if (activeTab === 'drawing') {
+        initializeCanvas();
+      }
     }
   }, [open, activeTab]);
+
+  const loadProfileSignature = async () => {
+    // Note: This would need the useSignatureManagement hook imported
+    // For now, using a placeholder. In production, import and use the hook.
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('signature_data, signature_type')
+        .eq('user_id', user.id)
+        .single();
+
+      if (data) {
+        setProfileSignature({ 
+          data: data.signature_data, 
+          type: data.signature_type 
+        });
+      }
+    } catch (error) {
+      console.error('Error loading profile signature:', error);
+    }
+  };
 
   const initializeCanvas = () => {
     const canvas = canvasRef.current;
@@ -92,7 +124,10 @@ export default function AdvanceDetailsSignatureModal({
   };
 
   const handleSave = () => {
-    if (activeTab === 'drawing') {
+    if (activeTab === 'profile') {
+      if (!profileSignature.data) return;
+      onSave({ data: profileSignature.data, type: profileSignature.type as any });
+    } else if (activeTab === 'drawing') {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const dataUrl = canvas.toDataURL('image/png');
@@ -122,7 +157,11 @@ export default function AdvanceDetailsSignatureModal({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="profile">
+              <Pen className="w-4 h-4 mr-2" />
+              Profile
+            </TabsTrigger>
             <TabsTrigger value="drawing">
               <Pen className="w-4 h-4 mr-2" />
               Draw
@@ -136,6 +175,41 @@ export default function AdvanceDetailsSignatureModal({
               Upload
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="profile" className="space-y-4">
+            <div className="flex flex-col items-center justify-center min-h-[200px] border-2 border-dashed rounded-lg p-6">
+              {profileSignature.data ? (
+                <div className="space-y-4 w-full">
+                  <div className="flex items-center justify-center p-4 bg-muted/50 rounded-lg">
+                    {profileSignature.type === 'drawing' || profileSignature.type === 'image' ? (
+                      <img 
+                        src={profileSignature.data} 
+                        alt="Profile signature"
+                        className="max-h-[150px] object-contain"
+                      />
+                    ) : (
+                      <div className="text-3xl font-signature" style={{ fontFamily: 'cursive' }}>
+                        {profileSignature.data}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center">
+                    Your saved signature will be used
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center space-y-2">
+                  <Pen className="w-12 h-12 mx-auto text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    No profile signature found
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Use other tabs or add signature to your profile
+                  </p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
           <TabsContent value="drawing" className="space-y-4">
             <div className="border-2 border-border rounded-lg overflow-hidden">
