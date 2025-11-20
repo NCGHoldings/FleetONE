@@ -30,6 +30,7 @@ interface GenerateBalanceInvoiceModalProps {
     bus_type: string;
     number_of_buses: number;
     number_of_passengers: number;
+    original_quotation_amount: number;
     gross_revenue: number;
     fuel_cost_fuel_only?: number;
     commission_pass_through_amount?: number;
@@ -166,7 +167,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       busType: quotationData.bus_type,
       numberOfBuses: quotationData.number_of_buses,
       numberOfPassengers: quotationData.number_of_passengers,
-      totalAmount: quotationData.gross_revenue + (quotationData.fuel_cost_fuel_only || 0) + (quotationData.commission_pass_through_amount || 0) - (quotationData.discount_amount_lkr || 0),
+      totalAmount: quotationData.original_quotation_amount,
       advanceAmount: quotationData.advance_paid,
       balanceAmount: finalBalance,
       paidAmount: quotationData.advance_paid,
