@@ -30,7 +30,9 @@ export function PageAccessModal({ open, onOpenChange, userId, userName }: PageAc
     { key: 'main', label: 'Main', items: PAGES.main },
     { key: 'operations', label: 'Operations', items: PAGES.operations },
     { key: 'business', label: 'Business', items: PAGES.business },
+    { key: 'finance', label: 'Finance', items: PAGES.finance },
     { key: 'yutong', label: 'Yutong Sales', items: PAGES.yutong },
+    { key: 'sinotruck', label: 'Sinotruck Operations', items: PAGES.sinotruck },
     { key: 'governance', label: 'Governance', items: PAGES.governance },
     { key: 'nsp', label: 'NSP', items: PAGES.nsp },
   ]), []);
