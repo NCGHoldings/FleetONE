@@ -47,6 +47,15 @@ export const useDocumentRegeneration = () => {
         paymentData = data;
       }
 
+      // Fetch all approved payments for the quotation to calculate total paid
+      const { data: allPayments } = await supabase
+        .from('special_hire_payments')
+        .select('amount')
+        .eq('quotation_id', quotationId)
+        .eq('status', 'approved');
+
+      const totalApprovedPaid = allPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+
       // Fetch current signatures for the document
       const { data: signatures } = await supabase
         .from('document_approvals')
@@ -81,6 +90,13 @@ export const useDocumentRegeneration = () => {
                (quotation.discount_amount_lkr || 0);
       };
 
+      // Determine if this is an advance document or balance/full invoice
+      const isAdvanceDoc = existingDoc.document_type === 'sales_receipt' || existingDoc.payment_type === 'advance';
+      
+      // For advance documents, use the specific payment amount
+      // For balance/full invoices, use the sum of all approved payments
+      const paidAmount = isAdvanceDoc ? (paymentData?.amount || 0) : totalApprovedPaid;
+
       // Create invoice data with fresh signatures
       const invoiceData: InvoiceData = {
         invoiceNo: `UPDATED-${existingDoc.payment_type.toUpperCase()}-${Date.now()}`,
@@ -99,7 +115,7 @@ export const useDocumentRegeneration = () => {
         numberOfPassengers: quotationData.number_of_passengers,
         totalAmount: calculateTotalAmount(quotationData),
         advanceAmount: quotationData.advance_paid || 0,
-        paidAmount: paymentData?.amount || 0,
+        paidAmount,
         vehicleNo: quotationData.assigned_bus_no,
         driverName: quotationData.assigned_driver_name,
         conductorName: quotationData.assigned_conductor_name,
