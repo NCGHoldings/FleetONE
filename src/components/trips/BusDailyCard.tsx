@@ -40,13 +40,15 @@ export function BusDailyCard({ summary, onRefresh }: BusDailyCardProps) {
     return "destructive";
   };
 
-  const allocatedExpenses = summary.total_distance > 0 
-    ? summary.trips.map(trip => ({
-        ...trip,
-        allocated_expense: (trip.distance_km || 0) / summary.total_distance * summary.total_expenses,
-        expense_percentage: (trip.distance_km || 0) / summary.total_distance * 100,
-      }))
-    : summary.trips.map(trip => ({ ...trip, allocated_expense: 0, expense_percentage: 0 }));
+  // Divide expenses equally by number of trips
+  const allocatedExpense = summary.total_expenses / summary.trip_count;
+  const expensePercentage = 100 / summary.trip_count;
+  
+  const allocatedExpenses = summary.trips.map(trip => ({
+    ...trip,
+    allocated_expense: allocatedExpense,
+    expense_percentage: expensePercentage,
+  }));
 
   return (
     <>
