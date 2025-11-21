@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 interface ExtractedMultiTripData {
   fileName: string;
@@ -45,6 +46,11 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
   const [isMultiDayRoute, setIsMultiDayRoute] = useState(false);
   const [multiDayConfig, setMultiDayConfig] = useState<any>(null);
   
+  // Manual override for multi-day mode
+  const [manualMultiDayEnabled, setManualMultiDayEnabled] = useState(false);
+  const [showBusNumberEdit, setShowBusNumberEdit] = useState(false);
+  const [availableMultiDayRoutes, setAvailableMultiDayRoutes] = useState<any[]>([]);
+  
   // Initialize mapped expenses from OCR data
   const initialMappedExpenses = data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses);
   const [mappedExpenses, setMappedExpenses] = useState<DBExpenseFields>(() => initialMappedExpenses);
@@ -69,6 +75,92 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
   const normalizeRouteName = (name: string | null) => {
     if (!name) return '';
     return name.replace(/[–—−]/g, '-').trim(); // Convert all dash variants to hyphen
+  };
+
+  // Load available multi-day routes for manual selection
+  useEffect(() => {
+    const loadMultiDayRoutes = async () => {
+      const { data: routes } = await supabase
+        .from('multi_day_route_config')
+        .select('*')
+        .eq('is_enabled', true)
+        .order('route_name');
+      
+      if (routes) {
+        setAvailableMultiDayRoutes(routes);
+      }
+    };
+    
+    loadMultiDayRoutes();
+  }, []);
+
+  // Helper: Enable multi-day mode manually
+  const enableMultiDayMode = async (routeConfig: any) => {
+    console.log('🔧 Manual multi-day mode enabled:', routeConfig);
+    setIsMultiDayRoute(true);
+    setMultiDayConfig(routeConfig);
+    
+    // Set default date range
+    const saveDateObj = parseISO(actualSaveDate);
+    const numTrips = editedData.trips.length;
+    const startDateObj = subDays(saveDateObj, numTrips - 1);
+    
+    const defaultStart = format(startDateObj, 'yyyy-MM-dd');
+    const defaultEnd = actualSaveDate;
+    
+    setDateRangeStart(defaultStart);
+    setDateRangeEnd(defaultEnd);
+    
+    // Set individual dates
+    const updatedTrips = editedData.trips.map((trip, idx) => ({
+      ...trip,
+      individualDate: format(addDays(startDateObj, idx), 'yyyy-MM-dd')
+    }));
+    
+    console.log('📅 Multi-day dates assigned:', updatedTrips.map(t => t.individualDate));
+    
+    setEditedData(prev => ({
+      ...prev,
+      trips: updatedTrips
+    }));
+
+    // Show success message
+    toast.success(
+      `✅ Multi-day mode enabled for ${routeConfig.route_name}`,
+      {
+        description: updatedTrips.map((t, idx) => 
+          `Trip ${idx + 1} → ${format(parseISO(t.individualDate!), 'MMM d, yyyy')}`
+        ).join(' • ')
+      }
+    );
+  };
+
+  // Helper: Re-check multi-day route when bus number changes
+  const recheckMultiDayRoute = async (busNumber: string) => {
+    try {
+      const { data: busData } = await supabase
+        .from('buses')
+        .select('route, id')
+        .eq('bus_no', busNumber)
+        .maybeSingle();
+      
+      if (busData?.route) {
+        const normalizedRoute = normalizeRouteName(busData.route);
+        const { data } = await supabase
+          .from('multi_day_route_config')
+          .select('*')
+          .eq('is_enabled', true)
+          .or(`route_name.ilike.%${normalizedRoute}%,route_pattern.ilike.%${normalizedRoute}%`)
+          .maybeSingle();
+        
+        if (data) {
+          console.log('✅ Auto-detected multi-day route after bus correction:', data);
+          await enableMultiDayMode(data);
+        }
+      }
+    } catch (error) {
+      console.error('Error rechecking route:', error);
+    }
   };
 
   // Check if bus route is configured as multi-day
@@ -216,10 +308,16 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
 
   const handleBusNumberChange = (value: string) => {
     setHasEdits(true);
+    const newBusNumber = value.toUpperCase();
     setEditedData(prev => ({
       ...prev,
-      busNumber: value
+      busNumber: newBusNumber
     }));
+    
+    // Auto re-check multi-day route when bus number changes in manual mode
+    if (manualMultiDayEnabled && !isMultiDayRoute) {
+      recheckMultiDayRoute(newBusNumber);
+    }
   };
 
   const handleTripIncomeChange = (tripIndex: number, field: keyof SingleTrip['income'], value: number) => {
@@ -438,12 +536,27 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                   )}
                 </div>
                 
-                {/* WARNING: No route assigned */}
-                {!busData?.route && (
-                  <div className="flex items-center gap-1 mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+                {/* WARNING: No route assigned + Manual Override Button */}
+                {!busData?.route && !isMultiDayRoute && (
+                  <Alert className="mt-2">
                     <AlertTriangle className="h-3 w-3" />
-                    <span>⚠️ No route assigned to this bus</span>
-                  </div>
+                    <AlertDescription className="text-xs flex items-center justify-between">
+                      <span>⚠️ No route assigned to this bus - Multi-day detection failed</span>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => {
+                          setManualMultiDayEnabled(true);
+                          setShowBusNumberEdit(true);
+                          setIsEditing(true);
+                          setIsOpen(true);
+                        }}
+                        className="ml-2 h-7 text-xs"
+                      >
+                        🔧 Manual Override
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
             </div>
@@ -457,6 +570,66 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
 
         <CollapsibleContent>
           <CardContent className="pt-0">
+            {/* Manual Override Active Badge */}
+            {manualMultiDayEnabled && (
+              <div className="mb-4">
+                <Badge className="bg-orange-500 text-white">
+                  🔧 Manual Override Active
+                </Badge>
+              </div>
+            )}
+
+            {/* Enhanced Bus Number Correction - Prominent when manual override */}
+            {(showBusNumberEdit || manualMultiDayEnabled) && (
+              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border-2 border-blue-300 dark:border-blue-700">
+                <Label className="text-sm font-semibold mb-2 block">
+                  ✏️ Correct Bus Number
+                </Label>
+                <Input
+                  value={editedData.busNumber}
+                  onChange={(e) => handleBusNumberChange(e.target.value)}
+                  className="h-12 text-xl font-bold"
+                  placeholder="e.g., NG 8247"
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Update the bus number if OCR captured it incorrectly. The system will auto-detect the multi-day route.
+                </p>
+              </div>
+            )}
+
+            {/* Multi-Day Route Selector - Manual Mode */}
+            {manualMultiDayEnabled && !isMultiDayRoute && availableMultiDayRoutes.length > 0 && (
+              <Card className="mb-4 bg-yellow-50 dark:bg-yellow-950/20 border-yellow-300 dark:border-yellow-700">
+                <CardContent className="pt-4">
+                  <Label className="text-sm font-semibold mb-2 block">
+                    📍 Select Multi-Day Route
+                  </Label>
+                  <Select 
+                    onValueChange={(routeId) => {
+                      const selectedRoute = availableMultiDayRoutes.find(r => r.id === routeId);
+                      if (selectedRoute) {
+                        enableMultiDayMode(selectedRoute);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Choose a multi-day route..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableMultiDayRoutes.map((route) => (
+                        <SelectItem key={route.id} value={route.id}>
+                          {route.route_name} ({route.typical_days_per_trip} days)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Select the route this bus is operating on to enable multi-day trip distribution
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: Image Preview */}
               <div>
