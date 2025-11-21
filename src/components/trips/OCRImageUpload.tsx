@@ -316,59 +316,69 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           });
           console.log(`  ✅ Successfully updated ${existingTrip.trip_no}`);
         } else {
-          // INSERT new trip
-          console.log(`  ➕ No existing trip found - Creating new trip`);
-          const uniqueTripNo = await generateUniqueTripNo(busData.bus_no, tripSaveDate, i + 1);
-          console.log(`     Generated trip_no: ${uniqueTripNo}`);
-          
-          const { error: insertError } = await supabase
-            .from('daily_trips')
-            .insert({
-              trip_no: uniqueTripNo,
-              trip_date: tripSaveDate,
-              bus_id: busData.id,
-              income: tripRevenue,
-              income_details: trip.income,
-            });
-          
-          if (insertError) {
-            console.error('❌ Error inserting trip:', insertError);
-            toast.error(`Failed to insert trip on ${tripSaveDate}: ${insertError.message}`);
-            return;
-          }
-          
-          mappingLog.push({
-            ocrTrip: i + 1,
-            revenue: tripRevenue,
-            date: tripSaveDate,
-            action: 'created',
-            tripNo: uniqueTripNo
-          });
-          console.log(`  ✅ Successfully created ${uniqueTripNo} on ${tripSaveDate}`);
-          
-          // Track missing multi-day mappings for warning
+          // No existing trip found
           if (hasIndividualDates) {
+            // MULTI-DAY ROUTE: Skip insertion, track missing trip
+            console.log(`  ⚠️ SKIPPED - Multi-day route requires pre-existing Daily Trip for ${tripSaveDate}`);
             missingMultiDayMappings.push({
               ocrTrip: i + 1,
               revenue: tripRevenue,
               date: tripSaveDate
             });
-            console.log(`  ⚠️ Multi-day route: No pre-existing trip found for this date`);
+            mappingLog.push({
+              ocrTrip: i + 1,
+              revenue: tripRevenue,
+              date: tripSaveDate,
+              action: 'skipped (no existing trip)',
+              tripNo: 'N/A'
+            });
+            console.log(`  ⚠️ Trip ${i + 1} skipped - must create via Driver Allocation first`);
+            continue;
+          } else {
+            // SINGLE-DAY ROUTE: Create new trip as before
+            console.log(`  ➕ No existing trip found - Creating new trip`);
+            const uniqueTripNo = await generateUniqueTripNo(busData.bus_no, tripSaveDate, i + 1);
+            console.log(`     Generated trip_no: ${uniqueTripNo}`);
+            
+            const { error: insertError } = await supabase
+              .from('daily_trips')
+              .insert({
+                trip_no: uniqueTripNo,
+                trip_date: tripSaveDate,
+                bus_id: busData.id,
+                income: tripRevenue,
+                income_details: trip.income,
+              });
+            
+            if (insertError) {
+              console.error('❌ Error inserting trip:', insertError);
+              toast.error(`Failed to insert trip on ${tripSaveDate}: ${insertError.message}`);
+              return;
+            }
+            
+            mappingLog.push({
+              ocrTrip: i + 1,
+              revenue: tripRevenue,
+              date: tripSaveDate,
+              action: 'created',
+              tripNo: uniqueTripNo
+            });
+            console.log(`  ✅ Successfully created ${uniqueTripNo} on ${tripSaveDate}`);
           }
         }
       }
 
-      // 6. SHOW WARNINGS FOR MISSING MULTI-DAY TRIPS
+      // 6. SHOW WARNINGS FOR SKIPPED MULTI-DAY TRIPS
       if (hasIndividualDates && missingMultiDayMappings.length > 0) {
         const warningMsg = missingMultiDayMappings
           .map(m => `Trip ${m.ocrTrip} (Rs. ${m.revenue.toLocaleString()}) on ${format(new Date(m.date), 'MMM d')}`)
           .join(', ');
         
         toast.warning(
-          `⚠️ Created new trips for ${busData.bus_no}`,
+          `⚠️ Missing Daily Trips for ${busData.bus_no}`,
           {
-            description: `No pre-existing Daily Trip records found for: ${warningMsg}. Check Driver Allocation to ensure these dates were scheduled.`,
-            duration: 10000
+            description: `OCR trips SKIPPED (not created): ${warningMsg}. These trips were not saved because no Daily Trip records exist for those dates. Please create them first using Driver Allocation, then re-run OCR.`,
+            duration: 15000
           }
         );
       }
