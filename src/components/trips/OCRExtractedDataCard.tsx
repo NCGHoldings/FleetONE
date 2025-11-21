@@ -9,7 +9,7 @@ import { SingleTrip, DailyExpenses } from "@/lib/ocr-processor";
 import { DB_EXPENSE_CATEGORIES, mapOCRExpensesToDB, DBExpenseFields, KNOWN_OCR_EXPENSE_KEYS } from "@/lib/ocr-expense-mapper";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, parseISO, differenceInDays, subDays } from "date-fns";
+import { format, parseISO, differenceInDays, subDays, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -153,26 +153,17 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
     checkMultiDayRoute();
   }, [data.busNumber, actualSaveDate]);
 
-  // Update trip dates when date range changes
+  // Update trip dates when date range changes - simplified sequential distribution
   useEffect(() => {
     if (isMultiDayRoute && dateRangeStart && dateRangeEnd) {
       const start = parseISO(dateRangeStart);
       const end = parseISO(dateRangeEnd);
-      const numTrips = editedData.trips.length;
       const totalDays = differenceInDays(end, start) + 1;
       
-      // Distribute trips across the date range
+      // Sequential date distribution: Trip 1 → Day 1, Trip 2 → Day 2, etc.
       const updatedTrips = editedData.trips.map((trip, idx) => {
-        let tripDate: string;
-        if (numTrips <= totalDays) {
-          // Spread trips evenly across available days
-          const interval = totalDays / numTrips;
-          tripDate = format(new Date(start.getTime() + Math.floor(idx * interval) * 86400000), 'yyyy-MM-dd');
-        } else {
-          // More trips than days - group them
-          const dayIndex = Math.min(idx, totalDays - 1);
-          tripDate = format(new Date(start.getTime() + dayIndex * 86400000), 'yyyy-MM-dd');
-        }
+        const dayIndex = Math.min(idx, totalDays - 1); // Cap at last day if more trips than days
+        const tripDate = format(addDays(start, dayIndex), 'yyyy-MM-dd');
         return {
           ...trip,
           individualDate: tripDate
