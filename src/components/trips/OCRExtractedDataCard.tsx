@@ -65,32 +65,61 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
   useEffect(() => {
     const checkMultiDayRoute = async () => {
       try {
-        // Get bus's route
+        // Get bus's route and ID
         const { data: busData } = await supabase
           .from('buses')
-          .select('route')
+          .select('route, id')
           .eq('bus_no', data.busNumber)
           .single();
 
-        if (!busData?.route) return;
+        let multiDayData = null;
 
-        // Check if route is configured as multi-day
-        const { data: multiDayData } = await supabase
-          .from('multi_day_route_config')
-          .select('*')
-          .eq('is_enabled', true)
-          .or(`route_name.ilike.%${busData.route}%,route_pattern.ilike.%${busData.route}%`)
-          .single();
+        // Try matching by assigned route first
+        if (busData?.route) {
+          const { data } = await supabase
+            .from('multi_day_route_config')
+            .select('*')
+            .eq('is_enabled', true)
+            .or(`route_name.ilike.%${busData.route}%,route_pattern.ilike.%${busData.route}%`)
+            .maybeSingle();
+          multiDayData = data;
+        }
+
+        // FALLBACK: If no route assigned, check recent trips for this bus
+        if (!multiDayData && busData?.id) {
+          const { data: recentTrips } = await supabase
+            .from('daily_trips')
+            .select('route_id, routes:route_id(route_name)')
+            .eq('bus_id', busData.id)
+            .not('route_id', 'is', null)
+            .order('trip_date', { ascending: false })
+            .limit(5);
+          
+          if (recentTrips && recentTrips.length > 0) {
+            const mostCommonRoute = recentTrips[0].routes?.route_name;
+            if (mostCommonRoute) {
+              const { data } = await supabase
+                .from('multi_day_route_config')
+                .select('*')
+                .eq('is_enabled', true)
+                .or(`route_name.ilike.%${mostCommonRoute}%,route_pattern.ilike.%${mostCommonRoute}%`)
+                .maybeSingle();
+              multiDayData = data;
+            }
+          }
+        }
 
         if (multiDayData) {
           setIsMultiDayRoute(true);
           setMultiDayConfig(multiDayData);
           
           // Initialize individual trip dates with smart defaults
+          // FIXED FORMULA: For n trips on date D, trip at index i gets date D-(n-i-1)
+          // Example: 2 trips on Nov 18: Trip 0 gets Nov 17, Trip 1 gets Nov 18
           const saveDateObj = parseISO(actualSaveDate);
           const updatedTrips = editedData.trips.map((trip, idx) => ({
             ...trip,
-            individualDate: format(subDays(saveDateObj, editedData.trips.length - idx), 'yyyy-MM-dd')
+            individualDate: format(subDays(saveDateObj, editedData.trips.length - idx - 1), 'yyyy-MM-dd')
           }));
           
           setEditedData(prev => ({
@@ -319,6 +348,13 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">
                   <span>📊 {data.trips.length} trip{data.trips.length !== 1 ? 's' : ''}</span>
+                  {isMultiDayRoute && editedData.trips.some(t => t.individualDate) && (
+                    <span className="text-blue-600 dark:text-blue-400 font-medium">
+                      📅 {editedData.trips.map(t => 
+                        t.individualDate ? format(parseISO(t.individualDate), 'MMM d') : '?'
+                      ).join(', ')}
+                    </span>
+                  )}
                   <span>💰 Revenue: Rs. {formatAmount(totalRevenue)}</span>
                   <span>💸 Expenses: Rs. {formatAmount(totalExpenses)}</span>
                   <span className={netProfit >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
@@ -366,7 +402,10 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                     <AlertDescription className="text-xs">
                       <p className="font-semibold">⚠️ Multi-Day Route Detected: {multiDayConfig.route_name}</p>
                       <p className="text-muted-foreground mt-1">
-                        Assign individual dates for each trip below. Sheet submission date: {format(parseISO(actualSaveDate), 'MMM d, yyyy')}
+                        Trips auto-assigned to consecutive dates. Sheet submission date: {format(parseISO(actualSaveDate), 'MMM d, yyyy')}
+                      </p>
+                      <p className="text-muted-foreground text-[10px] mt-1">
+                        💡 First trip → earliest date, Last trip → sheet date
                       </p>
                     </AlertDescription>
                   </Alert>
