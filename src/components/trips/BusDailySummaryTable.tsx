@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertT
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DeleteTripButton } from "./DeleteTripButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -190,7 +191,18 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
                               {trip.conductor_name && `Conductor: ${trip.conductor_name}`}
                             </div>
                           </div>
-                          <Badge variant="outline">{trip.trip_no}</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{trip.trip_no}</Badge>
+                            <DeleteTripButton
+                              tripId={trip.id}
+                              tripNo={trip.trip_no}
+                              busNo={summary.bus_no}
+                              routeName={trip.route_name}
+                              onDeleted={onRefresh}
+                              variant="icon"
+                              size="sm"
+                            />
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-4 gap-4 text-sm">

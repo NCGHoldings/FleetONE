@@ -269,9 +269,9 @@ export default function DailyTrips() {
                 <BusDailySummaryTable summaries={busSummaries} onRefresh={refetch} />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {busSummaries.map((summary) => (
-                    <BusDailyCard key={summary.bus_id} summary={summary} />
-                  ))}
+            {busSummaries.map((summary) => (
+              <BusDailyCard key={summary.bus_id} summary={summary} onRefresh={refetch} />
+            ))}
                 </div>
               )}
             </div>

@@ -8,12 +8,14 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format } from "date-fns";
+import { DeleteTripButton } from "./DeleteTripButton";
 
 interface BusDailyCardProps {
   summary: BusDailySummary;
+  onRefresh: () => void;
 }
 
-export function BusDailyCard({ summary }: BusDailyCardProps) {
+export function BusDailyCard({ summary, onRefresh }: BusDailyCardProps) {
   const navigate = useNavigate();
   const [showDetails, setShowDetails] = useState(false);
 
@@ -193,7 +195,21 @@ export function BusDailyCard({ summary }: BusDailyCardProps) {
                         <div className="font-medium">Trip #{idx + 1}</div>
                         <div className="text-sm text-muted-foreground">{trip.route_name}</div>
                       </div>
-                      <Badge variant="outline">{trip.trip_no}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{trip.trip_no}</Badge>
+                        <DeleteTripButton
+                          tripId={trip.id}
+                          tripNo={trip.trip_no}
+                          busNo={summary.bus_no}
+                          routeName={trip.route_name}
+                          onDeleted={() => {
+                            setShowDetails(false);
+                            onRefresh();
+                          }}
+                          variant="icon"
+                          size="sm"
+                        />
+                      </div>
                     </div>
 
                     {trip.driver_name && (
