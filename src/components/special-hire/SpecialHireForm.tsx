@@ -70,6 +70,7 @@ const additionalChargeTypes = [
   { value: 'driver_charges', label: 'Driver Charges' },
   { value: 'additional_distance', label: 'Additional Distance/KM' },
   { value: 'pass_through', label: 'Pass-Through Charge (No Cost)' },
+  { value: 'internal_cost', label: 'Internal Cost (Not Charged to Customer)' },
   { value: 'refund', label: 'Refund/Adjustment' },
   { value: 'other', label: 'Other' }
 ];
@@ -627,6 +628,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         if (charge.id === id) {
           const updatedCharge = { ...charge, [field]: value };
           
+          // Set default reason to "wages" when type is changed to "internal_cost"
+          if (field === 'type' && value === 'internal_cost' && !charge.reason) {
+            updatedCharge.reason = 'wages';
+          }
+          
           // Auto-calculate amount for additional_distance type
           if (updatedCharge.type === 'additional_distance' && field === 'distance' && value > 0) {
             // Get the exceeding KM rate from hire rate cards
@@ -852,8 +858,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       const subtotalAfterAdjustments = grossRevenue + commissionPassThroughAmount - discountAmount;
       
-      // Apply additional charges
-      const totalAdditionalCharges = additionalCharges.reduce((sum, charge) => {
+      // Apply additional charges (exclude internal_cost from customer total)
+      const customerAdditionalCharges = additionalCharges.filter(charge => 
+        charge.type !== 'internal_cost'
+      );
+      const totalAdditionalCharges = customerAdditionalCharges.reduce((sum, charge) => {
         if (charge.applyPerBus) {
           return sum + (charge.amount * charge.busesCount);
         }
@@ -862,11 +871,18 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       const finalCustomerTotal = subtotalAfterAdjustments + totalAdditionalCharges;
 
-      // Calculate total expenses
+      // Calculate total expenses (include ALL charges including internal_cost in deductions)
+      const internalExpenses = additionalCharges
+        .filter(charge => charge.type !== 'pass_through') // Exclude only pass-through
+        .reduce((sum, charge) => {
+          const effectiveAmount = charge.applyPerBus ? charge.amount * charge.busesCount : charge.amount;
+          return sum + effectiveAmount;
+        }, 0);
+      
       const driverChargeTotal = totalBuses * 1500; // Default driver charge per bus
       const totalOtherExpenses = otherExpenses.reduce((sum, exp) => sum + exp.amount, 0);
       const totalExpenses = driverChargeTotal + totalFuelCost + totalMaintenanceCost + 
-                            commissionExpenseAmount + totalOtherExpenses;
+                            commissionExpenseAmount + totalOtherExpenses + internalExpenses;
       
       const netProfit = finalCustomerTotal - totalExpenses;
 
@@ -1162,17 +1178,27 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         ? baseCustomerTotal * (data.discountPct / 100)
         : data.discountAmount;
       
-      // Final customer total with additional charges (handle distance-based charges)
-      const totalAdditionalCharges = additionalCharges.reduce((sum, charge) => {
+      // Final customer total with additional charges (exclude internal_cost from customer total)
+      const customerAdditionalCharges = additionalCharges.filter(charge => 
+        charge.type !== 'internal_cost'
+      );
+      const totalAdditionalCharges = customerAdditionalCharges.reduce((sum, charge) => {
         let chargeAmount = charge.type === 'additional_distance' ? (charge.amount || 0) : charge.amount;
         return sum + (charge.applyPerBus ? chargeAmount * charge.busesCount : chargeAmount);
       }, 0);
       const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount + totalAdditionalCharges;
       
-      // Company expenses
+      // Company expenses (include ALL charges including internal_cost in deductions)
+      const internalExpenses = additionalCharges
+        .filter(charge => charge.type !== 'pass_through') // Exclude only pass-through
+        .reduce((sum, charge) => {
+          const effectiveAmount = charge.applyPerBus ? charge.amount * charge.busesCount : charge.amount;
+          return sum + effectiveAmount;
+        }, 0);
+      
       const commissionExpense = baseCustomerTotal * (data.commissionPct / 100); // Total commission company pays
       const driverCharge = 1500; // Default driver charge
-      const totalExpenses = (driverCharge * data.numberOfBuses) + commissionExpense + totalFuelCost;
+      const totalExpenses = (driverCharge * data.numberOfBuses) + commissionExpense + totalFuelCost + internalExpenses;
       const netProfit = finalCustomerTotal - totalExpenses;
 
       const costs = {
@@ -2261,6 +2287,23 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                 placeholder="Please specify the reason for this charge"
                                 className="h-14 text-lg"
                               />
+                            </div>
+                          )}
+                          
+                          {charge.type === 'internal_cost' && (
+                            <div className="space-y-4">
+                              <Label className="text-lg font-bold text-foreground">
+                                Cost Description *
+                              </Label>
+                              <Input
+                                value={charge.reason || ''}
+                                onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
+                                placeholder="e.g., wages, staff costs, operational expenses"
+                                className="h-14 text-lg"
+                              />
+                              <p className="text-sm text-muted-foreground">
+                                This cost will be deducted from profit but NOT charged to the customer
+                              </p>
                             </div>
                           )}
                           

@@ -363,6 +363,7 @@ export function CostBreakdown({ data }: Props) {
                        additional_fuel: 'Additional Fuel Costs',
                        driver_charges: 'Driver Charges',
                        pass_through: 'Pass-Through Charge',
+                       internal_cost: charge.reason || 'Internal Cost',
                        other: charge.reason || 'Other'
                      };
                      
@@ -495,6 +496,7 @@ export function CostBreakdown({ data }: Props) {
                       additional_fuel: 'Additional Fuel Costs',
                       driver_charges: 'Driver Charges',
                       additional_distance: 'Additional Distance/KM',
+                      internal_cost: charge.reason || 'Internal Cost',
                       other: charge.reason || 'Other'
                     };
                     
@@ -503,6 +505,7 @@ export function CostBreakdown({ data }: Props) {
                       : charge.amount;
                       
                     const displayLabel = chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type;
+                    const isInternalCost = charge.type === 'internal_cost';
                     
                     let busInfo = '';
                     if (charge.applyPerBus && charge.busesCount) {
@@ -516,7 +519,14 @@ export function CostBreakdown({ data }: Props) {
                     
                     return (
                       <div key={index} className="flex justify-between">
-                        <span>{displayLabel}{busInfo}</span>
+                        <span>
+                          {displayLabel}{busInfo}
+                          {isInternalCost && (
+                            <span className="ml-2 text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded">
+                              Internal Only
+                            </span>
+                          )}
+                        </span>
                         <span>LKR {effectiveAmount.toLocaleString()}</span>
                       </div>
                     );
