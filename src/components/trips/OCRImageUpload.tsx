@@ -157,7 +157,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       // 2. FLEXIBLE BUS NUMBER MATCHING - try exact match first, then alternative formats
       let busQuery = supabase
         .from('buses')
-        .select('id, bus_no')
+        .select('id, bus_no, route')
         .eq('bus_no', data.busNumber);
       
       let { data: busData, error: busError } = await busQuery.single();
@@ -170,7 +170,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         
         const { data: altBusData, error: altError } = await supabase
           .from('buses')
-          .select('id, bus_no')
+          .select('id, bus_no, route')
           .eq('bus_no', altBusNumber)
           .single();
         
@@ -276,9 +276,10 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         console.log(`\n📊 OCR Trip ${i + 1}:`);
         console.log(`  • Revenue: Rs. ${tripRevenue.toLocaleString()}`);
         console.log(`  • Target Save Date: ${tripSaveDate}`);
-        console.log(`  • Individual Date Set: ${trip.individualDate ? 'YES' : 'NO'}`);
+        console.log(`  • Individual Date Set: ${!!trip.individualDate}`);
+        console.log(`  • Multi-day mode: ${hasIndividualDates}`);
         
-        // Find first unused existing trip for this date
+        // Find unused existing trip for this specific date
         const dateTrips = existingTripsByDate.get(tripSaveDate) || [];
         const unusedIndex = dateTrips.findIndex(t => !t.used);
         
@@ -288,25 +289,27 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         if (unusedIndex !== -1) {
           // UPDATE existing trip
           const existingTrip = dateTrips[unusedIndex];
-          console.log(`  ✏️ Updating existing trip: ${existingTrip.trip_no}`);
-          console.log(`     Old revenue: Rs. ${existingTrip.income?.toLocaleString() || 0}`);
-          console.log(`     New revenue: Rs. ${tripRevenue.toLocaleString()}`);
+          existingTrip.used = true;
           
           const { error: updateError } = await supabase
             .from('daily_trips')
             .update({
-              income_details: trip.income,
               income: tripRevenue,
+              ...Object.keys(trip.income).reduce((acc, key) => {
+                acc[key] = trip.income[key];
+                return acc;
+              }, {} as any),
+              updated_at: new Date().toISOString()
             })
             .eq('id', existingTrip.id);
           
           if (updateError) {
-            console.error(`❌ Error updating trip ${existingTrip.id}:`, updateError);
-            toast.error(`Failed to update trip on ${tripSaveDate}: ${updateError.message}`);
-            return;
+            console.error(`❌ Error updating trip ${existingTrip.trip_no}:`, updateError);
+            toast.error(`Failed to update trip: ${updateError.message}`);
+            continue;
           }
           
-          dateTrips[unusedIndex].used = true;
+          console.log(`  ✅ UPDATED existing trip: ${existingTrip.trip_no}`);
           mappingLog.push({
             ocrTrip: i + 1,
             revenue: tripRevenue,
@@ -314,74 +317,43 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
             action: 'updated',
             tripNo: existingTrip.trip_no
           });
-          console.log(`  ✅ Successfully updated ${existingTrip.trip_no}`);
+          
         } else {
-          // No existing trip found
-          if (hasIndividualDates) {
-            // MULTI-DAY ROUTE: Skip insertion, track missing trip
-            console.log(`  ⚠️ SKIPPED - Multi-day route requires pre-existing Daily Trip for ${tripSaveDate}`);
-            missingMultiDayMappings.push({
-              ocrTrip: i + 1,
-              revenue: tripRevenue,
-              date: tripSaveDate
+          // CREATE new trip for this date (works for both multi-day and single-day)
+          const newTripNo = await generateUniqueTripNo(busData.bus_no, tripSaveDate, i + 1);
+          
+          const { error: insertError } = await supabase
+            .from('daily_trips')
+            .insert({
+              trip_date: tripSaveDate,
+              bus_id: busData.id,
+              trip_no: newTripNo,
+              income: tripRevenue,
+              ...Object.keys(trip.income).reduce((acc, key) => {
+                acc[key] = trip.income[key];
+                return acc;
+              }, {} as any)
             });
-            mappingLog.push({
-              ocrTrip: i + 1,
-              revenue: tripRevenue,
-              date: tripSaveDate,
-              action: 'skipped (no existing trip)',
-              tripNo: 'N/A'
-            });
-            console.log(`  ⚠️ Trip ${i + 1} skipped - must create via Driver Allocation first`);
+          
+          if (insertError) {
+            console.error(`❌ Error creating trip ${newTripNo}:`, insertError);
+            toast.error(`Failed to create trip: ${insertError.message}`);
             continue;
-          } else {
-            // SINGLE-DAY ROUTE: Create new trip as before
-            console.log(`  ➕ No existing trip found - Creating new trip`);
-            const uniqueTripNo = await generateUniqueTripNo(busData.bus_no, tripSaveDate, i + 1);
-            console.log(`     Generated trip_no: ${uniqueTripNo}`);
-            
-            const { error: insertError } = await supabase
-              .from('daily_trips')
-              .insert({
-                trip_no: uniqueTripNo,
-                trip_date: tripSaveDate,
-                bus_id: busData.id,
-                income: tripRevenue,
-                income_details: trip.income,
-              });
-            
-            if (insertError) {
-              console.error('❌ Error inserting trip:', insertError);
-              toast.error(`Failed to insert trip on ${tripSaveDate}: ${insertError.message}`);
-              return;
-            }
-            
-            mappingLog.push({
-              ocrTrip: i + 1,
-              revenue: tripRevenue,
-              date: tripSaveDate,
-              action: 'created',
-              tripNo: uniqueTripNo
-            });
-            console.log(`  ✅ Successfully created ${uniqueTripNo} on ${tripSaveDate}`);
           }
+          
+          console.log(`  ✅ CREATED new trip: ${newTripNo} on ${tripSaveDate}`);
+          mappingLog.push({
+            ocrTrip: i + 1,
+            revenue: tripRevenue,
+            date: tripSaveDate,
+            action: 'created',
+            tripNo: newTripNo
+          });
         }
       }
 
-      // 6. SHOW WARNINGS FOR SKIPPED MULTI-DAY TRIPS
-      if (hasIndividualDates && missingMultiDayMappings.length > 0) {
-        const warningMsg = missingMultiDayMappings
-          .map(m => `Trip ${m.ocrTrip} (Rs. ${m.revenue.toLocaleString()}) on ${format(new Date(m.date), 'MMM d')}`)
-          .join(', ');
-        
-        toast.warning(
-          `⚠️ Missing Daily Trips for ${busData.bus_no}`,
-          {
-            description: `OCR trips SKIPPED (not created): ${warningMsg}. These trips were not saved because no Daily Trip records exist for those dates. Please create them first using Driver Allocation, then re-run OCR.`,
-            duration: 15000
-          }
-        );
-      }
+      console.log('\n✅ Sheet application completed');
+      console.log('Mapping Summary:', mappingLog);
 
       // 7. DELETE EXTRA TRIPS (only for non-multi-day routes)
       if (!hasIndividualDates) {
@@ -450,6 +422,32 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         toast.error(`Failed to save expenses: ${expenseError.message}`);
         return; // Stop if expenses fail
       }
+
+      console.log('✅ Expense upserted successfully');
+      
+      // Calculate total expenses for success message
+      const totalExpenses = Object.values(mappedExpenses).reduce((sum, val) => sum + val, 0);
+      
+      // Show enhanced success message
+      toast.success(
+        <div className="space-y-2">
+          <p className="font-bold">✅ {busData.bus_no}: Successfully Applied!</p>
+          <div className="text-xs space-y-1">
+            {mappingLog.map((log, idx) => (
+              <div key={idx} className="flex justify-between gap-4">
+                <span>Trip {log.ocrTrip}: {log.date}</span>
+                <span className="font-mono text-green-600">
+                  {log.action === 'updated' ? '✓ updated' : '+ created'} {log.tripNo}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground border-t pt-1 mt-1">
+            Expenses: {tripDate} • Total: Rs. {totalExpenses.toLocaleString()}
+          </p>
+        </div>,
+        { duration: 6000 }
+      );
 
       console.log('✅ Expense upserted, now verifying in DB...');
 

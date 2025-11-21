@@ -122,23 +122,30 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
         }
 
         if (multiDayData) {
+          console.log('🎯 Multi-day route detected:', multiDayData);
           setIsMultiDayRoute(true);
           setMultiDayConfig(multiDayData);
           
-          // Smart default date range: For n trips, start from (saveDate - (n-1)) to saveDate
+          // Set default date range based on number of trips
           const saveDateObj = parseISO(actualSaveDate);
-          const startDateObj = subDays(saveDateObj, editedData.trips.length - 1);
+          const numTrips = editedData.trips.length;
+          const startDateObj = subDays(saveDateObj, numTrips - 1);
+          
           const defaultStart = format(startDateObj, 'yyyy-MM-dd');
           const defaultEnd = actualSaveDate;
+          
+          console.log('📅 Default date range:', { defaultStart, defaultEnd, numTrips });
           
           setDateRangeStart(defaultStart);
           setDateRangeEnd(defaultEnd);
           
-          // Initialize individual trip dates with smart defaults
+          // IMMEDIATELY set individualDate on all trips
           const updatedTrips = editedData.trips.map((trip, idx) => ({
             ...trip,
-            individualDate: format(subDays(saveDateObj, editedData.trips.length - idx - 1), 'yyyy-MM-dd')
+            individualDate: format(addDays(startDateObj, idx), 'yyyy-MM-dd')
           }));
+          
+          console.log('🎯 Multi-day dates assigned:', updatedTrips.map(t => t.individualDate));
           
           setEditedData(prev => ({
             ...prev,
@@ -324,6 +331,21 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
     special_income: "Special (විශේෂ)",
   };
 
+  // Get bus data for route warning
+  const [busData, setBusData] = useState<any>(null);
+  
+  useEffect(() => {
+    const fetchBusData = async () => {
+      const { data: busInfo } = await supabase
+        .from('buses')
+        .select('route, id')
+        .eq('bus_no', data.busNumber)
+        .maybeSingle();
+      setBusData(busInfo);
+    };
+    fetchBusData();
+  }, [data.busNumber]);
+
   return (
     <Card className={`mb-4 border-2 ${getBorderColor(data.confidence)}`}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -351,6 +373,15 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                     </div>
                   ) : (
                     <span className="text-2xl font-bold">🚌 {editedData.busNumber}</span>
+                  )}
+                  
+                  {/* MULTI-DAY DATE RANGE PREVIEW - COLLAPSED STATE */}
+                  {!isOpen && isMultiDayRoute && multiDayConfig && editedData.trips.some(t => t.individualDate) && (
+                    <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                      📅 {editedData.trips.map(t => 
+                        t.individualDate ? format(parseISO(t.individualDate), 'MMM d') : '?'
+                      ).join(', ')}
+                    </Badge>
                   )}
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">
@@ -390,12 +421,10 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">
                   <span>📊 {data.trips.length} trip{data.trips.length !== 1 ? 's' : ''}</span>
-                  {isMultiDayRoute && editedData.trips.some(t => t.individualDate) && (
-                    <span className="text-blue-600 dark:text-blue-400 font-medium">
-                      📅 {editedData.trips.map(t => 
-                        t.individualDate ? format(parseISO(t.individualDate), 'MMM d') : '?'
-                      ).join(', ')}
-                    </span>
+                  {isMultiDayRoute && multiDayConfig && (
+                    <Badge variant="outline" className="text-[10px] py-0 px-1">
+                      {multiDayConfig.route_name}
+                    </Badge>
                   )}
                   <span>💰 Revenue: Rs. {formatAmount(totalRevenue)}</span>
                   <span>💸 Expenses: Rs. {formatAmount(totalExpenses)}</span>
@@ -408,6 +437,14 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                     </Badge>
                   )}
                 </div>
+                
+                {/* WARNING: No route assigned */}
+                {!busData?.route && (
+                  <div className="flex items-center gap-1 mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>⚠️ No route assigned to this bus</span>
+                  </div>
+                )}
               </div>
             </div>
             <CollapsibleTrigger asChild>
