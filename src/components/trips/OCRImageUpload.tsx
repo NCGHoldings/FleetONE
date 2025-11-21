@@ -265,7 +265,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       // Process each OCR trip
       console.log(`\n🔄 Processing ${data.trips.length} OCR trip(s)...`);
       console.log(`Multi-day detection: ${hasIndividualDates ? 'YES ✓' : 'NO'}`);
-      console.log(`Date range: ${minDateStr} to ${maxDateStr}`);
+      console.log(`Date range: ${minDate} to ${maxDate}`);
       console.log(`Existing trips found: ${existingTrips?.length || 0}`);
       
       for (let i = 0; i < data.trips.length; i++) {
