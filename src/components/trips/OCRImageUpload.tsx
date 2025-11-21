@@ -263,20 +263,35 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       };
 
       // Process each OCR trip
+      console.log(`\n🔄 Processing ${data.trips.length} OCR trip(s)...`);
+      console.log(`Multi-day detection: ${hasIndividualDates ? 'YES ✓' : 'NO'}`);
+      console.log(`Date range: ${minDateStr} to ${maxDateStr}`);
+      console.log(`Existing trips found: ${existingTrips?.length || 0}`);
+      
       for (let i = 0; i < data.trips.length; i++) {
         const trip = data.trips[i];
         const tripRevenue = Object.values(trip.income).reduce((s, v) => s + v, 0);
         const tripSaveDate = trip.individualDate || tripDate;
         
-        console.log(`📅 Trip ${i + 1}: Saving to ${tripSaveDate} • Revenue: Rs. ${tripRevenue.toLocaleString()}`);
+        console.log(`\n📊 OCR Trip ${i + 1}:`);
+        console.log(`  • Revenue: Rs. ${tripRevenue.toLocaleString()}`);
+        console.log(`  • Target Save Date: ${tripSaveDate}`);
+        console.log(`  • Individual Date Set: ${trip.individualDate ? 'YES' : 'NO'}`);
         
         // Find first unused existing trip for this date
         const dateTrips = existingTripsByDate.get(tripSaveDate) || [];
         const unusedIndex = dateTrips.findIndex(t => !t.used);
         
+        console.log(`  • Existing trips for ${tripSaveDate}: ${dateTrips.length}`);
+        console.log(`  • Unused trip found at index: ${unusedIndex}`);
+        
         if (unusedIndex !== -1) {
           // UPDATE existing trip
           const existingTrip = dateTrips[unusedIndex];
+          console.log(`  ✏️ Updating existing trip: ${existingTrip.trip_no}`);
+          console.log(`     Old revenue: Rs. ${existingTrip.income?.toLocaleString() || 0}`);
+          console.log(`     New revenue: Rs. ${tripRevenue.toLocaleString()}`);
+          
           const { error: updateError } = await supabase
             .from('daily_trips')
             .update({
@@ -299,10 +314,12 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
             action: 'updated',
             tripNo: existingTrip.trip_no
           });
-          console.log(`✏️ Updated: ${existingTrip.trip_no} (was Rs. ${existingTrip.income?.toLocaleString() || 0} → now Rs. ${tripRevenue.toLocaleString()})`);
+          console.log(`  ✅ Successfully updated ${existingTrip.trip_no}`);
         } else {
           // INSERT new trip
+          console.log(`  ➕ No existing trip found - Creating new trip`);
           const uniqueTripNo = await generateUniqueTripNo(busData.bus_no, tripSaveDate, i + 1);
+          console.log(`     Generated trip_no: ${uniqueTripNo}`);
           
           const { error: insertError } = await supabase
             .from('daily_trips')
@@ -327,15 +344,16 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
             action: 'created',
             tripNo: uniqueTripNo
           });
-          console.log(`➕ Created: ${uniqueTripNo} on ${tripSaveDate}`);
+          console.log(`  ✅ Successfully created ${uniqueTripNo} on ${tripSaveDate}`);
           
-          // Track missing multi-day mappings
+          // Track missing multi-day mappings for warning
           if (hasIndividualDates) {
             missingMultiDayMappings.push({
               ocrTrip: i + 1,
               revenue: tripRevenue,
               date: tripSaveDate
             });
+            console.log(`  ⚠️ Multi-day route: No pre-existing trip found for this date`);
           }
         }
       }

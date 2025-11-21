@@ -61,6 +61,16 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
     return unmapped;
   });
 
+  // Multi-day route: Date range state
+  const [dateRangeStart, setDateRangeStart] = useState<string>('');
+  const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
+
+  // Normalize route name to handle different dash characters (en-dash, em-dash, etc.)
+  const normalizeRouteName = (name: string | null) => {
+    if (!name) return '';
+    return name.replace(/[–—−]/g, '-').trim(); // Convert all dash variants to hyphen
+  };
+
   // Check if bus route is configured as multi-day
   useEffect(() => {
     const checkMultiDayRoute = async () => {
@@ -76,11 +86,12 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
 
         // Try matching by assigned route first
         if (busData?.route) {
+          const normalizedRoute = normalizeRouteName(busData.route);
           const { data } = await supabase
             .from('multi_day_route_config')
             .select('*')
             .eq('is_enabled', true)
-            .or(`route_name.ilike.%${busData.route}%,route_pattern.ilike.%${busData.route}%`)
+            .or(`route_name.ilike.%${normalizedRoute}%,route_pattern.ilike.%${normalizedRoute}%`)
             .maybeSingle();
           multiDayData = data;
         }
@@ -98,11 +109,12 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
           if (recentTrips && recentTrips.length > 0) {
             const mostCommonRoute = recentTrips[0].routes?.route_name;
             if (mostCommonRoute) {
+              const normalizedRoute = normalizeRouteName(mostCommonRoute);
               const { data } = await supabase
                 .from('multi_day_route_config')
                 .select('*')
                 .eq('is_enabled', true)
-                .or(`route_name.ilike.%${mostCommonRoute}%,route_pattern.ilike.%${mostCommonRoute}%`)
+                .or(`route_name.ilike.%${normalizedRoute}%,route_pattern.ilike.%${normalizedRoute}%`)
                 .maybeSingle();
               multiDayData = data;
             }
@@ -113,10 +125,16 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
           setIsMultiDayRoute(true);
           setMultiDayConfig(multiDayData);
           
-          // Initialize individual trip dates with smart defaults
-          // FIXED FORMULA: For n trips on date D, trip at index i gets date D-(n-i-1)
-          // Example: 2 trips on Nov 18: Trip 0 gets Nov 17, Trip 1 gets Nov 18
+          // Smart default date range: For n trips, start from (saveDate - (n-1)) to saveDate
           const saveDateObj = parseISO(actualSaveDate);
+          const startDateObj = subDays(saveDateObj, editedData.trips.length - 1);
+          const defaultStart = format(startDateObj, 'yyyy-MM-dd');
+          const defaultEnd = actualSaveDate;
+          
+          setDateRangeStart(defaultStart);
+          setDateRangeEnd(defaultEnd);
+          
+          // Initialize individual trip dates with smart defaults
           const updatedTrips = editedData.trips.map((trip, idx) => ({
             ...trip,
             individualDate: format(subDays(saveDateObj, editedData.trips.length - idx - 1), 'yyyy-MM-dd')
@@ -134,6 +152,39 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
 
     checkMultiDayRoute();
   }, [data.busNumber, actualSaveDate]);
+
+  // Update trip dates when date range changes
+  useEffect(() => {
+    if (isMultiDayRoute && dateRangeStart && dateRangeEnd) {
+      const start = parseISO(dateRangeStart);
+      const end = parseISO(dateRangeEnd);
+      const numTrips = editedData.trips.length;
+      const totalDays = differenceInDays(end, start) + 1;
+      
+      // Distribute trips across the date range
+      const updatedTrips = editedData.trips.map((trip, idx) => {
+        let tripDate: string;
+        if (numTrips <= totalDays) {
+          // Spread trips evenly across available days
+          const interval = totalDays / numTrips;
+          tripDate = format(new Date(start.getTime() + Math.floor(idx * interval) * 86400000), 'yyyy-MM-dd');
+        } else {
+          // More trips than days - group them
+          const dayIndex = Math.min(idx, totalDays - 1);
+          tripDate = format(new Date(start.getTime() + dayIndex * 86400000), 'yyyy-MM-dd');
+        }
+        return {
+          ...trip,
+          individualDate: tripDate
+        };
+      });
+      
+      setEditedData(prev => ({
+        ...prev,
+        trips: updatedTrips
+      }));
+    }
+  }, [dateRangeStart, dateRangeEnd, isMultiDayRoute]);
 
   const getConfidenceBadge = (confidence: number) => {
     const percent = Math.round(confidence * 100);
@@ -395,20 +446,71 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                   <p className="text-sm font-medium">📋 Bus {data.busNumber} • {data.date}</p>
                 </div>
 
-                {/* Multi-Day Route Alert */}
+                {/* Multi-Day Route Date Range Picker */}
                 {isMultiDayRoute && multiDayConfig && (
-                  <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-500/50">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertDescription className="text-xs">
-                      <p className="font-semibold">⚠️ Multi-Day Route Detected: {multiDayConfig.route_name}</p>
-                      <p className="text-muted-foreground mt-1">
-                        Trips auto-assigned to consecutive dates. Sheet submission date: {format(parseISO(actualSaveDate), 'MMM d, yyyy')}
-                      </p>
-                      <p className="text-muted-foreground text-[10px] mt-1">
-                        💡 First trip → earliest date, Last trip → sheet date
-                      </p>
-                    </AlertDescription>
-                  </Alert>
+                  <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-200 dark:border-blue-800">
+                    <CardContent className="pt-4">
+                      <div className="flex items-start gap-3">
+                        <CalendarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-1" />
+                        <div className="flex-1 space-y-3">
+                          <div>
+                            <h4 className="font-bold text-sm mb-1">
+                              📅 Multi-Day Route Detected: {multiDayConfig.route_name}
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                              This route spans multiple days. Select the date range for these {editedData.trips.length} trips.
+                            </p>
+                          </div>
+                          
+                          {/* DATE RANGE PICKER */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs text-muted-foreground mb-1">Start Date (Trip 1)</Label>
+                              <Input 
+                                type="date"
+                                value={dateRangeStart}
+                                onChange={(e) => setDateRangeStart(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground mb-1">End Date (Last Trip)</Label>
+                              <Input 
+                                type="date"
+                                value={dateRangeEnd}
+                                onChange={(e) => setDateRangeEnd(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* TRIP DATE MAPPING PREVIEW */}
+                          <div className="bg-white dark:bg-gray-900 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                            <h5 className="font-semibold text-xs mb-2 text-blue-700 dark:text-blue-300">📋 Trip Date Mapping Preview:</h5>
+                            <div className="space-y-1">
+                              {editedData.trips.map((trip, idx) => {
+                                const revenue = Object.values(trip.income).reduce((a, b) => a + b, 0);
+                                return (
+                                  <div key={idx} className="flex justify-between items-center py-1.5 border-b last:border-0 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold">Trip {trip.trip_no}</span>
+                                      <span className="text-muted-foreground">(Rs. {formatAmount(revenue)})</span>
+                                    </div>
+                                    <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">
+                                      → {trip.individualDate ? format(parseISO(trip.individualDate), 'MMM d, yyyy') : '?'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-2 italic">
+                              💡 Expenses will be saved to the sheet date: {format(parseISO(actualSaveDate), 'MMM d, yyyy')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Trips Section with Visual Breakdown */}
