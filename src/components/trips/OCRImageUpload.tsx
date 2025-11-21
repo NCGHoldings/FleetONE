@@ -327,12 +327,11 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           console.log(`    Trip ID: ${existingTrip.id}`);
           console.log(`    New Revenue: Rs. ${tripRevenue}`);
           
+          const incomeDetails = { ...trip.income };
+          
           const updatePayload = {
             income: tripRevenue,
-            ...Object.keys(trip.income).reduce((acc, key) => {
-              acc[key] = trip.income[key];
-              return acc;
-            }, {} as any),
+            income_details: incomeDetails as any,
             updated_at: new Date().toISOString()
           };
           
@@ -363,6 +362,8 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           // CREATE new trip for this date (works for both multi-day and single-day)
           const newTripNo = await generateUniqueTripNo(busData.bus_no, tripSaveDate, i + 1);
           
+          const incomeDetails = { ...trip.income };
+          
           const { error: insertError } = await supabase
             .from('daily_trips')
             .insert({
@@ -370,10 +371,8 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
               bus_id: busData.id,
               trip_no: newTripNo,
               income: tripRevenue,
-              ...Object.keys(trip.income).reduce((acc, key) => {
-                acc[key] = trip.income[key];
-                return acc;
-              }, {} as any)
+              income_details: incomeDetails as any,
+              data_source: 'ocr' as any
             });
           
           if (insertError) {
