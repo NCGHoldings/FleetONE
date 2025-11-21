@@ -10,10 +10,11 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
+import { MultiDayRouteConfig } from "@/components/trips/MultiDayRouteConfig";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -98,13 +99,14 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="account" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-7">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="display">Display</TabsTrigger>
           <TabsTrigger value="admin">Admin</TabsTrigger>
           <TabsTrigger value="data-entry">Data Entry</TabsTrigger>
           <TabsTrigger value="qr-codes">QR Codes</TabsTrigger>
+          <TabsTrigger value="multi-day-routes">Multi-Day Routes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="space-y-6 mt-6">
@@ -411,6 +413,25 @@ export default function Settings() {
               </CardHeader>
               <CardContent>
                 <ConductorSubmissionQRGenerator />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="multi-day-routes" className="space-y-6 mt-6">
+          <div className="grid gap-6 max-w-4xl">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5" />
+                  Multi-Day Route Management
+                </CardTitle>
+                <CardDescription>
+                  Configure long-distance routes that require per-trip date assignment (e.g., Moratuwa-Jaffna). When uploading OCR data for these routes, each trip can be assigned to its actual travel date.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MultiDayRouteConfig />
               </CardContent>
             </Card>
           </div>

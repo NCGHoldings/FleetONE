@@ -1,15 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Edit, CheckCircle, Eye, Trash2, Plus, Minus, AlertCircle, AlertTriangle } from "lucide-react";
+import { ChevronDown, Edit, CheckCircle, Eye, Trash2, Plus, Minus, AlertCircle, AlertTriangle, CalendarIcon } from "lucide-react";
 import { SingleTrip, DailyExpenses } from "@/lib/ocr-processor";
 import { DB_EXPENSE_CATEGORIES, mapOCRExpensesToDB, DBExpenseFields, KNOWN_OCR_EXPENSE_KEYS } from "@/lib/ocr-expense-mapper";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, parseISO, differenceInDays } from "date-fns";
+import { format, parseISO, differenceInDays, subDays } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
 
 interface ExtractedMultiTripData {
   fileName: string;
@@ -37,6 +41,10 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
   const [editedData, setEditedData] = useState(data);
   const [hasEdits, setHasEdits] = useState(false);
   
+  // Multi-day route detection
+  const [isMultiDayRoute, setIsMultiDayRoute] = useState(false);
+  const [multiDayConfig, setMultiDayConfig] = useState<any>(null);
+  
   // Initialize mapped expenses from OCR data
   const initialMappedExpenses = data.mapped_expenses || mapOCRExpensesToDB(data.daily_expenses);
   const [mappedExpenses, setMappedExpenses] = useState<DBExpenseFields>(() => initialMappedExpenses);
@@ -52,6 +60,51 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
     });
     return unmapped;
   });
+
+  // Check if bus route is configured as multi-day
+  useEffect(() => {
+    const checkMultiDayRoute = async () => {
+      try {
+        // Get bus's route
+        const { data: busData } = await supabase
+          .from('buses')
+          .select('route')
+          .eq('bus_no', data.busNumber)
+          .single();
+
+        if (!busData?.route) return;
+
+        // Check if route is configured as multi-day
+        const { data: multiDayData } = await supabase
+          .from('multi_day_route_config')
+          .select('*')
+          .eq('is_enabled', true)
+          .or(`route_name.ilike.%${busData.route}%,route_pattern.ilike.%${busData.route}%`)
+          .single();
+
+        if (multiDayData) {
+          setIsMultiDayRoute(true);
+          setMultiDayConfig(multiDayData);
+          
+          // Initialize individual trip dates with smart defaults
+          const saveDateObj = parseISO(actualSaveDate);
+          const updatedTrips = editedData.trips.map((trip, idx) => ({
+            ...trip,
+            individualDate: format(subDays(saveDateObj, editedData.trips.length - idx), 'yyyy-MM-dd')
+          }));
+          
+          setEditedData(prev => ({
+            ...prev,
+            trips: updatedTrips
+          }));
+        }
+      } catch (error) {
+        console.error('Error checking multi-day route:', error);
+      }
+    };
+
+    checkMultiDayRoute();
+  }, [data.busNumber, actualSaveDate]);
 
   const getConfidenceBadge = (confidence: number) => {
     const percent = Math.round(confidence * 100);
@@ -98,6 +151,18 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
       trips: prev.trips.map((trip, idx) =>
         idx === tripIndex
           ? { ...trip, income: { ...trip.income, [field]: value } }
+          : trip
+      )
+    }));
+  };
+
+  const handleTripDateChange = (tripIndex: number, newDate: Date) => {
+    setHasEdits(true);
+    setEditedData(prev => ({
+      ...prev,
+      trips: prev.trips.map((trip, idx) =>
+        idx === tripIndex
+          ? { ...trip, individualDate: format(newDate, 'yyyy-MM-dd') }
           : trip
       )
     }));
@@ -294,6 +359,19 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                   <p className="text-sm font-medium">📋 Bus {data.busNumber} • {data.date}</p>
                 </div>
 
+                {/* Multi-Day Route Alert */}
+                {isMultiDayRoute && multiDayConfig && (
+                  <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-500/50">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-xs">
+                      <p className="font-semibold">⚠️ Multi-Day Route Detected: {multiDayConfig.route_name}</p>
+                      <p className="text-muted-foreground mt-1">
+                        Assign individual dates for each trip below. Sheet submission date: {format(parseISO(actualSaveDate), 'MMM d, yyyy')}
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {/* Trips Section with Visual Breakdown */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -324,6 +402,35 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                     const tripRevenue = Object.values(trip.income).reduce((s, v) => s + v, 0);
                     return (
                       <div key={tripIdx} className="p-3 bg-primary/5 rounded-lg border">
+                        {/* Per-Trip Date Picker for Multi-Day Routes */}
+                        {isMultiDayRoute && trip.individualDate && (
+                          <div className="mb-3 pb-3 border-b">
+                            <Label className="text-xs text-muted-foreground mb-1 block">
+                              Trip {trip.trip_no} Date:
+                            </Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full justify-start text-left font-normal"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {format(parseISO(trip.individualDate), 'PPP')}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={parseISO(trip.individualDate)}
+                                  onSelect={(date) => date && handleTripDateChange(tripIdx, date)}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-semibold text-sm">Trip {trip.trip_no}</span>
                           <div className="flex items-center gap-2">

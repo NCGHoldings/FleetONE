@@ -14,6 +14,7 @@ export interface SingleTrip {
   income: TripIncome;
   odometer_start?: number;
   odometer_end?: number;
+  individualDate?: string; // NEW: YYYY-MM-DD for multi-day routes
 }
 
 export interface DailyExpenses extends Record<string, number> {

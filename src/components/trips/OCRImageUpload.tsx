@@ -230,14 +230,30 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         return `${prefix}${maxNum + 1}`;
       };
 
-      // Process each OCR trip
+      // Process each OCR trip with individual dates if available
       for (let i = 0; i < data.trips.length; i++) {
         const trip = data.trips[i];
         const tripRevenue = Object.values(trip.income).reduce((s, v) => s + v, 0);
         
-        if (existingTrips && i < existingTrips.length) {
+        // Use individual trip date if available (multi-day route), otherwise use manual date
+        const tripSaveDate = trip.individualDate || tripDate;
+        console.log(`📅 Trip ${trip.trip_no}: Saving to ${tripSaveDate}${trip.individualDate ? ' (individual date)' : ' (sheet date)'}`);
+        
+        // Query existing trip for this specific date
+        const { data: existingTripForDate, error: queryTripError } = await supabase
+          .from('daily_trips')
+          .select('id, trip_no')
+          .eq('bus_id', busData.id)
+          .eq('trip_date', tripSaveDate)
+          .limit(1);
+        
+        if (queryTripError) {
+          console.error(`Error querying trip for ${tripSaveDate}:`, queryTripError);
+        }
+        
+        if (existingTripForDate && existingTripForDate.length > 0) {
           // UPDATE existing trip
-          const existingTrip = existingTrips[i];
+          const existingTrip = existingTripForDate[0];
           const { error: updateError } = await supabase
             .from('daily_trips')
             .update({
@@ -256,13 +272,13 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           console.log(`✏️ Updated existing trip: ${existingTrip.trip_no}`);
         } else {
           // INSERT new trip with globally unique trip_no
-          const uniqueTripNo = await generateUniqueTripNo(busData.bus_no, tripDate, i + 1);
+          const uniqueTripNo = await generateUniqueTripNo(busData.bus_no, tripSaveDate, i + 1);
           
           const { error: insertError } = await supabase
             .from('daily_trips')
             .insert({
               trip_no: uniqueTripNo,
-              trip_date: tripDate,
+              trip_date: tripSaveDate,
               bus_id: busData.id,
               income: tripRevenue,
               income_details: trip.income,
@@ -275,24 +291,26 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           }
           
           insertedTripNos.push(uniqueTripNo);
-          console.log(`➕ Inserted new trip: ${uniqueTripNo}`);
+          console.log(`➕ Inserted new trip: ${uniqueTripNo} on ${tripSaveDate}`);
         }
       }
 
-      // 4b. DELETE EXTRA TRIPS if user removed them in preview
-      if (existingTrips && existingTrips.length > data.trips.length) {
-        const tripsToDelete = existingTrips.slice(data.trips.length);
-        for (const tripToDelete of tripsToDelete) {
-          const { error: deleteError } = await supabase
-            .from('daily_trips')
-            .delete()
-            .eq('id', tripToDelete.id);
-          
-          if (deleteError) {
-            console.error(`Error deleting trip ${tripToDelete.id}:`, deleteError);
-          } else {
-            deletedTripNos.push(tripToDelete.trip_no);
-            console.log(`🗑️ Deleted extra trip: ${tripToDelete.trip_no}`);
+      // 4b. DELETE EXTRA TRIPS removed by user (only for non-multi-day routes)
+      if (!data.trips.some(t => t.individualDate)) {
+        if (existingTrips && existingTrips.length > data.trips.length) {
+          const tripsToDelete = existingTrips.slice(data.trips.length);
+          for (const tripToDelete of tripsToDelete) {
+            const { error: deleteError } = await supabase
+              .from('daily_trips')
+              .delete()
+              .eq('id', tripToDelete.id);
+            
+            if (deleteError) {
+              console.error(`Error deleting trip ${tripToDelete.id}:`, deleteError);
+            } else {
+              deletedTripNos.push(tripToDelete.trip_no);
+              console.log(`🗑️ Deleted extra trip: ${tripToDelete.trip_no}`);
+            }
           }
         }
       }
