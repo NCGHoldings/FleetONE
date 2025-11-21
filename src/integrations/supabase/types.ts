@@ -2483,6 +2483,50 @@ export type Database = {
         }
         Relationships: []
       }
+      multi_day_route_config: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_enabled: boolean | null
+          route_id: string | null
+          route_name: string
+          route_pattern: string | null
+          typical_days_per_trip: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          route_id?: string | null
+          route_name: string
+          route_pattern?: string | null
+          typical_days_per_trip?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          route_id?: string | null
+          route_name?: string
+          route_pattern?: string | null
+          typical_days_per_trip?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "multi_day_route_config_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nsp_daily_sales: {
         Row: {
           created_at: string
