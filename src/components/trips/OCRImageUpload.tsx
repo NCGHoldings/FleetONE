@@ -160,28 +160,52 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         .select('id, bus_no, route')
         .eq('bus_no', data.busNumber);
       
-      let { data: busData, error: busError } = await busQuery.single();
+      let { data: busData, error: busError } = await busQuery.maybeSingle();
 
-      // If exact match fails, try alternative formats (NE-0746 <-> NE 0746)
+      console.log(`🔍 Bus lookup for: "${data.busNumber}"`);
+      console.log(`  Result:`, busData);
+      console.log(`  Bus ID: ${busData?.id}`);
+      console.log(`  Bus No: ${busData?.bus_no}`);
+      console.log(`  Route: ${busData?.route}`);
+
+      // If exact match fails, try multiple alternative formats
       if (busError || !busData) {
-        const altBusNumber = data.busNumber.includes('-') 
-          ? data.busNumber.replace('-', ' ')
-          : data.busNumber.replace(' ', '-');
+        console.log(`⚠️ Exact match failed for "${data.busNumber}", trying alternatives...`);
         
-        const { data: altBusData, error: altError } = await supabase
-          .from('buses')
-          .select('id, bus_no, route')
-          .eq('bus_no', altBusNumber)
-          .single();
+        const alternatives = [
+          data.busNumber.replace('-', ' '),  // NG-8262 → NG 8262
+          data.busNumber.replace(' ', '-'),  // NG 8262 → NG-8262
+          data.busNumber.replace(/\s+/g, ''), // Remove all spaces
+          data.busNumber.toUpperCase(),      // Force uppercase
+        ];
         
-        if (!altError && altBusData) {
-          busData = altBusData;
-          console.log(`✅ Bus matched with alternative format: ${altBusNumber}`);
-        } else {
-          toast.error(`Bus not found. Tried: "${data.busNumber}" and "${altBusNumber}"`);
-          console.error('Bus lookup error:', busError, altError);
+        for (const altBusNumber of alternatives) {
+          if (altBusNumber === data.busNumber) continue; // Skip if same as original
+          
+          console.log(`  Trying: "${altBusNumber}"`);
+          const { data: altBusData } = await supabase
+            .from('buses')
+            .select('id, bus_no, route')
+            .eq('bus_no', altBusNumber)
+            .maybeSingle();
+          
+          if (altBusData) {
+            busData = altBusData;
+            console.log(`✅ Bus matched with alternative format: ${altBusNumber}`);
+            break;
+          }
+        }
+        
+        if (!busData) {
+          toast.error(`Bus not found. Tried: "${data.busNumber}" and alternatives.`);
+          console.error('Bus lookup failed for all formats');
           return;
         }
+      }
+
+      // Warn if bus has no route (but allow trip creation)
+      if (!busData.route) {
+        console.warn(`⚠️ Bus ${busData.bus_no} has no route assigned`);
       }
 
       // 3. DETERMINE DATE RANGE AND PRE-LOAD ALL RELEVANT TRIPS
@@ -273,11 +297,19 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
         const tripRevenue = Object.values(trip.income).reduce((s, v) => s + v, 0);
         const tripSaveDate = trip.individualDate || tripDate;
         
+        // VALIDATION: Ensure valid date format
+        if (!tripSaveDate || tripSaveDate === 'undefined' || tripSaveDate === 'null') {
+          console.error(`❌ Invalid trip save date for Trip ${i + 1}:`, tripSaveDate);
+          toast.error(`Invalid date for Trip ${i + 1}. Please check date selection.`);
+          continue;
+        }
+        
         console.log(`\n📊 OCR Trip ${i + 1}:`);
         console.log(`  • Revenue: Rs. ${tripRevenue.toLocaleString()}`);
         console.log(`  • Target Save Date: ${tripSaveDate}`);
         console.log(`  • Individual Date Set: ${!!trip.individualDate}`);
         console.log(`  • Multi-day mode: ${hasIndividualDates}`);
+        console.log(`  • Income breakdown:`, trip.income);
         
         // Find unused existing trip for this specific date
         const dateTrips = existingTripsByDate.get(tripSaveDate) || [];
@@ -291,17 +323,26 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
           const existingTrip = dateTrips[unusedIndex];
           existingTrip.used = true;
           
-          const { error: updateError } = await supabase
+          console.log(`  🔄 Attempting to update trip ${existingTrip.trip_no}...`);
+          console.log(`    Trip ID: ${existingTrip.id}`);
+          console.log(`    New Revenue: Rs. ${tripRevenue}`);
+          
+          const updatePayload = {
+            income: tripRevenue,
+            ...Object.keys(trip.income).reduce((acc, key) => {
+              acc[key] = trip.income[key];
+              return acc;
+            }, {} as any),
+            updated_at: new Date().toISOString()
+          };
+          
+          console.log(`    Update payload:`, updatePayload);
+          
+          const { data: updateResult, error: updateError } = await supabase
             .from('daily_trips')
-            .update({
-              income: tripRevenue,
-              ...Object.keys(trip.income).reduce((acc, key) => {
-                acc[key] = trip.income[key];
-                return acc;
-              }, {} as any),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingTrip.id);
+            .update(updatePayload)
+            .eq('id', existingTrip.id)
+            .select();
           
           if (updateError) {
             console.error(`❌ Error updating trip ${existingTrip.trip_no}:`, updateError);
@@ -309,7 +350,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
             continue;
           }
           
-          console.log(`  ✅ UPDATED existing trip: ${existingTrip.trip_no}`);
+          console.log(`  ✅ UPDATED existing trip:`, updateResult);
           mappingLog.push({
             ocrTrip: i + 1,
             revenue: tripRevenue,
@@ -432,22 +473,31 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       toast.success(
         <div className="space-y-2">
           <p className="font-bold">✅ {busData.bus_no}: Successfully Applied!</p>
-          <div className="text-xs space-y-1">
-            {mappingLog.map((log, idx) => (
-              <div key={idx} className="flex justify-between gap-4">
-                <span>Trip {log.ocrTrip}: {log.date}</span>
-                <span className="font-mono text-green-600">
-                  {log.action === 'updated' ? '✓ updated' : '+ created'} {log.tripNo}
-                </span>
-              </div>
-            ))}
+          <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+            {mappingLog.length > 0 ? (
+              mappingLog.map((log, idx) => (
+                <div key={idx} className="flex justify-between gap-2">
+                  <span>Trip {log.ocrTrip}:</span>
+                  <span className="font-mono text-green-600">
+                    {log.date} • {log.action} • {log.tripNo}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-red-500">⚠️ No trips were updated or created!</p>
+            )}
           </div>
           <p className="text-xs text-muted-foreground border-t pt-1 mt-1">
             Expenses: {tripDate} • Total: Rs. {totalExpenses.toLocaleString()}
           </p>
         </div>,
-        { duration: 6000 }
+        { duration: 8000 }
       );
+
+      // If no trips were mapped, show error
+      if (mappingLog.length === 0) {
+        toast.error('⚠️ Warning: No trips were saved. Check console for details.');
+      }
 
       console.log('✅ Expense upserted, now verifying in DB...');
 
