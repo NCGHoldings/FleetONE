@@ -533,8 +533,9 @@ export function GLExportModal({
           {/* Preview Summary */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Export Preview</Label>
-            <div className="rounded-md border bg-card p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
+            <ScrollArea className="h-[500px] rounded-md border bg-card">
+              <div className="p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
                 <span className="text-muted-foreground">Date Range:</span>
                 <span className="font-medium">{displayDate}</span>
               </div>
@@ -720,10 +721,11 @@ export function GLExportModal({
                 </div>
               )}
             </div>
-          </div>
+          </ScrollArea>
         </div>
+      </div>
 
-        {/* Actions */}
+      {/* Actions */}
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
