@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Mail, Download, FileText, CheckCircle, Clock, Send } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Mail, Download, FileText, CheckCircle, Clock, Send, Info } from 'lucide-react';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -228,7 +229,22 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
     try {
       setIsLoading(true);
       const invoiceData = generateInvoiceData({ forCustomer: isCustomerInvoice });
-      await generateInvoicePDF(invoiceData);
+      
+      // Generate PDF blob
+      const pdfBlob = await generateInvoicePDF(invoiceData);
+      
+      // Create blob URL and download
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${invoiceData.invoiceNo}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+      
       toast.success('Invoice downloaded successfully');
     } catch (error) {
       console.error('Error downloading PDF:', error);
@@ -337,15 +353,31 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Generate Balance Invoice
-            </DialogTitle>
+            <div>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Final Balance Invoice
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Customer-facing invoice showing final balance due (signatures not required)
+              </p>
+            </div>
             {getStatusBadge()}
           </div>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[70vh] space-y-4">
+          {/* Customer Invoice Info Alert */}
+          <Alert className="border-primary/50 bg-primary/5">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Customer-Facing Invoice</AlertTitle>
+            <AlertDescription>
+              This invoice is sent to the customer showing the final balance due. 
+              Signatures are not included as this is for customer reference only.
+              Internal approved invoices with signatures are generated after payment confirmation.
+            </AlertDescription>
+          </Alert>
+
           {/* Financial Summary */}
           <Card>
             <CardHeader>

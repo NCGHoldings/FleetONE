@@ -166,11 +166,18 @@ export const DocumentViewer = ({
   };
 
   const getStatusBadge = () => {
+    // Show customer copy badge for balance invoices
+    if (document.payment_type === 'balance') {
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">Customer Copy - No Signatures Required</Badge>;
+    }
     if (document.document_status === 'draft') {
       return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">DRAFT</Badge>;
     }
     return <Badge variant="default" className="bg-green-100 text-green-800">APPROVED</Badge>;
   };
+
+  // Check if this is a customer-facing balance invoice
+  const isCustomerBalanceInvoice = document.payment_type === 'balance';
 
   const regenerateDocumentWithSignatures = async () => {
     if (!document.quotation_id) {
@@ -354,9 +361,11 @@ export const DocumentViewer = ({
 
         <div className="flex-1 overflow-hidden">
           <Tabs defaultValue="preview" className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="preview">Document Preview</TabsTrigger>
-              <TabsTrigger value="signatures">Signatures & Approval</TabsTrigger>
+            <TabsList className={isCustomerBalanceInvoice ? "w-full" : "grid w-full grid-cols-2"}>
+              <TabsTrigger value="preview" className={isCustomerBalanceInvoice ? "w-full" : ""}>Document Preview</TabsTrigger>
+              {!isCustomerBalanceInvoice && (
+                <TabsTrigger value="signatures">Signatures & Approval</TabsTrigger>
+              )}
             </TabsList>
             
             <TabsContent value="preview" className="flex-1 overflow-hidden border rounded-lg bg-gray-50 mt-2">
@@ -425,8 +434,9 @@ export const DocumentViewer = ({
               })()}
             </TabsContent>
             
-            <TabsContent value="signatures" className="flex-1 mt-2">
-              <div className="h-[70vh] overflow-y-auto p-4 space-y-4">
+            {!isCustomerBalanceInvoice && (
+              <TabsContent value="signatures" className="flex-1 mt-2">
+                <div className="h-[70vh] overflow-y-auto p-4 space-y-4">
                 {/* Update PDF Button */}
                 {canManageSignatures && (
                   <div className="bg-primary/10 border-2 border-primary/30 rounded-lg p-4">
@@ -457,7 +467,8 @@ export const DocumentViewer = ({
                   onSignatureUpdated={onSignatureUpdated}
                 />
               </div>
-            </TabsContent>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
 
