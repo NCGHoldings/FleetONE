@@ -68,6 +68,10 @@ export function GLExportModal({
       const startDate = format(customDateRange.from, 'yyyy-MM-dd');
       const endDate = format(customDateRange.to, 'yyyy-MM-dd');
 
+      console.log('🔍 GL Export Debug - Starting Data Fetch');
+      console.log('📅 Date Range:', startDate, 'to', endDate);
+      console.log('🚌 dateWiseBusSelection:', JSON.stringify(dateWiseBusSelection, null, 2));
+
       // Fetch ALL trips and expenses in date range
       const { data: trips, error: tripsError } = await supabase
         .from('daily_trips')
@@ -81,6 +85,11 @@ export function GLExportModal({
 
       if (tripsError) throw tripsError;
 
+      console.log(`📊 Fetched ${trips?.length || 0} total trips from database`);
+      trips?.forEach(trip => {
+        console.log(`  📦 Trip: ${trip.buses?.bus_no} on ${trip.trip_date} - Revenue: Rs.${trip.income || 0}`);
+      });
+
       const { data: expenses, error: expensesError } = await supabase
         .from('daily_bus_expenses')
         .select(`
@@ -92,18 +101,38 @@ export function GLExportModal({
 
       if (expensesError) throw expensesError;
 
+      console.log(`💰 Fetched ${expenses?.length || 0} total expense records from database`);
+
       // Filter based on date-wise bus selection
+      console.log('🔍 Starting trip filtering...');
       const filteredTrips = trips?.filter(trip => {
         const tripDate = format(new Date(trip.trip_date), 'yyyy-MM-dd');
         const busNo = trip.buses?.bus_no;
-        return busNo && dateWiseBusSelection[tripDate]?.includes(busNo);
+        const isSelected = busNo && dateWiseBusSelection[tripDate]?.includes(busNo);
+        
+        console.log(`  ${isSelected ? '✅' : '❌'} ${busNo} on ${tripDate}: ${isSelected ? 'INCLUDE' : 'EXCLUDE'} (Revenue: Rs.${trip.income || 0})`);
+        
+        return isSelected;
       }) || [];
 
+      console.log(`✅ After filtering: ${filteredTrips.length} trips`);
+      console.log('💰 Filtered trip revenues:');
+      filteredTrips.forEach(trip => {
+        console.log(`  ${trip.buses?.bus_no} on ${trip.trip_date}: Rs.${trip.income || 0}`);
+      });
+
+      console.log('🔍 Starting expense filtering...');
       const filteredExpenses = expenses?.filter(expense => {
         const expenseDate = format(new Date(expense.expense_date), 'yyyy-MM-dd');
         const busNo = expense.buses?.bus_no;
-        return busNo && dateWiseBusSelection[expenseDate]?.includes(busNo);
+        const isSelected = busNo && dateWiseBusSelection[expenseDate]?.includes(busNo);
+        
+        console.log(`  ${isSelected ? '✅' : '❌'} ${busNo} on ${expenseDate}: ${isSelected ? 'INCLUDE' : 'EXCLUDE'}`);
+        
+        return isSelected;
       }) || [];
+
+      console.log(`✅ After filtering: ${filteredExpenses.length} expense records`);
 
       return { trips: filteredTrips, expenses: filteredExpenses };
     },
@@ -212,11 +241,14 @@ export function GLExportModal({
   };
 
   const handleDateWiseBusToggle = (date: string, busNo: string) => {
+    console.log(`🔘 Toggling ${busNo} for date ${date}`);
     setDateWiseBusSelection(prev => {
       const currentBuses = prev[date] || [];
       const updated = currentBuses.includes(busNo)
         ? currentBuses.filter(b => b !== busNo)
         : [...currentBuses, busNo];
+      console.log(`  Before:`, prev);
+      console.log(`  After:`, { ...prev, [date]: updated });
       return { ...prev, [date]: updated };
     });
   };
