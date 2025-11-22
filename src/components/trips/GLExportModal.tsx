@@ -77,8 +77,8 @@ export function GLExportModal({
         .from('daily_trips')
         .select(`
           *,
-          buses:bus_id(bus_no),
-          routes:route_id(route_name, route_gl_code)
+          buses(bus_no),
+          routes(route_name)
         `)
         .gte('trip_date', startDate)
         .lte('trip_date', endDate);
@@ -98,7 +98,7 @@ export function GLExportModal({
         .from('daily_bus_expenses')
         .select(`
           *,
-          buses:bus_id(bus_no)
+          buses(bus_no)
         `)
         .gte('expense_date', startDate)
         .lte('expense_date', endDate);
@@ -121,9 +121,8 @@ export function GLExportModal({
     console.log('🚌 dateWiseBusSelection:', JSON.stringify(dateWiseBusSelection, null, 2));
 
     const filteredTrips = multiDateData.trips.filter(trip => {
-      // Normalize to YYYY-MM-DD consistently to avoid format mismatches
-      const tripDateObj = new Date(trip.trip_date);
-      const tripDate = tripDateObj.toISOString().split('T')[0]; // Force YYYY-MM-DD
+      // Normalize to YYYY-MM-DD - avoid timezone shifts
+      const tripDate = String(trip.trip_date).slice(0, 10);
       const busNo = trip.buses?.bus_no;
       
       if (!busNo) {
@@ -141,9 +140,8 @@ export function GLExportModal({
     });
 
     const filteredExpenses = multiDateData.expenses.filter(expense => {
-      // Normalize to YYYY-MM-DD consistently
-      const expenseDateObj = new Date(expense.expense_date);
-      const expenseDate = expenseDateObj.toISOString().split('T')[0]; // Force YYYY-MM-DD
+      // Normalize to YYYY-MM-DD - avoid timezone shifts
+      const expenseDate = String(expense.expense_date).slice(0, 10);
       const busNo = expense.buses?.bus_no;
       
       if (!busNo) {
@@ -239,7 +237,7 @@ export function GLExportModal({
 
     // 1) Revenue by date + bus
     filteredMultiDateData.trips.forEach(trip => {
-      const dateStr = format(new Date(trip.trip_date), 'yyyy-MM-dd');
+      const dateStr = String(trip.trip_date).slice(0, 10);
       const busNo = trip.buses?.bus_no;
       if (!busNo) return;
 
@@ -260,7 +258,7 @@ export function GLExportModal({
 
     // 2) Expenses by date + bus
     filteredMultiDateData.expenses.forEach(expense => {
-      const dateStr = format(new Date(expense.expense_date), 'yyyy-MM-dd');
+      const dateStr = String(expense.expense_date).slice(0, 10);
       const busNo = expense.buses?.bus_no;
       if (!busNo) return;
 
