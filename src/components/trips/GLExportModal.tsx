@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -120,27 +121,45 @@ export function GLExportModal({
     console.log('🚌 dateWiseBusSelection:', JSON.stringify(dateWiseBusSelection, null, 2));
 
     const filteredTrips = multiDateData.trips.filter(trip => {
-      const tripDate = format(new Date(trip.trip_date), 'yyyy-MM-dd');
+      // Normalize to YYYY-MM-DD consistently to avoid format mismatches
+      const tripDateObj = new Date(trip.trip_date);
+      const tripDate = tripDateObj.toISOString().split('T')[0]; // Force YYYY-MM-DD
       const busNo = trip.buses?.bus_no;
-      const isSelected = !!busNo && !!dateWiseBusSelection[tripDate]?.includes(busNo);
       
-      console.log(`  ${isSelected ? '✅' : '❌'} Trip: ${busNo} on ${tripDate} - Rs.${trip.income || 0}`);
+      if (!busNo) {
+        console.log('❌ Trip missing bus_no:', trip);
+        return false;
+      }
+      
+      const isSelected = dateWiseBusSelection[tripDate]?.includes(busNo);
+      
+      console.log(
+        `GL Filter: ${isSelected ? '✅ INCLUDE' : '❌ SKIP'} | ${busNo} on ${tripDate} | Revenue: Rs.${trip.income || 0}`
+      );
       
       return isSelected;
     });
 
     const filteredExpenses = multiDateData.expenses.filter(expense => {
-      const expenseDate = format(new Date(expense.expense_date), 'yyyy-MM-dd');
+      // Normalize to YYYY-MM-DD consistently
+      const expenseDateObj = new Date(expense.expense_date);
+      const expenseDate = expenseDateObj.toISOString().split('T')[0]; // Force YYYY-MM-DD
       const busNo = expense.buses?.bus_no;
-      const isSelected = !!busNo && !!dateWiseBusSelection[expenseDate]?.includes(busNo);
       
-      console.log(`  ${isSelected ? '✅' : '❌'} Expense: ${busNo} on ${expenseDate}`);
+      if (!busNo) {
+        console.log('❌ Expense missing bus_no:', expense);
+        return false;
+      }
+      
+      const isSelected = dateWiseBusSelection[expenseDate]?.includes(busNo);
+      
+      console.log(`GL Filter: ${isSelected ? '✅ INCLUDE' : '❌ SKIP'} | ${busNo} expense on ${expenseDate}`);
       
       return isSelected;
     });
 
     console.log(`✅ Filtering Complete: ${filteredTrips.length} trips, ${filteredExpenses.length} expenses`);
-    console.log('💰 Filtered trip details:');
+    console.log('💰 Filtered trip revenue summary:');
     filteredTrips.forEach(trip => {
       console.log(`  ${trip.buses?.bus_no} on ${trip.trip_date}: Rs.${trip.income || 0}`);
     });
@@ -572,58 +591,132 @@ export function GLExportModal({
                 </div>
               )}
 
-              {/* Detailed Date & Bus Breakdown */}
-              {dateSelectionMode === 'range' && dateBusBreakdown && (
-                <div className="pt-2 border-t mt-2 space-y-2">
-                  <div className="text-xs text-muted-foreground font-medium">
-                    Detailed Breakdown (Verify Before Export):
+              {/* Debug Info - Shows filtering results */}
+              {dateSelectionMode === 'range' && filteredMultiDateData && (
+                <div className="pt-2 border-t mt-2 text-xs space-y-1 bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-900">
+                  <div className="font-semibold text-yellow-800 dark:text-yellow-200">🐛 Debug Info:</div>
+                  <div className="space-y-0.5 text-yellow-700 dark:text-yellow-300">
+                    <div>Raw Trips Fetched: {multiDateData?.trips.length || 0}</div>
+                    <div>Filtered Trips: {filteredMultiDateData.trips.length}</div>
+                    <div>Filtered Expenses: {filteredMultiDateData.expenses.length}</div>
+                    <div>
+                      Breakdown Dates: {dateBusBreakdown ? Object.keys(dateBusBreakdown).map(d => format(new Date(d), 'MMM dd')).join(', ') : 'none'}
+                    </div>
                   </div>
-                  <ScrollArea className="max-h-[250px]">
-                    <div className="space-y-3 text-xs">
+                </div>
+              )}
+
+              {/* Enhanced Detailed Date & Bus Breakdown */}
+              {dateSelectionMode === 'range' && dateBusBreakdown && Object.keys(dateBusBreakdown).length > 0 && (
+                <div className="pt-3 border-t mt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-semibold text-primary">
+                      📊 Date-wise Revenue & Expense Breakdown
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {Object.values(dateBusBreakdown).reduce((total, buses) => 
+                        total + Object.keys(buses).length, 0
+                      )} entries
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Verify each date's data before export:
+                  </div>
+                  <ScrollArea className="max-h-[300px] border rounded-md p-2 bg-muted/20">
+                    <div className="space-y-4">
                       {datesInRange.map(date => {
                         const dateStr = format(date, 'yyyy-MM-dd');
                         const busesForDate = dateBusBreakdown[dateStr];
-                        if (!busesForDate || Object.keys(busesForDate).length === 0) return null;
+                        if (!busesForDate || Object.keys(busesForDate).length === 0) {
+                          return (
+                            <div key={dateStr} className="text-xs text-muted-foreground italic p-2">
+                              📅 {format(date, 'MMM dd, yyyy')} - No data
+                            </div>
+                          );
+                        }
+
+                        // Calculate date totals
+                        const dateTotal = Object.values(busesForDate).reduce(
+                          (sum, stats) => ({
+                            revenue: sum.revenue + stats.revenue,
+                            expenses: sum.expenses + stats.totalExpenses,
+                          }),
+                          { revenue: 0, expenses: 0 }
+                        );
 
                         return (
-                          <div key={dateStr} className="space-y-1">
-                            <div className="font-semibold text-primary">
-                              📅 {format(date, 'MMM dd, yyyy')}
-                            </div>
-                            {Object.entries(busesForDate).map(([busNo, stats]) => (
-                              <div
-                                key={`${dateStr}-${busNo}`}
-                                className="flex flex-wrap justify-between gap-2 pl-2 border-l-2 border-primary/20 py-1"
-                              >
-                                <span className="font-medium min-w-[60px]">{busNo}</span>
-                                <span className="text-muted-foreground text-[10px]">
-                                  {stats.tripCount} trip{stats.tripCount !== 1 ? 's' : ''}
-                                </span>
+                          <div key={dateStr} className="space-y-2 bg-background rounded-md p-3 border">
+                            {/* Date Header with Totals */}
+                            <div className="flex items-center justify-between border-b pb-2 mb-2">
+                              <div className="font-semibold text-primary">
+                                📅 {format(date, 'EEEE, MMM dd, yyyy')}
+                              </div>
+                              <div className="flex gap-3 text-xs">
                                 <span className="text-green-600 font-medium">
-                                  Rev: Rs. {stats.revenue.toLocaleString('en-US', {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0,
-                                  })}
+                                  Rev: Rs. {dateTotal.revenue.toLocaleString()}
                                 </span>
-                                <span className="text-red-600">
-                                  Exp: Rs. {stats.totalExpenses.toLocaleString('en-US', {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0,
-                                  })}
+                                <span className="text-red-600 font-medium">
+                                  Exp: Rs. {dateTotal.expenses.toLocaleString()}
                                 </span>
-                                <span className="text-blue-600 font-medium">
-                                  Net: Rs. {(stats.revenue - stats.totalExpenses).toLocaleString(
-                                    'en-US',
-                                    { minimumFractionDigits: 0, maximumFractionDigits: 0 }
-                                  )}
+                                <span className="text-blue-600 font-semibold">
+                                  Net: Rs. {(dateTotal.revenue - dateTotal.expenses).toLocaleString()}
                                 </span>
                               </div>
-                            ))}
+                            </div>
+
+                            {/* Bus-wise breakdown for this date */}
+                            <div className="space-y-1.5">
+                              {Object.entries(busesForDate).map(([busNo, stats]) => (
+                                <div
+                                  key={`${dateStr}-${busNo}`}
+                                  className="grid grid-cols-6 gap-2 items-center text-xs py-1.5 px-2 rounded hover:bg-muted/50"
+                                >
+                                  <span className="font-medium col-span-1">{busNo}</span>
+                                  <span className="text-muted-foreground text-center text-[10px]">
+                                    {stats.tripCount} trip{stats.tripCount !== 1 ? 's' : ''}
+                                  </span>
+                                  <span className="text-green-600 text-right font-medium">
+                                    Rs. {stats.revenue.toLocaleString()}
+                                  </span>
+                                  <span className="text-orange-600 text-right text-[10px]">
+                                    Fuel: {stats.fuel.toLocaleString()}
+                                  </span>
+                                  <span className="text-red-600 text-right">
+                                    Exp: {stats.totalExpenses.toLocaleString()}
+                                  </span>
+                                  <span className="text-blue-600 font-medium text-right">
+                                    Net: {(stats.revenue - stats.totalExpenses).toLocaleString()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   </ScrollArea>
+
+                  {/* Verification Check */}
+                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded text-xs">
+                    <div className="font-semibold text-blue-800 dark:text-blue-200 mb-1">✓ Verification:</div>
+                    <div className="space-y-0.5 text-blue-700 dark:text-blue-300">
+                      <div>
+                        Sum of all date breakdowns: Rs.{' '}
+                        {Object.values(dateBusBreakdown)
+                          .flatMap(buses => Object.values(buses))
+                          .reduce((sum, stats) => sum + stats.revenue, 0)
+                          .toLocaleString()}
+                      </div>
+                      <div>
+                        Matches Total Revenue above:{' '}
+                        {Math.abs(
+                          Object.values(dateBusBreakdown)
+                            .flatMap(buses => Object.values(buses))
+                            .reduce((sum, stats) => sum + stats.revenue, 0) - summary.totalRevenue
+                        ) < 1 ? '✅ Yes' : '❌ No - Data mismatch!'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
