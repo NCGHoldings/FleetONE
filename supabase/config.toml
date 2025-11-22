@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.analyze-trips]
 verify_jwt = true
+
+[functions.send-whatsapp-quotation]
+verify_jwt = true

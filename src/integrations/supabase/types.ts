@@ -4850,6 +4850,7 @@ export type Database = {
           refund_processed_by: string | null
           refund_reason: string | null
           refund_status: string | null
+          sent_via_whatsapp: boolean | null
           special_request: string | null
           status: string | null
           status_change_reason: string | null
@@ -4865,6 +4866,7 @@ export type Database = {
           uses_multi_parking: boolean | null
           valid_until: string | null
           version_number: string | null
+          whatsapp_sent_at: string | null
         }
         Insert: {
           additional_charges?: Json | null
@@ -4935,6 +4937,7 @@ export type Database = {
           refund_processed_by?: string | null
           refund_reason?: string | null
           refund_status?: string | null
+          sent_via_whatsapp?: boolean | null
           special_request?: string | null
           status?: string | null
           status_change_reason?: string | null
@@ -4950,6 +4953,7 @@ export type Database = {
           uses_multi_parking?: boolean | null
           valid_until?: string | null
           version_number?: string | null
+          whatsapp_sent_at?: string | null
         }
         Update: {
           additional_charges?: Json | null
@@ -5020,6 +5024,7 @@ export type Database = {
           refund_processed_by?: string | null
           refund_reason?: string | null
           refund_status?: string | null
+          sent_via_whatsapp?: boolean | null
           special_request?: string | null
           status?: string | null
           status_change_reason?: string | null
@@ -5035,6 +5040,7 @@ export type Database = {
           uses_multi_parking?: boolean | null
           valid_until?: string | null
           version_number?: string | null
+          whatsapp_sent_at?: string | null
         }
         Relationships: [
           {
