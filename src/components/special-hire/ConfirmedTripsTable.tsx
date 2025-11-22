@@ -1338,13 +1338,16 @@ export function ConfirmedTripsTable() {
             setBalanceInvoiceModalOpen(false);
             setSelectedAdjustment(null);
             
-            // Refresh documents and adjustments
+            // Comprehensive refresh: documents, adjustments, and full quotations list
             await loadDocumentStatus(selectedTrip.id);
             const docsResult = await getDocumentsByQuotation(selectedTrip.id);
             if (docsResult.success) {
               setQuotationDocuments(docsResult.documents || []);
             }
             await loadAdjustmentData(selectedTrip.id);
+            
+            // Trigger full refetch to ensure documents appear immediately
+            refetch();
           }}
         />
       )}
