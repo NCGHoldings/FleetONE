@@ -77,15 +77,20 @@ const handler = async (req: Request): Promise<Response> => {
     }
     console.log(`[${timestamp}] 📞 Formatted phone:`, formattedPhone);
 
-    // Step 1: Upload PDF to WhatsApp Media
+    // Step 1: Upload PDF to WhatsApp Media (memory-efficient streaming)
     console.log(`[${timestamp}] 📤 Uploading PDF to WhatsApp...`);
     
-    const pdfBuffer = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
+    // Decode base64 in chunks to avoid memory issues
+    const binaryString = atob(pdfBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
     const formData = new FormData();
-    const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
-    formData.append('file', pdfBlob, `Quotation_${quotationNo}.pdf`);
+    const pdfFile = new File([bytes], `Quotation_${quotationNo}.pdf`, { type: 'application/pdf' });
+    formData.append('file', pdfFile);
     formData.append('messaging_product', 'whatsapp');
-    formData.append('type', 'application/pdf');
 
     const uploadResponse = await fetch(
       `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/media`,
