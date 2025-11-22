@@ -92,14 +92,23 @@ export function aggregateMultiDateDataByBus(
   trips: any[],
   expenses: any[]
 ): BusDailySummary[] {
+  console.log('🔄 GL Aggregation - Starting aggregation');
+  console.log(`📊 Input: ${trips.length} trips, ${expenses.length} expense records`);
+  
   const busSummariesMap = new Map<string, BusDailySummary>();
 
   // Group trips by bus_no
-  trips.forEach(trip => {
+  trips.forEach((trip, index) => {
     const busNo = trip.buses?.bus_no;
-    if (!busNo) return;
+    console.log(`  📦 Processing trip ${index + 1}/${trips.length}: ${busNo} on ${trip.trip_date} - Revenue: Rs.${trip.income || 0}`);
+    
+    if (!busNo) {
+      console.log(`    ❌ Skipping trip - missing bus_no`);
+      return;
+    }
 
     if (!busSummariesMap.has(busNo)) {
+      console.log(`    ✨ Creating new summary for ${busNo}`);
       busSummariesMap.set(busNo, {
         bus_id: trip.bus_id,
         bus_no: busNo,
@@ -129,6 +138,8 @@ export function aggregateMultiDateDataByBus(
     summary.total_distance += trip.distance_km || 0;
     summary.trip_count += 1;
     
+    console.log(`    ➕ Added to ${busNo}: New total revenue = Rs.${summary.total_revenue}, Trip count = ${summary.trip_count}`);
+    
     // Collect unique routes, drivers, conductors
     if (trip.routes?.route_name && !summary.routes.includes(trip.routes.route_name)) {
       summary.routes.push(trip.routes.route_name);
@@ -136,13 +147,20 @@ export function aggregateMultiDateDataByBus(
   });
 
   // Aggregate expenses for each bus
+  console.log('💰 Processing expenses...');
   const busExpensesMap = new Map<string, any>();
   
-  expenses.forEach(expense => {
+  expenses.forEach((expense, index) => {
     const busNo = expense.buses?.bus_no;
-    if (!busNo) return;
+    console.log(`  💰 Processing expense ${index + 1}/${expenses.length}: ${busNo} on ${expense.expense_date}`);
+    
+    if (!busNo) {
+      console.log(`    ❌ Skipping expense - missing bus_no`);
+      return;
+    }
 
     if (!busExpensesMap.has(busNo)) {
+      console.log(`    ✨ Creating new expense entry for ${busNo}`);
       busExpensesMap.set(busNo, {
         fuel_cost: 0,
         repair: 0,
@@ -181,11 +199,15 @@ export function aggregateMultiDateDataByBus(
 
     expenseKeys.forEach(key => {
       const expenseValue = Number(expense[key] || 0);
+      if (expenseValue > 0) {
+        console.log(`    ➕ Adding ${key}: Rs.${expenseValue}`);
+      }
       busExpense[key] += expenseValue;
     });
   });
 
   // Assign aggregated expenses to summaries and calculate totals
+  console.log('📊 Finalizing summaries...');
   busSummariesMap.forEach((summary, busNo) => {
     const busExpense = busExpensesMap.get(busNo);
     
@@ -205,8 +227,16 @@ export function aggregateMultiDateDataByBus(
     summary.net_profit = summary.total_revenue - summary.total_expenses;
     summary.profit_margin = summary.total_revenue > 0 ? (summary.net_profit / summary.total_revenue) * 100 : 0;
     summary.has_distance = summary.total_distance > 0;
+    
+    console.log(`📊 Final summary for ${busNo}:`, {
+      trips: summary.trip_count,
+      revenue: summary.total_revenue,
+      expenses: summary.total_expenses,
+      netProfit: summary.net_profit
+    });
   });
 
+  console.log('✅ Aggregation complete');
   return Array.from(busSummariesMap.values());
 }
 
