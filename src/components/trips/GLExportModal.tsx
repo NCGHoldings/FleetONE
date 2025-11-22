@@ -424,7 +424,7 @@ export function GLExportModal({
           {dateSelectionMode === 'range' && datesInRange.length > 0 && (
             <div className="space-y-3">
               <Label className="text-sm font-medium">Select Buses for Each Date</Label>
-              <ScrollArea className="h-[400px] rounded-md border p-4">
+              <ScrollArea className="max-h-[400px] rounded-md border p-4">
                 <div className="space-y-4">
                   {datesInRange.map((date, index) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
@@ -533,9 +533,8 @@ export function GLExportModal({
           {/* Preview Summary */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Export Preview</Label>
-            <ScrollArea className="h-[500px] rounded-md border bg-card">
-              <div className="p-4 space-y-2 text-sm">
-                <div className="flex justify-between">
+            <div className="rounded-md border bg-card p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Date Range:</span>
                 <span className="font-medium">{displayDate}</span>
               </div>
@@ -721,11 +720,10 @@ export function GLExportModal({
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
         </div>
-      </div>
 
-      {/* Actions */}
+        {/* Actions */}
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
