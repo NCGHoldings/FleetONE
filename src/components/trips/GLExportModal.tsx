@@ -39,11 +39,18 @@ export function GLExportModal({
   const [customDateRange, setCustomDateRange] = useState<{ from?: Date; to?: Date }>();
   const [selectedBuses, setSelectedBuses] = useState<string[]>([]);
   const [selectAllBuses, setSelectAllBuses] = useState(true);
+  const [dateWiseBusSelection, setDateWiseBusSelection] = useState<Record<string, string[]>>({});
 
   // Get unique buses from busSummaries
   const availableBuses = useMemo(() => {
     return Array.from(new Set(busSummaries.map(s => s.bus_no))).sort();
   }, [busSummaries]);
+
+  // Get dates in range for date-wise selection
+  const datesInRange = useMemo(() => {
+    if (!customDateRange?.from || !customDateRange?.to) return [];
+    return eachDayOfInterval({ start: customDateRange.from, end: customDateRange.to });
+  }, [customDateRange]);
 
   // Initialize selected buses when modal opens
   useMemo(() => {
@@ -54,14 +61,14 @@ export function GLExportModal({
 
   // Fetch multi-date data when range mode is active
   const { data: multiDateData, isLoading: isLoadingMultiDate } = useQuery({
-    queryKey: ['gl-multi-date-data', customDateRange, selectedBuses],
+    queryKey: ['gl-multi-date-data', customDateRange, dateWiseBusSelection],
     queryFn: async () => {
       if (!customDateRange?.from || !customDateRange?.to) return null;
 
       const startDate = format(customDateRange.from, 'yyyy-MM-dd');
       const endDate = format(customDateRange.to, 'yyyy-MM-dd');
 
-      // Fetch trips
+      // Fetch ALL trips and expenses in date range
       const { data: trips, error: tripsError } = await supabase
         .from('daily_trips')
         .select(`
@@ -70,12 +77,10 @@ export function GLExportModal({
           routes(route_name, route_gl_code)
         `)
         .gte('trip_date', startDate)
-        .lte('trip_date', endDate)
-        .in('buses.bus_no', selectedBuses);
+        .lte('trip_date', endDate);
 
       if (tripsError) throw tripsError;
 
-      // Fetch expenses
       const { data: expenses, error: expensesError } = await supabase
         .from('daily_bus_expenses')
         .select(`
@@ -83,14 +88,26 @@ export function GLExportModal({
           buses!inner(id, bus_no)
         `)
         .gte('expense_date', startDate)
-        .lte('expense_date', endDate)
-        .in('buses.bus_no', selectedBuses);
+        .lte('expense_date', endDate);
 
       if (expensesError) throw expensesError;
 
-      return { trips: trips || [], expenses: expenses || [] };
+      // Filter based on date-wise bus selection
+      const filteredTrips = trips?.filter(trip => {
+        const tripDate = format(new Date(trip.trip_date), 'yyyy-MM-dd');
+        const busNo = trip.buses?.bus_no;
+        return busNo && dateWiseBusSelection[tripDate]?.includes(busNo);
+      }) || [];
+
+      const filteredExpenses = expenses?.filter(expense => {
+        const expenseDate = format(new Date(expense.expense_date), 'yyyy-MM-dd');
+        const busNo = expense.buses?.bus_no;
+        return busNo && dateWiseBusSelection[expenseDate]?.includes(busNo);
+      }) || [];
+
+      return { trips: filteredTrips, expenses: filteredExpenses };
     },
-    enabled: open && dateSelectionMode === 'range' && !!customDateRange?.from && !!customDateRange?.to && selectedBuses.length > 0,
+    enabled: open && dateSelectionMode === 'range' && !!customDateRange?.from && !!customDateRange?.to && Object.keys(dateWiseBusSelection).length > 0,
   });
 
   const displayDate = useMemo(() => {
@@ -147,17 +164,28 @@ export function GLExportModal({
       return;
     }
 
-    if (selectedBuses.length === 0) {
+    if (dateSelectionMode === 'single' && selectedBuses.length === 0) {
       toast.error('Please select at least one bus');
+      return;
+    }
+
+    if (dateSelectionMode === 'range' && Object.keys(dateWiseBusSelection).length === 0) {
+      toast.error('Please select buses for at least one date');
       return;
     }
 
     try {
       exportToExcel(glRows, exportDate, exportDateRange);
+      
       const dateInfo = exportDateRange 
         ? `${format(exportDateRange.from!, 'dd/MM/yyyy')} - ${format(exportDateRange.to!, 'dd/MM/yyyy')}`
         : format(exportDate, 'dd/MM/yyyy');
-      toast.success(`GL export generated successfully for ${dateInfo} (${selectedBuses.length} buses)`);
+      
+      const busCount = dateSelectionMode === 'range'
+        ? Array.from(new Set(Object.values(dateWiseBusSelection).flat())).length
+        : selectedBuses.length;
+        
+      toast.success(`GL export generated successfully for ${dateInfo} (${busCount} buses)`);
       onOpenChange(false);
     } catch (error) {
       console.error('Export error:', error);
@@ -181,6 +209,24 @@ export function GLExportModal({
     } else {
       setSelectedBuses([]);
     }
+  };
+
+  const handleDateWiseBusToggle = (date: string, busNo: string) => {
+    setDateWiseBusSelection(prev => {
+      const currentBuses = prev[date] || [];
+      const updated = currentBuses.includes(busNo)
+        ? currentBuses.filter(b => b !== busNo)
+        : [...currentBuses, busNo];
+      return { ...prev, [date]: updated };
+    });
+  };
+
+  const handleDateWiseSelectAll = (date: string) => {
+    setDateWiseBusSelection(prev => {
+      const currentBuses = prev[date] || [];
+      const allSelected = currentBuses.length === availableBuses.length;
+      return { ...prev, [date]: allSelected ? [] : [...availableBuses] };
+    });
   };
 
   return (
@@ -218,7 +264,10 @@ export function GLExportModal({
             {dateSelectionMode === 'range' && (
               <div className="pt-2">
                 <DateRangePicker 
-                  onDateRangeChange={setCustomDateRange}
+                  onDateRangeChange={(range) => {
+                    setCustomDateRange(range);
+                    setDateWiseBusSelection({});
+                  }}
                   className="w-full"
                 />
                 {isLoadingMultiDate && (
@@ -228,38 +277,96 @@ export function GLExportModal({
             )}
           </div>
 
-          {/* Bus Selection */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Select Buses ({selectedBuses.length}/{availableBuses.length})</Label>
-            <div className="rounded-md border p-3 space-y-3">
-              <div className="flex items-center space-x-2 pb-2 border-b">
-                <Checkbox
-                  id="select-all"
-                  checked={selectAllBuses}
-                  onCheckedChange={handleSelectAllToggle}
-                />
-                <Label htmlFor="select-all" className="font-medium cursor-pointer">
-                  Select All Buses
-                </Label>
-              </div>
-              <ScrollArea className="h-32">
-                <div className="space-y-2">
-                  {availableBuses.map(busNo => (
-                    <div key={busNo} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`bus-${busNo}`}
-                        checked={selectedBuses.includes(busNo)}
-                        onCheckedChange={(checked) => handleBusToggle(busNo, checked as boolean)}
-                      />
-                      <Label htmlFor={`bus-${busNo}`} className="font-normal cursor-pointer">
-                        {busNo}
-                      </Label>
-                    </div>
-                  ))}
+          {/* Bus Selection - Date Wise for Range Mode */}
+          {dateSelectionMode === 'range' && datesInRange.length > 0 && (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Select Buses for Each Date</Label>
+              <ScrollArea className="max-h-[400px] rounded-md border p-4">
+                <div className="space-y-4">
+                  {datesInRange.map((date, index) => {
+                    const dateStr = format(date, 'yyyy-MM-dd');
+                    const displayDate = format(date, 'MMM dd, yyyy');
+                    const selectedForDate = dateWiseBusSelection[dateStr] || [];
+                    const allSelectedForDate = selectedForDate.length === availableBuses.length;
+
+                    return (
+                      <div key={dateStr} className={`space-y-2 ${index > 0 ? 'pt-4 border-t' : ''}`}>
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold text-primary">
+                            📅 {displayDate}
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDateWiseSelectAll(dateStr)}
+                            className="h-7 text-xs"
+                          >
+                            {allSelectedForDate ? 'Deselect All' : 'Select All'}
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pl-4">
+                          {availableBuses.map((busNo) => (
+                            <div key={`${dateStr}-${busNo}`} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`${dateStr}-${busNo}`}
+                                checked={selectedForDate.includes(busNo)}
+                                onCheckedChange={() => handleDateWiseBusToggle(dateStr, busNo)}
+                              />
+                              <Label
+                                htmlFor={`${dateStr}-${busNo}`}
+                                className="text-sm font-normal cursor-pointer"
+                              >
+                                {busNo}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="text-xs text-muted-foreground pl-4">
+                          {selectedForDate.length} bus{selectedForDate.length !== 1 ? 'es' : ''} selected
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </div>
-          </div>
+          )}
+
+          {/* Bus Selection - Simple for Single Date Mode */}
+          {dateSelectionMode === 'single' && (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Select Buses ({selectedBuses.length}/{availableBuses.length})</Label>
+              <div className="rounded-md border p-3 space-y-3">
+                <div className="flex items-center space-x-2 pb-2 border-b">
+                  <Checkbox
+                    id="select-all"
+                    checked={selectAllBuses}
+                    onCheckedChange={handleSelectAllToggle}
+                  />
+                  <Label htmlFor="select-all" className="font-medium cursor-pointer">
+                    Select All Buses
+                  </Label>
+                </div>
+                <ScrollArea className="h-32">
+                  <div className="space-y-2">
+                    {availableBuses.map(busNo => (
+                      <div key={busNo} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`bus-${busNo}`}
+                          checked={selectedBuses.includes(busNo)}
+                          onCheckedChange={(checked) => handleBusToggle(busNo, checked as boolean)}
+                        />
+                        <Label htmlFor={`bus-${busNo}`} className="font-normal cursor-pointer">
+                          {busNo}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          )}
 
           {/* Export Mode Selection */}
           <div className="space-y-3">
@@ -314,6 +421,32 @@ export function GLExportModal({
                 <span className="text-muted-foreground">Total GL Entries:</span>
                 <span className="font-medium">{summary.entryCount} rows</span>
               </div>
+              
+              {/* Show date-wise bus selection summary */}
+              {dateSelectionMode === 'range' && Object.keys(dateWiseBusSelection).length > 0 && (
+                <div className="pt-2 border-t mt-2">
+                  <div className="text-xs text-muted-foreground mb-2 font-medium">Buses by Date:</div>
+                  <ScrollArea className="max-h-[100px]">
+                    <div className="space-y-1 text-xs">
+                      {datesInRange.map(date => {
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        const buses = dateWiseBusSelection[dateStr] || [];
+                        if (buses.length === 0) return null;
+                        return (
+                          <div key={dateStr} className="flex gap-2">
+                            <span className="font-medium text-primary min-w-[80px]">
+                              {format(date, 'MMM dd')}:
+                            </span>
+                            <span className="text-muted-foreground">
+                              {buses.join(', ')}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -325,7 +458,12 @@ export function GLExportModal({
           </Button>
           <Button 
             onClick={handleExport} 
-            disabled={!processedBusSummaries.length || selectedBuses.length === 0 || isLoadingMultiDate}
+            disabled={
+              !processedBusSummaries.length || 
+              (dateSelectionMode === 'single' && selectedBuses.length === 0) ||
+              (dateSelectionMode === 'range' && Object.keys(dateWiseBusSelection).length === 0) ||
+              isLoadingMultiDate
+            }
           >
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             {isLoadingMultiDate ? 'Loading...' : 'Export to Excel'}
