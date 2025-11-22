@@ -59,9 +59,9 @@ export function GLExportModal({
     }
   }, [open, availableBuses, selectAllBuses]);
 
-  // Fetch multi-date data when range mode is active
+  // Fetch multi-date data when range mode is active - FETCH ALL DATA WITHOUT FILTERING
   const { data: multiDateData, isLoading: isLoadingMultiDate } = useQuery({
-    queryKey: ['gl-multi-date-data', customDateRange, dateWiseBusSelection],
+    queryKey: ['gl-multi-date-data', customDateRange],
     queryFn: async () => {
       if (!customDateRange?.from || !customDateRange?.to) return null;
 
@@ -70,9 +70,8 @@ export function GLExportModal({
 
       console.log('🔍 GL Export Debug - Starting Data Fetch');
       console.log('📅 Date Range:', startDate, 'to', endDate);
-      console.log('🚌 dateWiseBusSelection:', JSON.stringify(dateWiseBusSelection, null, 2));
 
-      // Fetch ALL trips and expenses in date range
+      // Fetch ALL trips and expenses in date range (NO FILTERING YET)
       const { data: trips, error: tripsError } = await supabase
         .from('daily_trips')
         .select(`
@@ -85,10 +84,14 @@ export function GLExportModal({
 
       if (tripsError) throw tripsError;
 
-      console.log(`📊 Fetched ${trips?.length || 0} total trips from database`);
+      console.log(`📊 Fetched ${trips?.length || 0} total trips from database (UNFILTERED)`);
+      const tripsByBusDate: Record<string, number> = {};
       trips?.forEach(trip => {
+        const key = `${trip.buses?.bus_no}-${trip.trip_date}`;
+        tripsByBusDate[key] = (tripsByBusDate[key] || 0) + (trip.income || 0);
         console.log(`  📦 Trip: ${trip.buses?.bus_no} on ${trip.trip_date} - Revenue: Rs.${trip.income || 0}`);
       });
+      console.log('📊 Raw data summary by bus-date:', tripsByBusDate);
 
       const { data: expenses, error: expensesError } = await supabase
         .from('daily_bus_expenses')
@@ -101,43 +104,49 @@ export function GLExportModal({
 
       if (expensesError) throw expensesError;
 
-      console.log(`💰 Fetched ${expenses?.length || 0} total expense records from database`);
+      console.log(`💰 Fetched ${expenses?.length || 0} total expense records from database (UNFILTERED)`);
 
-      // Filter based on date-wise bus selection
-      console.log('🔍 Starting trip filtering...');
-      const filteredTrips = trips?.filter(trip => {
-        const tripDate = format(new Date(trip.trip_date), 'yyyy-MM-dd');
-        const busNo = trip.buses?.bus_no;
-        const isSelected = busNo && dateWiseBusSelection[tripDate]?.includes(busNo);
-        
-        console.log(`  ${isSelected ? '✅' : '❌'} ${busNo} on ${tripDate}: ${isSelected ? 'INCLUDE' : 'EXCLUDE'} (Revenue: Rs.${trip.income || 0})`);
-        
-        return isSelected;
-      }) || [];
-
-      console.log(`✅ After filtering: ${filteredTrips.length} trips`);
-      console.log('💰 Filtered trip revenues:');
-      filteredTrips.forEach(trip => {
-        console.log(`  ${trip.buses?.bus_no} on ${trip.trip_date}: Rs.${trip.income || 0}`);
-      });
-
-      console.log('🔍 Starting expense filtering...');
-      const filteredExpenses = expenses?.filter(expense => {
-        const expenseDate = format(new Date(expense.expense_date), 'yyyy-MM-dd');
-        const busNo = expense.buses?.bus_no;
-        const isSelected = busNo && dateWiseBusSelection[expenseDate]?.includes(busNo);
-        
-        console.log(`  ${isSelected ? '✅' : '❌'} ${busNo} on ${expenseDate}: ${isSelected ? 'INCLUDE' : 'EXCLUDE'}`);
-        
-        return isSelected;
-      }) || [];
-
-      console.log(`✅ After filtering: ${filteredExpenses.length} expense records`);
-
-      return { trips: filteredTrips, expenses: filteredExpenses };
+      // Return unfiltered data - filtering will happen in filteredMultiDateData useMemo
+      return { trips: trips || [], expenses: expenses || [] };
     },
-    enabled: open && dateSelectionMode === 'range' && !!customDateRange?.from && !!customDateRange?.to && Object.keys(dateWiseBusSelection).length > 0,
+    enabled: open && dateSelectionMode === 'range' && !!customDateRange?.from && !!customDateRange?.to,
   });
+
+  // Filter the fetched data based on date-wise bus selection
+  const filteredMultiDateData = useMemo(() => {
+    if (!multiDateData || dateSelectionMode !== 'range') return null;
+
+    console.log('🔍 Starting Post-Fetch Filtering');
+    console.log('🚌 dateWiseBusSelection:', JSON.stringify(dateWiseBusSelection, null, 2));
+
+    const filteredTrips = multiDateData.trips.filter(trip => {
+      const tripDate = format(new Date(trip.trip_date), 'yyyy-MM-dd');
+      const busNo = trip.buses?.bus_no;
+      const isSelected = !!busNo && !!dateWiseBusSelection[tripDate]?.includes(busNo);
+      
+      console.log(`  ${isSelected ? '✅' : '❌'} Trip: ${busNo} on ${tripDate} - Rs.${trip.income || 0}`);
+      
+      return isSelected;
+    });
+
+    const filteredExpenses = multiDateData.expenses.filter(expense => {
+      const expenseDate = format(new Date(expense.expense_date), 'yyyy-MM-dd');
+      const busNo = expense.buses?.bus_no;
+      const isSelected = !!busNo && !!dateWiseBusSelection[expenseDate]?.includes(busNo);
+      
+      console.log(`  ${isSelected ? '✅' : '❌'} Expense: ${busNo} on ${expenseDate}`);
+      
+      return isSelected;
+    });
+
+    console.log(`✅ Filtering Complete: ${filteredTrips.length} trips, ${filteredExpenses.length} expenses`);
+    console.log('💰 Filtered trip details:');
+    filteredTrips.forEach(trip => {
+      console.log(`  ${trip.buses?.bus_no} on ${trip.trip_date}: Rs.${trip.income || 0}`);
+    });
+
+    return { trips: filteredTrips, expenses: filteredExpenses };
+  }, [multiDateData, dateSelectionMode, dateWiseBusSelection]);
 
   const displayDate = useMemo(() => {
     if (dateSelectionMode === 'range' && customDateRange?.from && customDateRange?.to) {
@@ -159,9 +168,10 @@ export function GLExportModal({
 
   // Determine which data to use for GL generation
   const processedBusSummaries = useMemo(() => {
-    if (dateSelectionMode === 'range' && multiDateData) {
-      // Aggregate multi-date data by bus
-      return aggregateMultiDateDataByBus(multiDateData.trips, multiDateData.expenses);
+    if (dateSelectionMode === 'range' && filteredMultiDateData) {
+      // Aggregate multi-date FILTERED data by bus
+      console.log('🔄 Aggregating filtered multi-date data...');
+      return aggregateMultiDateDataByBus(filteredMultiDateData.trips, filteredMultiDateData.expenses);
     }
     
     // Filter single-date data by selected buses
@@ -170,7 +180,7 @@ export function GLExportModal({
     }
     
     return busSummaries;
-  }, [dateSelectionMode, multiDateData, busSummaries, selectedBuses, availableBuses]);
+  }, [dateSelectionMode, filteredMultiDateData, busSummaries, selectedBuses, availableBuses]);
 
   const glRows = useMemo(() => {
     if (!processedBusSummaries.length) return [];
@@ -186,6 +196,88 @@ export function GLExportModal({
   const summary = useMemo(() => {
     return calculateGLSummary(glRows);
   }, [glRows]);
+
+  // Calculate detailed breakdown for preview (date-wise, bus-wise)
+  type DateBusBreakdown = Record<
+    string, // '2025-11-17'
+    Record<
+      string, // 'ND 9817'
+      {
+        tripCount: number;
+        revenue: number;
+        fuel: number;
+        otherExpenses: number;
+        totalExpenses: number;
+      }
+    >
+  >;
+
+  const dateBusBreakdown = useMemo<DateBusBreakdown | null>(() => {
+    if (!filteredMultiDateData || dateSelectionMode !== 'range') return null;
+
+    console.log('📊 Calculating date-bus breakdown for preview...');
+    const breakdown: DateBusBreakdown = {};
+
+    // 1) Revenue by date + bus
+    filteredMultiDateData.trips.forEach(trip => {
+      const dateStr = format(new Date(trip.trip_date), 'yyyy-MM-dd');
+      const busNo = trip.buses?.bus_no;
+      if (!busNo) return;
+
+      if (!breakdown[dateStr]) breakdown[dateStr] = {};
+      if (!breakdown[dateStr][busNo]) {
+        breakdown[dateStr][busNo] = {
+          tripCount: 0,
+          revenue: 0,
+          fuel: 0,
+          otherExpenses: 0,
+          totalExpenses: 0,
+        };
+      }
+
+      breakdown[dateStr][busNo].tripCount += 1;
+      breakdown[dateStr][busNo].revenue += Number(trip.income || 0);
+    });
+
+    // 2) Expenses by date + bus
+    filteredMultiDateData.expenses.forEach(expense => {
+      const dateStr = format(new Date(expense.expense_date), 'yyyy-MM-dd');
+      const busNo = expense.buses?.bus_no;
+      if (!busNo) return;
+
+      if (!breakdown[dateStr]) breakdown[dateStr] = {};
+      if (!breakdown[dateStr][busNo]) {
+        breakdown[dateStr][busNo] = {
+          tripCount: 0,
+          revenue: 0,
+          fuel: 0,
+          otherExpenses: 0,
+          totalExpenses: 0,
+        };
+      }
+
+      const fuel = Number(expense.fuel_cost || 0);
+      const allKeys = [
+        'repair','tyre_tube','salary','police','food','emission_fitness',
+        'permits_renewal','staff_accommodation','highway_charges',
+        'accident_compensation','parking','log_sheet','vehicle_hire',
+        'ntc','runner','short_misc','temporary_permit','body_wash',
+        'legal_court','other'
+      ] as const;
+
+      const other = allKeys.reduce(
+        (sum, key) => sum + Number((expense as any)[key] || 0),
+        0
+      );
+
+      breakdown[dateStr][busNo].fuel += fuel;
+      breakdown[dateStr][busNo].otherExpenses += other;
+      breakdown[dateStr][busNo].totalExpenses += fuel + other;
+    });
+
+    console.log('📊 Breakdown calculated:', breakdown);
+    return breakdown;
+  }, [filteredMultiDateData, dateSelectionMode]);
 
   const handleExport = () => {
     if (!processedBusSummaries.length) {
@@ -472,6 +564,61 @@ export function GLExportModal({
                             <span className="text-muted-foreground">
                               {buses.join(', ')}
                             </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+
+              {/* Detailed Date & Bus Breakdown */}
+              {dateSelectionMode === 'range' && dateBusBreakdown && (
+                <div className="pt-2 border-t mt-2 space-y-2">
+                  <div className="text-xs text-muted-foreground font-medium">
+                    Detailed Breakdown (Verify Before Export):
+                  </div>
+                  <ScrollArea className="max-h-[250px]">
+                    <div className="space-y-3 text-xs">
+                      {datesInRange.map(date => {
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        const busesForDate = dateBusBreakdown[dateStr];
+                        if (!busesForDate || Object.keys(busesForDate).length === 0) return null;
+
+                        return (
+                          <div key={dateStr} className="space-y-1">
+                            <div className="font-semibold text-primary">
+                              📅 {format(date, 'MMM dd, yyyy')}
+                            </div>
+                            {Object.entries(busesForDate).map(([busNo, stats]) => (
+                              <div
+                                key={`${dateStr}-${busNo}`}
+                                className="flex flex-wrap justify-between gap-2 pl-2 border-l-2 border-primary/20 py-1"
+                              >
+                                <span className="font-medium min-w-[60px]">{busNo}</span>
+                                <span className="text-muted-foreground text-[10px]">
+                                  {stats.tripCount} trip{stats.tripCount !== 1 ? 's' : ''}
+                                </span>
+                                <span className="text-green-600 font-medium">
+                                  Rev: Rs. {stats.revenue.toLocaleString('en-US', {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0,
+                                  })}
+                                </span>
+                                <span className="text-red-600">
+                                  Exp: Rs. {stats.totalExpenses.toLocaleString('en-US', {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0,
+                                  })}
+                                </span>
+                                <span className="text-blue-600 font-medium">
+                                  Net: Rs. {(stats.revenue - stats.totalExpenses).toLocaleString(
+                                    'en-US',
+                                    { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+                                  )}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         );
                       })}
