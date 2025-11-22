@@ -213,10 +213,8 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       setInvoiceStatus('draft');
       toast.success('Invoice draft saved successfully');
       
-      // Trigger callback to refresh parent components
-      if (onInvoiceGenerated) {
-        onInvoiceGenerated();
-      }
+      // Delay to ensure database write completes before refresh
+      setTimeout(() => onInvoiceGenerated?.(), 500);
     } catch (error) {
       console.error('Error saving draft:', error);
       toast.error('Failed to save invoice draft');
@@ -317,7 +315,9 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       }
 
       toast.success(`Invoice emailed successfully to ${quotationData.customer_email}`);
-      onInvoiceGenerated?.();
+      
+      // Delay to ensure database write completes before refresh
+      setTimeout(() => onInvoiceGenerated?.(), 500);
     } catch (error) {
       console.error('Error sending email:', error);
       toast.error('Failed to send invoice email');
