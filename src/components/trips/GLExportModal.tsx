@@ -424,7 +424,7 @@ export function GLExportModal({
           {dateSelectionMode === 'range' && datesInRange.length > 0 && (
             <div className="space-y-3">
               <Label className="text-sm font-medium">Select Buses for Each Date</Label>
-              <ScrollArea className="max-h-[400px] rounded-md border p-4">
+              <ScrollArea className="h-[400px] rounded-md border p-4">
                 <div className="space-y-4">
                   {datesInRange.map((date, index) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
