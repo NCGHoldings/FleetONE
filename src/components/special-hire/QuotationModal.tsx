@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Download, Printer, Mail, Loader2 } from 'lucide-react';
+import { Download, Printer, Mail, Loader2, MessageCircle } from 'lucide-react';
 import { QuotationPreview } from './QuotationPreview';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
@@ -45,6 +45,7 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isEmailing, setIsEmailing] = useState(false);
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
 
   const handlePrint = () => {
     if (printRef.current) {
@@ -466,6 +467,100 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
     }
   };
 
+  const handleWhatsApp = async () => {
+    console.log('📱 === WHATSAPP SEND STARTED (Modal) ===');
+    console.log('Quotation:', quotation?.quotation_no);
+    console.log('Customer Phone:', quotation?.customer_phone);
+
+    if (!quotation?.customer_phone) {
+      toast.error("No phone number", {
+        description: "This customer doesn't have a phone number configured."
+      });
+      return;
+    }
+
+    setIsSendingWhatsApp(true);
+    const loadingToast = toast.loading("Sending via WhatsApp...", {
+      description: "Preparing quotation for WhatsApp"
+    });
+
+    try {
+      // Step 1: Generate PDF
+      toast.loading("Generating PDF document...", { id: loadingToast });
+      console.log('📄 Generating PDF...');
+      const pdfBase64 = await generatePDFBase64();
+      console.log('✅ PDF generated, size:', pdfBase64.length);
+
+      // Step 2: Send via WhatsApp
+      toast.loading("Sending to customer's WhatsApp...", { id: loadingToast });
+      console.log('📱 Invoking WhatsApp edge function...');
+      
+      const { data, error } = await supabase.functions.invoke('send-whatsapp-quotation', {
+        body: {
+          customerPhone: quotation.customer_phone,
+          customerName: quotation.customer_name,
+          quotationNo: quotation.quotation_no,
+          pickupLocation: quotation.pickup_location,
+          dropLocation: quotation.drop_location,
+          numberOfBuses: quotation.number_of_buses,
+          busType: quotation.bus_type,
+          totalAmount: quotation.gross_revenue,
+          pdfBase64
+        }
+      });
+
+      console.log('WhatsApp edge function response:', { data, error });
+
+      if (error) {
+        console.error('❌ WhatsApp edge function error:', error);
+        throw error;
+      }
+
+      // Step 3: Update status
+      console.log('✅ Updating WhatsApp send status...');
+      await supabase
+        .from('special_hire_quotations')
+        .update({ 
+          status: 'sent',
+          sent_via_whatsapp: true,
+          whatsapp_sent_at: new Date().toISOString()
+        })
+        .eq('id', quotation.id);
+
+      console.log('✅ === WHATSAPP SEND COMPLETED ===');
+      toast.success("WhatsApp sent successfully!", {
+        id: loadingToast,
+        description: `Quotation sent to ${quotation.customer_phone}`
+      });
+      
+      // Close modal after successful send
+      setTimeout(() => onOpenChange(false), 1500);
+
+    } catch (error: any) {
+      console.error('❌ === WHATSAPP SEND FAILED ===');
+      console.error('Error:', error);
+      
+      let errorDescription = error.message || 'Unknown error occurred';
+      
+      if (error.message?.includes('PDF')) {
+        errorDescription = 'Failed to generate PDF. Please try again.';
+      } else if (error.message?.includes('network')) {
+        errorDescription = 'Network error. Check your connection.';
+      } else if (error.message?.includes('WhatsApp')) {
+        errorDescription = 'WhatsApp service error. Please try again.';
+      } else if (error.message?.includes('phone')) {
+        errorDescription = 'Invalid phone number format.';
+      }
+      
+      toast.error("Failed to send WhatsApp", {
+        id: loadingToast,
+        description: errorDescription
+      });
+    } finally {
+      setIsSendingWhatsApp(false);
+    }
+  };
+
   if (!quotation) return null;
 
   return (
@@ -475,6 +570,14 @@ export function QuotationModal({ quotation, open, onOpenChange }: Props) {
           <DialogTitle className="flex items-center justify-between">
             <span>Quotation Preview - {quotation.quotation_no}</span>
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleWhatsApp} disabled={isSendingWhatsApp}>
+                {isSendingWhatsApp ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                )}
+                {isSendingWhatsApp ? 'Sending...' : 'WhatsApp'}
+              </Button>
               <Button variant="outline" size="sm" onClick={handleEmail} disabled={isEmailing}>
                 {isEmailing ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
