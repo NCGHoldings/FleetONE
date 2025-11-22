@@ -77,8 +77,8 @@ export function GLExportModal({
         .from('daily_trips')
         .select(`
           *,
-          buses!inner(id, bus_no),
-          routes(route_name, route_gl_code)
+          buses:bus_id(bus_no),
+          routes:route_id(route_name, route_gl_code)
         `)
         .gte('trip_date', startDate)
         .lte('trip_date', endDate);
@@ -98,7 +98,7 @@ export function GLExportModal({
         .from('daily_bus_expenses')
         .select(`
           *,
-          buses!inner(id, bus_no)
+          buses:bus_id(bus_no)
         `)
         .gte('expense_date', startDate)
         .lte('expense_date', endDate);
