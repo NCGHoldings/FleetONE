@@ -246,7 +246,8 @@ export function generateGLRows(options: GLExportOptions): GLRow[] {
 
   busSummaries.forEach(busSummary => {
     const busNo = busSummary.bus_no;
-    const route = busSummary.trips[0]?.route_gl_code || busSummary.trips[0]?.route_name?.substring(0, 15) || '-';
+    const firstTrip = busSummary.trips[0];
+    const route = firstTrip?.route_name?.substring(0, 15) || '-';
     const ref1 = formatRefColumn(date, busNo, dateRange);
     const sbu = 'PBS';
 
