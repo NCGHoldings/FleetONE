@@ -1335,19 +1335,25 @@ export function ConfirmedTripsTable() {
             adjustment_notes: selectedAdjustment.notes || '',
           }}
           onInvoiceGenerated={async () => {
-            setBalanceInvoiceModalOpen(false);
-            setSelectedAdjustment(null);
-            
-            // Comprehensive refresh: documents, adjustments, and full quotations list
-            await loadDocumentStatus(selectedTrip.id);
-            const docsResult = await getDocumentsByQuotation(selectedTrip.id);
-            if (docsResult.success) {
-              setQuotationDocuments(docsResult.documents || []);
+            try {
+              // Wait for each operation to complete sequentially
+              await loadDocumentStatus(selectedTrip.id);
+              const docsResult = await getDocumentsByQuotation(selectedTrip.id);
+              if (docsResult.success) {
+                setQuotationDocuments(docsResult.documents || []);
+              }
+              await loadAdjustmentData(selectedTrip.id);
+              await refetch();
+              
+              // Close modal after all refreshes complete
+              setBalanceInvoiceModalOpen(false);
+              setSelectedAdjustment(null);
+              
+              toast.success('Final Balance Invoice generated and visible in documents');
+            } catch (error) {
+              console.error('Error refreshing documents:', error);
+              toast.error('Document saved but refresh failed. Please reload the page.');
             }
-            await loadAdjustmentData(selectedTrip.id);
-            
-            // Trigger full refetch to ensure documents appear immediately
-            refetch();
           }}
         />
       )}
@@ -1473,10 +1479,23 @@ export function ConfirmedTripsTable() {
                           {doc.document_status === 'draft' ? 'DRAFT' : 'APPROVED'}
                         </Badge>
                         <span className="font-medium">
-                          {doc.document_type === 'sales_receipt' ? 'Sales Receipt' : 'Invoice'}
+                          {doc.document_type === 'sales_receipt' 
+                            ? 'Sales Receipt' 
+                            : doc.payment_type === 'balance'
+                            ? 'Final Balance Invoice'
+                            : doc.payment_type === 'advance'
+                            ? 'Advance Invoice'
+                            : doc.payment_type === 'full'
+                            ? 'Full Payment Invoice'
+                            : 'Invoice'}
                         </span>
                         <span className="text-muted-foreground">({doc.payment_type})</span>
                       </div>
+                      {doc.payment_type === 'balance' && (
+                        <p className="text-xs text-muted-foreground">
+                          Customer copy - No signatures required
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground">
                         Generated: {format(new Date(doc.generated_at), 'MMM dd, yyyy HH:mm')}
                       </p>
