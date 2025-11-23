@@ -65,6 +65,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [invoiceStatus, setInvoiceStatus] = useState<'draft' | 'sent_to_customer' | 'payment_pending' | 'paid'>('draft');
   const [companyLogo, setCompanyLogo] = useState<string>('');
@@ -78,6 +79,23 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       checkExistingInvoice();
     }
   }, [open, quotationData.id, adjustmentData.id]);
+
+  // Auto-save draft when modal opens (ensures document is always recorded)
+  useEffect(() => {
+    const autoSaveDraft = async () => {
+      if (open && !documentId && !isAutoSaving) {
+        setIsAutoSaving(true);
+        await handleSaveDraft();
+        setIsAutoSaving(false);
+      }
+    };
+    
+    // Small delay to ensure data is loaded
+    if (open && quotationData.id && adjustmentData.id) {
+      const timer = setTimeout(autoSaveDraft, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [open, documentId, quotationData.id, adjustmentData.id]);
 
   const fetchCompanyLogo = async () => {
     try {
@@ -226,6 +244,12 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
   const handleDownloadPDF = async () => {
     try {
       setIsLoading(true);
+      
+      // Ensure document is saved before downloading
+      if (!documentId) {
+        await handleSaveDraft();
+      }
+      
       const invoiceData = generateInvoiceData({ forCustomer: isCustomerInvoice });
       
       // Generate PDF blob
@@ -367,6 +391,17 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[70vh] space-y-4">
+          {/* Auto-saving indicator */}
+          {isAutoSaving && (
+            <Alert>
+              <Clock className="h-4 w-4 animate-spin" />
+              <AlertTitle>Saving invoice...</AlertTitle>
+              <AlertDescription>
+                Your balance invoice is being saved to the database.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Customer Invoice Info Alert */}
           <Alert className="border-primary/50 bg-primary/5">
             <Info className="h-4 w-4" />
@@ -433,15 +468,23 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
+              onClick={handleSaveDraft}
+              disabled={isLoading || isAutoSaving}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              {documentId ? 'Update Draft' : 'Save Draft'}
+            </Button>
+            <Button
+              variant="outline"
               onClick={handleDownloadPDF}
-              disabled={isLoading}
+              disabled={isLoading || isAutoSaving}
             >
               <Download className="w-4 h-4 mr-2" />
               Download PDF
             </Button>
             <Button
               onClick={handleEmailToCustomer}
-              disabled={isLoading || !quotationData.customer_email}
+              disabled={isLoading || isAutoSaving || !quotationData.customer_email}
             >
               <Mail className="w-4 h-4 mr-2" />
               Email to Customer
