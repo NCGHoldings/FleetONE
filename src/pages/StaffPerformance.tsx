@@ -36,6 +36,17 @@ interface StaffPerformanceData {
   onTimePercentage?: number; // Keep for compatibility with StaffDetailView
 }
 
+// Helper to safely parse notes field (could be JSON string or object)
+const parseNotes = (raw: any): any => {
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  try {
+    return JSON.parse(raw as string);
+  } catch {
+    return {};
+  }
+};
+
 export default function StaffPerformance() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,52 +120,82 @@ export default function StaffPerformance() {
 
       // Process trips and extract driver/conductor information
       trips?.forEach(trip => {
-        // Process driver
-        if (trip.driver) {
-          const driver = trip.driver as any;
-          const driverName = `${driver.first_name || ''} ${driver.last_name || ''}`.trim();
-          
-          if (driverName && driver.id) {
-            if (!staffMap.has(driver.id)) {
-              staffMap.set(driver.id, {
-                id: driver.id,
-                name: driverName,
-                phone: driver.phone,
-                license_number: driver.license_number,
-                roles: new Set(['driver']),
-                tripIds: [trip.id]
-              });
-            } else {
-              const existing = staffMap.get(driver.id)!;
-              existing.roles.add('driver');
-              if (!existing.tripIds.includes(trip.id)) {
-                existing.tripIds.push(trip.id);
-              }
+        const notes = parseNotes((trip as any).notes);
+
+        // Process driver - try profile first, fallback to notes
+        const driverProfile = (trip as any).driver;
+        let driverKey: string | null = null;
+        let driverName: string | null = null;
+        let driverPhone: string | undefined;
+        let driverLicense: string | undefined;
+
+        if (driverProfile && driverProfile.id) {
+          // Real profile exists
+          driverKey = driverProfile.id;
+          driverName = `${driverProfile.first_name || ''} ${driverProfile.last_name || ''}`.trim() || driverProfile.first_name || driverProfile.last_name;
+          driverPhone = driverProfile.phone;
+          driverLicense = driverProfile.license_number;
+        }
+
+        // Fallback to name in notes if no profile id
+        if (!driverKey && notes?.driver && notes.driver.toString().trim().toUpperCase() !== 'N/A') {
+          driverName = notes.driver.toString().trim();
+          driverKey = `name-${driverName.toLowerCase()}`; // virtual ID keyed by name
+        }
+
+        if (driverKey && driverName) {
+          if (!staffMap.has(driverKey)) {
+            staffMap.set(driverKey, {
+              id: driverKey,
+              name: driverName,
+              phone: driverPhone,
+              license_number: driverLicense,
+              roles: new Set(['driver']),
+              tripIds: [trip.id],
+            });
+          } else {
+            const existing = staffMap.get(driverKey)!;
+            existing.roles.add('driver');
+            if (!existing.tripIds.includes(trip.id)) {
+              existing.tripIds.push(trip.id);
             }
           }
         }
 
-        // Process conductor
-        if (trip.conductor) {
-          const conductor = trip.conductor as any;
-          const conductorName = `${conductor.first_name || ''} ${conductor.last_name || ''}`.trim();
-          
-          if (conductorName && conductor.id) {
-            if (!staffMap.has(conductor.id)) {
-              staffMap.set(conductor.id, {
-                id: conductor.id,
-                name: conductorName,
-                phone: conductor.phone,
-                license_number: undefined,
-                roles: new Set(['conductor']),
-                tripIds: [trip.id]
-              });
-            } else {
-              const existing = staffMap.get(conductor.id)!;
-              existing.roles.add('conductor');
-              if (!existing.tripIds.includes(trip.id)) {
-                existing.tripIds.push(trip.id);
-              }
+        // Process conductor - try profile first, fallback to notes
+        const conductorProfile = (trip as any).conductor;
+        let conductorKey: string | null = null;
+        let conductorName: string | null = null;
+        let conductorPhone: string | undefined;
+
+        if (conductorProfile && conductorProfile.id) {
+          // Real profile exists
+          conductorKey = conductorProfile.id;
+          conductorName = `${conductorProfile.first_name || ''} ${conductorProfile.last_name || ''}`.trim() || conductorProfile.first_name || conductorProfile.last_name;
+          conductorPhone = conductorProfile.phone;
+        }
+
+        // Fallback to name in notes if no profile id
+        if (!conductorKey && notes?.conductor && notes.conductor.toString().trim().toUpperCase() !== 'N/A') {
+          conductorName = notes.conductor.toString().trim();
+          conductorKey = `name-${conductorName.toLowerCase()}`;
+        }
+
+        if (conductorKey && conductorName) {
+          if (!staffMap.has(conductorKey)) {
+            staffMap.set(conductorKey, {
+              id: conductorKey,
+              name: conductorName,
+              phone: conductorPhone,
+              license_number: undefined,
+              roles: new Set(['conductor']),
+              tripIds: [trip.id],
+            });
+          } else {
+            const existing = staffMap.get(conductorKey)!;
+            existing.roles.add('conductor');
+            if (!existing.tripIds.includes(trip.id)) {
+              existing.tripIds.push(trip.id);
             }
           }
         }
@@ -210,7 +251,7 @@ export default function StaffPerformance() {
       if (finalStaff.length === 0) {
         toast({
           title: "No Staff Found",
-          description: "No driver or conductor data found in allocations. Please check your driver allocation records.",
+          description: "No driver or conductor data found in Daily Trips. Please check your daily trip entries.",
           variant: "destructive",
         });
       }
@@ -231,10 +272,25 @@ export default function StaffPerformance() {
       const staffTrips = trips.filter(trip => tripIds.includes(trip.id));
 
       // Fetch complaints related to this staff member
-      const { data: complaints } = await supabase
-        .from('feedback_complaints')
-        .select('*')
-        .containedBy('related_persons', [profileId]);
+      const isVirtualNameId = profileId.startsWith('name-');
+      let complaintsCount = 0;
+
+      if (!isVirtualNameId) {
+        // Real profile ID - use containedBy with related_persons array
+        const { data: complaints } = await supabase
+          .from('feedback_complaints')
+          .select('*')
+          .containedBy('related_persons', [profileId]);
+        complaintsCount = complaints?.length || 0;
+      } else {
+        // Virtual name-based ID - fallback to name search in title/description
+        const displayName = profileId.replace(/^name-/, '');
+        const { data: complaintsByName } = await supabase
+          .from('feedback_complaints')
+          .select('*')
+          .or(`title.ilike.%${displayName}%,description.ilike.%${displayName}%`);
+        complaintsCount = complaintsByName?.length || 0;
+      }
 
       const totalKm = staffTrips.reduce((sum, trip) => sum + (parseFloat(trip.distance_km) || 0), 0);
       const totalTrips = staffTrips.length;
@@ -261,7 +317,7 @@ export default function StaffPerformance() {
       performanceScore += tripBonus;
       
       // Deduct points for complaints
-      const complaintPenalty = Math.min(40, (complaints?.length || 0) * 10);
+      const complaintPenalty = Math.min(40, complaintsCount * 10);
       performanceScore = Math.max(0, performanceScore - complaintPenalty);
 
       // Calculate rating based on performance score
@@ -275,7 +331,7 @@ export default function StaffPerformance() {
         totalKm: Math.round(totalKm * 10) / 10,
         totalTrips,
         performanceScore: Math.round(performanceScore * 10) / 10,
-        complaints: complaints?.length || 0,
+        complaints: complaintsCount,
         fuelEfficiency: Math.round(avgFuelEfficiency * 10) / 10,
         rating: Math.round(rating * 10) / 10,
         onTimePercentage: Math.round(onTimePercentage * 10) / 10
