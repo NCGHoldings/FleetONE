@@ -80,112 +80,105 @@ export default function StaffPerformance() {
 
   const syncStaffFromTripsData = async () => {
     try {
-      console.log('Starting staff sync from trips data...');
+      console.log('Starting staff sync from daily trips...');
       
-      // Get all driver allocations
-      const { data: allocations } = await supabase
-        .from('driver_allocations')
-        .select('*');
-
-      // Get all daily trips
-      const { data: trips } = await supabase
+      // Get all daily trips with driver and conductor profile information
+      const { data: trips, error: tripsError } = await supabase
         .from('daily_trips')
-        .select('*');
+        .select(`
+          *,
+          driver:profiles!daily_trips_driver_id_fkey(id, first_name, last_name, phone, license_number),
+          conductor:profiles!daily_trips_conductor_id_fkey(id, first_name, last_name, phone)
+        `);
 
-      console.log('Allocations found:', allocations?.length || 0);
+      if (tripsError) {
+        console.error('Error fetching trips:', tripsError);
+        throw tripsError;
+      }
+
       console.log('Trips found:', trips?.length || 0);
 
       const staffMap = new Map<string, { 
+        id: string;
         name: string; 
-        phone?: string; 
+        phone?: string;
+        license_number?: string;
         roles: Set<string>;
         tripIds: string[];
-        allocatedTripIds: string[];
       }>();
 
-      // Process allocations - extract staff names from notes JSON
-      allocations?.forEach(allocation => {
-        try {
-          const notes = allocation.notes ? (typeof allocation.notes === 'string' ? JSON.parse(allocation.notes) : allocation.notes) : {};
-          
-          // Extract driver from notes
-          if (notes.driver && notes.driver.trim()) {
-            const driverName = notes.driver.trim();
-            if (!staffMap.has(driverName)) {
-              staffMap.set(driverName, {
-                name: driverName,
-                phone: notes.whatsapp,
-                roles: new Set(['driver']),
-                tripIds: [],
-                allocatedTripIds: [allocation.trip_id].filter(Boolean)
-              });
-            } else {
-              const existing = staffMap.get(driverName)!;
-              existing.roles.add('driver');
-              if (allocation.trip_id && !existing.allocatedTripIds.includes(allocation.trip_id)) {
-                existing.allocatedTripIds.push(allocation.trip_id);
-              }
-            }
-          }
-
-          // Extract conductor from notes
-          if (notes.conductor && notes.conductor.trim()) {
-            const conductorName = notes.conductor.trim();
-            if (!staffMap.has(conductorName)) {
-              staffMap.set(conductorName, {
-                name: conductorName,
-                phone: notes.whatsapp,
-                roles: new Set(['conductor']),
-                tripIds: [],
-                allocatedTripIds: [allocation.trip_id].filter(Boolean)
-              });
-            } else {
-              const existing = staffMap.get(conductorName)!;
-              existing.roles.add('conductor');
-              if (allocation.trip_id && !existing.allocatedTripIds.includes(allocation.trip_id)) {
-                existing.allocatedTripIds.push(allocation.trip_id);
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Error processing allocation notes:', e);
-        }
-      });
-
-      // Match trips to staff based on trip IDs from allocations
+      // Process trips and extract driver/conductor information
       trips?.forEach(trip => {
-        if (trip.trip_no) {
-          // Find staff who were allocated to this trip
-          staffMap.forEach((staffData, staffName) => {
-            if (staffData.allocatedTripIds.includes(trip.trip_no)) {
-              staffData.tripIds.push(trip.trip_no);
+        // Process driver
+        if (trip.driver) {
+          const driver = trip.driver as any;
+          const driverName = `${driver.first_name || ''} ${driver.last_name || ''}`.trim();
+          
+          if (driverName && driver.id) {
+            if (!staffMap.has(driver.id)) {
+              staffMap.set(driver.id, {
+                id: driver.id,
+                name: driverName,
+                phone: driver.phone,
+                license_number: driver.license_number,
+                roles: new Set(['driver']),
+                tripIds: [trip.id]
+              });
+            } else {
+              const existing = staffMap.get(driver.id)!;
+              existing.roles.add('driver');
+              if (!existing.tripIds.includes(trip.id)) {
+                existing.tripIds.push(trip.id);
+              }
             }
-          });
+          }
+        }
+
+        // Process conductor
+        if (trip.conductor) {
+          const conductor = trip.conductor as any;
+          const conductorName = `${conductor.first_name || ''} ${conductor.last_name || ''}`.trim();
+          
+          if (conductorName && conductor.id) {
+            if (!staffMap.has(conductor.id)) {
+              staffMap.set(conductor.id, {
+                id: conductor.id,
+                name: conductorName,
+                phone: conductor.phone,
+                license_number: undefined,
+                roles: new Set(['conductor']),
+                tripIds: [trip.id]
+              });
+            } else {
+              const existing = staffMap.get(conductor.id)!;
+              existing.roles.add('conductor');
+              if (!existing.tripIds.includes(trip.id)) {
+                existing.tripIds.push(trip.id);
+              }
+            }
+          }
         }
       });
 
-      console.log('Staff extracted from allocations:', staffMap.size);
+      console.log('Staff extracted from daily trips:', staffMap.size);
 
       // Convert to staff members array with real-time performance data
       const staffMembers: StaffMember[] = [];
       let empCounter = 1;
 
-      const performancePromises = Array.from(staffMap.entries()).map(async ([staffName, data]) => {
+      const performancePromises = Array.from(staffMap.entries()).map(async ([profileId, data]) => {
         const roleArray = Array.from(data.roles);
         const role = roleArray.length > 1 ? 'both' : roleArray[0] as 'driver' | 'conductor';
         
         const staffId = `EMP${empCounter.toString().padStart(3, '0')}`;
         empCounter++;
-
-        // Generate a deterministic UUID based on staff name for consistency
-        const staffUuid = crypto.randomUUID();
         
         const staffMember: StaffMember = {
-          id: staffUuid,
+          id: profileId, // Use actual profile ID from database
           staff_id: staffId,
-          name: staffName,
+          name: data.name,
           phone: data.phone,
-          license_number: undefined,
+          license_number: data.license_number,
           role,
           status: 'active',
           created_at: new Date().toISOString(),
@@ -193,7 +186,7 @@ export default function StaffPerformance() {
         };
 
         // Calculate real-time performance data based on actual trips
-        const performance = await calculateStaffPerformanceByName(staffName, data.tripIds, trips || []);
+        const performance = await calculateStaffPerformanceById(profileId, data.tripIds, trips || []);
         
         return { staffMember, performance };
       });
@@ -232,16 +225,16 @@ export default function StaffPerformance() {
     }
   };
 
-  const calculateStaffPerformanceByName = async (staffName: string, tripIds: string[], trips: any[]): Promise<StaffPerformanceData> => {
+  const calculateStaffPerformanceById = async (profileId: string, tripIds: string[], trips: any[]): Promise<StaffPerformanceData> => {
     try {
       // Get all trips for this staff member by trip IDs
-      const staffTrips = trips.filter(trip => tripIds.includes(trip.trip_no));
+      const staffTrips = trips.filter(trip => tripIds.includes(trip.id));
 
-      // Fetch complaints mentioning this staff member by name
+      // Fetch complaints related to this staff member
       const { data: complaints } = await supabase
         .from('feedback_complaints')
         .select('*')
-        .or(`description.ilike.%${staffName}%,title.ilike.%${staffName}%`);
+        .containedBy('related_persons', [profileId]);
 
       const totalKm = staffTrips.reduce((sum, trip) => sum + (parseFloat(trip.distance_km) || 0), 0);
       const totalTrips = staffTrips.length;
@@ -288,7 +281,7 @@ export default function StaffPerformance() {
         onTimePercentage: Math.round(onTimePercentage * 10) / 10
       };
     } catch (error) {
-      console.error('Error calculating staff performance for', staffName, ':', error);
+      console.error('Error calculating staff performance for profile', profileId, ':', error);
       return {
         totalKm: 0,
         totalTrips: 0,
