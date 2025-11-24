@@ -520,6 +520,89 @@ export type Database = {
         }
         Relationships: []
       }
+      bus_tyres: {
+        Row: {
+          bus_id: string
+          condition_percentage: number | null
+          created_at: string | null
+          current_km: number | null
+          current_tread_depth_mm: number | null
+          expected_lifespan_km: number | null
+          id: string
+          installation_date: string
+          km_at_installation: number | null
+          last_rotation_date: string | null
+          notes: string | null
+          nsp_sale_reference_id: string | null
+          original_tread_depth_mm: number | null
+          position: string
+          purchase_cost: number | null
+          purchase_date: string | null
+          status: string | null
+          tyre_brand: string
+          tyre_serial_number: string | null
+          tyre_size: string
+          tyre_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          bus_id: string
+          condition_percentage?: number | null
+          created_at?: string | null
+          current_km?: number | null
+          current_tread_depth_mm?: number | null
+          expected_lifespan_km?: number | null
+          id?: string
+          installation_date: string
+          km_at_installation?: number | null
+          last_rotation_date?: string | null
+          notes?: string | null
+          nsp_sale_reference_id?: string | null
+          original_tread_depth_mm?: number | null
+          position: string
+          purchase_cost?: number | null
+          purchase_date?: string | null
+          status?: string | null
+          tyre_brand: string
+          tyre_serial_number?: string | null
+          tyre_size: string
+          tyre_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          bus_id?: string
+          condition_percentage?: number | null
+          created_at?: string | null
+          current_km?: number | null
+          current_tread_depth_mm?: number | null
+          expected_lifespan_km?: number | null
+          id?: string
+          installation_date?: string
+          km_at_installation?: number | null
+          last_rotation_date?: string | null
+          notes?: string | null
+          nsp_sale_reference_id?: string | null
+          original_tread_depth_mm?: number | null
+          position?: string
+          purchase_cost?: number | null
+          purchase_date?: string | null
+          status?: string | null
+          tyre_brand?: string
+          tyre_serial_number?: string | null
+          tyre_size?: string
+          tyre_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bus_tyres_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       buses: {
         Row: {
           bus_no: string
@@ -544,7 +627,9 @@ export type Database = {
           route: string | null
           service_interval_km: number | null
           status: Database["public"]["Enums"]["fleet_status"] | null
+          total_tyres: number | null
           type: string
+          tyre_size_standard: string | null
           updated_at: string
           year: number
         }
@@ -571,7 +656,9 @@ export type Database = {
           route?: string | null
           service_interval_km?: number | null
           status?: Database["public"]["Enums"]["fleet_status"] | null
+          total_tyres?: number | null
           type: string
+          tyre_size_standard?: string | null
           updated_at?: string
           year: number
         }
@@ -598,7 +685,9 @@ export type Database = {
           route?: string | null
           service_interval_km?: number | null
           status?: Database["public"]["Enums"]["fleet_status"] | null
+          total_tyres?: number | null
           type?: string
+          tyre_size_standard?: string | null
           updated_at?: string
           year?: number
         }
@@ -5703,6 +5792,161 @@ export type Database = {
           },
         ]
       }
+      tyre_brands_catalog: {
+        Row: {
+          average_cost: number | null
+          brand_name: string
+          created_at: string | null
+          expected_lifespan_km: number | null
+          id: string
+          is_active: boolean | null
+          model_name: string | null
+          size: string
+          supplier: string | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          average_cost?: number | null
+          brand_name: string
+          created_at?: string | null
+          expected_lifespan_km?: number | null
+          id?: string
+          is_active?: boolean | null
+          model_name?: string | null
+          size: string
+          supplier?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          average_cost?: number | null
+          brand_name?: string
+          created_at?: string | null
+          expected_lifespan_km?: number | null
+          id?: string
+          is_active?: boolean | null
+          model_name?: string | null
+          size?: string
+          supplier?: string | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tyre_inspection_records: {
+        Row: {
+          bus_id: string
+          condition_status: string | null
+          created_at: string | null
+          damage_notes: string | null
+          id: string
+          inspection_date: string
+          inspector_id: string | null
+          next_inspection_date: string | null
+          photos: Json | null
+          pressure_psi: number | null
+          recommendation: string | null
+          tread_depth_mm: number | null
+          tyre_id: string | null
+          wear_pattern: string | null
+        }
+        Insert: {
+          bus_id: string
+          condition_status?: string | null
+          created_at?: string | null
+          damage_notes?: string | null
+          id?: string
+          inspection_date: string
+          inspector_id?: string | null
+          next_inspection_date?: string | null
+          photos?: Json | null
+          pressure_psi?: number | null
+          recommendation?: string | null
+          tread_depth_mm?: number | null
+          tyre_id?: string | null
+          wear_pattern?: string | null
+        }
+        Update: {
+          bus_id?: string
+          condition_status?: string | null
+          created_at?: string | null
+          damage_notes?: string | null
+          id?: string
+          inspection_date?: string
+          inspector_id?: string | null
+          next_inspection_date?: string | null
+          photos?: Json | null
+          pressure_psi?: number | null
+          recommendation?: string | null
+          tread_depth_mm?: number | null
+          tyre_id?: string | null
+          wear_pattern?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tyre_inspection_records_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tyre_inspection_records_tyre_id_fkey"
+            columns: ["tyre_id"]
+            isOneToOne: false
+            referencedRelation: "bus_tyres"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tyre_rotation_history: {
+        Row: {
+          bus_id: string
+          created_at: string | null
+          id: string
+          km_at_rotation: number | null
+          notes: string | null
+          performed_by: string | null
+          reason: string | null
+          rotation_date: string
+          rotation_type: string | null
+          tyres_moved: Json | null
+        }
+        Insert: {
+          bus_id: string
+          created_at?: string | null
+          id?: string
+          km_at_rotation?: number | null
+          notes?: string | null
+          performed_by?: string | null
+          reason?: string | null
+          rotation_date: string
+          rotation_type?: string | null
+          tyres_moved?: Json | null
+        }
+        Update: {
+          bus_id?: string
+          created_at?: string | null
+          id?: string
+          km_at_rotation?: number | null
+          notes?: string | null
+          performed_by?: string | null
+          reason?: string | null
+          rotation_date?: string
+          rotation_type?: string | null
+          tyres_moved?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tyre_rotation_history_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       upload_rate_limits: {
         Row: {
           created_at: string | null
@@ -8660,6 +8904,7 @@ export type Database = {
         Args: { p_business_hours?: number; p_start_date: string }
         Returns: string
       }
+      calculate_tyre_condition: { Args: { p_tyre_id: string }; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       create_admin_user: { Args: never; Returns: undefined }
       generate_customer_code: { Args: never; Returns: string }
@@ -8710,6 +8955,7 @@ export type Database = {
         Returns: undefined
       }
       update_active_seasonal_themes: { Args: never; Returns: undefined }
+      update_all_tyre_conditions: { Args: never; Returns: undefined }
       update_trip_status_with_adjustments: {
         Args: {
           p_changed_by?: string

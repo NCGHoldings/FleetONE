@@ -64,6 +64,7 @@ import HolidayManagement from "./pages/HolidayManagement";
 import SeasonalThemes from "./pages/SeasonalThemes";
 import DailyBusExpenses from "./pages/DailyBusExpenses";
 import Accounting from "./pages/Accounting";
+import TyreManagement from "./pages/TyreManagement";
 
 const queryClient = new QueryClient();
 
@@ -579,6 +580,19 @@ const App = () => (
             />
             
             <Route 
+              path="/tyre-management" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
+                  <PageAccessGuard pageId="tyre_management">
+                    <AppLayout>
+                      <TyreManagement />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route
               path="/governance/calendar" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'governance_admin', 'governance_manager', 'governance_viewer']}>
