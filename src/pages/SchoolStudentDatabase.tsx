@@ -27,8 +27,10 @@ import {
   Mail,
   MapPin,
   Loader2,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw
 } from "lucide-react";
+import { BulkAdmissionNumberUpdate } from "@/components/school-bus/BulkAdmissionNumberUpdate";
 
 interface Student {
   id: string;
@@ -85,13 +87,31 @@ export default function SchoolStudentDatabase() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
+  const [tnStudentsCount, setTnStudentsCount] = useState(0);
   
   const isSuperAdmin = userRoles?.includes('super_admin');
 
   useEffect(() => {
     fetchBranchData();
     fetchStudents();
+    fetchTNStudentsCount();
   }, [branchId]);
+
+  const fetchTNStudentsCount = async () => {
+    try {
+      const { count } = await supabase
+        .from('school_students')
+        .select('*', { count: 'exact', head: true })
+        .ilike('admission_no', '%TN%')
+        .eq('is_active', true)
+        .eq('branch_id', branchId);
+      
+      setTnStudentsCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching TN students count:', error);
+    }
+  };
 
   useEffect(() => {
     filterStudents();
@@ -423,6 +443,16 @@ export default function SchoolStudentDatabase() {
             <Plus className="h-4 w-4 mr-2" />
             Add Student
           </Button>
+          
+          {tnStudentsCount > 0 && (
+            <Button 
+              onClick={() => setShowBulkUpdateModal(true)}
+              className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Update TN Numbers ({tnStudentsCount})
+            </Button>
+          )}
           {isSuperAdmin && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -762,6 +792,16 @@ export default function SchoolStudentDatabase() {
           )}
         </DialogContent>
       </Dialog>
+
+      <BulkAdmissionNumberUpdate
+        open={showBulkUpdateModal}
+        onOpenChange={setShowBulkUpdateModal}
+        branchId={branchId}
+        onSuccess={() => {
+          fetchStudents();
+          fetchTNStudentsCount();
+        }}
+      />
     </div>
   );
 }
