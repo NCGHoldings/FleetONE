@@ -16,8 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useBudgets } from "@/hooks/useBudgets";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { ArrowLeft, ArrowRight, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface CreateBudgetWizardProps {
@@ -28,6 +30,9 @@ interface CreateBudgetWizardProps {
 export const CreateBudgetWizard = ({ open, onClose }: CreateBudgetWizardProps) => {
   const [step, setStep] = useState(1);
   const { createBudget, isLoading } = useBudgets();
+  const { hasRole, isAuthenticated } = useAuth();
+  
+  const hasPermission = hasRole('super_admin') || hasRole('admin') || hasRole('finance');
   const [formData, setFormData] = useState<{
     budget_name: string;
     fiscal_year: number;
@@ -76,6 +81,24 @@ export const CreateBudgetWizard = ({ open, onClose }: CreateBudgetWizardProps) =
         <DialogHeader>
           <DialogTitle>Create New Budget - Step {step} of 3</DialogTitle>
         </DialogHeader>
+
+        {!isAuthenticated && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              You must be logged in to create budgets. Please log in to continue.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isAuthenticated && !hasPermission && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              You don't have permission to create budgets. This action requires Finance, Admin, or Super Admin role. Please contact your administrator.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="space-y-6 py-4">
           {step === 1 && (
@@ -232,7 +255,10 @@ export const CreateBudgetWizard = ({ open, onClose }: CreateBudgetWizardProps) =
               Next <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           ) : (
-            <Button onClick={handleSubmit} disabled={isLoading}>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={isLoading || !isAuthenticated || !hasPermission}
+            >
               <Check className="h-4 w-4 mr-2" />
               Create Budget
             </Button>
