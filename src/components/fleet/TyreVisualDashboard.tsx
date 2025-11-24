@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useState } from "react";
 import { TyreDetailsModal } from "./TyreDetailsModal";
+import { BusTyreOverviewModal } from "./BusTyreOverviewModal";
+import { TyreRotationModal } from "./TyreRotationModal";
 import { Eye, RotateCcw, PlusCircle, AlertTriangle } from "lucide-react";
 import { BusTyre } from "@/hooks/useTyreManagement";
 
@@ -15,6 +17,8 @@ interface TyreVisualDashboardProps {
 export const TyreVisualDashboard = ({ bus, tyres }: TyreVisualDashboardProps) => {
   const [selectedTyreId, setSelectedTyreId] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showOverviewModal, setShowOverviewModal] = useState(false);
+  const [showRotationModal, setShowRotationModal] = useState(false);
 
   const getConditionColor = (percentage: number) => {
     if (percentage >= 70) return "bg-emerald-500";
@@ -134,11 +138,21 @@ export const TyreVisualDashboard = ({ bus, tyres }: TyreVisualDashboardProps) =>
 
         {/* Action Buttons */}
         <div className="flex gap-2 mt-4">
-          <Button variant="outline" size="sm" className="flex-1">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex-1 hover:bg-primary/10 hover:text-primary transition-colors"
+            onClick={() => setShowOverviewModal(true)}
+          >
             <Eye className="w-4 h-4 mr-1" />
             View All
           </Button>
-          <Button variant="outline" size="sm" className="flex-1">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex-1 hover:bg-purple-500/10 hover:text-purple-600 transition-colors"
+            onClick={() => setShowRotationModal(true)}
+          >
             <RotateCcw className="w-4 h-4 mr-1" />
             Rotate
           </Button>
@@ -153,6 +167,29 @@ export const TyreVisualDashboard = ({ bus, tyres }: TyreVisualDashboardProps) =>
           busNumber={bus.bus_no}
         />
       )}
+
+      <BusTyreOverviewModal
+        open={showOverviewModal}
+        onOpenChange={setShowOverviewModal}
+        bus={bus}
+        tyres={tyres}
+        onViewTyreDetails={(tyreId) => {
+          setSelectedTyreId(tyreId);
+          setShowDetailsModal(true);
+          setShowOverviewModal(false);
+        }}
+        onRotate={() => {
+          setShowRotationModal(true);
+          setShowOverviewModal(false);
+        }}
+      />
+
+      <TyreRotationModal
+        open={showRotationModal}
+        onOpenChange={setShowRotationModal}
+        bus={bus}
+        tyres={tyres}
+      />
     </>
   );
 };
