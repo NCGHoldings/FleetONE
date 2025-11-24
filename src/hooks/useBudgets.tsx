@@ -86,6 +86,11 @@ export const useBudgets = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      if (!user) {
+        toast.error("You must be logged in to create budgets");
+        throw new Error("Not authenticated");
+      }
+      
       const { data, error } = await supabase
         .from("budgets")
         .insert([{
@@ -95,14 +100,26 @@ export const useBudgets = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Handle specific error cases
+        if (error.code === '42501' || error.message.includes('permission denied') || error.message.includes('policy')) {
+          toast.error("Permission denied. You need Finance, Admin, or Super Admin role to create budgets.");
+        } else if (error.code === '23505') {
+          toast.error("A budget with this code already exists");
+        } else {
+          toast.error(`Failed to create budget: ${error.message}`);
+        }
+        throw error;
+      }
 
       toast.success("Budget created successfully");
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
       return data;
     } catch (error: any) {
       console.error("Error creating budget:", error);
-      toast.error("Failed to create budget");
+      if (!error.message.includes('Permission denied') && !error.message.includes('authenticated')) {
+        toast.error("Failed to create budget");
+      }
       throw error;
     } finally {
       setIsLoading(false);

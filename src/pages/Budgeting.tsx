@@ -1,15 +1,20 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BudgetDashboard } from "@/components/budgeting/BudgetDashboard";
 import { BudgetListView } from "@/components/budgeting/BudgetListView";
 import { CreateBudgetWizard } from "@/components/budgeting/CreateBudgetWizard";
 import { TemplateLibrary } from "@/components/budgeting/TemplateLibrary";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Plus, AlertCircle, Lock } from "lucide-react";
 
 const Budgeting = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showCreateWizard, setShowCreateWizard] = useState(false);
+  const { hasRole, isAuthenticated } = useAuth();
+  
+  const hasPermission = hasRole('super_admin') || hasRole('admin') || hasRole('finance');
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -25,11 +30,31 @@ const Budgeting = () => {
         <Button
           onClick={() => setShowCreateWizard(true)}
           className="bg-gradient-to-r from-blue-600 to-purple-600"
+          disabled={!isAuthenticated || !hasPermission}
         >
+          {!hasPermission && <Lock className="h-4 w-4 mr-2" />}
           <Plus className="h-4 w-4 mr-2" />
           Create Budget
         </Button>
       </div>
+
+      {!isAuthenticated && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            You must be logged in to access budgeting features. Please log in to continue.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isAuthenticated && !hasPermission && (
+        <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+          <Lock className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            You have view-only access to budgets. To create or edit budgets, you need Finance, Admin, or Super Admin role. Please contact your administrator for access.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
