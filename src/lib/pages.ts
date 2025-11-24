@@ -61,6 +61,7 @@ export const PAGES: PageCategories = {
   nsp: [
     { id: "nsp_daily_sales", title: "Daily Sales", url: "/nsp-daily-sales" },
     { id: "nsp_summary", title: "Summary & Reports", url: "/nsp-summary" },
+    { id: "tyre_management", title: "Tyre Management", url: "/tyre-management" },
   ],
   governance: [
     { id: "governance_calendar", title: "Governance Calendar", url: "/governance/calendar" },
