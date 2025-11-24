@@ -114,6 +114,7 @@ const nspItems = [
 
 const financeItems = [
   { id: "accounting", title: "Accounting & GL", url: "/accounting", icon: BookOpen },
+  { id: "budgeting", title: "Budgeting", url: "/budgeting", icon: BookOpen },
 ];
 
 export function AppSidebar() {

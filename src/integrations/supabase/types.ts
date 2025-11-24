@@ -366,6 +366,372 @@ export type Database = {
           },
         ]
       }
+      budget_approvals: {
+        Row: {
+          approval_level: number
+          approved_at: string | null
+          approver_id: string
+          budget_id: string
+          comments: string | null
+          created_at: string | null
+          id: string
+          status: string | null
+        }
+        Insert: {
+          approval_level: number
+          approved_at?: string | null
+          approver_id: string
+          budget_id: string
+          comments?: string | null
+          created_at?: string | null
+          id?: string
+          status?: string | null
+        }
+        Update: {
+          approval_level?: number
+          approved_at?: string | null
+          approver_id?: string
+          budget_id?: string
+          comments?: string | null
+          created_at?: string | null
+          id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_approvals_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_departments: {
+        Row: {
+          allocated_amount: number | null
+          budget_id: string
+          created_at: string | null
+          department_code: string | null
+          department_name: string
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          manager_id: string | null
+          parent_department_id: string | null
+          spent_amount: number | null
+          updated_at: string | null
+          variance_amount: number | null
+        }
+        Insert: {
+          allocated_amount?: number | null
+          budget_id: string
+          created_at?: string | null
+          department_code?: string | null
+          department_name: string
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          manager_id?: string | null
+          parent_department_id?: string | null
+          spent_amount?: number | null
+          updated_at?: string | null
+          variance_amount?: number | null
+        }
+        Update: {
+          allocated_amount?: number | null
+          budget_id?: string
+          created_at?: string | null
+          department_code?: string | null
+          department_name?: string
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          manager_id?: string | null
+          parent_department_id?: string | null
+          spent_amount?: number | null
+          updated_at?: string | null
+          variance_amount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_departments_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_departments_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_departments_parent_department_id_fkey"
+            columns: ["parent_department_id"]
+            isOneToOne: false
+            referencedRelation: "budget_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_line_items: {
+        Row: {
+          account_id: string | null
+          actual_amount: number | null
+          budget_amount: number | null
+          budget_id: string
+          category: string
+          created_at: string | null
+          department_id: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          line_item_name: string
+          monthly_allocation: Json | null
+          notes: string | null
+          period_type: string | null
+          subcategory: string | null
+          updated_at: string | null
+          variance_amount: number | null
+          variance_percentage: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          actual_amount?: number | null
+          budget_amount?: number | null
+          budget_id: string
+          category: string
+          created_at?: string | null
+          department_id?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          line_item_name: string
+          monthly_allocation?: Json | null
+          notes?: string | null
+          period_type?: string | null
+          subcategory?: string | null
+          updated_at?: string | null
+          variance_amount?: number | null
+          variance_percentage?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          actual_amount?: number | null
+          budget_amount?: number | null
+          budget_id?: string
+          category?: string
+          created_at?: string | null
+          department_id?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          line_item_name?: string
+          monthly_allocation?: Json | null
+          notes?: string | null
+          period_type?: string | null
+          subcategory?: string | null
+          updated_at?: string | null
+          variance_amount?: number | null
+          variance_percentage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_line_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_line_items_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_line_items_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "budget_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_revisions: {
+        Row: {
+          budget_id: string
+          created_at: string | null
+          id: string
+          new_value: Json | null
+          old_value: Json | null
+          reason: string | null
+          revised_by: string
+          revision_date: string | null
+          revision_type: string
+        }
+        Insert: {
+          budget_id: string
+          created_at?: string | null
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          reason?: string | null
+          revised_by: string
+          revision_date?: string | null
+          revision_type: string
+        }
+        Update: {
+          budget_id?: string
+          created_at?: string | null
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          reason?: string | null
+          revised_by?: string
+          revision_date?: string | null
+          revision_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_revisions_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          industry_type: string
+          is_active: boolean | null
+          is_system_template: boolean | null
+          template_name: string
+          template_structure: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          industry_type: string
+          is_active?: boolean | null
+          is_system_template?: boolean | null
+          template_name: string
+          template_structure?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          industry_type?: string
+          is_active?: boolean | null
+          is_system_template?: boolean | null
+          template_name?: string
+          template_structure?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      budgets: {
+        Row: {
+          approval_notes: string | null
+          approved_at: string | null
+          approved_by: string | null
+          budget_code: string
+          budget_name: string
+          budget_period: string
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          end_date: string
+          fiscal_year: number
+          id: string
+          is_locked: boolean | null
+          parent_budget_id: string | null
+          start_date: string
+          status: string | null
+          template_id: string | null
+          total_budget_amount: number | null
+          updated_at: string | null
+          version_number: number | null
+        }
+        Insert: {
+          approval_notes?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          budget_code: string
+          budget_name: string
+          budget_period: string
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          end_date: string
+          fiscal_year: number
+          id?: string
+          is_locked?: boolean | null
+          parent_budget_id?: string | null
+          start_date: string
+          status?: string | null
+          template_id?: string | null
+          total_budget_amount?: number | null
+          updated_at?: string | null
+          version_number?: number | null
+        }
+        Update: {
+          approval_notes?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          budget_code?: string
+          budget_name?: string
+          budget_period?: string
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          end_date?: string
+          fiscal_year?: number
+          id?: string
+          is_locked?: boolean | null
+          parent_budget_id?: string | null
+          start_date?: string
+          status?: string | null
+          template_id?: string | null
+          total_budget_amount?: number | null
+          updated_at?: string | null
+          version_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_parent_budget_id_fkey"
+            columns: ["parent_budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "budget_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bus_loan_payments: {
         Row: {
           actual_payment_date: string | null
@@ -8907,6 +9273,7 @@ export type Database = {
       calculate_tyre_condition: { Args: { p_tyre_id: string }; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       create_admin_user: { Args: never; Returns: undefined }
+      generate_budget_code: { Args: { p_fiscal_year: number }; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_employee_id: { Args: never; Returns: string }
       generate_journal_entry_number: { Args: never; Returns: string }
