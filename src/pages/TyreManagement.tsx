@@ -7,15 +7,18 @@ import { useTyreManagement } from "@/hooks/useTyreManagement";
 import { TyreVisualDashboard } from "@/components/fleet/TyreVisualDashboard";
 import { AddTyreModal } from "@/components/fleet/AddTyreModal";
 import { TyreInspectionForm } from "@/components/fleet/TyreInspectionForm";
+import { TyreAlertPanel } from "@/components/fleet/TyreAlertPanel";
 import { 
   Plus, Search, Filter, TrendingUp, AlertTriangle, 
-  RotateCcw, DollarSign
+  RotateCcw, DollarSign, BarChart3
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function TyreManagement() {
   const { tyres, tyresLoading, stats } = useTyreManagement();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCondition, setFilterCondition] = useState("all");
@@ -77,6 +80,13 @@ export default function TyreManagement() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24" />
       </div>
+
+      {/* Alert Panel */}
+      {tyres && tyres.length > 0 && (
+        <div className="mb-8">
+          <TyreAlertPanel tyres={tyres} />
+        </div>
+      )}
 
       {/* Stats Cards */}
       {stats && (
@@ -172,6 +182,10 @@ export default function TyreManagement() {
           </div>
 
           <div className="flex gap-3">
+            <Button onClick={() => navigate('/tyre-analytics')} variant="outline">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              View Analytics
+            </Button>
             <Button onClick={() => setShowInspectionForm(true)} variant="outline">
               <RotateCcw className="w-4 h-4 mr-2" />
               Record Inspection
