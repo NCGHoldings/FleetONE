@@ -3,14 +3,16 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTyreManagement } from "@/hooks/useTyreManagement";
 import { TyreVisualDashboard } from "@/components/fleet/TyreVisualDashboard";
 import { AddTyreModal } from "@/components/fleet/AddTyreModal";
 import { TyreInspectionForm } from "@/components/fleet/TyreInspectionForm";
 import { TyreAlertPanel } from "@/components/fleet/TyreAlertPanel";
+import { NSPTyreInventory } from "@/components/fleet/NSPTyreInventory";
 import { 
   Plus, Search, Filter, TrendingUp, AlertTriangle, 
-  RotateCcw, DollarSign, BarChart3
+  RotateCcw, DollarSign, BarChart3, Package
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -155,66 +157,82 @@ export default function TyreManagement() {
 
       {/* Filters and Actions */}
       <Card className="p-6 mb-6 bg-card/50 backdrop-blur">
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-4 flex-1 w-full lg:w-auto">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search bus number..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+        <Tabs defaultValue="fleet" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="fleet">Fleet Tyres</TabsTrigger>
+            <TabsTrigger value="inventory">
+              <Package className="w-4 h-4 mr-2" />
+              NSP Inventory
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="fleet" className="space-y-6">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-4 flex-1 w-full lg:w-auto">
+                <div className="relative flex-1 sm:max-w-xs">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Search bus number..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                <Select value={filterCondition} onValueChange={setFilterCondition}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Filter by condition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Conditions</SelectItem>
+                    <SelectItem value="good">Good (≥50%)</SelectItem>
+                    <SelectItem value="warning">Warning (30-49%)</SelectItem>
+                    <SelectItem value="critical">Critical (&lt;30%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-3">
+                <Button onClick={() => navigate('/tyre-analytics')} variant="outline">
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  View Analytics
+                </Button>
+                <Button onClick={() => setShowInspectionForm(true)} variant="outline">
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Record Inspection
+                </Button>
+                <Button onClick={() => setShowAddModal(true)} className="bg-gradient-to-r from-primary to-purple-600">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Tyre
+                </Button>
+              </div>
             </div>
 
-            <Select value={filterCondition} onValueChange={setFilterCondition}>
-              <SelectTrigger className="w-full sm:w-48">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter by condition" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Conditions</SelectItem>
-                <SelectItem value="good">Good (≥50%)</SelectItem>
-                <SelectItem value="warning">Warning (30-49%)</SelectItem>
-                <SelectItem value="critical">Critical (&lt;30%)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Bus Tyre Grids */}
+            {tyresLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+                <p className="mt-4 text-muted-foreground">Loading tyre data...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredBuses?.map(bus => (
+                  <TyreVisualDashboard
+                    key={bus.id}
+                    bus={bus}
+                    tyres={tyresByBus?.[bus.id] || []}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
-          <div className="flex gap-3">
-            <Button onClick={() => navigate('/tyre-analytics')} variant="outline">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              View Analytics
-            </Button>
-            <Button onClick={() => setShowInspectionForm(true)} variant="outline">
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Record Inspection
-            </Button>
-            <Button onClick={() => setShowAddModal(true)} className="bg-gradient-to-r from-primary to-purple-600">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Tyre
-            </Button>
-          </div>
-        </div>
+          <TabsContent value="inventory">
+            <NSPTyreInventory buses={buses || []} />
+          </TabsContent>
+        </Tabs>
       </Card>
-
-      {/* Bus Tyre Grids */}
-      {tyresLoading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-          <p className="mt-4 text-muted-foreground">Loading tyre data...</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredBuses?.map(bus => (
-            <TyreVisualDashboard
-              key={bus.id}
-              bus={bus}
-              tyres={tyresByBus?.[bus.id] || []}
-            />
-          ))}
-        </div>
-      )}
 
       {/* Modals */}
       {showAddModal && (
