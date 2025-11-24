@@ -109,6 +109,7 @@ const sinotruckItems = [
 const nspItems = [
   { id: "nsp_daily_sales", title: "Daily Sales", url: "/nsp-daily-sales", icon: ShoppingCart },
   { id: "nsp_summary", title: "Summary & Reports", url: "/nsp-summary", icon: FileSpreadsheet },
+  { id: "tyre_management", title: "Tyre Management", url: "/tyre-management", icon: Wrench },
 ];
 
 const financeItems = [
