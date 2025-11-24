@@ -64,6 +64,7 @@ import HolidayManagement from "./pages/HolidayManagement";
 import SeasonalThemes from "./pages/SeasonalThemes";
 import DailyBusExpenses from "./pages/DailyBusExpenses";
 import Accounting from "./pages/Accounting";
+import Budgeting from "./pages/Budgeting";
 import TyreManagement from "./pages/TyreManagement";
 
 const queryClient = new QueryClient();
@@ -636,6 +637,17 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'finance']}>
                   <Accounting />
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/budgeting" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'finance']}>
+                  <AppLayout>
+                    <Budgeting />
+                  </AppLayout>
                 </ProtectedRoute>
               } 
             />

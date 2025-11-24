@@ -47,6 +47,7 @@ export const PAGES: PageCategories = {
   ],
   finance: [
     { id: "accounting", title: "Accounting & GL", url: "/accounting" },
+    { id: "budgeting", title: "Budgeting", url: "/budgeting" },
   ],
   yutong: [
     { id: "yutong_quotations", title: "Quotations", url: "/yutong-quotations" },
