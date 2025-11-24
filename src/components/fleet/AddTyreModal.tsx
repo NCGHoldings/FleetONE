@@ -15,9 +15,10 @@ interface AddTyreModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   buses: any[];
+  nspSaleReferenceId?: string | null;
 }
 
-export const AddTyreModal = ({ open, onOpenChange, buses }: AddTyreModalProps) => {
+export const AddTyreModal = ({ open, onOpenChange, buses, nspSaleReferenceId }: AddTyreModalProps) => {
   const { addTyre } = useTyreManagement();
   const [formData, setFormData] = useState({
     bus_id: "",
@@ -51,6 +52,7 @@ export const AddTyreModal = ({ open, onOpenChange, buses }: AddTyreModalProps) =
       current_km: parseInt(formData.km_at_installation),
       condition_percentage: 100,
       status: "active",
+      nsp_sale_reference_id: nspSaleReferenceId,
     });
 
     onOpenChange(false);
@@ -71,7 +73,14 @@ export const AddTyreModal = ({ open, onOpenChange, buses }: AddTyreModalProps) =
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Tyre</DialogTitle>
+          <DialogTitle>
+            {nspSaleReferenceId ? "Install Tyre from NSP Purchase" : "Add New Tyre"}
+          </DialogTitle>
+          {nspSaleReferenceId && (
+            <p className="text-sm text-muted-foreground">
+              This tyre will be linked to the NSP purchase record
+            </p>
+          )}
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">

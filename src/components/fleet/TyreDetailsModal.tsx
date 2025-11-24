@@ -50,6 +50,23 @@ export const TyreDetailsModal = ({ open, onOpenChange, tyreId, busNumber }: Tyre
     enabled: open,
   });
 
+  const { data: nspSale } = useQuery({
+    queryKey: ["nsp-sale-details", tyre?.nsp_sale_reference_id],
+    queryFn: async () => {
+      if (!tyre?.nsp_sale_reference_id) return null;
+      
+      const { data, error } = await supabase
+        .from("nsp_daily_sales")
+        .select("*")
+        .eq("id", tyre.nsp_sale_reference_id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: open && !!tyre?.nsp_sale_reference_id,
+  });
+
   if (!tyre) return null;
 
   const kmDriven = tyre.current_km - tyre.km_at_installation;
@@ -206,6 +223,49 @@ export const TyreDetailsModal = ({ open, onOpenChange, tyreId, busNumber }: Tyre
                   Notes
                 </h4>
                 <p className="text-sm text-muted-foreground">{tyre.notes}</p>
+              </Card>
+            )}
+
+            {/* NSP Purchase Details */}
+            {nspSale && (
+              <Card className="p-4 border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-purple-500/5">
+                <h4 className="font-semibold mb-3 flex items-center gap-2 text-primary">
+                  <Calendar className="w-4 h-4" />
+                  NSP Purchase Record
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Purchase Date:</span>
+                    <span className="font-medium">{formatDateDisplay(nspSale.sale_date)}</span>
+                  </div>
+                  {nspSale.tyre_entries && Array.isArray(nspSale.tyre_entries) && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Tyres Purchased:</p>
+                      <div className="space-y-1">
+                        {nspSale.tyre_entries.map((entry: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center p-2 rounded bg-background/50">
+                            <span className="text-sm font-medium">{entry.type}</span>
+                            <div className="flex items-center gap-2">
+                              {entry.quantity && (
+                                <Badge variant="outline" className="text-xs">
+                                  Qty: {entry.quantity}
+                                </Badge>
+                              )}
+                              <span className="text-sm font-semibold text-primary">
+                                LKR {entry.amount.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t">
+                    <Badge className="bg-emerald-500">
+                      Linked to NSP Sale
+                    </Badge>
+                  </div>
+                </div>
               </Card>
             )}
           </TabsContent>
