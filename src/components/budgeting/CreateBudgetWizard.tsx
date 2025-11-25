@@ -92,38 +92,47 @@ export const CreateBudgetWizard = ({ open, onClose, initialTemplate }: CreateBud
 
   const handleSubmit = async () => {
     try {
-      const budget = await createBudget(formData);
+      const budget = await createBudget({
+        ...formData,
+        template_id: formData.template_id || null, // Convert empty string to null
+      });
       
       // If template selected, create departments and line items
       if (selectedTemplate && budget) {
         const structure = selectedTemplate.template_structure;
+        const departmentMap: Record<string, string> = {};
         
-        // Create departments and line items
+        // Step 1: Create all departments and build name->id map
         for (const dept of structure.departments || []) {
           const department = await addDepartment({
             budget_id: budget.id,
             department_name: dept.name,
             department_code: dept.code,
           });
-          
-          // Create line items for this department
-          const lineItems = (dept.categories || []).map((cat: any, index: number) => ({
-            department_id: department.id,
-            line_item_name: cat.name,
-            category: cat.type,
-            subcategory: cat.subcategory,
-            display_order: index,
+          departmentMap[dept.name] = department.id;
+        }
+        
+        // Step 2: Get line items from template
+        const lineItems = structure.line_items || [];
+        
+        // Step 3: Create line items with correct department_id
+        if (lineItems.length > 0) {
+          const formattedLineItems = lineItems.map((item: any, index: number) => ({
+            department_id: departmentMap[item.department] || null,
+            line_item_name: item.name,
+            category: item.category || item.type,
+            subcategory: item.subcategory,
+            display_order: item.display_order || index,
             is_active: true,
-            budget_amount: 0,
+            budget_amount: item.default_amount || 0,
             actual_amount: 0,
             variance_amount: 0,
             variance_percentage: 0,
             period_type: "monthly",
+            account_id: item.account_code || null,
           }));
           
-          if (lineItems.length > 0) {
-            await bulkImportLineItems(budget.id, lineItems);
-          }
+          await bulkImportLineItems(budget.id, formattedLineItems);
         }
       }
       
@@ -131,6 +140,7 @@ export const CreateBudgetWizard = ({ open, onClose, initialTemplate }: CreateBud
       onClose();
     } catch (error) {
       console.error("Error creating budget:", error);
+      toast.error("Failed to create budget");
     }
   };
 
