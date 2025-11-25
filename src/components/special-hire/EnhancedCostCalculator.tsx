@@ -378,7 +378,13 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
             exceedingKm: exceedingKm,
             freeExceedingKm: 0,
             chargeableExceedingKm: exceedingKm,
-            rateCardRange: rateCard ? `${rateCard.from_km || 0}-${rateCard.to_km || 0} km` : undefined
+            rateCardRange: rateCard ? (
+              // For Outside hire, show the threshold coverage (0-100 km)
+              // For other hire types (Lyceum, Inside), show the actual km range
+              rateCard.hire_type === 'Outside' 
+                ? `0-${rateCard.exceeding_km_threshold || 100} km`
+                : `${rateCard.from_km || 0}-${rateCard.to_km || 999999} km`
+            ) : undefined
           };
         })(),
         grossRevenue: quotation.gross_revenue || 0,
