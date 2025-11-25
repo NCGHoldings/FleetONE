@@ -112,32 +112,29 @@ export default function RealTimeTracking() {
   const debugGPSConnection = async () => {
     setIsRefreshing(true)
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking', {
-        body: {
-          apiEndpoint: gpsSettings.apiEndpoint,
-          apiKey: gpsSettings.apiKey
-        }
+      const { data, error } = await supabase.functions.invoke('fetch-fios-tracking', {
+        body: {}
       })
       
       if (error) {
-        console.error('GPS Debug Error:', error)
-        toast.error(`GPS Connection Error: ${error.message || 'Unknown error'}`)
+        console.error('FIOS Debug Error:', error)
+        toast.error(`FIOS Connection Error: ${error.message || 'Unknown error'}`)
         return
       }
 
       if (!data?.success) {
-        console.error('GPS Debug Failed:', data)
-        toast.error(`GPS Debug Failed: ${data?.error || 'API returned error'}`)
-        // Show detailed debug info in console
-        console.log('Debug Info:', data?.debug_info)
-        console.log('Traccar Config:', data?.traccar_config)
+        console.error('FIOS Debug Failed:', data)
+        toast.error(`FIOS Debug Failed: ${data?.error || 'API returned error'}`)
         return
       }
 
-      console.log('GPS Debug Success:', data)
-      toast.success(`GPS connection successful! Found ${data.data?.length || 0} vehicles`)
+      console.log('FIOS Debug Success:', data)
+      toast.success(`FIOS connection successful! Matched ${data.matched} vehicles, ${data.unmatched} unmatched`)
+      
+      // Refresh the tracking data to show the updated info
+      await fetchTrackingData()
     } catch (error) {
-      console.error('Debug GPS error:', error)
+      console.error('Debug FIOS error:', error)
       toast.error(`Debug failed: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       setIsRefreshing(false)
