@@ -243,6 +243,28 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
       const fuelPricePerLiter = fuelSettings?.diesel_price_lkr_per_l || 350;
       const maintenanceRatePerKm = fuelSettings?.maintenance_rate_lkr_per_km || 20;
 
+      // Recalculate commission on full pre-commission total (includes additional charges)
+      const preCommissionTotal = (quotation.gross_revenue || 0) + 
+                                (quotation.fuel_cost_fuel_only || 0) + 
+                                (quotation.total_additional_charges || 0) - 
+                                (quotation.discount_amount_lkr || 0);
+
+      // Calculate commission percentages from stored amounts (reverse calculate)
+      const storedCommissionAmount = quotation.commission_amount || 0;
+      const storedPassThroughAmount = quotation.commission_pass_through_amount || 0;
+      
+      // If we have stored amounts but no total, estimate percentage
+      const commissionPct = preCommissionTotal > 0 
+        ? (storedCommissionAmount / preCommissionTotal) * 100 
+        : 0;
+      const commissionPassThroughPct = preCommissionTotal > 0 
+        ? (storedPassThroughAmount / preCommissionTotal) * 100 
+        : 0;
+      
+      // Recalculate commission on the full pre-commission total
+      const recalculatedCommissionAmount = preCommissionTotal * (commissionPct / 100);
+      const recalculatedPassThroughAmount = preCommissionTotal * (commissionPassThroughPct / 100);
+
       // Prepare the cost breakdown data from the quotation to match CostBreakdown props
       const data: CostData = {
         kmParkingToPickup: quotation.km_parking_to_pickup || 0,
@@ -297,10 +319,10 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         customerTotalWithFuel: (quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0) + (quotation.total_additional_charges || 0) - (quotation.discount_amount_lkr || 0),
         driverCharge: 0,
         otherExpenses: [],
-        commissionPct: 0,
-        commissionAmount: quotation.commission_amount || 0,
-        commissionPassThroughPct: 0,
-        commissionPassThroughAmount: quotation.commission_pass_through_amount || 0,
+        commissionPct: commissionPct,
+        commissionAmount: recalculatedCommissionAmount,
+        commissionPassThroughPct: commissionPassThroughPct,
+        commissionPassThroughAmount: recalculatedPassThroughAmount,
         discountType: quotation.discount_type || 'none',
         discountPct: quotation.discount_percentage || 0,
         discountAmount: quotation.discount_amount_lkr || 0,
