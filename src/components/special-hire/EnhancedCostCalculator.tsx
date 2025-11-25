@@ -61,6 +61,26 @@ interface QuotationData {
   avg_km_per_l?: number;
 }
 
+interface PostTripAdjustment {
+  actual_km_traveled: number;
+  original_quoted_km: number;
+  extra_km: number;
+  extra_km_charge_per_km: number;
+  extra_km_total_charge: number;
+  additional_expenses: Array<{
+    description: string;
+    amount: number;
+    category: "toll" | "parking" | "waiting" | "driver_meals" | "other";
+  }>;
+  total_additional_expenses: number;
+  original_quotation_amount: number;
+  adjustment_amount: number;
+  final_trip_amount: number;
+  advance_already_paid: number;
+  balance_due: number;
+  adjustment_status: string;
+}
+
 interface CostData {
   kmParkingToPickup: number;
   kmTrip: number;
@@ -109,6 +129,21 @@ interface CostData {
   }>;
   totalAdditionalCharges?: number;
   numberOfBuses?: number;
+  postTripAdjustment?: {
+    actualKmTraveled: number;
+    originalQuotedKm: number;
+    extraKm: number;
+    extraKmChargePerKm: number;
+    extraKmTotalCharge: number;
+    additionalExpenses: Array<{description: string; amount: number; category: string}>;
+    totalAdditionalExpenses: number;
+    originalQuotationAmount: number;
+    adjustmentAmount: number;
+    finalTripAmount: number;
+    advanceAlreadyPaid: number;
+    balanceDue: number;
+    adjustmentStatus: string;
+  };
 }
 
 export function EnhancedCostCalculator({ preselectedQuotationId }: { preselectedQuotationId?: string } = {}) {
@@ -219,6 +254,16 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         .eq('is_default', true)
         .maybeSingle();
 
+      // Fetch post-trip adjustment if exists
+      const { data: adjustment } = await supabase
+        .from('special_hire_trip_adjustments')
+        .select('*')
+        .eq('quotation_id', quotation.id)
+        .eq('adjustment_status', 'finalized')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       // Parse additional charges from quotation (stored as JSONB)
       let additionalCharges: Array<{ type: string; amount: number; reason?: string }> = [];
       if (quotation.additional_charges) {
@@ -283,6 +328,23 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         maintenanceRatePerKm: maintenanceRatePerKm,
         pickupDateTime: quotation.pickup_datetime,
         dropDateTime: quotation.drop_datetime,
+        postTripAdjustment: adjustment ? {
+          actualKmTraveled: adjustment.actual_km_traveled || 0,
+          originalQuotedKm: adjustment.original_quoted_km || 0,
+          extraKm: adjustment.extra_km || 0,
+          extraKmChargePerKm: adjustment.extra_km_charge_per_km || 0,
+          extraKmTotalCharge: adjustment.extra_km_total_charge || 0,
+          additionalExpenses: Array.isArray(adjustment.additional_expenses) 
+            ? adjustment.additional_expenses as Array<{description: string; amount: number; category: string}>
+            : [],
+          totalAdditionalExpenses: adjustment.total_additional_expenses || 0,
+          originalQuotationAmount: adjustment.original_quotation_amount || 0,
+          adjustmentAmount: adjustment.adjustment_amount || 0,
+          finalTripAmount: adjustment.final_trip_amount || 0,
+          advanceAlreadyPaid: adjustment.advance_already_paid || 0,
+          balanceDue: adjustment.balance_due || 0,
+          adjustmentStatus: adjustment.adjustment_status || 'draft',
+        } : undefined,
         rateCardDetails: (() => {
           // Calculate actual hours from datetime fields
           let actualHours = 8;
