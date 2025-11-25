@@ -157,15 +157,39 @@ Deno.serve(async (req) => {
       const parsedBusNo = parseBusNumber(vehicle.nm);
       
       // Try to match with database bus
-      const bus = buses?.find(b => 
+      let bus = buses?.find(b => 
         b.bus_no === parsedBusNo || 
         b.bus_no.replace(/\s+/g, '-') === parsedBusNo ||
         b.bus_no.replace(/\s+/g, '') === parsedBusNo.replace(/-/g, '')
       );
 
+      // Auto-create bus if it doesn't exist
       if (!bus) {
-        unmatchedVehicles.push(vehicle.nm);
-        continue;
+        console.log(`[FIOS] Auto-creating missing bus: ${parsedBusNo}`);
+        const busType = parsedBusNo.startsWith('NG') ? 'Imported Bus' : 'Regular';
+        
+        const { data: newBus, error: createError } = await supabase
+          .from('buses')
+          .insert({
+            bus_no: parsedBusNo,
+            type: busType,
+            model: 'Unknown',
+            capacity: 50,
+            year: 2020,
+            status: 'active'
+          })
+          .select()
+          .single();
+        
+        if (createError) {
+          console.error(`[FIOS] Failed to create bus ${parsedBusNo}:`, createError);
+          unmatchedVehicles.push(vehicle.nm);
+          continue;
+        }
+        
+        bus = newBus;
+        buses?.push(newBus); // Add to local array for subsequent matches
+        console.log(`[FIOS] ✅ Created new bus: ${parsedBusNo}`);
       }
 
       const lastUpdate = new Date(vehicle.pos.t * 1000).toISOString();
