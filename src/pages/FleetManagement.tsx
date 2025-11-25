@@ -224,6 +224,48 @@ const FleetManagementComponent = () => {
       },
     },
     {
+      accessorKey: "next_service_mileage",
+      header: "Service Status",
+      cell: ({ row }) => {
+        const bus = row.original;
+        const currentMileage = bus.current_mileage || 0;
+        const nextServiceMileage = bus.next_service_mileage;
+        
+        if (!nextServiceMileage) {
+          return <Badge variant="secondary">Not Set</Badge>;
+        }
+        
+        const kmRemaining = nextServiceMileage - currentMileage;
+        
+        // Color coding based on km remaining
+        if (kmRemaining <= 0) {
+          return (
+            <Badge className="bg-red-500 text-white hover:bg-red-600">
+              Overdue by {Math.abs(kmRemaining).toLocaleString()} km
+            </Badge>
+          );
+        } else if (kmRemaining <= 200) {
+          return (
+            <Badge className="bg-orange-500 text-white hover:bg-orange-600">
+              Due in {kmRemaining.toLocaleString()} km
+            </Badge>
+          );
+        } else if (kmRemaining <= 500) {
+          return (
+            <Badge className="bg-yellow-500 text-white hover:bg-yellow-600">
+              {kmRemaining.toLocaleString()} km remaining
+            </Badge>
+          );
+        } else {
+          return (
+            <Badge className="bg-green-500 text-white hover:bg-green-600">
+              {kmRemaining.toLocaleString()} km remaining
+            </Badge>
+          );
+        }
+      },
+    },
+    {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => {

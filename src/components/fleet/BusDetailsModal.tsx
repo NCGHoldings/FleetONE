@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bus, Calendar, Gauge, MapPin, Wrench, DollarSign, CreditCard, TrendingUp } from "lucide-react";
+import { Bus, Calendar, Gauge, MapPin, Wrench, DollarSign, CreditCard, TrendingUp, Bell } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
@@ -20,10 +20,12 @@ export function BusDetailsModal({ open, onOpenChange, bus, onOpenLoanDashboard }
 
   const [loanData, setLoanData] = useState<any>(null);
   const [loanStats, setLoanStats] = useState<{ totalPaid: number; balanceDue: number; progress: number } | null>(null);
+  const [serviceAlerts, setServiceAlerts] = useState<any[]>([]);
 
   useEffect(() => {
     if (open && bus) {
       fetchLoanData();
+      fetchServiceAlerts();
     }
   }, [open, bus]);
 
@@ -51,6 +53,24 @@ export function BusDetailsModal({ open, onOpenChange, bus, onOpenLoanDashboard }
       }
     } catch (error) {
       console.error("Error fetching loan data:", error);
+    }
+  };
+
+  const fetchServiceAlerts = async () => {
+    if (!bus) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("bus_service_alerts")
+        .select("*")
+        .eq("bus_id", bus.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      setServiceAlerts(data || []);
+    } catch (error) {
+      console.error("Error fetching service alerts:", error);
     }
   };
 
@@ -280,6 +300,48 @@ export function BusDetailsModal({ open, onOpenChange, bus, onOpenLoanDashboard }
                       Until {new Date(loanData.end_date).toLocaleDateString()}
                     </p>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Service Alert History */}
+          {serviceAlerts.length > 0 && (
+            <Card className="md:col-span-2 border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Bell className="w-4 h-4" />
+                  Recent Service Alerts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {serviceAlerts.map((alert) => (
+                    <div key={alert.id} className="flex items-start gap-3 p-3 bg-background rounded-lg border">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant={alert.alert_type === 'overdue' ? 'destructive' : 'secondary'} className={alert.alert_type === 'overdue' ? '' : 'bg-orange-500 text-white hover:bg-orange-600'}>
+                            {alert.alert_type === 'overdue' ? 'Overdue' : 'Upcoming Service'}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(alert.created_at).toLocaleDateString()} at {new Date(alert.created_at).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <p className="text-sm">
+                          Alert sent at <span className="font-semibold">{alert.triggered_at_km.toLocaleString()} km</span>
+                          {' '}for service due at <span className="font-semibold">{alert.next_service_km.toLocaleString()} km</span>
+                        </p>
+                        {alert.external_response && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            External platform: {alert.external_response.success ? '✓ Notified' : '✗ Failed'}
+                          </p>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {alert.status}
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

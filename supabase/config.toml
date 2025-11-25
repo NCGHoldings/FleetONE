@@ -8,3 +8,9 @@ verify_jwt = true
 
 [functions.send-whatsapp-quotation]
 verify_jwt = true
+
+[functions.check-service-alerts]
+verify_jwt = false
+
+[functions.update-bus-odometer]
+verify_jwt = false

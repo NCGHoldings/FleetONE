@@ -856,6 +856,50 @@ export type Database = {
           },
         ]
       }
+      bus_service_alerts: {
+        Row: {
+          alert_sent_at: string | null
+          alert_type: string
+          bus_id: string | null
+          created_at: string | null
+          external_response: Json | null
+          id: string
+          next_service_km: number
+          status: string | null
+          triggered_at_km: number
+        }
+        Insert: {
+          alert_sent_at?: string | null
+          alert_type: string
+          bus_id?: string | null
+          created_at?: string | null
+          external_response?: Json | null
+          id?: string
+          next_service_km: number
+          status?: string | null
+          triggered_at_km: number
+        }
+        Update: {
+          alert_sent_at?: string | null
+          alert_type?: string
+          bus_id?: string | null
+          created_at?: string | null
+          external_response?: Json | null
+          id?: string
+          next_service_km?: number
+          status?: string | null
+          triggered_at_km?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bus_service_alerts_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bus_types: {
         Row: {
           avg_km_per_l: number | null
@@ -983,6 +1027,8 @@ export type Database = {
           expected_km_per_liter: number | null
           id: string
           insurance_expiry: string | null
+          last_alert_km: number | null
+          last_alert_sent_at: string | null
           last_service_date: string | null
           last_service_mileage: number | null
           model: string
@@ -1012,6 +1058,8 @@ export type Database = {
           expected_km_per_liter?: number | null
           id?: string
           insurance_expiry?: string | null
+          last_alert_km?: number | null
+          last_alert_sent_at?: string | null
           last_service_date?: string | null
           last_service_mileage?: number | null
           model: string
@@ -1041,6 +1089,8 @@ export type Database = {
           expected_km_per_liter?: number | null
           id?: string
           insurance_expiry?: string | null
+          last_alert_km?: number | null
+          last_alert_sent_at?: string | null
           last_service_date?: string | null
           last_service_mileage?: number | null
           model?: string
@@ -4400,6 +4450,39 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      service_alert_config: {
+        Row: {
+          alert_threshold_km: number
+          created_at: string | null
+          external_api_endpoint: string | null
+          external_api_key: string | null
+          id: string
+          is_enabled: boolean | null
+          service_interval_km: number
+          updated_at: string | null
+        }
+        Insert: {
+          alert_threshold_km?: number
+          created_at?: string | null
+          external_api_endpoint?: string | null
+          external_api_key?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          service_interval_km?: number
+          updated_at?: string | null
+        }
+        Update: {
+          alert_threshold_km?: number
+          created_at?: string | null
+          external_api_endpoint?: string | null
+          external_api_key?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          service_interval_km?: number
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       service_master: {
         Row: {
