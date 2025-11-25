@@ -146,10 +146,18 @@ export function CostBreakdown({ data }: Props) {
     ? (customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter
     : ((customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
   
+  // Calculate additional distance from charges
+  const additionalDistanceFromCharges = Array.isArray(data.additionalCharges) 
+    ? data.additionalCharges
+        .filter(charge => charge.type === 'additional_distance')
+        .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+    : 0;
+
   // Use actual km if post-trip adjustment exists
+  // Always include additional distance from charges
   const actualTripDistance = data.postTripAdjustment 
-    ? data.postTripAdjustment.actualKmTraveled + safeData.kmParkingToPickup + safeData.kmDropToParking
-    : safeData.totalTripDistance;
+    ? data.postTripAdjustment.actualKmTraveled + safeData.kmParkingToPickup + safeData.kmDropToParking + additionalDistanceFromCharges
+    : safeData.totalTripDistance + additionalDistanceFromCharges;
   
   // Calculate total fuel cost for internal tracking (all distances)
   const calculatedFuelCost = isMultiParking
@@ -162,7 +170,9 @@ export function CostBreakdown({ data }: Props) {
   // Calculate maintenance cost (for all buses)  
   // For multi-parking, divide parking distances by number of buses, then add trip distance
   const distancePerBus = isMultiParking 
-    ? ((safeData.kmParkingToPickup + safeData.kmDropToParking) / safeData.numberOfBuses) + (data.postTripAdjustment ? data.postTripAdjustment.actualKmTraveled : safeData.kmTrip)
+    ? ((safeData.kmParkingToPickup + safeData.kmDropToParking) / safeData.numberOfBuses) + 
+      (data.postTripAdjustment ? data.postTripAdjustment.actualKmTraveled : safeData.kmTrip) + 
+      additionalDistanceFromCharges
     : actualTripDistance;
   const calculatedMaintenanceCost = (distancePerBus * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   

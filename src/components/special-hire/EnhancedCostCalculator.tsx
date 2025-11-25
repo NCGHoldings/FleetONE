@@ -330,7 +330,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         dropDateTime: quotation.drop_datetime,
         postTripAdjustment: adjustment ? {
           actualKmTraveled: adjustment.actual_km_traveled || 0,
-          originalQuotedKm: adjustment.original_quoted_km || 0,
+          originalQuotedKm: adjustment.original_quoted_km || quotation.km_trip || 0,
           extraKm: adjustment.extra_km || 0,
           extraKmChargePerKm: adjustment.extra_km_charge_per_km || 0,
           extraKmTotalCharge: adjustment.extra_km_total_charge || 0,
