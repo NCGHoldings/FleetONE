@@ -16,8 +16,10 @@ interface CostData {
   exceedingDistanceCharge: number;
   maintenanceCost?: number;
   totalTripDistance?: number;
+  totalDistance?: number; // Total distance including additional distance from charges
   busTypeEfficiency?: number;
   fuelPricePerLiter?: number;
+  fuelPrice?: number; // Alternative fuel price field
   maintenanceRatePerKm?: number;
   pickupDateTime?: string;
   dropDateTime?: string;
@@ -118,9 +120,9 @@ export function CostBreakdown({ data }: Props) {
     overnightCharge: data.overnightCharge || 0,
     exceedingDistanceCharge: data.exceedingDistanceCharge || 0,
     maintenanceCost: data.maintenanceCost || 0,
-    totalTripDistance: (data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0),
+    totalTripDistance: data.totalDistance || ((data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0)),
     busTypeEfficiency: data.busTypeEfficiency || 8,
-    fuelPricePerLiter: data.fuelPricePerLiter || 350,
+    fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 350,
     maintenanceRatePerKm: data.maintenanceRatePerKm || 20,
     grossRevenue: data.grossRevenue || 0,
     customerTotalWithFuel: data.customerTotalWithFuel || 0,
@@ -154,10 +156,10 @@ export function CostBreakdown({ data }: Props) {
     : 0;
 
   // Use actual km if post-trip adjustment exists
-  // Always include additional distance from charges
+  // For regular quotations, use passed totalDistance (already includes additional distance)
   const actualTripDistance = data.postTripAdjustment 
     ? data.postTripAdjustment.actualKmTraveled + safeData.kmParkingToPickup + safeData.kmDropToParking + additionalDistanceFromCharges
-    : safeData.totalTripDistance + additionalDistanceFromCharges;
+    : (data.totalDistance || safeData.totalTripDistance);
   
   // Calculate total fuel cost for internal tracking (all distances)
   const calculatedFuelCost = isMultiParking
