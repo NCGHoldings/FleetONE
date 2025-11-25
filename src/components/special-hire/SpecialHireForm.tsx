@@ -1279,7 +1279,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         totalExpenses: costs.total_expenses,
         netProfit: costs.net_profit,
         numberOfBuses: data.numberOfBuses,
-        totalDistance: (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0),
+        totalDistance: (distanceData.kmParkingToPickup || 0) + (distanceData.kmTrip || 0) + (distanceData.kmDropToParking || 0) + totalAdditionalDistance,
         fuelLiters: Math.round(fuelLiters * 10) / 10,
         busTypeName: busTypeData.name,
         busTypeEfficiency: busTypeData.avg_km_per_l || 8,
