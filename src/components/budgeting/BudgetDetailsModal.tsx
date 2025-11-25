@@ -8,6 +8,7 @@ import { useBudgetDepartments } from "@/hooks/useBudgetDepartments";
 import { useBudgetLineItems } from "@/hooks/useBudgetLineItems";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { BudgetPnLView } from "./BudgetPnLView";
 
 interface BudgetDetailsModalProps {
   budgetId: string;
@@ -102,13 +103,18 @@ export const BudgetDetailsModal = ({
           </Button>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs defaultValue="pnl" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="pnl">Budget vs Actual</TabsTrigger>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="departments">Departments</TabsTrigger>
             <TabsTrigger value="line-items">Line Items</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
+
+          {/* P&L View Tab */}
+          <TabsContent value="pnl" className="space-y-4 mt-6">
+            <BudgetPnLView budgetId={budgetId} />
+          </TabsContent>
 
           <TabsContent value="overview" className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -255,13 +261,6 @@ export const BudgetDetailsModal = ({
                 <p>No line items added yet</p>
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="history" className="space-y-4">
-            <div className="text-center p-8 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Revision history coming soon</p>
-            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>

@@ -18,9 +18,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useBudgets } from "@/hooks/useBudgets";
+import { useBudgetDepartments } from "@/hooks/useBudgetDepartments";
+import { useBudgetLineItems } from "@/hooks/useBudgetLineItems";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, ArrowRight, Check, AlertCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, AlertCircle, FileText, Building2 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CreateBudgetWizardProps {
   open: boolean;
@@ -29,7 +33,10 @@ interface CreateBudgetWizardProps {
 
 export const CreateBudgetWizard = ({ open, onClose }: CreateBudgetWizardProps) => {
   const [step, setStep] = useState(1);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const { createBudget, isLoading } = useBudgets();
+  const { addDepartment } = useBudgetDepartments();
+  const { bulkImportLineItems } = useBudgetLineItems();
   const { hasRole, isAuthenticated } = useAuth();
   
   const hasPermission = hasRole('super_admin') || hasRole('admin') || hasRole('finance');
@@ -41,6 +48,7 @@ export const CreateBudgetWizard = ({ open, onClose }: CreateBudgetWizardProps) =
     end_date: string;
     currency: string;
     description: string;
+    template_id: string;
   }>({
     budget_name: "",
     fiscal_year: new Date().getFullYear(),
@@ -49,6 +57,21 @@ export const CreateBudgetWizard = ({ open, onClose }: CreateBudgetWizardProps) =
     end_date: "",
     currency: "LKR",
     description: "",
+    template_id: "",
+  });
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ["budgetTemplates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("budget_templates")
+        .select("*")
+        .eq("is_active", true)
+        .order("template_name");
+      
+      if (error) throw error;
+      return data;
+    },
   });
 
   const handleNext = () => {
@@ -67,7 +90,41 @@ export const CreateBudgetWizard = ({ open, onClose }: CreateBudgetWizardProps) =
 
   const handleSubmit = async () => {
     try {
-      await createBudget(formData);
+      const budget = await createBudget(formData);
+      
+      // If template selected, create departments and line items
+      if (selectedTemplate && budget) {
+        const structure = selectedTemplate.template_structure;
+        
+        // Create departments and line items
+        for (const dept of structure.departments || []) {
+          const department = await addDepartment({
+            budget_id: budget.id,
+            department_name: dept.name,
+            department_code: dept.code,
+          });
+          
+          // Create line items for this department
+          const lineItems = (dept.categories || []).map((cat: any, index: number) => ({
+            department_id: department.id,
+            line_item_name: cat.name,
+            category: cat.type,
+            subcategory: cat.subcategory,
+            display_order: index,
+            is_active: true,
+            budget_amount: 0,
+            actual_amount: 0,
+            variance_amount: 0,
+            variance_percentage: 0,
+            period_type: "monthly",
+          }));
+          
+          if (lineItems.length > 0) {
+            await bulkImportLineItems(budget.id, lineItems);
+          }
+        }
+      }
+      
       toast.success("Budget created successfully!");
       onClose();
     } catch (error) {
@@ -193,25 +250,65 @@ export const CreateBudgetWizard = ({ open, onClose }: CreateBudgetWizardProps) =
           )}
 
           {step === 2 && (
-            <div className="text-center py-8">
-              <h3 className="text-lg font-semibold mb-4">Select Template</h3>
-              <p className="text-muted-foreground mb-6">
-                Choose an industry template or start from scratch
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="border rounded-lg p-6 hover:border-primary cursor-pointer">
-                  <h4 className="font-semibold mb-2">Transport & Bus Company</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Pre-configured for transport operations
-                  </p>
-                </div>
-                <div className="border rounded-lg p-6 hover:border-primary cursor-pointer">
-                  <h4 className="font-semibold mb-2">Start from Scratch</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Create custom budget structure
-                  </p>
-                </div>
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <FileText className="w-12 h-12 mx-auto mb-3 text-primary" />
+                <h3 className="text-lg font-semibold mb-2">Choose Budget Template</h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Select from industry-specific templates or start from scratch
+                </p>
               </div>
+              
+              <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
+                <Button
+                  variant={!selectedTemplate ? "default" : "outline"}
+                  className="h-auto py-6 flex-col items-center"
+                  onClick={() => {
+                    setSelectedTemplate(null);
+                    setFormData({ ...formData, template_id: "" });
+                  }}
+                >
+                  <FileText className="w-10 h-10 mb-2" />
+                  <p className="font-medium">Start from Scratch</p>
+                  <p className="text-xs opacity-70 mt-1">Build custom budget</p>
+                </Button>
+                
+                {templates.map((template) => (
+                  <Button
+                    key={template.id}
+                    variant={selectedTemplate?.id === template.id ? "default" : "outline"}
+                    className="h-auto py-6 flex-col items-center"
+                    onClick={() => {
+                      setSelectedTemplate(template);
+                      setFormData({ ...formData, template_id: template.id });
+                    }}
+                  >
+                    <Building2 className="w-10 h-10 mb-2" />
+                    <p className="font-medium text-sm">{template.template_name}</p>
+                    <p className="text-xs opacity-70 mt-1 line-clamp-2">{template.description}</p>
+                  </Button>
+                ))}
+              </div>
+              
+              {selectedTemplate && (
+                <div className="mt-4 p-4 border rounded-lg bg-muted/30">
+                  <h4 className="font-semibold mb-2">Template Preview</h4>
+                  <p className="text-sm text-muted-foreground mb-3">{selectedTemplate.description}</p>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">Includes {selectedTemplate.template_structure?.departments?.length || 0} departments:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedTemplate.template_structure?.departments || []).slice(0, 5).map((dept: any, idx: number) => (
+                        <span key={idx} className="text-xs bg-background px-2 py-1 rounded-md border">
+                          {dept.name}
+                        </span>
+                      ))}
+                      {(selectedTemplate.template_structure?.departments?.length || 0) > 5 && (
+                        <span className="text-xs text-muted-foreground">+{selectedTemplate.template_structure.departments.length - 5} more</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
