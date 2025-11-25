@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api'
 import { Badge } from '@/components/ui/badge'
 import { Locate, Navigation, Clock } from 'lucide-react'
@@ -41,6 +41,8 @@ const FleetTrackingMap = ({ trackingData, apiKey, isLoading = false }: FleetTrac
   const [selectedBus, setSelectedBus] = useState<TrackingData | null>(null)
   const [mapCenter, setMapCenter] = useState({ lat: 6.9271, lng: 79.8612 }) // Colombo, Sri Lanka
   const [mapZoom, setMapZoom] = useState(8)
+  const [isMapLoaded, setIsMapLoaded] = useState(false)
+  const mapRef = useRef<google.maps.Map | null>(null)
 
   // Filter out buses without valid GPS coordinates
   const validBuses = useMemo(() => {
@@ -51,9 +53,11 @@ const FleetTrackingMap = ({ trackingData, apiKey, isLoading = false }: FleetTrac
     )
   }, [trackingData])
 
-  // Auto-center map to show all buses
+  // Auto-center map to show all buses (only after map is loaded)
   useEffect(() => {
-    if (validBuses.length > 0) {
+    if (!isMapLoaded || !window.google || validBuses.length === 0) return
+    
+    try {
       const bounds = new google.maps.LatLngBounds()
       validBuses.forEach(bus => {
         if (bus.gps_coordinates) {
@@ -71,10 +75,24 @@ const FleetTrackingMap = ({ trackingData, apiKey, isLoading = false }: FleetTrac
       } else {
         setMapZoom(10)
       }
+      
+      // Fit bounds if we have a map reference
+      if (mapRef.current) {
+        mapRef.current.fitBounds(bounds)
+      }
+    } catch (error) {
+      console.error('Error setting map bounds:', error)
     }
-  }, [validBuses])
+  }, [validBuses, isMapLoaded])
+  
+  const handleMapLoad = (map: google.maps.Map) => {
+    mapRef.current = map
+    setIsMapLoaded(true)
+  }
 
   const getMarkerIcon = (bus: TrackingData) => {
+    if (!window.google) return undefined
+    
     let color = '#6B7280' // grey for inactive
     
     if (bus.status === 'active' && bus.speed_kmh && bus.speed_kmh > 0) {
@@ -179,6 +197,7 @@ const FleetTrackingMap = ({ trackingData, apiKey, isLoading = false }: FleetTrac
         mapContainerStyle={mapContainerStyle}
         center={mapCenter}
         zoom={mapZoom}
+        onLoad={handleMapLoad}
         options={{
           zoomControl: true,
           mapTypeControl: true,
