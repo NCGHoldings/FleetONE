@@ -13,14 +13,35 @@ import {
 } from "@/components/ui/select";
 import { Eye, Edit, Trash2, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { BudgetDetailsModal } from "./BudgetDetailsModal";
+import { EditBudgetModal } from "./EditBudgetModal";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const BudgetListView = () => {
-  const { fetchBudgets, deleteBudget } = useBudgets();
+  const { fetchBudgets, deleteBudget, duplicateBudget } = useBudgets();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
+  
+  // Modal states
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState<string | null>(null);
+  const [duplicatingBudgetId, setDuplicatingBudgetId] = useState<string | null>(null);
 
-  const { data: budgets, isLoading } = useQuery({
+  const { data: budgets, isLoading, refetch } = useQuery({
     queryKey: ["budgets", statusFilter, yearFilter],
     queryFn: () =>
       fetchBudgets({
@@ -28,6 +49,67 @@ export const BudgetListView = () => {
         fiscal_year: yearFilter !== "all" ? parseInt(yearFilter) : undefined,
       }),
   });
+
+  const handleView = (budgetId: string) => {
+    setSelectedBudgetId(budgetId);
+    setShowDetailsModal(true);
+  };
+
+  const handleEdit = (budgetId: string) => {
+    setSelectedBudgetId(budgetId);
+    setShowEditModal(true);
+  };
+
+  const handleDuplicate = async (budgetId: string) => {
+    const currentYear = new Date().getFullYear();
+    const newFiscalYear = window.prompt(
+      `Enter the fiscal year for the duplicated budget:`,
+      (currentYear + 1).toString()
+    );
+
+    if (!newFiscalYear) return;
+
+    const year = parseInt(newFiscalYear);
+    if (isNaN(year) || year < 2000 || year > 2100) {
+      toast.error("Invalid fiscal year");
+      return;
+    }
+
+    try {
+      setDuplicatingBudgetId(budgetId);
+      await duplicateBudget(budgetId, year);
+      toast.success("Budget duplicated successfully");
+      refetch();
+    } catch (error) {
+      console.error("Error duplicating budget:", error);
+      toast.error("Failed to duplicate budget");
+    } finally {
+      setDuplicatingBudgetId(null);
+    }
+  };
+
+  const handleDeleteClick = (budgetId: string) => {
+    setBudgetToDelete(budgetId);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!budgetToDelete) return;
+
+    try {
+      const success = await deleteBudget(budgetToDelete);
+      if (success) {
+        toast.success("Budget deleted successfully");
+        refetch();
+      }
+    } catch (error) {
+      console.error("Error deleting budget:", error);
+      toast.error("Failed to delete budget");
+    } finally {
+      setShowDeleteDialog(false);
+      setBudgetToDelete(null);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, string> = {
@@ -80,21 +162,38 @@ export const BudgetListView = () => {
       header: "Actions",
       cell: ({ row }: any) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="ghost">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleView(row.original.id)}
+            title="View Details"
+          >
             <Eye className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="ghost">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleEdit(row.original.id)}
+            title="Edit Budget"
+          >
             <Edit className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="ghost">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleDuplicate(row.original.id)}
+            disabled={duplicatingBudgetId === row.original.id}
+            title="Duplicate Budget"
+          >
             <Copy className="h-4 w-4" />
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => deleteBudget(row.original.id)}
+            onClick={() => handleDeleteClick(row.original.id)}
+            title="Delete Budget"
           >
-            <Trash2 className="h-4 w-4 text-red-500" />
+            <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
       ),
@@ -148,6 +247,52 @@ export const BudgetListView = () => {
         data={budgets || []}
         searchKey="budget_name"
       />
+
+      {selectedBudgetId && (
+        <>
+          <BudgetDetailsModal
+            budgetId={selectedBudgetId}
+            open={showDetailsModal}
+            onOpenChange={setShowDetailsModal}
+            onEdit={() => {
+              setShowDetailsModal(false);
+              setShowEditModal(true);
+            }}
+            onDuplicate={() => {
+              setShowDetailsModal(false);
+              handleDuplicate(selectedBudgetId);
+            }}
+          />
+
+          <EditBudgetModal
+            budgetId={selectedBudgetId}
+            open={showEditModal}
+            onOpenChange={setShowEditModal}
+            onSuccess={() => {
+              refetch();
+              setShowEditModal(false);
+            }}
+          />
+        </>
+      )}
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the budget
+              and all associated departments and line items.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
