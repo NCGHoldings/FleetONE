@@ -11,13 +11,14 @@ import { ColumnDef } from "@tanstack/react-table";
 import { 
   MapPin, Truck, Gauge, Fuel, Settings, 
   AlertTriangle, CheckCircle, RadioIcon as Radio,
-  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2
+  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2, Plus
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { format } from "date-fns";
 import FleetTrackingMap from "@/components/fleet/FleetTrackingMap";
+import { seedMissingGPSBuses } from "@/utils/seed-missing-gps-buses";
 
 interface TrackingData {
   id: string;
@@ -78,6 +79,8 @@ export default function RealTimeTracking() {
     };
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [unmatchedVehicleCount, setUnmatchedVehicleCount] = useState(0);
+  const [isAddingBuses, setIsAddingBuses] = useState(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
 
   const isSupervisor = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
@@ -160,6 +163,8 @@ export default function RealTimeTracking() {
 
       console.log("FIOS API response:", data);
       
+      setUnmatchedVehicleCount(data.unmatched || 0);
+      
       if (data.unmatchedVehicles && data.unmatchedVehicles.length > 0) {
         toast.success(`GPS Data Updated: ${data.matched} vehicles matched. ${data.unmatched} vehicles not found in database.`);
       } else {
@@ -217,6 +222,18 @@ export default function RealTimeTracking() {
       }
     };
   }, [gpsSettings.refreshInterval]);
+
+  const handleAddMissingBuses = async () => {
+    setIsAddingBuses(true);
+    const result = await seedMissingGPSBuses();
+    
+    if (result.success) {
+      // Refresh GPS data after adding buses
+      await refreshData();
+    }
+    
+    setIsAddingBuses(false);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -397,6 +414,19 @@ export default function RealTimeTracking() {
           </div>
           
           <div className="flex gap-2">
+            {unmatchedVehicleCount > 0 && (
+              <Button 
+                onClick={handleAddMissingBuses}
+                variant="default"
+                disabled={isAddingBuses}
+                className="bg-green-500/80 hover:bg-green-600 text-white transition-all duration-300 animate-scale-in"
+                style={{ animationDelay: '0.15s' }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {isAddingBuses ? "Adding Buses..." : `Add ${unmatchedVehicleCount} Missing GPS Buses`}
+              </Button>
+            )}
+            
             <Button 
               variant="outline" 
               onClick={refreshData}
