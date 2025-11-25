@@ -3,6 +3,9 @@ project_id = "wwjpdszkmtnzshbulkon"
 [functions.fetch-fios-tracking]
 verify_jwt = false
 
+[functions.get-maps-api-key]
+verify_jwt = true
+
 [functions.refresh-seasonal-themes]
 verify_jwt = false
 
