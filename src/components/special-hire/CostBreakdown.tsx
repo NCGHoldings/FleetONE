@@ -157,9 +157,10 @@ export function CostBreakdown({ data }: Props) {
 
   // Use actual km if post-trip adjustment exists
   // For regular quotations, use passed totalDistance (already includes additional distance)
+  // For calculator tab, calculate totalTripDistance + additionalDistanceFromCharges
   const actualTripDistance = data.postTripAdjustment 
     ? data.postTripAdjustment.actualKmTraveled + safeData.kmParkingToPickup + safeData.kmDropToParking + additionalDistanceFromCharges
-    : (data.totalDistance || safeData.totalTripDistance);
+    : (data.totalDistance !== undefined ? data.totalDistance : safeData.totalTripDistance + additionalDistanceFromCharges);
   
   // Calculate total fuel cost for internal tracking (all distances)
   const calculatedFuelCost = isMultiParking
