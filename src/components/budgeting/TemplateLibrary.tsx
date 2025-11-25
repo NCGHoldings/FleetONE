@@ -3,9 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useBudgetTemplates, BudgetTemplate } from "@/hooks/useBudgetTemplates";
 import { Button } from "@/components/ui/button";
-import { Eye, Copy } from "lucide-react";
+import { Eye, Copy, Edit } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
+import { TemplateEditorModal } from "./TemplateEditorModal";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface TemplateLibraryProps {
   onUseTemplate?: (template: BudgetTemplate) => void;
@@ -15,6 +18,12 @@ export const TemplateLibrary = ({ onUseTemplate }: TemplateLibraryProps) => {
   const { fetchTemplates } = useBudgetTemplates();
   const [selectedTemplate, setSelectedTemplate] = useState<BudgetTemplate | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showEditorModal, setShowEditorModal] = useState(false);
+
+  const { data: templates, isLoading, refetch } = useQuery({
+    queryKey: ["budget_templates"],
+    queryFn: () => fetchTemplates(),
+  });
 
   const handlePreview = (template: BudgetTemplate) => {
     setSelectedTemplate(template);
@@ -26,10 +35,30 @@ export const TemplateLibrary = ({ onUseTemplate }: TemplateLibraryProps) => {
     onUseTemplate?.(template);
   };
 
-  const { data: templates, isLoading } = useQuery({
-    queryKey: ["budget_templates"],
-    queryFn: () => fetchTemplates(),
-  });
+  const handleEditTemplate = (template: BudgetTemplate) => {
+    setSelectedTemplate(template);
+    setShowEditorModal(true);
+  };
+
+  const handleSaveTemplate = async (updatedTemplate: BudgetTemplate) => {
+    try {
+      const { error } = await supabase
+        .from("budget_templates")
+        .update({
+          template_structure: updatedTemplate.template_structure,
+        })
+        .eq("id", updatedTemplate.id);
+
+      if (error) throw error;
+
+      toast.success("Template updated successfully");
+      setShowEditorModal(false);
+      refetch();
+    } catch (error: any) {
+      console.error("Error updating template:", error);
+      toast.error("Failed to update template");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -94,6 +123,14 @@ export const TemplateLibrary = ({ onUseTemplate }: TemplateLibraryProps) => {
                 </Button>
                 <Button 
                   size="sm" 
+                  variant="outline"
+                  onClick={() => handleEditTemplate(template)}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+                <Button 
+                  size="sm" 
                   className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600"
                   onClick={() => handleUseTemplate(template)}
                 >
@@ -111,6 +148,12 @@ export const TemplateLibrary = ({ onUseTemplate }: TemplateLibraryProps) => {
         open={showPreviewModal}
         onClose={() => setShowPreviewModal(false)}
         onUseTemplate={handleUseTemplate}
+      />
+      <TemplateEditorModal
+        template={selectedTemplate}
+        open={showEditorModal}
+        onClose={() => setShowEditorModal(false)}
+        onSave={handleSaveTemplate}
       />
     </div>
   );
