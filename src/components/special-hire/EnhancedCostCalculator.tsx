@@ -248,12 +248,12 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         .maybeSingle();
 
     // Fetch fuel settings for correct fuel price
-    // Use .order() and .limit() to handle multiple default records gracefully
+    // Order by created_at ASC to get the oldest default record (matches FuelSettingsAdmin logic)
     const { data: fuelSettingsArray } = await supabase
       .from('fuel_settings')
       .select('diesel_price_lkr_per_l, maintenance_rate_lkr_per_km')
       .eq('is_default', true)
-      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(1);
 
     const fuelSettings = fuelSettingsArray?.[0] || null;
