@@ -844,21 +844,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         totalMaintenanceCost += maintenanceCostPerBus * bus.quantity;
       }
 
-      // Apply commission and discounts to combined total
-      const grossRevenue = combinedSubtotal;
-      const commissionExpenseAmount = grossRevenue * (data.commissionPct / 100);
-      const commissionPassThroughAmount = grossRevenue * (Math.min(data.commissionPassThroughPct, data.commissionPct) / 100);
-      
-      let discountAmount = 0;
-      if (data.discountType === 'percentage') {
-        discountAmount = grossRevenue * (data.discountPct / 100);
-      } else {
-        discountAmount = data.discountAmount;
-      }
-
-      const subtotalAfterAdjustments = grossRevenue + commissionPassThroughAmount - discountAmount;
-      
-      // Apply additional charges (exclude internal_cost from customer total)
+      // Apply additional charges BEFORE commission (exclude internal_cost from customer total)
       const customerAdditionalCharges = additionalCharges.filter(charge => 
         charge.type !== 'internal_cost'
       );
@@ -869,7 +855,24 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         return sum + charge.amount;
       }, 0);
 
-      const finalCustomerTotal = subtotalAfterAdjustments + totalAdditionalCharges;
+      // Calculate pre-commission total (includes all charges except commission)
+      const grossRevenue = combinedSubtotal;
+      
+      let discountAmount = 0;
+      if (data.discountType === 'percentage') {
+        discountAmount = grossRevenue * (data.discountPct / 100);
+      } else {
+        discountAmount = data.discountAmount;
+      }
+
+      // Pre-commission total = revenue + additional charges - discount
+      const preCommissionTotal = grossRevenue + totalAdditionalCharges - discountAmount;
+      
+      // Calculate commission on the FULL pre-commission total
+      const commissionExpenseAmount = preCommissionTotal * (data.commissionPct / 100);
+      const commissionPassThroughAmount = preCommissionTotal * (Math.min(data.commissionPassThroughPct, data.commissionPct) / 100);
+
+      const finalCustomerTotal = preCommissionTotal + commissionPassThroughAmount;
 
       // Calculate total expenses (include ALL charges including internal_cost in deductions)
       const internalExpenses = additionalCharges
@@ -1165,20 +1168,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }
 
       const grossRevenue = hireCharge * data.numberOfBuses;
-      // Commission and discount calculations
-      const baseCustomerTotal = grossRevenue + totalFuelCost;
       
-      // Commission pass-through (added to customer bill)
-      // Ensure pass-through percentage never exceeds commission percentage
-      const safePassThroughPct = Math.min(data.commissionPassThroughPct, data.commissionPct);
-      const commissionPassThroughAmount = baseCustomerTotal * (safePassThroughPct / 100);
-      
-      // Discount (subtracted from customer bill)
-      const discountAmount = data.discountType === 'percentage' 
-        ? baseCustomerTotal * (data.discountPct / 100)
-        : data.discountAmount;
-      
-      // Final customer total with additional charges (exclude internal_cost from customer total)
+      // Calculate additional charges BEFORE commission (exclude internal_cost from customer total)
       const customerAdditionalCharges = additionalCharges.filter(charge => 
         charge.type !== 'internal_cost'
       );
@@ -1186,7 +1177,22 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         let chargeAmount = charge.type === 'additional_distance' ? (charge.amount || 0) : charge.amount;
         return sum + (charge.applyPerBus ? chargeAmount * charge.busesCount : chargeAmount);
       }, 0);
-      const finalCustomerTotal = baseCustomerTotal + commissionPassThroughAmount - discountAmount + totalAdditionalCharges;
+      
+      // Discount (subtracted from customer bill)
+      const discountAmount = data.discountType === 'percentage' 
+        ? grossRevenue * (data.discountPct / 100)
+        : data.discountAmount;
+      
+      // Pre-commission total = revenue + fuel + additional charges - discount
+      const preCommissionTotal = grossRevenue + totalFuelCost + totalAdditionalCharges - discountAmount;
+      
+      // Commission calculations on FULL pre-commission total
+      // Ensure pass-through percentage never exceeds commission percentage
+      const safePassThroughPct = Math.min(data.commissionPassThroughPct, data.commissionPct);
+      const commissionPassThroughAmount = preCommissionTotal * (safePassThroughPct / 100);
+      const commissionExpense = preCommissionTotal * (data.commissionPct / 100); // Total commission company pays
+      
+      const finalCustomerTotal = preCommissionTotal + commissionPassThroughAmount;
       
       // Company expenses (include ALL charges including internal_cost in deductions)
       const internalExpenses = additionalCharges
@@ -1195,8 +1201,6 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           const effectiveAmount = charge.applyPerBus ? charge.amount * charge.busesCount : charge.amount;
           return sum + effectiveAmount;
         }, 0);
-      
-      const commissionExpense = baseCustomerTotal * (data.commissionPct / 100); // Total commission company pays
       const driverCharge = 1500; // Default driver charge
       const totalExpenses = (driverCharge * data.numberOfBuses) + commissionExpense + totalFuelCost + internalExpenses;
       const netProfit = finalCustomerTotal - totalExpenses;
