@@ -1,5 +1,8 @@
 project_id = "wwjpdszkmtnzshbulkon"
 
+[functions.fetch-fios-tracking]
+verify_jwt = false
+
 [functions.refresh-seasonal-themes]
 verify_jwt = false
 
