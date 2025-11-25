@@ -1,11 +1,12 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChevronDown, ChevronUp, Calendar } from "lucide-react";
+import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MonthlyBudgetBreakdown } from "./MonthlyBudgetBreakdown";
 
 interface BudgetPnLViewProps {
   budgetId: string;
@@ -20,19 +21,21 @@ interface LineItemWithDept {
   actual_amount?: number;
   variance_amount?: number;
   variance_percentage?: number;
-  department_id?: string;
-  department?: {
-    id: string;
+  budget_departments?: {
     department_name: string;
-    department_code?: string;
   };
 }
 
-export const BudgetPnLView = ({ budgetId }: BudgetPnLViewProps) => {
+export function BudgetPnLView({ budgetId }: BudgetPnLViewProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     revenue: true,
-    expense: true,
+    "Fixed Expenses": true,
+    "Operating Expenses": true,
+    Maintenance: true,
+    Discretionary: true,
+    "Capital Expenditure": true,
   });
+  const [activeTab, setActiveTab] = useState<"summary" | "monthly">("summary");
 
   const { data: lineItems = [], isLoading } = useQuery({
     queryKey: ["budgetLineItems", budgetId],
@@ -41,7 +44,7 @@ export const BudgetPnLView = ({ budgetId }: BudgetPnLViewProps) => {
         .from("budget_line_items")
         .select(`
           *,
-          department:budget_departments(id, department_name, department_code)
+          budget_departments(department_name)
         `)
         .eq("budget_id", budgetId)
         .eq("is_active", true)
@@ -63,32 +66,47 @@ export const BudgetPnLView = ({ budgetId }: BudgetPnLViewProps) => {
 
   const getVarianceColor = (variance?: number) => {
     if (!variance) return "text-muted-foreground";
-    return variance < 0 ? "text-destructive" : "text-green-600";
+    return variance < 0 ? "text-red-600" : "text-green-600";
   };
 
   const getVarianceBgColor = (variance?: number) => {
     if (!variance) return "bg-muted/30";
-    return variance < 0 ? "bg-destructive/10" : "bg-green-500/10";
+    return variance < 0 ? "bg-red-500/10" : "bg-green-500/10";
   };
 
-  // Group by category
-  const revenueItems = lineItems.filter((item) => item.category === "revenue");
-  const expenseItems = lineItems.filter((item) => item.category === "expense");
+  const revenueItems = lineItems.filter((item) => item.category === "Revenue");
+  const expenseItems = lineItems.filter((item) => item.category === "Expense");
 
-  // Calculate totals
+  // Group expenses by subcategory
+  const expensesBySubcategory = expenseItems.reduce((acc, item) => {
+    const subcategory = item.subcategory || "Other";
+    if (!acc[subcategory]) {
+      acc[subcategory] = [];
+    }
+    acc[subcategory].push(item);
+    return acc;
+  }, {} as Record<string, typeof expenseItems>);
+
   const totalRevenueBudget = revenueItems.reduce((sum, item) => sum + (item.budget_amount || 0), 0);
   const totalRevenueActual = revenueItems.reduce((sum, item) => sum + (item.actual_amount || 0), 0);
-  const totalRevenueVariance = totalRevenueBudget - totalRevenueActual;
-  const totalRevenueVariancePerc = totalRevenueBudget ? ((totalRevenueVariance / totalRevenueBudget) * 100) : 0;
+  const totalRevenueVariance = totalRevenueActual - totalRevenueBudget;
 
-  const totalExpenseBudget = expenseItems.reduce((sum, item) => sum + (item.budget_amount || 0), 0);
-  const totalExpenseActual = expenseItems.reduce((sum, item) => sum + (item.actual_amount || 0), 0);
-  const totalExpenseVariance = totalExpenseBudget - totalExpenseActual;
-  const totalExpenseVariancePerc = totalExpenseBudget ? ((totalExpenseVariance / totalExpenseBudget) * 100) : 0;
+  const totalExpensesBudget = expenseItems.reduce((sum, item) => sum + (item.budget_amount || 0), 0);
+  const totalExpensesActual = expenseItems.reduce((sum, item) => sum + (item.actual_amount || 0), 0);
+  const totalExpensesVariance = totalExpensesActual - totalExpensesBudget;
 
-  const netProfit = totalRevenueActual - totalExpenseActual;
-  const budgetedProfit = totalRevenueBudget - totalExpenseBudget;
-  const profitVariance = budgetedProfit - netProfit;
+  const netProfitBudget = totalRevenueBudget - totalExpensesBudget;
+  const netProfitActual = totalRevenueActual - totalExpensesActual;
+  const netProfitVariance = netProfitActual - netProfitBudget;
+
+  const calculateSubcategoryTotals = (subcategory: string) => {
+    const items = expensesBySubcategory[subcategory] || [];
+    return {
+      budget: items.reduce((sum, item) => sum + (item.budget_amount || 0), 0),
+      actual: items.reduce((sum, item) => sum + (item.actual_amount || 0), 0),
+      variance: items.reduce((sum, item) => sum + ((item.actual_amount || 0) - (item.budget_amount || 0)), 0),
+    };
+  };
 
   if (isLoading) {
     return (
@@ -101,186 +119,190 @@ export const BudgetPnLView = ({ budgetId }: BudgetPnLViewProps) => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Summary Header */}
-      <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-        <div className="grid grid-cols-3 gap-6">
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
-            <p className="text-2xl font-bold">{formatCurrency(totalRevenueActual)}</p>
-            <p className="text-xs text-muted-foreground">Budget: {formatCurrency(totalRevenueBudget)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Total Expenses</p>
-            <p className="text-2xl font-bold">{formatCurrency(totalExpenseActual)}</p>
-            <p className="text-xs text-muted-foreground">Budget: {formatCurrency(totalExpenseBudget)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Net Profit/Loss</p>
-            <p className={`text-2xl font-bold ${netProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
-              {formatCurrency(netProfit)}
-            </p>
-            <p className="text-xs text-muted-foreground">Budget: {formatCurrency(budgetedProfit)}</p>
-          </div>
-        </div>
-      </Card>
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "summary" | "monthly")} className="space-y-4">
+      <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsTrigger value="summary">Summary View</TabsTrigger>
+        <TabsTrigger value="monthly">
+          <Calendar className="h-4 w-4 mr-2" />
+          Monthly Breakdown
+        </TabsTrigger>
+      </TabsList>
 
-      {/* Revenue Section */}
-      <Card className="overflow-hidden">
-        <div
-          className="p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-b cursor-pointer hover:bg-green-500/20 transition-colors"
-          onClick={() => toggleSection("revenue")}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {expandedSections.revenue ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-              <h3 className="text-lg font-bold">Revenue</h3>
-              <Badge variant="secondary">{revenueItems.length} items</Badge>
+      <TabsContent value="summary" className="space-y-4">
+        {/* Summary Header */}
+        <Card className="bg-gradient-to-br from-primary/10 to-purple-500/10 border-primary/30">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Total Revenue</p>
+                <p className="text-3xl font-bold text-green-700">{formatCurrency(totalRevenueBudget)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Actual: {formatCurrency(totalRevenueActual)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Total Expenses</p>
+                <p className="text-3xl font-bold text-red-700">{formatCurrency(totalExpensesBudget)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Actual: {formatCurrency(totalExpensesActual)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Net Profit/Loss</p>
+                <p className={`text-3xl font-bold ${netProfitBudget >= 0 ? "text-green-700" : "text-red-700"}`}>
+                  {formatCurrency(netProfitBudget)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Actual: {formatCurrency(netProfitActual)}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-6 text-sm font-semibold">
-              <span className="w-32 text-right">{formatCurrency(totalRevenueBudget)}</span>
-              <span className="w-32 text-right">{formatCurrency(totalRevenueActual)}</span>
-              <span className={`w-32 text-right ${getVarianceColor(totalRevenueVariance)}`}>
-                {formatCurrency(totalRevenueVariance)}
-              </span>
-              <span className={`w-24 text-right ${getVarianceColor(totalRevenueVariance)}`}>
-                {totalRevenueVariancePerc.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {expandedSections.revenue && (
-          <div className="divide-y">
-            {/* Header Row */}
-            <div className="grid grid-cols-12 gap-4 p-4 bg-muted/30 text-xs font-semibold text-muted-foreground">
-              <div className="col-span-4">Line Item</div>
-              <div className="col-span-2 text-right">Budget</div>
-              <div className="col-span-2 text-right">Actual</div>
-              <div className="col-span-2 text-right">Variance</div>
-              <div className="col-span-2 text-right">Variance %</div>
-            </div>
+        {/* Revenue Section */}
+        <Card>
+          <CardHeader className="cursor-pointer" onClick={() => toggleSection("revenue")}>
+            <CardTitle className="flex items-center justify-between text-green-700">
+              <span>Revenue</span>
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-normal">
+                  {formatCurrency(totalRevenueBudget)} • {revenueItems.length} items
+                </span>
+                {expandedSections.revenue ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+              </div>
+            </CardTitle>
+          </CardHeader>
+          {expandedSections.revenue && (
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 font-medium">Line Item</th>
+                      <th className="text-left py-2 font-medium">Department</th>
+                      <th className="text-right py-2 font-medium">Budget</th>
+                      <th className="text-right py-2 font-medium">Actual</th>
+                      <th className="text-right py-2 font-medium">Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {revenueItems.map((item) => (
+                      <tr key={item.id} className="border-b last:border-0">
+                        <td className="py-2">{item.line_item_name}</td>
+                        <td className="py-2 text-muted-foreground">{item.budget_departments?.department_name || "-"}</td>
+                        <td className="py-2 text-right">{formatCurrency(item.budget_amount)}</td>
+                        <td className="py-2 text-right">{formatCurrency(item.actual_amount)}</td>
+                        <td className={`py-2 text-right ${getVarianceColor(item.variance_amount)}`}>
+                          {formatCurrency(item.variance_amount)} ({((item.variance_percentage || 0) * 100).toFixed(1)}%)
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold bg-green-50">
+                      <td colSpan={2} className="py-2">
+                        Total Revenue
+                      </td>
+                      <td className="py-2 text-right">{formatCurrency(totalRevenueBudget)}</td>
+                      <td className="py-2 text-right">{formatCurrency(totalRevenueActual)}</td>
+                      <td className={`py-2 text-right ${getVarianceColor(totalRevenueVariance)}`}>
+                        {formatCurrency(totalRevenueVariance)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          )}
+        </Card>
 
-            {revenueItems.map((item) => {
-              const variance = (item.budget_amount || 0) - (item.actual_amount || 0);
-              const variancePerc = item.budget_amount ? ((variance / item.budget_amount) * 100) : 0;
-              
-              return (
-                <div key={item.id} className="grid grid-cols-12 gap-4 p-4 hover:bg-muted/30 transition-colors">
-                  <div className="col-span-4">
-                    <p className="font-medium">{item.line_item_name}</p>
-                    {item.subcategory && (
-                      <p className="text-xs text-muted-foreground">{item.subcategory}</p>
-                    )}
+        {/* Expenses by Subcategory */}
+        {Object.entries(expensesBySubcategory).map(([subcategory, items]) => {
+          const totals = calculateSubcategoryTotals(subcategory);
+          return (
+            <Card key={subcategory}>
+              <CardHeader className="cursor-pointer" onClick={() => toggleSection(subcategory)}>
+                <CardTitle className="flex items-center justify-between text-red-700">
+                  <span>{subcategory}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-normal">
+                      {formatCurrency(totals.budget)} • {items.length} items
+                    </span>
+                    {expandedSections[subcategory] ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                   </div>
-                  <div className="col-span-2 text-right text-sm">{formatCurrency(item.budget_amount)}</div>
-                  <div className="col-span-2 text-right text-sm font-semibold">{formatCurrency(item.actual_amount)}</div>
-                  <div className={`col-span-2 text-right text-sm font-semibold ${getVarianceColor(variance)}`}>
-                    {formatCurrency(Math.abs(variance))}
+                </CardTitle>
+              </CardHeader>
+              {expandedSections[subcategory] && (
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 font-medium">Line Item</th>
+                          <th className="text-left py-2 font-medium">Department</th>
+                          <th className="text-right py-2 font-medium">Budget</th>
+                          <th className="text-right py-2 font-medium">Actual</th>
+                          <th className="text-right py-2 font-medium">Variance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((item) => (
+                          <tr key={item.id} className="border-b last:border-0">
+                            <td className="py-2">{item.line_item_name}</td>
+                            <td className="py-2 text-muted-foreground">
+                              {item.budget_departments?.department_name || "-"}
+                            </td>
+                            <td className="py-2 text-right">{formatCurrency(item.budget_amount)}</td>
+                            <td className="py-2 text-right">{formatCurrency(item.actual_amount)}</td>
+                            <td className={`py-2 text-right ${getVarianceColor(item.variance_amount)}`}>
+                              {formatCurrency(item.variance_amount)} ({((item.variance_percentage || 0) * 100).toFixed(1)}%)
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="font-bold bg-muted/30">
+                          <td colSpan={2} className="py-2">
+                            Subtotal - {subcategory}
+                          </td>
+                          <td className="py-2 text-right">{formatCurrency(totals.budget)}</td>
+                          <td className="py-2 text-right">{formatCurrency(totals.actual)}</td>
+                          <td className={`py-2 text-right ${getVarianceColor(totals.variance)}`}>
+                            {formatCurrency(totals.variance)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                  <div className="col-span-2 text-right">
-                    <Badge variant="secondary" className={getVarianceBgColor(variance)}>
-                      {variance < 0 ? <TrendingDown className="w-3 h-3 mr-1" /> : <TrendingUp className="w-3 h-3 mr-1" />}
-                      {Math.abs(variancePerc).toFixed(1)}%
-                    </Badge>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+                </CardContent>
+              )}
+            </Card>
+          );
+        })}
 
-      {/* Expense Section */}
-      <Card className="overflow-hidden">
-        <div
-          className="p-4 bg-gradient-to-r from-orange-500/10 to-red-500/10 border-b cursor-pointer hover:bg-orange-500/20 transition-colors"
-          onClick={() => toggleSection("expense")}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {expandedSections.expense ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-              <h3 className="text-lg font-bold">Expenses</h3>
-              <Badge variant="secondary">{expenseItems.length} items</Badge>
+        {/* Total Expenses Row */}
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-5 gap-4 font-bold text-red-900">
+              <div className="col-span-2">TOTAL EXPENSES</div>
+              <div className="text-right">{formatCurrency(totalExpensesBudget)}</div>
+              <div className="text-right">{formatCurrency(totalExpensesActual)}</div>
+              <div className={`text-right ${getVarianceColor(totalExpensesVariance)}`}>
+                {formatCurrency(totalExpensesVariance)}
+              </div>
             </div>
-            <div className="flex items-center gap-6 text-sm font-semibold">
-              <span className="w-32 text-right">{formatCurrency(totalExpenseBudget)}</span>
-              <span className="w-32 text-right">{formatCurrency(totalExpenseActual)}</span>
-              <span className={`w-32 text-right ${getVarianceColor(totalExpenseVariance)}`}>
-                {formatCurrency(totalExpenseVariance)}
-              </span>
-              <span className={`w-24 text-right ${getVarianceColor(totalExpenseVariance)}`}>
-                {totalExpenseVariancePerc.toFixed(1)}%
-              </span>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {expandedSections.expense && (
-          <div className="divide-y">
-            {/* Header Row */}
-            <div className="grid grid-cols-12 gap-4 p-4 bg-muted/30 text-xs font-semibold text-muted-foreground">
-              <div className="col-span-4">Line Item</div>
-              <div className="col-span-2 text-right">Budget</div>
-              <div className="col-span-2 text-right">Actual</div>
-              <div className="col-span-2 text-right">Variance</div>
-              <div className="col-span-2 text-right">Variance %</div>
+        {/* Net Profit/Loss */}
+        <Card className={netProfitActual >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-5 gap-4 font-bold text-lg">
+              <div className="col-span-2">NET PROFIT/LOSS</div>
+              <div className="text-right">{formatCurrency(netProfitBudget)}</div>
+              <div className={`text-right ${netProfitActual >= 0 ? "text-green-700" : "text-red-700"}`}>
+                {formatCurrency(netProfitActual)}
+              </div>
+              <div className={`text-right ${getVarianceColor(netProfitVariance)}`}>{formatCurrency(netProfitVariance)}</div>
             </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
 
-            {expenseItems.map((item) => {
-              const variance = (item.budget_amount || 0) - (item.actual_amount || 0);
-              const variancePerc = item.budget_amount ? ((variance / item.budget_amount) * 100) : 0;
-              
-              return (
-                <div key={item.id} className="grid grid-cols-12 gap-4 p-4 hover:bg-muted/30 transition-colors">
-                  <div className="col-span-4">
-                    <p className="font-medium">{item.line_item_name}</p>
-                    {item.subcategory && (
-                      <p className="text-xs text-muted-foreground">{item.subcategory}</p>
-                    )}
-                  </div>
-                  <div className="col-span-2 text-right text-sm">{formatCurrency(item.budget_amount)}</div>
-                  <div className="col-span-2 text-right text-sm font-semibold">{formatCurrency(item.actual_amount)}</div>
-                  <div className={`col-span-2 text-right text-sm font-semibold ${getVarianceColor(variance)}`}>
-                    {formatCurrency(Math.abs(variance))}
-                  </div>
-                  <div className="col-span-2 text-right">
-                    <Badge variant="secondary" className={getVarianceBgColor(variance)}>
-                      {variance < 0 ? <TrendingDown className="w-3 h-3 mr-1" /> : <TrendingUp className="w-3 h-3 mr-1" />}
-                      {Math.abs(variancePerc).toFixed(1)}%
-                    </Badge>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      {/* Net Profit/Loss Row */}
-      <Card className={`p-6 border-2 ${netProfit >= 0 ? "border-green-500/30 bg-green-500/5" : "border-destructive/30 bg-destructive/5"}`}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold">Net Profit / (Loss)</h3>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground mb-1">Budgeted</p>
-              <p className="text-lg font-semibold">{formatCurrency(budgetedProfit)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground mb-1">Actual</p>
-              <p className={`text-2xl font-bold ${netProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
-                {formatCurrency(netProfit)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground mb-1">Variance</p>
-              <p className={`text-lg font-semibold ${getVarianceColor(profitVariance)}`}>
-                {formatCurrency(Math.abs(profitVariance))}
-              </p>
-            </div>
-          </div>
-        </div>
-      </Card>
-    </div>
+      <TabsContent value="monthly">
+        <MonthlyBudgetBreakdown lineItems={lineItems} />
+      </TabsContent>
+    </Tabs>
   );
-};
+}
