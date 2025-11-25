@@ -21,6 +21,7 @@ import { useBudgets } from "@/hooks/useBudgets";
 import { useBudgetDepartments } from "@/hooks/useBudgetDepartments";
 import { useBudgetLineItems } from "@/hooks/useBudgetLineItems";
 import { useAuth } from "@/hooks/useAuth";
+import { BudgetTemplate } from "@/hooks/useBudgetTemplates";
 import { ArrowLeft, ArrowRight, Check, AlertCircle, FileText, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -29,11 +30,12 @@ import { supabase } from "@/integrations/supabase/client";
 interface CreateBudgetWizardProps {
   open: boolean;
   onClose: () => void;
+  initialTemplate?: BudgetTemplate | null;
 }
 
-export const CreateBudgetWizard = ({ open, onClose }: CreateBudgetWizardProps) => {
+export const CreateBudgetWizard = ({ open, onClose, initialTemplate }: CreateBudgetWizardProps) => {
   const [step, setStep] = useState(1);
-  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<BudgetTemplate | null>(initialTemplate || null);
   const { createBudget, isLoading } = useBudgets();
   const { addDepartment } = useBudgetDepartments();
   const { bulkImportLineItems } = useBudgetLineItems();

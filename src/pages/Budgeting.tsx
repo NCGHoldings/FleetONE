@@ -8,13 +8,21 @@ import { TemplateLibrary } from "@/components/budgeting/TemplateLibrary";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, AlertCircle, Lock } from "lucide-react";
+import { BudgetTemplate } from "@/hooks/useBudgetTemplates";
 
 const Budgeting = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showCreateWizard, setShowCreateWizard] = useState(false);
+  const [preSelectedTemplate, setPreSelectedTemplate] = useState<BudgetTemplate | null>(null);
   const { hasRole, isAuthenticated } = useAuth();
   
   const hasPermission = hasRole('super_admin') || hasRole('admin') || hasRole('finance');
+
+  const handleUseTemplate = (template: BudgetTemplate) => {
+    setPreSelectedTemplate(template);
+    setActiveTab("budgets");
+    setShowCreateWizard(true);
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -73,7 +81,7 @@ const Budgeting = () => {
         </TabsContent>
 
         <TabsContent value="templates" className="mt-6">
-          <TemplateLibrary />
+          <TemplateLibrary onUseTemplate={handleUseTemplate} />
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-6">
@@ -87,7 +95,11 @@ const Budgeting = () => {
       {showCreateWizard && (
         <CreateBudgetWizard
           open={showCreateWizard}
-          onClose={() => setShowCreateWizard(false)}
+          onClose={() => {
+            setShowCreateWizard(false);
+            setPreSelectedTemplate(null);
+          }}
+          initialTemplate={preSelectedTemplate}
         />
       )}
     </div>

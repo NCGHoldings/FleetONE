@@ -1,12 +1,30 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useBudgetTemplates } from "@/hooks/useBudgetTemplates";
+import { useBudgetTemplates, BudgetTemplate } from "@/hooks/useBudgetTemplates";
 import { Button } from "@/components/ui/button";
 import { Eye, Copy } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TemplatePreviewModal } from "./TemplatePreviewModal";
 
-export const TemplateLibrary = () => {
+interface TemplateLibraryProps {
+  onUseTemplate?: (template: BudgetTemplate) => void;
+}
+
+export const TemplateLibrary = ({ onUseTemplate }: TemplateLibraryProps) => {
   const { fetchTemplates } = useBudgetTemplates();
+  const [selectedTemplate, setSelectedTemplate] = useState<BudgetTemplate | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+
+  const handlePreview = (template: BudgetTemplate) => {
+    setSelectedTemplate(template);
+    setShowPreviewModal(true);
+  };
+
+  const handleUseTemplate = (template: BudgetTemplate) => {
+    setShowPreviewModal(false);
+    onUseTemplate?.(template);
+  };
 
   const { data: templates, isLoading } = useQuery({
     queryKey: ["budget_templates"],
@@ -65,11 +83,20 @@ export const TemplateLibrary = () => {
                 {template.description || "No description available"}
               </p>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => handlePreview(template)}
+                >
                   <Eye className="h-4 w-4 mr-2" />
                   Preview
                 </Button>
-                <Button size="sm" className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600">
+                <Button 
+                  size="sm" 
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600"
+                  onClick={() => handleUseTemplate(template)}
+                >
                   <Copy className="h-4 w-4 mr-2" />
                   Use Template
                 </Button>
@@ -78,6 +105,13 @@ export const TemplateLibrary = () => {
           </Card>
         ))}
       </div>
+
+      <TemplatePreviewModal
+        template={selectedTemplate}
+        open={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        onUseTemplate={handleUseTemplate}
+      />
     </div>
   );
 };
