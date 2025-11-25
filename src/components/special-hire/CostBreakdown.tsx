@@ -59,6 +59,21 @@ interface CostData {
   }>;
   totalAdditionalCharges?: number;
   numberOfBuses?: number;
+  postTripAdjustment?: {
+    actualKmTraveled: number;
+    originalQuotedKm: number;
+    extraKm: number;
+    extraKmChargePerKm: number;
+    extraKmTotalCharge: number;
+    additionalExpenses: Array<{description: string; amount: number; category: string}>;
+    totalAdditionalExpenses: number;
+    originalQuotationAmount: number;
+    adjustmentAmount: number;
+    finalTripAmount: number;
+    advanceAlreadyPaid: number;
+    balanceDue: number;
+    adjustmentStatus: string;
+  };
   // Multi-parking support
   busCalculations?: Array<{
     busNumber: number;
@@ -131,19 +146,24 @@ export function CostBreakdown({ data }: Props) {
     ? (customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter
     : ((customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
   
+  // Use actual km if post-trip adjustment exists
+  const actualTripDistance = data.postTripAdjustment 
+    ? data.postTripAdjustment.actualKmTraveled + safeData.kmParkingToPickup + safeData.kmDropToParking
+    : safeData.totalTripDistance;
+  
   // Calculate total fuel cost for internal tracking (all distances)
   const calculatedFuelCost = isMultiParking
-    ? ((safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter)
-    : ((safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
+    ? ((actualTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter)
+    : ((actualTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
   
   // Calculate deductions fuel cost - ALWAYS multiply by number of buses for expense tracking
-  const deductionsFuelCost = ((safeData.totalTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
+  const deductionsFuelCost = ((actualTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
   
   // Calculate maintenance cost (for all buses)  
   // For multi-parking, divide parking distances by number of buses, then add trip distance
   const distancePerBus = isMultiParking 
-    ? ((safeData.kmParkingToPickup + safeData.kmDropToParking) / safeData.numberOfBuses) + safeData.kmTrip
-    : safeData.totalTripDistance;
+    ? ((safeData.kmParkingToPickup + safeData.kmDropToParking) / safeData.numberOfBuses) + (data.postTripAdjustment ? data.postTripAdjustment.actualKmTraveled : safeData.kmTrip)
+    : actualTripDistance;
   const calculatedMaintenanceCost = (distancePerBus * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   
   // Calculate additional charges total with per-bus support (exclude pass-through charges from expenses)
@@ -162,11 +182,15 @@ export function CostBreakdown({ data }: Props) {
   // Calculate other expenses total
   const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   
-  // Calculate correct total expenses (align with deductions section - use deductions fuel cost)
-  const correctTotalExpenses = deductionsFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount;
+  // Add post-trip additional expenses to total expenses
+  const postTripExpensesTotal = data.postTripAdjustment?.totalAdditionalExpenses || 0;
   
-  // Calculate correct net profit (Final Total - Customer Pays minus Total Expenses)
-  const correctNetProfit = safeData.customerTotalWithFuel - correctTotalExpenses;
+  // Calculate correct total expenses (align with deductions section - use deductions fuel cost)
+  const correctTotalExpenses = deductionsFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount + postTripExpensesTotal;
+  
+  // Calculate correct net profit - use final trip amount if adjustment exists
+  const finalCustomerAmount = data.postTripAdjustment?.finalTripAmount || safeData.customerTotalWithFuel;
+  const correctNetProfit = finalCustomerAmount - correctTotalExpenses;
   
   // Calculate net profit per bus
   const netProfitPerBus = correctNetProfit / safeData.numberOfBuses;
@@ -290,6 +314,64 @@ export function CostBreakdown({ data }: Props) {
 
         <Separator />
 
+        {/* Post-Trip Adjustments Section */}
+        {data.postTripAdjustment && data.postTripAdjustment.adjustmentStatus === 'finalized' && (
+          <>
+            <div className="border-2 border-orange-200 bg-orange-50 rounded-md p-4">
+              <h4 className="font-medium mb-3 text-orange-700 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                Post-Trip Adjustments
+              </h4>
+              
+              {/* KM Comparison */}
+              <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+                <div className="text-center">
+                  <div className="font-medium">Original Quoted</div>
+                  <div className="text-muted-foreground">{data.postTripAdjustment.originalQuotedKm} km</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium">Actual Traveled</div>
+                  <div className="text-muted-foreground">{data.postTripAdjustment.actualKmTraveled} km</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-orange-600">Extra KM</div>
+                  <div className="text-orange-600">{data.postTripAdjustment.extraKm} km</div>
+                </div>
+              </div>
+              
+              {/* Extra KM Charges */}
+              {data.postTripAdjustment.extraKm > 0 && (
+                <div className="flex justify-between mb-2">
+                  <span>Extra KM Charge ({data.postTripAdjustment.extraKm} km × LKR {data.postTripAdjustment.extraKmChargePerKm})</span>
+                  <span className="text-orange-600 font-medium">LKR {data.postTripAdjustment.extraKmTotalCharge.toLocaleString()}</span>
+                </div>
+              )}
+              
+              {/* Additional Trip Expenses */}
+              {data.postTripAdjustment.additionalExpenses && data.postTripAdjustment.additionalExpenses.length > 0 && (
+                <div className="space-y-1 mb-2">
+                  <div className="text-sm font-medium text-orange-600">Additional Trip Expenses:</div>
+                  {data.postTripAdjustment.additionalExpenses.map((expense, index) => (
+                    <div key={index} className="flex justify-between pl-4 text-sm">
+                      <span>{expense.description} ({expense.category})</span>
+                      <span>LKR {expense.amount.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <Separator className="my-2" />
+              <div className="flex justify-between font-bold text-orange-600">
+                <span>Total Adjustment</span>
+                <span>LKR {data.postTripAdjustment.adjustmentAmount.toLocaleString()}</span>
+              </div>
+            </div>
+            <Separator />
+          </>
+        )}
+
         {/* Revenue Section */}
         <div>
           <h4 className="font-medium mb-2">Hire Charges Breakdown</h4>
@@ -396,9 +478,34 @@ export function CostBreakdown({ data }: Props) {
             )}
             <Separator />
             <div className="flex justify-between font-bold text-lg text-green-600 bg-green-50 p-3 rounded-md border-2 border-green-200">
-              <span>FINAL TOTAL - Customer Pays</span>
+              <span>ORIGINAL QUOTE - Customer Pays</span>
               <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
             </div>
+
+            {/* Post-Trip Adjustments to Customer Total */}
+            {data.postTripAdjustment && data.postTripAdjustment.adjustmentStatus === 'finalized' && (
+              <>
+                <div className="flex justify-between text-orange-600 mt-2">
+                  <span>Post-Trip Adjustment</span>
+                  <span>+LKR {data.postTripAdjustment.adjustmentAmount.toLocaleString()}</span>
+                </div>
+                
+                <div className="flex justify-between font-bold text-lg text-blue-600 bg-blue-50 p-3 rounded-md border-2 border-blue-200 mt-2">
+                  <span>FINAL TRIP AMOUNT</span>
+                  <span>LKR {data.postTripAdjustment.finalTripAmount.toLocaleString()}</span>
+                </div>
+                
+                <div className="flex justify-between text-muted-foreground mt-2">
+                  <span>Advance Already Paid</span>
+                  <span>-LKR {data.postTripAdjustment.advanceAlreadyPaid.toLocaleString()}</span>
+                </div>
+                
+                <div className="flex justify-between font-bold text-lg text-purple-600 bg-purple-50 p-3 rounded-md border-2 border-purple-200 mt-2">
+                  <span>BALANCE DUE</span>
+                  <span>LKR {data.postTripAdjustment.balanceDue.toLocaleString()}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -478,11 +585,25 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Deductions</h4>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Fuel Cost (Total Trip - {safeData.totalTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
+              <span>
+                Fuel Cost (Total Trip - {actualTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})
+                {data.postTripAdjustment && (
+                  <span className="ml-2 text-xs text-orange-600">
+                    (Recalculated: quoted {safeData.totalTripDistance.toFixed(1)} km → actual {actualTripDistance.toFixed(1)} km)
+                  </span>
+                )}
+              </span>
               <span>LKR {deductionsFuelCost.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>Maintenance Cost (Internal - {distancePerBus.toFixed(1)} km per bus × LKR {safeData.maintenanceRatePerKm} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})</span>
+              <span>
+                Maintenance Cost (Internal - {distancePerBus.toFixed(1)} km per bus × LKR {safeData.maintenanceRatePerKm} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})
+                {data.postTripAdjustment && (
+                  <span className="ml-2 text-xs text-orange-600">
+                    (Recalculated on actual km)
+                  </span>
+                )}
+              </span>
               <span>LKR {calculatedMaintenanceCost.toLocaleString()}</span>
             </div>
             {(Array.isArray(data.additionalCharges) && data.additionalCharges.length > 0) && (
@@ -539,6 +660,17 @@ export function CostBreakdown({ data }: Props) {
                 <span>LKR {expense.amount.toLocaleString()}</span>
               </div>
             ))}
+            {/* Post-Trip Additional Expenses in Deductions */}
+            {data.postTripAdjustment?.additionalExpenses && data.postTripAdjustment.additionalExpenses.length > 0 && (
+              <>
+                {data.postTripAdjustment.additionalExpenses.map((expense, index) => (
+                  <div key={`post-trip-${index}`} className="flex justify-between text-orange-600">
+                    <span>{expense.description} (Post-Trip - {expense.category})</span>
+                    <span>LKR {expense.amount.toLocaleString()}</span>
+                  </div>
+                ))}
+              </>
+            )}
             <div className="flex justify-between">
               <span>Commission to pay ({safeData.commissionPct}%)</span>
               <span>LKR {safeData.commissionAmount.toLocaleString()}</span>
