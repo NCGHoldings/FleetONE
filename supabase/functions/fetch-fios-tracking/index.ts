@@ -39,14 +39,22 @@ async function authenticateWithFIOS(token: string): Promise<string> {
   const loginUrl = `https://fios-api.kloudip.com/api?svc=token/login&params=${encodeURIComponent(JSON.stringify({ token, fl: 1 }))}`;
   
   const response = await fetch(loginUrl);
-  const data = await response.json();
   
-  if (!data.eid || data.eid !== '') {
-    throw new Error(`FIOS authentication failed: ${data.eid || 'Unknown error'}`);
+  if (!response.ok) {
+    throw new Error(`FIOS API returned status ${response.status}`);
+  }
+  
+  const data = await response.json();
+  console.log('[FIOS] Login response:', JSON.stringify(data));
+  
+  // FIOS returns session ID in 'eid' field on success
+  // If there's an error, eid will contain error code
+  if (!data.eid) {
+    throw new Error(`FIOS authentication failed: No session ID returned`);
   }
   
   const sessionId = data.eid;
-  console.log('[FIOS] Authentication successful, session ID obtained');
+  console.log('[FIOS] Authentication successful, session ID:', sessionId.substring(0, 8) + '...');
   
   // Cache session ID for 4 minutes (240 seconds)
   cachedSessionId = sessionId;
