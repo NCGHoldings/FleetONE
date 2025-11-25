@@ -345,7 +345,7 @@ export function TripDetailsModal({
             quotationNo={trip.quotation.quotation_no}
             customerName={trip.quotation.customer_name}
             originalAmount={calculateTotalAmount()}
-            originalKm={0}
+            originalKm={(trip.quotation as any).km_trip || 0}
             advancePaid={trip.advance_paid || 0}
             defaultKmRate={300}
             onAdjustmentSaved={fetchAdjustmentData}
