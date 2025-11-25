@@ -69,7 +69,7 @@ export default function RealTimeTracking() {
       }
     }
     return {
-      apiEndpoint: 'https://track.schoolride.lk',
+      apiEndpoint: 'https://fios-api.kloudip.com',
       apiKey: '',
       refreshInterval: 30
     };
@@ -145,39 +145,33 @@ export default function RealTimeTracking() {
   }
 
   const simulateGPSUpdate = async () => {
+    console.log("Fetching live GPS data from FIOS API...");
+    
     try {
-      // Pass GPS settings to the edge function
-      const { data, error } = await supabase.functions.invoke('fetch-gps-tracking', {
-        body: {
-          apiEndpoint: gpsSettings.apiEndpoint,
-          apiKey: gpsSettings.apiKey
-        }
-      })
-      
+      const { data, error } = await supabase.functions.invoke('fetch-fios-tracking', {
+        body: {}
+      });
+
       if (error) {
-        console.error('GPS API failed:', error)
-        toast.error(`GPS API Error: ${error.message || 'Unknown error'}`)
-        return
+        console.error("FIOS API error:", error);
+        toast.error(`GPS Update Failed: ${error.message || "Failed to fetch GPS data from FIOS API"}`);
+        return;
       }
 
-      if (!data?.success) {
-        console.error('GPS API returned error:', data)
-        toast.error(`GPS Error: ${data?.error || 'API call failed'}`)
-        return
-      }
-
-      console.log('Real GPS data received:', data)
+      console.log("FIOS API response:", data);
       
-      // If we got real data, update the table immediately
-      if (data.data && data.data.length > 0) {
-        await fetchTrackingData() // Refresh the table with new data
-        toast.success(`Updated tracking data for ${data.data.length} vehicles`)
+      if (data.unmatchedVehicles && data.unmatchedVehicles.length > 0) {
+        toast.success(`GPS Data Updated: ${data.matched} vehicles matched. ${data.unmatched} vehicles not found in database.`);
       } else {
-        toast.info('No vehicles found in GPS system')
+        toast.success(`GPS Data Updated: ${data.matched} vehicles from FIOS API`);
       }
-    } catch (error) {
-      console.error('Error calling GPS tracking function:', error)
-      toast.error(`GPS Function Error: ${error instanceof Error ? error.message : String(error)}`)
+      
+      // Refresh the tracking data from database
+      await fetchTrackingData();
+      
+    } catch (err) {
+      console.error("Failed to update GPS data:", err);
+      toast.error("Failed to connect to FIOS API");
     }
   };
 
