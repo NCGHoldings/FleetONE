@@ -11,12 +11,13 @@ import { ColumnDef } from "@tanstack/react-table";
 import { 
   MapPin, Truck, Gauge, Fuel, Settings, 
   AlertTriangle, CheckCircle, RadioIcon as Radio,
-  Thermometer, Droplets, Battery, Navigation, RefreshCw
+  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { format } from "date-fns";
+import FleetTrackingMap from "@/components/fleet/FleetTrackingMap";
 
 interface TrackingData {
   id: string;
@@ -58,6 +59,8 @@ export default function RealTimeTracking() {
   const [loading, setLoading] = useState(true);
   const [isMapView, setIsMapView] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
+  const [isLoadingApiKey, setIsLoadingApiKey] = useState(true);
   const [gpsSettings, setGpsSettings] = useState<GPSSettings>(() => {
     // Load settings from localStorage if available
     const savedSettings = localStorage.getItem('gpsSettings');
@@ -171,6 +174,32 @@ export default function RealTimeTracking() {
       toast.error("Failed to connect to FIOS API");
     }
   };
+
+  // Fetch Google Maps API key on mount
+  useEffect(() => {
+    const fetchApiKey = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-maps-api-key')
+        
+        if (error) {
+          console.error('Error fetching Google Maps API key:', error)
+          toast.error('Failed to load map API key')
+          return
+        }
+        
+        if (data?.apiKey) {
+          setGoogleMapsApiKey(data.apiKey)
+        }
+      } catch (error) {
+        console.error('Error fetching API key:', error)
+        toast.error('Failed to initialize map')
+      } finally {
+        setIsLoadingApiKey(false)
+      }
+    }
+    
+    fetchApiKey()
+  }, [])
 
   useEffect(() => {
     fetchTrackingData();
@@ -547,21 +576,37 @@ export default function RealTimeTracking() {
               Fleet Map View
             </CardTitle>
             <CardDescription>
-              Real-time vehicle locations with live tracking
+              Real-time vehicle locations with live GPS tracking
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-96 bg-muted rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="font-semibold mb-2">Interactive Map Coming Soon</h3>
-                <p className="text-muted-foreground text-sm">
-                  Live GPS tracking with vehicle markers, routes, and real-time updates
-                </p>
-                <div className="mt-4 text-xs text-muted-foreground">
-                  API Endpoint: {gpsSettings.apiEndpoint}
+            <div className="h-[600px] w-full">
+              {isLoadingApiKey ? (
+                <div className="w-full h-full flex items-center justify-center bg-muted/20 rounded-lg border">
+                  <div className="text-center space-y-4">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+                    <p className="text-muted-foreground">Loading map...</p>
+                  </div>
                 </div>
-              </div>
+              ) : googleMapsApiKey ? (
+                <FleetTrackingMap 
+                  trackingData={trackingData} 
+                  apiKey={googleMapsApiKey}
+                  isLoading={loading}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-muted/20 rounded-lg border">
+                  <div className="text-center space-y-4">
+                    <MapPin className="h-16 w-16 text-muted-foreground mx-auto opacity-50" />
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold">Map Unavailable</h3>
+                      <p className="text-sm text-muted-foreground max-w-md">
+                        Unable to load Google Maps. Please check your configuration.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
