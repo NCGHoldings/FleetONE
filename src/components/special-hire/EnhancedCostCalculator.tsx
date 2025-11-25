@@ -48,6 +48,7 @@ interface QuotationData {
   discount_type?: string;
   discount_amount_lkr?: number;
   total_additional_charges?: number;
+  additional_charges?: any; // JSONB field - can be array or string
   trip_days?: number;
   standard_hours?: number;
   available_hours?: number;
@@ -200,76 +201,125 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
     }
   }, [selectedQuotationId, quotations]);
 
-  const displayOriginalCostBreakdown = (quotation: QuotationData) => {
-    // Prepare the cost breakdown data from the quotation to match CostBreakdown props
-    const data: CostData = {
-      kmParkingToPickup: quotation.km_parking_to_pickup || 0,
-      kmTrip: quotation.km_trip || 0,
-      kmDropToParking: quotation.km_drop_to_parking || 0,
-      fuelCostFuelOnly: quotation.fuel_cost_fuel_only || 0,
-      hireCharge: quotation.gross_revenue || 0,
-      fixedRate: quotation.hire_charge || (quotation.gross_revenue || 0) / (quotation.number_of_buses || 1),
-      overtimeCharge: quotation.overtime_charge || 0,
-      overnightCharge: quotation.overnight_charge || 0,
-      exceedingDistanceCharge: quotation.exceeding_km_charge || 0,
-      maintenanceCost: quotation.maintenance_cost || 0,
-      totalTripDistance: quotation.total_distance_km || 0,
-      busTypeEfficiency: quotation.avg_km_per_l || 8,
-      fuelPricePerLiter: 350, // Default, could be fetched from settings
-      maintenanceRatePerKm: 20, // Default, could be fetched from settings
-      pickupDateTime: quotation.pickup_datetime,
-      dropDateTime: quotation.drop_datetime,
-      rateCardDetails: (() => {
-        // Calculate actual hours from datetime fields
-        let actualHours = 8;
-        let availableHours = 8;
-        const standardHours = 8;
-        
-        if (quotation.pickup_datetime && quotation.drop_datetime) {
-          const pickupTime = new Date(quotation.pickup_datetime);
-          const dropTime = new Date(quotation.drop_datetime);
-          actualHours = Math.max(0, (dropTime.getTime() - pickupTime.getTime()) / (1000 * 60 * 60));
-        }
-        
-        // Calculate available hours from distance (baseline speed: 10 km/h)
-        const baselineSpeed = 10; // km/h
-        const tripDistance = quotation.km_trip || 0;
-        availableHours = tripDistance / baselineSpeed;
-        
-        // Calculate overtime hours
-        const overtimeHours = Math.max(0, actualHours - availableHours);
-        
-        return {
-          standardHours,
-          actualHours,
-          availableHours,
-          overtimeHours,
-          agreedDistance: quotation.km_trip || 0,
-          actualDistance: quotation.km_trip || 0,
-          exceedingKm: Math.max(0, (quotation.km_trip || 0) - 100),
-          freeExceedingKm: 0,
-          chargeableExceedingKm: Math.max(0, (quotation.km_trip || 0) - 100)
-        };
-      })(),
-      grossRevenue: quotation.gross_revenue || 0,
-      customerTotalWithFuel: (quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0) + (quotation.total_additional_charges || 0) - (quotation.discount_amount_lkr || 0),
-      driverCharge: 0,
-      otherExpenses: [],
-      commissionPct: 0,
-      commissionAmount: quotation.commission_amount || 0,
-      commissionPassThroughPct: 0,
-      commissionPassThroughAmount: quotation.commission_pass_through_amount || 0,
-      discountType: quotation.discount_type || 'none',
-      discountPct: quotation.discount_percentage || 0,
-      discountAmount: quotation.discount_amount_lkr || 0,
-      totalExpenses: quotation.total_expenses || 0,
-      netProfit: quotation.net_profit || 0,
-      additionalCharges: [],
-      totalAdditionalCharges: quotation.total_additional_charges || 0,
-      numberOfBuses: quotation.number_of_buses || 1
-    };
+  const displayOriginalCostBreakdown = async (quotation: QuotationData) => {
+    try {
+      // Fetch rate card data for correct base rate and exceeding km calculations
+      const { data: rateCard } = await supabase
+        .from('hire_rate_cards')
+        .select('*')
+        .eq('bus_type_id', quotation.bus_type_id)
+        .eq('hire_type', quotation.hire_type)
+        .eq('is_active', true)
+        .maybeSingle();
 
-    setCostData(data);
+      // Fetch fuel settings for correct fuel price
+      const { data: fuelSettings } = await supabase
+        .from('fuel_settings')
+        .select('diesel_price_lkr_per_l, maintenance_rate_lkr_per_km')
+        .eq('is_default', true)
+        .maybeSingle();
+
+      // Parse additional charges from quotation (stored as JSONB)
+      let additionalCharges: Array<{ type: string; amount: number; reason?: string }> = [];
+      if (quotation.additional_charges) {
+        try {
+          additionalCharges = Array.isArray(quotation.additional_charges) 
+            ? quotation.additional_charges 
+            : JSON.parse(quotation.additional_charges as any);
+        } catch (e) {
+          console.error('Error parsing additional charges:', e);
+        }
+      }
+
+      // Calculate base rate from rate card (NOT from hire_charge)
+      const fixedRate = rateCard?.flat_fee_lkr || 30000;
+
+      // Calculate exceeding distance correctly
+      const exceedingKmThreshold = rateCard?.exceeding_km_threshold || 100;
+      const tripDistance = quotation.km_trip || 0;
+      const exceedingKm = Math.max(0, tripDistance - exceedingKmThreshold);
+      const exceedingDistanceCharge = exceedingKm * (rateCard?.exceeding_km_rate_lkr || 175);
+
+      const fuelPricePerLiter = fuelSettings?.diesel_price_lkr_per_l || 350;
+      const maintenanceRatePerKm = fuelSettings?.maintenance_rate_lkr_per_km || 20;
+
+      // Prepare the cost breakdown data from the quotation to match CostBreakdown props
+      const data: CostData = {
+        kmParkingToPickup: quotation.km_parking_to_pickup || 0,
+        kmTrip: quotation.km_trip || 0,
+        kmDropToParking: quotation.km_drop_to_parking || 0,
+        fuelCostFuelOnly: quotation.fuel_cost_fuel_only || 0,
+        hireCharge: quotation.gross_revenue || 0,
+        fixedRate: fixedRate,
+        overtimeCharge: quotation.overtime_charge || 0,
+        overnightCharge: quotation.overnight_charge || 0,
+        exceedingDistanceCharge: exceedingDistanceCharge,
+        maintenanceCost: quotation.maintenance_cost || 0,
+        totalTripDistance: quotation.total_distance_km || 0,
+        busTypeEfficiency: quotation.avg_km_per_l || 8,
+        fuelPricePerLiter: fuelPricePerLiter,
+        maintenanceRatePerKm: maintenanceRatePerKm,
+        pickupDateTime: quotation.pickup_datetime,
+        dropDateTime: quotation.drop_datetime,
+        rateCardDetails: (() => {
+          // Calculate actual hours from datetime fields
+          let actualHours = 8;
+          let availableHours = 8;
+          const standardHours = 8;
+          
+          if (quotation.pickup_datetime && quotation.drop_datetime) {
+            const pickupTime = new Date(quotation.pickup_datetime);
+            const dropTime = new Date(quotation.drop_datetime);
+            actualHours = Math.max(0, (dropTime.getTime() - pickupTime.getTime()) / (1000 * 60 * 60));
+          }
+          
+          // Calculate available hours from distance (baseline speed: 10 km/h)
+          const baselineSpeed = 10; // km/h
+          availableHours = tripDistance / baselineSpeed;
+          
+          // Calculate overtime hours
+          const overtimeHours = Math.max(0, actualHours - availableHours);
+          
+          return {
+            standardHours,
+            actualHours,
+            availableHours,
+            overtimeHours,
+            agreedDistance: tripDistance,
+            actualDistance: tripDistance,
+            exceedingKm: exceedingKm,
+            freeExceedingKm: 0,
+            chargeableExceedingKm: exceedingKm,
+            rateCardRange: rateCard ? `${rateCard.from_km || 0}-${rateCard.to_km || 0} km` : undefined
+          };
+        })(),
+        grossRevenue: quotation.gross_revenue || 0,
+        customerTotalWithFuel: (quotation.gross_revenue || 0) + (quotation.fuel_cost_fuel_only || 0) + (quotation.commission_pass_through_amount || 0) + (quotation.total_additional_charges || 0) - (quotation.discount_amount_lkr || 0),
+        driverCharge: 0,
+        otherExpenses: [],
+        commissionPct: 0,
+        commissionAmount: quotation.commission_amount || 0,
+        commissionPassThroughPct: 0,
+        commissionPassThroughAmount: quotation.commission_pass_through_amount || 0,
+        discountType: quotation.discount_type || 'none',
+        discountPct: quotation.discount_percentage || 0,
+        discountAmount: quotation.discount_amount_lkr || 0,
+        totalExpenses: quotation.total_expenses || 0,
+        netProfit: quotation.net_profit || 0,
+        additionalCharges: additionalCharges,
+        totalAdditionalCharges: quotation.total_additional_charges || 0,
+        numberOfBuses: quotation.number_of_buses || 1
+      };
+
+      setCostData(data);
+    } catch (error) {
+      console.error('Error displaying cost breakdown:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load cost breakdown details",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStatusBadge = (status: string) => {
