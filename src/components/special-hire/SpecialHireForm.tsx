@@ -1196,7 +1196,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       
       // Company expenses (include ALL charges including internal_cost in deductions)
       const internalExpenses = additionalCharges
-        .filter(charge => charge.type !== 'pass_through') // Exclude only pass-through
+        .filter(charge => charge.type !== 'pass_through' && charge.type !== 'additional_distance') // Exclude pass-through and additional_distance
         .reduce((sum, charge) => {
           const effectiveAmount = charge.applyPerBus ? charge.amount * charge.busesCount : charge.amount;
           return sum + effectiveAmount;

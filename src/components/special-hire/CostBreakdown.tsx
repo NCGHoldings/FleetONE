@@ -179,11 +179,11 @@ export function CostBreakdown({ data }: Props) {
     : actualTripDistance;
   const calculatedMaintenanceCost = (distancePerBus * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
   
-  // Calculate additional charges total with per-bus support (exclude pass-through charges from expenses)
+  // Calculate additional charges total with per-bus support (exclude pass-through and additional_distance charges from expenses)
   const additionalChargesTotal = Array.isArray(data.additionalCharges) 
     ? data.additionalCharges.reduce((sum, charge) => {
-        // Skip pass-through charges in expense calculations
-        if (charge.type === 'pass_through') return sum;
+        // Skip pass-through and additional_distance charges in expense calculations
+        if (charge.type === 'pass_through' || charge.type === 'additional_distance') return sum;
         
         const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
           ? charge.amount * charge.busesCount 
@@ -622,7 +622,7 @@ export function CostBreakdown({ data }: Props) {
             {(Array.isArray(data.additionalCharges) && data.additionalCharges.length > 0) && (
               <>
                 {data.additionalCharges
-                  .filter(charge => charge.type !== 'pass_through') // Exclude pass-through charges from deductions
+                  .filter(charge => charge.type !== 'pass_through' && charge.type !== 'additional_distance') // Exclude pass-through and additional_distance charges from deductions
                   .map((charge, index) => {
                     const chargeTypeLabels = {
                       permits: 'Permits Cost',
