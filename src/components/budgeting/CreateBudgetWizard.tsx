@@ -126,8 +126,7 @@ export const CreateBudgetWizard = ({ open, onClose, initialTemplate }: CreateBud
             is_active: true,
             budget_amount: item.default_amount || 0,
             actual_amount: 0,
-            variance_amount: 0,
-            variance_percentage: 0,
+            // variance_amount and variance_percentage are generated columns - database calculates them
             period_type: "monthly",
             account_id: item.account_code || null,
           }));
