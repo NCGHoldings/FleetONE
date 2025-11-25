@@ -11,9 +11,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface LineItem {
   name: string;
+  account_code?: string;
   category: string;
   subcategory: string;
   department: string;
+  default_amount?: number;
 }
 
 interface TemplateEditorModalProps {
@@ -32,9 +34,11 @@ export function TemplateEditorModal({ template, open, onClose, onSave }: Templat
 
   const [newItem, setNewItem] = useState<LineItem>({
     name: "",
+    account_code: "",
     category: "Expense",
     subcategory: "Operating Expenses",
     department: "Administration",
+    default_amount: 0,
   });
 
   const categories = ["Revenue", "Expense", "Cash Flow"];
@@ -62,9 +66,11 @@ export function TemplateEditorModal({ template, open, onClose, onSave }: Templat
     setLineItems([...lineItems, { ...newItem }]);
     setNewItem({
       name: "",
+      account_code: "",
       category: "Expense",
       subcategory: "Operating Expenses",
       department: "Administration",
+      default_amount: 0,
     });
     toast.success("Line item added");
   };
@@ -114,6 +120,23 @@ export function TemplateEditorModal({ template, open, onClose, onSave }: Templat
                     value={newItem.name}
                     onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
                     placeholder="Enter line item name"
+                  />
+                </div>
+                <div>
+                  <Label>Account Code</Label>
+                  <Input
+                    value={newItem.account_code}
+                    onChange={(e) => setNewItem({ ...newItem, account_code: e.target.value })}
+                    placeholder="e.g., 401"
+                  />
+                </div>
+                <div>
+                  <Label>Default Amount (LKR)</Label>
+                  <Input
+                    type="number"
+                    value={newItem.default_amount}
+                    onChange={(e) => setNewItem({ ...newItem, default_amount: parseFloat(e.target.value) || 0 })}
+                    placeholder="Optional"
                   />
                 </div>
                 <div>
@@ -199,9 +222,19 @@ export function TemplateEditorModal({ template, open, onClose, onSave }: Templat
                             className="flex items-center gap-2 p-2 border rounded bg-background hover:bg-muted/50 transition-colors"
                           >
                             <GripVertical className="h-4 w-4 text-muted-foreground" />
+                            {item.account_code && (
+                              <span className="font-mono text-xs px-2 py-0.5 bg-primary/10 text-primary rounded">
+                                {item.account_code}
+                              </span>
+                            )}
                             <div className="flex-1 text-sm">
                               <span className="font-medium">{item.name}</span>
                               <span className="text-muted-foreground ml-2">• {item.department}</span>
+                              {item.default_amount !== undefined && item.default_amount > 0 && (
+                                <span className="text-muted-foreground ml-2">
+                                  • LKR {item.default_amount.toLocaleString()}
+                                </span>
+                              )}
                             </div>
                             <Button
                               variant="ghost"

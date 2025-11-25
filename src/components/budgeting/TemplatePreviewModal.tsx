@@ -1,9 +1,12 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { FileText, Building, Tag, TrendingUp, TrendingDown } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText, Building, Tag, TrendingUp, TrendingDown, LayoutGrid, Table2 } from "lucide-react";
 import { BudgetTemplate } from "@/hooks/useBudgetTemplates";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { TemplateSpreadsheetView } from "./TemplateSpreadsheetView";
+import { useState } from "react";
 
 interface TemplatePreviewModalProps {
   template: BudgetTemplate | null;
@@ -18,6 +21,8 @@ export const TemplatePreviewModal = ({
   onClose,
   onUseTemplate,
 }: TemplatePreviewModalProps) => {
+  const [activeTab, setActiveTab] = useState("summary");
+  
   if (!template) return null;
 
   const structure = template.template_structure as any;
@@ -58,8 +63,25 @@ export const TemplatePreviewModal = ({
           {template?.description && <p className="text-sm text-muted-foreground mt-2">{template.description}</p>}
         </DialogHeader>
 
-        <ScrollArea className="h-[65vh] pr-4">
-          <div className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsTrigger value="summary" className="flex items-center gap-2">
+              <LayoutGrid className="h-4 w-4" />
+              Summary
+            </TabsTrigger>
+            <TabsTrigger value="spreadsheet" className="flex items-center gap-2">
+              <Table2 className="h-4 w-4" />
+              Spreadsheet View
+            </TabsTrigger>
+            <TabsTrigger value="departments" className="flex items-center gap-2">
+              <Building className="h-4 w-4" />
+              Departments
+            </TabsTrigger>
+          </TabsList>
+
+          <ScrollArea className="h-[60vh] pr-4">
+            {/* Summary Tab */}
+            <TabsContent value="summary" className="space-y-6 mt-0">
             {/* Departments Section */}
             <Card>
               <CardHeader>
@@ -199,8 +221,79 @@ export const TemplatePreviewModal = ({
                 </Card>
               )}
             </div>
-          </div>
-        </ScrollArea>
+            </TabsContent>
+
+            {/* Spreadsheet View Tab */}
+            <TabsContent value="spreadsheet" className="mt-0">
+              <TemplateSpreadsheetView lineItems={lineItems} />
+            </TabsContent>
+
+            {/* Departments Tab */}
+            <TabsContent value="departments" className="space-y-4 mt-0">
+              <div className="grid grid-cols-1 gap-4">
+                {departments.map((dept: any, index: number) => {
+                  const deptItems = lineItems.filter((item: any) => item.department === dept.name);
+                  const revenueCount = deptItems.filter((item: any) => item.category === "Revenue").length;
+                  const expenseCount = deptItems.filter((item: any) => item.category === "Expense").length;
+                  
+                  return (
+                    <Card key={index} className="border-l-4 border-l-primary">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold flex items-center gap-2">
+                              <Building className="h-4 w-4" />
+                              {dept.name}
+                            </h3>
+                            {dept.code && <p className="text-sm text-muted-foreground">Code: {dept.code}</p>}
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-primary">{deptItems.length}</div>
+                            <div className="text-xs text-muted-foreground">Line Items</div>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div className="text-center p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                            <div className="text-2xl font-bold text-emerald-700">{revenueCount}</div>
+                            <div className="text-xs text-emerald-600">Revenue Items</div>
+                          </div>
+                          <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+                            <div className="text-2xl font-bold text-red-700">{expenseCount}</div>
+                            <div className="text-xs text-red-600">Expense Items</div>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          {deptItems.slice(0, 5).map((item: any, idx: number) => (
+                            <div key={idx} className="text-sm p-2 border rounded bg-muted/30 flex items-center gap-2">
+                              {item.account_code && (
+                                <span className="font-mono text-xs text-muted-foreground px-2 py-0.5 bg-background rounded">
+                                  {item.account_code}
+                                </span>
+                              )}
+                              <span className="flex-1">{item.name}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                item.category === 'Revenue' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                                {item.category}
+                              </span>
+                            </div>
+                          ))}
+                          {deptItems.length > 5 && (
+                            <div className="text-xs text-center text-muted-foreground py-2">
+                              + {deptItems.length - 5} more items
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
