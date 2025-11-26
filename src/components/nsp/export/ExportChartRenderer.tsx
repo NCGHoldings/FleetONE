@@ -15,34 +15,34 @@ export function ExportChartRenderer({ analytics }: ExportChartRendererProps) {
   const combinedTrendData = [...analytics.dailyTrend, ...analytics.predictions];
 
   return (
-    <div className="bg-background">
-      {/* Full-width Sales Trend Chart */}
-      <div id="export-sales-trend" className="mb-4 p-3 bg-card" style={{ width: '1000px', height: '280px' }}>
+    <div className="bg-white">
+      {/* Sales Trend Chart - Full Page */}
+      <div id="export-sales-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '420px' }}>
         <SalesTrendChart data={combinedTrendData} />
       </div>
 
-      {/* Side-by-side: Category Distribution & Comparison */}
-      <div className="flex gap-4 mb-4">
-        <div id="export-category-distribution" className="p-3 bg-card" style={{ width: '480px', height: '320px' }}>
-          <CategoryDistributionChart data={analytics.categoryTotals} />
-        </div>
-        <div id="export-category-comparison" className="p-3 bg-card" style={{ width: '480px', height: '320px' }}>
-          <CategoryComparisonChart data={analytics.categoryTotals} />
-        </div>
+      {/* Category Distribution Chart - Full Width for Stacking */}
+      <div id="export-category-distribution" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '400px' }}>
+        <CategoryDistributionChart data={analytics.categoryTotals} />
       </div>
 
-      {/* Medium: Monthly Trend Chart */}
-      <div id="export-monthly-trend" className="mb-4 p-3 bg-card" style={{ width: '800px', height: '260px' }}>
+      {/* Category Comparison Chart - Full Width for Stacking */}
+      <div id="export-category-comparison" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '400px' }}>
+        <CategoryComparisonChart data={analytics.categoryTotals} />
+      </div>
+
+      {/* Monthly Trend Chart - Full Width */}
+      <div id="export-monthly-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '380px' }}>
         <MonthlyTrendChart data={analytics.monthlyTrend} />
       </div>
 
-      {/* Medium: Day of Week Chart */}
-      <div id="export-day-of-week" className="mb-4 p-3 bg-card" style={{ width: '800px', height: '260px' }}>
+      {/* Day of Week Chart - Full Width */}
+      <div id="export-day-of-week" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '380px' }}>
         <DayOfWeekChart data={analytics.dayOfWeekAnalysis} />
       </div>
 
-      {/* Compact: Tyre Breakdown Chart */}
-      <div id="export-tyre-breakdown" className="mb-4 p-3 bg-card" style={{ width: '700px', height: '240px' }}>
+      {/* Tyre Breakdown Chart - Full Width */}
+      <div id="export-tyre-breakdown" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '380px' }}>
         <TyreSalesBreakdown data={analytics.tyreBreakdown} />
       </div>
     </div>
