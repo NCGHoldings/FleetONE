@@ -196,6 +196,9 @@ Deno.serve(async (req) => {
       const status = vehicle.pos.s > 0 ? 'active' : 'inactive';
       const engineHealth = getEngineHealth(vehicle.pos.s, lastUpdate);
 
+      // Get odometer data if available (from FIOS messages API in future)
+      const odometerKm = null; // Will be populated from messages/load_interval API
+      
       trackingData.push({
         bus_id: bus.id,
         bus_no: bus.bus_no,
@@ -217,10 +220,14 @@ Deno.serve(async (req) => {
         driver_name: null,
         alerts: [],
         // Enhanced GPS data
-        heading_degrees: vehicle.pos.c || null, // Course/heading (0-360 degrees)
-        altitude_meters: vehicle.pos.z || null, // Altitude in meters
-        satellite_count: vehicle.pos.sc || null, // Number of satellites
-        fios_device_id: vehicle.id || null // FIOS device ID
+        heading_degrees: vehicle.pos.c || null,
+        altitude_meters: vehicle.pos.z || null,
+        satellite_count: vehicle.pos.sc || null,
+        fios_device_id: vehicle.id || null,
+        // Odometer & mileage data
+        odometer_km: odometerKm,
+        daily_mileage_km: null,
+        engine_hours: null
       });
     }
 
@@ -236,9 +243,43 @@ Deno.serve(async (req) => {
       if (insertError) throw insertError;
     }
 
+    // Update bus odometers and trigger service alerts for buses with odometer data
+    const odometerUpdates = [];
+    for (const data of trackingData) {
+      if (data.odometer_km && data.odometer_km > 0) {
+        console.log(`[FIOS] Updating odometer for ${data.bus_no}: ${data.odometer_km} km`);
+        
+        try {
+          const { data: updateResult, error: updateError } = await supabase.functions.invoke(
+            'update-bus-odometer',
+            {
+              body: {
+                bus_no: data.bus_no,
+                current_km: data.odometer_km,
+                updated_at: new Date().toISOString()
+              }
+            }
+          );
+
+          if (updateError) {
+            console.error(`[FIOS] Odometer update error for ${data.bus_no}:`, updateError);
+          } else {
+            console.log(`[FIOS] ✅ Odometer updated for ${data.bus_no}:`, updateResult);
+            odometerUpdates.push({ bus_no: data.bus_no, success: true, result: updateResult });
+          }
+        } catch (error) {
+          console.error(`[FIOS] Exception updating odometer for ${data.bus_no}:`, error);
+          odometerUpdates.push({ bus_no: data.bus_no, success: false, error: error.message });
+        }
+      }
+    }
+
     console.log(`[FIOS] Successfully updated ${trackingData.length} vehicles`);
     if (unmatchedVehicles.length > 0) {
       console.log(`[FIOS] Unmatched vehicles: ${unmatchedVehicles.join(', ')}`);
+    }
+    if (odometerUpdates.length > 0) {
+      console.log(`[FIOS] Processed ${odometerUpdates.length} odometer updates`);
     }
 
     return new Response(
@@ -247,7 +288,9 @@ Deno.serve(async (req) => {
         message: `Updated ${trackingData.length} vehicles from FIOS API`,
         matched: trackingData.length,
         unmatched: unmatchedVehicles.length,
-        unmatchedVehicles: unmatchedVehicles
+        unmatchedVehicles: unmatchedVehicles,
+        odometer_updates: odometerUpdates.length,
+        odometer_results: odometerUpdates
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

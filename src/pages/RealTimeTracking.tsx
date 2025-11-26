@@ -11,7 +11,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { 
   MapPin, Truck, Gauge, Fuel, Settings, 
   AlertTriangle, CheckCircle, RadioIcon as Radio,
-  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2, Plus, Satellite
+  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2, Plus, Satellite, Activity
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -754,6 +754,12 @@ export default function RealTimeTracking() {
                     {vehicle.altitude_meters !== null && vehicle.altitude_meters !== undefined && (
                       <div className="flex items-center gap-1">
                         <span>Alt: {Math.round(vehicle.altitude_meters)}m</span>
+                      </div>
+                    )}
+                    {vehicle.odometer_km && vehicle.odometer_km > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Activity className="h-3 w-3" />
+                        <span>{vehicle.odometer_km.toLocaleString()} km</span>
                       </div>
                     )}
                   </div>
