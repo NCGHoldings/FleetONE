@@ -237,6 +237,65 @@ function getEngineHealth(speed: number, lastUpdate: string): string {
   return 'good';
 }
 
+// Get current date in Sri Lanka timezone (UTC+5:30)
+function getSriLankaDate(): string {
+  const now = new Date();
+  const sriLankaTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+  return sriLankaTime.toISOString().split('T')[0];
+}
+
+// Haversine formula to calculate distance between two GPS points
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Calculate GPS-based mileage for buses without FIOS odometer
+async function calculateGPSMileage(supabase: any, busId: string, sriLankaDate: string): Promise<number> {
+  try {
+    // Get start and end of day in Sri Lanka timezone
+    const startOfDay = new Date(`${sriLankaDate}T00:00:00+05:30`);
+    const endOfDay = new Date(`${sriLankaDate}T23:59:59+05:30`);
+    
+    const { data: waypoints, error } = await supabase
+      .from('gps_location_history')
+      .select('latitude, longitude, timestamp')
+      .eq('bus_id', busId)
+      .gte('timestamp', startOfDay.toISOString())
+      .lte('timestamp', endOfDay.toISOString())
+      .order('timestamp', { ascending: true });
+    
+    if (error || !waypoints || waypoints.length < 2) {
+      return 0;
+    }
+    
+    // Calculate total distance using Haversine formula
+    let totalDistance = 0;
+    for (let i = 1; i < waypoints.length; i++) {
+      const dist = haversineDistance(
+        waypoints[i-1].latitude, waypoints[i-1].longitude,
+        waypoints[i].latitude, waypoints[i].longitude
+      );
+      // Only add if distance is reasonable (< 5km between points to filter outliers)
+      if (dist < 5) {
+        totalDistance += dist;
+      }
+    }
+    
+    return totalDistance;
+  } catch (error) {
+    console.error('[GPS] Error calculating mileage:', error);
+    return 0;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -265,15 +324,16 @@ Deno.serve(async (req) => {
     // Fetch all vehicle positions
     const vehicles = await fetchAllVehiclePositions(sessionId);
 
-    // Get all buses from database
+    // Get all buses from database with odometer tracking fields
     const { data: buses, error: busError } = await supabase
       .from('buses')
-      .select('id, bus_no, route');
+      .select('id, bus_no, route, base_odometer_km, base_odometer_date, odometer_source, current_mileage');
 
     if (busError) throw busError;
 
     const trackingData = [];
     const unmatchedVehicles = [];
+    const sriLankaDate = getSriLankaDate();
 
     for (const vehicle of vehicles) {
       const parsedBusNo = parseBusNumber(vehicle.nm);
@@ -324,6 +384,45 @@ Deno.serve(async (req) => {
       // Fetch REAL fuel level from FIOS messages API (not the flag)
       const fuelLevel = await fetchFuelData(sessionId, vehicle.id);
       
+      // Calculate odometer based on source
+      let finalOdometer: number | null = null;
+      let dailyMileage: number | null = null;
+      let odometerSource = 'fios';
+      
+      if (mileageData.odometer && mileageData.odometer > 0) {
+        // Bus has FIOS odometer data - use it directly
+        finalOdometer = mileageData.odometer;
+        dailyMileage = mileageData.dailyMileage;
+        odometerSource = 'fios';
+      } else if (bus.base_odometer_km && bus.base_odometer_km > 0) {
+        // Bus doesn't have FIOS odometer but has manual base - calculate from GPS
+        console.log(`[GPS] Calculating mileage for ${bus.bus_no} without FIOS odometer`);
+        
+        // Get today's GPS-calculated mileage
+        const todayGPSMileage = await calculateGPSMileage(supabase, bus.id, sriLankaDate);
+        
+        // Get cumulative GPS mileage since base date
+        const { data: historicMileage } = await supabase
+          .from('bus_daily_mileage')
+          .select('daily_km')
+          .eq('bus_id', bus.id)
+          .gte('date', bus.base_odometer_date)
+          .lt('date', sriLankaDate);
+        
+        const cumulativeGPSMileage = (historicMileage || []).reduce((sum, day) => sum + (day.daily_km || 0), 0);
+        
+        finalOdometer = bus.base_odometer_km + cumulativeGPSMileage + todayGPSMileage;
+        dailyMileage = todayGPSMileage;
+        odometerSource = 'gps_calculated';
+        
+        console.log(`[GPS] ${bus.bus_no}: Base=${bus.base_odometer_km}, Historic=${cumulativeGPSMileage}, Today=${todayGPSMileage}, Total=${finalOdometer}`);
+      } else {
+        // No FIOS odometer and no manual base - use existing current_mileage or null
+        finalOdometer = bus.current_mileage || null;
+        dailyMileage = null;
+        odometerSource = 'manual';
+      }
+      
       // Store GPS location history for track playback
       if (bus.id) {
         const { error: gpsError } = await supabase.from('gps_location_history').insert({
@@ -353,6 +452,26 @@ Deno.serve(async (req) => {
         if (fuelError) console.error(`[FIOS] Fuel reading error for ${bus.bus_no}:`, fuelError);
       }
       
+      // Save or update daily mileage record
+      if (dailyMileage !== null && dailyMileage > 0) {
+        const { error: mileageError } = await supabase
+          .from('bus_daily_mileage')
+          .upsert({
+            bus_id: bus.id,
+            date: sriLankaDate,
+            end_odometer_km: finalOdometer,
+            daily_km: dailyMileage,
+            data_source: odometerSource,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'bus_id,date'
+          });
+        
+        if (mileageError) {
+          console.error(`[FIOS] Daily mileage error for ${bus.bus_no}:`, mileageError);
+        }
+      }
+      
       trackingData.push({
         bus_id: bus.id,
         bus_no: bus.bus_no,
@@ -378,9 +497,9 @@ Deno.serve(async (req) => {
         altitude_meters: vehicle.pos.z || null,
         satellite_count: vehicle.pos.sc || null,
         fios_device_id: vehicle.id || null,
-        // Odometer & mileage data
-        odometer_km: mileageData.odometer,
-        daily_mileage_km: mileageData.dailyMileage,
+        // Odometer & mileage data with source
+        odometer_km: finalOdometer,
+        daily_mileage_km: dailyMileage,
         engine_hours: null
       });
     }
@@ -404,6 +523,22 @@ Deno.serve(async (req) => {
         console.log(`[FIOS] Updating odometer for ${data.bus_no}: ${data.odometer_km} km`);
         
         try {
+          // Update current_mileage in buses table
+          const { error: busUpdateError } = await supabase
+            .from('buses')
+            .update({
+              current_mileage: Math.round(data.odometer_km),
+              updated_at: new Date().toISOString()
+            })
+            .eq('bus_no', data.bus_no);
+          
+          if (busUpdateError) {
+            console.error(`[FIOS] Bus update error for ${data.bus_no}:`, busUpdateError);
+            odometerUpdates.push({ bus_no: data.bus_no, success: false, error: busUpdateError.message });
+            continue;
+          }
+          
+          // Trigger service alert check
           const { data: updateResult, error: updateError } = await supabase.functions.invoke(
             'update-bus-odometer',
             {

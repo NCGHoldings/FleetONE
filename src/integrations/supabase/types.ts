@@ -735,6 +735,56 @@ export type Database = {
           },
         ]
       }
+      bus_daily_mileage: {
+        Row: {
+          adjustment_reason: string | null
+          bus_id: string
+          created_at: string | null
+          daily_km: number | null
+          data_source: string | null
+          date: string
+          end_odometer_km: number | null
+          id: string
+          is_adjusted: boolean | null
+          start_odometer_km: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          adjustment_reason?: string | null
+          bus_id: string
+          created_at?: string | null
+          daily_km?: number | null
+          data_source?: string | null
+          date: string
+          end_odometer_km?: number | null
+          id?: string
+          is_adjusted?: boolean | null
+          start_odometer_km?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          adjustment_reason?: string | null
+          bus_id?: string
+          created_at?: string | null
+          daily_km?: number | null
+          data_source?: string | null
+          date?: string
+          end_odometer_km?: number | null
+          id?: string
+          is_adjusted?: boolean | null
+          start_odometer_km?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bus_daily_mileage_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bus_fuel_readings: {
         Row: {
           bus_id: string
@@ -1059,6 +1109,8 @@ export type Database = {
       }
       buses: {
         Row: {
+          base_odometer_date: string | null
+          base_odometer_km: number | null
           bus_no: string
           capacity: number
           chassis_number: string | null
@@ -1075,6 +1127,7 @@ export type Database = {
           model: string
           next_service_date: string | null
           next_service_mileage: number | null
+          odometer_source: string | null
           owner_address: string | null
           owner_name: string | null
           owner_nic: string | null
@@ -1090,6 +1143,8 @@ export type Database = {
           year: number
         }
         Insert: {
+          base_odometer_date?: string | null
+          base_odometer_km?: number | null
           bus_no: string
           capacity: number
           chassis_number?: string | null
@@ -1106,6 +1161,7 @@ export type Database = {
           model: string
           next_service_date?: string | null
           next_service_mileage?: number | null
+          odometer_source?: string | null
           owner_address?: string | null
           owner_name?: string | null
           owner_nic?: string | null
@@ -1121,6 +1177,8 @@ export type Database = {
           year: number
         }
         Update: {
+          base_odometer_date?: string | null
+          base_odometer_km?: number | null
           bus_no?: string
           capacity?: number
           chassis_number?: string | null
@@ -1137,6 +1195,7 @@ export type Database = {
           model?: string
           next_service_date?: string | null
           next_service_mileage?: number | null
+          odometer_source?: string | null
           owner_address?: string | null
           owner_name?: string | null
           owner_nic?: string | null

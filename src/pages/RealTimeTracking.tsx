@@ -22,6 +22,8 @@ import { seedMissingGPSBuses } from "@/utils/seed-missing-gps-buses";
 import { ServiceStatusBadge } from "@/components/fleet/ServiceStatusBadge";
 import { VehicleDetailsModal } from "@/components/fleet/VehicleDetailsModal";
 import { ServiceAlertPanel } from "@/components/fleet/ServiceAlertPanel";
+import { ManualOdometerEntryModal } from "@/components/fleet/ManualOdometerEntryModal";
+import { OdometerAdjustmentModal } from "@/components/fleet/OdometerAdjustmentModal";
 import { useQuery } from "@tanstack/react-query";
 
 interface TrackingData {
@@ -94,6 +96,9 @@ export default function RealTimeTracking() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [unmatchedVehicleCount, setUnmatchedVehicleCount] = useState(0);
   const [isAddingBuses, setIsAddingBuses] = useState(false);
+  const [selectedBusForOdometer, setSelectedBusForOdometer] = useState<{id: string, no: string, odometer?: number} | null>(null);
+  const [isOdometerEntryOpen, setIsOdometerEntryOpen] = useState(false);
+  const [isOdometerAdjustmentOpen, setIsOdometerAdjustmentOpen] = useState(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
 
   const isSupervisor = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
@@ -382,7 +387,7 @@ export default function RealTimeTracking() {
       ),
     },
     {
-      accessorKey: "odometer_km",
+       accessorKey: "odometer_km",
       header: "Odometer",
       cell: ({ row }) => {
         const odometer = row.original.odometer_km;
@@ -391,19 +396,53 @@ export default function RealTimeTracking() {
         return (
           <div className="space-y-1">
             {odometer && odometer > 0 ? (
-              <>
-                <div className="flex items-center gap-1">
-                  <Activity className="h-3 w-3 text-muted-foreground" />
-                  <span className="font-mono text-sm">{odometer.toLocaleString()} km</span>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  {odometer ? (
+                    <span className="font-medium">{odometer.toFixed(1)} km</span>
+                  ) : (
+                    <span className="text-muted-foreground">No data</span>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setSelectedBusForOdometer({ 
+                        id: row.original.bus_id, 
+                        no: row.original.bus_no,
+                        odometer: odometer || undefined
+                      });
+                      setIsOdometerEntryOpen(true);
+                    }}
+                    className="h-6 text-xs px-2"
+                  >
+                    Set Base
+                  </Button>
                 </div>
                 {dailyMileage && dailyMileage > 0 && (
                   <div className="text-xs text-muted-foreground">
                     +{dailyMileage.toFixed(1)} km today
                   </div>
                 )}
-              </>
+              </div>
             ) : (
-              <span className="text-muted-foreground">-</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground">-</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedBusForOdometer({ 
+                      id: row.original.bus_id, 
+                      no: row.original.bus_no
+                    });
+                    setIsOdometerEntryOpen(true);
+                  }}
+                  className="h-6 text-xs px-2"
+                >
+                  Set Base
+                </Button>
+              </div>
             )}
           </div>
         );
@@ -896,10 +935,34 @@ export default function RealTimeTracking() {
       <ServiceAlertPanel />
 
       {/* Vehicle Details Modal */}
-      <VehicleDetailsModal 
+      <VehicleDetailsModal
         open={!!selectedVehicle}
         onOpenChange={(open) => !open && setSelectedVehicle(null)}
         busNo={selectedVehicle || ''}
+      />
+
+      <ManualOdometerEntryModal
+        open={isOdometerEntryOpen}
+        onOpenChange={setIsOdometerEntryOpen}
+        busId={selectedBusForOdometer?.id || ''}
+        busNo={selectedBusForOdometer?.no || ''}
+        currentOdometer={selectedBusForOdometer?.odometer}
+        onSuccess={() => {
+          fetchTrackingData();
+          setSelectedBusForOdometer(null);
+        }}
+      />
+
+      <OdometerAdjustmentModal
+        open={isOdometerAdjustmentOpen}
+        onOpenChange={setIsOdometerAdjustmentOpen}
+        busId={selectedBusForOdometer?.id || ''}
+        busNo={selectedBusForOdometer?.no || ''}
+        currentOdometer={selectedBusForOdometer?.odometer}
+        onSuccess={() => {
+          fetchTrackingData();
+          setSelectedBusForOdometer(null);
+        }}
       />
     </div>
   );
