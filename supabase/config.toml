@@ -20,3 +20,12 @@ verify_jwt = false
 
 [functions.update-bus-odometer]
 verify_jwt = false
+
+[functions.check-fuel-alerts]
+verify_jwt = false
+
+[functions.fetch-driver-events]
+verify_jwt = false
+
+[functions.populate-sample-fleet-data]
+verify_jwt = false

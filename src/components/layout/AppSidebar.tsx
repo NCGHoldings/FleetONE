@@ -54,6 +54,7 @@ const mainItems = [
   { id: "daily_trips", title: "Daily Trips", url: "/trips", icon: Calendar },
   { id: "trips_analytics", title: "Trips Analytics", url: "/trips/analytics", icon: TrendingUp },
   { id: "fleet_management", title: "Fleet Management", url: "/fleet", icon: Bus },
+  { id: "fleet_analytics", title: "Fleet Analytics", url: "/fleet-analytics", icon: BarChart3 },
   { id: "maintenance", title: "Maintenance", url: "/maintenance", icon: Wrench },
   { id: "insurance", title: "Insurance", url: "/insurance", icon: Shield },
   { id: "staff_management", title: "Staff Management", url: "/staff", icon: Users },
