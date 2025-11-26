@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.populate-sample-fleet-data]
 verify_jwt = false
+
+[functions.aggregate-fleet-analytics]
+verify_jwt = false
