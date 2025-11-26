@@ -24,6 +24,7 @@ import { VehicleDetailsModal } from "@/components/fleet/VehicleDetailsModal";
 import { ServiceAlertPanel } from "@/components/fleet/ServiceAlertPanel";
 import { ManualOdometerEntryModal } from "@/components/fleet/ManualOdometerEntryModal";
 import { OdometerAdjustmentModal } from "@/components/fleet/OdometerAdjustmentModal";
+import { OdometerOverviewModal } from "@/components/fleet/OdometerOverviewModal";
 import { useQuery } from "@tanstack/react-query";
 
 interface TrackingData {
@@ -60,6 +61,7 @@ interface TrackingData {
   odometer_km?: number;
   daily_mileage_km?: number;
   engine_hours?: number;
+  odometer_source?: string;
 }
 
 interface GPSSettings {
@@ -99,6 +101,7 @@ export default function RealTimeTracking() {
   const [selectedBusForOdometer, setSelectedBusForOdometer] = useState<{id: string, no: string, odometer?: number} | null>(null);
   const [isOdometerEntryOpen, setIsOdometerEntryOpen] = useState(false);
   const [isOdometerAdjustmentOpen, setIsOdometerAdjustmentOpen] = useState(false);
+  const [isOdometerOverviewOpen, setIsOdometerOverviewOpen] = useState(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
 
   const isSupervisor = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
@@ -392,32 +395,26 @@ export default function RealTimeTracking() {
       cell: ({ row }) => {
         const odometer = row.original.odometer_km;
         const dailyMileage = row.original.daily_mileage_km;
+        const odometerSource = row.original.odometer_source || 'manual';
+        
+        const getSourceBadge = () => {
+          switch(odometerSource) {
+            case 'fios':
+              return <Badge variant="default" className="text-xs">FIOS</Badge>;
+            case 'gps_calculated':
+              return <Badge variant="secondary" className="text-xs">GPS</Badge>;
+            default:
+              return <Badge variant="outline" className="text-xs">Manual</Badge>;
+          }
+        };
         
         return (
           <div className="space-y-1">
             {odometer && odometer > 0 ? (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  {odometer ? (
-                    <span className="font-medium">{odometer.toFixed(1)} km</span>
-                  ) : (
-                    <span className="text-muted-foreground">No data</span>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSelectedBusForOdometer({ 
-                        id: row.original.bus_id, 
-                        no: row.original.bus_no,
-                        odometer: odometer || undefined
-                      });
-                      setIsOdometerEntryOpen(true);
-                    }}
-                    className="h-6 text-xs px-2"
-                  >
-                    Set Base
-                  </Button>
+                  <span className="font-medium">{odometer.toFixed(1)} km</span>
+                  {getSourceBadge()}
                 </div>
                 {dailyMileage && dailyMileage > 0 && (
                   <div className="text-xs text-muted-foreground">
@@ -574,6 +571,16 @@ export default function RealTimeTracking() {
             >
               <MapPin className="h-4 w-4 mr-2 animate-wiggle" />
               {isMapView ? 'Table View' : 'Map View'}
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => setIsOdometerOverviewOpen(true)}
+              className="bg-white/10 backdrop-blur-sm border border-white/30 hover:bg-white/20 transition-all duration-300 animate-scale-in"
+              style={{ animationDelay: '0.35s' }}
+            >
+              <Gauge className="h-4 w-4 mr-2" />
+              Odometer Overview
             </Button>
             
             {isSupervisor && (
@@ -962,6 +969,31 @@ export default function RealTimeTracking() {
         onSuccess={() => {
           fetchTrackingData();
           setSelectedBusForOdometer(null);
+        }}
+      />
+
+      <OdometerOverviewModal
+        open={isOdometerOverviewOpen}
+        onOpenChange={setIsOdometerOverviewOpen}
+        data={trackingData.map(bus => ({
+          bus_no: bus.bus_no,
+          bus_id: bus.bus_id,
+          current_mileage: bus.odometer_km || null,
+          base_odometer_km: null,
+          base_odometer_date: null,
+          daily_mileage: bus.daily_mileage_km || null,
+          last_update: bus.last_update,
+          odometer_source: bus.odometer_source || 'manual'
+        }))}
+        onSetBase={(busId, busNo) => {
+          setSelectedBusForOdometer({ id: busId, no: busNo });
+          setIsOdometerEntryOpen(true);
+          setIsOdometerOverviewOpen(false);
+        }}
+        onAdjust={(busId, busNo, currentOdometer) => {
+          setSelectedBusForOdometer({ id: busId, no: busNo, odometer: currentOdometer });
+          setIsOdometerAdjustmentOpen(true);
+          setIsOdometerOverviewOpen(false);
         }}
       />
     </div>
