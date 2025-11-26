@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { InquiryFollowUpForm } from "./InquiryFollowUpForm";
 import { InquiryAssignmentModal } from "./InquiryAssignmentModal";
 import { ConvertToQuotationModal } from "./ConvertToQuotationModal";
+import { FuturePlanningModal } from "./FuturePlanningModal";
+import { FollowUpStatusUpdateModal } from "./FollowUpStatusUpdateModal";
 
 interface InquiryDetailsModalProps {
   inquiryId: string;
@@ -37,6 +39,9 @@ export const InquiryDetailsModal = ({
   const [showFollowUpForm, setShowFollowUpForm] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  const [showPlanningModal, setShowPlanningModal] = useState(false);
+  const [showStatusUpdateModal, setShowStatusUpdateModal] = useState(false);
+  const [selectedFollowUpId, setSelectedFollowUpId] = useState<string | null>(null);
 
   const { data: inquiry, isLoading } = useQuery({
     queryKey: ["inquiry-details", inquiryId],
@@ -218,24 +223,70 @@ export const InquiryDetailsModal = ({
             <Card className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold">Follow-up History</h3>
-                <Button size="sm" onClick={() => setShowFollowUpForm(true)}>
-                  Add Follow-up
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setShowPlanningModal(true)}>
+                    Schedule Meeting
+                  </Button>
+                  <Button size="sm" onClick={() => setShowFollowUpForm(true)}>
+                    Add Follow-up
+                  </Button>
+                </div>
               </div>
               <div className="space-y-3">
                 {followUps?.map((followUp: any) => (
                   <div key={followUp.id} className="border-l-2 border-primary pl-3">
                     <div className="flex items-center justify-between">
-                      <Badge variant="outline">{followUp.follow_up_type}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{followUp.follow_up_type}</Badge>
+                        {followUp.completion_status && (
+                          <Badge 
+                            variant={
+                              followUp.completion_status === "completed" ? "default" :
+                              followUp.completion_status === "pending" ? "secondary" : "outline"
+                            }
+                          >
+                            {followUp.completion_status}
+                          </Badge>
+                        )}
+                        {followUp.outcome && (
+                          <Badge 
+                            variant={
+                              followUp.outcome === "positive" ? "default" :
+                              followUp.outcome === "negative" ? "destructive" : "secondary"
+                            }
+                          >
+                            {followUp.outcome}
+                          </Badge>
+                        )}
+                      </div>
                       <span className="text-xs text-muted-foreground">
-                        {format(new Date(followUp.created_at), "MMM dd, yyyy HH:mm")}
+                        {followUp.planned_date 
+                          ? format(new Date(followUp.planned_date), "MMM dd, yyyy HH:mm")
+                          : format(new Date(followUp.created_at), "MMM dd, yyyy HH:mm")
+                        }
                       </span>
                     </div>
                     <p className="text-sm mt-1">{followUp.notes}</p>
+                    {followUp.outcome_notes && (
+                      <p className="text-sm mt-1 text-muted-foreground italic">{followUp.outcome_notes}</p>
+                    )}
                     {followUp.created_by_profile && (
                       <p className="text-xs text-muted-foreground mt-1">
                         By: {followUp.created_by_profile.first_name} {followUp.created_by_profile.last_name}
                       </p>
+                    )}
+                    {followUp.completion_status === "pending" && followUp.planned_date && (
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="mt-2"
+                        onClick={() => {
+                          setSelectedFollowUpId(followUp.id);
+                          setShowStatusUpdateModal(true);
+                        }}
+                      >
+                        Mark as Completed
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -296,6 +347,27 @@ export const InquiryDetailsModal = ({
             setShowConvertModal(false);
             onClose();
             onRefresh();
+          }}
+        />
+      )}
+
+      {showPlanningModal && (
+        <FuturePlanningModal
+          inquiryId={inquiryId}
+          open={showPlanningModal}
+          onClose={() => setShowPlanningModal(false)}
+        />
+      )}
+
+      {showStatusUpdateModal && selectedFollowUpId && (
+        <FollowUpStatusUpdateModal
+          inquiryId={inquiryId}
+          followUpId={selectedFollowUpId}
+          inquiry={inquiry}
+          open={showStatusUpdateModal}
+          onClose={() => {
+            setShowStatusUpdateModal(false);
+            setSelectedFollowUpId(null);
           }}
         />
       )}

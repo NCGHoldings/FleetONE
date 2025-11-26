@@ -2960,33 +2960,105 @@ export type Database = {
         }
         Relationships: []
       }
+      inquiry_activity_log: {
+        Row: {
+          activity_type: string
+          created_at: string | null
+          id: string
+          inquiry_id: string
+          new_value: Json | null
+          old_value: Json | null
+          performed_by: string | null
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string | null
+          id?: string
+          inquiry_id: string
+          new_value?: Json | null
+          old_value?: Json | null
+          performed_by?: string | null
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string | null
+          id?: string
+          inquiry_id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          performed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inquiry_activity_log_inquiry_id_fkey"
+            columns: ["inquiry_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_inquiries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inquiry_activity_log_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inquiry_follow_ups: {
         Row: {
+          completed_at: string | null
+          completion_status: string | null
           created_at: string
           created_by: string | null
           follow_up_type: string
           id: string
           inquiry_id: string
+          location: string | null
           next_follow_up_date: string | null
           notes: string
+          outcome: string | null
+          outcome_notes: string | null
+          planned_date: string | null
+          planned_duration_minutes: number | null
+          reminder_date: string | null
+          reminder_sent: boolean | null
         }
         Insert: {
+          completed_at?: string | null
+          completion_status?: string | null
           created_at?: string
           created_by?: string | null
           follow_up_type: string
           id?: string
           inquiry_id: string
+          location?: string | null
           next_follow_up_date?: string | null
           notes: string
+          outcome?: string | null
+          outcome_notes?: string | null
+          planned_date?: string | null
+          planned_duration_minutes?: number | null
+          reminder_date?: string | null
+          reminder_sent?: boolean | null
         }
         Update: {
+          completed_at?: string | null
+          completion_status?: string | null
           created_at?: string
           created_by?: string | null
           follow_up_type?: string
           id?: string
           inquiry_id?: string
+          location?: string | null
           next_follow_up_date?: string | null
           notes?: string
+          outcome?: string | null
+          outcome_notes?: string | null
+          planned_date?: string | null
+          planned_duration_minutes?: number | null
+          reminder_date?: string | null
+          reminder_sent?: boolean | null
         }
         Relationships: [
           {
@@ -5328,6 +5400,7 @@ export type Database = {
           customer_id: string | null
           customer_name: string
           id: string
+          inquiry_id: string | null
           is_active_version: boolean | null
           parent_quotation_id: string | null
           payment_terms: string | null
@@ -5357,6 +5430,7 @@ export type Database = {
           customer_id?: string | null
           customer_name: string
           id?: string
+          inquiry_id?: string | null
           is_active_version?: boolean | null
           parent_quotation_id?: string | null
           payment_terms?: string | null
@@ -5386,6 +5460,7 @@ export type Database = {
           customer_id?: string | null
           customer_name?: string
           id?: string
+          inquiry_id?: string | null
           is_active_version?: boolean | null
           parent_quotation_id?: string | null
           payment_terms?: string | null
@@ -5409,6 +5484,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "sinotruck_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_quotations_inquiry_id_fkey"
+            columns: ["inquiry_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_inquiries"
             referencedColumns: ["id"]
           },
           {
@@ -9123,6 +9205,7 @@ export type Database = {
           edit_type: string | null
           finance_company: string | null
           id: string
+          inquiry_id: string | null
           is_active_version: boolean | null
           is_sub_customer: boolean | null
           main_customer_name: string | null
@@ -9170,6 +9253,7 @@ export type Database = {
           edit_type?: string | null
           finance_company?: string | null
           id?: string
+          inquiry_id?: string | null
           is_active_version?: boolean | null
           is_sub_customer?: boolean | null
           main_customer_name?: string | null
@@ -9217,6 +9301,7 @@ export type Database = {
           edit_type?: string | null
           finance_company?: string | null
           id?: string
+          inquiry_id?: string | null
           is_active_version?: boolean | null
           is_sub_customer?: boolean | null
           main_customer_name?: string | null
@@ -9254,6 +9339,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "yutong_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_quotations_inquiry_id_fkey"
+            columns: ["inquiry_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_inquiries"
             referencedColumns: ["id"]
           },
           {

@@ -41,6 +41,16 @@ export const ConvertToQuotationModal = ({
         .eq("id", inquiry.id);
 
       if (error) throw error;
+
+      // Log activity for audit trail
+      await supabase.from("inquiry_activity_log").insert({
+        inquiry_id: inquiry.id,
+        activity_type: "converted",
+        new_value: {
+          product_type: inquiry.product_type,
+          converted_at: new Date().toISOString(),
+        },
+      });
     },
     onSuccess: () => {
       toast({ title: "Inquiry marked as converted" });
