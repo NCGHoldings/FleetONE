@@ -4045,6 +4045,7 @@ export type Database = {
           engine_temperature: number | null
           fios_device_id: number | null
           fuel_level: number | null
+          fuel_level_liters: number | null
           gps_coordinates: Json | null
           heading_degrees: number | null
           id: string
@@ -4077,6 +4078,7 @@ export type Database = {
           engine_temperature?: number | null
           fios_device_id?: number | null
           fuel_level?: number | null
+          fuel_level_liters?: number | null
           gps_coordinates?: Json | null
           heading_degrees?: number | null
           id?: string
@@ -4109,6 +4111,7 @@ export type Database = {
           engine_temperature?: number | null
           fios_device_id?: number | null
           fuel_level?: number | null
+          fuel_level_liters?: number | null
           gps_coordinates?: Json | null
           heading_degrees?: number | null
           id?: string
