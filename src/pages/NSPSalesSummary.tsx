@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileSpreadsheet, ShoppingCart, Download, TrendingUp, BarChart3, LineChart } from "lucide-react";
 import { SalesSummaryTable } from "@/components/nsp/SalesSummaryTable";
-import { ExportModal } from "@/components/nsp/ExportModal";
+import { EnhancedExportModal } from "@/components/nsp/EnhancedExportModal";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { addDays } from "date-fns";
 import { useNSPSalesAnalytics } from "@/hooks/useNSPSalesAnalytics";
@@ -225,10 +225,11 @@ const NSPSalesSummary = () => {
         </TabsContent>
       </Tabs>
 
-      <ExportModal
+      <EnhancedExportModal
         open={showExportModal}
         onClose={() => setShowExportModal(false)}
         dateRange={dateRange}
+        analytics={analytics}
       />
     </div>
   );
