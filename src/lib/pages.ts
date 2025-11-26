@@ -25,6 +25,7 @@ export const PAGES: PageCategories = {
     { id: "daily_trips", title: "Daily Trips", url: "/trips" },
     { id: "trips_analytics", title: "Trips Analytics", url: "/trips/analytics" },
     { id: "fleet_management", title: "Fleet Management", url: "/fleet" },
+    { id: "fleet_analytics", title: "Fleet Analytics", url: "/fleet-analytics" },
     { id: "maintenance", title: "Maintenance", url: "/maintenance" },
     { id: "insurance", title: "Insurance", url: "/insurance" },
     { id: "staff_management", title: "Staff Management", url: "/staff" },
