@@ -4051,6 +4051,7 @@ export type Database = {
           last_update: string
           odometer_km: number | null
           odometer_reading: number | null
+          odometer_source: string | null
           oil_pressure: number | null
           route_id: string | null
           route_name: string | null
@@ -4082,6 +4083,7 @@ export type Database = {
           last_update?: string
           odometer_km?: number | null
           odometer_reading?: number | null
+          odometer_source?: string | null
           oil_pressure?: number | null
           route_id?: string | null
           route_name?: string | null
@@ -4113,6 +4115,7 @@ export type Database = {
           last_update?: string
           odometer_km?: number | null
           odometer_reading?: number | null
+          odometer_source?: string | null
           oil_pressure?: number | null
           route_id?: string | null
           route_name?: string | null
