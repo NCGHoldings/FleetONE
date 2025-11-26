@@ -39,6 +39,7 @@ interface TrackingData {
   status: string;
   last_update: string;
   fuel_level?: number;
+  fuel_level_liters?: number; // Fuel in liters from FIOS
   tire_pressure?: {
     front_left: number;
     front_right: number;
@@ -348,18 +349,18 @@ export default function RealTimeTracking() {
       },
     },
     {
-      accessorKey: "fuel_level",
+      accessorKey: "fuel_level_liters",
       header: "Fuel",
       cell: ({ row }) => {
-        const fuelLevel = row.getValue("fuel_level") as number;
-        return fuelLevel ? (
+        const fuelLiters = row.getValue("fuel_level_liters") as number;
+        return fuelLiters ? (
           <div className="flex items-center gap-2">
-            <Fuel className={`h-4 w-4 ${getFuelLevelColor(fuelLevel)}`} />
-            <span className={getFuelLevelColor(fuelLevel)}>
-              {Math.round(fuelLevel)}%
-            </span>
+            <Fuel className="h-4 w-4 text-primary" />
+            <span className="font-medium">{Math.round(fuelLiters)} L</span>
           </div>
-        ) : '-';
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
       },
     },
     {

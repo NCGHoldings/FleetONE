@@ -15,6 +15,7 @@ interface TrackingData {
   status: string
   last_update: string
   fuel_level?: number
+  fuel_level_liters?: number // Fuel in liters from FIOS
   tire_pressure?: {
     front_left: number
     front_right: number
@@ -250,10 +251,10 @@ const FleetTrackingMap = ({ trackingData, apiKey, isLoading = false }: FleetTrac
                   </Badge>
                 </div>
 
-                {selectedBus.fuel_level !== undefined && selectedBus.fuel_level !== null && (
+                {selectedBus.fuel_level_liters !== undefined && selectedBus.fuel_level_liters !== null && (
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">Fuel:</span>
-                    <span className="text-foreground font-medium">{Math.round(selectedBus.fuel_level)}%</span>
+                    <span className="text-foreground font-medium">{Math.round(selectedBus.fuel_level_liters)} L</span>
                   </div>
                 )}
 

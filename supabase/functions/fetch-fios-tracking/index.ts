@@ -181,20 +181,42 @@ async function fetchFuelData(sessionId: string, deviceId: number): Promise<numbe
       return null;
     }
     
-    // Parse messages to find fuel sensor data
+    // DEBUG: Log all available parameters from first message
+    if (data.messages[0]?.p) {
+      console.log(`[FIOS DEBUG] Device ${deviceId} available parameters:`, JSON.stringify(Object.keys(data.messages[0].p)));
+      console.log(`[FIOS DEBUG] Device ${deviceId} parameter values:`, JSON.stringify(data.messages[0].p));
+    }
+    
+    // Parse messages to find fuel sensor data (in LITERS)
     let latestFuel: number | null = null;
     
     for (const msg of data.messages) {
       if (msg.p) {
-        // Check multiple possible fuel parameter names
-        const fuelFields = ['fuel', 'fuel_level', 'fuel_percent', 'fuel_level_percent', 'can_fuel', 'fuel_sensor'];
+        // Expanded list of possible FIOS/Wialon fuel parameter names
+        const fuelFields = [
+          // Standard fuel fields
+          'fuel', 'fuel_level', 'fuel_percent', 'fuel_level_percent',
+          'can_fuel', 'fuel_sensor', 'fuel1', 'fuel2',
+          // Wialon/FIOS specific analog inputs
+          'adc1', 'adc2', 'adc3', 'adc4',
+          // Fuel level sensors
+          'fls', 'fls1', 'fls2', 'fuel_lvl', 'fuel_lev',
+          // Liters-based fields
+          'fuel_liters', 'fuel_l', 'tank_level', 'fuel_volume',
+          // CAN bus parameters
+          'can_fuel_level', 'can_fuel_percent',
+          // Generic IO parameters
+          'io1', 'io2', 'io_fuel', 'io_fuel_level',
+          'param23', 'param24', 'param25', 'param200', 'param201'
+        ];
         
         for (const field of fuelFields) {
           if (msg.p[field] !== undefined && msg.p[field] !== null) {
             const value = parseFloat(msg.p[field]);
-            if (!isNaN(value) && value >= 0 && value <= 100) {
+            // Accept any positive value as liters (removed 0-100 filter)
+            if (!isNaN(value) && value >= 0) {
               latestFuel = value;
-              console.log(`[FIOS] Found fuel data in field '${field}': ${value}%`);
+              console.log(`[FIOS] Found fuel data in field '${field}': ${value} liters`);
               break;
             }
           }
@@ -207,7 +229,7 @@ async function fetchFuelData(sessionId: string, deviceId: number): Promise<numbe
     if (latestFuel === null) {
       console.log(`[FIOS] No fuel sensor detected for device ${deviceId}`);
     } else {
-      console.log(`[FIOS] Device ${deviceId} - Fuel: ${latestFuel}%`);
+      console.log(`[FIOS] Device ${deviceId} - Fuel: ${latestFuel} liters`);
     }
     
     return latestFuel;
@@ -455,11 +477,11 @@ Deno.serve(async (req) => {
         if (gpsError) console.error(`[FIOS] GPS history error for ${bus.bus_no}:`, gpsError);
       }
       
-      // Store fuel reading if available
+      // Store fuel reading if available (in liters)
       if (bus.id && fuelLevel !== null) {
         const { error: fuelError } = await supabase.from('bus_fuel_readings').insert({
           bus_id: bus.id,
-          fuel_level_percent: fuelLevel,
+          fuel_level_liters: fuelLevel, // Store liters directly
           odometer_reading: mileageData.odometer,
           reading_timestamp: lastUpdate,
           data_source: 'fios'
