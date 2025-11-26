@@ -17,6 +17,12 @@ export default function FuelConsumptionChart() {
         .gte('analytics_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
         .order('analytics_date', { ascending: true });
 
+      // If no analytics data, show message
+      if (!data || data.length === 0) {
+        console.log('No fuel analytics data available. Fuel sensors may not be installed or aggregation needs to run.');
+        return [];
+      }
+
       // Group by date and calculate average efficiency
       const grouped = data?.reduce((acc: any, curr: any) => {
         const date = curr.analytics_date;
@@ -46,6 +52,10 @@ export default function FuelConsumptionChart() {
         {isLoading ? (
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">
             Loading chart data...
+          </div>
+        ) : !chartData || chartData.length === 0 ? (
+          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            No fuel data available. Fuel sensors may not be installed on buses.
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={300}>

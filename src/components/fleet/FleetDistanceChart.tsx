@@ -17,6 +17,12 @@ export default function FleetDistanceChart() {
         .gte('analytics_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
         .order('analytics_date', { ascending: true });
 
+      // If no analytics data, show message
+      if (!data || data.length === 0) {
+        console.log('No fleet analytics data available. Please run aggregation function.');
+        return [];
+      }
+
       // Group by date and sum distance
       const grouped = data?.reduce((acc: any, curr: any) => {
         const date = curr.analytics_date;
@@ -43,6 +49,10 @@ export default function FleetDistanceChart() {
         {isLoading ? (
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">
             Loading chart data...
+          </div>
+        ) : !chartData || chartData.length === 0 ? (
+          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+            No analytics data available. Fleet analytics aggregation needs to run.
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={300}>

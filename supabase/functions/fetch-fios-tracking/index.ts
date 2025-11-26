@@ -128,19 +128,17 @@ async function fetchMileageData(sessionId: string, deviceId: number): Promise<{o
     let firstOdometer: number | null = null;
     
     for (const msg of data.messages) {
-      if (msg.p && msg.p.mileage) {
-        const mileage = parseFloat(msg.p.mileage);
-        if (!isNaN(mileage) && mileage > 0) {
-          if (!firstOdometer) firstOdometer = mileage;
-          latestOdometer = mileage;
-        }
-      }
-      // Also check for odometer field
-      if (msg.p && msg.p.odometer) {
-        const odometer = parseFloat(msg.p.odometer);
-        if (!isNaN(odometer) && odometer > 0) {
-          if (!firstOdometer) firstOdometer = odometer;
-          latestOdometer = odometer;
+      // Check multiple possible odometer parameter names
+      const odometerFields = ['mileage', 'odometer', 'can_odometer', 'total_distance', 'distance', 'odo', 'km', 'can_mileage'];
+      
+      for (const field of odometerFields) {
+        if (msg.p && msg.p[field]) {
+          const value = parseFloat(msg.p[field]);
+          if (!isNaN(value) && value > 0) {
+            if (!firstOdometer) firstOdometer = value;
+            latestOdometer = value;
+            break; // Found valid odometer, move to next message
+          }
         }
       }
     }
@@ -153,6 +151,70 @@ async function fetchMileageData(sessionId: string, deviceId: number): Promise<{o
   } catch (error) {
     console.error(`[FIOS] Error fetching mileage for device ${deviceId}:`, error);
     return { odometer: null, dailyMileage: null };
+  }
+}
+
+async function fetchFuelData(sessionId: string, deviceId: number): Promise<number | null> {
+  console.log(`[FIOS] Fetching fuel data for device ${deviceId}...`);
+  
+  try {
+    // Fetch last 1 hour of messages for latest fuel reading
+    const now = Math.floor(Date.now() / 1000);
+    const oneHourAgo = now - (60 * 60);
+    
+    const params = {
+      itemId: deviceId,
+      timeFrom: oneHourAgo,
+      timeTo: now,
+      flags: 0,
+      flagsMask: 0,
+      loadCount: 50
+    };
+    
+    const url = `https://fios-api.kloudip.com/api?svc=messages/load_interval&params=${encodeURIComponent(JSON.stringify(params))}&sid=${sessionId}`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (!data.messages || data.messages.length === 0) {
+      console.log(`[FIOS] No messages found for fuel data on device ${deviceId}`);
+      return null;
+    }
+    
+    // Parse messages to find fuel sensor data
+    let latestFuel: number | null = null;
+    
+    for (const msg of data.messages) {
+      if (msg.p) {
+        // Check multiple possible fuel parameter names
+        const fuelFields = ['fuel', 'fuel_level', 'fuel_percent', 'fuel_level_percent', 'can_fuel', 'fuel_sensor'];
+        
+        for (const field of fuelFields) {
+          if (msg.p[field] !== undefined && msg.p[field] !== null) {
+            const value = parseFloat(msg.p[field]);
+            if (!isNaN(value) && value >= 0 && value <= 100) {
+              latestFuel = value;
+              console.log(`[FIOS] Found fuel data in field '${field}': ${value}%`);
+              break;
+            }
+          }
+        }
+        
+        if (latestFuel !== null) break; // Found valid fuel data, stop searching
+      }
+    }
+    
+    if (latestFuel === null) {
+      console.log(`[FIOS] No fuel sensor detected for device ${deviceId}`);
+    } else {
+      console.log(`[FIOS] Device ${deviceId} - Fuel: ${latestFuel}%`);
+    }
+    
+    return latestFuel;
+    
+  } catch (error) {
+    console.error(`[FIOS] Error fetching fuel for device ${deviceId}:`, error);
+    return null;
   }
 }
 
@@ -259,8 +321,8 @@ Deno.serve(async (req) => {
       // Fetch odometer & mileage data from FIOS messages API
       const mileageData = await fetchMileageData(sessionId, vehicle.id);
       
-      // Extract fuel level if available (from FIOS params)
-      const fuelLevel = vehicle.pos.f || null; // Fuel percentage
+      // Fetch REAL fuel level from FIOS messages API (not the flag)
+      const fuelLevel = await fetchFuelData(sessionId, vehicle.id);
       
       // Store GPS location history for track playback
       if (bus.id) {
