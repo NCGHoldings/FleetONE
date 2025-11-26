@@ -14,25 +14,145 @@ export async function generatePDFReport(
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
+  let pageNumber = 1;
+
+  // Helper to add page header
+  const addPageHeader = () => {
+    doc.setFillColor(30, 58, 138);
+    doc.rect(0, 0, pageWidth, 8, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    doc.text('NSP Sales Analytics Report', margin, 5);
+    doc.setTextColor(0, 0, 0);
+  };
+
+  // Helper to add page footer
+  const addPageFooter = () => {
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Page ${pageNumber}`, pageWidth - margin - 10, pageHeight - 10);
+    doc.text(`Generated: ${format(new Date(), "MMM dd, yyyy")}`, margin, pageHeight - 10);
+    pageNumber++;
+  };
 
   // Helper to add new page if needed
   const checkAddPage = (requiredHeight: number) => {
-    if (yPosition + requiredHeight > pageHeight - margin) {
+    if (yPosition + requiredHeight > pageHeight - margin - 15) {
+      addPageFooter();
       doc.addPage();
-      yPosition = 20;
+      addPageHeader();
+      yPosition = 15;
       return true;
     }
     return false;
   };
 
-  // Header
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 58, 138); // Blue color
-  doc.text("NSP Sales Analytics Report", margin, yPosition);
-  yPosition += 10;
+  // Helper to capture and add chart
+  const addChartImage = async (elementId: string, title: string, width: number, height: number, xPos?: number) => {
+    if (!chartContainer) return;
+    
+    const chartElement = chartContainer.querySelector(`#${elementId}`);
+    if (!chartElement) return;
 
-  doc.setFontSize(10);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text(title, xPos || margin, yPosition);
+    yPosition += 6;
+
+    try {
+      const canvas = await html2canvas(chartElement as HTMLElement, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = width;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      doc.addImage(imgData, 'PNG', xPos || margin, yPosition, imgWidth, Math.min(imgHeight, height));
+      yPosition += Math.min(imgHeight, height) + 5;
+    } catch (error) {
+      console.error(`Error capturing ${elementId}:`, error);
+      doc.setFontSize(10);
+      doc.text(`[Chart could not be rendered]`, xPos || margin, yPosition);
+      yPosition += 10;
+    }
+  };
+
+  // Helper to add side-by-side charts
+  const addSideBySideCharts = async (
+    leftChart: { id: string; title: string },
+    rightChart: { id: string; title: string }
+  ) => {
+    addPageFooter();
+    doc.addPage();
+    addPageHeader();
+    yPosition = 15;
+
+    const halfWidth = (pageWidth - 3 * margin) / 2;
+    const chartHeight = 85;
+
+    // Left chart
+    if (chartContainer) {
+      const leftElement = chartContainer.querySelector(`#${leftChart.id}`);
+      if (leftElement) {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(leftChart.title, margin, yPosition);
+        
+        try {
+          const canvas = await html2canvas(leftElement as HTMLElement, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+          });
+          const imgData = canvas.toDataURL('image/png');
+          doc.addImage(imgData, 'PNG', margin, yPosition + 6, halfWidth, chartHeight);
+        } catch (error) {
+          console.error(`Error capturing ${leftChart.id}:`, error);
+        }
+      }
+    }
+
+    // Right chart
+    if (chartContainer) {
+      const rightElement = chartContainer.querySelector(`#${rightChart.id}`);
+      if (rightElement) {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(rightChart.title, margin + halfWidth + margin, yPosition);
+        
+        try {
+          const canvas = await html2canvas(rightElement as HTMLElement, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+          });
+          const imgData = canvas.toDataURL('image/png');
+          doc.addImage(imgData, 'PNG', margin + halfWidth + margin, yPosition + 6, halfWidth, chartHeight);
+        } catch (error) {
+          console.error(`Error capturing ${rightChart.id}:`, error);
+        }
+      }
+    }
+
+    yPosition = pageHeight - margin;
+  };
+
+  // Add header to first page
+  addPageHeader();
+  yPosition = 15;
+
+  // Title Section
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 58, 138);
+  doc.text("NSP Sales Analytics Report", margin, yPosition);
+  yPosition += 8;
+
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 100, 100);
   doc.text(
@@ -40,8 +160,7 @@ export async function generatePDFReport(
     margin,
     yPosition
   );
-  doc.text(`Generated: ${format(new Date(), "MMM dd, yyyy HH:mm")}`, margin, yPosition + 5);
-  yPosition += 15;
+  yPosition += 12;
 
   // KPI Summary
   if (options.includeOverview && options.includeKPIs) {
@@ -101,72 +220,51 @@ export async function generatePDFReport(
     yPosition += 5;
   }
 
-  // Helper function to capture and add chart
-  const addChartImage = async (elementId: string, title: string) => {
-    if (!chartContainer) return;
-    
-    const chartElement = chartContainer.querySelector(`#${elementId}`);
-    if (!chartElement) return;
-
-    doc.addPage();
-    yPosition = 20;
-
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text(title, margin, yPosition);
-    yPosition += 10;
-
-    try {
-      const canvas = await html2canvas(chartElement as HTMLElement, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const imgWidth = pageWidth - 2 * margin;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      doc.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
-    } catch (error) {
-      console.error(`Error capturing ${elementId}:`, error);
-      doc.setFontSize(10);
-      doc.text(`[Chart could not be rendered]`, margin, yPosition);
-    }
-  };
-
   // Add charts based on selection
   if (options.includeOverview && options.includeSalesTrend) {
-    await addChartImage('export-sales-trend', 'Sales Trend Analysis');
+    addPageFooter();
+    doc.addPage();
+    addPageHeader();
+    yPosition = 15;
+    await addChartImage('export-sales-trend', 'Sales Trend Analysis', pageWidth - 2 * margin, 70);
   }
 
   if (options.includeOverview && options.includeCategoryDistribution) {
-    await addChartImage('export-category-distribution', 'Category Distribution');
-    await addChartImage('export-category-comparison', 'Category Comparison');
+    await addSideBySideCharts(
+      { id: 'export-category-distribution', title: 'Category Distribution' },
+      { id: 'export-category-comparison', title: 'Category Comparison' }
+    );
   }
 
-  if (options.includeDetailedAnalytics && options.includeMonthlyTrend) {
-    await addChartImage('export-monthly-trend', 'Monthly Trend');
-  }
+  if (options.includeDetailedAnalytics && (options.includeMonthlyTrend || options.includeDayOfWeek)) {
+    addPageFooter();
+    doc.addPage();
+    addPageHeader();
+    yPosition = 15;
 
-  if (options.includeDetailedAnalytics && options.includeDayOfWeek) {
-    await addChartImage('export-day-of-week', 'Day-of-Week Performance');
+    if (options.includeMonthlyTrend) {
+      await addChartImage('export-monthly-trend', 'Monthly Trend', pageWidth - 2 * margin, 60);
+    }
+
+    if (options.includeDayOfWeek) {
+      checkAddPage(70);
+      await addChartImage('export-day-of-week', 'Day-of-Week Performance', pageWidth - 2 * margin, 60);
+    }
   }
 
   if (options.includeDetailedAnalytics && options.includeTyreBreakdown && analytics.tyreBreakdown?.length > 0) {
-    await addChartImage('export-tyre-breakdown', 'Tyre Sales Breakdown');
+    checkAddPage(70);
+    await addChartImage('export-tyre-breakdown', 'Tyre Sales Breakdown', pageWidth - 2 * margin, 55);
   }
 
   // Performance Section
   if (options.includePerformance && options.includeBestWorst) {
-    doc.addPage();
-    yPosition = 20;
+    checkAddPage(50);
 
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text("Performance Analysis", margin, yPosition);
-    yPosition += 10;
+    yPosition += 8;
 
     if (analytics.bestDay) {
       doc.setFontSize(12);
@@ -198,13 +296,15 @@ export async function generatePDFReport(
 
   // Data Table
   if (options.includeDataTable && analytics.dailyTrend?.length > 0) {
+    addPageFooter();
     doc.addPage();
-    yPosition = 20;
+    addPageHeader();
+    yPosition = 15;
 
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text("Daily Sales Data", margin, yPosition);
-    yPosition += 8;
+    yPosition += 6;
 
     const tableData = analytics.dailyTrend.map((record: any) => [
       format(new Date(record.date), "MMM dd"),
@@ -226,6 +326,9 @@ export async function generatePDFReport(
       styles: { fontSize: 8 },
     });
   }
+
+  // Add final page footer
+  addPageFooter();
 
   // Save PDF
   doc.save(`NSP_Analytics_Report_${format(new Date(), "yyyyMMdd_HHmmss")}.pdf`);
