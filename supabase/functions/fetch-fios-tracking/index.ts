@@ -264,7 +264,7 @@ Deno.serve(async (req) => {
       
       // Store GPS location history for track playback
       if (bus.id) {
-        await supabase.from('gps_location_history').insert({
+        const { error: gpsError } = await supabase.from('gps_location_history').insert({
           bus_id: bus.id,
           latitude: vehicle.pos.y,
           longitude: vehicle.pos.x,
@@ -275,18 +275,20 @@ Deno.serve(async (req) => {
           fuel_level_percent: fuelLevel,
           timestamp: lastUpdate,
           data_source: 'fios'
-        }).catch(err => console.error(`[FIOS] GPS history error for ${bus.bus_no}:`, err));
+        });
+        if (gpsError) console.error(`[FIOS] GPS history error for ${bus.bus_no}:`, gpsError);
       }
       
       // Store fuel reading if available
       if (bus.id && fuelLevel !== null) {
-        await supabase.from('bus_fuel_readings').insert({
+        const { error: fuelError } = await supabase.from('bus_fuel_readings').insert({
           bus_id: bus.id,
           fuel_level_percent: fuelLevel,
           odometer_reading: mileageData.odometer,
           reading_timestamp: lastUpdate,
           data_source: 'fios'
-        }).catch(err => console.error(`[FIOS] Fuel reading error for ${bus.bus_no}:`, err));
+        });
+        if (fuelError) console.error(`[FIOS] Fuel reading error for ${bus.bus_no}:`, fuelError);
       }
       
       trackingData.push({
