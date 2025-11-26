@@ -735,6 +735,47 @@ export type Database = {
           },
         ]
       }
+      bus_fuel_readings: {
+        Row: {
+          bus_id: string
+          created_at: string | null
+          data_source: string | null
+          fuel_level_liters: number | null
+          fuel_level_percent: number | null
+          id: string
+          odometer_reading: number | null
+          reading_timestamp: string
+        }
+        Insert: {
+          bus_id: string
+          created_at?: string | null
+          data_source?: string | null
+          fuel_level_liters?: number | null
+          fuel_level_percent?: number | null
+          id?: string
+          odometer_reading?: number | null
+          reading_timestamp: string
+        }
+        Update: {
+          bus_id?: string
+          created_at?: string | null
+          data_source?: string | null
+          fuel_level_liters?: number | null
+          fuel_level_percent?: number | null
+          id?: string
+          odometer_reading?: number | null
+          reading_timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bus_fuel_readings_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bus_loan_payments: {
         Row: {
           actual_payment_date: string | null
@@ -1193,6 +1234,78 @@ export type Database = {
             columns: ["parent_company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      completed_trips: {
+        Row: {
+          avg_speed_kmh: number | null
+          behavior_score: number | null
+          bus_id: string
+          created_at: string | null
+          distance_km: number | null
+          driver_id: string | null
+          end_odometer: number | null
+          end_time: string | null
+          fuel_consumed_liters: number | null
+          fuel_efficiency_kmpl: number | null
+          id: string
+          max_speed_kmh: number | null
+          route_polyline: string | null
+          start_odometer: number | null
+          start_time: string | null
+          trip_date: string
+        }
+        Insert: {
+          avg_speed_kmh?: number | null
+          behavior_score?: number | null
+          bus_id: string
+          created_at?: string | null
+          distance_km?: number | null
+          driver_id?: string | null
+          end_odometer?: number | null
+          end_time?: string | null
+          fuel_consumed_liters?: number | null
+          fuel_efficiency_kmpl?: number | null
+          id?: string
+          max_speed_kmh?: number | null
+          route_polyline?: string | null
+          start_odometer?: number | null
+          start_time?: string | null
+          trip_date: string
+        }
+        Update: {
+          avg_speed_kmh?: number | null
+          behavior_score?: number | null
+          bus_id?: string
+          created_at?: string | null
+          distance_km?: number | null
+          driver_id?: string | null
+          end_odometer?: number | null
+          end_time?: string | null
+          fuel_consumed_liters?: number | null
+          fuel_efficiency_kmpl?: number | null
+          id?: string
+          max_speed_kmh?: number | null
+          route_polyline?: string | null
+          start_odometer?: number | null
+          start_time?: string | null
+          trip_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "completed_trips_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "completed_trips_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1764,6 +1877,131 @@ export type Database = {
           },
         ]
       }
+      driver_behavior_events: {
+        Row: {
+          actual_value: number | null
+          bus_id: string
+          created_at: string | null
+          driver_id: string | null
+          event_timestamp: string
+          event_type: string
+          id: string
+          latitude: number | null
+          location_description: string | null
+          longitude: number | null
+          severity: string | null
+          speed_kmh: number | null
+          threshold_value: number | null
+        }
+        Insert: {
+          actual_value?: number | null
+          bus_id: string
+          created_at?: string | null
+          driver_id?: string | null
+          event_timestamp: string
+          event_type: string
+          id?: string
+          latitude?: number | null
+          location_description?: string | null
+          longitude?: number | null
+          severity?: string | null
+          speed_kmh?: number | null
+          threshold_value?: number | null
+        }
+        Update: {
+          actual_value?: number | null
+          bus_id?: string
+          created_at?: string | null
+          driver_id?: string | null
+          event_timestamp?: string
+          event_type?: string
+          id?: string
+          latitude?: number | null
+          location_description?: string | null
+          longitude?: number | null
+          severity?: string | null
+          speed_kmh?: number | null
+          threshold_value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_behavior_events_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_behavior_events_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_scorecards: {
+        Row: {
+          created_at: string | null
+          driver_id: string
+          excessive_idle_count: number | null
+          harsh_acceleration_count: number | null
+          harsh_braking_count: number | null
+          id: string
+          safety_rating: string | null
+          score_period_end: string
+          score_period_start: string
+          sharp_turn_count: number | null
+          speeding_count: number | null
+          total_distance_km: number | null
+          total_score: number | null
+          total_trips: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          driver_id: string
+          excessive_idle_count?: number | null
+          harsh_acceleration_count?: number | null
+          harsh_braking_count?: number | null
+          id?: string
+          safety_rating?: string | null
+          score_period_end: string
+          score_period_start: string
+          sharp_turn_count?: number | null
+          speeding_count?: number | null
+          total_distance_km?: number | null
+          total_score?: number | null
+          total_trips?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          driver_id?: string
+          excessive_idle_count?: number | null
+          harsh_acceleration_count?: number | null
+          harsh_braking_count?: number | null
+          id?: string
+          safety_rating?: string | null
+          score_period_end?: string
+          score_period_start?: string
+          sharp_turn_count?: number | null
+          speeding_count?: number | null
+          total_distance_km?: number | null
+          total_score?: number | null
+          total_trips?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_scorecards_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_training: {
         Row: {
           created_at: string
@@ -2047,6 +2285,65 @@ export type Database = {
         }
         Relationships: []
       }
+      fleet_analytics_daily: {
+        Row: {
+          analytics_date: string
+          avg_speed_kmh: number | null
+          behavior_events_count: number | null
+          bus_id: string
+          created_at: string | null
+          fuel_consumed_liters: number | null
+          fuel_efficiency_kmpl: number | null
+          id: string
+          max_speed_kmh: number | null
+          safety_score: number | null
+          total_distance_km: number | null
+          total_idle_time_minutes: number | null
+          total_trips: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          analytics_date: string
+          avg_speed_kmh?: number | null
+          behavior_events_count?: number | null
+          bus_id: string
+          created_at?: string | null
+          fuel_consumed_liters?: number | null
+          fuel_efficiency_kmpl?: number | null
+          id?: string
+          max_speed_kmh?: number | null
+          safety_score?: number | null
+          total_distance_km?: number | null
+          total_idle_time_minutes?: number | null
+          total_trips?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          analytics_date?: string
+          avg_speed_kmh?: number | null
+          behavior_events_count?: number | null
+          bus_id?: string
+          created_at?: string | null
+          fuel_consumed_liters?: number | null
+          fuel_efficiency_kmpl?: number | null
+          id?: string
+          max_speed_kmh?: number | null
+          safety_score?: number | null
+          total_distance_km?: number | null
+          total_idle_time_minutes?: number | null
+          total_trips?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_analytics_daily_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       frequency_rules: {
         Row: {
           created_at: string
@@ -2073,6 +2370,106 @@ export type Database = {
           rule_type?: Database["public"]["Enums"]["frequency_rule_type"]
         }
         Relationships: []
+      }
+      fuel_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_timestamp: string | null
+          alert_type: string
+          bus_id: string
+          created_at: string | null
+          fuel_drop_amount: number | null
+          fuel_level_percent: number | null
+          id: string
+          notes: string | null
+          odometer_reading: number | null
+          status: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_timestamp?: string | null
+          alert_type: string
+          bus_id: string
+          created_at?: string | null
+          fuel_drop_amount?: number | null
+          fuel_level_percent?: number | null
+          id?: string
+          notes?: string | null
+          odometer_reading?: number | null
+          status?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_timestamp?: string | null
+          alert_type?: string
+          bus_id?: string
+          created_at?: string | null
+          fuel_drop_amount?: number | null
+          fuel_level_percent?: number | null
+          id?: string
+          notes?: string | null
+          odometer_reading?: number | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_alerts_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fuel_consumption_logs: {
+        Row: {
+          bus_id: string
+          created_at: string | null
+          created_by: string | null
+          fuel_cost: number | null
+          fuel_filled_liters: number | null
+          fuel_station: string | null
+          id: string
+          log_date: string
+          notes: string | null
+          odometer_at_fillup: number | null
+        }
+        Insert: {
+          bus_id: string
+          created_at?: string | null
+          created_by?: string | null
+          fuel_cost?: number | null
+          fuel_filled_liters?: number | null
+          fuel_station?: string | null
+          id?: string
+          log_date: string
+          notes?: string | null
+          odometer_at_fillup?: number | null
+        }
+        Update: {
+          bus_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          fuel_cost?: number | null
+          fuel_filled_liters?: number | null
+          fuel_station?: string | null
+          id?: string
+          log_date?: string
+          notes?: string | null
+          odometer_at_fillup?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_consumption_logs_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fuel_settings: {
         Row: {
@@ -2343,6 +2740,59 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "governance_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gps_location_history: {
+        Row: {
+          altitude_meters: number | null
+          bus_id: string
+          created_at: string | null
+          data_source: string | null
+          fuel_level_percent: number | null
+          heading: number | null
+          id: string
+          latitude: number
+          longitude: number
+          odometer_reading: number | null
+          speed_kmh: number | null
+          timestamp: string
+        }
+        Insert: {
+          altitude_meters?: number | null
+          bus_id: string
+          created_at?: string | null
+          data_source?: string | null
+          fuel_level_percent?: number | null
+          heading?: number | null
+          id?: string
+          latitude: number
+          longitude: number
+          odometer_reading?: number | null
+          speed_kmh?: number | null
+          timestamp: string
+        }
+        Update: {
+          altitude_meters?: number | null
+          bus_id?: string
+          created_at?: string | null
+          data_source?: string | null
+          fuel_level_percent?: number | null
+          heading?: number | null
+          id?: string
+          latitude?: number
+          longitude?: number
+          odometer_reading?: number | null
+          speed_kmh?: number | null
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gps_location_history_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
             referencedColumns: ["id"]
           },
         ]
@@ -3877,6 +4327,69 @@ export type Database = {
           via_locations?: string[] | null
         }
         Relationships: []
+      }
+      safety_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_message: string
+          alert_type: string
+          bus_id: string
+          created_at: string | null
+          driver_id: string | null
+          event_timestamp: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          severity: string | null
+          status: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_message: string
+          alert_type: string
+          bus_id: string
+          created_at?: string | null
+          driver_id?: string | null
+          event_timestamp: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          severity?: string | null
+          status?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_message?: string
+          alert_type?: string
+          bus_id?: string
+          created_at?: string | null
+          driver_id?: string | null
+          event_timestamp?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          severity?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_alerts_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_alerts_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sbus: {
         Row: {
