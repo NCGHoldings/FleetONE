@@ -264,6 +264,8 @@ async function calculateGPSMileage(supabase: any, busId: string, sriLankaDate: s
     const startOfDay = new Date(`${sriLankaDate}T00:00:00+05:30`);
     const endOfDay = new Date(`${sriLankaDate}T23:59:59+05:30`);
     
+    console.log(`[GPS] Fetching waypoints for bus ${busId} from ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+    
     const { data: waypoints, error } = await supabase
       .from('gps_location_history')
       .select('latitude, longitude, timestamp')
@@ -272,7 +274,13 @@ async function calculateGPSMileage(supabase: any, busId: string, sriLankaDate: s
       .lte('timestamp', endOfDay.toISOString())
       .order('timestamp', { ascending: true });
     
-    if (error || !waypoints || waypoints.length < 2) {
+    if (error) {
+      console.error(`[GPS] Error fetching waypoints:`, error);
+      return 0;
+    }
+    
+    if (!waypoints || waypoints.length < 2) {
+      console.log(`[GPS] Insufficient waypoints for ${busId} on ${sriLankaDate} (found: ${waypoints?.length || 0})`);
       return 0;
     }
     
@@ -289,7 +297,8 @@ async function calculateGPSMileage(supabase: any, busId: string, sriLankaDate: s
       }
     }
     
-    return totalDistance;
+    console.log(`[GPS] Calculated ${totalDistance.toFixed(2)} km from ${waypoints.length} waypoints`);
+    return Math.round(totalDistance * 10) / 10; // Round to 1 decimal
   } catch (error) {
     console.error('[GPS] Error calculating mileage:', error);
     return 0;
@@ -396,18 +405,33 @@ Deno.serve(async (req) => {
         odometerSource = 'fios';
       } else if (bus.base_odometer_km && bus.base_odometer_km > 0) {
         // Bus doesn't have FIOS odometer but has manual base - calculate from GPS
-        console.log(`[GPS] Calculating mileage for ${bus.bus_no} without FIOS odometer`);
+        console.log(`[Odometer] ${bus.bus_no}: Starting GPS calculation with base ${bus.base_odometer_km} km from ${bus.base_odometer_date}`);
         
         // Get today's GPS-calculated mileage
         const todayGPSMileage = await calculateGPSMileage(supabase, bus.id, sriLankaDate);
+        console.log(`[Odometer] ${bus.bus_no}: Today's GPS mileage = ${todayGPSMileage} km`);
         
         // Get cumulative GPS mileage since base date
-        const { data: historicMileage } = await supabase
+        const { data: historicMileage, error: histError } = await supabase
           .from('bus_daily_mileage')
           .select('daily_km')
           .eq('bus_id', bus.id)
           .gte('date', bus.base_odometer_date)
           .lt('date', sriLankaDate);
+        
+        if (histError) {
+          console.error(`[Odometer] ${bus.bus_no}: Error fetching historic mileage:`, histError);
+        }
+        
+        const cumulativeGPSMileage = (historicMileage || []).reduce((sum, day) => sum + (day.daily_km || 0), 0);
+        console.log(`[Odometer] ${bus.bus_no}: Cumulative historic GPS = ${cumulativeGPSMileage} km`);
+        
+        finalOdometer = bus.base_odometer_km + cumulativeGPSMileage + todayGPSMileage;
+        dailyMileage = todayGPSMileage;
+        odometerSource = 'gps_calculated';
+        
+        console.log(`[Odometer] ${bus.bus_no}: Final = ${bus.base_odometer_km} (base) + ${cumulativeGPSMileage} (historic) + ${todayGPSMileage} (today) = ${finalOdometer} km`);
+      }
         
         const cumulativeGPSMileage = (historicMileage || []).reduce((sum, day) => sum + (day.daily_km || 0), 0);
         
@@ -452,8 +476,9 @@ Deno.serve(async (req) => {
         if (fuelError) console.error(`[FIOS] Fuel reading error for ${bus.bus_no}:`, fuelError);
       }
       
-      // Save or update daily mileage record
-      if (dailyMileage !== null && dailyMileage > 0) {
+      // Save or update daily mileage record (always save, even if 0 - bus might be parked)
+      if (dailyMileage !== null) {
+        console.log(`[Daily Mileage] ${bus.bus_no}: Saving ${dailyMileage} km for ${sriLankaDate}`);
         const { error: mileageError } = await supabase
           .from('bus_daily_mileage')
           .upsert({
@@ -500,6 +525,7 @@ Deno.serve(async (req) => {
         // Odometer & mileage data with source
         odometer_km: finalOdometer,
         daily_mileage_km: dailyMileage,
+        odometer_source: odometerSource,
         engine_hours: null
       });
     }
