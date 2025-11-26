@@ -66,6 +66,7 @@ import DailyBusExpenses from "./pages/DailyBusExpenses";
 import Accounting from "./pages/Accounting";
 import Budgeting from "./pages/Budgeting";
 import TyreManagement from "./pages/TyreManagement";
+import FleetAnalytics from "./pages/FleetAnalytics";
 
 const queryClient = new QueryClient();
 
@@ -288,6 +289,18 @@ const App = () => (
                   <PageAccessGuard pageId="real_time_tracking">
                     <AppLayout>
                       <RealTimeTracking />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/fleet-analytics" 
+              element={
+                <ProtectedRoute>
+                  <PageAccessGuard pageId="fleet_management">
+                    <AppLayout>
+                      <FleetAnalytics />
                     </AppLayout>
                   </PageAccessGuard>
                 </ProtectedRoute>
