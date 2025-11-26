@@ -352,7 +352,7 @@ export default function RealTimeTracking() {
       accessorKey: "fuel_level_liters",
       header: "Fuel",
       cell: ({ row }) => {
-        const fuelLiters = row.getValue("fuel_level_liters") as number;
+        const fuelLiters = row.getValue("fuel_level_liters") as number || row.original.fuel_level as number;
         return fuelLiters ? (
           <div className="flex items-center gap-2">
             <Fuel className="h-4 w-4 text-primary" />
