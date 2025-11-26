@@ -33,14 +33,19 @@ export const TyreRotationModal = ({ open, onOpenChange, bus, tyres }: TyreRotati
     const frontRight = tyres.find(t => t.position === "Front Right");
     const rearLeft1 = tyres.find(t => t.position === "Rear Left 1");
     const rearRight1 = tyres.find(t => t.position === "Rear Right 1");
+    const rearLeft2 = tyres.find(t => t.position === "Rear Left 2");
+    const rearRight2 = tyres.find(t => t.position === "Rear Right 2");
 
-    if (frontLeft && rearRight1) plan.push({ from: "Front Left", to: "Rear Right 1", tyreId: frontLeft.id });
-    if (frontRight && rearLeft1) plan.push({ from: "Front Right", to: "Rear Left 1", tyreId: frontRight.id });
-    if (rearLeft1 && frontRight) plan.push({ from: "Rear Left 1", to: "Front Right", tyreId: rearLeft1.id });
-    if (rearRight1 && frontLeft) plan.push({ from: "Rear Right 1", to: "Front Left", tyreId: rearRight1.id });
+    // Full 6-tyre cross rotation: FL→RR2, FR→RL2, RL1→RR1, RR1→RL1, RL2→FR, RR2→FL
+    if (frontLeft && rearRight2) plan.push({ from: "Front Left", to: "Rear Right 2", tyreId: frontLeft.id });
+    if (frontRight && rearLeft2) plan.push({ from: "Front Right", to: "Rear Left 2", tyreId: frontRight.id });
+    if (rearLeft1 && rearRight1) plan.push({ from: "Rear Left 1", to: "Rear Right 1", tyreId: rearLeft1.id });
+    if (rearRight1 && rearLeft1) plan.push({ from: "Rear Right 1", to: "Rear Left 1", tyreId: rearRight1.id });
+    if (rearLeft2 && frontRight) plan.push({ from: "Rear Left 2", to: "Front Right", tyreId: rearLeft2.id });
+    if (rearRight2 && frontLeft) plan.push({ from: "Rear Right 2", to: "Front Left", tyreId: rearRight2.id });
 
     setRotationPlan(plan);
-    setRotationType("cross_rotation");
+    setRotationType("cross_rotation_6tyre");
   };
 
   const suggestFrontToRear = () => {
@@ -49,14 +54,40 @@ export const TyreRotationModal = ({ open, onOpenChange, bus, tyres }: TyreRotati
     const frontRight = tyres.find(t => t.position === "Front Right");
     const rearLeft1 = tyres.find(t => t.position === "Rear Left 1");
     const rearRight1 = tyres.find(t => t.position === "Rear Right 1");
+    const rearLeft2 = tyres.find(t => t.position === "Rear Left 2");
+    const rearRight2 = tyres.find(t => t.position === "Rear Right 2");
 
+    // Progressive rotation: FL→RL1→RL2, FR→RR1→RR2
     if (frontLeft && rearLeft1) plan.push({ from: "Front Left", to: "Rear Left 1", tyreId: frontLeft.id });
     if (frontRight && rearRight1) plan.push({ from: "Front Right", to: "Rear Right 1", tyreId: frontRight.id });
-    if (rearLeft1 && frontLeft) plan.push({ from: "Rear Left 1", to: "Front Left", tyreId: rearLeft1.id });
-    if (rearRight1 && frontRight) plan.push({ from: "Rear Right 1", to: "Front Right", tyreId: rearRight1.id });
+    if (rearLeft1 && rearLeft2) plan.push({ from: "Rear Left 1", to: "Rear Left 2", tyreId: rearLeft1.id });
+    if (rearRight1 && rearRight2) plan.push({ from: "Rear Right 1", to: "Rear Right 2", tyreId: rearRight1.id });
+    if (rearLeft2 && frontLeft) plan.push({ from: "Rear Left 2", to: "Front Left", tyreId: rearLeft2.id });
+    if (rearRight2 && frontRight) plan.push({ from: "Rear Right 2", to: "Front Right", tyreId: rearRight2.id });
 
     setRotationPlan(plan);
-    setRotationType("front_to_rear");
+    setRotationType("progressive_6tyre");
+  };
+
+  const suggestAxleSwap = () => {
+    const plan: RotationStep[] = [];
+    const frontLeft = tyres.find(t => t.position === "Front Left");
+    const frontRight = tyres.find(t => t.position === "Front Right");
+    const rearLeft1 = tyres.find(t => t.position === "Rear Left 1");
+    const rearRight1 = tyres.find(t => t.position === "Rear Right 1");
+    const rearLeft2 = tyres.find(t => t.position === "Rear Left 2");
+    const rearRight2 = tyres.find(t => t.position === "Rear Right 2");
+
+    // Swap axles: Front↔Rear1, Rear1↔Rear2
+    if (frontLeft && rearLeft1) plan.push({ from: "Front Left", to: "Rear Left 1", tyreId: frontLeft.id });
+    if (frontRight && rearRight1) plan.push({ from: "Front Right", to: "Rear Right 1", tyreId: frontRight.id });
+    if (rearLeft1 && rearLeft2) plan.push({ from: "Rear Left 1", to: "Rear Left 2", tyreId: rearLeft1.id });
+    if (rearRight1 && rearRight2) plan.push({ from: "Rear Right 1", to: "Rear Right 2", tyreId: rearRight1.id });
+    if (rearLeft2 && frontLeft) plan.push({ from: "Rear Left 2", to: "Front Left", tyreId: rearLeft2.id });
+    if (rearRight2 && frontRight) plan.push({ from: "Rear Right 2", to: "Front Right", tyreId: rearRight2.id });
+
+    setRotationPlan(plan);
+    setRotationType("axle_swap_6tyre");
   };
 
   const executeRotation = async () => {
@@ -134,7 +165,7 @@ export const TyreRotationModal = ({ open, onOpenChange, bus, tyres }: TyreRotati
 
           {/* Rotation Pattern Buttons */}
           <div className="space-y-3">
-            <h3 className="font-semibold">Select Rotation Pattern:</h3>
+            <h3 className="font-semibold">Select Rotation Pattern (6 Tyres):</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Button 
                 onClick={suggestCrossRotation} 
@@ -142,9 +173,9 @@ export const TyreRotationModal = ({ open, onOpenChange, bus, tyres }: TyreRotati
                 className="h-auto py-4 flex-col items-start"
               >
                 <RotateCcw className="w-5 h-5 mb-2 text-primary" />
-                <span className="font-semibold">Cross Rotation</span>
+                <span className="font-semibold">Full Cross</span>
                 <span className="text-xs text-muted-foreground mt-1">
-                  FL→RR, FR→RL (Best for even wear)
+                  FL↔RR2, FR↔RL2, RL1↔RR1
                 </span>
               </Button>
               <Button 
@@ -153,19 +184,20 @@ export const TyreRotationModal = ({ open, onOpenChange, bus, tyres }: TyreRotati
                 className="h-auto py-4 flex-col items-start"
               >
                 <TrendingUp className="w-5 h-5 mb-2 text-primary" />
-                <span className="font-semibold">Front to Rear</span>
+                <span className="font-semibold">Progressive</span>
                 <span className="text-xs text-muted-foreground mt-1">
-                  FL→RL, FR→RR (Simple pattern)
+                  F→R1→R2 (circular pattern)
                 </span>
               </Button>
               <Button 
+                onClick={suggestAxleSwap}
                 variant="outline"
                 className="h-auto py-4 flex-col items-start"
-                disabled
               >
-                <span className="font-semibold">Custom Pattern</span>
+                <RotateCcw className="w-5 h-5 mb-2 text-purple-600" />
+                <span className="font-semibold">Axle Swap</span>
                 <span className="text-xs text-muted-foreground mt-1">
-                  Coming soon
+                  Front↔Rear1↔Rear2
                 </span>
               </Button>
             </div>

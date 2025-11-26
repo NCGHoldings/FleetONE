@@ -234,6 +234,21 @@ export const useTyreManagement = () => {
     },
   });
 
+  // Sync all tyre conditions manually
+  const syncAllConditionsMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("sync_all_tyre_conditions");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bus-tyres"] });
+      toast.success("All tyre conditions synced successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to sync conditions: ${error.message}`);
+    },
+  });
+
   // Calculate overall stats
   const stats = tyres ? {
     totalTyres: tyres.length,
@@ -260,5 +275,7 @@ export const useTyreManagement = () => {
     addRotation: addRotationMutation.mutate,
     updateTyre: updateTyreMutation.mutate,
     deleteTyre: deleteTyreMutation.mutate,
+    syncAllConditions: syncAllConditionsMutation.mutate,
+    isSyncing: syncAllConditionsMutation.isPending,
   };
 };
