@@ -2901,6 +2901,83 @@ export type Database = {
         }
         Relationships: []
       }
+      inquiry_follow_ups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          follow_up_type: string
+          id: string
+          inquiry_id: string
+          next_follow_up_date: string | null
+          notes: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          follow_up_type: string
+          id?: string
+          inquiry_id: string
+          next_follow_up_date?: string | null
+          notes: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          follow_up_type?: string
+          id?: string
+          inquiry_id?: string
+          next_follow_up_date?: string | null
+          notes?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inquiry_follow_ups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inquiry_follow_ups_inquiry_id_fkey"
+            columns: ["inquiry_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_inquiries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inquiry_hub_settings: {
+        Row: {
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          setting_key: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inquiry_hub_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       insurance_records: {
         Row: {
           agent_email: string | null
@@ -7040,6 +7117,92 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_inquiries: {
+        Row: {
+          address: string | null
+          assigned_to: string | null
+          budget_range: string | null
+          company_name: string | null
+          converted_at: string | null
+          converted_to_quotation_id: string | null
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          external_ref_id: string | null
+          follow_up_date: string | null
+          id: string
+          inquiry_message: string | null
+          inquiry_number: string
+          interested_model: string | null
+          notes: string | null
+          priority: string
+          product_type: string
+          quantity: number | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          assigned_to?: string | null
+          budget_range?: string | null
+          company_name?: string | null
+          converted_at?: string | null
+          converted_to_quotation_id?: string | null
+          created_at?: string
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          external_ref_id?: string | null
+          follow_up_date?: string | null
+          id?: string
+          inquiry_message?: string | null
+          inquiry_number: string
+          interested_model?: string | null
+          notes?: string | null
+          priority?: string
+          product_type: string
+          quantity?: number | null
+          source: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          assigned_to?: string | null
+          budget_range?: string | null
+          company_name?: string | null
+          converted_at?: string | null
+          converted_to_quotation_id?: string | null
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          external_ref_id?: string | null
+          follow_up_date?: string | null
+          id?: string
+          inquiry_message?: string | null
+          inquiry_number?: string
+          interested_model?: string | null
+          notes?: string | null
+          priority?: string
+          product_type?: string
+          quantity?: number | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_inquiries_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workshop_settings: {
         Row: {
           created_at: string
@@ -9896,6 +10059,7 @@ export type Database = {
       generate_budget_code: { Args: { p_fiscal_year: number }; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_employee_id: { Args: never; Returns: string }
+      generate_inquiry_number: { Args: never; Returns: string }
       generate_journal_entry_number: { Args: never; Returns: string }
       generate_next_version_number: {
         Args: { p_parent_id: string }

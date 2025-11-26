@@ -67,6 +67,7 @@ import Accounting from "./pages/Accounting";
 import Budgeting from "./pages/Budgeting";
 import TyreManagement from "./pages/TyreManagement";
 import FleetAnalytics from "./pages/FleetAnalytics";
+import VehicleInquiryHub from "./pages/VehicleInquiryHub";
 
 const queryClient = new QueryClient();
 
@@ -567,8 +568,21 @@ const App = () => (
               } 
             />
             
+            <Route 
+              path="/vehicle-inquiries" 
+              element={
+                <ProtectedRoute>
+                  <PageAccessGuard pageId="vehicle_inquiries">
+                    <AppLayout>
+                      <VehicleInquiryHub />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            
             <Route
-              path="/nsp-daily-sales" 
+              path="/nsp-daily-sales"
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
                   <PageAccessGuard pageId="nsp_daily_sales">

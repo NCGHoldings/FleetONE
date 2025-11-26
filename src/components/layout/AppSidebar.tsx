@@ -93,6 +93,7 @@ const businessItems = [
   { id: "business_ideas", title: "Business Ideas", url: "/business", icon: Lightbulb },
   { id: "document_manager", title: "Document Manager", url: "/documents", icon: FileText },
   { id: "feedback", title: "Feedback", url: "/feedback", icon: MessageSquare },
+  { id: "vehicle_inquiries", title: "Vehicle Inquiries", url: "/vehicle-inquiries", icon: Users },
 ];
 
 const yutongItems = [

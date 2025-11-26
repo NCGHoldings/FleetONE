@@ -45,6 +45,7 @@ export const PAGES: PageCategories = {
     { id: "business_ideas", title: "Business Ideas", url: "/business" },
     { id: "document_manager", title: "Document Manager", url: "/documents" },
     { id: "feedback", title: "Feedback", url: "/feedback" },
+    { id: "vehicle_inquiries", title: "Vehicle Inquiries", url: "/vehicle-inquiries" },
   ],
   finance: [
     { id: "accounting", title: "Accounting & GL", url: "/accounting" },
