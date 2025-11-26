@@ -522,6 +522,7 @@ Deno.serve(async (req) => {
         speed_kmh: vehicle.pos.s,
         status: status,
         last_update: lastUpdate,
+        fuel_level: fuelLevel, // Keep for backward compatibility
         fuel_level_liters: fuelLevel, // Store fuel in liters
         tire_pressure: null,
         engine_health: engineHealth,

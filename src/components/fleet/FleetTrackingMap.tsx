@@ -251,10 +251,10 @@ const FleetTrackingMap = ({ trackingData, apiKey, isLoading = false }: FleetTrac
                   </Badge>
                 </div>
 
-                {selectedBus.fuel_level_liters !== undefined && selectedBus.fuel_level_liters !== null && (
+                {(selectedBus.fuel_level_liters || selectedBus.fuel_level) && (
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">Fuel:</span>
-                    <span className="text-foreground font-medium">{Math.round(selectedBus.fuel_level_liters)} L</span>
+                    <span className="text-foreground font-medium">{Math.round(selectedBus.fuel_level_liters || selectedBus.fuel_level || 0)} L</span>
                   </div>
                 )}
 
