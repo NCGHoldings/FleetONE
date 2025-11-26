@@ -48,7 +48,7 @@ export async function generatePDFReport(
   };
 
   // Helper to capture and add chart with proper sizing
-  const addChartImage = async (elementId: string, title: string, targetHeight: number) => {
+  const addChartImage = async (elementId: string, title: string, maxHeight: number) => {
     if (!chartContainer) return;
     
     const chartElement = chartContainer.querySelector(`#${elementId}`);
@@ -62,15 +62,28 @@ export async function generatePDFReport(
     yPosition += 8;
 
     try {
+      // Add small delay to ensure chart fully renders
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       const canvas = await html2canvas(chartElement as HTMLElement, {
         backgroundColor: '#ffffff',
         scale: 2,
         logging: false,
+        useCORS: true,
+        allowTaint: true,
+        windowWidth: 1000,
+        windowHeight: 600,
       });
 
       const imgData = canvas.toDataURL('image/png');
       const imgWidth = pageWidth - 2 * margin;
-      const imgHeight = targetHeight;
+      
+      // Calculate proper aspect ratio from captured canvas
+      const aspectRatio = canvas.height / canvas.width;
+      const calculatedHeight = imgWidth * aspectRatio;
+      
+      // Use calculated height but cap at max if needed
+      const imgHeight = Math.min(calculatedHeight, maxHeight);
 
       // Add subtle border around chart
       doc.setDrawColor(220, 220, 220);
@@ -100,14 +113,17 @@ export async function generatePDFReport(
     addPageHeader();
     yPosition = 18;
 
-    // Add top chart
-    await addChartImage(topChart.id, topChart.title, 105);
+    // Add top chart with height for stacking
+    await addChartImage(topChart.id, topChart.title, 110);
     
     // Add spacing between charts
-    yPosition += 5;
+    yPosition += 10;
+    
+    // Check if we need a new page for bottom chart
+    checkAddPage(110);
     
     // Add bottom chart
-    await addChartImage(bottomChart.id, bottomChart.title, 105);
+    await addChartImage(bottomChart.id, bottomChart.title, 110);
   };
 
   // Add header to first page
@@ -197,7 +213,7 @@ export async function generatePDFReport(
     doc.addPage();
     addPageHeader();
     yPosition = 18;
-    await addChartImage('export-sales-trend', 'Sales Trend Analysis', 130);
+    await addChartImage('export-sales-trend', 'Sales Trend Analysis', 140);
   }
 
   // Category Distribution & Comparison - Stacked Vertically
