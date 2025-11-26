@@ -47,18 +47,19 @@ export async function generatePDFReport(
     return false;
   };
 
-  // Helper to capture and add chart
-  const addChartImage = async (elementId: string, title: string, width: number, height: number, xPos?: number) => {
+  // Helper to capture and add chart with proper sizing
+  const addChartImage = async (elementId: string, title: string, targetHeight: number) => {
     if (!chartContainer) return;
     
     const chartElement = chartContainer.querySelector(`#${elementId}`);
     if (!chartElement) return;
 
+    // Add section title with professional styling
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text(title, xPos || margin, yPosition);
-    yPosition += 6;
+    doc.setTextColor(41, 128, 185);
+    doc.text(title, margin, yPosition);
+    yPosition += 8;
 
     try {
       const canvas = await html2canvas(chartElement as HTMLElement, {
@@ -68,77 +69,45 @@ export async function generatePDFReport(
       });
 
       const imgData = canvas.toDataURL('image/png');
-      const imgWidth = width;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      doc.addImage(imgData, 'PNG', xPos || margin, yPosition, imgWidth, Math.min(imgHeight, height));
-      yPosition += Math.min(imgHeight, height) + 5;
+      const imgWidth = pageWidth - 2 * margin;
+      const imgHeight = targetHeight;
+
+      // Add subtle border around chart
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.5);
+      doc.rect(margin, yPosition, imgWidth, imgHeight);
+
+      // Add chart image
+      doc.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
+      yPosition += imgHeight + 12;
     } catch (error) {
       console.error(`Error capturing ${elementId}:`, error);
       doc.setFontSize(10);
-      doc.text(`[Chart could not be rendered]`, xPos || margin, yPosition);
+      doc.setTextColor(255, 0, 0);
+      doc.text(`[Chart could not be rendered]`, margin, yPosition);
       yPosition += 10;
     }
   };
 
-  // Helper to add side-by-side charts
-  const addSideBySideCharts = async (
-    leftChart: { id: string; title: string },
-    rightChart: { id: string; title: string }
+  // Helper to add two charts stacked vertically on same page
+  const addStackedCharts = async (
+    topChart: { id: string; title: string },
+    bottomChart: { id: string; title: string }
   ) => {
+    // Start new page
     addPageFooter();
     doc.addPage();
     addPageHeader();
-    yPosition = 15;
+    yPosition = 18;
 
-    const halfWidth = (pageWidth - 3 * margin) / 2;
-    const chartHeight = 85;
-
-    // Left chart
-    if (chartContainer) {
-      const leftElement = chartContainer.querySelector(`#${leftChart.id}`);
-      if (leftElement) {
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text(leftChart.title, margin, yPosition);
-        
-        try {
-          const canvas = await html2canvas(leftElement as HTMLElement, {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            logging: false,
-          });
-          const imgData = canvas.toDataURL('image/png');
-          doc.addImage(imgData, 'PNG', margin, yPosition + 6, halfWidth, chartHeight);
-        } catch (error) {
-          console.error(`Error capturing ${leftChart.id}:`, error);
-        }
-      }
-    }
-
-    // Right chart
-    if (chartContainer) {
-      const rightElement = chartContainer.querySelector(`#${rightChart.id}`);
-      if (rightElement) {
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text(rightChart.title, margin + halfWidth + margin, yPosition);
-        
-        try {
-          const canvas = await html2canvas(rightElement as HTMLElement, {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            logging: false,
-          });
-          const imgData = canvas.toDataURL('image/png');
-          doc.addImage(imgData, 'PNG', margin + halfWidth + margin, yPosition + 6, halfWidth, chartHeight);
-        } catch (error) {
-          console.error(`Error capturing ${rightChart.id}:`, error);
-        }
-      }
-    }
-
-    yPosition = pageHeight - margin;
+    // Add top chart
+    await addChartImage(topChart.id, topChart.title, 105);
+    
+    // Add spacing between charts
+    yPosition += 5;
+    
+    // Add bottom chart
+    await addChartImage(bottomChart.id, bottomChart.title, 105);
   };
 
   // Add header to first page
@@ -220,41 +189,52 @@ export async function generatePDFReport(
     yPosition += 5;
   }
 
-  // Add charts based on selection
+  // Add charts based on selection with vertical stacking
+  
+  // Sales Trend Chart - Full Page
   if (options.includeOverview && options.includeSalesTrend) {
     addPageFooter();
     doc.addPage();
     addPageHeader();
-    yPosition = 15;
-    await addChartImage('export-sales-trend', 'Sales Trend Analysis', pageWidth - 2 * margin, 70);
+    yPosition = 18;
+    await addChartImage('export-sales-trend', 'Sales Trend Analysis', 130);
   }
 
+  // Category Distribution & Comparison - Stacked Vertically
   if (options.includeOverview && options.includeCategoryDistribution) {
-    await addSideBySideCharts(
+    await addStackedCharts(
       { id: 'export-category-distribution', title: 'Category Distribution' },
       { id: 'export-category-comparison', title: 'Category Comparison' }
     );
   }
 
-  if (options.includeDetailedAnalytics && (options.includeMonthlyTrend || options.includeDayOfWeek)) {
+  // Monthly Trend & Day of Week - Stacked Vertically
+  if (options.includeDetailedAnalytics && options.includeMonthlyTrend && options.includeDayOfWeek) {
+    await addStackedCharts(
+      { id: 'export-monthly-trend', title: 'Monthly Sales Trend' },
+      { id: 'export-day-of-week', title: 'Day of Week Analysis' }
+    );
+  } else if (options.includeDetailedAnalytics && options.includeMonthlyTrend) {
     addPageFooter();
     doc.addPage();
     addPageHeader();
-    yPosition = 15;
-
-    if (options.includeMonthlyTrend) {
-      await addChartImage('export-monthly-trend', 'Monthly Trend', pageWidth - 2 * margin, 60);
-    }
-
-    if (options.includeDayOfWeek) {
-      checkAddPage(70);
-      await addChartImage('export-day-of-week', 'Day-of-Week Performance', pageWidth - 2 * margin, 60);
-    }
+    yPosition = 18;
+    await addChartImage('export-monthly-trend', 'Monthly Sales Trend', 120);
+  } else if (options.includeDetailedAnalytics && options.includeDayOfWeek) {
+    addPageFooter();
+    doc.addPage();
+    addPageHeader();
+    yPosition = 18;
+    await addChartImage('export-day-of-week', 'Day of Week Analysis', 120);
   }
 
+  // Tyre Breakdown Chart
   if (options.includeDetailedAnalytics && options.includeTyreBreakdown && analytics.tyreBreakdown?.length > 0) {
-    checkAddPage(70);
-    await addChartImage('export-tyre-breakdown', 'Tyre Sales Breakdown', pageWidth - 2 * margin, 55);
+    addPageFooter();
+    doc.addPage();
+    addPageHeader();
+    yPosition = 18;
+    await addChartImage('export-tyre-breakdown', 'Tyre Sales Breakdown', 110);
   }
 
   // Performance Section
