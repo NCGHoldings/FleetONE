@@ -45,7 +45,7 @@ export const TyreVisualDashboard = ({ bus, tyres }: TyreVisualDashboardProps) =>
     setShowDetailsModal(true);
   };
 
-  // Organize tyres by position
+  // Always define all 6 tyre positions (bus with 3 axles = 6 tyres)
   const frontLeft = tyres.find(t => t.position === "Front Left");
   const frontRight = tyres.find(t => t.position === "Front Right");
   const rearLeft1 = tyres.find(t => t.position === "Rear Left 1");
@@ -124,16 +124,14 @@ export const TyreVisualDashboard = ({ bus, tyres }: TyreVisualDashboardProps) =>
             </div>
           </div>
 
-          {/* Rear Axle 2 (if exists) */}
-          {(rearLeft2 || rearRight2) && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2 text-center">REAR AXLE 2</p>
-              <div className="flex justify-center gap-8">
-                <TyreIndicator tyre={rearLeft2} position="RL2" />
-                <TyreIndicator tyre={rearRight2} position="RR2" />
-              </div>
+          {/* Rear Axle 2 - Always show all 6 positions */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-2 text-center">REAR AXLE 2</p>
+            <div className="flex justify-center gap-8">
+              <TyreIndicator tyre={rearLeft2} position="RL2" />
+              <TyreIndicator tyre={rearRight2} position="RR2" />
             </div>
-          )}
+          </div>
         </div>
 
         {/* Action Buttons */}

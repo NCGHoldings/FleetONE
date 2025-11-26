@@ -19,7 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function TyreManagement() {
-  const { tyres, tyresLoading, stats } = useTyreManagement();
+  const { tyres, tyresLoading, stats, syncAllConditions, isSyncing } = useTyreManagement();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -194,6 +194,15 @@ export default function TyreManagement() {
               </div>
 
               <div className="flex gap-3">
+                <Button 
+                  onClick={() => syncAllConditions()} 
+                  variant="outline"
+                  disabled={isSyncing}
+                  className="border-emerald-500/50 hover:bg-emerald-500/10"
+                >
+                  <TrendingUp className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing...' : 'Sync All Mileages'}
+                </Button>
                 <Button onClick={() => navigate('/tyre-analytics')} variant="outline">
                   <BarChart3 className="w-4 h-4 mr-2" />
                   View Analytics
