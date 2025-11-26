@@ -7,6 +7,8 @@ import { Plus, Phone, Globe, MessageSquare, Users } from "lucide-react";
 import { InquiryList } from "@/components/inquiries/InquiryList";
 import { ManualInquiryForm } from "@/components/inquiries/ManualInquiryForm";
 import { InquiryHubSettingsTab } from "@/components/inquiries/InquiryHubSettingsTab";
+import { InquiryPlanningTab } from "@/components/inquiries/InquiryPlanningTab";
+import { FuturePlanningModal } from "@/components/inquiries/FuturePlanningModal";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -14,6 +16,7 @@ const VehicleInquiryHub = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "all";
   const [showManualForm, setShowManualForm] = useState(false);
+  const [showQuickSchedule, setShowQuickSchedule] = useState(false);
 
   // Fetch inquiry stats
   const { data: stats } = useQuery({
@@ -70,10 +73,16 @@ const VehicleInquiryHub = () => {
             Manage customer inquiries for Yutong and Sinotruck products
           </p>
         </div>
-        <Button onClick={() => setShowManualForm(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Manual Inquiry
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowQuickSchedule(true)}>
+            <Phone className="mr-2 h-4 w-4" />
+            Schedule Meeting
+          </Button>
+          <Button onClick={() => setShowManualForm(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Manual Inquiry
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -125,11 +134,12 @@ const VehicleInquiryHub = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="all">All Inquiries</TabsTrigger>
           <TabsTrigger value="yutong">Yutong</TabsTrigger>
           <TabsTrigger value="sinotruck">Sinotruck</TabsTrigger>
           <TabsTrigger value="manual">Phone/Walk-in</TabsTrigger>
+          <TabsTrigger value="planning">Planning</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -149,6 +159,10 @@ const VehicleInquiryHub = () => {
           <InquiryList filter="manual" />
         </TabsContent>
 
+        <TabsContent value="planning" className="space-y-4">
+          <InquiryPlanningTab />
+        </TabsContent>
+
         <TabsContent value="settings" className="space-y-4">
           <InquiryHubSettingsTab />
         </TabsContent>
@@ -162,6 +176,13 @@ const VehicleInquiryHub = () => {
           setShowManualForm(false);
           // Refetch will happen automatically via React Query
         }}
+      />
+
+      {/* Quick Schedule Modal */}
+      <FuturePlanningModal
+        open={showQuickSchedule}
+        onClose={() => setShowQuickSchedule(false)}
+        inquiryId={null}
       />
     </div>
   );
