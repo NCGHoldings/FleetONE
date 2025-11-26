@@ -19,6 +19,10 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { format } from "date-fns";
 import FleetTrackingMap from "@/components/fleet/FleetTrackingMap";
 import { seedMissingGPSBuses } from "@/utils/seed-missing-gps-buses";
+import { ServiceStatusBadge } from "@/components/fleet/ServiceStatusBadge";
+import { VehicleDetailsModal } from "@/components/fleet/VehicleDetailsModal";
+import { ServiceAlertPanel } from "@/components/fleet/ServiceAlertPanel";
+import { useQuery } from "@tanstack/react-query";
 
 interface TrackingData {
   id: string;
@@ -70,6 +74,7 @@ export default function RealTimeTracking() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
   const [isLoadingApiKey, setIsLoadingApiKey] = useState(true);
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [gpsSettings, setGpsSettings] = useState<GPSSettings>(() => {
     // Load settings from localStorage if available
     const savedSettings = localStorage.getItem('gpsSettings');
@@ -275,9 +280,12 @@ export default function RealTimeTracking() {
       accessorKey: "bus_no",
       header: "Bus No",
       cell: ({ row }) => (
-        <div className="font-mono font-medium">
+        <button 
+          onClick={() => setSelectedVehicle(row.original.bus_no)}
+          className="font-mono font-medium text-primary hover:underline cursor-pointer"
+        >
           {row.getValue("bus_no")}
-        </div>
+        </button>
       ),
     },
     {
@@ -402,7 +410,39 @@ export default function RealTimeTracking() {
       },
     },
     {
-      id: "actions",
+      accessorKey: "service_status",
+      header: "Service Status",
+      cell: ({ row }) => {
+        const ServiceStatusCell = () => {
+          const { data: busData } = useQuery({
+            queryKey: ['bus-service', row.original.bus_no],
+            queryFn: async () => {
+              const { data } = await supabase
+                .from('buses')
+                .select('current_mileage, next_service_mileage')
+                .eq('bus_no', row.original.bus_no)
+                .single();
+              return data;
+            },
+          });
+
+          if (!busData?.current_mileage || !busData?.next_service_mileage) {
+            return <span className="text-muted-foreground text-sm">N/A</span>;
+          }
+
+          return (
+            <ServiceStatusBadge
+              currentKm={busData.current_mileage}
+              nextServiceKm={busData.next_service_mileage}
+              showKm={false}
+            />
+          );
+        };
+        
+        return <ServiceStatusCell />;
+      },
+    },
+    {
       header: "Actions",
       cell: ({ row }) => (
         <div className="flex gap-2">
@@ -851,6 +891,16 @@ export default function RealTimeTracking() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Service Alert Panel */}
+      <ServiceAlertPanel />
+
+      {/* Vehicle Details Modal */}
+      <VehicleDetailsModal 
+        open={!!selectedVehicle}
+        onOpenChange={(open) => !open && setSelectedVehicle(null)}
+        busNo={selectedVehicle || ''}
+      />
     </div>
   );
 }
