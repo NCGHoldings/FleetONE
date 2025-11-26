@@ -215,7 +215,12 @@ Deno.serve(async (req) => {
         battery_voltage: null,
         odometer_reading: null,
         driver_name: null,
-        alerts: []
+        alerts: [],
+        // Enhanced GPS data
+        heading_degrees: vehicle.pos.c || null, // Course/heading (0-360 degrees)
+        altitude_meters: vehicle.pos.z || null, // Altitude in meters
+        satellite_count: vehicle.pos.sc || null, // Number of satellites
+        fios_device_id: vehicle.id || null // FIOS device ID
       });
     }
 
