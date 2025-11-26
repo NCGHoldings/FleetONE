@@ -259,6 +259,36 @@ Deno.serve(async (req) => {
       // Fetch odometer & mileage data from FIOS messages API
       const mileageData = await fetchMileageData(sessionId, vehicle.id);
       
+      // Extract fuel level if available (from FIOS params)
+      const fuelLevel = vehicle.pos.f || null; // Fuel percentage
+      
+      // Store GPS location history for track playback
+      if (bus.id) {
+        await supabase.from('gps_location_history').insert({
+          bus_id: bus.id,
+          latitude: vehicle.pos.y,
+          longitude: vehicle.pos.x,
+          speed_kmh: vehicle.pos.s,
+          heading: vehicle.pos.c || null,
+          altitude_meters: vehicle.pos.z || null,
+          odometer_reading: mileageData.odometer,
+          fuel_level_percent: fuelLevel,
+          timestamp: lastUpdate,
+          data_source: 'fios'
+        }).catch(err => console.error(`[FIOS] GPS history error for ${bus.bus_no}:`, err));
+      }
+      
+      // Store fuel reading if available
+      if (bus.id && fuelLevel !== null) {
+        await supabase.from('bus_fuel_readings').insert({
+          bus_id: bus.id,
+          fuel_level_percent: fuelLevel,
+          odometer_reading: mileageData.odometer,
+          reading_timestamp: lastUpdate,
+          data_source: 'fios'
+        }).catch(err => console.error(`[FIOS] Fuel reading error for ${bus.bus_no}:`, err));
+      }
+      
       trackingData.push({
         bus_id: bus.id,
         bus_no: bus.bus_no,
@@ -271,7 +301,7 @@ Deno.serve(async (req) => {
         speed_kmh: vehicle.pos.s,
         status: status,
         last_update: lastUpdate,
-        fuel_level: null,
+        fuel_level: fuelLevel,
         tire_pressure: null,
         engine_health: engineHealth,
         engine_temperature: null,
@@ -332,6 +362,14 @@ Deno.serve(async (req) => {
           odometerUpdates.push({ bus_no: data.bus_no, success: false, error: error.message });
         }
       }
+    }
+
+    // Trigger fuel alerts check
+    try {
+      await supabase.functions.invoke('check-fuel-alerts');
+      console.log('[FIOS] Fuel alerts check triggered');
+    } catch (error) {
+      console.error('[FIOS] Fuel alerts check error:', error);
     }
 
     console.log(`[FIOS] Successfully updated ${trackingData.length} vehicles`);
