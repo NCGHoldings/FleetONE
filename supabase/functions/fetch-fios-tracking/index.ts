@@ -431,15 +431,6 @@ Deno.serve(async (req) => {
         odometerSource = 'gps_calculated';
         
         console.log(`[Odometer] ${bus.bus_no}: Final = ${bus.base_odometer_km} (base) + ${cumulativeGPSMileage} (historic) + ${todayGPSMileage} (today) = ${finalOdometer} km`);
-      }
-        
-        const cumulativeGPSMileage = (historicMileage || []).reduce((sum, day) => sum + (day.daily_km || 0), 0);
-        
-        finalOdometer = bus.base_odometer_km + cumulativeGPSMileage + todayGPSMileage;
-        dailyMileage = todayGPSMileage;
-        odometerSource = 'gps_calculated';
-        
-        console.log(`[GPS] ${bus.bus_no}: Base=${bus.base_odometer_km}, Historic=${cumulativeGPSMileage}, Today=${todayGPSMileage}, Total=${finalOdometer}`);
       } else {
         // No FIOS odometer and no manual base - use existing current_mileage or null
         finalOdometer = bus.current_mileage || null;
