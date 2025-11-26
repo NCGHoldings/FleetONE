@@ -374,6 +374,34 @@ export default function RealTimeTracking() {
       ),
     },
     {
+      accessorKey: "odometer_km",
+      header: "Odometer",
+      cell: ({ row }) => {
+        const odometer = row.original.odometer_km;
+        const dailyMileage = row.original.daily_mileage_km;
+        
+        return (
+          <div className="space-y-1">
+            {odometer && odometer > 0 ? (
+              <>
+                <div className="flex items-center gap-1">
+                  <Activity className="h-3 w-3 text-muted-foreground" />
+                  <span className="font-mono text-sm">{odometer.toLocaleString()} km</span>
+                </div>
+                {dailyMileage && dailyMileage > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    +{dailyMileage.toFixed(1)} km today
+                  </div>
+                )}
+              </>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => (
@@ -400,6 +428,8 @@ export default function RealTimeTracking() {
   const averageSpeed = trackingData.length > 0 ? 
     Math.round(trackingData.reduce((sum, v) => sum + v.speed_kmh, 0) / trackingData.length) : 0;
   const lowFuelVehicles = trackingData.filter(v => (v.fuel_level || 0) < 20).length;
+  const totalFleetMileage = trackingData.reduce((sum, v) => sum + (v.odometer_km || 0), 0);
+  const totalDailyMileage = trackingData.reduce((sum, v) => sum + (v.daily_mileage_km || 0), 0);
 
   return (
     <div className="space-y-8 animate-fade-in p-6">
@@ -554,7 +584,7 @@ export default function RealTimeTracking() {
       </div>
 
       {/* Enhanced KPI Cards with Animations */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
           <div className="professional-card hover:shadow-primary transition-all duration-500 group">
             <KPICard
@@ -576,6 +606,18 @@ export default function RealTimeTracking() {
               change="0"
               changeType="neutral"
               description="fleet average"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.25s' }}>
+          <div className="professional-card hover:shadow-info transition-all duration-500 group">
+            <KPICard
+              title="Total Fleet Mileage"
+              value={`${totalFleetMileage.toLocaleString()} km`}
+              icon={<Activity className="h-4 w-4 group-hover:animate-pulse-subtle" />}
+              change="0"
+              changeType="neutral"
+              description={`+${totalDailyMileage.toFixed(0)} km today`}
             />
           </div>
         </div>
@@ -661,6 +703,46 @@ export default function RealTimeTracking() {
           </CardContent>
         </Card>
       )}
+
+      {/* Odometer & Mileage Card */}
+      <Card className="animate-scale-in">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-primary" />
+            Odometer & Daily Mileage
+          </CardTitle>
+          <CardDescription>
+            Real-time odometer readings and today's mileage
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {trackingData.filter(v => v.odometer_km && v.odometer_km > 0).slice(0, 6).map(vehicle => (
+              <div key={vehicle.id} className="space-y-1 border-b pb-2 last:border-0">
+                <div className="flex justify-between items-center">
+                  <span className="font-mono text-sm font-semibold">{vehicle.bus_no}</span>
+                  <span className="text-sm font-medium text-primary">
+                    {vehicle.odometer_km!.toLocaleString()} km
+                  </span>
+                </div>
+                {vehicle.daily_mileage_km && vehicle.daily_mileage_km > 0 && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Today's mileage</span>
+                    <span className="text-green-600 font-medium">
+                      +{vehicle.daily_mileage_km.toFixed(1)} km
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+            {trackingData.filter(v => v.odometer_km && v.odometer_km > 0).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No odometer data available yet
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Vehicle Health Overview */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

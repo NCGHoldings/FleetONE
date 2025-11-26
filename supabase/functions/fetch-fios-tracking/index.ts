@@ -96,6 +96,66 @@ async function fetchAllVehiclePositions(sessionId: string): Promise<FIOSUnit[]> 
   return data.items || [];
 }
 
+async function fetchMileageData(sessionId: string, deviceId: number): Promise<{odometer: number | null, dailyMileage: number | null}> {
+  console.log(`[FIOS] Fetching mileage for device ${deviceId}...`);
+  
+  try {
+    // Fetch last 24 hours of messages
+    const now = Math.floor(Date.now() / 1000);
+    const oneDayAgo = now - (24 * 60 * 60);
+    
+    const params = {
+      itemId: deviceId,
+      timeFrom: oneDayAgo,
+      timeTo: now,
+      flags: 0,
+      flagsMask: 0,
+      loadCount: 100
+    };
+    
+    const url = `https://fios-api.kloudip.com/api?svc=messages/load_interval&params=${encodeURIComponent(JSON.stringify(params))}&sid=${sessionId}`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (!data.messages || data.messages.length === 0) {
+      console.log(`[FIOS] No messages found for device ${deviceId}`);
+      return { odometer: null, dailyMileage: null };
+    }
+    
+    // Parse messages to find mileage/odometer data
+    let latestOdometer: number | null = null;
+    let firstOdometer: number | null = null;
+    
+    for (const msg of data.messages) {
+      if (msg.p && msg.p.mileage) {
+        const mileage = parseFloat(msg.p.mileage);
+        if (!isNaN(mileage) && mileage > 0) {
+          if (!firstOdometer) firstOdometer = mileage;
+          latestOdometer = mileage;
+        }
+      }
+      // Also check for odometer field
+      if (msg.p && msg.p.odometer) {
+        const odometer = parseFloat(msg.p.odometer);
+        if (!isNaN(odometer) && odometer > 0) {
+          if (!firstOdometer) firstOdometer = odometer;
+          latestOdometer = odometer;
+        }
+      }
+    }
+    
+    const dailyMileage = latestOdometer && firstOdometer ? latestOdometer - firstOdometer : null;
+    
+    console.log(`[FIOS] Device ${deviceId} - Odometer: ${latestOdometer}, Daily: ${dailyMileage}`);
+    return { odometer: latestOdometer, dailyMileage };
+    
+  } catch (error) {
+    console.error(`[FIOS] Error fetching mileage for device ${deviceId}:`, error);
+    return { odometer: null, dailyMileage: null };
+  }
+}
+
 function parseBusNumber(fiosName: string): string {
   // FIOS Name: \"NE-2266-NUGEGODA\" → \"NE 2266\"
   // Remove location suffix and format
@@ -196,8 +256,8 @@ Deno.serve(async (req) => {
       const status = vehicle.pos.s > 0 ? 'active' : 'inactive';
       const engineHealth = getEngineHealth(vehicle.pos.s, lastUpdate);
 
-      // Get odometer data if available (from FIOS messages API in future)
-      const odometerKm = null; // Will be populated from messages/load_interval API
+      // Fetch odometer & mileage data from FIOS messages API
+      const mileageData = await fetchMileageData(sessionId, vehicle.id);
       
       trackingData.push({
         bus_id: bus.id,
@@ -225,8 +285,8 @@ Deno.serve(async (req) => {
         satellite_count: vehicle.pos.sc || null,
         fios_device_id: vehicle.id || null,
         // Odometer & mileage data
-        odometer_km: odometerKm,
-        daily_mileage_km: null,
+        odometer_km: mileageData.odometer,
+        daily_mileage_km: mileageData.dailyMileage,
         engine_hours: null
       });
     }
