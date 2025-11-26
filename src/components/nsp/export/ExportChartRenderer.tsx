@@ -17,32 +17,32 @@ export function ExportChartRenderer({ analytics }: ExportChartRendererProps) {
   return (
     <div className="bg-white">
       {/* Sales Trend Chart - Full Page */}
-      <div id="export-sales-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '420px' }}>
+      <div id="export-sales-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '500px' }}>
         <SalesTrendChart data={combinedTrendData} />
       </div>
 
       {/* Category Distribution Chart - Full Width for Stacking */}
-      <div id="export-category-distribution" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '400px' }}>
+      <div id="export-category-distribution" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '480px' }}>
         <CategoryDistributionChart data={analytics.categoryTotals} />
       </div>
 
       {/* Category Comparison Chart - Full Width for Stacking */}
-      <div id="export-category-comparison" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '400px' }}>
+      <div id="export-category-comparison" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '480px' }}>
         <CategoryComparisonChart data={analytics.categoryTotals} />
       </div>
 
       {/* Monthly Trend Chart - Full Width */}
-      <div id="export-monthly-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '380px' }}>
+      <div id="export-monthly-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '460px' }}>
         <MonthlyTrendChart data={analytics.monthlyTrend} />
       </div>
 
       {/* Day of Week Chart - Full Width */}
-      <div id="export-day-of-week" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '380px' }}>
+      <div id="export-day-of-week" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '460px' }}>
         <DayOfWeekChart data={analytics.dayOfWeekAnalysis} />
       </div>
 
       {/* Tyre Breakdown Chart - Full Width */}
-      <div id="export-tyre-breakdown" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '380px' }}>
+      <div id="export-tyre-breakdown" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '460px' }}>
         <TyreSalesBreakdown data={analytics.tyreBreakdown} />
       </div>
     </div>
