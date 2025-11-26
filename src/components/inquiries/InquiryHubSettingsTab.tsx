@@ -242,13 +242,13 @@ export const InquiryHubSettingsTab = () => {
           <div className="space-y-2">
             <Label>Default Assignee for Yutong Inquiries</Label>
             <Select
-              value={settings?.default_assignees?.yutong || ""}
+              value={settings?.default_assignees?.yutong || "none"}
               onValueChange={(value) =>
                 updateSettingMutation.mutate({
                   key: "default_assignees",
                   value: {
                     ...settings?.default_assignees,
-                    yutong: value || null,
+                    yutong: value === "none" ? null : value,
                   },
                 })
               }
@@ -257,7 +257,7 @@ export const InquiryHubSettingsTab = () => {
                 <SelectValue placeholder="No auto-assignment" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No auto-assignment</SelectItem>
+                <SelectItem value="none">No auto-assignment</SelectItem>
                 {users?.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.first_name} {user.last_name}
@@ -270,13 +270,13 @@ export const InquiryHubSettingsTab = () => {
           <div className="space-y-2">
             <Label>Default Assignee for Sinotruck Inquiries</Label>
             <Select
-              value={settings?.default_assignees?.sinotruck || ""}
+              value={settings?.default_assignees?.sinotruck || "none"}
               onValueChange={(value) =>
                 updateSettingMutation.mutate({
                   key: "default_assignees",
                   value: {
                     ...settings?.default_assignees,
-                    sinotruck: value || null,
+                    sinotruck: value === "none" ? null : value,
                   },
                 })
               }
@@ -285,7 +285,7 @@ export const InquiryHubSettingsTab = () => {
                 <SelectValue placeholder="No auto-assignment" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No auto-assignment</SelectItem>
+                <SelectItem value="none">No auto-assignment</SelectItem>
                 {users?.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.first_name} {user.last_name}
