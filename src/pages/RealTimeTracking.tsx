@@ -11,7 +11,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { 
   MapPin, Truck, Gauge, Fuel, Settings, 
   AlertTriangle, CheckCircle, RadioIcon as Radio,
-  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2, Plus
+  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2, Plus, Satellite
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -46,6 +46,14 @@ interface TrackingData {
   driver_id?: string;
   driver_name?: string;
   alerts?: any[];
+  // Enhanced GPS data from FIOS
+  heading_degrees?: number;
+  altitude_meters?: number;
+  satellite_count?: number;
+  fios_device_id?: number;
+  odometer_km?: number;
+  daily_mileage_km?: number;
+  engine_hours?: number;
 }
 
 interface GPSSettings {
@@ -709,23 +717,44 @@ export default function RealTimeTracking() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Battery className="h-5 w-5" />
-              Battery Voltage
+              <Satellite className="h-5 w-5" />
+              GPS Data Quality
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {trackingData.slice(0, 5).map(vehicle => (
-                <div key={vehicle.id} className="flex justify-between items-center">
-                  <span className="font-mono text-sm">{vehicle.bus_no}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">
-                      {vehicle.battery_voltage ? `${vehicle.battery_voltage.toFixed(1)}V` : 'N/A'}
-                    </span>
-                    {vehicle.battery_voltage && vehicle.battery_voltage > 12 ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                <div key={vehicle.id} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-mono text-sm font-semibold">{vehicle.bus_no}</span>
+                    <div className="flex items-center gap-2">
+                      {vehicle.satellite_count !== null && vehicle.satellite_count !== undefined ? (
+                        <>
+                          <span className={`text-sm font-medium ${vehicle.satellite_count >= 4 ? 'text-green-600' : 'text-yellow-600'}`}>
+                            {vehicle.satellite_count} sats
+                          </span>
+                          {vehicle.satellite_count >= 4 ? (
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">N/A</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    {vehicle.heading_degrees !== null && vehicle.heading_degrees !== undefined && (
+                      <div className="flex items-center gap-1">
+                        <Navigation className="h-3 w-3" />
+                        <span>{vehicle.heading_degrees}°</span>
+                      </div>
+                    )}
+                    {vehicle.altitude_meters !== null && vehicle.altitude_meters !== undefined && (
+                      <div className="flex items-center gap-1">
+                        <span>Alt: {Math.round(vehicle.altitude_meters)}m</span>
+                      </div>
                     )}
                   </div>
                 </div>

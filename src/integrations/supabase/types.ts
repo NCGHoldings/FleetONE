@@ -3445,23 +3445,30 @@ export type Database = {
       real_time_tracking: {
         Row: {
           alerts: Json | null
+          altitude_meters: number | null
           battery_voltage: number | null
           bus_id: string
           bus_no: string
           created_at: string
           current_location: string | null
+          daily_mileage_km: number | null
           driver_id: string | null
           driver_name: string | null
           engine_health: string | null
+          engine_hours: number | null
           engine_temperature: number | null
+          fios_device_id: number | null
           fuel_level: number | null
           gps_coordinates: Json | null
+          heading_degrees: number | null
           id: string
           last_update: string
+          odometer_km: number | null
           odometer_reading: number | null
           oil_pressure: number | null
           route_id: string | null
           route_name: string | null
+          satellite_count: number | null
           speed_kmh: number | null
           status: string
           tire_pressure: Json | null
@@ -3469,23 +3476,30 @@ export type Database = {
         }
         Insert: {
           alerts?: Json | null
+          altitude_meters?: number | null
           battery_voltage?: number | null
           bus_id: string
           bus_no: string
           created_at?: string
           current_location?: string | null
+          daily_mileage_km?: number | null
           driver_id?: string | null
           driver_name?: string | null
           engine_health?: string | null
+          engine_hours?: number | null
           engine_temperature?: number | null
+          fios_device_id?: number | null
           fuel_level?: number | null
           gps_coordinates?: Json | null
+          heading_degrees?: number | null
           id?: string
           last_update?: string
+          odometer_km?: number | null
           odometer_reading?: number | null
           oil_pressure?: number | null
           route_id?: string | null
           route_name?: string | null
+          satellite_count?: number | null
           speed_kmh?: number | null
           status?: string
           tire_pressure?: Json | null
@@ -3493,23 +3507,30 @@ export type Database = {
         }
         Update: {
           alerts?: Json | null
+          altitude_meters?: number | null
           battery_voltage?: number | null
           bus_id?: string
           bus_no?: string
           created_at?: string
           current_location?: string | null
+          daily_mileage_km?: number | null
           driver_id?: string | null
           driver_name?: string | null
           engine_health?: string | null
+          engine_hours?: number | null
           engine_temperature?: number | null
+          fios_device_id?: number | null
           fuel_level?: number | null
           gps_coordinates?: Json | null
+          heading_degrees?: number | null
           id?: string
           last_update?: string
+          odometer_km?: number | null
           odometer_reading?: number | null
           oil_pressure?: number | null
           route_id?: string | null
           route_name?: string | null
+          satellite_count?: number | null
           speed_kmh?: number | null
           status?: string
           tire_pressure?: Json | null
