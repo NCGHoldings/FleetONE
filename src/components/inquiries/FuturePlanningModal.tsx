@@ -1,22 +1,24 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, MapPin, Users, Calendar as CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 
 interface FuturePlanningModalProps {
   open: boolean;
   onClose: () => void;
-  inquiryId: string;
+  inquiryId: string | null; // Allow null for standalone scheduling
 }
 
-export const FuturePlanningModal = ({ open, onClose, inquiryId }: FuturePlanningModalProps) => {
+export const FuturePlanningModal = ({ open, onClose, inquiryId: propInquiryId }: FuturePlanningModalProps) => {
+  const [selectedInquiryId, setSelectedInquiryId] = useState<string>(propInquiryId || "");
   const queryClient = useQueryClient();
   const [followUpType, setFollowUpType] = useState<string>("phone_call");
   const [plannedDate, setPlannedDate] = useState<string>("");
@@ -27,8 +29,28 @@ export const FuturePlanningModal = ({ open, onClose, inquiryId }: FuturePlanning
   const [notes, setNotes] = useState<string>("");
   const [reminderBefore, setReminderBefore] = useState<string>("1440"); // 1 day in minutes
 
+  // Fetch all inquiries for the dropdown (if inquiryId is null)
+  const { data: inquiries } = useQuery({
+    queryKey: ["inquiries-for-planning"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vehicle_inquiries")
+        .select("id, inquiry_number, customer_name, product_type, status")
+        .neq("status", "converted")
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !propInquiryId, // Only fetch if no inquiry ID provided
+  });
+
   const scheduleMeetingMutation = useMutation({
     mutationFn: async () => {
+      const targetInquiryId = propInquiryId || selectedInquiryId;
+      if (!targetInquiryId) {
+        throw new Error("Please select an inquiry");
+      }
       const plannedDateTime = `${plannedDate}T${plannedTime}:00`;
       const reminderDateTime = new Date(new Date(plannedDateTime).getTime() - parseInt(reminderBefore) * 60000).toISOString();
 
@@ -36,7 +58,7 @@ export const FuturePlanningModal = ({ open, onClose, inquiryId }: FuturePlanning
       const { data: followUp, error } = await supabase
         .from("inquiry_follow_ups")
         .insert({
-          inquiry_id: inquiryId,
+          inquiry_id: targetInquiryId,
           follow_up_type: followUpType,
           notes: notes,
           planned_date: plannedDateTime,
@@ -52,7 +74,7 @@ export const FuturePlanningModal = ({ open, onClose, inquiryId }: FuturePlanning
 
       // Log activity
       await supabase.from("inquiry_activity_log").insert({
-        inquiry_id: inquiryId,
+        inquiry_id: targetInquiryId,
         activity_type: "meeting_scheduled",
         new_value: {
           type: followUpType,
@@ -65,12 +87,14 @@ export const FuturePlanningModal = ({ open, onClose, inquiryId }: FuturePlanning
       return followUp;
     },
     onSuccess: () => {
+      const targetInquiryId = propInquiryId || selectedInquiryId;
       toast({
         title: "Meeting Scheduled",
         description: "The meeting/call has been scheduled successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["inquiry-details", inquiryId] });
-      queryClient.invalidateQueries({ queryKey: ["inquiry-follow-ups", inquiryId] });
+      queryClient.invalidateQueries({ queryKey: ["inquiry-details", targetInquiryId] });
+      queryClient.invalidateQueries({ queryKey: ["inquiry-follow-ups", targetInquiryId] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming-meetings"] });
       onClose();
       resetForm();
     },
@@ -93,6 +117,9 @@ export const FuturePlanningModal = ({ open, onClose, inquiryId }: FuturePlanning
     setPurpose("follow_up");
     setNotes("");
     setReminderBefore("1440");
+    if (!propInquiryId) {
+      setSelectedInquiryId("");
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -116,9 +143,39 @@ export const FuturePlanningModal = ({ open, onClose, inquiryId }: FuturePlanning
             <CalendarIcon className="h-5 w-5 text-primary" />
             Schedule Future Meeting/Call
           </DialogTitle>
+          <DialogDescription>
+            Plan future interactions with your customer
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Inquiry Selection (if not pre-selected) */}
+          {!propInquiryId && (
+            <div className="space-y-2">
+              <Label htmlFor="inquiry">Select Inquiry *</Label>
+              <Select value={selectedInquiryId} onValueChange={setSelectedInquiryId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose an inquiry to schedule for..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {inquiries?.map((inquiry) => (
+                    <SelectItem key={inquiry.id} value={inquiry.id}>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {inquiry.product_type}
+                        </Badge>
+                        <span>{inquiry.customer_name}</span>
+                        <span className="text-muted-foreground text-xs">
+                          ({inquiry.inquiry_number})
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Meeting Type */}
           <div className="space-y-2">
             <Label htmlFor="type">Meeting/Call Type</Label>
