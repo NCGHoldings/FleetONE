@@ -35,6 +35,8 @@ import SchoolBusService from "./pages/SchoolBusService";
 import BranchDashboard from "./pages/BranchDashboard";
 import SchoolStudentDatabase from "./pages/SchoolStudentDatabase";
 import SchoolPayments from "./pages/SchoolPayments";
+import SchoolPaymentImport from "./pages/SchoolPaymentImport";
+import SchoolPaymentSettings from "./pages/SchoolPaymentSettings";
 import ReceiptUpload from "./pages/ReceiptUpload";
 import SchoolReports from "./pages/SchoolReports";
 import YutongQuotations from "./pages/YutongQuotations";
@@ -432,6 +434,26 @@ const App = () => (
             <ProtectedRoute>
               <AppLayout>
                 <SchoolPayments />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId/payment-import" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SchoolPaymentImport />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/school-bus/branch/:branchId/payment-settings" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SchoolPaymentSettings />
               </AppLayout>
             </ProtectedRoute>
           } 
