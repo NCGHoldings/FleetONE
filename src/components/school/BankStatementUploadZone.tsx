@@ -75,11 +75,13 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
       setProgress(50);
 
       // Fetch all active students for this branch
-      const { data: students } = await supabase
+      const studentsQuery: any = await (supabase as any)
         .from('school_students')
-        .select('id, admission_no, student_name, parent_name')
+        .select('*')
         .eq('branch_id', branchId)
         .eq('status', 'active');
+      
+      const students = studentsQuery.data;
 
       setProgress(60);
 
