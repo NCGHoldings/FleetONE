@@ -68,6 +68,7 @@ import Budgeting from "./pages/Budgeting";
 import TyreManagement from "./pages/TyreManagement";
 import FleetAnalytics from "./pages/FleetAnalytics";
 import VehicleInquiryHub from "./pages/VehicleInquiryHub";
+import ScheduledTasks from "./pages/ScheduledTasks";
 
 const queryClient = new QueryClient();
 
@@ -660,7 +661,20 @@ const App = () => (
             />
             
             <Route 
-              path="/accounting" 
+              path="/scheduled-tasks" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
+                  <PageAccessGuard pageId="scheduled_tasks">
+                    <AppLayout>
+                      <ScheduledTasks />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/accounting"
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'finance']}>
                   <Accounting />

@@ -23,17 +23,28 @@ const ScheduledTasks = () => {
   const { data: cronJobs, isLoading, refetch } = useQuery({
     queryKey: ['cron-jobs'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_cron_jobs');
-      
-      if (error) {
-        // If function doesn't exist, return empty array
-        if (error.message.includes('does not exist')) {
+      try {
+        // Try to fetch cron jobs - will return empty if not set up yet
+        const response = await fetch(
+          `https://wwjpdszkmtnzshbulkon.supabase.co/rest/v1/rpc/get_cron_jobs`,
+          {
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3anBkc3prbXRuenNoYnVsa29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NTQxMjAsImV4cCI6MjA3MTUzMDEyMH0.EiNNdtKsKSmiBxnpMrLjiQ45jYuJWqijjK-hCkpw_y4',
+              'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3anBkc3prbXRuenNoYnVsa29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NTQxMjAsImV4cCI6MjA3MTUzMDEyMH0.EiNNdtKsKSmiBxnpMrLjiQ45jYuJWqijjK-hCkpw_y4`,
+            },
+          }
+        );
+        
+        if (!response.ok) {
           return [];
         }
-        throw error;
+        
+        const data = await response.json();
+        return (data || []) as CronJob[];
+      } catch (error) {
+        console.error('Error fetching cron jobs:', error);
+        return [];
       }
-      
-      return data as CronJob[];
     },
   });
 

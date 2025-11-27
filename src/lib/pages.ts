@@ -70,6 +70,7 @@ export const PAGES: PageCategories = {
     { id: "governance_calendar", title: "Governance Calendar", url: "/governance/calendar" },
     { id: "governance_holidays", title: "Holiday Management", url: "/governance/holidays" },
     { id: "seasonal_themes", title: "Seasonal Themes", url: "/seasonal-themes" },
+    { id: "scheduled_tasks", title: "Scheduled Tasks", url: "/scheduled-tasks" },
   ],
 };
 
