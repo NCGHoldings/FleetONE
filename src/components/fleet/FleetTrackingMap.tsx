@@ -56,7 +56,7 @@ const FleetTrackingMap = ({ trackingData, apiKey, isLoading = false }: FleetTrac
 
   // Auto-center map to show all buses (only after map is loaded)
   useEffect(() => {
-    if (!isMapLoaded || !window.google || validBuses.length === 0) return
+    if (!isMapLoaded || !window.google || !window.google.maps || validBuses.length === 0) return
     
     try {
       const bounds = new google.maps.LatLngBounds()
@@ -92,7 +92,10 @@ const FleetTrackingMap = ({ trackingData, apiKey, isLoading = false }: FleetTrac
   }
 
   const getMarkerIcon = (bus: TrackingData) => {
-    if (!window.google) return undefined
+    // Check if Google Maps API is fully loaded
+    if (!window.google || !window.google.maps || !window.google.maps.SymbolPath) {
+      return undefined
+    }
     
     let color = '#6B7280' // grey for inactive
     
@@ -206,7 +209,7 @@ const FleetTrackingMap = ({ trackingData, apiKey, isLoading = false }: FleetTrac
           fullscreenControl: true,
         }}
       >
-        {validBuses.map((bus) => (
+        {isMapLoaded && validBuses.map((bus) => (
           <Marker
             key={bus.id}
             position={bus.gps_coordinates!}
