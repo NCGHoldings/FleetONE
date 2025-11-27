@@ -273,10 +273,18 @@ export default function SchoolPayments() {
             </p>
           </div>
         </div>
-        <Button>
-          <Download className="w-4 h-4 mr-2" />
-          Export Report
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate(`/school-bus/branch/${branchId}/payment-import`)}>
+            Import Bank Statement
+          </Button>
+          <Button onClick={() => navigate(`/school-bus/branch/${branchId}/payment-settings`)} variant="outline">
+            Import Settings
+          </Button>
+          <Button onClick={handleExport}>
+            <Download className="w-4 h-4 mr-2" />
+            Export Report
+          </Button>
+        </div>
       </div>
 
       {/* Payment Stats */}

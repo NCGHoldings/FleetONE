@@ -4682,6 +4682,177 @@ export type Database = {
         }
         Relationships: []
       }
+      school_payment_import_items: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string
+          extracted_ids: Json | null
+          id: string
+          import_id: string
+          match_confidence: number | null
+          match_status: string | null
+          matched_student_ids: Json | null
+          notes: string | null
+          payment_transaction_ids: Json | null
+          processed_at: string | null
+          processed_by: string | null
+          suggested_students: Json | null
+          txn_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description: string
+          extracted_ids?: Json | null
+          id?: string
+          import_id: string
+          match_confidence?: number | null
+          match_status?: string | null
+          matched_student_ids?: Json | null
+          notes?: string | null
+          payment_transaction_ids?: Json | null
+          processed_at?: string | null
+          processed_by?: string | null
+          suggested_students?: Json | null
+          txn_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string
+          extracted_ids?: Json | null
+          id?: string
+          import_id?: string
+          match_confidence?: number | null
+          match_status?: string | null
+          matched_student_ids?: Json | null
+          notes?: string | null
+          payment_transaction_ids?: Json | null
+          processed_at?: string | null
+          processed_by?: string | null
+          suggested_students?: Json | null
+          txn_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_payment_import_items_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "school_payment_imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_payment_import_settings: {
+        Row: {
+          admission_prefixes: Json | null
+          auto_approve_high_confidence: boolean | null
+          auto_split_siblings: boolean | null
+          branch_id: string
+          created_at: string | null
+          custom_patterns: Json | null
+          default_payment_method: string | null
+          enable_pattern_learning: boolean | null
+          id: string
+          min_confidence_threshold: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          admission_prefixes?: Json | null
+          auto_approve_high_confidence?: boolean | null
+          auto_split_siblings?: boolean | null
+          branch_id: string
+          created_at?: string | null
+          custom_patterns?: Json | null
+          default_payment_method?: string | null
+          enable_pattern_learning?: boolean | null
+          id?: string
+          min_confidence_threshold?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          admission_prefixes?: Json | null
+          auto_approve_high_confidence?: boolean | null
+          auto_split_siblings?: boolean | null
+          branch_id?: string
+          created_at?: string | null
+          custom_patterns?: Json | null
+          default_payment_method?: string | null
+          enable_pattern_learning?: boolean | null
+          id?: string
+          min_confidence_threshold?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_payment_import_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_payment_imports: {
+        Row: {
+          auto_matched_count: number | null
+          branch_id: string
+          created_at: string | null
+          created_by: string | null
+          file_name: string
+          id: string
+          import_date: string | null
+          manual_matched_count: number | null
+          status: string | null
+          total_amount_imported: number | null
+          total_transactions: number | null
+          unmatched_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_matched_count?: number | null
+          branch_id: string
+          created_at?: string | null
+          created_by?: string | null
+          file_name: string
+          id?: string
+          import_date?: string | null
+          manual_matched_count?: number | null
+          status?: string | null
+          total_amount_imported?: number | null
+          total_transactions?: number | null
+          unmatched_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_matched_count?: number | null
+          branch_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          file_name?: string
+          id?: string
+          import_date?: string | null
+          manual_matched_count?: number | null
+          status?: string | null
+          total_amount_imported?: number | null
+          total_transactions?: number | null
+          unmatched_count?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_payment_imports_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_payment_months: {
         Row: {
           created_at: string
@@ -4705,6 +4876,50 @@ export type Database = {
           month_year?: string
         }
         Relationships: []
+      }
+      school_payment_pattern_history: {
+        Row: {
+          branch_id: string
+          created_at: string | null
+          id: string
+          last_used_at: string | null
+          matched_admission_no: string
+          original_description: string
+          pattern_type: string | null
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          matched_admission_no: string
+          original_description: string
+          pattern_type?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          matched_admission_no?: string
+          original_description?: string
+          pattern_type?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_payment_pattern_history_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       school_payment_transactions: {
         Row: {
