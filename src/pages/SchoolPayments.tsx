@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,7 @@ interface Branch {
 
 export default function SchoolPayments() {
   const { branchId } = useParams<{ branchId: string }>();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [branch, setBranch] = useState<Branch | null>(null);
@@ -138,6 +139,13 @@ export default function SchoolPayments() {
   const handleViewHistory = (student: Student) => {
     setSelectedStudent(student);
     setShowHistoryModal(true);
+  };
+
+  const handleExport = () => {
+    toast({
+      title: "Export Feature",
+      description: "Export functionality coming soon",
+    });
   };
 
   const columns: ColumnDef<Student>[] = [
