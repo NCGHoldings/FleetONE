@@ -10236,6 +10236,16 @@ export type Database = {
         | { Args: { quotation_date?: string }; Returns: string }
       generate_yutong_ticket_number: { Args: never; Returns: string }
       generate_yutong_warranty_number: { Args: never; Returns: string }
+      get_cron_jobs: {
+        Args: never
+        Returns: {
+          active: boolean
+          command: string
+          jobid: number
+          jobname: string
+          schedule: string
+        }[]
+      }
       get_user_page_permissions: {
         Args: { _user_id: string }
         Returns: {
