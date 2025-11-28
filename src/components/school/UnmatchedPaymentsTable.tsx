@@ -45,12 +45,11 @@ export function UnmatchedPaymentsTable({ importId, branchId, onStatsUpdate }: Un
       .eq('match_status', 'unmatched')
       .order('txn_date', { ascending: false });
 
-    // Fetch all active students
+    // Fetch all students
     const studentsQuery: any = await (supabase as any)
       .from('school_students')
       .select('*')
       .eq('branch_id', branchId)
-      .eq('status', 'active')
       .order('student_name');
     
     const studentsData = studentsQuery.data;
