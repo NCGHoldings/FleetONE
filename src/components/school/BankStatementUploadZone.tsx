@@ -74,12 +74,11 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
 
       setProgress(50);
 
-      // Fetch all active students for this branch
+      // Fetch all students for this branch
       const studentsQuery: any = await (supabase as any)
         .from('school_students')
         .select('*')
-        .eq('branch_id', branchId)
-        .eq('status', 'active');
+        .eq('branch_id', branchId);
       
       const students = studentsQuery.data;
 
@@ -110,11 +109,32 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           patterns
         );
 
-        const matchedStudents = students?.filter(s =>
-          extraction.admissionNumbers.some(id =>
-            s.admission_no.toUpperCase().includes(id.toUpperCase())
-          )
-        ) || [];
+        // Smart matching: handles prefix variations (LNU14480 matches N14480)
+        const matchedStudents = students?.filter(s => {
+          const dbNumeric = s.admission_no.replace(/[^0-9]/g, '');
+          
+          return extraction.admissionNumbers.some(extractedId => {
+            const extractedNumeric = extractedId.replace(/[^0-9]/g, '');
+            
+            // Match 1: Exact match (case-insensitive)
+            if (s.admission_no.toUpperCase() === extractedId.toUpperCase()) {
+              return true;
+            }
+            
+            // Match 2: Numeric portions match (LNU14480 → 14480 matches N14480 → 14480)
+            if (dbNumeric && extractedNumeric && dbNumeric === extractedNumeric) {
+              return true;
+            }
+            
+            // Match 3: Partial contains match
+            if (s.admission_no.toUpperCase().includes(extractedId.toUpperCase()) ||
+                extractedId.toUpperCase().includes(s.admission_no.toUpperCase())) {
+              return true;
+            }
+            
+            return false;
+          });
+        }) || [];
 
         let matchStatus = 'unmatched';
         if (matchedStudents.length > 0 && extraction.confidence >= settings.min_confidence_threshold) {
