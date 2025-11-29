@@ -86,7 +86,7 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
         const splitAmount = item.amount / matchedStudents.length;
         
         const paymentDate = new Date(item.txn_date);
-        const paymentMonth = paymentDate.toISOString().slice(0, 7);
+        const paymentMonth = paymentDate.toISOString().slice(0, 7) + '-01';
 
         return matchedStudents.map((studentId: string) => {
           const student = studentMap.get(studentId);
