@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, Trash2 } from "lucide-react";
 import { formatDateDisplay } from "@/lib/utils";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -38,6 +38,32 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
       setItems(data);
     }
     setLoading(false);
+  };
+
+  const handleDeleteRow = async (itemId: string) => {
+    try {
+      // Update the item's match_status to 'ignored'
+      const { error } = await supabase
+        .from('school_payment_import_items')
+        .update({ match_status: 'ignored' })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Removed",
+        description: "Payment row removed from list",
+      });
+
+      // Remove from displayed list
+      setItems(prev => prev.filter(item => item.id !== itemId));
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove row",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleConfirmAll = async () => {
@@ -209,6 +235,20 @@ export function PaymentMatchingPreview({ importId, matchStatus, onStatsUpdate }:
         >
           {row.original.match_confidence}%
         </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleDeleteRow(row.original.id)}
+          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       ),
     },
   ];

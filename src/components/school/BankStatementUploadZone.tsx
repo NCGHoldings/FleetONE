@@ -126,22 +126,31 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
               return true;
             }
             
-            // Match 3: Partial contains match
-            if (s.admission_no.toUpperCase().includes(extractedId.toUpperCase()) ||
-                extractedId.toUpperCase().includes(s.admission_no.toUpperCase())) {
-              return true;
+            // Match 3: Partial contains match (only if not too short to avoid false positives)
+            if (extractedId.length >= 4) {
+              if (s.admission_no.toUpperCase().includes(extractedId.toUpperCase()) ||
+                  extractedId.toUpperCase().includes(s.admission_no.toUpperCase())) {
+                return true;
+              }
             }
             
             return false;
           });
         }) || [];
 
+        // Deduplicate matched students by ID
+        const uniqueMatchedStudents = [...new Map(matchedStudents.map((s: any) => [s.id, s])).values()];
+
+        // Classification logic:
+        // Auto-matched: Exactly 1 unique student AND confidence >= threshold
+        // Needs Review: Multiple students matched OR confidence < threshold
+        // Unmatched: No students matched
         let matchStatus = 'unmatched';
-        if (matchedStudents.length > 0 && extraction.confidence >= settings.min_confidence_threshold) {
+        if (uniqueMatchedStudents.length === 1 && extraction.confidence >= settings.min_confidence_threshold) {
           matchStatus = 'auto_matched';
           autoMatched++;
-        } else if (matchedStudents.length > 0) {
-          matchStatus = 'partial_match';
+        } else if (uniqueMatchedStudents.length > 0) {
+          matchStatus = 'partial_match'; // Multiple matches or low confidence → needs review
           needsReview++;
         } else {
           unmatched++;
@@ -153,10 +162,10 @@ export function BankStatementUploadZone({ branchId, onUploadComplete }: BankStat
           description: txn.description,
           amount: txn.amount,
           extracted_ids: extraction.admissionNumbers,
-          matched_student_ids: matchedStudents.map(s => s.id),
+          matched_student_ids: uniqueMatchedStudents.map((s: any) => s.id),
           match_status: matchStatus,
           match_confidence: extraction.confidence,
-          suggested_students: matchedStudents.map(s => ({
+          suggested_students: uniqueMatchedStudents.map((s: any) => ({
             id: s.id,
             admission_no: s.admission_no,
             student_name: s.student_name,
