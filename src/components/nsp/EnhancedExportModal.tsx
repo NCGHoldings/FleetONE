@@ -37,6 +37,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
   const [includeMonthlyTrend, setIncludeMonthlyTrend] = useState(true);
   const [includeDayOfWeek, setIncludeDayOfWeek] = useState(true);
   const [includeTyreBreakdown, setIncludeTyreBreakdown] = useState(true);
+  const [includeCategoryTrends, setIncludeCategoryTrends] = useState(true);
   
   const [includePerformance, setIncludePerformance] = useState(true);
   const [includeBestWorst, setIncludeBestWorst] = useState(true);
@@ -66,6 +67,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
         includeMonthlyTrend,
         includeDayOfWeek,
         includeTyreBreakdown,
+        includeCategoryTrends,
         includePerformance,
         includeBestWorst,
         includeCategoryComparison,
@@ -220,6 +222,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                       setIncludeMonthlyTrend(false);
                       setIncludeDayOfWeek(false);
                       setIncludeTyreBreakdown(false);
+                      setIncludeCategoryTrends(false);
                     }
                   }}
                 />
@@ -259,6 +262,17 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                   />
                   <Label htmlFor="tyre-breakdown" className="cursor-pointer text-sm">
                     Tyre Sales Breakdown Chart
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="category-trends"
+                    checked={includeCategoryTrends}
+                    disabled={!includeDetailedAnalytics}
+                    onCheckedChange={(checked) => setIncludeCategoryTrends(checked as boolean)}
+                  />
+                  <Label htmlFor="category-trends" className="cursor-pointer text-sm">
+                    Individual Category Trend Charts (LSS Outside, LSS Inside, Tyre)
                   </Label>
                 </div>
               </div>
