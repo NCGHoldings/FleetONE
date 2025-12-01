@@ -335,6 +335,7 @@ export async function generatePDFReport(
         }
         break;
 
+      case 'dataTable':
         if (options.includeDataTable && analytics.dailyTrend?.length > 0) {
           addPageFooter();
           doc.addPage();
