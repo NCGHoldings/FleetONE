@@ -253,8 +253,9 @@ export async function generatePDFReport(
     await addChartImage('export-tyre-breakdown', 'Tyre Sales Breakdown', 110);
   }
 
-  // Individual Category Trend Charts - All 3 on one page (or 2+1 if needed)
+  // Individual Category Trend Charts - 2+1 layout for clean view
   if (options.includeDetailedAnalytics && options.includeCategoryTrends) {
+    // Page 1: LSS Outside + LSS Inside stacked
     addPageFooter();
     doc.addPage();
     addPageHeader();
@@ -267,23 +268,20 @@ export async function generatePDFReport(
     doc.text("Individual Category Sales Trends", margin, yPosition);
     yPosition += 10;
     
-    // Chart 1: LSS Outside (height ~75mm)
-    await addChartImage('export-lss-outside-trend', 'LSS Outside Sales Trend', 75);
+    // Chart 1: LSS Outside
+    await addChartImage('export-lss-outside-trend', 'LSS Outside Sales Trend', 110);
     
-    // Chart 2: LSS Inside (height ~75mm)
-    await addChartImage('export-lss-inside-trend', 'LSS Inside Sales Trend', 75);
+    // Chart 2: LSS Inside
+    await addChartImage('export-lss-inside-trend', 'LSS Inside Sales Trend', 110);
     
-    // Check if Chart 3 fits on same page (need ~85mm space)
-    // If not enough space, add new page
-    if (yPosition + 85 > pageHeight - margin - 15) {
-      addPageFooter();
-      doc.addPage();
-      addPageHeader();
-      yPosition = 18;
-    }
+    // Page 2: Tyre Sales (full page)
+    addPageFooter();
+    doc.addPage();
+    addPageHeader();
+    yPosition = 18;
     
     // Chart 3: Tyre Sales
-    await addChartImage('export-tyre-trend', 'Tyre Sales Trend', 75);
+    await addChartImage('export-tyre-trend', 'Tyre Sales Trend', 140);
   }
 
   // Performance Section
