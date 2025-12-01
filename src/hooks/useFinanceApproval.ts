@@ -71,7 +71,7 @@ export const useFinanceApproval = () => {
             .select('id')
             .eq('document_id', paymentData.quotation.id)
             .eq('approval_type', 'checked_by')
-            .single();
+            .maybeSingle();
 
           if (!existingApproval) {
             const { data: profile } = await supabase
@@ -82,7 +82,7 @@ export const useFinanceApproval = () => {
 
             if (profile?.signature_data) {
               // Add to document_approvals
-              await supabase.from('document_approvals').insert({
+              const { error: insertError } = await supabase.from('document_approvals').insert({
                 document_id: paymentData.quotation.id,
                 approval_type: 'checked_by',
                 approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
@@ -91,7 +91,11 @@ export const useFinanceApproval = () => {
                 user_id: profile.user_id,
               });
 
-              toast.success(`Checked By signature auto-added: ${profile.first_name}`);
+              if (!insertError) {
+                toast.success(`Checked By signature auto-added: ${profile.first_name}`);
+              } else {
+                console.error('Failed to add checked_by signature:', insertError);
+              }
             }
           }
         }

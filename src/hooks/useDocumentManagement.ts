@@ -52,7 +52,7 @@ export const useDocumentManagement = () => {
             .select('id')
             .eq('document_id', quotationId)
             .eq('approval_type', 'prepared_by')
-            .single();
+            .maybeSingle();
 
           if (!existingApproval) {
             const { data: profile } = await supabase
@@ -62,7 +62,7 @@ export const useDocumentManagement = () => {
               .single();
 
             if (profile?.signature_data) {
-              await supabase.from('document_approvals').insert({
+              const { error: insertError } = await supabase.from('document_approvals').insert({
                 document_id: quotationId,
                 approval_type: 'prepared_by',
                 approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
@@ -70,8 +70,13 @@ export const useDocumentManagement = () => {
                 approval_date: new Date().toISOString().split('T')[0],
                 user_id: profile.user_id,
               });
-              console.log('✅ Prepared By signature auto-added:', profile.first_name);
-              toast.success(`Prepared By signature auto-added: ${profile.first_name}`);
+
+              if (!insertError) {
+                console.log('✅ Prepared By signature auto-added:', profile.first_name);
+                toast.success(`Prepared By signature auto-added: ${profile.first_name}`);
+              } else {
+                console.error('Failed to add prepared_by signature:', insertError);
+              }
             }
           }
         }

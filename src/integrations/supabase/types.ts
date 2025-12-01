@@ -1735,15 +1735,7 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "document_approvals_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "document_storage"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       document_storage: {
         Row: {
