@@ -106,6 +106,37 @@ export const useDocumentManagement = () => {
         throw error;
       }
 
+      // Auto-add prepared_by signature
+      try {
+        const { data: setting } = await supabase
+          .from('special_hire_signature_settings')
+          .select('default_user_id, is_enabled')
+          .eq('signature_role', 'prepared_by')
+          .single();
+
+        if (setting?.is_enabled && setting.default_user_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, signature_data, user_id')
+            .eq('user_id', setting.default_user_id)
+            .single();
+
+          if (profile?.signature_data) {
+            await supabase.from('document_approvals').insert({
+              document_id: quotationId,
+              approval_type: 'prepared_by',
+              approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+              signature_data: profile.signature_data,
+              approval_date: new Date().toISOString().split('T')[0],
+              user_id: profile.user_id,
+            });
+            console.log('✅ Prepared By signature auto-added:', profile.first_name);
+          }
+        }
+      } catch (sigError) {
+        console.log('Auto-signature skipped:', sigError);
+      }
+
       toast.success(`Draft ${invoiceData.document_type === 'sales_receipt' ? 'sales receipt' : 'invoice'} generated and stored.`);
       return { success: true, document: data };
     } catch (error) {
