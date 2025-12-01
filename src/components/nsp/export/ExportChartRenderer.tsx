@@ -48,7 +48,7 @@ export function ExportChartRenderer({ analytics }: ExportChartRendererProps) {
       </div>
 
       {/* Individual Category Trend Charts - Separate for Export */}
-      <div id="export-lss-outside-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '360px' }}>
+      <div id="export-lss-outside-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '460px' }}>
         <CategoryTrendChart 
           data={analytics.dailyTrend} 
           category="lssOutside" 
@@ -57,7 +57,7 @@ export function ExportChartRenderer({ analytics }: ExportChartRendererProps) {
         />
       </div>
 
-      <div id="export-lss-inside-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '360px' }}>
+      <div id="export-lss-inside-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '460px' }}>
         <CategoryTrendChart 
           data={analytics.dailyTrend} 
           category="lssInside" 
@@ -66,7 +66,7 @@ export function ExportChartRenderer({ analytics }: ExportChartRendererProps) {
         />
       </div>
 
-      <div id="export-tyre-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '360px' }}>
+      <div id="export-tyre-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '460px' }}>
         <CategoryTrendChart 
           data={analytics.dailyTrend} 
           category="tyre" 
