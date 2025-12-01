@@ -157,8 +157,30 @@ Deno.serve(async (req) => {
         // Calculate averages
         const avgSpeed = points.length > 0 ? speedSum / points.length : 0;
         
-        // Mock fuel efficiency (will be real once fuel sensors are working)
-        const fuelEfficiency = totalDistance > 0 ? (totalDistance / (totalDistance * 0.15)).toFixed(2) : 0; // Mock: ~6-7 km/L
+        // Real fuel efficiency calculation from fuel readings
+        let fuelEfficiency = 0;
+        const { data: fuelReadings } = await supabase
+          .from('bus_fuel_readings')
+          .select('fuel_level_liters')
+          .eq('bus_id', bus.id)
+          .gte('reading_timestamp', `${date}T00:00:00`)
+          .lte('reading_timestamp', `${date}T23:59:59`)
+          .order('reading_timestamp', { ascending: true });
+        
+        if (fuelReadings && fuelReadings.length >= 2) {
+          const fuelStart = fuelReadings[0].fuel_level_liters || 0;
+          const fuelEnd = fuelReadings[fuelReadings.length - 1].fuel_level_liters || 0;
+          const fuelConsumed = Math.abs(fuelStart - fuelEnd);
+          
+          if (fuelConsumed > 0 && totalDistance > 0) {
+            fuelEfficiency = totalDistance / fuelConsumed;
+          }
+        }
+        
+        // If no fuel data, estimate based on distance (fallback)
+        if (fuelEfficiency === 0 && totalDistance > 0) {
+          fuelEfficiency = totalDistance / (totalDistance * 0.15); // Mock: ~6-7 km/L
+        }
 
         const analytics = {
           bus_id: bus.id,
@@ -169,7 +191,7 @@ Deno.serve(async (req) => {
           max_speed_kmh: parseFloat(maxSpeed.toFixed(1)),
           total_idle_time_minutes: parseFloat(totalIdleTime.toFixed(0)),
           behavior_events_count: behaviorEventsCount,
-          fuel_efficiency_kmpl: parseFloat(fuelEfficiency),
+          fuel_efficiency_kmpl: parseFloat(fuelEfficiency.toFixed(2)),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
