@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { 
   MapPin, Truck, Gauge, Fuel, Settings, 
   AlertTriangle, CheckCircle, RadioIcon as Radio,
-  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2, Plus, Satellite, Activity
+  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2, Plus, Satellite, Activity, BarChart3
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -73,6 +74,7 @@ interface GPSSettings {
 
 export default function RealTimeTracking() {
   const { hasRole } = useAuth();
+  const navigate = useNavigate();
   const [trackingData, setTrackingData] = useState<TrackingData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMapView, setIsMapView] = useState(false);
@@ -529,6 +531,16 @@ export default function RealTimeTracking() {
           </div>
           
           <div className="flex gap-2">
+            <Button 
+              variant="default" 
+              onClick={() => navigate('/fleet-analytics')}
+              className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary-hover hover:to-purple-700 text-white transition-all duration-300 animate-scale-in shadow-lg"
+              style={{ animationDelay: '0.1s' }}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              View Analytics
+            </Button>
+            
             {unmatchedVehicleCount > 0 && (
               <Button 
                 onClick={handleAddMissingBuses}
