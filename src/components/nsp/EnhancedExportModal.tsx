@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Download, FileSpreadsheet, FileText, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { generatePDFReport } from "./export/PDFReportGenerator";
 import { generateExcelReport } from "./export/ExcelReportGenerator";
 import { generateCSVReport } from "./export/CSVReportGenerator";
 import { ExportChartRenderer } from "./export/ExportChartRenderer";
+import { PageOrderSelector, PageSection } from "./export/PageOrderSelector";
 
 interface EnhancedExportModalProps {
   open: boolean;
@@ -25,6 +27,20 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
   const [exportFormat, setExportFormat] = useState<"excel" | "pdf" | "csv">("pdf");
   const [isExporting, setIsExporting] = useState(false);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+
+  // Default page order
+  const defaultPageOrder: PageSection[] = [
+    { id: 'cover', label: 'Cover Page (KPIs & Insights)', locked: true },
+    { id: 'salesTrend', label: 'Sales Trend Chart' },
+    { id: 'categoryDistribution', label: 'Category Distribution & Comparison' },
+    { id: 'monthlyDayOfWeek', label: 'Monthly Trend & Day of Week' },
+    { id: 'tyreBreakdown', label: 'Tyre Sales Breakdown' },
+    { id: 'categoryTrends', label: 'Individual Category Trends (LSS Outside, Inside, Tyre)' },
+    { id: 'performance', label: 'Performance Analysis' },
+    { id: 'dataTable', label: 'Raw Data Table' },
+  ];
+
+  const [pageOrder, setPageOrder] = useState<PageSection[]>(defaultPageOrder);
 
   // Section selections
   const [includeOverview, setIncludeOverview] = useState(true);
@@ -72,6 +88,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
         includeBestWorst,
         includeCategoryComparison,
         includeDataTable,
+        pageOrder,
       };
 
       if (exportFormat === "pdf") {
@@ -336,6 +353,34 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                 </Label>
               </div>
             </div>
+
+            {/* Page Order Section - PDF Only */}
+            {exportFormat === "pdf" && (
+              <Collapsible className="border-t pt-4">
+                <CollapsibleTrigger className="flex items-center justify-between w-full group">
+                  <Label className="text-base font-semibold cursor-pointer">
+                    📄 Page Order (Drag to reorder)
+                  </Label>
+                  <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4">
+                  <PageOrderSelector
+                    pageOrder={pageOrder}
+                    onReorder={setPageOrder}
+                    enabledSections={new Set([
+                      'cover', // Always enabled (locked)
+                      includeOverview && includeSalesTrend ? 'salesTrend' : '',
+                      includeOverview && includeCategoryDistribution ? 'categoryDistribution' : '',
+                      includeDetailedAnalytics && (includeMonthlyTrend || includeDayOfWeek) ? 'monthlyDayOfWeek' : '',
+                      includeDetailedAnalytics && includeTyreBreakdown ? 'tyreBreakdown' : '',
+                      includeDetailedAnalytics && includeCategoryTrends ? 'categoryTrends' : '',
+                      includePerformance ? 'performance' : '',
+                      includeDataTable ? 'dataTable' : '',
+                    ].filter(Boolean))}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </div>
 
           <div className="flex gap-2 border-t pt-4">
