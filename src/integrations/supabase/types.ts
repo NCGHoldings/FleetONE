@@ -6601,6 +6601,33 @@ export type Database = {
           },
         ]
       }
+      special_hire_signature_settings: {
+        Row: {
+          created_at: string | null
+          default_user_id: string | null
+          id: string
+          is_enabled: boolean | null
+          signature_role: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_user_id?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          signature_role: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_user_id?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          signature_role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       special_hire_submissions: {
         Row: {
           company_name: string | null

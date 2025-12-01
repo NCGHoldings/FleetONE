@@ -10,12 +10,13 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
 import { MultiDayRouteConfig } from "@/components/trips/MultiDayRouteConfig";
 import { ServiceAlertSettings } from "@/components/settings/ServiceAlertSettings";
+import { SpecialHireSignatureSettings } from "@/components/settings/SpecialHireSignatureSettings";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -100,7 +101,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="account" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-8">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-9">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="display">Display</TabsTrigger>
@@ -109,6 +110,7 @@ export default function Settings() {
           <TabsTrigger value="qr-codes">QR Codes</TabsTrigger>
           <TabsTrigger value="multi-day-routes">Multi-Day Routes</TabsTrigger>
           <TabsTrigger value="service-alerts">Service Alerts</TabsTrigger>
+          <TabsTrigger value="signatures">Signatures</TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="space-y-6 mt-6">
@@ -441,6 +443,25 @@ export default function Settings() {
 
         <TabsContent value="service-alerts" className="space-y-6 mt-6">
           <ServiceAlertSettings />
+        </TabsContent>
+
+        <TabsContent value="signatures" className="space-y-6 mt-6">
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PenTool className="w-5 h-5" />
+                  Special Hire Signature Automation
+                </CardTitle>
+                <CardDescription>
+                  Configure default signers for automatic signature addition during payment confirmation and approvals
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SpecialHireSignatureSettings />
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

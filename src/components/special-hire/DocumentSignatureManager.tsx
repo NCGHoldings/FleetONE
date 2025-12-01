@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ApprovalSignatureModal } from './ApprovalSignatureModal';
 import { SignaturePreviewCard } from './SignaturePreviewCard';
+import { QuickApprovalButton } from './QuickApprovalButton';
 import { useSignatureManagement, type ApprovalData } from '@/hooks/useSignatureManagement';
 import { useDocumentRegeneration } from '@/hooks/useDocumentRegeneration';
 import { useDocumentManagement } from '@/hooks/useDocumentManagement';
@@ -171,6 +172,17 @@ export const DocumentSignatureManager: React.FC<DocumentSignatureManagerProps> =
           <Badge variant={documentStatus === 'approved' ? 'default' : 'secondary'}>
             {documentStatus === 'approved' ? 'Approved' : 'Draft'}
           </Badge>
+
+          {quotationId && (
+            <QuickApprovalButton
+              documentId={documentId}
+              quotationId={quotationId}
+              onApproved={() => {
+                loadApprovals();
+                onSignatureUpdated?.();
+              }}
+            />
+          )}
           
           <Button
             variant="outline"
