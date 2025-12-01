@@ -56,6 +56,49 @@ export const useFinanceApproval = () => {
 
       if (paymentError) throw paymentError;
 
+      // Auto-add checked_by signature FIRST, before regenerating PDFs
+      try {
+        const { data: setting } = await supabase
+          .from('special_hire_signature_settings')
+          .select('default_user_id, is_enabled')
+          .eq('signature_role', 'checked_by')
+          .single();
+
+        if (setting?.is_enabled && setting.default_user_id) {
+          // Check if checked_by signature already exists for this quotation
+          const { data: existingApproval } = await supabase
+            .from('document_approvals')
+            .select('id')
+            .eq('document_id', paymentData.quotation.id)
+            .eq('approval_type', 'checked_by')
+            .single();
+
+          if (!existingApproval) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, signature_data, user_id')
+              .eq('user_id', setting.default_user_id)
+              .single();
+
+            if (profile?.signature_data) {
+              // Add to document_approvals
+              await supabase.from('document_approvals').insert({
+                document_id: paymentData.quotation.id,
+                approval_type: 'checked_by',
+                approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+                signature_data: profile.signature_data,
+                approval_date: new Date().toISOString().split('T')[0],
+                user_id: profile.user_id,
+              });
+
+              toast.success(`Checked By signature auto-added: ${profile.first_name}`);
+            }
+          }
+        }
+      } catch (sigError) {
+        console.log('Auto-signature skipped:', sigError);
+      }
+
       // Update all related invoices to approved status
       const { error: invoiceUpdateError } = await supabase
         .from('special_hire_invoices')
@@ -102,8 +145,8 @@ export const useFinanceApproval = () => {
 
       // Update draft documents to approved status
       for (const doc of draftDocuments || []) {
-        // Get existing approvals for this document, but use passed signatures if available
-        let docApprovals = await getDocumentApprovals(doc.id);
+        // Get existing approvals for this quotation (use quotation_id, not document storage id)
+        let docApprovals = await getDocumentApprovals(paymentData.quotation.id);
         
         // If signatures were passed from the approval modal, use those instead
         if (signatures) {

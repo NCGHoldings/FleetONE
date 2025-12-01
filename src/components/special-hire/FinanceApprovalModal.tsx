@@ -148,50 +148,7 @@ export const FinanceApprovalModal = ({
   const handleApprove = async () => {
     setAction('approve');
     
-    // Auto-add checked_by signature
-    try {
-      const { data: setting } = await supabase
-        .from('special_hire_signature_settings')
-        .select('default_user_id, is_enabled')
-        .eq('signature_role', 'checked_by')
-        .single();
-
-      if (setting?.is_enabled && setting.default_user_id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name, signature_data, user_id')
-          .eq('user_id', setting.default_user_id)
-          .single();
-
-        if (profile?.signature_data && documents[0]?.id) {
-          // Add to document_approvals
-          await supabase.from('document_approvals').insert({
-            document_id: documents[0].quotation_id,
-            approval_type: 'checked_by',
-            approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-            signature_data: profile.signature_data,
-            approval_date: new Date().toISOString().split('T')[0],
-            user_id: profile.user_id,
-          });
-
-          // Add to signatures state
-          setSignatures(prev => ({
-            ...prev,
-            checked_by: {
-              approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-              signature_data: profile.signature_data,
-              approval_date: new Date().toISOString().split('T')[0],
-            }
-          }));
-
-          toast.success(`Finance signature auto-added: ${profile.first_name}`);
-        }
-      }
-    } catch (sigError) {
-      console.log('Auto-signature skipped:', sigError);
-    }
-
-    // Combine existing signatures with new ones
+    // Combine existing signatures with new ones (auto-signature handled in hook)
     const finalSignatures = { ...existingSignatures };
     Object.entries(signatures).forEach(([type, sig]) => {
       if (sig) {
