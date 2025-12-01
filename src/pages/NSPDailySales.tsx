@@ -143,7 +143,7 @@ const NSPDailySales = () => {
     } else {
       message += `\n`;
     }
-    message += `Pepiliyana Sale  = ${formatCurrency(data.pepiliyana_sale)}\n\n`;
+    message += `Breakdown Sale   = ${formatCurrency(data.pepiliyana_sale)}\n\n`;
 
     if (data.other_income.length > 0) {
       message += `Other Income\n`;

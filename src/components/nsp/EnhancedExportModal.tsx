@@ -35,7 +35,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
     { id: 'categoryDistribution', label: 'Category Distribution & Comparison' },
     { id: 'monthlyDayOfWeek', label: 'Monthly Trend & Day of Week' },
     { id: 'tyreBreakdown', label: 'Tyre Sales Breakdown' },
-    { id: 'categoryTrends', label: 'Individual Category Trends (LSS Outside, Inside, Tyre)' },
+    { id: 'categoryTrends', label: 'Individual Category Trends (LSS Outside, Inside, Tyre, Breakdown)' },
     { id: 'performance', label: 'Performance Analysis' },
     { id: 'dataTable', label: 'Raw Data Table' },
   ];
@@ -289,7 +289,7 @@ export function EnhancedExportModal({ open, onClose, dateRange, analytics }: Enh
                     onCheckedChange={(checked) => setIncludeCategoryTrends(checked as boolean)}
                   />
                   <Label htmlFor="category-trends" className="cursor-pointer text-sm">
-                    Individual Category Trend Charts (LSS Outside, LSS Inside, Tyre)
+                    Individual Category Trend Charts (LSS Outside, LSS Inside, Tyre, Breakdown)
                   </Label>
                 </div>
               </div>

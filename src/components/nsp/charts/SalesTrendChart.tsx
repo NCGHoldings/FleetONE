@@ -9,7 +9,7 @@ interface SalesTrendChartProps {
     lssOutside?: number;
     lssInside?: number;
     tyre?: number;
-    pepiliyana?: number;
+    breakdown?: number;
     other?: number;
     isPrediction?: boolean;
   }>;

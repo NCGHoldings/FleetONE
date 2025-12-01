@@ -56,7 +56,7 @@ export async function generateCSVReport(
       "LSS Outside": "LSS Outside",
       "LSS Inside": "LSS Inside",
       "Tyre Sale": "Tyre Sale",
-      Pepiliyana: "Pepiliyana",
+      "Breakdown Sales": "Breakdown Sales",
       "Other Income": "Other Income",
       "Total Sales": "Total Sales",
     });
@@ -67,7 +67,7 @@ export async function generateCSVReport(
         "LSS Outside": record.lssOutside,
         "LSS Inside": record.lssInside,
         "Tyre Sale": record.tyre,
-        Pepiliyana: record.pepiliyana,
+        "Breakdown Sales": record.breakdown,
         "Other Income": record.other,
         "Total Sales": record.total,
       });

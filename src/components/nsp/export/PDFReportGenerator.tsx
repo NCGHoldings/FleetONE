@@ -286,14 +286,17 @@ export async function generatePDFReport(
           // Chart 2: LSS Inside
           await addChartImage('export-lss-inside-trend', 'LSS Inside Sales Trend', 110);
           
-          // Page 2: Tyre Sales (full page)
+          // Page 2: Tyre Sales + Breakdown Sales stacked
           addPageFooter();
           doc.addPage();
           addPageHeader();
           yPosition = 18;
           
           // Chart 3: Tyre Sales
-          await addChartImage('export-tyre-trend', 'Tyre Sales Trend', 140);
+          await addChartImage('export-tyre-trend', 'Tyre Sales Trend', 110);
+          
+          // Chart 4: Breakdown Sales
+          await addChartImage('export-breakdown-trend', 'Breakdown Sales Trend', 110);
         }
         break;
 
@@ -347,25 +350,25 @@ export async function generatePDFReport(
           doc.text("Daily Sales Data", margin, yPosition);
           yPosition += 6;
 
-          const tableData = analytics.dailyTrend.map((record: any) => [
-            format(new Date(record.date), "MMM dd"),
-            record.lssOutside.toLocaleString(),
-            record.lssInside.toLocaleString(),
-            record.tyre.toLocaleString(),
-            record.pepiliyana.toLocaleString(),
-            record.other.toLocaleString(),
-            record.total.toLocaleString(),
-          ]);
+    const tableData = analytics.dailyTrend.map((record: any) => [
+      format(new Date(record.date), "MMM dd"),
+      record.lssOutside.toLocaleString(),
+      record.lssInside.toLocaleString(),
+      record.tyre.toLocaleString(),
+      record.breakdown.toLocaleString(),
+      record.other.toLocaleString(),
+      record.total.toLocaleString(),
+    ]);
 
-          autoTable(doc, {
-            startY: yPosition,
-            head: [["Date", "LSS Out", "LSS In", "Tyre", "Pepil", "Other", "Total"]],
-            body: tableData,
-            theme: 'striped',
-            headStyles: { fillColor: [30, 58, 138], textColor: 255 },
-            margin: { left: margin, right: margin },
-            styles: { fontSize: 8 },
-          });
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["Date", "LSS Out", "LSS In", "Tyre", "Brkdwn", "Other", "Total"]],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [30, 58, 138], textColor: 255 },
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 8 },
+    });
         }
         break;
     }

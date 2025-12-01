@@ -199,7 +199,7 @@ export function SalesSummaryTable({ dateRange }: SalesSummaryTableProps) {
                   <TableHead className="text-right">LSS Outside</TableHead>
                   <TableHead className="text-right">LSS Inside</TableHead>
                   <TableHead className="text-right">Tyre Sale</TableHead>
-                  <TableHead className="text-right">Pepiliyana</TableHead>
+                  <TableHead className="text-right">Breakdown</TableHead>
                   <TableHead className="text-right">Other</TableHead>
                   <TableHead className="text-right font-bold">Total</TableHead>
                   <TableHead className="text-right">Actions</TableHead>

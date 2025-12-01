@@ -47,7 +47,7 @@ export async function generateExcelReport(
       "LSS Outside": record.lssOutside,
       "LSS Inside": record.lssInside,
       "Tyre Sale": record.tyre,
-      "Pepiliyana": record.pepiliyana,
+      "Breakdown Sales": record.breakdown,
       "Other Income": record.other,
       "Total Sales": record.total,
     }));

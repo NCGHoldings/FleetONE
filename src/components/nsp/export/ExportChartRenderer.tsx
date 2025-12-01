@@ -74,6 +74,16 @@ export function ExportChartRenderer({ analytics }: ExportChartRendererProps) {
           color="#14B8A6"
         />
       </div>
+
+      {/* Breakdown Sales Trend Chart */}
+      <div id="export-breakdown-trend" className="mb-4 p-4 bg-white" style={{ width: '900px', height: '460px' }}>
+        <CategoryTrendChart 
+          data={analytics.dailyTrend} 
+          category="breakdown" 
+          title="Breakdown Sales Trend"
+          color="#EC4899"
+        />
+      </div>
     </div>
   );
 }
