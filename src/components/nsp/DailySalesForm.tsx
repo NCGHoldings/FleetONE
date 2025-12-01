@@ -25,7 +25,7 @@ export function DailySalesForm({ onSave, isSaving, initialDate }: DailySalesForm
   const [lssOutsideSale, setLssOutsideSale] = useState<number>(0);
   const [lssInsideSale, setLssInsideSale] = useState<number>(0);
   const [tyreEntries, setTyreEntries] = useState<TyreEntry[]>([]);
-  const [pepiliyanaSale, setPepiliyanaSale] = useState<number>(0);
+  const [breakdownSale, setBreakdownSale] = useState<number>(0);
   const [otherIncome, setOtherIncome] = useState<OtherIncomeItem[]>([]);
   const [notes, setNotes] = useState<string>("");
   const [showOtherIncomeModal, setShowOtherIncomeModal] = useState(false);
@@ -61,7 +61,7 @@ export function DailySalesForm({ onSave, isSaving, initialDate }: DailySalesForm
         // Handle tyre_entries - it may not exist in older records
         const tyreEntriesData = (data as any).tyre_entries;
         setTyreEntries(Array.isArray(tyreEntriesData) ? tyreEntriesData : []);
-        setPepiliyanaSale(data.pepiliyana_sale || 0);
+        setBreakdownSale(data.pepiliyana_sale || 0);
         setOtherIncome(Array.isArray(data.other_income) ? data.other_income as unknown as OtherIncomeItem[] : []);
         setNotes(data.notes || "");
       } else {
@@ -69,7 +69,7 @@ export function DailySalesForm({ onSave, isSaving, initialDate }: DailySalesForm
         setLssOutsideSale(0);
         setLssInsideSale(0);
         setTyreEntries([]);
-        setPepiliyanaSale(0);
+        setBreakdownSale(0);
         setOtherIncome([]);
         setNotes("");
       }
@@ -92,7 +92,7 @@ export function DailySalesForm({ onSave, isSaving, initialDate }: DailySalesForm
   const calculateTotal = () => {
     const tyreSaleTotal = calculateTyreSaleTotal();
     const otherTotal = otherIncome.reduce((sum, item) => sum + item.amount, 0);
-    return lssOutsideSale + lssInsideSale + tyreSaleTotal + pepiliyanaSale + otherTotal;
+    return lssOutsideSale + lssInsideSale + tyreSaleTotal + breakdownSale + otherTotal;
   };
 
   const handleAddTyre = (item: TyreEntry) => {
@@ -129,7 +129,7 @@ export function DailySalesForm({ onSave, isSaving, initialDate }: DailySalesForm
       lss_outside_sale: lssOutsideSale,
       lss_inside_sale: lssInsideSale,
       tyre_entries: tyreEntries,
-      pepiliyana_sale: pepiliyanaSale,
+      pepiliyana_sale: breakdownSale,
       other_income: otherIncome,
       notes: notes,
     };
@@ -268,19 +268,19 @@ export function DailySalesForm({ onSave, isSaving, initialDate }: DailySalesForm
             )}
           </div>
 
-          {/* Pepiliyana Sales */}
+          {/* Breakdown Sales */}
           <div className="space-y-4 p-6 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/50 rounded-lg">
             <h3 className="font-semibold text-lg flex items-center gap-2">
               <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-              Pepiliyana Sales
+              Breakdown Sales
             </h3>
             <div className="space-y-2">
-              <Label htmlFor="pepiliyana-sale">Pepiliyana Sale</Label>
+              <Label htmlFor="breakdown-sale">Breakdown Sale</Label>
               <Input
-                id="pepiliyana-sale"
+                id="breakdown-sale"
                 type="number"
-                value={pepiliyanaSale}
-                onChange={(e) => setPepiliyanaSale(Number(e.target.value))}
+                value={breakdownSale}
+                onChange={(e) => setBreakdownSale(Number(e.target.value))}
                 placeholder="0"
                 className="h-12 text-lg"
                 min="0"

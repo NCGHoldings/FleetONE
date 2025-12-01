@@ -9,7 +9,7 @@ const COLORS: { [key: string]: string } = {
   'LSS Outside': '#3B82F6',
   'LSS Inside': '#A855F7',
   'Tyre Sale': '#14B8A6',
-  'Pepiliyana': '#EC4899',
+  'Breakdown Sales': '#EC4899',
   'Other Income': '#F97316'
 };
 

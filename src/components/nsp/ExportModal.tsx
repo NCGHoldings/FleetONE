@@ -112,7 +112,7 @@ export function ExportModal({ open, onClose, dateRange: initialRange }: ExportMo
           "LSS Outside": record.lss_outside_sale,
           "LSS Inside": record.lss_inside_sale,
           "Tyre Sale": record.tyre_sale,
-          Pepiliyana: record.pepiliyana_sale,
+          "Breakdown Sales": record.pepiliyana_sale,
           "Other Income": otherTotal,
           "Total Sale": record.total_sale,
         };
@@ -191,7 +191,7 @@ export function ExportModal({ open, onClose, dateRange: initialRange }: ExportMo
 
       autoTable(doc, {
         startY: includeSummary ? 60 : 40,
-        head: [["Date", "LSS Out", "LSS In", "Tyre", "Pepil", "Other", "Total"]],
+        head: [["Date", "LSS Out", "LSS In", "Tyre", "Brkdwn", "Other", "Total"]],
         body: tableData,
       });
     }
@@ -211,7 +211,7 @@ export function ExportModal({ open, onClose, dateRange: initialRange }: ExportMo
         LSS_Outside: record.lss_outside_sale,
         LSS_Inside: record.lss_inside_sale,
         Tyre_Sale: record.tyre_sale,
-        Pepiliyana: record.pepiliyana_sale,
+        Breakdown_Sales: record.pepiliyana_sale,
         Other_Income: otherTotal,
         Total_Sale: record.total_sale,
       };

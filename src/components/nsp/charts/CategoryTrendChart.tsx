@@ -9,9 +9,10 @@ interface CategoryTrendChartProps {
     lssOutside?: number;
     lssInside?: number;
     tyre?: number;
+    breakdown?: number;
     isPrediction?: boolean;
   }>;
-  category: 'lssOutside' | 'lssInside' | 'tyre';
+  category: 'lssOutside' | 'lssInside' | 'tyre' | 'breakdown';
   title: string;
   color: string;
 }

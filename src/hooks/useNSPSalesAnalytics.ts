@@ -35,7 +35,7 @@ export const useNSPSalesAnalytics = (dateRange: { from: Date; to: Date }) => {
         lssOutside: record.lss_outside_sale || 0,
         lssInside: record.lss_inside_sale || 0,
         tyre: record.tyre_sale || 0,
-        pepiliyana: record.pepiliyana_sale || 0,
+        breakdown: record.pepiliyana_sale || 0,
         other: (record.other_income || []).reduce((sum, item) => sum + (item.amount || 0), 0)
       }));
 
@@ -44,7 +44,7 @@ export const useNSPSalesAnalytics = (dateRange: { from: Date; to: Date }) => {
         'LSS Outside': salesData.reduce((sum, r) => sum + (r.lss_outside_sale || 0), 0),
         'LSS Inside': salesData.reduce((sum, r) => sum + (r.lss_inside_sale || 0), 0),
         'Tyre Sale': salesData.reduce((sum, r) => sum + (r.tyre_sale || 0), 0),
-        'Pepiliyana': salesData.reduce((sum, r) => sum + (r.pepiliyana_sale || 0), 0),
+        'Breakdown Sales': salesData.reduce((sum, r) => sum + (r.pepiliyana_sale || 0), 0),
         'Other Income': salesData.reduce((sum, r) => sum + (r.other_income || []).reduce((s, i) => s + (i.amount || 0), 0), 0)
       };
 
