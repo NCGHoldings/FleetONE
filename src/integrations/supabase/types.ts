@@ -4094,6 +4094,7 @@ export type Database = {
       }
       real_time_tracking: {
         Row: {
+          alarm_active: boolean | null
           alerts: Json | null
           altitude_meters: number | null
           battery_voltage: number | null
@@ -4110,9 +4111,12 @@ export type Database = {
           fios_device_id: number | null
           fuel_level: number | null
           fuel_level_liters: number | null
+          gps_accuracy: number | null
           gps_coordinates: Json | null
+          gsm_signal_strength: number | null
           heading_degrees: number | null
           id: string
+          ignition_status: boolean | null
           last_update: string
           odometer_km: number | null
           odometer_reading: number | null
@@ -4127,6 +4131,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          alarm_active?: boolean | null
           alerts?: Json | null
           altitude_meters?: number | null
           battery_voltage?: number | null
@@ -4143,9 +4148,12 @@ export type Database = {
           fios_device_id?: number | null
           fuel_level?: number | null
           fuel_level_liters?: number | null
+          gps_accuracy?: number | null
           gps_coordinates?: Json | null
+          gsm_signal_strength?: number | null
           heading_degrees?: number | null
           id?: string
+          ignition_status?: boolean | null
           last_update?: string
           odometer_km?: number | null
           odometer_reading?: number | null
@@ -4160,6 +4168,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          alarm_active?: boolean | null
           alerts?: Json | null
           altitude_meters?: number | null
           battery_voltage?: number | null
@@ -4176,9 +4185,12 @@ export type Database = {
           fios_device_id?: number | null
           fuel_level?: number | null
           fuel_level_liters?: number | null
+          gps_accuracy?: number | null
           gps_coordinates?: Json | null
+          gsm_signal_strength?: number | null
           heading_degrees?: number | null
           id?: string
+          ignition_status?: boolean | null
           last_update?: string
           odometer_km?: number | null
           odometer_reading?: number | null
