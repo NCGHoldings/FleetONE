@@ -205,153 +205,169 @@ export async function generatePDFReport(
     yPosition += 5;
   }
 
-  // Add charts based on selection with vertical stacking
+  // Render sections based on page order
+  const pageOrder = options.pageOrder || [];
   
-  // Sales Trend Chart - Full Page
-  if (options.includeOverview && options.includeSalesTrend) {
-    addPageFooter();
-    doc.addPage();
-    addPageHeader();
-    yPosition = 18;
-    await addChartImage('export-sales-trend', 'Sales Trend Analysis', 140);
-  }
+  for (const section of pageOrder) {
+    switch (section.id) {
+      case 'cover':
+        // Cover page is already rendered above (KPIs + Insights)
+        // This is just a placeholder for the order logic
+        break;
 
-  // Category Distribution & Comparison - Stacked Vertically
-  if (options.includeOverview && options.includeCategoryDistribution) {
-    await addStackedCharts(
-      { id: 'export-category-distribution', title: 'Category Distribution' },
-      { id: 'export-category-comparison', title: 'Category Comparison' }
-    );
-  }
+      case 'salesTrend':
+        if (options.includeOverview && options.includeSalesTrend) {
+          addPageFooter();
+          doc.addPage();
+          addPageHeader();
+          yPosition = 18;
+          await addChartImage('export-sales-trend', 'Sales Trend Analysis', 140);
+        }
+        break;
 
-  // Monthly Trend & Day of Week - Stacked Vertically
-  if (options.includeDetailedAnalytics && options.includeMonthlyTrend && options.includeDayOfWeek) {
-    await addStackedCharts(
-      { id: 'export-monthly-trend', title: 'Monthly Sales Trend' },
-      { id: 'export-day-of-week', title: 'Day of Week Analysis' }
-    );
-  } else if (options.includeDetailedAnalytics && options.includeMonthlyTrend) {
-    addPageFooter();
-    doc.addPage();
-    addPageHeader();
-    yPosition = 18;
-    await addChartImage('export-monthly-trend', 'Monthly Sales Trend', 120);
-  } else if (options.includeDetailedAnalytics && options.includeDayOfWeek) {
-    addPageFooter();
-    doc.addPage();
-    addPageHeader();
-    yPosition = 18;
-    await addChartImage('export-day-of-week', 'Day of Week Analysis', 120);
-  }
+      case 'categoryDistribution':
+        if (options.includeOverview && options.includeCategoryDistribution) {
+          await addStackedCharts(
+            { id: 'export-category-distribution', title: 'Category Distribution' },
+            { id: 'export-category-comparison', title: 'Category Comparison' }
+          );
+        }
+        break;
 
-  // Tyre Breakdown Chart
-  if (options.includeDetailedAnalytics && options.includeTyreBreakdown && analytics.tyreBreakdown?.length > 0) {
-    addPageFooter();
-    doc.addPage();
-    addPageHeader();
-    yPosition = 18;
-    await addChartImage('export-tyre-breakdown', 'Tyre Sales Breakdown', 110);
-  }
+      case 'monthlyDayOfWeek':
+        if (options.includeDetailedAnalytics && options.includeMonthlyTrend && options.includeDayOfWeek) {
+          await addStackedCharts(
+            { id: 'export-monthly-trend', title: 'Monthly Sales Trend' },
+            { id: 'export-day-of-week', title: 'Day of Week Analysis' }
+          );
+        } else if (options.includeDetailedAnalytics && options.includeMonthlyTrend) {
+          addPageFooter();
+          doc.addPage();
+          addPageHeader();
+          yPosition = 18;
+          await addChartImage('export-monthly-trend', 'Monthly Sales Trend', 120);
+        } else if (options.includeDetailedAnalytics && options.includeDayOfWeek) {
+          addPageFooter();
+          doc.addPage();
+          addPageHeader();
+          yPosition = 18;
+          await addChartImage('export-day-of-week', 'Day of Week Analysis', 120);
+        }
+        break;
 
-  // Individual Category Trend Charts - 2+1 layout for clean view
-  if (options.includeDetailedAnalytics && options.includeCategoryTrends) {
-    // Page 1: LSS Outside + LSS Inside stacked
-    addPageFooter();
-    doc.addPage();
-    addPageHeader();
-    yPosition = 18;
-    
-    // Section title
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text("Individual Category Sales Trends", margin, yPosition);
-    yPosition += 10;
-    
-    // Chart 1: LSS Outside
-    await addChartImage('export-lss-outside-trend', 'LSS Outside Sales Trend', 110);
-    
-    // Chart 2: LSS Inside
-    await addChartImage('export-lss-inside-trend', 'LSS Inside Sales Trend', 110);
-    
-    // Page 2: Tyre Sales (full page)
-    addPageFooter();
-    doc.addPage();
-    addPageHeader();
-    yPosition = 18;
-    
-    // Chart 3: Tyre Sales
-    await addChartImage('export-tyre-trend', 'Tyre Sales Trend', 140);
-  }
+      case 'tyreBreakdown':
+        if (options.includeDetailedAnalytics && options.includeTyreBreakdown && analytics.tyreBreakdown?.length > 0) {
+          addPageFooter();
+          doc.addPage();
+          addPageHeader();
+          yPosition = 18;
+          await addChartImage('export-tyre-breakdown', 'Tyre Sales Breakdown', 110);
+        }
+        break;
 
-  // Performance Section
-  if (options.includePerformance && options.includeBestWorst) {
-    checkAddPage(50);
+      case 'categoryTrends':
+        if (options.includeDetailedAnalytics && options.includeCategoryTrends) {
+          // Page 1: LSS Outside + LSS Inside stacked
+          addPageFooter();
+          doc.addPage();
+          addPageHeader();
+          yPosition = 18;
+          
+          // Section title
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 0, 0);
+          doc.text("Individual Category Sales Trends", margin, yPosition);
+          yPosition += 10;
+          
+          // Chart 1: LSS Outside
+          await addChartImage('export-lss-outside-trend', 'LSS Outside Sales Trend', 110);
+          
+          // Chart 2: LSS Inside
+          await addChartImage('export-lss-inside-trend', 'LSS Inside Sales Trend', 110);
+          
+          // Page 2: Tyre Sales (full page)
+          addPageFooter();
+          doc.addPage();
+          addPageHeader();
+          yPosition = 18;
+          
+          // Chart 3: Tyre Sales
+          await addChartImage('export-tyre-trend', 'Tyre Sales Trend', 140);
+        }
+        break;
 
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text("Performance Analysis", margin, yPosition);
-    yPosition += 8;
+      case 'performance':
+        if (options.includePerformance && options.includeBestWorst) {
+          checkAddPage(50);
 
-    if (analytics.bestDay) {
-      doc.setFontSize(12);
-      doc.text("Best Performing Day", margin, yPosition);
-      yPosition += 6;
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Date: ${format(new Date(analytics.bestDay.sale_date), "MMM dd, yyyy")}`, margin + 5, yPosition);
-      yPosition += 5;
-      doc.text(`Sales: LKR ${analytics.bestDay.total_sale.toLocaleString()}`, margin + 5, yPosition);
-      yPosition += 10;
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text("Performance Analysis", margin, yPosition);
+          yPosition += 8;
+
+          if (analytics.bestDay) {
+            doc.setFontSize(12);
+            doc.text("Best Performing Day", margin, yPosition);
+            yPosition += 6;
+            
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Date: ${format(new Date(analytics.bestDay.sale_date), "MMM dd, yyyy")}`, margin + 5, yPosition);
+            yPosition += 5;
+            doc.text(`Sales: LKR ${analytics.bestDay.total_sale.toLocaleString()}`, margin + 5, yPosition);
+            yPosition += 10;
+          }
+
+          if (analytics.worstDay) {
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text("Lowest Performing Day", margin, yPosition);
+            yPosition += 6;
+            
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Date: ${format(new Date(analytics.worstDay.sale_date), "MMM dd, yyyy")}`, margin + 5, yPosition);
+            yPosition += 5;
+            doc.text(`Sales: LKR ${analytics.worstDay.total_sale.toLocaleString()}`, margin + 5, yPosition);
+            yPosition += 10;
+          }
+        }
+        break;
+
+        if (options.includeDataTable && analytics.dailyTrend?.length > 0) {
+          addPageFooter();
+          doc.addPage();
+          addPageHeader();
+          yPosition = 15;
+
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text("Daily Sales Data", margin, yPosition);
+          yPosition += 6;
+
+          const tableData = analytics.dailyTrend.map((record: any) => [
+            format(new Date(record.date), "MMM dd"),
+            record.lssOutside.toLocaleString(),
+            record.lssInside.toLocaleString(),
+            record.tyre.toLocaleString(),
+            record.pepiliyana.toLocaleString(),
+            record.other.toLocaleString(),
+            record.total.toLocaleString(),
+          ]);
+
+          autoTable(doc, {
+            startY: yPosition,
+            head: [["Date", "LSS Out", "LSS In", "Tyre", "Pepil", "Other", "Total"]],
+            body: tableData,
+            theme: 'striped',
+            headStyles: { fillColor: [30, 58, 138], textColor: 255 },
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 8 },
+          });
+        }
+        break;
     }
-
-    if (analytics.worstDay) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text("Lowest Performing Day", margin, yPosition);
-      yPosition += 6;
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Date: ${format(new Date(analytics.worstDay.sale_date), "MMM dd, yyyy")}`, margin + 5, yPosition);
-      yPosition += 5;
-      doc.text(`Sales: LKR ${analytics.worstDay.total_sale.toLocaleString()}`, margin + 5, yPosition);
-      yPosition += 10;
-    }
-  }
-
-  // Data Table
-  if (options.includeDataTable && analytics.dailyTrend?.length > 0) {
-    addPageFooter();
-    doc.addPage();
-    addPageHeader();
-    yPosition = 15;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text("Daily Sales Data", margin, yPosition);
-    yPosition += 6;
-
-    const tableData = analytics.dailyTrend.map((record: any) => [
-      format(new Date(record.date), "MMM dd"),
-      record.lssOutside.toLocaleString(),
-      record.lssInside.toLocaleString(),
-      record.tyre.toLocaleString(),
-      record.pepiliyana.toLocaleString(),
-      record.other.toLocaleString(),
-      record.total.toLocaleString(),
-    ]);
-
-    autoTable(doc, {
-      startY: yPosition,
-      head: [["Date", "LSS Out", "LSS In", "Tyre", "Pepil", "Other", "Total"]],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { fillColor: [30, 58, 138], textColor: 255 },
-      margin: { left: margin, right: margin },
-      styles: { fontSize: 8 },
-    });
   }
 
   // Add final page footer
