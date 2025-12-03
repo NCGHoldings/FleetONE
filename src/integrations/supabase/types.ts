@@ -4094,6 +4094,7 @@ export type Database = {
       }
       real_time_tracking: {
         Row: {
+          alarm_active: boolean | null
           alerts: Json | null
           altitude_meters: number | null
           battery_voltage: number | null
@@ -4110,9 +4111,12 @@ export type Database = {
           fios_device_id: number | null
           fuel_level: number | null
           fuel_level_liters: number | null
+          gps_accuracy: number | null
           gps_coordinates: Json | null
+          gsm_signal_strength: number | null
           heading_degrees: number | null
           id: string
+          ignition_status: boolean | null
           last_update: string
           odometer_km: number | null
           odometer_reading: number | null
@@ -4127,6 +4131,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          alarm_active?: boolean | null
           alerts?: Json | null
           altitude_meters?: number | null
           battery_voltage?: number | null
@@ -4143,9 +4148,12 @@ export type Database = {
           fios_device_id?: number | null
           fuel_level?: number | null
           fuel_level_liters?: number | null
+          gps_accuracy?: number | null
           gps_coordinates?: Json | null
+          gsm_signal_strength?: number | null
           heading_degrees?: number | null
           id?: string
+          ignition_status?: boolean | null
           last_update?: string
           odometer_km?: number | null
           odometer_reading?: number | null
@@ -4160,6 +4168,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          alarm_active?: boolean | null
           alerts?: Json | null
           altitude_meters?: number | null
           battery_voltage?: number | null
@@ -4176,9 +4185,12 @@ export type Database = {
           fios_device_id?: number | null
           fuel_level?: number | null
           fuel_level_liters?: number | null
+          gps_accuracy?: number | null
           gps_coordinates?: Json | null
+          gsm_signal_strength?: number | null
           heading_degrees?: number | null
           id?: string
+          ignition_status?: boolean | null
           last_update?: string
           odometer_km?: number | null
           odometer_reading?: number | null
@@ -6927,6 +6939,68 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      temporary_accounts: {
+        Row: {
+          account_code: string
+          auth_user_id: string
+          created_at: string
+          created_by: string | null
+          generated_email: string
+          id: string
+          last_login_at: string | null
+          login_count: number | null
+          notes: string | null
+          plain_password_display: string | null
+          profile_id: string | null
+          status: string
+          updated_at: string
+          valid_until: string
+          validity_hours: number
+        }
+        Insert: {
+          account_code: string
+          auth_user_id: string
+          created_at?: string
+          created_by?: string | null
+          generated_email: string
+          id?: string
+          last_login_at?: string | null
+          login_count?: number | null
+          notes?: string | null
+          plain_password_display?: string | null
+          profile_id?: string | null
+          status?: string
+          updated_at?: string
+          valid_until: string
+          validity_hours?: number
+        }
+        Update: {
+          account_code?: string
+          auth_user_id?: string
+          created_at?: string
+          created_by?: string | null
+          generated_email?: string
+          id?: string
+          last_login_at?: string | null
+          login_count?: number | null
+          notes?: string | null
+          plain_password_display?: string | null
+          profile_id?: string | null
+          status?: string
+          updated_at?: string
+          valid_until?: string
+          validity_hours?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "temporary_accounts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       theme_presets: {
         Row: {
@@ -10447,6 +10521,7 @@ export type Database = {
       calculate_tyre_condition: { Args: { p_tyre_id: string }; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       create_admin_user: { Args: never; Returns: undefined }
+      expire_temporary_accounts: { Args: never; Returns: number }
       generate_budget_code: { Args: { p_fiscal_year: number }; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_employee_id: { Args: never; Returns: string }
@@ -10463,6 +10538,7 @@ export type Database = {
       generate_sinotruck_customer_code: { Args: never; Returns: string }
       generate_sinotruck_quotation_no: { Args: never; Returns: string }
       generate_submission_code: { Args: never; Returns: string }
+      generate_temp_account_code: { Args: never; Returns: string }
       generate_yutong_invoice_no: { Args: never; Returns: string }
       generate_yutong_order_no: { Args: never; Returns: string }
       generate_yutong_quotation_no:

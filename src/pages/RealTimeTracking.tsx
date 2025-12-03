@@ -64,6 +64,11 @@ interface TrackingData {
   daily_mileage_km?: number;
   engine_hours?: number;
   odometer_source?: string;
+  // Additional FIOS telemetry
+  gsm_signal_strength?: number;
+  ignition_status?: boolean;
+  gps_accuracy?: number;
+  alarm_active?: boolean;
 }
 
 interface GPSSettings {
@@ -509,6 +514,8 @@ export default function RealTimeTracking() {
   const lowFuelVehicles = trackingData.filter(v => (v.fuel_level || 0) < 20).length;
   const totalFleetMileage = trackingData.reduce((sum, v) => sum + (v.odometer_km || 0), 0);
   const totalDailyMileage = trackingData.reduce((sum, v) => sum + (v.daily_mileage_km || 0), 0);
+  const enginesRunning = trackingData.filter(v => v.ignition_status === true).length;
+  const lowBatteryCount = trackingData.filter(v => v.battery_voltage && v.battery_voltage < 12.0).length;
 
   return (
     <div className="space-y-8 animate-fade-in p-6">
@@ -683,7 +690,7 @@ export default function RealTimeTracking() {
       </div>
 
       {/* Enhanced KPI Cards with Animations */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <div className="animate-scale-in" style={{ animationDelay: '0.1s' }}>
           <div className="professional-card hover:shadow-primary transition-all duration-500 group">
             <KPICard
@@ -696,8 +703,20 @@ export default function RealTimeTracking() {
             />
           </div>
         </div>
-        <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+        <div className="animate-scale-in" style={{ animationDelay: '0.15s' }}>
           <div className="professional-card hover:shadow-success transition-all duration-500 group">
+            <KPICard
+              title="Engines Running"
+              value={`${enginesRunning}/${totalVehicles}`}
+              icon={<Activity className="h-4 w-4 group-hover:animate-pulse-subtle" />}
+              change="0"
+              changeType="neutral"
+              description="ignition ON"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.2s' }}>
+          <div className="professional-card hover:shadow-info transition-all duration-500 group">
             <KPICard
               title="Average Speed"
               value={`${averageSpeed} km/h`}
@@ -729,6 +748,18 @@ export default function RealTimeTracking() {
               change="0"
               changeType="neutral"
               description="require attention"
+            />
+          </div>
+        </div>
+        <div className="animate-scale-in" style={{ animationDelay: '0.35s' }}>
+          <div className="professional-card hover:shadow-destructive transition-all duration-500 group">
+            <KPICard
+              title="Low Battery"
+              value={lowBatteryCount.toString()}
+              icon={<Battery className="h-4 w-4 group-hover:animate-bounce-notification" />}
+              change="0"
+              changeType="neutral"
+              description="< 12.0V"
             />
           </div>
         </div>
@@ -803,40 +834,77 @@ export default function RealTimeTracking() {
         </Card>
       )}
 
-      {/* Odometer & Mileage Card */}
+      {/* Odometer & Mileage Card - ALL 16 BUSES */}
       <Card className="animate-scale-in">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
-            Odometer & Daily Mileage
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Odometer & Daily Mileage - All Buses
+            </div>
+            <div className="text-sm font-normal text-muted-foreground">
+              Total: {totalFleetMileage.toLocaleString()} km (+{totalDailyMileage.toFixed(1)} km today)
+            </div>
           </CardTitle>
           <CardDescription>
-            Real-time odometer readings and today's mileage
+            Real-time odometer readings and today's mileage for all {totalVehicles} buses
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {trackingData.filter(v => v.odometer_km && v.odometer_km > 0).slice(0, 6).map(vehicle => (
+          <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2">
+            {trackingData.map(vehicle => (
               <div key={vehicle.id} className="space-y-1 border-b pb-2 last:border-0">
                 <div className="flex justify-between items-center">
-                  <span className="font-mono text-sm font-semibold">{vehicle.bus_no}</span>
-                  <span className="text-sm font-medium text-primary">
-                    {vehicle.odometer_km!.toLocaleString()} km
-                  </span>
-                </div>
-                {vehicle.daily_mileage_km && vehicle.daily_mileage_km > 0 && (
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Today's mileage</span>
-                    <span className="text-green-600 font-medium">
-                      +{vehicle.daily_mileage_km.toFixed(1)} km
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm font-semibold">{vehicle.bus_no}</span>
+                    {vehicle.ignition_status && (
+                      <Badge variant="default" className="text-xs bg-green-500">
+                        Engine ON
+                      </Badge>
+                    )}
+                    {vehicle.battery_voltage && vehicle.battery_voltage < 12.0 && (
+                      <Badge variant="destructive" className="text-xs">
+                        Low Battery
+                      </Badge>
+                    )}
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    {vehicle.odometer_km && vehicle.odometer_km > 0 ? (
+                      <span className="text-sm font-medium text-primary">
+                        {vehicle.odometer_km.toLocaleString()} km
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No odometer</span>
+                    )}
+                    <Badge variant="outline" className="text-xs">
+                      {vehicle.odometer_source === 'fios' ? 'FIOS' : 
+                       vehicle.odometer_source === 'gps_calculated' ? 'GPS' : 'Manual'}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <span>Today: {vehicle.daily_mileage_km ? `+${vehicle.daily_mileage_km.toFixed(1)} km` : '0 km'}</span>
+                    {vehicle.battery_voltage && (
+                      <span className={vehicle.battery_voltage < 12.0 ? 'text-red-500 font-medium' : ''}>
+                        Battery: {vehicle.battery_voltage.toFixed(1)}V
+                      </span>
+                    )}
+                    {vehicle.gsm_signal_strength !== null && vehicle.gsm_signal_strength !== undefined && (
+                      <span>Signal: {vehicle.gsm_signal_strength}%</span>
+                    )}
+                  </div>
+                  {vehicle.status === 'active' ? (
+                    <span className="text-green-600 font-medium">Active</span>
+                  ) : (
+                    <span className="text-muted-foreground">Inactive</span>
+                  )}
+                </div>
               </div>
             ))}
-            {trackingData.filter(v => v.odometer_km && v.odometer_km > 0).length === 0 && (
+            {trackingData.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">
-                No odometer data available yet
+                No tracking data available yet
               </p>
             )}
           </div>

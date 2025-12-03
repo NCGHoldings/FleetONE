@@ -81,31 +81,31 @@ export default function AcceptInvite() {
     setSubmitting(true);
 
     try {
-      // Create user account - database trigger will handle profile and role setup
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email: invite.email,
-        password: password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            invite_token: token,
-            first_name: invite.first_name,
-            last_name: invite.last_name,
-          },
-        },
+      console.log("Calling accept-staff-invite edge function with token:", token);
+      
+      // Call edge function to create user via Admin API (bypasses signup restriction)
+      const { data, error: invokeError } = await supabase.functions.invoke('accept-staff-invite', {
+        body: { token, password }
       });
 
-      if (signUpError) throw signUpError;
+      console.log("Edge function response:", { data, error: invokeError });
 
-      if (!authData.user) {
-        throw new Error("Failed to create user account");
+      if (invokeError) {
+        console.error("Edge function invoke error:", invokeError);
+        throw new Error(invokeError.message || "Failed to create account");
       }
 
-      toast.success("Account created successfully! Please check your email to confirm your account.");
+      if (data?.error) {
+        console.error("Edge function returned error:", data.error);
+        throw new Error(data.error);
+      }
 
-      // Redirect to welcome page
+      console.log("Account created successfully:", data);
+      toast.success("Account created successfully! You can now sign in.");
+
+      // Redirect to auth page to sign in
       setTimeout(() => {
-        navigate("/");
+        navigate("/auth");
       }, 2000);
     } catch (err: any) {
       console.error("Error accepting invite:", err);
