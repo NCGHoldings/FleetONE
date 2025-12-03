@@ -6,9 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Generate secure random password
-function generatePassword(length = 12): string {
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+// Generate secure random password (alphanumeric only to avoid serialization issues)
+function generatePassword(length = 16): string {
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let password = '';
   const randomValues = new Uint8Array(length);
   crypto.getRandomValues(randomValues);
