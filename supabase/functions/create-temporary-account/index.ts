@@ -103,21 +103,21 @@ serve(async (req) => {
 
     console.log(`User created: ${newUser.user.id}`);
 
-    // Create profile
+    // Update or create profile (trigger may have already created it)
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({
+      .upsert({
         user_id: newUser.user.id,
         first_name: 'Temporary',
         last_name: 'User',
         hire_date: new Date().toISOString().split('T')[0],
         status: 'active',
-      })
+      }, { onConflict: 'user_id' })
       .select()
       .single();
 
     if (profileError) {
-      console.error('Error creating profile:', profileError);
+      console.error('Error creating/updating profile:', profileError);
       // Cleanup: delete the user if profile creation fails
       await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
       return new Response(JSON.stringify({ error: 'Failed to create profile' }), {
