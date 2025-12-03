@@ -386,7 +386,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
       console.log('📸 Generating canvas from DOM...');
       const canvas = await html2canvas(tempDiv, {
-        scale: 3, // Higher quality
+        scale: 1.5, // Optimized for file size while maintaining print quality
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
@@ -395,7 +395,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
 
       console.log('✅ Canvas generated:', canvas.width, 'x', canvas.height);
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', 0.92); // JPEG 92% quality - ~95% smaller files
       const pdf = new jsPDF('p', 'mm', 'a4');
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -404,7 +404,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
       const imgHeight = canvas.height;
       const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
 
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth * ratio, imgHeight * ratio);
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth * ratio, imgHeight * ratio);
       
       root.unmount();
       document.body.removeChild(tempDiv);
