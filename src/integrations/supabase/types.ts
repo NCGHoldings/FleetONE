@@ -735,6 +735,77 @@ export type Database = {
           },
         ]
       }
+      bus_api_connections: {
+        Row: {
+          api_auth_type: string | null
+          api_endpoint: string
+          api_key: string | null
+          api_name: string
+          bus_id: string | null
+          bus_no: string
+          created_at: string | null
+          device_identifier: string | null
+          discovered_schema: Json | null
+          field_mappings: Json | null
+          id: string
+          is_active: boolean | null
+          last_error_message: string | null
+          last_sync_at: string | null
+          last_sync_status: string | null
+          learned_patterns: Json | null
+          sync_interval_seconds: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          api_auth_type?: string | null
+          api_endpoint: string
+          api_key?: string | null
+          api_name?: string
+          bus_id?: string | null
+          bus_no: string
+          created_at?: string | null
+          device_identifier?: string | null
+          discovered_schema?: Json | null
+          field_mappings?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_error_message?: string | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          learned_patterns?: Json | null
+          sync_interval_seconds?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          api_auth_type?: string | null
+          api_endpoint?: string
+          api_key?: string | null
+          api_name?: string
+          bus_id?: string | null
+          bus_no?: string
+          created_at?: string | null
+          device_identifier?: string | null
+          discovered_schema?: Json | null
+          field_mappings?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_error_message?: string | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          learned_patterns?: Json | null
+          sync_interval_seconds?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bus_api_connections_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: true
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bus_daily_mileage: {
         Row: {
           adjustment_reason: string | null

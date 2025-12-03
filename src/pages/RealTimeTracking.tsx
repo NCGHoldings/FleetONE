@@ -12,7 +12,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { 
   MapPin, Truck, Gauge, Fuel, Settings, 
   AlertTriangle, CheckCircle, RadioIcon as Radio,
-  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2, Plus, Satellite, Activity, BarChart3
+  Thermometer, Droplets, Battery, Navigation, RefreshCw, Loader2, Plus, Satellite, Activity, BarChart3, Link2
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ import { ServiceAlertPanel } from "@/components/fleet/ServiceAlertPanel";
 import { ManualOdometerEntryModal } from "@/components/fleet/ManualOdometerEntryModal";
 import { OdometerAdjustmentModal } from "@/components/fleet/OdometerAdjustmentModal";
 import { OdometerOverviewModal } from "@/components/fleet/OdometerOverviewModal";
+import { BusApiConnectionModal } from "@/components/fleet/BusApiConnectionModal";
 import { useQuery } from "@tanstack/react-query";
 
 interface TrackingData {
@@ -110,6 +111,8 @@ export default function RealTimeTracking() {
   const [isOdometerEntryOpen, setIsOdometerEntryOpen] = useState(false);
   const [isOdometerAdjustmentOpen, setIsOdometerAdjustmentOpen] = useState(false);
   const [isOdometerOverviewOpen, setIsOdometerOverviewOpen] = useState(false);
+  const [selectedBusForApi, setSelectedBusForApi] = useState<{id: string, no: string} | null>(null);
+  const [isApiConnectionOpen, setIsApiConnectionOpen] = useState(false);
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
 
   const isSupervisor = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
@@ -489,18 +492,41 @@ export default function RealTimeTracking() {
     {
       header: "Actions",
       cell: ({ row }) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => {
-            // View detailed vehicle info
-            toast.info(`Viewing details for ${row.original.bus_no}`);
-          }}>
+        <div className="flex gap-1">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => setSelectedVehicle(row.original.bus_no)}
+            title="View Details"
+          >
             <Settings className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => {
-            // Show on map
-            toast.info(`Locating ${row.original.bus_no} on map`);
-          }}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => {
+              // Switch to map view and center on this bus
+              setIsMapView(true);
+              setSelectedVehicle(row.original.bus_no);
+              toast.success(`Showing ${row.original.bus_no} on map`);
+            }}
+            title="Show on Map"
+          >
             <MapPin className="h-4 w-4" />
+          </Button>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={() => {
+              setSelectedBusForApi({
+                id: row.original.bus_id,
+                no: row.original.bus_no
+              });
+              setIsApiConnectionOpen(true);
+            }}
+            title="Configure API"
+          >
+            <Link2 className="h-4 w-4" />
           </Button>
         </div>
       ),
@@ -1077,6 +1103,20 @@ export default function RealTimeTracking() {
           setIsOdometerOverviewOpen(false);
         }}
       />
+
+      {/* Bus API Connection Modal */}
+      {selectedBusForApi && (
+        <BusApiConnectionModal
+          isOpen={isApiConnectionOpen}
+          onClose={() => {
+            setIsApiConnectionOpen(false);
+            setSelectedBusForApi(null);
+          }}
+          busId={selectedBusForApi.id}
+          busNo={selectedBusForApi.no}
+          onSaved={fetchTrackingData}
+        />
+      )}
     </div>
   );
 }
