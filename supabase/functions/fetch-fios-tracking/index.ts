@@ -460,40 +460,7 @@ Deno.serve(async (req) => {
         odometerSource = 'manual';
       }
       
-      // Extract battery voltage from FIOS messages (pwr_ext field)
-      let batteryVoltage: number | null = null;
-      try {
-        const now = Math.floor(Date.now() / 1000);
-        const oneHourAgo = now - (60 * 60);
-        
-        const batteryParams = {
-          itemId: vehicle.id,
-          timeFrom: oneHourAgo,
-          timeTo: now,
-          flags: 0,
-          flagsMask: 0,
-          loadCount: 10
-        };
-        
-        const batteryUrl = `https://fios-api.kloudip.com/api?svc=messages/load_interval&params=${encodeURIComponent(JSON.stringify(batteryParams))}&sid=${sessionId}`;
-        const batteryResponse = await fetch(batteryUrl);
-        const batteryData = await batteryResponse.json();
-        
-        if (batteryData.messages && batteryData.messages.length > 0) {
-          for (const msg of batteryData.messages) {
-            if (msg.p && msg.p.pwr_ext) {
-              batteryVoltage = parseFloat(msg.p.pwr_ext);
-              if (!isNaN(batteryVoltage) && batteryVoltage > 0) {
-                break;
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`[FIOS] Error fetching battery voltage for ${bus.bus_no}:`, error);
-      }
-      
-      // Store GPS location history for track playback with additional telemetry
+      // Store GPS location history for track playback
       if (bus.id) {
         const { error: gpsError } = await supabase.from('gps_location_history').insert({
           bus_id: bus.id,
@@ -543,13 +510,6 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Extract additional FIOS data
-      const batteryVoltage = mileageData.odometer ? null : null; // Will be extracted from messages API
-      const gsmSignal = vehicle.pos.gsm || null; // GSM signal strength if available
-      const ignitionStatus = vehicle.pos.s > 0 ? true : false; // Ignition ON if speed > 0
-      const gpsAccuracy = vehicle.pos.hdop || null; // HDOP for GPS accuracy
-      const alarmActive = false; // Will be checked from alarm flags
-      
       trackingData.push({
         bus_id: bus.id,
         bus_no: bus.bus_no,
@@ -567,7 +527,7 @@ Deno.serve(async (req) => {
         tire_pressure: null,
         engine_health: engineHealth,
         engine_temperature: null,
-        battery_voltage: batteryVoltage,
+        battery_voltage: null,
         odometer_reading: null,
         driver_name: null,
         alerts: [],
@@ -580,12 +540,7 @@ Deno.serve(async (req) => {
         odometer_km: finalOdometer,
         daily_mileage_km: dailyMileage,
         odometer_source: odometerSource,
-        engine_hours: null,
-        // Additional FIOS data
-        gsm_signal_strength: gsmSignal,
-        ignition_status: ignitionStatus,
-        gps_accuracy: gpsAccuracy,
-        alarm_active: alarmActive
+        engine_hours: null
       });
     }
 

@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { PageAccessModal } from "@/components/staff/PageAccessModal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { TemporaryAccountsSection } from "@/components/staff/TemporaryAccountsSection";
 
 interface Profile {
   id: string;
@@ -575,11 +574,6 @@ export default function StaffManagement() {
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Temporary Access Accounts */}
-      {isSuperAdmin && (
-        <TemporaryAccountsSection />
       )}
 
       {/* Pending Invites */}
