@@ -81,19 +81,26 @@ export default function AcceptInvite() {
     setSubmitting(true);
 
     try {
+      console.log("Calling accept-staff-invite edge function with token:", token);
+      
       // Call edge function to create user via Admin API (bypasses signup restriction)
       const { data, error: invokeError } = await supabase.functions.invoke('accept-staff-invite', {
         body: { token, password }
       });
 
+      console.log("Edge function response:", { data, error: invokeError });
+
       if (invokeError) {
+        console.error("Edge function invoke error:", invokeError);
         throw new Error(invokeError.message || "Failed to create account");
       }
 
       if (data?.error) {
+        console.error("Edge function returned error:", data.error);
         throw new Error(data.error);
       }
 
+      console.log("Account created successfully:", data);
       toast.success("Account created successfully! You can now sign in.");
 
       // Redirect to auth page to sign in
