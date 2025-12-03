@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.send-staff-invite]
 verify_jwt = true
+
+[functions.create-temporary-account]
+verify_jwt = true
