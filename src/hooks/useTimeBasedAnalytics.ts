@@ -51,14 +51,10 @@ export function useTimeBasedAnalytics(
   return useQuery({
     queryKey: ["time-based-analytics", startDate, endDate, branchId],
     queryFn: async () => {
-      const query = supabase
+      // Query daily_trips directly - use trip's own expense columns
+      const { data: trips, error } = await supabase
         .from("daily_trips")
-        .select(`
-          *,
-          daily_bus_expenses(*)
-        `);
-
-      const { data: trips, error } = await query;
+        .select('*');
 
       if (error) throw error;
 
@@ -118,17 +114,11 @@ function processTimeBasedData(trips: any[]): TimeBasedAnalytics {
     const tripDate = parseISO(trip.trip_date);
     const hour = trip.start_time ? parseInt(trip.start_time.split(':')[0]) : 12;
     const dayOfWeek = getDay(tripDate);
-    const efficiency = Number(trip.fuel_efficiency) || 0;
+    const efficiency = Number(trip.km_per_liter) || 0;
 
-    // Calculate expenses
-    let expenses = 0;
-    if (trip.daily_bus_expenses && Array.isArray(trip.daily_bus_expenses)) {
-      expenses = trip.daily_bus_expenses.reduce((sum: number, exp: any) => {
-        return sum + (Number(exp.amount) || 0);
-      }, 0);
-    }
-
-    const netProfit = income - expenses;
+    // Use trip's own expense columns instead of joining
+    const expenses = Number(trip.total_expenses) || Number(trip.fuel_cost) || 0;
+    const netProfit = Number(trip.net_income) || (income - expenses);
 
     // Update hourly data
     const hourData = hourlyData[hour];

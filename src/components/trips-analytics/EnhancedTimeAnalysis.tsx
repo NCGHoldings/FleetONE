@@ -41,12 +41,12 @@ export default function EnhancedTimeAnalysis({
             </div>
             <h3 className="text-xl font-semibold">No Time-Based Data Available</h3>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Time analysis requires departure_time data in daily trips. 
+              Time analysis requires start_time data in daily trips. 
               Ensure trips have start times recorded for time-based analytics.
             </p>
             <Badge variant="outline" className="mt-2">
               <AlertTriangle className="w-3 h-3 mr-1" />
-              Missing departure_time in trips
+              Missing start_time in trips
             </Badge>
           </div>
         </CardContent>
