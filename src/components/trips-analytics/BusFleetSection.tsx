@@ -162,7 +162,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
                     paddingAngle={2}
                     dataKey="value"
                     nameKey="name"
-                    label={({ name, value }) => `${name}: ${value.toFixed(1)}%`}
+                    label={({ name, value }) => `${name}: ${Number(value).toFixed(1)}%`}
                   >
                     {utilizationData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
