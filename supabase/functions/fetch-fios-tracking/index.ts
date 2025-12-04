@@ -543,8 +543,7 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Extract additional FIOS data
-      const batteryVoltage = mileageData.odometer ? null : null; // Will be extracted from messages API
+      // Extract additional FIOS data (batteryVoltage already extracted from messages API above)
       const gsmSignal = vehicle.pos.gsm || null; // GSM signal strength if available
       const ignitionStatus = vehicle.pos.s > 0 ? true : false; // Ignition ON if speed > 0
       const gpsAccuracy = vehicle.pos.hdop || null; // HDOP for GPS accuracy
