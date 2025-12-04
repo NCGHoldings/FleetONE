@@ -15,13 +15,16 @@ import DriverComparisonChart from '@/components/trips-analytics/charts/DriverCom
 import RoutePerformanceChart from '@/components/trips-analytics/charts/RoutePerformanceChart';
 import ExpenseDistributionChart from '@/components/trips-analytics/charts/ExpenseDistributionChart';
 import DataQualityAlert from '@/components/trips-analytics/DataQualityAlert';
-import TimeBasedAnalysis from '@/components/trips-analytics/TimeBasedAnalysis';
+import EnhancedTimeAnalysis from '@/components/trips-analytics/EnhancedTimeAnalysis';
 import AIInsightsPanel from '@/components/trips-analytics/AIInsightsPanel';
 import ComparisonDashboard from '@/components/trips-analytics/ComparisonDashboard';
 import WaterfallChart from '@/components/trips-analytics/charts/WaterfallChart';
 import RadarComparisonChart from '@/components/trips-analytics/charts/RadarComparisonChart';
 import SankeyFlowChart from '@/components/trips-analytics/charts/SankeyFlowChart';
 import CircularRevenueChart from '@/components/trips-analytics/charts/CircularRevenueChart';
+import DriverPerformanceSection from '@/components/trips-analytics/DriverPerformanceSection';
+import BusFleetSection from '@/components/trips-analytics/BusFleetSection';
+import ExpenseAnalyticsSection from '@/components/trips-analytics/ExpenseAnalyticsSection';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -266,7 +269,7 @@ const handleFilterChange = useCallback((filters: any) => {
 
         {/* Time-Based Analysis Tab */}
         <TabsContent value="time" className="space-y-6">
-          <TimeBasedAnalysis
+          <EnhancedTimeAnalysis
             startDate={dateRange.startDate}
             endDate={dateRange.endDate}
             branchId={undefined}
@@ -470,182 +473,56 @@ const handleFilterChange = useCallback((filters: any) => {
 
         {/* Drivers Tab */}
         <TabsContent value="drivers" className="space-y-6">
-          <DriverComparisonChart data={analytics.driverStats} />
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Driver Leaderboard</h3>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Rank</TableHead>
-                    <TableHead>Driver</TableHead>
-                    <TableHead className="text-right">Trips</TableHead>
-                    <TableHead className="text-right">Distance (km)</TableHead>
-                    <TableHead className="text-right">Income</TableHead>
-                    <TableHead className="text-right">Expenses</TableHead>
-                    <TableHead className="text-right">Net Income</TableHead>
-                    <TableHead className="text-right">Avg km/L</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analytics.driverStats.map((driver) => (
-                    <TableRow key={driver.driverId}>
-                      <TableCell>
-                        <span className={`font-bold ${driver.rank <= 3 ? 'text-primary' : ''}`}>
-                          {driver.rank <= 3 ? ['🥇', '🥈', '🥉'][driver.rank - 1] : `#${driver.rank}`}
-                        </span>
-                      </TableCell>
-                      <TableCell className="font-medium">{driver.driverName}</TableCell>
-                      <TableCell className="text-right">{driver.totalTrips}</TableCell>
-                      <TableCell className="text-right">{driver.totalDistance.toFixed(1)}</TableCell>
-                      <TableCell className="text-right">₨{driver.totalIncome.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">₨{driver.totalExpenses.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-semibold">₨{driver.netIncome.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">
-                        <span className={driver.avgEfficiency >= 12 ? 'text-green-600' : driver.avgEfficiency >= 10 ? 'text-yellow-600' : 'text-red-600'}>
-                          {driver.avgEfficiency.toFixed(2)}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
+          <DriverPerformanceSection driverStats={analytics.driverStats} />
         </TabsContent>
 
         {/* Buses Tab */}
         <TabsContent value="buses" className="space-y-6">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Fleet Performance</h3>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Bus No</TableHead>
-                    <TableHead className="text-right">Trips</TableHead>
-                    <TableHead className="text-right">Distance (km)</TableHead>
-                    <TableHead className="text-right">Current Odo</TableHead>
-                    <TableHead className="text-right">Income</TableHead>
-                    <TableHead className="text-right">Avg km/L</TableHead>
-                    <TableHead className="text-right">Utilization</TableHead>
-                    <TableHead className="text-right">Last Trip</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analytics.busStats.map((bus) => (
-                    <TableRow key={bus.busNo}>
-                      <TableCell className="font-medium">{bus.busNo}</TableCell>
-                      <TableCell className="text-right">{bus.totalTrips}</TableCell>
-                      <TableCell className="text-right">{bus.totalDistance.toFixed(1)}</TableCell>
-                      <TableCell className="text-right">{bus.currentOdo.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">₨{bus.totalIncome.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{bus.avgEfficiency.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{bus.utilizationRate.toFixed(1)}%</TableCell>
-                      <TableCell className="text-right">{bus.lastTripDate}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
+          <BusFleetSection busStats={analytics.busStats} />
         </TabsContent>
 
         {/* Expenses Tab */}
         <TabsContent value="expenses" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ExpenseDistributionChart data={analytics.expenseBreakdown} />
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Expense Summary</h3>
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-muted-foreground">Total Fuel Cost</span>
-                    <span className="font-bold">₨{analytics.overview.totalFuelCost.toLocaleString()}</span>
-                  </div>
-                  <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-primary h-full" 
-                      style={{ width: `${analytics.expenseBreakdown.fuelPercentage}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {analytics.expenseBreakdown.fuelPercentage.toFixed(1)}% of total expenses
-                  </p>
-                </div>
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-muted-foreground">Other Expenses</span>
-                    <span className="font-bold">₨{analytics.overview.totalOtherExpenses.toLocaleString()}</span>
-                  </div>
-                  <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-chart-2 h-full" 
-                      style={{ width: `${analytics.expenseBreakdown.otherPercentage}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {analytics.expenseBreakdown.otherPercentage.toFixed(1)}% of total expenses
-                  </p>
-                </div>
-                <div className="pt-4 border-t">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground font-medium">Total Expenses</span>
-                    <span className="text-xl font-bold">₨{analytics.overview.totalExpenses.toLocaleString()}</span>
-                  </div>
-                </div>
-                <div className="pt-4 border-t">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Cost per Trip</span>
-                    <span className="font-semibold">
-                      ₨{analytics.overview.totalTrips > 0 ? (analytics.overview.totalExpenses / analytics.overview.totalTrips).toFixed(0) : '0'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between mt-2">
-                    <span className="text-muted-foreground">Cost per Kilometer</span>
-                    <span className="font-semibold">
-                      ₨{analytics.overview.totalDistance > 0 ? (analytics.overview.totalExpenses / analytics.overview.totalDistance).toFixed(2) : '0.00'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
+          <ExpenseAnalyticsSection 
+            expenseBreakdown={analytics.expenseBreakdown}
+            overview={analytics.overview}
+            dailyTrends={analytics.dailyTrends}
+          />
         </TabsContent>
 
         {/* Trends Tab */}
         <TabsContent value="trends" className="space-y-6">
           <RevenueTrendChart data={analytics.dailyTrends} />
           <EfficiencyChart data={analytics.dailyTrends} />
-          <Card className="p-6">
+          <Card className="p-6 shadow-lg">
             <h3 className="text-lg font-semibold mb-4">Daily Performance Data</h3>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/50">
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Trips</TableHead>
-                    <TableHead className="text-right">Distance (km)</TableHead>
+                    <TableHead className="text-right">Distance</TableHead>
                     <TableHead className="text-right">Income</TableHead>
                     <TableHead className="text-right">Expenses</TableHead>
                     <TableHead className="text-right">Net Income</TableHead>
-                    <TableHead className="text-right">Avg km/L</TableHead>
+                    <TableHead className="text-right">Efficiency</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {analytics.dailyTrends.map((day) => (
-                    <TableRow key={day.date}>
-                      <TableCell>{day.date}</TableCell>
+                    <TableRow key={day.date} className="hover:bg-muted/30">
+                      <TableCell className="font-medium">{day.date}</TableCell>
                       <TableCell className="text-right">{day.trips}</TableCell>
-                      <TableCell className="text-right">{day.distance.toFixed(1)}</TableCell>
+                      <TableCell className="text-right">{day.distance.toFixed(1)} km</TableCell>
                       <TableCell className="text-right">₨{day.income.toLocaleString()}</TableCell>
                       <TableCell className="text-right">₨{day.expenses.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        <span className={day.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      <TableCell className="text-right">
+                        <span className={`font-bold ${day.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                           ₨{day.netIncome.toLocaleString()}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">{day.avgEfficiency.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{day.avgEfficiency.toFixed(2)} km/L</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

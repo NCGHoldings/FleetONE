@@ -101,7 +101,7 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         .from('daily_trips')
         .select(`
           *,
-          buses(registration_number),
+          buses(bus_no, registration_number, model, type, capacity),
           routes(route_no, route_name),
           profiles!driver_id(first_name, last_name)
         `)
@@ -361,15 +361,14 @@ function processAnalyticsData(
     });
     
     const busInfo = busTrips[0]?.buses;
-    const busRegistration = busInfo?.registration_number || 'Unknown Bus';
-    
-    // Log warning if bus registration is missing
-    if (!busInfo?.registration_number && busId) {
-      console.warn(`Missing bus registration for bus_id: ${busId}`);
-    }
+    // Use bus_no as primary identifier (e.g., "NE 2520"), fallback to registration_number
+    const busNumber = busInfo?.bus_no || busInfo?.registration_number || 'Unknown Bus';
     
     return {
-      busNo: busRegistration,
+      busNo: busNumber,
+      busModel: busInfo?.model || '',
+      busType: busInfo?.type || '',
+      busCapacity: busInfo?.capacity || 0,
       totalTrips: busTrips.length,
       totalDistance: sumBy(busTrips, 'distance_km') || 0,
       currentOdo: busTrips[0]?.odo_end || 0,
