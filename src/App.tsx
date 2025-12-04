@@ -13,6 +13,7 @@ import { SeasonalThemeProvider } from "./components/seasonal/SeasonalThemeProvid
 // Pages
 import Auth from "./pages/Auth";
 import AcceptInvite from "./pages/AcceptInvite";
+import InstallApp from "./pages/InstallApp";
 import Welcome from "./pages/Welcome";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -86,6 +87,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />
+            <Route path="/install" element={<InstallApp />} />
             <Route path="/public/complaint" element={<PublicComplaint />} />
             <Route path="/public/special-hire" element={<PublicSpecialHire />} />
             <Route path="/public/receipt-upload" element={<PublicReceiptUpload />} />
