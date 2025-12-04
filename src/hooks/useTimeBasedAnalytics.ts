@@ -116,7 +116,7 @@ function processTimeBasedData(trips: any[]): TimeBasedAnalytics {
   trips.forEach((trip) => {
     const income = Number(trip.income) || 0;
     const tripDate = parseISO(trip.trip_date);
-    const hour = trip.departure_time ? parseInt(trip.departure_time.split(':')[0]) : 12;
+    const hour = trip.start_time ? parseInt(trip.start_time.split(':')[0]) : 12;
     const dayOfWeek = getDay(tripDate);
     const efficiency = Number(trip.fuel_efficiency) || 0;
 
