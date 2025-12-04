@@ -33,7 +33,8 @@ export interface TripData {
   status?: string;
   odo_start?: number;
   odo_end?: number;
-  buses?: { registration_number: string };
+  notes?: any; // JSON field containing driver/conductor names
+  buses?: { registration_number: string; bus_no?: string };
   routes?: { route_no: string; route_name: string };
   profiles?: { first_name: string; last_name: string };
 }
@@ -268,10 +269,30 @@ function processAnalyticsData(
   const profitChange = prevNetProfit > 0 ? ((netProfit - prevNetProfit) / prevNetProfit) * 100 : 0;
   const tripsChange = prevTotalTrips > 0 ? ((totalTrips - prevTotalTrips) / prevTotalTrips) * 100 : 0;
 
-  // Driver statistics with expense mapping
-  const driverGroups = groupBy(trips, 'driver_id');
-  const driverStats: DriverStats[] = Object.keys(driverGroups).map(driver => {
-    const driverTrips = driverGroups[driver];
+  // Helper to parse notes JSON for driver/conductor names
+  const parseNotes = (notes: any): { driver?: string; conductor?: string } => {
+    if (!notes) return {};
+    if (typeof notes === 'string') {
+      try { return JSON.parse(notes); } catch { return {}; }
+    }
+    return notes;
+  };
+
+  // Driver statistics - group by driver name from notes JSON
+  const tripsByDriver = new Map<string, any[]>();
+  trips.forEach(trip => {
+    const parsedNotes = parseNotes(trip.notes);
+    const driverName = parsedNotes.driver || 
+      (trip.profiles ? `${trip.profiles.first_name} ${trip.profiles.last_name}`.trim() : null) ||
+      'Unknown Driver';
+    
+    if (!tripsByDriver.has(driverName)) {
+      tripsByDriver.set(driverName, []);
+    }
+    tripsByDriver.get(driverName)!.push(trip);
+  });
+
+  const driverStats: DriverStats[] = Array.from(tripsByDriver.entries()).map(([driverName, driverTrips]) => {
     const driverIncome = sumBy(driverTrips, 'income');
     
     // Calculate driver expenses from expense map
@@ -284,13 +305,8 @@ function processAnalyticsData(
       }
     });
     
-    const driverProfile = driverTrips[0]?.profiles;
-    const driverName = driverProfile 
-      ? `${driverProfile.first_name} ${driverProfile.last_name}`.trim() 
-      : 'Unknown Driver';
-    
     return {
-      driverId: driver,
+      driverId: driverName, // Use driver name as ID since driver_id is often null
       driverName: driverName,
       totalTrips: driverTrips.length,
       totalDistance: sumBy(driverTrips, 'distance_km'),
