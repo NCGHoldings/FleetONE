@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -372,11 +373,8 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
     `;
     document.body.appendChild(tempDiv);
 
-    const React = await import('react');
-    const ReactDOM = await import('react-dom/client');
-
     try {
-      const root = ReactDOM.createRoot(tempDiv);
+      const root = createRoot(tempDiv);
       const quotationElement = React.createElement(QuotationPreview, { quotation });
       
       await new Promise<void>((resolve) => {
