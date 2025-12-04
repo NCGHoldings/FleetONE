@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Eraser, Save, Pen, Type, Image } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AdvanceDetailsSignatureModalProps {
   open: boolean;
@@ -42,8 +43,8 @@ export default function AdvanceDetailsSignatureModal({
     // Note: This would need the useSignatureManagement hook imported
     // For now, using a placeholder. In production, import and use the hook.
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       if (!user) return;
 
       const { data } = await supabase
