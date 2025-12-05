@@ -7183,7 +7183,6 @@ export type Database = {
           last_login_at: string | null
           login_count: number | null
           notes: string | null
-          plain_password_display: string | null
           profile_id: string | null
           status: string
           updated_at: string
@@ -7200,7 +7199,6 @@ export type Database = {
           last_login_at?: string | null
           login_count?: number | null
           notes?: string | null
-          plain_password_display?: string | null
           profile_id?: string | null
           status?: string
           updated_at?: string
@@ -7217,7 +7215,6 @@ export type Database = {
           last_login_at?: string | null
           login_count?: number | null
           notes?: string | null
-          plain_password_display?: string | null
           profile_id?: string | null
           status?: string
           updated_at?: string
