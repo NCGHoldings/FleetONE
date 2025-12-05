@@ -47,14 +47,34 @@ export function BusCategoryBadge({
 
   const IconComponent = iconMap[icon] || Bus;
   
-  // Determine colors based on category code
-  const colorClasses: Record<string, string> = {
+  // Sub-category specific colors within parent color families
+  const subCategoryColorClasses: Record<string, Record<string, string>> = {
+    'public_bus': {
+      'super_luxury': 'bg-indigo-500/15 text-indigo-700 border-indigo-500/30 dark:text-indigo-400',
+      'semi_luxury': 'bg-blue-500/15 text-blue-700 border-blue-500/30 dark:text-blue-400',
+      'leyland': 'bg-cyan-500/15 text-cyan-700 border-cyan-500/30 dark:text-cyan-400',
+    },
+    'school_bus': {
+      'default': 'bg-purple-500/15 text-purple-700 border-purple-500/30 dark:text-purple-400',
+    },
+    'special_hire': {
+      'default': 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-400',
+    },
+  };
+
+  // Main category colors (fallback when no sub-category)
+  const categoryColorClasses: Record<string, string> = {
     'public_bus': 'bg-blue-500/15 text-blue-700 border-blue-500/30 dark:text-blue-400',
     'school_bus': 'bg-purple-500/15 text-purple-700 border-purple-500/30 dark:text-purple-400',
     'special_hire': 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-400',
   };
 
-  const badgeColor = colorClasses[category.code] || 'bg-gray-500/15 text-gray-700 border-gray-500/30';
+  // Determine badge color: use sub-category color if available, otherwise category color
+  let badgeColor = categoryColorClasses[category.code] || 'bg-gray-500/15 text-gray-700 border-gray-500/30';
+  
+  if (subCategory && subCategoryColorClasses[category.code]?.[subCategory.code]) {
+    badgeColor = subCategoryColorClasses[category.code][subCategory.code];
+  }
 
   return (
     <Badge 
