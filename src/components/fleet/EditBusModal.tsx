@@ -4,10 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Info } from "lucide-react";
+import { useBusCategories } from "@/hooks/useBusCategories";
 
 interface EditBusModalProps {
   open: boolean;
@@ -18,6 +20,7 @@ interface EditBusModalProps {
 
 export function EditBusModal({ open, onOpenChange, bus, onSuccess }: EditBusModalProps) {
   const [loading, setLoading] = useState(false);
+  const { categories, subCategories, getSubCategoriesForCategory } = useBusCategories();
   const [formData, setFormData] = useState({
     bus_no: "",
     type: "",
@@ -34,6 +37,8 @@ export function EditBusModal({ open, onOpenChange, bus, onSuccess }: EditBusModa
     chassis_number: "",
     service_interval_km: "10000",
     expected_km_per_liter: "8",
+    category_id: "",
+    sub_category_id: "",
   });
   const { toast } = useToast();
 
@@ -55,9 +60,27 @@ export function EditBusModal({ open, onOpenChange, bus, onSuccess }: EditBusModa
         chassis_number: bus.chassis_number || "",
         service_interval_km: bus.service_interval_km?.toString() || "10000",
         expected_km_per_liter: bus.expected_km_per_liter?.toString() || "8",
+        category_id: bus.category_id || "",
+        sub_category_id: bus.sub_category_id || "",
       });
     }
   }, [bus]);
+
+  const availableSubCategories = formData.category_id 
+    ? getSubCategoriesForCategory(formData.category_id) 
+    : [];
+
+  const getAssignmentSourceLabel = () => {
+    if (!bus?.category_assignment_source) return null;
+    const sources: Record<string, string> = {
+      'auto_school_routes': 'Auto-assigned from School Routes',
+      'auto_route_pattern': 'Auto-assigned from Route Pattern',
+      'auto_daily_trips': 'Auto-assigned from Daily Trips',
+      'default': 'Default Assignment',
+      'manual': 'Manually Assigned'
+    };
+    return sources[bus.category_assignment_source] || bus.category_assignment_source;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +105,9 @@ export function EditBusModal({ open, onOpenChange, bus, onSuccess }: EditBusModa
           chassis_number: formData.chassis_number || null,
           service_interval_km: parseInt(formData.service_interval_km),
           expected_km_per_liter: parseFloat(formData.expected_km_per_liter),
+          category_id: formData.category_id || null,
+          sub_category_id: formData.sub_category_id || null,
+          category_assignment_source: 'manual',
           updated_at: new Date().toISOString(),
         })
         .eq('id', bus.id);
@@ -128,6 +154,48 @@ export function EditBusModal({ open, onOpenChange, bus, onSuccess }: EditBusModa
                   onChange={(e) => setFormData({ ...formData, bus_no: e.target.value })}
                   required
                 />
+              </div>
+
+              {/* Category Selection */}
+              <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Bus Category</Label>
+                  {getAssignmentSourceLabel() && (
+                    <Badge variant="outline" className="text-xs">
+                      <Info className="w-3 h-3 mr-1" />
+                      {getAssignmentSourceLabel()}
+                    </Badge>
+                  )}
+                </div>
+                <Select
+                  value={formData.category_id}
+                  onValueChange={(value) => setFormData({ ...formData, category_id: value, sub_category_id: '' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                {availableSubCategories.length > 0 && (
+                  <Select
+                    value={formData.sub_category_id}
+                    onValueChange={(value) => setFormData({ ...formData, sub_category_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select sub-category (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSubCategories.map(sub => (
+                        <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div>

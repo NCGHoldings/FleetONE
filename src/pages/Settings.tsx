@@ -10,13 +10,14 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
 import { MultiDayRouteConfig } from "@/components/trips/MultiDayRouteConfig";
 import { ServiceAlertSettings } from "@/components/settings/ServiceAlertSettings";
 import { SpecialHireSignatureSettings } from "@/components/settings/SpecialHireSignatureSettings";
+import { BusCategoriesSettings } from "@/components/settings/BusCategoriesSettings";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -101,7 +102,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="account" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-9">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-10">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="display">Display</TabsTrigger>
@@ -111,6 +112,7 @@ export default function Settings() {
           <TabsTrigger value="multi-day-routes">Multi-Day Routes</TabsTrigger>
           <TabsTrigger value="service-alerts">Service Alerts</TabsTrigger>
           <TabsTrigger value="signatures">Signatures</TabsTrigger>
+          <TabsTrigger value="bus-categories">Bus Categories</TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="space-y-6 mt-6">
@@ -462,6 +464,23 @@ export default function Settings() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="bus-categories" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Tag className="w-5 h-5" />
+                Bus Categories Configuration
+              </CardTitle>
+              <CardDescription>
+                Manage bus categories, sub-categories, and auto-assignment rules. Buses are automatically categorized based on routes and usage patterns.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <BusCategoriesSettings />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

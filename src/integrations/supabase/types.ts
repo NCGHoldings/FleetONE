@@ -806,6 +806,96 @@ export type Database = {
           },
         ]
       }
+      bus_categories: {
+        Row: {
+          code: string
+          color: string
+          created_at: string
+          description: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          color?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          color?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bus_category_route_rules: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          matched_buses_count: number | null
+          priority: number | null
+          route_pattern: string
+          sub_category_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          matched_buses_count?: number | null
+          priority?: number | null
+          route_pattern: string
+          sub_category_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          matched_buses_count?: number | null
+          priority?: number | null
+          route_pattern?: string
+          sub_category_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bus_category_route_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "bus_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bus_category_route_rules_sub_category_id_fkey"
+            columns: ["sub_category_id"]
+            isOneToOne: false
+            referencedRelation: "bus_sub_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bus_daily_mileage: {
         Row: {
           adjustment_reason: string | null
@@ -1062,6 +1152,53 @@ export type Database = {
           },
         ]
       }
+      bus_sub_categories: {
+        Row: {
+          category_id: string
+          code: string
+          color: string | null
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          code: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          code?: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bus_sub_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "bus_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bus_types: {
         Row: {
           avg_km_per_l: number | null
@@ -1184,6 +1321,8 @@ export type Database = {
           base_odometer_km: number | null
           bus_no: string
           capacity: number
+          category_assignment_source: string | null
+          category_id: string | null
           chassis_number: string | null
           created_at: string
           current_mileage: number | null
@@ -1207,6 +1346,7 @@ export type Database = {
           route: string | null
           service_interval_km: number | null
           status: Database["public"]["Enums"]["fleet_status"] | null
+          sub_category_id: string | null
           total_tyres: number | null
           type: string
           tyre_size_standard: string | null
@@ -1218,6 +1358,8 @@ export type Database = {
           base_odometer_km?: number | null
           bus_no: string
           capacity: number
+          category_assignment_source?: string | null
+          category_id?: string | null
           chassis_number?: string | null
           created_at?: string
           current_mileage?: number | null
@@ -1241,6 +1383,7 @@ export type Database = {
           route?: string | null
           service_interval_km?: number | null
           status?: Database["public"]["Enums"]["fleet_status"] | null
+          sub_category_id?: string | null
           total_tyres?: number | null
           type: string
           tyre_size_standard?: string | null
@@ -1252,6 +1395,8 @@ export type Database = {
           base_odometer_km?: number | null
           bus_no?: string
           capacity?: number
+          category_assignment_source?: string | null
+          category_id?: string | null
           chassis_number?: string | null
           created_at?: string
           current_mileage?: number | null
@@ -1275,13 +1420,29 @@ export type Database = {
           route?: string | null
           service_interval_km?: number | null
           status?: Database["public"]["Enums"]["fleet_status"] | null
+          sub_category_id?: string | null
           total_tyres?: number | null
           type?: string
           tyre_size_standard?: string | null
           updated_at?: string
           year?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "buses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "bus_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buses_sub_category_id_fkey"
+            columns: ["sub_category_id"]
+            isOneToOne: false
+            referencedRelation: "bus_sub_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       chart_of_accounts: {
         Row: {
