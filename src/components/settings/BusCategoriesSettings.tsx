@@ -27,19 +27,48 @@ const iconOptions = [
   { value: 'tag', label: 'Tag' }
 ];
 
-const colorOptions = [
+// Category-specific color options for sub-categories
+const categoryColorFamilies: Record<string, Array<{ value: string; label: string }>> = {
+  'public_bus': [
+    { value: '#4F46E5', label: 'Indigo (Premium)' },
+    { value: '#3B82F6', label: 'Blue (Standard)' },
+    { value: '#06B6D4', label: 'Cyan (Economy)' },
+    { value: '#0EA5E9', label: 'Sky' },
+  ],
+  'school_bus': [
+    { value: '#8B5CF6', label: 'Purple' },
+    { value: '#A855F7', label: 'Violet' },
+    { value: '#D946EF', label: 'Fuchsia' },
+  ],
+  'special_hire': [
+    { value: '#10B981', label: 'Emerald' },
+    { value: '#14B8A6', label: 'Teal' },
+    { value: '#22C55E', label: 'Green' },
+  ],
+};
+
+const defaultColorOptions = [
   { value: '#3B82F6', label: 'Blue' },
   { value: '#8B5CF6', label: 'Purple' },
   { value: '#10B981', label: 'Emerald' },
   { value: '#F59E0B', label: 'Amber' },
   { value: '#EF4444', label: 'Red' },
-  { value: '#6B7280', label: 'Gray' }
+  { value: '#06B6D4', label: 'Cyan' },
 ];
 
 const colorClasses: Record<string, string> = {
   'public_bus': 'from-blue-500 to-blue-600',
   'school_bus': 'from-purple-500 to-purple-600',
   'special_hire': 'from-emerald-500 to-emerald-600',
+};
+
+// Sub-category specific gradient classes
+const subCategoryGradients: Record<string, Record<string, string>> = {
+  'public_bus': {
+    'super_luxury': 'from-indigo-500 to-indigo-600',
+    'semi_luxury': 'from-blue-500 to-blue-600',
+    'leyland': 'from-cyan-500 to-cyan-600',
+  },
 };
 
 export function BusCategoriesSettings() {
@@ -555,7 +584,7 @@ export function BusCategoriesSettings() {
                     </div>
                   </SelectTrigger>
                   <SelectContent>
-                    {colorOptions.map(opt => (
+                    {defaultColorOptions.map(opt => (
                       <SelectItem key={opt.value} value={opt.value}>
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 rounded" style={{ backgroundColor: opt.value }} />
@@ -635,14 +664,20 @@ export function BusCategoriesSettings() {
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {colorOptions.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded" style={{ backgroundColor: opt.value }} />
-                        {opt.label}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {(() => {
+                    const parentCat = categories.find(c => c.id === subCategoryForm.category_id);
+                    const colorOpts = parentCat?.code && categoryColorFamilies[parentCat.code] 
+                      ? categoryColorFamilies[parentCat.code] 
+                      : defaultColorOptions;
+                    return colorOpts.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded" style={{ backgroundColor: opt.value }} />
+                          {opt.label}
+                        </div>
+                      </SelectItem>
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
             </div>
