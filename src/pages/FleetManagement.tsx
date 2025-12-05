@@ -30,6 +30,7 @@ import { ServiceHistoryModal } from "@/components/fleet/ServiceHistoryModal";
 import { ScheduleMaintenanceModal } from "@/components/fleet/ScheduleMaintenanceModal";
 import { BusLoanModal } from "@/components/fleet/BusLoanModal";
 import { BusLoanDashboardModal } from "@/components/fleet/BusLoanDashboardModal";
+import { BusCategoryBadge } from "@/components/fleet/BusCategoryBadge";
 
 interface Fleet {
   id: string;
@@ -57,6 +58,9 @@ interface Fleet {
   last_service_mileage?: number;
   next_service_mileage?: number;
   insurance_expiry?: string;
+  category_id?: string;
+  sub_category_id?: string;
+  category_assignment_source?: string;
 }
 
 const getStatusBadge = (status: Fleet['status']) => {
@@ -163,6 +167,17 @@ const FleetManagementComponent = () => {
     {
       accessorKey: "bus_no",
       header: "Bus No.",
+    },
+    {
+      accessorKey: "category_id",
+      header: "Category",
+      cell: ({ row }) => (
+        <BusCategoryBadge 
+          categoryId={row.original.category_id} 
+          subCategoryId={row.original.sub_category_id}
+          size="sm"
+        />
+      ),
     },
     {
       accessorKey: "type",
