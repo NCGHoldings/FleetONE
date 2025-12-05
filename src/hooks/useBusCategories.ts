@@ -38,6 +38,14 @@ export interface BusRouteRule {
   sub_category?: BusSubCategory;
 }
 
+export interface BusInCategory {
+  id: string;
+  bus_no: string;
+  model: string;
+  status: string;
+  category_assignment_source: string | null;
+}
+
 export function useBusCategories() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -74,7 +82,7 @@ export function useBusCategories() {
   });
 
   // Fetch sub-categories with bus counts
-  const { data: subCategories = [], isLoading: loadingSubCategories } = useQuery({
+  const { data: subCategories = [], isLoading: loadingSubCategories, refetch: refetchSubCategories } = useQuery({
     queryKey: ['bus-sub-categories'],
     queryFn: async () => {
       const { data: subs, error } = await supabase
@@ -105,7 +113,7 @@ export function useBusCategories() {
   });
 
   // Fetch route rules
-  const { data: routeRules = [], isLoading: loadingRules } = useQuery({
+  const { data: routeRules = [], isLoading: loadingRules, refetch: refetchRules } = useQuery({
     queryKey: ['bus-route-rules'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -137,6 +145,30 @@ export function useBusCategories() {
       color: subCategory?.color || category?.color || '#6B7280',
       icon: category?.icon || 'bus'
     };
+  };
+
+  // Get buses for a category
+  const getBusesForCategory = async (categoryId: string): Promise<BusInCategory[]> => {
+    const { data, error } = await supabase
+      .from('buses')
+      .select('id, bus_no, model, status, category_assignment_source')
+      .eq('category_id', categoryId)
+      .order('bus_no');
+    
+    if (error) throw error;
+    return (data || []) as BusInCategory[];
+  };
+
+  // Get buses for a sub-category
+  const getBusesForSubCategory = async (subCategoryId: string): Promise<BusInCategory[]> => {
+    const { data, error } = await supabase
+      .from('buses')
+      .select('id, bus_no, model, status, category_assignment_source')
+      .eq('sub_category_id', subCategoryId)
+      .order('bus_no');
+    
+    if (error) throw error;
+    return (data || []) as BusInCategory[];
   };
 
   // Assign category to a bus
@@ -185,6 +217,57 @@ export function useBusCategories() {
     }
   });
 
+  // Update category
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<BusCategory> }) => {
+      const { error } = await supabase
+        .from('bus_categories')
+        .update(data)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bus-categories'] });
+      toast({ title: "Success", description: "Category updated successfully" });
+    }
+  });
+
+  // Delete category
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // First, unassign buses from this category
+      await supabase
+        .from('buses')
+        .update({ category_id: null, sub_category_id: null })
+        .eq('category_id', id);
+      
+      // Delete sub-categories
+      await supabase
+        .from('bus_sub_categories')
+        .delete()
+        .eq('category_id', id);
+      
+      // Delete route rules
+      await supabase
+        .from('bus_category_route_rules')
+        .delete()
+        .eq('category_id', id);
+      
+      const { error } = await supabase
+        .from('bus_categories')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bus-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['bus-sub-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['bus-route-rules'] });
+      queryClient.invalidateQueries({ queryKey: ['fleet'] });
+      toast({ title: "Success", description: "Category deleted successfully" });
+    }
+  });
+
   // Add new sub-category
   const addSubCategoryMutation = useMutation({
     mutationFn: async (data: { category_id: string; code: string; name: string; description?: string; color?: string }) => {
@@ -199,6 +282,50 @@ export function useBusCategories() {
     }
   });
 
+  // Update sub-category
+  const updateSubCategoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<BusSubCategory> }) => {
+      const { error } = await supabase
+        .from('bus_sub_categories')
+        .update(data)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bus-sub-categories'] });
+      toast({ title: "Success", description: "Sub-category updated successfully" });
+    }
+  });
+
+  // Delete sub-category
+  const deleteSubCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Unassign buses from this sub-category
+      await supabase
+        .from('buses')
+        .update({ sub_category_id: null })
+        .eq('sub_category_id', id);
+      
+      // Delete route rules using this sub-category
+      await supabase
+        .from('bus_category_route_rules')
+        .delete()
+        .eq('sub_category_id', id);
+      
+      const { error } = await supabase
+        .from('bus_sub_categories')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bus-sub-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['bus-route-rules'] });
+      queryClient.invalidateQueries({ queryKey: ['fleet'] });
+      toast({ title: "Success", description: "Sub-category deleted successfully" });
+    }
+  });
+
   // Add new route rule
   const addRouteRuleMutation = useMutation({
     mutationFn: async (data: { route_pattern: string; category_id: string; sub_category_id?: string | null; priority?: number; is_active?: boolean }) => {
@@ -210,6 +337,21 @@ export function useBusCategories() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bus-route-rules'] });
       toast({ title: "Success", description: "Route rule added successfully" });
+    }
+  });
+
+  // Update route rule
+  const updateRouteRuleMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<BusRouteRule> }) => {
+      const { error } = await supabase
+        .from('bus_category_route_rules')
+        .update(data)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bus-route-rules'] });
+      toast({ title: "Success", description: "Route rule updated successfully" });
     }
   });
 
@@ -228,22 +370,59 @@ export function useBusCategories() {
     }
   });
 
-  // Re-run auto-assignment
+  // Re-run auto-assignment - FIXED to use daily_trips + routes
   const rerunAutoAssignment = async () => {
-    toast({ title: "Processing", description: "Re-running auto-assignment..." });
+    toast({ title: "Processing", description: "Re-running auto-assignment from actual trip data..." });
     
     // Get all buses
-    const { data: buses } = await supabase.from('buses').select('id, bus_no, route');
-    const { data: schoolRoutes } = await supabase.from('school_routes').select('bus_reg_no');
-    const { data: dailyTrips } = await supabase.from('daily_trips').select('bus_id');
+    const { data: buses } = await supabase.from('buses').select('id, bus_no');
     
-    const schoolBusNos = new Set(schoolRoutes?.map(sr => sr.bus_reg_no) || []);
-    const tripBusIds = new Set(dailyTrips?.map(dt => dt.bus_id) || []);
+    // Get school routes to identify school buses
+    const { data: schoolRoutes } = await supabase.from('school_routes').select('bus_reg_no');
+    const schoolBusNos = new Set(schoolRoutes?.map(sr => sr.bus_reg_no?.toUpperCase().replace(/\s+/g, '')) || []);
+    
+    // Get all daily trips with routes to find actual route assignments
+    const { data: tripData } = await supabase
+      .from('daily_trips')
+      .select(`
+        bus_id,
+        routes:route_id (
+          id,
+          route_name
+        )
+      `);
+    
+    // Build a map of bus_id -> route names from actual trip data
+    const busRouteMap: Record<string, Set<string>> = {};
+    tripData?.forEach(trip => {
+      if (trip.bus_id && trip.routes) {
+        if (!busRouteMap[trip.bus_id]) {
+          busRouteMap[trip.bus_id] = new Set();
+        }
+        const routeData = trip.routes as { id: string; route_name: string } | null;
+        if (routeData?.route_name) {
+          busRouteMap[trip.bus_id].add(routeData.route_name.toLowerCase());
+        }
+      }
+    });
+    
+    // Get active route rules
+    const { data: activeRules } = await supabase
+      .from('bus_category_route_rules')
+      .select('*')
+      .eq('is_active', true)
+      .order('priority', { ascending: false });
     
     const publicBusCat = categories.find(c => c.code === 'public_bus');
     const schoolBusCat = categories.find(c => c.code === 'school_bus');
     const superLuxury = subCategories.find(s => s.code === 'super_luxury' && s.category_id === publicBusCat?.id);
     const semiLuxury = subCategories.find(s => s.code === 'semi_luxury' && s.category_id === publicBusCat?.id);
+
+    // Track match counts for route rules
+    const ruleMatchCounts: Record<string, number> = {};
+    (activeRules || []).forEach(rule => {
+      ruleMatchCounts[rule.id] = 0;
+    });
 
     let updated = 0;
     for (const bus of buses || []) {
@@ -251,28 +430,46 @@ export function useBusCategories() {
       let subCategoryId = semiLuxury?.id;
       let source = 'default';
 
+      const busNoNormalized = bus.bus_no?.toUpperCase().replace(/\s+/g, '') || '';
+      
       // Check if school bus
-      if (schoolBusNos.has(bus.bus_no)) {
+      if (schoolBusNos.has(busNoNormalized)) {
         categoryId = schoolBusCat?.id;
         subCategoryId = null;
         source = 'auto_school_routes';
-      }
-      // Check if super luxury route
-      else if (bus.route && (
-        bus.route.toLowerCase().includes('jaffna') ||
-        bus.route.toLowerCase().includes('badulla') ||
-        bus.route.toLowerCase().includes('moratuwa') ||
-        bus.route.toLowerCase().includes('makumbura')
-      )) {
-        categoryId = publicBusCat?.id;
-        subCategoryId = superLuxury?.id;
-        source = 'auto_route_pattern';
-      }
-      // Check if in daily trips
-      else if (tripBusIds.has(bus.id)) {
-        categoryId = publicBusCat?.id;
-        subCategoryId = semiLuxury?.id;
-        source = 'auto_daily_trips';
+      } else {
+        // Get routes this bus has actually run from daily_trips
+        const busRoutes = busRouteMap[bus.id];
+        
+        if (busRoutes && busRoutes.size > 0) {
+          // Check route rules against actual trip routes
+          for (const rule of activeRules || []) {
+            // Convert SQL LIKE pattern to regex
+            const pattern = rule.route_pattern
+              .toLowerCase()
+              .replace(/%/g, '.*')
+              .replace(/_/g, '.');
+            const regex = new RegExp(pattern, 'i');
+            
+            // Check if any of the bus's actual routes match this rule
+            const hasMatch = Array.from(busRoutes).some(route => regex.test(route));
+            
+            if (hasMatch) {
+              categoryId = rule.category_id;
+              subCategoryId = rule.sub_category_id;
+              source = 'auto_route_rule';
+              ruleMatchCounts[rule.id] = (ruleMatchCounts[rule.id] || 0) + 1;
+              break; // Use first matching rule (highest priority)
+            }
+          }
+          
+          // If no rule matched but has trips, mark as public bus
+          if (source === 'default') {
+            categoryId = publicBusCat?.id;
+            subCategoryId = semiLuxury?.id;
+            source = 'auto_daily_trips';
+          }
+        }
       }
 
       await supabase
@@ -287,12 +484,22 @@ export function useBusCategories() {
       updated++;
     }
 
+    // Update matched_buses_count for each route rule
+    for (const [ruleId, count] of Object.entries(ruleMatchCounts)) {
+      await supabase
+        .from('bus_category_route_rules')
+        .update({ matched_buses_count: count })
+        .eq('id', ruleId);
+    }
+
     await refetchCategories();
+    await refetchSubCategories();
+    await refetchRules();
     queryClient.invalidateQueries({ queryKey: ['fleet'] });
     
     toast({
       title: "Auto-Assignment Complete",
-      description: `Updated ${updated} buses based on route patterns and usage.`
+      description: `Updated ${updated} buses based on actual trip data and route patterns.`
     });
   };
 
@@ -305,10 +512,17 @@ export function useBusCategories() {
     loadingRules,
     getSubCategoriesForCategory,
     getCategoryBadgeInfo,
+    getBusesForCategory,
+    getBusesForSubCategory,
     assignCategory: assignCategoryMutation.mutate,
     addCategory: addCategoryMutation.mutate,
+    updateCategory: updateCategoryMutation.mutate,
+    deleteCategory: deleteCategoryMutation.mutate,
     addSubCategory: addSubCategoryMutation.mutate,
+    updateSubCategory: updateSubCategoryMutation.mutate,
+    deleteSubCategory: deleteSubCategoryMutation.mutate,
     addRouteRule: addRouteRuleMutation.mutate,
+    updateRouteRule: updateRouteRuleMutation.mutate,
     deleteRouteRule: deleteRouteRuleMutation.mutate,
     rerunAutoAssignment
   };
