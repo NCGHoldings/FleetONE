@@ -43,9 +43,22 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+// Interface for inquiry data passed from Vehicle Inquiry Hub
+interface InquiryInitialData {
+  inquiryId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  companyName: string;
+  address: string;
+  interestedModel: string;
+  quantity: number;
+}
+
 interface YutongQuotationFormProps {
   onSubmit: () => void;
   onCancel: () => void;
+  initialData?: InquiryInitialData | null;
 }
 
 interface BusModel {
@@ -77,7 +90,7 @@ interface TempAddOn {
   notes?: string;
 }
 
-export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormProps) {
+export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQuotationFormProps) {
   const [busModels, setBusModels] = useState<BusModel[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedModel, setSelectedModel] = useState<BusModel | null>(null);
@@ -92,10 +105,15 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      quantity: 1,
+      quantity: initialData?.quantity || 1,
       discount_amount: 0,
       valid_days: 30,
       customer_type: 'personal',
+      customer_name: initialData?.customerName || '',
+      customer_phone: initialData?.customerPhone || '',
+      customer_email: initialData?.customerEmail || '',
+      company_name: initialData?.companyName || '',
+      customer_address: initialData?.address || '',
     }
   });
 
@@ -267,6 +285,7 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
         customer_type: data.customer_type || 'personal',
         business_registration_number: data.business_registration_number || null,
         tax_registration_number: data.tax_registration_number || null,
+        inquiry_id: initialData?.inquiryId || null,
       };
 
       const { data: quotation, error } = await supabase

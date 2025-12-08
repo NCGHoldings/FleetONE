@@ -31,9 +31,23 @@ interface DashboardStats {
   totalValue: number;
 }
 
+// Interface for inquiry data passed via URL
+interface InquiryInitialData {
+  inquiryId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  companyName: string;
+  address: string;
+  interestedModel: string;
+  quantity: number;
+}
+
 export default function YutongQuotations() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
+  const [inquiryData, setInquiryData] = useState<InquiryInitialData | null>(null);
   const activeTab = searchParams.get('tab') || 'quotations';
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
@@ -67,6 +81,30 @@ export default function YutongQuotations() {
     }
   };
 
+  // Check for inquiry data in URL params and auto-open form
+  useEffect(() => {
+    const fromInquiry = searchParams.get('fromInquiry');
+    if (fromInquiry) {
+      const data: InquiryInitialData = {
+        inquiryId: fromInquiry,
+        customerName: searchParams.get('customerName') || '',
+        customerPhone: searchParams.get('customerPhone') || '',
+        customerEmail: searchParams.get('customerEmail') || '',
+        companyName: searchParams.get('companyName') || '',
+        address: searchParams.get('address') || '',
+        interestedModel: searchParams.get('interestedModel') || '',
+        quantity: parseInt(searchParams.get('quantity') || '1', 10),
+      };
+      setInquiryData(data);
+      setShowForm(true);
+      
+      // Clear the URL params after reading
+      const newParams = new URLSearchParams();
+      if (activeTab !== 'quotations') newParams.set('tab', activeTab);
+      navigate(`/yutong-quotations${newParams.toString() ? '?' + newParams.toString() : ''}`, { replace: true });
+    }
+  }, [searchParams, navigate, activeTab]);
+
   useEffect(() => {
     loadStats();
   }, []);
@@ -77,11 +115,17 @@ export default function YutongQuotations() {
 
   const handleFormSubmit = () => {
     setShowForm(false);
+    setInquiryData(null);
     loadStats();
     toast({
       title: "Success",
       description: "Yutong quotation created successfully"
     });
+  };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setInquiryData(null);
   };
 
   return (
@@ -210,7 +254,8 @@ export default function YutongQuotations() {
       {showForm && (
         <YutongQuotationForm
           onSubmit={handleFormSubmit}
-          onCancel={() => setShowForm(false)}
+          onCancel={handleFormCancel}
+          initialData={inquiryData}
         />
       )}
     </div>

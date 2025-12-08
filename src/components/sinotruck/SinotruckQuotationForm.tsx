@@ -9,10 +9,23 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
+// Interface for inquiry data passed from Vehicle Inquiry Hub
+interface InquiryInitialData {
+  inquiryId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  companyName: string;
+  address: string;
+  interestedModel: string;
+  quantity: number;
+}
+
 interface SinotruckQuotationFormProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: InquiryInitialData | null;
 }
 
 const DEFAULT_PAYMENT_TERMS = `Payment Terms:
@@ -39,7 +52,7 @@ const DEFAULT_TERMS_AND_CONDITIONS = [
   "This quotation is subject to final approval by management."
 ];
 
-export const SinotruckQuotationForm = ({ open, onClose, onSuccess }: SinotruckQuotationFormProps) => {
+export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }: SinotruckQuotationFormProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -47,11 +60,11 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess }: SinotruckQu
 
   const [formData, setFormData] = useState({
     customer_id: "",
-    customer_name: "",
-    customer_address: "",
-    contact_number: "",
+    customer_name: initialData?.customerName || "",
+    customer_address: initialData?.address || "",
+    contact_number: initialData?.customerPhone || "",
     truck_model_id: "",
-    quantity: 1,
+    quantity: initialData?.quantity || 1,
     payment_terms: DEFAULT_PAYMENT_TERMS,
     valid_until: "",
   });
@@ -126,6 +139,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess }: SinotruckQu
         status: "draft",
         valid_until: formData.valid_until || null,
         created_by: user?.id,
+        inquiry_id: initialData?.inquiryId || null,
       }]);
 
       if (error) throw error;
