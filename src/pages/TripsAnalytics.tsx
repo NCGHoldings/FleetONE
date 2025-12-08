@@ -125,7 +125,19 @@ const handleFilterChange = useCallback((filters: any) => {
     );
   }
 
-  if (!analytics) return null;
+  if (!analytics) {
+    return (
+      <div className="container mx-auto p-6">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No Analytics Data</AlertTitle>
+          <AlertDescription>
+            Unable to load analytics data. Please try refreshing the page.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
 // Show empty state if no trips found
   if (analytics.overview.totalTrips === 0) {
