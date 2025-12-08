@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Mail, Clock, FileText, FileCheck, UserCheck } from 'lucide-react';
+import { CheckCircle, Mail, Clock, FileText, FileCheck, UserCheck, CreditCard } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SignatureWorkflowIndicatorProps {
@@ -8,21 +8,24 @@ interface SignatureWorkflowIndicatorProps {
   documents: any[];
 }
 
-interface SignerInfo {
+interface SignerSetting {
+  role: string;
   name: string;
-  role: 'prepared_by' | 'checked_by' | 'approved_by';
+  isEnabled: boolean;
 }
 
 export function SignatureWorkflowIndicator({ quotationId, documents }: SignatureWorkflowIndicatorProps) {
-  const [defaultSigners, setDefaultSigners] = useState<Record<string, string>>({});
+  const [signerSettings, setSignerSettings] = useState<Record<string, SignerSetting>>({});
+  const [hasPayments, setHasPayments] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadDefaultSigners();
-  }, []);
+    loadData();
+  }, [quotationId]);
 
-  const loadDefaultSigners = async () => {
+  const loadData = async () => {
     try {
+      // Load signature settings with signer names
       const { data: settings } = await supabase
         .from('special_hire_signature_settings')
         .select(`
@@ -31,32 +34,65 @@ export function SignatureWorkflowIndicator({ quotationId, documents }: Signature
           is_enabled
         `);
 
+      const signerMap: Record<string, SignerSetting> = {};
+      
       if (settings) {
-        const signerNames: Record<string, string> = {};
+        // Get all unique user IDs that are not null
+        const userIds = settings
+          .filter(s => s.default_user_id)
+          .map(s => s.default_user_id);
         
-        for (const setting of settings) {
-          if (setting.default_user_id && setting.is_enabled) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('first_name, last_name')
-              .eq('id', setting.default_user_id)
-              .single();
-            
-            if (profile) {
-              const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+        // Fetch profiles in one query
+        let profilesMap: Record<string, string> = {};
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .in('id', userIds);
+          
+          if (profiles) {
+            profiles.forEach(p => {
+              const fullName = [p.first_name, p.last_name].filter(Boolean).join(' ');
               if (fullName) {
-                signerNames[setting.signature_role] = fullName;
+                profilesMap[p.id] = fullName;
               }
-            }
+            });
           }
         }
         
-        setDefaultSigners(signerNames);
+        // Build signer settings map
+        settings.forEach(setting => {
+          const name = setting.default_user_id ? profilesMap[setting.default_user_id] : undefined;
+          signerMap[setting.signature_role] = {
+            role: setting.signature_role,
+            name: name || getRoleFallbackLabel(setting.signature_role),
+            isEnabled: setting.is_enabled
+          };
+        });
       }
+      
+      setSignerSettings(signerMap);
+
+      // Check if quotation has any payments
+      const { count } = await supabase
+        .from('special_hire_payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('quotation_id', quotationId);
+      
+      setHasPayments((count || 0) > 0);
     } catch (error) {
-      console.error('Error loading default signers:', error);
+      console.error('Error loading workflow data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getRoleFallbackLabel = (role: string): string => {
+    switch (role) {
+      case 'prepared_by': return 'Assign Preparer';
+      case 'checked_by': return 'Assign Checker';
+      case 'approved_by': return 'Assign Approver';
+      default: return 'Not Configured';
     }
   };
 
@@ -74,58 +110,79 @@ export function SignatureWorkflowIndicator({ quotationId, documents }: Signature
   // Determine workflow stage
   const allComplete = hasPreparedBy && hasCheckedBy && hasApprovedBy;
   
-  const getNextSignerInfo = (): { stage: string; signer: string; color: string; icon: React.ReactNode } => {
-    if (!hasDocuments) {
+  const getWorkflowInfo = (): { stage: string; signer: string; color: string; icon: React.ReactNode; description: string } => {
+    // No payments yet - waiting for payment confirmation
+    if (!hasPayments) {
       return {
-        stage: 'No Document',
-        signer: 'Generate document first',
+        stage: 'Awaiting Payment',
+        signer: '',
         color: 'bg-gray-100 text-gray-700 border-gray-300',
-        icon: <FileText className="w-3.5 h-3.5" />
+        icon: <CreditCard className="w-3.5 h-3.5" />,
+        description: 'Confirm payment to generate document'
       };
     }
     
+    // Has payments but no document generated yet
+    if (!hasDocuments) {
+      return {
+        stage: 'Generate Document',
+        signer: '',
+        color: 'bg-amber-100 text-amber-800 border-amber-300',
+        icon: <FileText className="w-3.5 h-3.5" />,
+        description: 'Document pending generation'
+      };
+    }
+    
+    // Document exists, check signature progress
     if (!hasPreparedBy) {
+      const setting = signerSettings['prepared_by'];
       return {
         stage: 'Prepared By',
-        signer: defaultSigners['prepared_by'] || 'Pending',
+        signer: setting?.name || 'Not Configured',
         color: 'bg-blue-100 text-blue-800 border-blue-300',
-        icon: <FileText className="w-3.5 h-3.5" />
+        icon: <FileText className="w-3.5 h-3.5" />,
+        description: 'Awaiting preparation signature'
       };
     }
     
     if (!hasCheckedBy) {
+      const setting = signerSettings['checked_by'];
       return {
         stage: 'Checked By',
-        signer: defaultSigners['checked_by'] || 'Pending',
+        signer: setting?.name || 'Not Configured',
         color: 'bg-purple-100 text-purple-800 border-purple-300',
-        icon: <FileCheck className="w-3.5 h-3.5" />
+        icon: <FileCheck className="w-3.5 h-3.5" />,
+        description: 'Awaiting verification signature'
       };
     }
     
     if (!hasApprovedBy) {
+      const setting = signerSettings['approved_by'];
       return {
         stage: 'Approved By',
-        signer: defaultSigners['approved_by'] || 'Pending',
+        signer: setting?.name || 'Not Configured',
         color: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-        icon: <UserCheck className="w-3.5 h-3.5" />
+        icon: <UserCheck className="w-3.5 h-3.5" />,
+        description: 'Awaiting final approval'
       };
     }
     
-    // All complete
+    // All signatures complete
     return {
       stage: 'Complete',
       signer: '',
       color: 'bg-green-100 text-green-800 border-green-300',
-      icon: <CheckCircle className="w-3.5 h-3.5" />
+      icon: <CheckCircle className="w-3.5 h-3.5" />,
+      description: hasEmailSent ? 'Document sent to customer' : 'Ready to send'
     };
   };
 
-  const nextSigner = getNextSignerInfo();
+  const workflow = getWorkflowInfo();
   
   if (loading) {
     return (
       <div className="flex items-center gap-1">
-        <div className="w-16 h-5 bg-muted animate-pulse rounded" />
+        <div className="w-20 h-5 bg-muted animate-pulse rounded" />
       </div>
     );
   }
@@ -135,15 +192,15 @@ export function SignatureWorkflowIndicator({ quotationId, documents }: Signature
       {/* Main workflow indicator */}
       <Badge 
         variant="outline" 
-        className={`${nextSigner.color} text-xs font-medium px-2 py-1 flex items-center gap-1.5 border`}
+        className={`${workflow.color} text-xs font-medium px-2 py-1 flex items-center gap-1.5 border`}
       >
-        {nextSigner.icon}
+        {workflow.icon}
         <span>
-          {allComplete ? 'Complete' : `Next: ${nextSigner.stage}`}
+          {allComplete ? 'Complete' : workflow.stage}
         </span>
       </Badge>
       
-      {/* Signer name or email status */}
+      {/* Secondary info: signer name or email status */}
       {allComplete ? (
         <div className="flex items-center gap-1 text-xs">
           {hasEmailSent ? (
@@ -158,9 +215,16 @@ export function SignatureWorkflowIndicator({ quotationId, documents }: Signature
             </span>
           )}
         </div>
-      ) : nextSigner.signer && nextSigner.stage !== 'No Document' ? (
-        <span className="text-xs text-muted-foreground truncate max-w-[100px]" title={nextSigner.signer}>
-          {nextSigner.signer}
+      ) : workflow.signer ? (
+        <span 
+          className="text-xs text-muted-foreground truncate max-w-[120px]" 
+          title={workflow.signer}
+        >
+          {workflow.signer}
+        </span>
+      ) : workflow.stage !== 'Awaiting Payment' && workflow.description ? (
+        <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+          {workflow.description}
         </span>
       ) : null}
     </div>
