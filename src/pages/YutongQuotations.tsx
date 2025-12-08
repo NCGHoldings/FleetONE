@@ -34,6 +34,7 @@ interface DashboardStats {
 // Interface for inquiry data passed via URL
 interface InquiryInitialData {
   inquiryId: string;
+  inquiryNumber: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -87,6 +88,7 @@ export default function YutongQuotations() {
     if (fromInquiry) {
       const data: InquiryInitialData = {
         inquiryId: fromInquiry,
+        inquiryNumber: searchParams.get('inquiryNumber') || '',
         customerName: searchParams.get('customerName') || '',
         customerPhone: searchParams.get('customerPhone') || '',
         customerEmail: searchParams.get('customerEmail') || '',
