@@ -4502,6 +4502,66 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_commission_payments: {
+        Row: {
+          commission_amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          paid_at: string | null
+          paid_by: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_status: string
+          quotation_id: string
+          referral_agent_id: string
+          updated_at: string
+        }
+        Insert: {
+          commission_amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          quotation_id: string
+          referral_agent_id: string
+          updated_at?: string
+        }
+        Update: {
+          commission_amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: string
+          quotation_id?: string
+          referral_agent_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_commission_payments_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_commission_payments_referral_agent_id_fkey"
+            columns: ["referral_agent_id"]
+            isOneToOne: false
+            referencedRelation: "referral_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       repair_staff_log: {
         Row: {
           created_at: string

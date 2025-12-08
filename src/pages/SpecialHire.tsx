@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AdminApprovalInterface } from '../components/special-hire/AdminApprovalInterface';
-import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, ChevronDown } from 'lucide-react';
+import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, ChevronDown, Users } from 'lucide-react';
 import { CostCalculator } from "@/components/special-hire/CostCalculator";
 import { EnhancedCostCalculator } from "@/components/special-hire/EnhancedCostCalculator";
 import { ConfirmedTripsTable } from "@/components/special-hire/ConfirmedTripsTable";
@@ -17,6 +17,7 @@ import { SpecialHireForm } from "@/components/special-hire/SpecialHireForm";
 import { SubmissionsList } from "@/components/special-hire/SubmissionsList";
 import { SpecialHireQRGenerator } from "@/components/special-hire/SpecialHireQRGenerator";
 import { RateCoverageMaps } from "@/components/special-hire/RateCoverageMaps";
+import { ReferralAgentsManagement } from "@/components/special-hire/ReferralAgentsManagement";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -427,7 +428,7 @@ export default function SpecialHire() {
 
       {/* Enhanced Tabs with Role-based Access */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-9">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-10">
           <TabsTrigger value="quotations" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Quotations</span>
@@ -452,6 +453,14 @@ export default function SpecialHire() {
             <Calculator className="h-4 w-4" />
             <span className="hidden sm:inline">Calculator</span>
           </TabsTrigger>
+
+          {/* Referral Agents tab - visible to finance and admin users */}
+          {isFinanceUser && (
+            <TabsTrigger value="referral-agents" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Referrals</span>
+            </TabsTrigger>
+          )}
 
           {/* Admin-only tabs */}
           {isAdmin && (
@@ -513,6 +522,13 @@ export default function SpecialHire() {
         <TabsContent value="calculator" className="space-y-6">
           <EnhancedCostCalculator preselectedQuotationId={selectedCalculatorQuotationId} />
         </TabsContent>
+
+        {/* Referral Agents content - restricted to finance users */}
+        {isFinanceUser && (
+          <TabsContent value="referral-agents" className="space-y-6">
+            <ReferralAgentsManagement />
+          </TabsContent>
+        )}
 
         {/* Admin-only content */}
         {isAdmin && (
