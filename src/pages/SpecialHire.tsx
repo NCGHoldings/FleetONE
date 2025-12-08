@@ -428,7 +428,7 @@ export default function SpecialHire() {
 
       {/* Enhanced Tabs with Role-based Access */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-10">
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="quotations" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Quotations</span>
@@ -448,19 +448,12 @@ export default function SpecialHire() {
             <Calculator className="h-4 w-4" />
             <span className="hidden sm:inline">Calculator</span>
           </TabsTrigger>
-          
-          <TabsTrigger value="calculator-legacy" className="flex items-center gap-2 hidden">
-            <Calculator className="h-4 w-4" />
-            <span className="hidden sm:inline">Calculator</span>
-          </TabsTrigger>
 
           {/* Referral Agents tab - visible to finance and admin users */}
-          {isFinanceUser && (
-            <TabsTrigger value="referral-agents" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Referrals</span>
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="referral-agents" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Referrals</span>
+          </TabsTrigger>
 
           {/* Admin-only tabs */}
           {isAdmin && (
@@ -523,12 +516,10 @@ export default function SpecialHire() {
           <EnhancedCostCalculator preselectedQuotationId={selectedCalculatorQuotationId} />
         </TabsContent>
 
-        {/* Referral Agents content - restricted to finance users */}
-        {isFinanceUser && (
-          <TabsContent value="referral-agents" className="space-y-6">
-            <ReferralAgentsManagement />
-          </TabsContent>
-        )}
+        {/* Referral Agents content */}
+        <TabsContent value="referral-agents" className="space-y-6">
+          <ReferralAgentsManagement />
+        </TabsContent>
 
         {/* Admin-only content */}
         {isAdmin && (
