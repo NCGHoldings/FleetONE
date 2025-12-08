@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { FileText, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 // Interface for inquiry data passed from Vehicle Inquiry Hub
 interface InquiryInitialData {
   inquiryId: string;
+  inquiryNumber: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -158,8 +162,34 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Quotation</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            Create New Quotation
+            {initialData?.inquiryNumber && (
+              <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700">
+                <Link2 className="h-3 w-3 mr-1" />
+                {initialData.inquiryNumber}
+              </Badge>
+            )}
+          </DialogTitle>
         </DialogHeader>
+
+        {/* Inquiry Reference Banner */}
+        {initialData?.inquiryId && (
+          <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+            <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertTitle className="text-blue-800 dark:text-blue-300">Generating Quotation Against Inquiry</AlertTitle>
+            <AlertDescription className="text-blue-700 dark:text-blue-400">
+              <div className="flex flex-wrap gap-4 mt-1">
+                <span><strong>Inquiry No:</strong> {initialData.inquiryNumber}</span>
+                <span><strong>Customer:</strong> {initialData.customerName}</span>
+                {initialData.interestedModel && (
+                  <span><strong>Model Interest:</strong> {initialData.interestedModel}</span>
+                )}
+              </div>
+              <p className="text-sm mt-2 opacity-80">This quotation will be automatically linked to the inquiry for tracking.</p>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">

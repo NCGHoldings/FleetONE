@@ -58,6 +58,7 @@ export const ConvertToQuotationModal = ({
       // Navigate to appropriate quotation page with pre-filled data
       const queryParams = new URLSearchParams({
         fromInquiry: inquiry.id,
+        inquiryNumber: inquiry.inquiry_number || "",
         customerName: inquiry.customer_name,
         customerPhone: inquiry.customer_phone || "",
         customerEmail: inquiry.customer_email || "",
