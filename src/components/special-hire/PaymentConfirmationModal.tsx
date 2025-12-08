@@ -115,9 +115,12 @@ export const PaymentConfirmationModal = ({
     }
   };
 
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+
   const handleFileUpload = async (file: File) => {
     try {
       setIsUploadingProof(true);
+      setUploadStatus('uploading');
       const userId = user?.id || 'anonymous';
       const key = `payment-proofs/${userId}/${quotationData.quotation_no || 'quotation'}/${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
@@ -129,8 +132,12 @@ export const PaymentConfirmationModal = ({
         .from('payment-proofs')
         .createSignedUrl(key, 60 * 10);
       if (signed?.signedUrl) setProofPreviewUrl(signed.signedUrl);
+      setUploadStatus('success');
+      toast.success('Payment proof uploaded successfully');
     } catch (e) {
       console.error('Upload failed:', e);
+      setUploadStatus('error');
+      toast.error('Failed to upload payment proof. Please try again.');
     } finally {
       setIsUploadingProof(false);
     }
@@ -150,10 +157,20 @@ export const PaymentConfirmationModal = ({
   };
 
   const handleConfirm = () => {
-    // Validate required fields for balance payment
-    if (paymentType === 'balance' && (!paymentProofUrl || !driverName || !busNo)) {
-      toast.error('For balance payments, payment proof, driver name, and bus number are required.');
-      return;
+    // Validate required fields for balance payment with specific messages
+    if (paymentType === 'balance') {
+      if (!paymentProofUrl) {
+        toast.error('Please upload payment proof for balance payment');
+        return;
+      }
+      if (!driverName) {
+        toast.error('Please enter driver name for trip assignment');
+        return;
+      }
+      if (!busNo) {
+        toast.error('Please enter bus number for trip assignment');
+        return;
+      }
     }
 
     onConfirm({
@@ -378,7 +395,9 @@ export const PaymentConfirmationModal = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paymentProof">Payment Proof (image/PDF, optional)</Label>
+              <Label htmlFor="paymentProof">
+                Payment Proof (image/PDF){paymentType === 'balance' ? ' *' : ' (optional)'}
+              </Label>
               <Input
                 id="paymentProof"
                 type="file"
@@ -389,16 +408,38 @@ export const PaymentConfirmationModal = ({
                 }}
                 disabled={isUploadingProof}
               />
-              {paymentProofUrl && (
-                <div className="flex items-center gap-2">
-                  {proofPreviewUrl && (
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={proofPreviewUrl} target="_blank" rel="noopener noreferrer">Preview</a>
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={handleRemoveProof}>Remove</Button>
-                </div>
-              )}
+              {/* Upload Status Indicator */}
+              <div className="flex items-center gap-2 min-h-[32px]">
+                {uploadStatus === 'uploading' && (
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <span className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                    Uploading...
+                  </span>
+                )}
+                {uploadStatus === 'success' && paymentProofUrl && (
+                  <span className="text-sm text-green-600 flex items-center gap-2">
+                    ✓ Uploaded
+                  </span>
+                )}
+                {uploadStatus === 'error' && (
+                  <span className="text-sm text-red-600 flex items-center gap-2">
+                    ✗ Upload failed - please try again
+                  </span>
+                )}
+                {paymentProofUrl && (
+                  <div className="flex items-center gap-2 ml-auto">
+                    {proofPreviewUrl && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={proofPreviewUrl} target="_blank" rel="noopener noreferrer">Preview</a>
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      handleRemoveProof();
+                      setUploadStatus('idle');
+                    }}>Remove</Button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
