@@ -28,6 +28,7 @@ import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { SignatureWorkflowIndicator } from './SignatureWorkflowIndicator';
 
 export function ConfirmedTripsTable() {
   const { quotations, loading: realtimeLoading, refetch } = useRealtimeSpecialHire();
@@ -935,8 +936,7 @@ export function ConfirmedTripsTable() {
                     <TableHead className="font-semibold">Vehicle Assignment</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold">Payment</TableHead>
-                    <TableHead className="font-semibold">Email Status</TableHead>
-                    <TableHead className="font-semibold">Signatures</TableHead>
+                    <TableHead className="font-semibold">Workflow</TableHead>
                     <TableHead className="font-semibold">Financial</TableHead>
                     <TableHead className="font-semibold text-center">Actions</TableHead>
                   </TableRow>
@@ -1049,29 +1049,12 @@ export function ConfirmedTripsTable() {
                           </div>
                         </TableCell>
 
-                        {/* Email Status Column */}
+                        {/* Workflow Column - Combined Email & Signatures */}
                         <TableCell>
-                          {documentsData[trip.id] ? (
-                            renderDocumentStatusSummary(documentsData[trip.id])
-                          ) : (
-                            <Button 
-                              size="sm" 
-                              variant="ghost"
-                              onClick={() => loadDocumentStatus(trip.id)}
-                              className="text-xs"
-                            >
-                              Load Status
-                            </Button>
-                          )}
-                        </TableCell>
-
-                        {/* Signatures Column */}
-                        <TableCell>
-                          {documentsData[trip.id]?.[0]?.document_approvals ? (
-                            renderSignatureStatus(documentsData[trip.id][0].document_approvals)
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No signatures</span>
-                          )}
+                          <SignatureWorkflowIndicator 
+                            quotationId={trip.id}
+                            documents={documentsData[trip.id] || []}
+                          />
                         </TableCell>
 
                         {/* Financial */}
