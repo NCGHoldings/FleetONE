@@ -7810,6 +7810,7 @@ export type Database = {
           converted_at: string | null
           converted_to_quotation_id: string | null
           created_at: string
+          customer_class: string | null
           customer_email: string | null
           customer_name: string
           customer_phone: string | null
@@ -7835,6 +7836,7 @@ export type Database = {
           converted_at?: string | null
           converted_to_quotation_id?: string | null
           created_at?: string
+          customer_class?: string | null
           customer_email?: string | null
           customer_name: string
           customer_phone?: string | null
@@ -7860,6 +7862,7 @@ export type Database = {
           converted_at?: string | null
           converted_to_quotation_id?: string | null
           created_at?: string
+          customer_class?: string | null
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string | null
