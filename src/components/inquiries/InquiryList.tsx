@@ -15,17 +15,19 @@ import { Input } from "@/components/ui/input";
 import { Eye, UserPlus, Search } from "lucide-react";
 import { format } from "date-fns";
 import { InquiryDetailsModal } from "./InquiryDetailsModal";
+import { CustomerClassBadge } from "./CustomerClassBadge";
 
 interface InquiryListProps {
   filter: "all" | "yutong" | "sinotruck" | "manual";
+  customerClassFilter?: "all" | "C0" | "C1" | "C2" | "C3";
 }
 
-export const InquiryList = ({ filter }: InquiryListProps) => {
+export const InquiryList = ({ filter, customerClassFilter = "all" }: InquiryListProps) => {
   const [search, setSearch] = useState("");
   const [selectedInquiry, setSelectedInquiry] = useState<string | null>(null);
 
   const { data: inquiries, isLoading, refetch } = useQuery({
-    queryKey: ["inquiries", filter, search],
+    queryKey: ["inquiries", filter, customerClassFilter, search],
     queryFn: async () => {
       let query = supabase
         .from("vehicle_inquiries")
@@ -35,13 +37,18 @@ export const InquiryList = ({ filter }: InquiryListProps) => {
         `)
         .order("created_at", { ascending: false });
 
-      // Apply filters
+      // Apply product type filters
       if (filter === "yutong") {
         query = query.eq("product_type", "yutong");
       } else if (filter === "sinotruck") {
         query = query.eq("product_type", "sinotruck");
       } else if (filter === "manual") {
         query = query.in("source", ["phone", "walk-in"]);
+      }
+
+      // Apply customer class filter
+      if (customerClassFilter && customerClassFilter !== "all") {
+        query = query.eq("customer_class", customerClassFilter);
       }
 
       if (search) {
@@ -116,6 +123,7 @@ export const InquiryList = ({ filter }: InquiryListProps) => {
               <TableHead>Inquiry #</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Customer</TableHead>
+              <TableHead>Class</TableHead>
               <TableHead>Product</TableHead>
               <TableHead>Model</TableHead>
               <TableHead>Source</TableHead>
@@ -128,7 +136,7 @@ export const InquiryList = ({ filter }: InquiryListProps) => {
           <TableBody>
             {inquiries?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground">
+                <TableCell colSpan={11} className="text-center text-muted-foreground">
                   No inquiries found
                 </TableCell>
               </TableRow>
@@ -142,6 +150,9 @@ export const InquiryList = ({ filter }: InquiryListProps) => {
                       <div className="font-medium">{inquiry.customer_name}</div>
                       <div className="text-sm text-muted-foreground">{inquiry.customer_phone}</div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <CustomerClassBadge customerClass={inquiry.customer_class} showLabel={false} />
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{inquiry.product_type.toUpperCase()}</Badge>

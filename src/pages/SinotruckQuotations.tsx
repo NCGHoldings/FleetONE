@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Plus, FileText, Truck, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { SinotruckQuotationForm } from "@/components/sinotruck/SinotruckQuotationForm";
 import { SinotruckQuotationsList } from "@/components/sinotruck/SinotruckQuotationsList";
 import { SinotruckTruckModelsAdmin } from "@/components/sinotruck/SinotruckTruckModelsAdmin";
@@ -17,9 +17,23 @@ interface DashboardStats {
   totalValue: number;
 }
 
+// Interface for inquiry data passed via URL
+interface InquiryInitialData {
+  inquiryId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  companyName: string;
+  address: string;
+  interestedModel: string;
+  quantity: number;
+}
+
 const SinotruckQuotations = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
+  const [inquiryData, setInquiryData] = useState<InquiryInitialData | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
     pendingQuotations: 0,
@@ -49,6 +63,30 @@ const SinotruckQuotations = () => {
     }
   };
 
+  // Check for inquiry data in URL params and auto-open form
+  useEffect(() => {
+    const fromInquiry = searchParams.get('fromInquiry');
+    if (fromInquiry) {
+      const data: InquiryInitialData = {
+        inquiryId: fromInquiry,
+        customerName: searchParams.get('customerName') || '',
+        customerPhone: searchParams.get('customerPhone') || '',
+        customerEmail: searchParams.get('customerEmail') || '',
+        companyName: searchParams.get('companyName') || '',
+        address: searchParams.get('address') || '',
+        interestedModel: searchParams.get('interestedModel') || '',
+        quantity: parseInt(searchParams.get('quantity') || '1', 10),
+      };
+      setInquiryData(data);
+      setShowForm(true);
+      
+      // Clear the URL params after reading
+      const newParams = new URLSearchParams();
+      if (activeTab !== 'quotations') newParams.set('tab', activeTab);
+      navigate(`/sinotruck-quotations${newParams.toString() ? '?' + newParams.toString() : ''}`, { replace: true });
+    }
+  }, [searchParams, navigate, activeTab]);
+
   useEffect(() => {
     loadStats();
   }, []);
@@ -59,7 +97,13 @@ const SinotruckQuotations = () => {
 
   const handleFormSubmit = () => {
     setShowForm(false);
+    setInquiryData(null);
     loadStats();
+  };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setInquiryData(null);
   };
 
   return (
@@ -174,8 +218,9 @@ const SinotruckQuotations = () => {
       {showForm && (
         <SinotruckQuotationForm
           open={showForm}
-          onClose={() => setShowForm(false)}
+          onClose={handleFormCancel}
           onSuccess={handleFormSubmit}
+          initialData={inquiryData}
         />
       )}
     </div>

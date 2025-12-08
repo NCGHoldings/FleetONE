@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 const VehicleInquiryHub = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "all";
+  const activeClassFilter = (searchParams.get("class") || "all") as "all" | "C0" | "C1" | "C2" | "C3";
   const [showManualForm, setShowManualForm] = useState(false);
   const [showQuickSchedule, setShowQuickSchedule] = useState(false);
 
@@ -61,7 +62,15 @@ const VehicleInquiryHub = () => {
   });
 
   const handleTabChange = (value: string) => {
-    setSearchParams({ tab: value });
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("tab", value);
+    setSearchParams(newParams);
+  };
+
+  const handleClassFilterChange = (value: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("class", value);
+    setSearchParams(newParams);
   };
 
   return (
@@ -143,20 +152,46 @@ const VehicleInquiryHub = () => {
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
+        {/* Customer Class Filter Tabs - Show for inquiry tabs only */}
+        {["all", "yutong", "sinotruck", "manual"].includes(activeTab) && (
+          <div className="flex gap-2 mt-4 mb-2">
+            <span className="text-sm text-muted-foreground self-center mr-2">Filter by Class:</span>
+            {[
+              { value: "all", label: "All" },
+              { value: "C0", label: "C0 • Inquiry" },
+              { value: "C1", label: "C1 • Quotation" },
+              { value: "C2", label: "C2 • Advance" },
+              { value: "C3", label: "C3 • Paid" },
+            ].map((item) => (
+              <button
+                key={item.value}
+                onClick={() => handleClassFilterChange(item.value)}
+                className={`px-3 py-1 text-sm rounded-full border transition-colors ${
+                  activeClassFilter === item.value
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border hover:bg-muted"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <TabsContent value="all" className="space-y-4">
-          <InquiryList filter="all" />
+          <InquiryList filter="all" customerClassFilter={activeClassFilter} />
         </TabsContent>
 
         <TabsContent value="yutong" className="space-y-4">
-          <InquiryList filter="yutong" />
+          <InquiryList filter="yutong" customerClassFilter={activeClassFilter} />
         </TabsContent>
 
         <TabsContent value="sinotruck" className="space-y-4">
-          <InquiryList filter="sinotruck" />
+          <InquiryList filter="sinotruck" customerClassFilter={activeClassFilter} />
         </TabsContent>
 
         <TabsContent value="manual" className="space-y-4">
-          <InquiryList filter="manual" />
+          <InquiryList filter="manual" customerClassFilter={activeClassFilter} />
         </TabsContent>
 
         <TabsContent value="planning" className="space-y-4">
