@@ -47,11 +47,20 @@ export function usePagePermissions(targetUserId?: string) {
         return true;
       }
       
-      // Zero-Trust: Deny by default if no explicit permission set
+      // Management roles (admin, supervisor, finance) get default access
+      // unless explicitly denied (has_access === false)
+      const hasManagementRole = hasRole('admin') || hasRole('supervisor') || hasRole('finance');
+      if (hasManagementRole && !targetUserId) {
+        const value = permissions[pageId];
+        // If explicitly denied, respect that; otherwise allow
+        return value === false ? false : true;
+      }
+      
+      // Zero-Trust: Deny by default if no explicit permission set for other roles
       const value = permissions[pageId];
       return value === undefined ? false : !!value;
     },
-    [permissions, isSuperAdmin, targetUserId]
+    [permissions, isSuperAdmin, targetUserId, hasRole]
   );
 
   const setAccess = useCallback((pageId: string, value: boolean) => {

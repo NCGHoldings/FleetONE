@@ -97,13 +97,19 @@ const handleFilterChange = useCallback((filters: any) => {
   }, [analytics]);
 
   if (error) {
+    const isPermissionError = error.message?.includes('permission') || 
+                              error.message?.includes('policy') ||
+                              error.message?.includes('denied') ||
+                              error.message?.includes('RLS');
     return (
       <div className="container mx-auto p-6">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Failed to Load Analytics</AlertTitle>
+          <AlertTitle>{isPermissionError ? 'Access Denied' : 'Failed to Load Analytics'}</AlertTitle>
           <AlertDescription>
-            {error.message || 'An error occurred while loading trip analytics data'}
+            {isPermissionError 
+              ? 'You do not have permission to view trip analytics data. Please contact your administrator to request access.'
+              : (error.message || 'An error occurred while loading trip analytics data')}
           </AlertDescription>
         </Alert>
       </div>
