@@ -53,32 +53,32 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
 
   const topDrivers = validDrivers.slice(0, 5);
   const totalDrivers = validDrivers.length;
-  const avgIncome = validDrivers.reduce((sum, d) => sum + d.netIncome, 0) / totalDrivers;
-  const avgEfficiency = validDrivers.reduce((sum, d) => sum + d.avgEfficiency, 0) / totalDrivers;
+  const avgIncome = totalDrivers > 0 ? validDrivers.reduce((sum, d) => sum + (d.netIncome ?? 0), 0) / totalDrivers : 0;
+  const avgEfficiency = totalDrivers > 0 ? validDrivers.reduce((sum, d) => sum + (d.avgEfficiency ?? 0), 0) / totalDrivers : 0;
   const topPerformer = validDrivers[0];
 
   // Prepare radar chart data
   const radarData = topDrivers.map(driver => {
-    const maxIncome = Math.max(...validDrivers.map(d => d.totalIncome));
-    const maxDistance = Math.max(...validDrivers.map(d => d.totalDistance));
-    const maxTrips = Math.max(...validDrivers.map(d => d.totalTrips));
-    const maxEfficiency = Math.max(...validDrivers.map(d => d.avgEfficiency));
+    const maxIncome = Math.max(...validDrivers.map(d => d.totalIncome ?? 0), 1);
+    const maxDistance = Math.max(...validDrivers.map(d => d.totalDistance ?? 0), 1);
+    const maxTrips = Math.max(...validDrivers.map(d => d.totalTrips ?? 0), 1);
+    const maxEfficiency = Math.max(...validDrivers.map(d => d.avgEfficiency ?? 0), 1);
     
     return {
       driver: driver.driverName.split(' ')[0],
-      income: (driver.totalIncome / maxIncome) * 100,
-      distance: (driver.totalDistance / maxDistance) * 100,
-      trips: (driver.totalTrips / maxTrips) * 100,
-      efficiency: (driver.avgEfficiency / maxEfficiency) * 100,
+      income: ((driver.totalIncome ?? 0) / maxIncome) * 100,
+      distance: ((driver.totalDistance ?? 0) / maxDistance) * 100,
+      trips: ((driver.totalTrips ?? 0) / maxTrips) * 100,
+      efficiency: ((driver.avgEfficiency ?? 0) / maxEfficiency) * 100,
     };
   });
 
   // Bar chart data for comparison
   const barChartData = topDrivers.map(driver => ({
     name: driver.driverName.split(' ')[0],
-    income: driver.totalIncome,
-    expenses: driver.totalExpenses,
-    profit: driver.netIncome,
+    income: driver.totalIncome ?? 0,
+    expenses: driver.totalExpenses ?? 0,
+    profit: driver.netIncome ?? 0,
   }));
 
   const gradientColors = [
@@ -165,7 +165,7 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg Efficiency</p>
-                  <p className="text-2xl font-bold text-cyan-600">{avgEfficiency.toFixed(2)} km/L</p>
+                  <p className="text-2xl font-bold text-cyan-600">{(avgEfficiency ?? 0).toFixed(2)} km/L</p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600">
                   <Fuel className="w-6 h-6 text-white" />
@@ -191,7 +191,7 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barChartData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis type="number" tickFormatter={(v) => `₨${(v/1000).toFixed(0)}k`} />
+                  <XAxis type="number" tickFormatter={(v) => `₨${((v ?? 0)/1000).toFixed(0)}k`} />
                   <YAxis type="category" dataKey="name" width={80} />
                   <Tooltip 
                     formatter={(value: number) => [`₨${value.toLocaleString()}`, '']}
@@ -222,11 +222,11 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
             <div className="h-[350px]">
               <ResponsiveRadar
                 data={[
-                  { metric: 'Income', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], (d.totalIncome / Math.max(...validDrivers.map(x => x.totalIncome))) * 100])) },
-                  { metric: 'Distance', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], (d.totalDistance / Math.max(...validDrivers.map(x => x.totalDistance))) * 100])) },
-                  { metric: 'Trips', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], (d.totalTrips / Math.max(...validDrivers.map(x => x.totalTrips))) * 100])) },
-                  { metric: 'Efficiency', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], (d.avgEfficiency / Math.max(...validDrivers.map(x => x.avgEfficiency))) * 100])) },
-                  { metric: 'Profit', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], (d.netIncome / Math.max(...validDrivers.map(x => x.netIncome))) * 100])) },
+                  { metric: 'Income', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], ((d.totalIncome ?? 0) / Math.max(...validDrivers.map(x => x.totalIncome ?? 0), 1)) * 100])) },
+                  { metric: 'Distance', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], ((d.totalDistance ?? 0) / Math.max(...validDrivers.map(x => x.totalDistance ?? 0), 1)) * 100])) },
+                  { metric: 'Trips', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], ((d.totalTrips ?? 0) / Math.max(...validDrivers.map(x => x.totalTrips ?? 0), 1)) * 100])) },
+                  { metric: 'Efficiency', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], ((d.avgEfficiency ?? 0) / Math.max(...validDrivers.map(x => x.avgEfficiency ?? 0), 1)) * 100])) },
+                  { metric: 'Profit', ...Object.fromEntries(topDrivers.map(d => [d.driverName.split(' ')[0], ((d.netIncome ?? 0) / Math.max(...validDrivers.map(x => x.netIncome ?? 0), 1)) * 100])) },
                 ]}
                 keys={topDrivers.map(d => d.driverName.split(' ')[0])}
                 indexBy="metric"
@@ -284,7 +284,7 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
               </TableHeader>
               <TableBody>
                 {validDrivers.map((driver, idx) => {
-                  const performanceScore = (driver.netIncome / Math.max(...validDrivers.map(d => d.netIncome))) * 100;
+                  const performanceScore = ((driver.netIncome ?? 0) / Math.max(...validDrivers.map(d => d.netIncome ?? 0), 1)) * 100;
                   return (
                     <TableRow key={driver.driverId} className="hover:bg-muted/30">
                       <TableCell>
@@ -297,23 +297,23 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
                       <TableCell>
                         <div className="font-medium">{driver.driverName}</div>
                       </TableCell>
-                      <TableCell className="text-right font-mono">{driver.totalTrips}</TableCell>
-                      <TableCell className="text-right font-mono">{driver.totalDistance.toFixed(0)} km</TableCell>
-                      <TableCell className="text-right font-mono">₨{driver.totalIncome.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono">{driver.totalTrips ?? 0}</TableCell>
+                      <TableCell className="text-right font-mono">{(driver.totalDistance ?? 0).toFixed(0)} km</TableCell>
+                      <TableCell className="text-right font-mono">₨{(driver.totalIncome ?? 0).toLocaleString()}</TableCell>
                       <TableCell className="text-right">
-                        <span className={`font-bold ${driver.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ₨{driver.netIncome.toLocaleString()}
+                        <span className={`font-bold ${(driver.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          ₨{(driver.netIncome ?? 0).toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={driver.avgEfficiency >= 12 ? 'default' : driver.avgEfficiency >= 10 ? 'secondary' : 'destructive'}>
-                          {driver.avgEfficiency.toFixed(2)} km/L
+                        <Badge variant={(driver.avgEfficiency ?? 0) >= 12 ? 'default' : (driver.avgEfficiency ?? 0) >= 10 ? 'secondary' : 'destructive'}>
+                          {(driver.avgEfficiency ?? 0).toFixed(2)} km/L
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Progress value={performanceScore} className="h-2" />
-                          <span className="text-xs text-muted-foreground w-10">{performanceScore.toFixed(0)}%</span>
+                          <span className="text-xs text-muted-foreground w-10">{(performanceScore ?? 0).toFixed(0)}%</span>
                         </div>
                       </TableCell>
                     </TableRow>

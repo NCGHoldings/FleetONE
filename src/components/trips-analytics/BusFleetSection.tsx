@@ -27,28 +27,44 @@ interface BusFleetSectionProps {
 }
 
 export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
+  if (!busStats || busStats.length === 0) {
+    return (
+      <Card className="border-2 border-dashed border-muted">
+        <CardContent className="p-12">
+          <div className="text-center space-y-4">
+            <Bus className="w-16 h-16 mx-auto text-muted-foreground" />
+            <h3 className="text-xl font-semibold">No Bus Fleet Data Available</h3>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              No bus data found for the selected period.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const totalBuses = busStats.length;
-  const totalFleetIncome = busStats.reduce((sum, b) => sum + b.totalIncome, 0);
-  const totalFleetDistance = busStats.reduce((sum, b) => sum + b.totalDistance, 0);
-  const avgFleetEfficiency = busStats.reduce((sum, b) => sum + b.avgEfficiency, 0) / totalBuses;
+  const totalFleetIncome = busStats.reduce((sum, b) => sum + (b.totalIncome ?? 0), 0);
+  const totalFleetDistance = busStats.reduce((sum, b) => sum + (b.totalDistance ?? 0), 0);
+  const avgFleetEfficiency = totalBuses > 0 ? busStats.reduce((sum, b) => sum + (b.avgEfficiency ?? 0), 0) / totalBuses : 0;
   const topBus = busStats[0];
 
   // Utilization chart data
   const utilizationData = busStats.slice(0, 8).map(bus => ({
     name: bus.busNo,
-    value: bus.utilizationRate,
-    income: bus.totalIncome,
+    value: bus.utilizationRate ?? 0,
+    income: bus.totalIncome ?? 0,
   }));
 
   // Distance comparison data
   const distanceData = busStats.slice(0, 10).map(bus => ({
     name: bus.busNo,
-    distance: bus.totalDistance,
-    trips: bus.totalTrips,
+    distance: bus.totalDistance ?? 0,
+    trips: bus.totalTrips ?? 0,
   }));
 
   // Efficiency ranking
-  const efficiencyRanking = [...busStats].sort((a, b) => b.avgEfficiency - a.avgEfficiency);
+  const efficiencyRanking = [...busStats].sort((a, b) => (b.avgEfficiency ?? 0) - (a.avgEfficiency ?? 0));
 
   const COLORS = ['#3B82F6', '#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#6366F1'];
 
@@ -88,7 +104,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Fleet Revenue</p>
-                  <p className="text-2xl font-bold text-emerald-600">₨{(totalFleetIncome / 1000).toFixed(0)}K</p>
+                  <p className="text-2xl font-bold text-emerald-600">₨{((totalFleetIncome ?? 0) / 1000).toFixed(0)}K</p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600">
                   <TrendingUp className="w-6 h-6 text-white" />
@@ -128,7 +144,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg Efficiency</p>
-                  <p className="text-2xl font-bold text-cyan-600">{avgFleetEfficiency.toFixed(2)} km/L</p>
+                  <p className="text-2xl font-bold text-cyan-600">{(avgFleetEfficiency ?? 0).toFixed(2)} km/L</p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600">
                   <Fuel className="w-6 h-6 text-white" />
@@ -162,7 +178,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
                     paddingAngle={2}
                     dataKey="value"
                     nameKey="name"
-                    label={({ name, value }) => `${name}: ${Number(value).toFixed(1)}%`}
+                    label={({ name, value }) => `${name}: ${Number(value ?? 0).toFixed(1)}%`}
                   >
                     {utilizationData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -170,7 +186,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
                   </Pie>
                   <Tooltip 
                     formatter={(value: number, name: string, props: any) => [
-                      `${value.toFixed(1)}% utilization`,
+                      `${(value ?? 0).toFixed(1)}% utilization`,
                       props.payload.name
                     ]}
                     contentStyle={{ 
@@ -246,14 +262,14 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
                       <span className="font-bold">{bus.busNo}</span>
                       <Badge variant={idx < 3 ? 'default' : 'secondary'}>#{idx + 1}</Badge>
                     </div>
-                    <div className="text-2xl font-bold text-emerald-600">{bus.avgEfficiency.toFixed(2)} km/L</div>
+                    <div className="text-2xl font-bold text-emerald-600">{(bus.avgEfficiency ?? 0).toFixed(2)} km/L</div>
                     <div className="mt-2">
                       <Progress 
-                        value={(bus.avgEfficiency / Math.max(...busStats.map(b => b.avgEfficiency))) * 100} 
+                        value={((bus.avgEfficiency ?? 0) / Math.max(...busStats.map(b => b.avgEfficiency ?? 0), 1)) * 100} 
                         className="h-2"
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">{bus.totalTrips} trips</p>
+                    <p className="text-xs text-muted-foreground mt-1">{bus.totalTrips ?? 0} trips</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -299,22 +315,22 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
                       <Badge variant="outline">{bus.busType || 'Standard'}</Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono">{bus.totalTrips}</TableCell>
-                    <TableCell className="text-right font-mono">{Number(bus.totalDistance).toFixed(0)} km</TableCell>
-                    <TableCell className="text-right font-mono">₨{bus.totalIncome.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono">{Number(bus.totalDistance ?? 0).toFixed(0)} km</TableCell>
+                    <TableCell className="text-right font-mono">₨{(bus.totalIncome ?? 0).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
-                      <span className={`font-bold ${bus.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        ₨{bus.netIncome.toLocaleString()}
+                      <span className={`font-bold ${(bus.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        ₨{(bus.netIncome ?? 0).toLocaleString()}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Badge variant={bus.avgEfficiency >= 12 ? 'default' : bus.avgEfficiency >= 10 ? 'secondary' : 'destructive'}>
-                        {bus.avgEfficiency.toFixed(2)} km/L
+                      <Badge variant={(bus.avgEfficiency ?? 0) >= 12 ? 'default' : (bus.avgEfficiency ?? 0) >= 10 ? 'secondary' : 'destructive'}>
+                        {(bus.avgEfficiency ?? 0).toFixed(2)} km/L
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center gap-2 justify-end">
-                        <Progress value={bus.utilizationRate} className="h-2 w-16" />
-                        <span className="text-xs">{bus.utilizationRate.toFixed(1)}%</span>
+                        <Progress value={bus.utilizationRate ?? 0} className="h-2 w-16" />
+                        <span className="text-xs">{(bus.utilizationRate ?? 0).toFixed(1)}%</span>
                       </div>
                     </TableCell>
                     <TableCell>

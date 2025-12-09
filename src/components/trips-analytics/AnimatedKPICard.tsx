@@ -39,14 +39,15 @@ export default function AnimatedKPICard({
 
   const formatValue = (val: number | string): string => {
     if (typeof val === 'string') return val;
+    const safeVal = val ?? 0;
     
     switch (format) {
       case 'currency':
-        return `₨${val.toLocaleString()}`;
+        return `₨${safeVal.toLocaleString()}`;
       case 'percentage':
-        return `${val.toFixed(1)}%`;
+        return `${safeVal.toFixed(1)}%`;
       default:
-        return val.toLocaleString();
+        return safeVal.toLocaleString();
     }
   };
 
@@ -143,7 +144,7 @@ export default function AnimatedKPICard({
                   ) : (
                     <TrendingDown className="w-4 h-4" />
                   )}
-                  <span>{Math.abs(trend).toFixed(1)}%</span>
+                  <span>{Math.abs(trend ?? 0).toFixed(1)}%</span>
                   {trendLabel && (
                     <span className="text-xs text-muted-foreground ml-1">
                       {trendLabel}

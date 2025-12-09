@@ -55,36 +55,36 @@ export default function ExpenseAnalyticsSection({
   overview, 
   dailyTrends 
 }: ExpenseAnalyticsSectionProps) {
-  const costPerTrip = overview.totalTrips > 0 ? overview.totalExpenses / overview.totalTrips : 0;
-  const costPerKm = overview.totalDistance > 0 ? overview.totalExpenses / overview.totalDistance : 0;
-  const fuelCostPerKm = overview.totalDistance > 0 ? expenseBreakdown.fuel / overview.totalDistance : 0;
+  const costPerTrip = (overview.totalTrips ?? 0) > 0 ? (overview.totalExpenses ?? 0) / overview.totalTrips : 0;
+  const costPerKm = (overview.totalDistance ?? 0) > 0 ? (overview.totalExpenses ?? 0) / overview.totalDistance : 0;
+  const fuelCostPerKm = (overview.totalDistance ?? 0) > 0 ? (expenseBreakdown.fuel ?? 0) / overview.totalDistance : 0;
 
   // Pie chart data
   const pieData = [
-    { name: 'Fuel', value: expenseBreakdown.fuel, color: '#3B82F6' },
-    { name: 'Highway/Toll', value: expenseBreakdown.toll, color: '#8B5CF6' },
-    { name: 'Repairs/Tyres', value: expenseBreakdown.repair, color: '#EF4444' },
-    { name: 'Salaries', value: expenseBreakdown.salaries, color: '#10B981' },
-    { name: 'Permits/Legal', value: expenseBreakdown.permits, color: '#F59E0B' },
-    { name: 'Other', value: expenseBreakdown.other, color: '#6366F1' },
+    { name: 'Fuel', value: expenseBreakdown.fuel ?? 0, color: '#3B82F6' },
+    { name: 'Highway/Toll', value: expenseBreakdown.toll ?? 0, color: '#8B5CF6' },
+    { name: 'Repairs/Tyres', value: expenseBreakdown.repair ?? 0, color: '#EF4444' },
+    { name: 'Salaries', value: expenseBreakdown.salaries ?? 0, color: '#10B981' },
+    { name: 'Permits/Legal', value: expenseBreakdown.permits ?? 0, color: '#F59E0B' },
+    { name: 'Other', value: expenseBreakdown.other ?? 0, color: '#6366F1' },
   ].filter(item => item.value > 0);
 
   // Expense trend data
   const expenseTrendData = dailyTrends.map(day => ({
-    date: day.date.split('-').slice(1).join('/'),
-    expenses: day.expenses,
-    income: day.income,
-    profit: day.netIncome,
+    date: day.date ? day.date.split('-').slice(1).join('/') : '',
+    expenses: day.expenses ?? 0,
+    income: day.income ?? 0,
+    profit: day.netIncome ?? 0,
   }));
 
   // Category comparison for bar chart
   const categoryData = [
-    { category: 'Fuel', amount: expenseBreakdown.fuel, percentage: expenseBreakdown.fuelPercentage },
-    { category: 'Highway', amount: expenseBreakdown.toll, percentage: expenseBreakdown.tollPercentage },
-    { category: 'Repairs', amount: expenseBreakdown.repair, percentage: expenseBreakdown.repairPercentage },
-    { category: 'Salaries', amount: expenseBreakdown.salaries, percentage: expenseBreakdown.salariesPercentage },
-    { category: 'Permits', amount: expenseBreakdown.permits, percentage: expenseBreakdown.permitsPercentage },
-    { category: 'Other', amount: expenseBreakdown.other, percentage: expenseBreakdown.otherPercentage },
+    { category: 'Fuel', amount: expenseBreakdown.fuel ?? 0, percentage: expenseBreakdown.fuelPercentage ?? 0 },
+    { category: 'Highway', amount: expenseBreakdown.toll ?? 0, percentage: expenseBreakdown.tollPercentage ?? 0 },
+    { category: 'Repairs', amount: expenseBreakdown.repair ?? 0, percentage: expenseBreakdown.repairPercentage ?? 0 },
+    { category: 'Salaries', amount: expenseBreakdown.salaries ?? 0, percentage: expenseBreakdown.salariesPercentage ?? 0 },
+    { category: 'Permits', amount: expenseBreakdown.permits ?? 0, percentage: expenseBreakdown.permitsPercentage ?? 0 },
+    { category: 'Other', amount: expenseBreakdown.other ?? 0, percentage: expenseBreakdown.otherPercentage ?? 0 },
   ];
 
   const COLORS = ['#3B82F6', '#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#6366F1'];
@@ -103,9 +103,9 @@ export default function ExpenseAnalyticsSection({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Expenses</p>
-                  <p className="text-2xl font-bold text-red-600">₨{overview.totalExpenses.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-red-600">₨{(overview.totalExpenses ?? 0).toLocaleString()}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {overview.profitMargin.toFixed(1)}% profit margin
+                    {(overview.profitMargin ?? 0).toFixed(1)}% profit margin
                   </p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-red-500 to-orange-600">
@@ -126,9 +126,9 @@ export default function ExpenseAnalyticsSection({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Fuel Cost</p>
-                  <p className="text-2xl font-bold text-blue-600">₨{expenseBreakdown.fuel.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-blue-600">₨{(expenseBreakdown.fuel ?? 0).toLocaleString()}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {expenseBreakdown.fuelPercentage.toFixed(1)}% of expenses
+                    {(expenseBreakdown.fuelPercentage ?? 0).toFixed(1)}% of expenses
                   </p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600">
@@ -149,9 +149,9 @@ export default function ExpenseAnalyticsSection({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Cost per Trip</p>
-                  <p className="text-2xl font-bold text-purple-600">₨{costPerTrip.toFixed(0)}</p>
+                  <p className="text-2xl font-bold text-purple-600">₨{(costPerTrip ?? 0).toFixed(0)}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Avg across {overview.totalTrips} trips
+                    Avg across {overview.totalTrips ?? 0} trips
                   </p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-purple-500 to-pink-600">
@@ -172,9 +172,9 @@ export default function ExpenseAnalyticsSection({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Cost per Km</p>
-                  <p className="text-2xl font-bold text-amber-600">₨{costPerKm.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-amber-600">₨{(costPerKm ?? 0).toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Fuel: ₨{fuelCostPerKm.toFixed(2)}/km
+                    Fuel: ₨{(fuelCostPerKm ?? 0).toFixed(2)}/km
                   </p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-amber-500 to-yellow-600">
@@ -256,7 +256,7 @@ export default function ExpenseAnalyticsSection({
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="date" />
-                  <YAxis tickFormatter={(v) => `₨${(v/1000).toFixed(0)}k`} />
+                  <YAxis tickFormatter={(v) => `₨${((v ?? 0)/1000).toFixed(0)}k`} />
                   <Tooltip 
                     formatter={(value: number) => [`₨${value.toLocaleString()}`, '']}
                     contentStyle={{ 
@@ -290,7 +290,7 @@ export default function ExpenseAnalyticsSection({
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categoryData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis type="number" tickFormatter={(v) => `₨${(v/1000).toFixed(0)}k`} />
+                  <XAxis type="number" tickFormatter={(v) => `₨${((v ?? 0)/1000).toFixed(0)}k`} />
                   <YAxis type="category" dataKey="category" width={80} />
                   <Tooltip 
                     formatter={(value: number) => [`₨${value.toLocaleString()}`, 'Amount']}
@@ -328,8 +328,8 @@ export default function ExpenseAnalyticsSection({
                       <span className="font-medium">{item.category}</span>
                     </div>
                     <div className="text-right">
-                      <span className="font-bold">₨{item.amount.toLocaleString()}</span>
-                      <span className="text-muted-foreground ml-2">({item.percentage.toFixed(1)}%)</span>
+                      <span className="font-bold">₨{(item.amount ?? 0).toLocaleString()}</span>
+                      <span className="text-muted-foreground ml-2">({(item.percentage ?? 0).toFixed(1)}%)</span>
                     </div>
                   </div>
                   <Progress 
@@ -352,7 +352,7 @@ export default function ExpenseAnalyticsSection({
           <CardContent className="pt-6">
             <div className="text-center space-y-2">
               <Badge variant="outline" className="mb-2">Per Trip</Badge>
-              <p className="text-3xl font-bold">₨{costPerTrip.toFixed(0)}</p>
+              <p className="text-3xl font-bold">₨{(costPerTrip ?? 0).toFixed(0)}</p>
               <p className="text-sm text-muted-foreground">Average expense per trip</p>
             </div>
           </CardContent>
@@ -362,7 +362,7 @@ export default function ExpenseAnalyticsSection({
           <CardContent className="pt-6">
             <div className="text-center space-y-2">
               <Badge variant="outline" className="mb-2">Per Kilometer</Badge>
-              <p className="text-3xl font-bold">₨{costPerKm.toFixed(2)}</p>
+              <p className="text-3xl font-bold">₨{(costPerKm ?? 0).toFixed(2)}</p>
               <p className="text-sm text-muted-foreground">Total cost per km traveled</p>
             </div>
           </CardContent>
@@ -372,7 +372,7 @@ export default function ExpenseAnalyticsSection({
           <CardContent className="pt-6">
             <div className="text-center space-y-2">
               <Badge variant="outline" className="mb-2">Fuel Cost/Km</Badge>
-              <p className="text-3xl font-bold">₨{fuelCostPerKm.toFixed(2)}</p>
+              <p className="text-3xl font-bold">₨{(fuelCostPerKm ?? 0).toFixed(2)}</p>
               <p className="text-sm text-muted-foreground">Fuel only per km</p>
             </div>
           </CardContent>
