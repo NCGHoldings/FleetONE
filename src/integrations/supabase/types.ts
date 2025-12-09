@@ -298,6 +298,42 @@ export type Database = {
           },
         ]
       }
+      api_usage_logs: {
+        Row: {
+          api_name: string
+          cache_hit: boolean | null
+          created_at: string
+          endpoint: string | null
+          estimated_cost: number | null
+          id: string
+          metadata: Json | null
+          query_text: string | null
+          response_status: string | null
+        }
+        Insert: {
+          api_name: string
+          cache_hit?: boolean | null
+          created_at?: string
+          endpoint?: string | null
+          estimated_cost?: number | null
+          id?: string
+          metadata?: Json | null
+          query_text?: string | null
+          response_status?: string | null
+        }
+        Update: {
+          api_name?: string
+          cache_hit?: boolean | null
+          created_at?: string
+          endpoint?: string | null
+          estimated_cost?: number | null
+          id?: string
+          metadata?: Json | null
+          query_text?: string | null
+          response_status?: string | null
+        }
+        Relationships: []
+      }
       approval_name_suggestions: {
         Row: {
           created_at: string
