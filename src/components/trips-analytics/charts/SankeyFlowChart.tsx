@@ -114,19 +114,19 @@ export default function SankeyFlowChart({
           <div className="text-center">
             <div className="text-sm text-muted-foreground">Total Income</div>
             <div className="text-lg font-bold text-blue-600">
-              ₨{data.totalIncome.toLocaleString()}
+              Rs {data.totalIncome.toLocaleString()}
             </div>
           </div>
           <div className="text-center">
             <div className="text-sm text-muted-foreground">Total Expenses</div>
             <div className="text-lg font-bold text-purple-600">
-              ₨{(data.fuelCost + data.tollCost + data.repairCost + data.salaries + data.permits + data.otherExpenses).toLocaleString()}
+              Rs {(data.fuelCost + data.tollCost + data.repairCost + data.salaries + data.permits + data.otherExpenses).toLocaleString()}
             </div>
           </div>
           <div className="text-center">
             <div className="text-sm text-muted-foreground">Net Profit</div>
             <div className={`text-lg font-bold ${data.netProfit > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              ₨{data.netProfit.toLocaleString()}
+              Rs {data.netProfit.toLocaleString()}
             </div>
           </div>
           <div className="text-center">

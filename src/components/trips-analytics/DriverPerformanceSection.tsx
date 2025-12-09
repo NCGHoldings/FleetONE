@@ -125,7 +125,7 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Top Performer</p>
                   <p className="text-xl font-bold truncate max-w-[150px]">{topPerformer?.driverName}</p>
-                  <p className="text-sm text-muted-foreground">₨{topPerformer?.netIncome.toLocaleString()}</p>
+                  <p className="text-sm text-muted-foreground">Rs {topPerformer?.netIncome.toLocaleString()}</p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-amber-500 to-orange-600">
                   <Trophy className="w-6 h-6 text-white" />
@@ -145,7 +145,7 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Avg Net Income</p>
-                  <p className="text-2xl font-bold text-emerald-600">₨{avgIncome.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-emerald-600">Rs {avgIncome.toLocaleString()}</p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600">
                   <TrendingUp className="w-6 h-6 text-white" />
@@ -191,10 +191,10 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barChartData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis type="number" tickFormatter={(v) => `₨${((v ?? 0)/1000).toFixed(0)}k`} />
+                  <XAxis type="number" tickFormatter={(v) => `Rs ${((v ?? 0)/1000).toFixed(0)}k`} />
                   <YAxis type="category" dataKey="name" width={80} />
                   <Tooltip 
-                    formatter={(value: number) => [`₨${value.toLocaleString()}`, '']}
+                    formatter={(value: number) => [`Rs ${value.toLocaleString()}`, '']}
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--card))', 
                       border: '1px solid hsl(var(--border))',
@@ -299,10 +299,10 @@ export default function DriverPerformanceSection({ driverStats }: DriverPerforma
                       </TableCell>
                       <TableCell className="text-right font-mono">{driver.totalTrips ?? 0}</TableCell>
                       <TableCell className="text-right font-mono">{(driver.totalDistance ?? 0).toFixed(0)} km</TableCell>
-                      <TableCell className="text-right font-mono">₨{(driver.totalIncome ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono">Rs {(driver.totalIncome ?? 0).toLocaleString()}</TableCell>
                       <TableCell className="text-right">
                         <span className={`font-bold ${(driver.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ₨{(driver.netIncome ?? 0).toLocaleString()}
+                          Rs {(driver.netIncome ?? 0).toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">

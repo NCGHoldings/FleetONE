@@ -315,7 +315,7 @@ export function useComparisonAnalytics(
           currentValue: entity.netProfit,
           targetValue: leader.netProfit,
           gap: profitGap,
-          impact: `₹${profitGap.toLocaleString()} potential gain`,
+          impact: `Rs ${profitGap.toLocaleString()} potential gain`,
           recommendation: profitGap > entity.netProfit * 0.3 
             ? 'Focus on cost reduction and route optimization'
             : 'Fine-tune operations for incremental gains'
@@ -368,7 +368,7 @@ export function useComparisonAnalytics(
       if (entity.expenses > entity.income * 0.7) {
         items.push({
           action: `Reduce ${entity.name} operating costs by 10%`,
-          expectedImpact: `₹${Math.round(entity.expenses * 0.1).toLocaleString()} savings`,
+          expectedImpact: `Rs ${Math.round(entity.expenses * 0.1).toLocaleString()} savings`,
           effort: 'medium',
           priority: 1,
           timeframe: '30 days',
@@ -476,7 +476,7 @@ function formatMetricValue(metric: string, value: number): string {
     case 'income':
     case 'expenses':
     case 'netProfit':
-      return `₹${value.toLocaleString()}`;
+      return `Rs ${value.toLocaleString()}`;
     case 'efficiency':
       return `${value.toFixed(1)} km/L`;
     case 'trips':
