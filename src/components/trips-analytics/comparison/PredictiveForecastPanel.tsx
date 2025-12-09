@@ -78,8 +78,8 @@ export default function PredictiveForecastPanel({
     return totals;
   }, [entities, predictions]);
 
-  const formatCurrency = (value: number) => `₹${(value / 1000).toFixed(0)}k`;
-  const formatDate = (date: string) => format(new Date(date), 'MMM dd');
+  const formatCurrency = (value: number) => `₹${((value ?? 0) / 1000).toFixed(0)}k`;
+  const formatDate = (date: string) => date ? format(new Date(date), 'MMM dd') : '';
 
   return (
     <motion.div
@@ -136,7 +136,7 @@ export default function PredictiveForecastPanel({
                             ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400'
                       }`}>
-                        {projectedChange > 0 ? '+' : ''}{projectedChange.toFixed(1)}%
+                        {projectedChange > 0 ? '+' : ''}{(projectedChange ?? 0).toFixed(1)}%
                       </Badge>
                     </div>
                     

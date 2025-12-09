@@ -202,37 +202,37 @@ export default function ComparisonDashboard({
                 <ComparisonSparklineCard
                   title="Income"
                   entities={selectedEntities}
-                  getValue={(e) => e.income}
+                  getValue={(e) => e.income ?? 0}
                   historicalData={historical}
-                  getHistoricalValue={(p) => p.income}
-                  format={(v) => `₹${(v/1000).toFixed(0)}k`}
+                  getHistoricalValue={(p) => p.income ?? 0}
+                  format={(v) => `₹${((v ?? 0)/1000).toFixed(0)}k`}
                   icon={<DollarSign className="h-4 w-4" />}
                 />
                 <ComparisonSparklineCard
                   title="Net Profit"
                   entities={selectedEntities}
-                  getValue={(e) => e.netProfit}
+                  getValue={(e) => e.netProfit ?? 0}
                   historicalData={historical}
-                  getHistoricalValue={(p) => p.profit}
-                  format={(v) => `₹${(v/1000).toFixed(0)}k`}
+                  getHistoricalValue={(p) => p.profit ?? 0}
+                  format={(v) => `₹${((v ?? 0)/1000).toFixed(0)}k`}
                   icon={<TrendingUp className="h-4 w-4" />}
                 />
                 <ComparisonSparklineCard
                   title="Trips"
                   entities={selectedEntities}
-                  getValue={(e) => e.trips}
+                  getValue={(e) => e.trips ?? 0}
                   historicalData={historical}
-                  getHistoricalValue={(p) => p.trips}
-                  format={(v) => v.toString()}
+                  getHistoricalValue={(p) => p.trips ?? 0}
+                  format={(v) => (v ?? 0).toString()}
                   icon={<MapPin className="h-4 w-4" />}
                 />
                 <ComparisonSparklineCard
                   title="Efficiency"
                   entities={selectedEntities}
-                  getValue={(e) => e.efficiency}
+                  getValue={(e) => e.efficiency ?? 0}
                   historicalData={historical}
-                  getHistoricalValue={(p) => p.efficiency}
-                  format={(v) => `${v.toFixed(1)} km/L`}
+                  getHistoricalValue={(p) => p.efficiency ?? 0}
+                  format={(v) => `${(v ?? 0).toFixed(1)} km/L`}
                   icon={<Gauge className="h-4 w-4" />}
                 />
               </div>

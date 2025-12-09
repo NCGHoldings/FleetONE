@@ -215,8 +215,8 @@ const handleFilterChange = useCallback((filters: any) => {
         />
         <AnimatedKPICard
           title="Total Distance"
-          value={`${analytics.overview.totalDistance.toFixed(0)} km`}
-          subtitle={`Avg ${analytics.overview.avgDistancePerTrip.toFixed(1)} km/trip`}
+          value={`${(analytics.overview.totalDistance ?? 0).toFixed(0)} km`}
+          subtitle={`Avg ${(analytics.overview.avgDistancePerTrip ?? 0).toFixed(1)} km/trip`}
           icon={Route}
         />
         <AnimatedKPICard
@@ -239,17 +239,17 @@ const handleFilterChange = useCallback((filters: any) => {
         />
         <AnimatedKPICard
           title="Total Expenses"
-          value={analytics.overview.totalExpenses}
+          value={analytics.overview.totalExpenses ?? 0}
           format="currency"
-          subtitle={`${analytics.overview.profitMargin.toFixed(1)}% profit margin`}
+          subtitle={`${(analytics.overview.profitMargin ?? 0).toFixed(1)}% profit margin`}
           icon={DollarSign}
         />
         <AnimatedKPICard
           title="Fuel Efficiency"
-          value={`${analytics.overview.avgEfficiency.toFixed(2)} km/L`}
+          value={`${(analytics.overview.avgEfficiency ?? 0).toFixed(2)} km/L`}
           subtitle="Fleet average"
           icon={Fuel}
-          color={analytics.overview.avgEfficiency >= 12 ? 'success' : analytics.overview.avgEfficiency >= 10 ? 'default' : 'warning'}
+          color={(analytics.overview.avgEfficiency ?? 0) >= 12 ? 'success' : (analytics.overview.avgEfficiency ?? 0) >= 10 ? 'default' : 'warning'}
         />
         <AnimatedKPICard
           title="Active Buses"
@@ -423,11 +423,11 @@ const handleFilterChange = useCallback((filters: any) => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-3 border-b">
                   <span className="text-muted-foreground">Avg Income per Trip</span>
-                  <span className="text-lg font-bold">₨{analytics.overview.avgIncomePerTrip.toFixed(0)}</span>
+                  <span className="text-lg font-bold">₨{(analytics.overview.avgIncomePerTrip ?? 0).toFixed(0)}</span>
                 </div>
                 <div className="flex justify-between items-center pb-3 border-b">
                   <span className="text-muted-foreground">Fuel Cost Share</span>
-                  <span className="text-lg font-bold">{analytics.expenseBreakdown.fuelPercentage.toFixed(1)}%</span>
+                  <span className="text-lg font-bold">{(analytics.expenseBreakdown.fuelPercentage ?? 0).toFixed(1)}%</span>
                 </div>
                 <div className="flex justify-between items-center pb-3 border-b">
                   <span className="text-muted-foreground">Total Fuel Cost</span>
@@ -466,16 +466,16 @@ const handleFilterChange = useCallback((filters: any) => {
                     <TableRow key={route.routeNo}>
                       <TableCell className="font-medium">{route.routeName}</TableCell>
                       <TableCell className="text-right">{route.totalTrips}</TableCell>
-                      <TableCell className="text-right">{route.totalDistance.toFixed(1)}</TableCell>
-                      <TableCell className="text-right">₨{route.totalIncome.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">₨{route.totalExpenses.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-semibold">₨{route.netIncome.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{(route.totalDistance ?? 0).toFixed(1)}</TableCell>
+                      <TableCell className="text-right">₨{(route.totalIncome ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">₨{(route.totalExpenses ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-semibold">₨{(route.netIncome ?? 0).toLocaleString()}</TableCell>
                       <TableCell className="text-right">
-                        <span className={route.profitMargin >= 30 ? 'text-green-600' : route.profitMargin >= 20 ? 'text-yellow-600' : 'text-red-600'}>
-                          {route.profitMargin.toFixed(1)}%
+                        <span className={(route.profitMargin ?? 0) >= 30 ? 'text-green-600' : (route.profitMargin ?? 0) >= 20 ? 'text-yellow-600' : 'text-red-600'}>
+                          {(route.profitMargin ?? 0).toFixed(1)}%
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">{route.avgEfficiency.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{(route.avgEfficiency ?? 0).toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -527,15 +527,15 @@ const handleFilterChange = useCallback((filters: any) => {
                     <TableRow key={day.date} className="hover:bg-muted/30">
                       <TableCell className="font-medium">{day.date}</TableCell>
                       <TableCell className="text-right">{day.trips}</TableCell>
-                      <TableCell className="text-right">{day.distance.toFixed(1)} km</TableCell>
-                      <TableCell className="text-right">₨{day.income.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">₨{day.expenses.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{(day.distance ?? 0).toFixed(1)} km</TableCell>
+                      <TableCell className="text-right">₨{(day.income ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">₨{(day.expenses ?? 0).toLocaleString()}</TableCell>
                       <TableCell className="text-right">
-                        <span className={`font-bold ${day.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ₨{day.netIncome.toLocaleString()}
+                        <span className={`font-bold ${(day.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          ₨{(day.netIncome ?? 0).toLocaleString()}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">{day.avgEfficiency.toFixed(2)} km/L</TableCell>
+                      <TableCell className="text-right">{(day.avgEfficiency ?? 0).toFixed(2)} km/L</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

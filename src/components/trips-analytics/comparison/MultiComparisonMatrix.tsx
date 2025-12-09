@@ -35,11 +35,11 @@ const ENTITY_COLORS = [
 ];
 
 const METRICS = [
-  { key: 'income', label: 'Income', format: (v: number) => `₹${(v/1000).toFixed(0)}k`, higherIsBetter: true },
-  { key: 'expenses', label: 'Expenses', format: (v: number) => `₹${(v/1000).toFixed(0)}k`, higherIsBetter: false },
-  { key: 'netProfit', label: 'Net Profit', format: (v: number) => `₹${(v/1000).toFixed(0)}k`, higherIsBetter: true },
-  { key: 'trips', label: 'Trips', format: (v: number) => v.toString(), higherIsBetter: true },
-  { key: 'efficiency', label: 'Efficiency', format: (v: number) => `${v.toFixed(1)} km/L`, higherIsBetter: true },
+  { key: 'income', label: 'Income', format: (v: number) => `₹${((v ?? 0)/1000).toFixed(0)}k`, higherIsBetter: true },
+  { key: 'expenses', label: 'Expenses', format: (v: number) => `₹${((v ?? 0)/1000).toFixed(0)}k`, higherIsBetter: false },
+  { key: 'netProfit', label: 'Net Profit', format: (v: number) => `₹${((v ?? 0)/1000).toFixed(0)}k`, higherIsBetter: true },
+  { key: 'trips', label: 'Trips', format: (v: number) => (v ?? 0).toString(), higherIsBetter: true },
+  { key: 'efficiency', label: 'Efficiency', format: (v: number) => `${(v ?? 0).toFixed(1)} km/L`, higherIsBetter: true },
 ];
 
 export default function MultiComparisonMatrix({

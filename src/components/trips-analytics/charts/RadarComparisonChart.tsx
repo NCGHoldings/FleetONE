@@ -44,10 +44,10 @@ export default function RadarComparisonChart({
   const topItems = items.slice(0, Math.min(5, items.length));
 
   // Normalize data to 0-100 scale for radar chart
-  const maxIncome = Math.max(...topItems.map(i => i.income));
-  const maxExpenses = Math.max(...topItems.map(i => i.expenses));
-  const maxTrips = Math.max(...topItems.map(i => i.trips));
-  const maxEfficiency = Math.max(...topItems.map(i => i.efficiency));
+  const maxIncome = Math.max(...topItems.map(i => i.income ?? 0), 1);
+  const maxExpenses = Math.max(...topItems.map(i => i.expenses ?? 0), 1);
+  const maxTrips = Math.max(...topItems.map(i => i.trips ?? 0), 1);
+  const maxEfficiency = Math.max(...topItems.map(i => i.efficiency ?? 0), 1);
 
   const data = [
     {
@@ -55,7 +55,7 @@ export default function RadarComparisonChart({
       ...Object.fromEntries(
         topItems.map(item => [
           item.name,
-          maxIncome > 0 ? (item.income / maxIncome) * 100 : 0
+          maxIncome > 0 ? ((item.income ?? 0) / maxIncome) * 100 : 0
         ])
       )
     },
@@ -64,7 +64,7 @@ export default function RadarComparisonChart({
       ...Object.fromEntries(
         topItems.map(item => [
           item.name,
-          maxEfficiency > 0 ? (item.efficiency / maxEfficiency) * 100 : 0
+          maxEfficiency > 0 ? ((item.efficiency ?? 0) / maxEfficiency) * 100 : 0
         ])
       )
     },
@@ -73,7 +73,7 @@ export default function RadarComparisonChart({
       ...Object.fromEntries(
         topItems.map(item => [
           item.name,
-          maxTrips > 0 ? (item.trips / maxTrips) * 100 : 0
+          maxTrips > 0 ? ((item.trips ?? 0) / maxTrips) * 100 : 0
         ])
       )
     },
@@ -82,7 +82,7 @@ export default function RadarComparisonChart({
       ...Object.fromEntries(
         topItems.map(item => [
           item.name,
-          maxExpenses > 0 ? Math.max(0, 100 - (item.expenses / maxExpenses) * 100) : 0
+          maxExpenses > 0 ? Math.max(0, 100 - ((item.expenses ?? 0) / maxExpenses) * 100) : 0
         ])
       )
     },
@@ -91,7 +91,7 @@ export default function RadarComparisonChart({
       ...Object.fromEntries(
         topItems.map(item => [
           item.name,
-          maxIncome > 0 ? ((item.income - item.expenses) / maxIncome) * 100 : 0
+          maxIncome > 0 ? (((item.income ?? 0) - (item.expenses ?? 0)) / maxIncome) * 100 : 0
         ])
       )
     },

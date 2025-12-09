@@ -25,14 +25,14 @@ interface WaterfallChartProps {
 
 export default function WaterfallChart({ title = "Profit Waterfall Analysis", description = "Visual breakdown of income to profit", data }: WaterfallChartProps) {
   const items: WaterfallItem[] = [
-    { label: 'Total Income', value: data.totalIncome, type: 'total' },
-    { label: 'Fuel Cost', value: -data.fuelCost, type: 'negative' },
-    { label: 'Highway Charges', value: -data.tollCost, type: 'negative' },
-    { label: 'Repairs & Tyre', value: -data.repairCost, type: 'negative' },
-    { label: 'Salaries', value: -data.salaries, type: 'negative' },
-    { label: 'Permits & Legal', value: -data.permits, type: 'negative' },
-    { label: 'Other Expenses', value: -data.otherExpenses, type: 'negative' },
-    { label: 'Net Profit', value: data.netProfit, type: 'total' },
+    { label: 'Total Income', value: data.totalIncome ?? 0, type: 'total' },
+    { label: 'Fuel Cost', value: -(data.fuelCost ?? 0), type: 'negative' },
+    { label: 'Highway Charges', value: -(data.tollCost ?? 0), type: 'negative' },
+    { label: 'Repairs & Tyre', value: -(data.repairCost ?? 0), type: 'negative' },
+    { label: 'Salaries', value: -(data.salaries ?? 0), type: 'negative' },
+    { label: 'Permits & Legal', value: -(data.permits ?? 0), type: 'negative' },
+    { label: 'Other Expenses', value: -(data.otherExpenses ?? 0), type: 'negative' },
+    { label: 'Net Profit', value: data.netProfit ?? 0, type: 'total' },
   ];
 
   // Calculate cumulative values for positioning
@@ -229,7 +229,7 @@ export default function WaterfallChart({ title = "Profit Waterfall Analysis", de
                     fill={getBarColor(item.type)}
                     textAnchor="middle"
                   >
-                    {((Math.abs(item.value) / data.totalIncome) * 100).toFixed(1)}%
+                    {(((Math.abs(item.value) / (data.totalIncome || 1)) * 100)).toFixed(1)}%
                   </motion.text>
 
                   {/* Icon */}
