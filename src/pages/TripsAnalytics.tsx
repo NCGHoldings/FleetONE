@@ -25,12 +25,13 @@ import CircularRevenueChart from '@/components/trips-analytics/charts/CircularRe
 import DriverPerformanceSection from '@/components/trips-analytics/DriverPerformanceSection';
 import BusFleetSection from '@/components/trips-analytics/BusFleetSection';
 import ExpenseAnalyticsSection from '@/components/trips-analytics/ExpenseAnalyticsSection';
+import AnalyticsErrorBoundary from '@/components/trips-analytics/AnalyticsErrorBoundary';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 
-export default function TripsAnalytics() {
+function TripsAnalyticsContent() {
   const [dateRange, setDateRange] = useState<{
     startDate: Date;
     endDate: Date;
@@ -552,5 +553,13 @@ const handleFilterChange = useCallback((filters: any) => {
         dateRange={{ from: dateRange.startDate, to: dateRange.endDate }}
       />
     </div>
+  );
+}
+
+export default function TripsAnalytics() {
+  return (
+    <AnalyticsErrorBoundary fallbackMessage="Failed to render the Trip Analytics dashboard. Please try refreshing the page.">
+      <TripsAnalyticsContent />
+    </AnalyticsErrorBoundary>
   );
 }
