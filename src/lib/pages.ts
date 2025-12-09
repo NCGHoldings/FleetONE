@@ -50,6 +50,7 @@ export const PAGES: PageCategories = {
   finance: [
     { id: "accounting", title: "Accounting & GL", url: "/accounting" },
     { id: "budgeting", title: "Budgeting", url: "/budgeting" },
+    { id: "api_usage", title: "API Usage", url: "/api-usage" },
   ],
   yutong: [
     { id: "yutong_quotations", title: "Quotations", url: "/yutong-quotations" },
