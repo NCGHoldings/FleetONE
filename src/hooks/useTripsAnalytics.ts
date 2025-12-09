@@ -497,7 +497,7 @@ function generateInsights(data: any): Insight[] {
     insights.push({
       type: 'success',
       title: 'Top Performer',
-      message: `${topDriver.driverName} generated ₨${topDriver.netIncome.toLocaleString()} net income with ${topDriver.totalTrips} trips at ${topDriver.avgEfficiency.toFixed(1)} km/L average`
+      message: `${topDriver.driverName} generated Rs ${topDriver.netIncome.toLocaleString()} net income with ${topDriver.totalTrips} trips at ${topDriver.avgEfficiency.toFixed(1)} km/L average`
     });
   }
 
@@ -528,7 +528,7 @@ function generateInsights(data: any): Insight[] {
     insights.push({
       type: 'info',
       title: 'Top Revenue Route',
-      message: `${topRoute.routeName} generated ₨${topRoute.totalIncome.toLocaleString()} (${routeShare.toFixed(1)}% of total revenue) with ${topRoute.profitMargin.toFixed(1)}% profit margin`
+      message: `${topRoute.routeName} generated Rs ${topRoute.totalIncome.toLocaleString()} (${routeShare.toFixed(1)}% of total revenue) with ${topRoute.profitMargin.toFixed(1)}% profit margin`
     });
   }
 
@@ -538,7 +538,7 @@ function generateInsights(data: any): Insight[] {
     insights.push({
       type: 'error',
       title: 'Negative Profit Alert',
-      message: `${negativeTrips.length} trips resulted in losses totaling ₨${Math.abs(sumBy(negativeTrips, 'net_income')).toLocaleString()}`,
+      message: `${negativeTrips.length} trips resulted in losses totaling Rs ${Math.abs(sumBy(negativeTrips, 'net_income')).toLocaleString()}`,
       action: 'View Loss-Making Trips'
     });
   }

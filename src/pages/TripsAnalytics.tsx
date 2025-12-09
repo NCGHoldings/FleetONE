@@ -83,16 +83,70 @@ const handleFilterChange = useCallback((filters: any) => {
     });
   }, []);
 
-  // Extract unique values for filters
-  const { availableRoutes, availableDrivers, availableBuses } = useMemo(() => {
+  // Extract unique values for filters with readable names
+  const { availableRoutes, availableDrivers, availableBuses, routeNameToIdMap, busNameToIdMap, driverNameToIdMap } = useMemo(() => {
     if (!analytics?.rawTrips) {
-      return { availableRoutes: [], availableDrivers: [], availableBuses: [] };
+      return { 
+        availableRoutes: [], 
+        availableDrivers: [], 
+        availableBuses: [],
+        routeNameToIdMap: new Map<string, string>(),
+        busNameToIdMap: new Map<string, string>(),
+        driverNameToIdMap: new Map<string, string>()
+      };
     }
     
+    // Create maps for name to ID lookup
+    const routeNameToId = new Map<string, string>();
+    const busNameToId = new Map<string, string>();
+    const driverNameToId = new Map<string, string>();
+    
+    // Extract route names (e.g., "101 - Jaffna to Moratuwa")
+    const routeNames = new Set<string>();
+    analytics.rawTrips.forEach(t => {
+      if (t.routes) {
+        const routeName = `${t.routes.route_no} - ${t.routes.route_name}`;
+        routeNames.add(routeName);
+        routeNameToId.set(routeName, t.route_id);
+      }
+    });
+    
+    // Extract bus numbers (e.g., "NE 2520")
+    const busNumbers = new Set<string>();
+    analytics.rawTrips.forEach(t => {
+      if (t.buses) {
+        const busName = t.buses.bus_no || t.buses.registration_number || '';
+        if (busName) {
+          busNumbers.add(busName);
+          busNameToId.set(busName, t.bus_id);
+        }
+      }
+    });
+    
+    // Extract driver names from notes JSON
+    const driverNames = new Set<string>();
+    analytics.rawTrips.forEach(t => {
+      let driverName = '';
+      if (t.notes) {
+        const notes = typeof t.notes === 'string' ? JSON.parse(t.notes || '{}') : t.notes;
+        driverName = notes.driver || '';
+      }
+      if (!driverName && t.profiles) {
+        driverName = `${t.profiles.first_name} ${t.profiles.last_name}`.trim();
+      }
+      if (driverName && driverName !== 'Unknown Driver') {
+        driverNames.add(driverName);
+        driverNameToId.set(driverName, t.driver_id || driverName);
+      }
+    });
+    
     return {
-      availableRoutes: [...new Set(analytics.rawTrips.map(t => t.route_id).filter(Boolean))],
-      availableDrivers: [...new Set(analytics.rawTrips.map(t => t.driver_id).filter(Boolean))],
-      availableBuses: [...new Set(analytics.rawTrips.map(t => t.bus_id).filter(Boolean))]
+      availableRoutes: Array.from(routeNames).sort(),
+      availableDrivers: Array.from(driverNames).sort(),
+      availableBuses: Array.from(busNumbers).sort(),
+      routeNameToIdMap: routeNameToId,
+      busNameToIdMap: busNameToId,
+      driverNameToIdMap: driverNameToId
     };
   }, [analytics]);
 
@@ -429,7 +483,7 @@ const handleFilterChange = useCallback((filters: any) => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-3 border-b">
                   <span className="text-muted-foreground">Avg Income per Trip</span>
-                  <span className="text-lg font-bold">₨{(analytics.overview.avgIncomePerTrip ?? 0).toFixed(0)}</span>
+                  <span className="text-lg font-bold">Rs {(analytics.overview.avgIncomePerTrip ?? 0).toFixed(0)}</span>
                 </div>
                 <div className="flex justify-between items-center pb-3 border-b">
                   <span className="text-muted-foreground">Fuel Cost Share</span>
@@ -437,11 +491,11 @@ const handleFilterChange = useCallback((filters: any) => {
                 </div>
                 <div className="flex justify-between items-center pb-3 border-b">
                   <span className="text-muted-foreground">Total Fuel Cost</span>
-                  <span className="text-lg font-bold">₨{analytics.overview.totalFuelCost.toLocaleString()}</span>
+                  <span className="text-lg font-bold">Rs {analytics.overview.totalFuelCost.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Other Expenses</span>
-                  <span className="text-lg font-bold">₨{analytics.overview.totalOtherExpenses.toLocaleString()}</span>
+                  <span className="text-lg font-bold">Rs {analytics.overview.totalOtherExpenses.toLocaleString()}</span>
                 </div>
               </div>
             </Card>
@@ -473,9 +527,9 @@ const handleFilterChange = useCallback((filters: any) => {
                       <TableCell className="font-medium">{route.routeName}</TableCell>
                       <TableCell className="text-right">{route.totalTrips}</TableCell>
                       <TableCell className="text-right">{(route.totalDistance ?? 0).toFixed(1)}</TableCell>
-                      <TableCell className="text-right">₨{(route.totalIncome ?? 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">₨{(route.totalExpenses ?? 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-semibold">₨{(route.netIncome ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">Rs {(route.totalIncome ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">Rs {(route.totalExpenses ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-semibold">Rs {(route.netIncome ?? 0).toLocaleString()}</TableCell>
                       <TableCell className="text-right">
                         <span className={(route.profitMargin ?? 0) >= 30 ? 'text-green-600' : (route.profitMargin ?? 0) >= 20 ? 'text-yellow-600' : 'text-red-600'}>
                           {(route.profitMargin ?? 0).toFixed(1)}%
@@ -534,11 +588,11 @@ const handleFilterChange = useCallback((filters: any) => {
                       <TableCell className="font-medium">{day.date}</TableCell>
                       <TableCell className="text-right">{day.trips}</TableCell>
                       <TableCell className="text-right">{(day.distance ?? 0).toFixed(1)} km</TableCell>
-                      <TableCell className="text-right">₨{(day.income ?? 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">₨{(day.expenses ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">Rs {(day.income ?? 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">Rs {(day.expenses ?? 0).toLocaleString()}</TableCell>
                       <TableCell className="text-right">
                         <span className={`font-bold ${(day.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ₨{(day.netIncome ?? 0).toLocaleString()}
+                          Rs {(day.netIncome ?? 0).toLocaleString()}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">{(day.avgEfficiency ?? 0).toFixed(2)} km/L</TableCell>

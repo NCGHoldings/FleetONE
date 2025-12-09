@@ -70,7 +70,7 @@ export default function ExpenseDistributionChart({ data }: ExpenseDistributionCh
               border: '1px solid hsl(var(--border))',
               borderRadius: '8px'
             }}
-            formatter={(value: number) => `₨${value.toLocaleString()}`}
+            formatter={(value: number) => `Rs ${value.toLocaleString()}`}
           />
         </PieChart>
       </ResponsiveContainer>
@@ -78,14 +78,14 @@ export default function ExpenseDistributionChart({ data }: ExpenseDistributionCh
         {chartData.map((item, index) => (
           <div key={item.name}>
             <p className="text-xs text-muted-foreground">{item.name}</p>
-            <p className="text-lg font-bold text-foreground">₨{item.value.toLocaleString()}</p>
+            <p className="text-lg font-bold text-foreground">Rs {item.value.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">{((item.value / total) * 100).toFixed(1)}%</p>
           </div>
         ))}
       </div>
       <div className="mt-4 pt-4 border-t text-center">
         <p className="text-sm text-muted-foreground">Total Expenses</p>
-        <p className="text-2xl font-bold text-foreground">₨{total.toLocaleString()}</p>
+        <p className="text-2xl font-bold text-foreground">Rs {total.toLocaleString()}</p>
       </div>
     </Card>
   );
