@@ -183,13 +183,6 @@ serve(async (req) => {
     if (dropCoordsInput && dropCoordsInput.length === 2) {
       await logApiUsage(supabase, 'geocoding', dropLocation, true, 'COORDS_PROVIDED');
     }
-    const pickupPoint = pickupCoordsInput && pickupCoordsInput.length === 2
-      ? { lat: pickupCoordsInput[1], lng: pickupCoordsInput[0], formatted_address: pickupLocation }
-      : await geocodeLK(pickupLocation);
-
-    const dropPoint = dropCoordsInput && dropCoordsInput.length === 2
-      ? { lat: dropCoordsInput[1], lng: dropCoordsInput[0], formatted_address: dropLocation }
-      : await geocodeLK(dropLocation);
 
     // Resolve intermediate stops to coordinates (if provided coords, use them; else geocode)
     const intermediatePoints: Array<{ lat: number; lng: number; formatted?: string }> = [];
