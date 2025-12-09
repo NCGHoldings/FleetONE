@@ -1,14 +1,44 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// API costs for tracking (per 1000 calls)
+const API_COSTS = {
+  geocoding: 0.005,    // $5 per 1000
+  directions: 0.005,   // $5 per 1000
+};
+
+// Helper function to log API usage
+const logApiUsage = async (supabase: any, apiName: string, queryText: string, cacheHit: boolean, status: string, metadata: any = {}) => {
+  try {
+    const estimatedCost = cacheHit ? 0 : (API_COSTS[apiName as keyof typeof API_COSTS] || 0);
+    await supabase.from('api_usage_logs').insert({
+      api_name: apiName,
+      endpoint: 'calculate-distance',
+      query_text: queryText?.substring(0, 200),
+      cache_hit: cacheHit,
+      response_status: status,
+      estimated_cost: estimatedCost,
+      metadata
+    });
+  } catch (e) {
+    console.warn('Failed to log API usage:', e);
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // Initialize Supabase client for logging
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
     const {
@@ -121,9 +151,11 @@ serve(async (req) => {
       const resp = await fetch(url);
       if (!resp.ok) {
         console.error('Geocoding HTTP failed:', await resp.text());
+        await logApiUsage(supabase, 'geocoding', query, false, 'HTTP_ERROR');
         throw new Error(`Geocoding failed (${resp.status})`);
       }
       const data = await resp.json();
+      await logApiUsage(supabase, 'geocoding', query, false, data.status);
       if (data.status !== 'OK' || !data.results?.length) {
         console.error('Geocoding API error:', data.status, data.error_message);
         throw new Error(`Location not found: ${query}`);
@@ -138,6 +170,22 @@ serve(async (req) => {
     };
 
     // Resolve pickup and drop points: prefer provided coords, else geocode text
+    // OPTIMIZATION: If coordinates are provided, skip geocoding to save API calls
+    const pickupPoint = pickupCoordsInput && pickupCoordsInput.length === 2
+      ? { lat: pickupCoordsInput[1], lng: pickupCoordsInput[0], formatted_address: pickupLocation }
+      : await geocodeLK(pickupLocation);
+
+    const dropPoint = dropCoordsInput && dropCoordsInput.length === 2
+      ? { lat: dropCoordsInput[1], lng: dropCoordsInput[0], formatted_address: dropLocation }
+      : await geocodeLK(dropLocation);
+    
+    // Log if coordinates were reused (cache hit equivalent)
+    if (pickupCoordsInput && pickupCoordsInput.length === 2) {
+      await logApiUsage(supabase, 'geocoding', pickupLocation, true, 'COORDS_PROVIDED');
+    }
+    if (dropCoordsInput && dropCoordsInput.length === 2) {
+      await logApiUsage(supabase, 'geocoding', dropLocation, true, 'COORDS_PROVIDED');
+    }
     const pickupPoint = pickupCoordsInput && pickupCoordsInput.length === 2
       ? { lat: pickupCoordsInput[1], lng: pickupCoordsInput[0], formatted_address: pickupLocation }
       : await geocodeLK(pickupLocation);
