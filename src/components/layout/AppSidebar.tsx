@@ -26,7 +26,8 @@ import {
   Sparkles,
   BookOpen,
   Upload,
-  Clock
+  Clock,
+  Activity
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -117,6 +118,7 @@ const nspItems = [
 const financeItems = [
   { id: "accounting", title: "Accounting & GL", url: "/accounting", icon: BookOpen },
   { id: "budgeting", title: "Budgeting", url: "/budgeting", icon: BookOpen },
+  { id: "api_usage", title: "API Usage", url: "/api-usage", icon: Activity },
 ];
 
 export function AppSidebar() {
