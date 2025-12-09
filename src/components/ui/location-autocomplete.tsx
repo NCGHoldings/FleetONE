@@ -34,7 +34,8 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   const debounceRef = useRef<NodeJS.Timeout>();
 
   const searchLocations = async (query: string) => {
-    if (!query || query.trim().length < 2) {
+    // Increased minimum length from 2 to 3 characters to reduce API calls
+    if (!query || query.trim().length < 3) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -66,9 +67,10 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
+    // Increased debounce from 300ms to 500ms to reduce redundant API calls
     debounceRef.current = setTimeout(() => {
       searchLocations(query);
-    }, 300);
+    }, 500);
   };
 
   useEffect(() => {
