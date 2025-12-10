@@ -205,7 +205,7 @@ export default function ComparisonDashboard({
                   getValue={(e) => e.income ?? 0}
                   historicalData={historical}
                   getHistoricalValue={(p) => p.income ?? 0}
-                  format={(v) => `Rs ${((v ?? 0)/1000).toFixed(0)}k`}
+                  format={(v) => `₹${((v ?? 0)/1000).toFixed(0)}k`}
                   icon={<DollarSign className="h-4 w-4" />}
                 />
                 <ComparisonSparklineCard
@@ -214,7 +214,7 @@ export default function ComparisonDashboard({
                   getValue={(e) => e.netProfit ?? 0}
                   historicalData={historical}
                   getHistoricalValue={(p) => p.profit ?? 0}
-                  format={(v) => `Rs ${((v ?? 0)/1000).toFixed(0)}k`}
+                  format={(v) => `₹${((v ?? 0)/1000).toFixed(0)}k`}
                   icon={<TrendingUp className="h-4 w-4" />}
                 />
                 <ComparisonSparklineCard

@@ -104,7 +104,7 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Fleet Revenue</p>
-                  <p className="text-2xl font-bold text-emerald-600">Rs {((totalFleetIncome ?? 0) / 1000).toFixed(0)}K</p>
+                  <p className="text-2xl font-bold text-emerald-600">₨{((totalFleetIncome ?? 0) / 1000).toFixed(0)}K</p>
                 </div>
                 <div className="p-3 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600">
                   <TrendingUp className="w-6 h-6 text-white" />
@@ -316,10 +316,10 @@ export default function BusFleetSection({ busStats }: BusFleetSectionProps) {
                     </TableCell>
                     <TableCell className="text-right font-mono">{bus.totalTrips}</TableCell>
                     <TableCell className="text-right font-mono">{Number(bus.totalDistance ?? 0).toFixed(0)} km</TableCell>
-                    <TableCell className="text-right font-mono">Rs {(bus.totalIncome ?? 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono">₨{(bus.totalIncome ?? 0).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <span className={`font-bold ${(bus.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        Rs {(bus.netIncome ?? 0).toLocaleString()}
+                        ₨{(bus.netIncome ?? 0).toLocaleString()}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">

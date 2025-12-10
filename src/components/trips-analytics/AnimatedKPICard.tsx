@@ -43,7 +43,7 @@ export default function AnimatedKPICard({
     
     switch (format) {
       case 'currency':
-        return `Rs ${safeVal.toLocaleString()}`;
+        return `₨${safeVal.toLocaleString()}`;
       case 'percentage':
         return `${safeVal.toFixed(1)}%`;
       default:

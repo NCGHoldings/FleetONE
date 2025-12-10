@@ -69,7 +69,7 @@ export default function HistoricalTrendPanel({
     );
   }, [entities, historicalData, selectedPeriod]);
 
-  const formatCurrency = (value: number) => `Rs ${((value ?? 0) / 1000).toFixed(0)}k`;
+  const formatCurrency = (value: number) => `₹${((value ?? 0) / 1000).toFixed(0)}k`;
   const formatDate = (date: string) => date ? format(new Date(date), 'MMM dd') : '';
 
   const getMomentumIcon = (momentum: string) => {

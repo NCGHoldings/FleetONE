@@ -124,58 +124,20 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         console.warn('Could not fetch expenses, continuing with trips data only:', expensesError);
       }
 
-      // Helper to parse notes JSON for driver/conductor names
-      const parseNotesForFilter = (notes: any): { driver?: string; conductor?: string } => {
-        if (!notes) return {};
-        if (typeof notes === 'string') {
-          try { return JSON.parse(notes); } catch { return {}; }
-        }
-        return notes;
-      };
-
-      // Apply additional filters - match by human-readable names, not UUIDs
+      // Apply additional filters
       let filteredTrips = trips || [];
       
-      // Filter by route name (e.g., "R001 - Colombo - Kandy")
       if (stableKey.routes && stableKey.routes.length > 0) {
-        filteredTrips = filteredTrips.filter(t => {
-          if (!t.routes) return false;
-          const routeDisplayName = `${t.routes.route_no} - ${t.routes.route_name}`;
-          return stableKey.routes!.some(selectedRoute => 
-            selectedRoute === routeDisplayName || 
-            selectedRoute === t.routes.route_no ||
-            selectedRoute.includes(t.routes.route_no)
-          );
-        });
+        filteredTrips = filteredTrips.filter(t => stableKey.routes!.includes(t.route_id));
       }
-      
-      // Filter by driver name from notes JSON
       if (stableKey.drivers && stableKey.drivers.length > 0) {
-        filteredTrips = filteredTrips.filter(t => {
-          const parsedNotes = parseNotesForFilter(t.notes);
-          let driverName = parsedNotes.driver || '';
-          if (!driverName && t.profiles) {
-            driverName = `${t.profiles.first_name} ${t.profiles.last_name}`.trim();
-          }
-          return stableKey.drivers!.includes(driverName);
-        });
+        filteredTrips = filteredTrips.filter(t => stableKey.drivers!.includes(t.driver_id));
       }
-      
-      // Filter by conductor name from notes JSON
       if ((filters as any).conductors && (filters as any).conductors.length > 0) {
-        filteredTrips = filteredTrips.filter(t => {
-          const parsedNotes = parseNotesForFilter(t.notes);
-          const conductorName = parsedNotes.conductor || '';
-          return (filters as any).conductors!.includes(conductorName);
-        });
+        filteredTrips = filteredTrips.filter(t => (filters as any).conductors!.includes(t.conductor_id));
       }
-      
-      // Filter by bus number (e.g., "NC 6951")
       if (stableKey.buses && stableKey.buses.length > 0) {
-        filteredTrips = filteredTrips.filter(t => {
-          const busName = t.buses?.bus_no || t.buses?.registration_number || '';
-          return stableKey.buses!.includes(busName);
-        });
+        filteredTrips = filteredTrips.filter(t => stableKey.buses!.includes(t.bus_id));
       }
 
       return processAnalyticsData(filteredTrips, expenses || [], filters, !!expensesError);
@@ -535,7 +497,7 @@ function generateInsights(data: any): Insight[] {
     insights.push({
       type: 'success',
       title: 'Top Performer',
-      message: `${topDriver.driverName} generated Rs ${topDriver.netIncome.toLocaleString()} net income with ${topDriver.totalTrips} trips at ${topDriver.avgEfficiency.toFixed(1)} km/L average`
+      message: `${topDriver.driverName} generated ₨${topDriver.netIncome.toLocaleString()} net income with ${topDriver.totalTrips} trips at ${topDriver.avgEfficiency.toFixed(1)} km/L average`
     });
   }
 
@@ -566,7 +528,7 @@ function generateInsights(data: any): Insight[] {
     insights.push({
       type: 'info',
       title: 'Top Revenue Route',
-      message: `${topRoute.routeName} generated Rs ${topRoute.totalIncome.toLocaleString()} (${routeShare.toFixed(1)}% of total revenue) with ${topRoute.profitMargin.toFixed(1)}% profit margin`
+      message: `${topRoute.routeName} generated ₨${topRoute.totalIncome.toLocaleString()} (${routeShare.toFixed(1)}% of total revenue) with ${topRoute.profitMargin.toFixed(1)}% profit margin`
     });
   }
 
@@ -576,7 +538,7 @@ function generateInsights(data: any): Insight[] {
     insights.push({
       type: 'error',
       title: 'Negative Profit Alert',
-      message: `${negativeTrips.length} trips resulted in losses totaling Rs ${Math.abs(sumBy(negativeTrips, 'net_income')).toLocaleString()}`,
+      message: `${negativeTrips.length} trips resulted in losses totaling ₨${Math.abs(sumBy(negativeTrips, 'net_income')).toLocaleString()}`,
       action: 'View Loss-Making Trips'
     });
   }

@@ -157,7 +157,7 @@ export default function WaterfallChart({ title = "Profit Waterfall Analysis", de
                   fill="hsl(var(--muted-foreground))"
                   textAnchor="end"
                 >
-                  Rs {(maxValue * ratio / 1000).toFixed(0)}k
+                  ₨{(maxValue * ratio / 1000).toFixed(0)}k
                 </text>
               </g>
             ))}
@@ -214,7 +214,7 @@ export default function WaterfallChart({ title = "Profit Waterfall Analysis", de
                     fill="hsl(var(--foreground))"
                     textAnchor="middle"
                   >
-                    Rs {(Math.abs(item.value) / 1000).toFixed(0)}k
+                    ₨{(Math.abs(item.value) / 1000).toFixed(0)}k
                   </motion.text>
                   
                   {/* Percentage label */}

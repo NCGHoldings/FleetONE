@@ -13,20 +13,16 @@ interface LocationSuggestion {
 
 interface LocationAutocompleteProps {
   value: string;
-  onChange: (value: string, coordinates?: [number, number]) => void;
+  onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
-  initialCoordinates?: [number, number]; // Pass existing coords to skip geocoding
-  skipInitialSearch?: boolean; // Skip search on initial load
 }
 
 export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   value,
   onChange,
   placeholder = "Enter location",
-  className = "",
-  initialCoordinates,
-  skipInitialSearch = false
+  className = ""
 }) => {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,44 +32,9 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
-  
-  // Refs to prevent unnecessary API calls
-  const skipNextSearchRef = useRef(false);
-  const lastSelectedValueRef = useRef<string>('');
-  const hasUserInteractedRef = useRef(false);
-  const isInitialMountRef = useRef(true);
-
-  // Check if value looks like a complete/selected address
-  const isCompleteAddress = (val: string): boolean => {
-    if (!val) return false;
-    // Detect patterns like "Place, Sri Lanka" or "Place, City, Sri Lanka"
-    const completePatterns = [
-      /, Sri Lanka$/i,
-      /, LK$/i,
-      /\d{5}/, // Postal codes
-    ];
-    return completePatterns.some(pattern => pattern.test(val));
-  };
 
   const searchLocations = async (query: string) => {
-    // Skip search if flag is set (after selection)
-    if (skipNextSearchRef.current) {
-      skipNextSearchRef.current = false;
-      return;
-    }
-
-    // Skip if value matches last selected (user clicked suggestion)
-    if (query === lastSelectedValueRef.current) {
-      return;
-    }
-
-    // Skip search for complete addresses (already selected)
-    if (isCompleteAddress(query)) {
-      return;
-    }
-
-    // Minimum 3 characters to reduce API calls
-    if (!query || query.trim().length < 3) {
+    if (!query || query.trim().length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -105,27 +66,12 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
-    // 500ms debounce to reduce redundant API calls
     debounceRef.current = setTimeout(() => {
       searchLocations(query);
-    }, 500);
+    }, 300);
   };
 
   useEffect(() => {
-    // Skip search on initial mount if skipInitialSearch is true
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
-      if (skipInitialSearch || value) {
-        // Don't search on initial load - wait for user interaction
-        return;
-      }
-    }
-
-    // Only search if user has interacted with the input
-    if (!hasUserInteractedRef.current) {
-      return;
-    }
-
     debouncedSearch(value);
     return () => {
       if (debounceRef.current) {
@@ -135,22 +81,14 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    hasUserInteractedRef.current = true;
     onChange(e.target.value);
   };
 
   const handleSuggestionClick = (suggestion: LocationSuggestion) => {
-    // Set flags to prevent re-searching
-    skipNextSearchRef.current = true;
-    lastSelectedValueRef.current = suggestion.place_name;
-    
-    // Pass coordinates if available from suggestion
-    onChange(suggestion.place_name, suggestion.coordinates);
-    
+    onChange(suggestion.place_name);
     setShowSuggestions(false);
     setSuggestions([]);
     setHighlightedIndex(-1);
-    
     // Remove focus from input to prevent re-showing suggestions
     if (inputRef.current) {
       inputRef.current.blur();
@@ -194,13 +132,6 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     }, 100);
   };
 
-  const handleFocus = () => {
-    hasUserInteractedRef.current = true;
-    if (suggestions.length > 0) {
-      setShowSuggestions(true);
-    }
-  };
-
   return (
     <div className="relative">
       <div className="relative">
@@ -210,7 +141,7 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          onFocus={handleFocus}
+          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
           placeholder={placeholder}
           className={className}
         />
