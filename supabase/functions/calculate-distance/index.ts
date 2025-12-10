@@ -57,7 +57,9 @@ serve(async (req) => {
       avoidTolls = false, // Avoid toll roads
       debugMode = false, // Enable detailed logging and comparison
       routePreference = 'distance', // 'distance' or 'duration'
-      optimizeTrip = true, // NEW: Use Google's optimized route for trip distance (matches Google Maps)
+      // CRITICAL: Default to sequential routing (false) to match Google Maps exactly
+      // When optimize:true, Google reorders waypoints which gives WRONG distance for return trips
+      optimizeTrip = false, // Sequential routing - preserves exact customer-defined stop order
     } = await req.json()
 
     console.log('Distance calculation request:', {
@@ -493,19 +495,16 @@ serve(async (req) => {
         // Build waypoints for trip - only intermediate stops (not origin/destination)
         const tripWaypointList = tripPoints.slice(1, -1).map(p => `${p.lat},${p.lng}`);
         
-        // KEY FIX: Use optimize:true for trip waypoints when optimizeTrip is enabled
-        // This makes the distance match Google Maps by allowing optimal stop order
+        // CRITICAL: Always use SEQUENTIAL routing by default to match Google Maps exactly
+        // optimize:true reorders waypoints which gives WRONG distances for return trips
+        // (e.g., A→B→A would be collapsed to just A→B, losing the return leg)
         let waypointsParam = '';
         if (tripWaypointList.length > 0) {
-          if (optimizeTrip) {
-            // Optimized route - matches Google Maps distance
-            waypointsParam = `&waypoints=optimize:true|${tripWaypointList.join('|')}`;
-            console.log('Using OPTIMIZED trip routing (matches Google Maps)');
-          } else {
-            // Sequential route - preserves exact stop order
-            waypointsParam = `&waypoints=${encodeURIComponent(tripWaypointList.join('|'))}`;
-            console.log('Using SEQUENTIAL trip routing (exact stop order)');
-          }
+          // Sequential route - preserves EXACT customer-defined stop order
+          // This ensures distance matches what user sees in Google Maps
+          waypointsParam = `&waypoints=${encodeURIComponent(tripWaypointList.join('|'))}`;
+          console.log('Using SEQUENTIAL trip routing (matches Google Maps exactly)');
+          console.log('Waypoints in order:', tripWaypointList);
         }
         
         const tripUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${tripOrigin}&destination=${tripDest}&${buildRouteParams()}${waypointsParam}&key=${GOOGLE_API_KEY}`;
