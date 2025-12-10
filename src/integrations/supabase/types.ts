@@ -298,6 +298,42 @@ export type Database = {
           },
         ]
       }
+      api_usage_logs: {
+        Row: {
+          api_name: string
+          cache_hit: boolean | null
+          created_at: string
+          endpoint: string | null
+          estimated_cost: number | null
+          id: string
+          metadata: Json | null
+          query_text: string | null
+          response_status: string | null
+        }
+        Insert: {
+          api_name: string
+          cache_hit?: boolean | null
+          created_at?: string
+          endpoint?: string | null
+          estimated_cost?: number | null
+          id?: string
+          metadata?: Json | null
+          query_text?: string | null
+          response_status?: string | null
+        }
+        Update: {
+          api_name?: string
+          cache_hit?: boolean | null
+          created_at?: string
+          endpoint?: string | null
+          estimated_cost?: number | null
+          id?: string
+          metadata?: Json | null
+          query_text?: string | null
+          response_status?: string | null
+        }
+        Relationships: []
+      }
       approval_name_suggestions: {
         Row: {
           created_at: string
@@ -1443,6 +1479,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cached_locations: {
+        Row: {
+          coordinates: Json | null
+          created_at: string | null
+          hit_count: number | null
+          id: string
+          last_accessed_at: string | null
+          main_text: string
+          place_id: string
+          place_name: string
+          search_terms: string[] | null
+        }
+        Insert: {
+          coordinates?: Json | null
+          created_at?: string | null
+          hit_count?: number | null
+          id?: string
+          last_accessed_at?: string | null
+          main_text: string
+          place_id: string
+          place_name: string
+          search_terms?: string[] | null
+        }
+        Update: {
+          coordinates?: Json | null
+          created_at?: string | null
+          hit_count?: number | null
+          id?: string
+          last_accessed_at?: string | null
+          main_text?: string
+          place_id?: string
+          place_name?: string
+          search_terms?: string[] | null
+        }
+        Relationships: []
       }
       chart_of_accounts: {
         Row: {

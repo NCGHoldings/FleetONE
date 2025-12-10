@@ -72,6 +72,7 @@ import TyreManagement from "./pages/TyreManagement";
 import FleetAnalytics from "./pages/FleetAnalytics";
 import VehicleInquiryHub from "./pages/VehicleInquiryHub";
 import ScheduledTasks from "./pages/ScheduledTasks";
+import ApiUsageMonitoring from "./pages/ApiUsageMonitoring";
 
 const queryClient = new QueryClient();
 
@@ -712,6 +713,17 @@ const App = () => (
                 <ProtectedRoute requiredRoles={['super_admin', 'admin', 'finance']}>
                   <AppLayout>
                     <Budgeting />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/api-usage" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
+                  <AppLayout>
+                    <ApiUsageMonitoring />
                   </AppLayout>
                 </ProtectedRoute>
               } 

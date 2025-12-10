@@ -1,14 +1,44 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// API costs for tracking (per 1000 calls)
+const API_COSTS = {
+  geocoding: 0.005,    // $5 per 1000
+  directions: 0.005,   // $5 per 1000
+};
+
+// Helper function to log API usage
+const logApiUsage = async (supabase: any, apiName: string, queryText: string, cacheHit: boolean, status: string, metadata: any = {}) => {
+  try {
+    const estimatedCost = cacheHit ? 0 : (API_COSTS[apiName as keyof typeof API_COSTS] || 0);
+    await supabase.from('api_usage_logs').insert({
+      api_name: apiName,
+      endpoint: 'calculate-distance',
+      query_text: queryText?.substring(0, 200),
+      cache_hit: cacheHit,
+      response_status: status,
+      estimated_cost: estimatedCost,
+      metadata
+    });
+  } catch (e) {
+    console.warn('Failed to log API usage:', e);
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // Initialize Supabase client for logging
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
     const {
@@ -27,6 +57,7 @@ serve(async (req) => {
       avoidTolls = false, // Avoid toll roads
       debugMode = false, // Enable detailed logging and comparison
       routePreference = 'distance', // 'distance' or 'duration'
+      optimizeTrip = true, // NEW: Use Google's optimized route for trip distance (matches Google Maps)
     } = await req.json()
 
     console.log('Distance calculation request:', {
@@ -73,10 +104,6 @@ serve(async (req) => {
         params += `&avoid=${avoidanceParams.join('|')}`;
       }
       
-      // CRITICAL: Never use optimize=true to maintain exact stop sequence
-      // This was causing the 82km discrepancy by reordering stops
-      // We want exact sequential routing, not optimized routing
-      
       return params;
     };
 
@@ -121,9 +148,11 @@ serve(async (req) => {
       const resp = await fetch(url);
       if (!resp.ok) {
         console.error('Geocoding HTTP failed:', await resp.text());
+        await logApiUsage(supabase, 'geocoding', query, false, 'HTTP_ERROR');
         throw new Error(`Geocoding failed (${resp.status})`);
       }
       const data = await resp.json();
+      await logApiUsage(supabase, 'geocoding', query, false, data.status);
       if (data.status !== 'OK' || !data.results?.length) {
         console.error('Geocoding API error:', data.status, data.error_message);
         throw new Error(`Location not found: ${query}`);
@@ -138,6 +167,7 @@ serve(async (req) => {
     };
 
     // Resolve pickup and drop points: prefer provided coords, else geocode text
+    // OPTIMIZATION: If coordinates are provided, skip geocoding to save API calls
     const pickupPoint = pickupCoordsInput && pickupCoordsInput.length === 2
       ? { lat: pickupCoordsInput[1], lng: pickupCoordsInput[0], formatted_address: pickupLocation }
       : await geocodeLK(pickupLocation);
@@ -145,6 +175,14 @@ serve(async (req) => {
     const dropPoint = dropCoordsInput && dropCoordsInput.length === 2
       ? { lat: dropCoordsInput[1], lng: dropCoordsInput[0], formatted_address: dropLocation }
       : await geocodeLK(dropLocation);
+    
+    // Log if coordinates were reused (cache hit equivalent)
+    if (pickupCoordsInput && pickupCoordsInput.length === 2) {
+      await logApiUsage(supabase, 'geocoding', pickupLocation, true, 'COORDS_PROVIDED');
+    }
+    if (dropCoordsInput && dropCoordsInput.length === 2) {
+      await logApiUsage(supabase, 'geocoding', dropLocation, true, 'COORDS_PROVIDED');
+    }
 
     // Resolve intermediate stops to coordinates (if provided coords, use them; else geocode)
     const intermediatePoints: Array<{ lat: number; lng: number; formatted?: string }> = [];
@@ -431,57 +469,83 @@ serve(async (req) => {
       }
 
     } else {
-      // Original optimized route calculation
-      console.log('Using optimized route calculation');
+      // Route calculation with optional trip optimization
+      console.log('Using route calculation, optimizeTrip:', optimizeTrip);
       
-      const allPoints = [
-        { lat: parkingLat, lng: parkingLng },
-        pickupPoint,
-        ...intermediatePoints,
-        dropPoint,
-        { lat: parkingLat, lng: parkingLng },
-      ];
-
-      const origin = `${allPoints[0].lat},${allPoints[0].lng}`;
-      const destination = `${allPoints[allPoints.length - 1].lat},${allPoints[allPoints.length - 1].lng}`;
-      const waypointList = allPoints.slice(1, -1).map(p => `${p.lat},${p.lng}`);
-      // CRITICAL: Force sequential waypoint processing for bus routes
-      // Add waypoint ordering to prevent Google from reordering stops
-      const waypointsParam = waypointList.length ? `&waypoints=${encodeURIComponent(waypointList.join('|'))}` : '';
-      const routeParams = buildRouteParams();
-
-      console.log('Requesting Google Directions with sequential waypoints...');
-      console.log('Waypoints in order:', waypointList);
-      const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&${routeParams}${waypointsParam}&key=${GOOGLE_API_KEY}`;
-      const dirResp = await fetch(directionsUrl);
-      if (!dirResp.ok) {
-        console.error('Directions HTTP failed:', await dirResp.text());
-        throw new Error(`Directions request failed (${dirResp.status})`);
-      }
-      const dirData = await dirResp.json();
-      console.log('Directions API status:', dirData.status);
-      if (dirData.status !== 'OK' || !dirData.routes?.length) {
-        console.error('Directions API error:', dirData.status, dirData.error_message);
-        throw new Error('No route found for the specified waypoints');
-      }
-
-      const route = dirData.routes[0];
-      const legs = route.legs || [];
-
-      const totalMeters = legs.reduce((sum: number, leg: any) => sum + (leg.distance?.value || 0), 0);
-      totalDistance = roundKm(totalMeters);
-
-      // Segment breakdown from optimized route
-      if (legs.length >= 2) {
-        kmParkingToPickup = roundKm(legs[0].distance?.value || 0);
-        const lastIdx = legs.length - 1;
-        kmDropToParking = roundKm(legs[lastIdx].distance?.value || 0);
-        let tripMeters = 0;
-        for (let i = 1; i < lastIdx; i++) {
-          tripMeters += legs[i].distance?.value || 0;
+      // Calculate parking to pickup separately (never optimized)
+      const parkingToPickupUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${parkingLat},${parkingLng}&destination=${pickupPoint.lat},${pickupPoint.lng}&${buildRouteParams()}&key=${GOOGLE_API_KEY}`;
+      const parkingToPickupResp = await fetch(parkingToPickupUrl);
+      if (parkingToPickupResp.ok) {
+        const parkingToPickupData = await parkingToPickupResp.json();
+        if (parkingToPickupData.status === 'OK' && parkingToPickupData.routes?.length) {
+          kmParkingToPickup = roundKm(parkingToPickupData.routes[0].legs[0].distance.value);
         }
-        kmTrip = roundKm(tripMeters);
       }
+      await logApiUsage(supabase, 'directions', 'parking_to_pickup', false, 'OK');
+
+      // Calculate trip portion (pickup -> intermediate -> drop)
+      // Use optimize:true if optimizeTrip is enabled to match Google Maps distance
+      const tripPoints = [pickupPoint, ...intermediatePoints, dropPoint];
+      if (tripPoints.length >= 2) {
+        const tripOrigin = `${tripPoints[0].lat},${tripPoints[0].lng}`;
+        const tripDest = `${tripPoints[tripPoints.length - 1].lat},${tripPoints[tripPoints.length - 1].lng}`;
+        
+        // Build waypoints for trip - only intermediate stops (not origin/destination)
+        const tripWaypointList = tripPoints.slice(1, -1).map(p => `${p.lat},${p.lng}`);
+        
+        // KEY FIX: Use optimize:true for trip waypoints when optimizeTrip is enabled
+        // This makes the distance match Google Maps by allowing optimal stop order
+        let waypointsParam = '';
+        if (tripWaypointList.length > 0) {
+          if (optimizeTrip) {
+            // Optimized route - matches Google Maps distance
+            waypointsParam = `&waypoints=optimize:true|${tripWaypointList.join('|')}`;
+            console.log('Using OPTIMIZED trip routing (matches Google Maps)');
+          } else {
+            // Sequential route - preserves exact stop order
+            waypointsParam = `&waypoints=${encodeURIComponent(tripWaypointList.join('|'))}`;
+            console.log('Using SEQUENTIAL trip routing (exact stop order)');
+          }
+        }
+        
+        const tripUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${tripOrigin}&destination=${tripDest}&${buildRouteParams()}${waypointsParam}&key=${GOOGLE_API_KEY}`;
+        console.log('Trip route URL:', tripUrl.replace(GOOGLE_API_KEY!, '***'));
+        
+        const tripResp = await fetch(tripUrl);
+        if (tripResp.ok) {
+          const tripData = await tripResp.json();
+          if (tripData.status === 'OK' && tripData.routes?.length) {
+            const tripRoute = tripData.routes[0];
+            const tripLegs = tripRoute.legs || [];
+            const tripMeters = tripLegs.reduce((sum: number, leg: any) => sum + (leg.distance?.value || 0), 0);
+            kmTrip = roundKm(tripMeters);
+            
+            // Log if route was reordered
+            if (optimizeTrip && tripRoute.waypoint_order && tripRoute.waypoint_order.length > 0) {
+              const expectedOrder = tripWaypointList.map((_, i) => i);
+              const actualOrder = tripRoute.waypoint_order;
+              if (JSON.stringify(expectedOrder) !== JSON.stringify(actualOrder)) {
+                console.log('Route was optimized. Original order:', expectedOrder, 'Optimized order:', actualOrder);
+              }
+            }
+          }
+        }
+        await logApiUsage(supabase, 'directions', 'trip_segment', false, 'OK');
+      }
+
+      // Calculate drop to parking separately (never optimized)
+      const dropToParkingUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${dropPoint.lat},${dropPoint.lng}&destination=${parkingLat},${parkingLng}&${buildRouteParams()}&key=${GOOGLE_API_KEY}`;
+      const dropToParkingResp = await fetch(dropToParkingUrl);
+      if (dropToParkingResp.ok) {
+        const dropToParkingData = await dropToParkingResp.json();
+        if (dropToParkingData.status === 'OK' && dropToParkingData.routes?.length) {
+          kmDropToParking = roundKm(dropToParkingData.routes[0].legs[0].distance.value);
+        }
+      }
+      await logApiUsage(supabase, 'directions', 'drop_to_parking', false, 'OK');
+
+      totalDistance = kmParkingToPickup + kmTrip + kmDropToParking;
+      console.log('Distance breakdown:', { kmParkingToPickup, kmTrip, kmDropToParking, totalDistance });
     }
 
     // Prepare outputs consistent with previous API

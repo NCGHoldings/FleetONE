@@ -77,7 +77,7 @@ export default function CircularRevenueChart({
         <div className="bg-background border border-border rounded-lg shadow-lg p-3">
           <div className="font-semibold text-foreground">{data.name}</div>
           <div className="text-sm text-muted-foreground">
-            ₨{data.value.toLocaleString()}
+            Rs {data.value.toLocaleString()}
           </div>
           <div className="text-xs text-muted-foreground">
             {percentage}% of total
@@ -126,7 +126,7 @@ export default function CircularRevenueChart({
             <div className="text-center">
               <div className="text-sm text-muted-foreground">Total</div>
               <div className="text-2xl font-bold text-foreground">
-                ₨{(totalRevenue / 1000).toFixed(0)}k
+                Rs {(totalRevenue / 1000).toFixed(0)}k
               </div>
             </div>
           </div>
@@ -155,7 +155,7 @@ export default function CircularRevenueChart({
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-semibold text-foreground">
-                    ₨{(item.value / 1000).toFixed(0)}k
+                    Rs {(item.value / 1000).toFixed(0)}k
                   </span>
                   <span className="text-xs text-muted-foreground w-12 text-right">
                     {percentage}%

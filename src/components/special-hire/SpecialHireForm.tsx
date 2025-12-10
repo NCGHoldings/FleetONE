@@ -1007,6 +1007,18 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         numberOfBuses: data.numberOfBuses,
       };
 
+      // OPTIMIZATION: Pass existing coordinates when editing to skip geocoding API calls
+      if (isEditing && initialData) {
+        // Pass pickup coordinates if available
+        if (initialData.pickup_lat && initialData.pickup_lng) {
+          distanceCalculationBody.pickupCoords = [initialData.pickup_lng, initialData.pickup_lat];
+        }
+        // Pass drop coordinates if available
+        if (initialData.drop_lat && initialData.drop_lng) {
+          distanceCalculationBody.dropCoords = [initialData.drop_lng, initialData.drop_lat];
+        }
+      }
+
       if (useMultiParking && busDetails.length > 0) {
         // Multi-parking mode: send bus details with individual parking locations
         distanceCalculationBody.busDetails = busDetails.map(bus => ({
