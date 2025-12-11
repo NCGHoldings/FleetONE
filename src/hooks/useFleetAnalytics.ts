@@ -10,6 +10,18 @@ export interface FleetKPIs {
   totalVehicles: number;
   maxSpeed: number;
   totalIdleTime: number;
+  // Trends (compared to previous period)
+  distanceTrend: number;
+  speedTrend: number;
+  utilizationTrend: number;
+  efficiencyTrend: number;
+  idleTrend: number;
+  // Data source info
+  dataSource: {
+    mileageRecords: number;
+    gpsRecords: number;
+    fuelRecords: number;
+  };
 }
 
 export interface BusSpeedData {
@@ -31,14 +43,21 @@ export interface SpeedDistribution {
 }
 
 export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
-  // Real-time KPIs
+  // Calculate previous period for trend comparison
+  const periodLength = dateRange.end.getTime() - dateRange.start.getTime();
+  const prevPeriodEnd = dateRange.start;
+  const prevPeriodStart = new Date(dateRange.start.getTime() - periodLength);
+
+  // Real-time KPIs with trend calculations
   const { data: kpis, isLoading: kpisLoading, refetch: refetchKPIs } = useQuery({
     queryKey: ['fleet-kpis', dateRange],
     queryFn: async (): Promise<FleetKPIs> => {
       const startDate = dateRange.start.toISOString();
       const endDate = dateRange.end.toISOString();
+      const prevStartDate = prevPeriodStart.toISOString();
+      const prevEndDate = prevPeriodEnd.toISOString();
 
-      // Total distance from daily mileage
+      // Current period - Total distance from daily mileage
       const { data: mileageData } = await supabase
         .from('bus_daily_mileage')
         .select('daily_km')
@@ -47,7 +66,16 @@ export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
 
       const totalDistance = mileageData?.reduce((sum, row) => sum + (row.daily_km || 0), 0) || 0;
 
-      // Average speed from GPS history (excluding stationary)
+      // Previous period distance
+      const { data: prevMileageData } = await supabase
+        .from('bus_daily_mileage')
+        .select('daily_km')
+        .gte('date', prevStartDate.split('T')[0])
+        .lt('date', prevEndDate.split('T')[0]);
+
+      const prevTotalDistance = prevMileageData?.reduce((sum, row) => sum + (row.daily_km || 0), 0) || 0;
+
+      // Current period - Average speed from GPS history (excluding stationary)
       const { data: speedData } = await supabase
         .from('gps_location_history')
         .select('speed_kmh')
@@ -59,38 +87,81 @@ export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
         ? speedData.reduce((sum, row) => sum + (row.speed_kmh || 0), 0) / speedData.length
         : 0;
 
-      // Max speed
       const maxSpeed = speedData && speedData.length > 0
         ? Math.max(...speedData.map(row => row.speed_kmh || 0))
+        : 0;
+
+      // Previous period speed
+      const { data: prevSpeedData } = await supabase
+        .from('gps_location_history')
+        .select('speed_kmh')
+        .gte('timestamp', prevStartDate)
+        .lt('timestamp', prevEndDate)
+        .gt('speed_kmh', 0);
+
+      const prevAvgSpeed = prevSpeedData && prevSpeedData.length > 0
+        ? prevSpeedData.reduce((sum, row) => sum + (row.speed_kmh || 0), 0) / prevSpeedData.length
         : 0;
 
       // Active vehicles from real-time tracking
       const { data: trackingData } = await supabase
         .from('real_time_tracking')
-        .select('status, bus_no');
+        .select('status, bus_no, ignition_status');
 
-      const activeVehicles = trackingData?.filter(v => v.status === 'active').length || 0;
+      const activeVehicles = trackingData?.filter(v => v.status === 'active' || v.ignition_status === true).length || 0;
       const totalVehicles = trackingData?.length || 0;
 
-      // Fuel efficiency from analytics
-      const { data: analyticsData } = await supabase
-        .from('fleet_analytics_daily')
-        .select('fuel_efficiency_kmpl')
-        .gte('analytics_date', startDate.split('T')[0])
-        .lte('analytics_date', endDate.split('T')[0]);
+      // Fuel efficiency from daily expenses
+      const { data: expensesData } = await supabase
+        .from('daily_bus_expenses')
+        .select('fuel_liters')
+        .gte('expense_date', startDate.split('T')[0])
+        .lte('expense_date', endDate.split('T')[0]);
 
-      const fuelEfficiency = analyticsData && analyticsData.length > 0
-        ? analyticsData.reduce((sum, row) => sum + (row.fuel_efficiency_kmpl || 0), 0) / analyticsData.length
+      const totalFuelLiters = expensesData?.reduce((sum, row) => sum + (row.fuel_liters || 0), 0) || 0;
+      const fuelEfficiency = totalFuelLiters > 0 ? totalDistance / totalFuelLiters : 0;
+
+      // Previous period fuel efficiency
+      const { data: prevExpensesData } = await supabase
+        .from('daily_bus_expenses')
+        .select('fuel_liters')
+        .gte('expense_date', prevStartDate.split('T')[0])
+        .lt('expense_date', prevEndDate.split('T')[0]);
+
+      const prevTotalFuelLiters = prevExpensesData?.reduce((sum, row) => sum + (row.fuel_liters || 0), 0) || 0;
+      const prevFuelEfficiency = prevTotalFuelLiters > 0 ? prevTotalDistance / prevTotalFuelLiters : 0;
+
+      // Idle time calculation from GPS (points where speed = 0 but ignition on)
+      const { data: idlePoints } = await supabase
+        .from('gps_location_history')
+        .select('id')
+        .gte('timestamp', startDate)
+        .lte('timestamp', endDate)
+        .eq('speed_kmh', 0);
+
+      // Estimate idle time (each GPS point represents ~30 seconds)
+      const totalIdleTime = (idlePoints?.length || 0) * 0.5; // minutes
+
+      // Calculate trends (percentage change)
+      const distanceTrend = prevTotalDistance > 0 
+        ? Math.round(((totalDistance - prevTotalDistance) / prevTotalDistance) * 100) 
         : 0;
+      const speedTrend = prevAvgSpeed > 0 
+        ? Math.round(((avgSpeed - prevAvgSpeed) / prevAvgSpeed) * 100) 
+        : 0;
+      const efficiencyTrend = prevFuelEfficiency > 0 
+        ? Math.round(((fuelEfficiency - prevFuelEfficiency) / prevFuelEfficiency) * 100) 
+        : 0;
+      
+      // Utilization trend - compare with previous tracking data snapshot
+      const utilizationTrend = 0; // Would need historical tracking data
 
-      // Total idle time
-      const { data: idleData } = await supabase
-        .from('fleet_analytics_daily')
-        .select('total_idle_time_minutes')
-        .gte('analytics_date', startDate.split('T')[0])
-        .lte('analytics_date', endDate.split('T')[0]);
-
-      const totalIdleTime = idleData?.reduce((sum, row) => sum + (row.total_idle_time_minutes || 0), 0) || 0;
+      // Get fuel readings count
+      const { count: fuelRecordsCount } = await supabase
+        .from('bus_fuel_readings')
+        .select('id', { count: 'exact', head: true })
+        .gte('reading_timestamp', startDate)
+        .lte('reading_timestamp', endDate);
 
       return {
         totalDistance: Math.round(totalDistance),
@@ -100,6 +171,16 @@ export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
         totalVehicles,
         maxSpeed: Math.round(maxSpeed),
         totalIdleTime: Math.round(totalIdleTime),
+        distanceTrend,
+        speedTrend,
+        utilizationTrend,
+        efficiencyTrend,
+        idleTrend: 0,
+        dataSource: {
+          mileageRecords: mileageData?.length || 0,
+          gpsRecords: speedData?.length || 0,
+          fuelRecords: fuelRecordsCount || 0,
+        },
       };
     },
   });
@@ -120,7 +201,7 @@ export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
         .order('speed_kmh', { ascending: false });
 
       // Group by bus and calculate max/avg speeds
-      const busStats = data?.reduce((acc: any, curr: any) => {
+      const busStats = data?.reduce((acc: Record<string, { bus_no: string; speeds: number[]; last_recorded: string }>, curr: any) => {
         const busNo = curr.buses.bus_no;
         if (!acc[busNo]) {
           acc[busNo] = {
@@ -137,10 +218,10 @@ export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
       }, {});
 
       return Object.values(busStats || {})
-        .map((bus: any) => ({
+        .map((bus) => ({
           bus_no: bus.bus_no,
           max_speed: Math.max(...bus.speeds),
-          avg_speed: bus.speeds.reduce((a: number, b: number) => a + b, 0) / bus.speeds.length,
+          avg_speed: Math.round(bus.speeds.reduce((a, b) => a + b, 0) / bus.speeds.length),
           last_recorded: bus.last_recorded,
         }))
         .sort((a, b) => b.max_speed - a.max_speed)
@@ -163,14 +244,14 @@ export function useFleetAnalytics(dateRange: { start: Date; end: Date }) {
         .order('date', { ascending: true });
 
       // Transform to chart format with each bus as a series
-      const dates = [...new Set(data?.map(d => d.date) || [])];
-      const buses = [...new Set(data?.map(d => d.buses.bus_no) || [])];
+      const dates = [...new Set(data?.map((d: any) => d.date) || [])];
+      const buses = [...new Set(data?.map((d: any) => d.buses.bus_no) || [])];
 
       return dates.map(date => {
         const row: OdometerTrendData = { date };
         buses.forEach(busNo => {
-          const dayData = data?.find(d => d.date === date && d.buses.bus_no === busNo);
-          row[busNo] = dayData?.daily_km || 0;
+          const dayData = data?.find((d: any) => d.date === date && d.buses.bus_no === busNo);
+          row[busNo] = (dayData as any)?.daily_km || 0;
         });
         return row;
       });
