@@ -296,20 +296,20 @@ export default function SpecialHire() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Enhanced Header */}
-      <div className="flex justify-between items-start">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-6">
+      {/* Enhanced Header - Mobile Responsive */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Special Hire Management</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Special Hire Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage quotations, track payments, and oversee special hire operations
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="h-4 w-4 text-muted-foreground hidden sm:block" />
             <Select value={comparisonPeriod} onValueChange={setComparisonPeriod}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-full sm:w-[140px] h-10">
                 <SelectValue placeholder="Compare with" />
               </SelectTrigger>
               <SelectContent>
@@ -321,177 +321,182 @@ export default function SpecialHire() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+          <Button onClick={() => setShowForm(true)} className="flex items-center justify-center gap-2 h-10 sm:h-9">
             <Plus className="h-4 w-4" />
-            New Quotation
+            <span className="sm:inline">New Quotation</span>
           </Button>
         </div>
       </div>
 
-      {/* Enhanced Dashboard Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <FileText className="h-5 w-5 text-blue-500" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Quotations</p>
-                  <p className="text-2xl font-bold">{stats.totalQuotations}</p>
-                </div>
-              </div>
-              {renderChangeIndicator(stats.totalQuotationsChange)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-5 w-5 text-yellow-500" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                  <p className="text-2xl font-bold">{stats.pendingQuotations}</p>
-                </div>
-              </div>
-              {renderChangeIndicator(stats.pendingQuotationsChange)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Bus className="h-5 w-5 text-green-500" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Confirmed Trips</p>
-                  <p className="text-2xl font-bold">{stats.confirmedTrips}</p>
-                </div>
-              </div>
-              {renderChangeIndicator(stats.confirmedTripsChange)}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Finance-specific stats - only show to finance users */}
-        {isFinanceUser && (
-          <Card>
-            <CardContent className="p-4">
+      {/* Enhanced Dashboard Stats - Mobile Scrollable */}
+      <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 pb-2">
+        <div className="flex sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 min-w-max sm:min-w-0">
+          <Card className="min-w-[140px] sm:min-w-0">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <AlertTriangle className="h-5 w-5 text-orange-500" />
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Finance Pending</p>
-                    <p className="text-2xl font-bold">{stats.pendingFinanceApprovals}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Quotations</p>
+                    <p className="text-xl sm:text-2xl font-bold">{stats.totalQuotations}</p>
                   </div>
                 </div>
-                {renderChangeIndicator(stats.pendingFinanceApprovalsChange)}
+                {renderChangeIndicator(stats.totalQuotationsChange)}
               </div>
             </CardContent>
           </Card>
-        )}
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="h-5 w-5 text-purple-500" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Revenue</p>
-                  <p className="text-xl font-bold">LKR {stats.totalRevenue.toLocaleString()}</p>
-                </div>
-              </div>
-              {renderChangeIndicator(stats.totalRevenueChange)}
-            </div>
-          </CardContent>
-        </Card>
-
-        {isAdmin && (
-          <Card>
-            <CardContent className="p-4">
+          <Card className="min-w-[140px] sm:min-w-0">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5 text-red-500" />
+                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Need Approval</p>
-                    <p className="text-2xl font-bold">{stats.pendingApprovals}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pending</p>
+                    <p className="text-xl sm:text-2xl font-bold">{stats.pendingQuotations}</p>
                   </div>
                 </div>
-                {renderChangeIndicator(stats.pendingApprovalsChange)}
+                {renderChangeIndicator(stats.pendingQuotationsChange)}
               </div>
             </CardContent>
           </Card>
-        )}
+
+          <Card className="min-w-[140px] sm:min-w-0">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Bus className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Confirmed Trips</p>
+                    <p className="text-xl sm:text-2xl font-bold">{stats.confirmedTrips}</p>
+                  </div>
+                </div>
+                {renderChangeIndicator(stats.confirmedTripsChange)}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Finance-specific stats - only show to finance users */}
+          {isFinanceUser && (
+            <Card className="min-w-[140px] sm:min-w-0">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground">Finance Pending</p>
+                      <p className="text-xl sm:text-2xl font-bold">{stats.pendingFinanceApprovals}</p>
+                    </div>
+                  </div>
+                  {renderChangeIndicator(stats.pendingFinanceApprovalsChange)}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="min-w-[140px] sm:min-w-0">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Revenue</p>
+                    <p className="text-lg sm:text-xl font-bold">LKR {stats.totalRevenue.toLocaleString()}</p>
+                  </div>
+                </div>
+                {renderChangeIndicator(stats.totalRevenueChange)}
+              </div>
+            </CardContent>
+          </Card>
+
+          {isAdmin && (
+            <Card className="min-w-[140px] sm:min-w-0">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground">Need Approval</p>
+                      <p className="text-xl sm:text-2xl font-bold">{stats.pendingApprovals}</p>
+                    </div>
+                  </div>
+                  {renderChangeIndicator(stats.pendingApprovalsChange)}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
 
-      {/* Enhanced Tabs with Role-based Access */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-          <TabsTrigger value="quotations" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">Quotations</span>
-          </TabsTrigger>
-          
-          <TabsTrigger value="submissions" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">Submissions</span>
-          </TabsTrigger>
-          
-          <TabsTrigger value="confirmed-trips" className="flex items-center gap-2">
-            <Bus className="h-4 w-4" />
-            <span className="hidden sm:inline">Trips</span>
-          </TabsTrigger>
-          
-          <TabsTrigger value="calculator" className="flex items-center gap-2">
-            <Calculator className="h-4 w-4" />
-            <span className="hidden sm:inline">Calculator</span>
-          </TabsTrigger>
-
-          {/* Referral Agents tab - visible to finance and admin users */}
-          <TabsTrigger value="referral-agents" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Referrals</span>
-          </TabsTrigger>
-
-          {/* Admin-only tabs */}
-          {isAdmin && (
-            <TabsTrigger value="approvals" className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Approvals</span>
+      {/* Enhanced Tabs with Role-based Access - Mobile Scrollable */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex h-auto gap-1 p-1 min-w-max">
+            <TabsTrigger value="quotations" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Quotes</span>
             </TabsTrigger>
-          )}
+            
+            <TabsTrigger value="submissions" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Submissions</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="confirmed-trips" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <Bus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Trips</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="calculator" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <Calculator className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Calc</span>
+            </TabsTrigger>
 
-          {/* Operations tabs - visible to operations users */}
-          {isOperationsUser && (
-            <>
-              <TabsTrigger value="bus-types" className="flex items-center gap-2">
-                <Bus className="h-4 w-4" />
-                <span className="hidden sm:inline">Bus Types</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="rate-cards" className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                <span className="hidden sm:inline">Rate Cards</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="fuel-settings" className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">Fuel</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="reports" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Reports</span>
-              </TabsTrigger>
-            </>
-          )}
-        </TabsList>
+            <TabsTrigger value="referral-agents" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Referrals</span>
+            </TabsTrigger>
 
-        <TabsContent value="quotations" className="space-y-6">
-          <div className="flex justify-end mb-4">
-            <Button onClick={() => setShowForm(true)}>
+            {isAdmin && (
+              <TabsTrigger value="approvals" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+                <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span>Approvals</span>
+              </TabsTrigger>
+            )}
+
+            {isOperationsUser && (
+              <>
+                <TabsTrigger value="bus-types" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+                  <Bus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Buses</span>
+                </TabsTrigger>
+                
+                <TabsTrigger value="rate-cards" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Rates</span>
+                </TabsTrigger>
+                
+                <TabsTrigger value="fuel-settings" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+                  <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Fuel</span>
+                </TabsTrigger>
+                
+                <TabsTrigger value="reports" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+                  <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Reports</span>
+                </TabsTrigger>
+              </>
+            )}
+          </TabsList>
+        </div>
+
+        <TabsContent value="quotations" className="space-y-4 sm:space-y-6">
+          <div className="flex justify-end mb-2 sm:mb-4">
+            <Button onClick={() => setShowForm(true)} size="sm" className="sm:hidden">
+              <Plus className="w-4 h-4 mr-1" />
+              New
+            </Button>
+            <Button onClick={() => setShowForm(true)} className="hidden sm:flex">
               <Plus className="w-4 h-4 mr-2" />
               New Quotation
             </Button>

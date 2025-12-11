@@ -249,32 +249,32 @@ export default function PublicSpecialHireForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 px-3 py-4 sm:p-6">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="mx-auto w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-            <Bus className="w-10 h-10 text-primary" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4 sm:mb-6">
+            <Bus className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
             Special Hire Request
           </h1>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-base sm:text-lg text-muted-foreground px-2">
             Get a custom quotation for your transportation needs
           </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4 sm:pb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
               <div>
-                <CardTitle>Request Details</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Request Details</CardTitle>
+                <CardDescription className="text-sm mt-1">
                   Please provide complete information to help us prepare an accurate quotation for you.
                 </CardDescription>
               </div>
               <Select value={language} onValueChange={(value: Language) => setLanguage(value)}>
-                <SelectTrigger className="w-24">
+                <SelectTrigger className="w-20 sm:w-24 h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -285,35 +285,37 @@ export default function PublicSpecialHireForm() {
               </Select>
             </div>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <CardContent className="px-4 sm:px-6">
+            <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
               {/* Customer Information */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Customer Information</h3>
+                <h3 className="text-base sm:text-lg font-semibold">Customer Information</h3>
                 
                 <div>
-                  <Label htmlFor="companyName">Company Name (Optional)</Label>
+                  <Label htmlFor="companyName" className="text-sm">Company Name (Optional)</Label>
                   <Input
                     id="companyName"
                     value={formData.companyName}
                     onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
                     placeholder="Your company name"
+                    className="h-11 sm:h-10 text-base sm:text-sm"
                   />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="customerName">Full Name *</Label>
+                    <Label htmlFor="customerName" className="text-sm">Full Name *</Label>
                     <Input
                       id="customerName"
                       value={formData.customerName}
                       onChange={(e) => setFormData(prev => ({ ...prev, customerName: e.target.value }))}
                       placeholder="Your full name"
                       required
+                      className="h-11 sm:h-10 text-base sm:text-sm"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="customerPhone">Phone Number *</Label>
+                    <Label htmlFor="customerPhone" className="text-sm">Phone Number *</Label>
                     <Input
                       id="customerPhone"
                       type="tel"
@@ -322,32 +324,34 @@ export default function PublicSpecialHireForm() {
                       onChange={(e) => setFormData(prev => ({ ...prev, customerPhone: e.target.value }))}
                       maxLength={15}
                       required
+                      className="h-11 sm:h-10 text-base sm:text-sm"
                     />
                     <p className="text-xs text-muted-foreground mt-1">Format: +94XXXXXXXXX or 10-15 digits</p>
                   </div>
                 </div>
                 
                 <div>
-                  <Label htmlFor="customerEmail">Email Address</Label>
+                  <Label htmlFor="customerEmail" className="text-sm">Email Address</Label>
                   <Input
                     id="customerEmail"
                     type="email"
                     value={formData.customerEmail}
                     onChange={(e) => setFormData(prev => ({ ...prev, customerEmail: e.target.value }))}
                     placeholder="Your email address"
+                    className="h-11 sm:h-10 text-base sm:text-sm"
                   />
                 </div>
               </div>
 
               {/* Trip Details */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Trip Details</h3>
+                <h3 className="text-base sm:text-lg font-semibold">Trip Details</h3>
                 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="hireType">Hire Type *</Label>
+                    <Label htmlFor="hireType" className="text-sm">Hire Type *</Label>
                     <Select value={formData.hireType} onValueChange={(value) => setFormData(prev => ({ ...prev, hireType: value }))}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-11 sm:h-10 text-base sm:text-sm">
                         <SelectValue placeholder="Select hire type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -359,9 +363,9 @@ export default function PublicSpecialHireForm() {
                   </div>
 
                   <div>
-                    <Label htmlFor="busType">Bus Type *</Label>
+                    <Label htmlFor="busType" className="text-sm">Bus Type *</Label>
                     <Select value={formData.busTypeId} onValueChange={(value) => setFormData(prev => ({ ...prev, busTypeId: value }))}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-11 sm:h-10 text-base sm:text-sm">
                         <SelectValue placeholder="Select bus type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -375,9 +379,9 @@ export default function PublicSpecialHireForm() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="numberOfBuses">Number of Buses *</Label>
+                    <Label htmlFor="numberOfBuses" className="text-sm">Number of Buses *</Label>
                     <Input
                       id="numberOfBuses"
                       type="number"
@@ -395,11 +399,12 @@ export default function PublicSpecialHireForm() {
                       }}
                       placeholder="Enter number of buses"
                       required
+                      className="h-11 sm:h-10 text-base sm:text-sm"
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="numberOfPassengers">Number of Passengers *</Label>
+                    <Label htmlFor="numberOfPassengers" className="text-sm">Number of Passengers *</Label>
                     <Input
                       id="numberOfPassengers"
                       type="number"
@@ -417,39 +422,42 @@ export default function PublicSpecialHireForm() {
                       }}
                       placeholder="Enter number of passengers"
                       required
+                      className="h-11 sm:h-10 text-base sm:text-sm"
                     />
                   </div>
                 </div>
 
                 {/* Route Section */}
                 <div className="space-y-4">
-                  <h4 className="text-md font-semibold flex items-center gap-2">
+                  <h4 className="text-sm sm:text-md font-semibold flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
                     Route Information
                   </h4>
                   
-                  <Alert>
+                  <Alert className="py-3">
                     <MapPin className="h-4 w-4" />
-                    <AlertDescription className="text-sm">
+                    <AlertDescription className="text-xs sm:text-sm">
                       {getDropPointMessage(language)}
                     </AlertDescription>
                   </Alert>
 
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                     <div>
-                      <Label htmlFor="pickupLocation">Pickup Location *</Label>
+                      <Label htmlFor="pickupLocation" className="text-sm">Pickup Location *</Label>
                       <LocationAutocomplete
                         value={formData.pickupLocation}
                         onChange={(value) => setFormData(prev => ({ ...prev, pickupLocation: value }))}
                         placeholder="Enter pickup location"
+                        className="h-11 sm:h-10 text-base sm:text-sm"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="dropLocation">Drop Location *</Label>
+                      <Label htmlFor="dropLocation" className="text-sm">Drop Location *</Label>
                       <LocationAutocomplete
                         value={formData.dropLocation}
                         onChange={(value) => setFormData(prev => ({ ...prev, dropLocation: value }))}
                         placeholder="Enter drop location"
+                        className="h-11 sm:h-10 text-base sm:text-sm"
                       />
                     </div>
                   </div>
@@ -457,16 +465,17 @@ export default function PublicSpecialHireForm() {
                   {/* Intermediate Places */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label>Trip Places (Optional)</Label>
+                      <Label className="text-sm">Trip Places (Optional)</Label>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={addIntermediatePlace}
-                        className="flex items-center gap-1"
+                        className="flex items-center gap-1 h-9 sm:h-8 text-sm"
                       >
                         <Plus className="w-3 h-3" />
-                        Add Place
+                        <span className="hidden sm:inline">Add Place</span>
+                        <span className="sm:hidden">Add</span>
                       </Button>
                     </div>
                     
@@ -476,39 +485,41 @@ export default function PublicSpecialHireForm() {
                           value={place}
                           onChange={(value) => updateIntermediatePlace(index, value)}
                           placeholder={`Trip place ${index + 1}`}
-                          className="flex-1"
+                          className="flex-1 h-11 sm:h-10 text-base sm:text-sm"
                         />
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => removeIntermediatePlace(index)}
-                          className="px-2"
+                          className="px-3 h-11 sm:h-10"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-4 h-4 sm:w-3 sm:h-3" />
                         </Button>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   <div>
-                    <Label>Pickup Date & Time *</Label>
+                    <Label className="text-sm">Pickup Date & Time *</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal",
+                            "w-full justify-start text-left font-normal h-11 sm:h-10 text-sm",
                             !formData.pickupDateTime && "text-muted-foreground"
                           )}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {formData.pickupDateTime ? format(formData.pickupDateTime, "PPP p") : "Select pickup date & time"}
+                          <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">
+                            {formData.pickupDateTime ? format(formData.pickupDateTime, "PPP p") : "Select pickup date & time"}
+                          </span>
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
                           selected={formData.pickupDateTime}
@@ -524,7 +535,7 @@ export default function PublicSpecialHireForm() {
                         />
                         {formData.pickupDateTime && (
                           <div className="p-3 border-t">
-                            <Label htmlFor="pickupTime">Time:</Label>
+                            <Label htmlFor="pickupTime" className="text-sm">Time:</Label>
                             <WheelTimePicker
                               value={format(formData.pickupDateTime, "HH:mm")}
                               onChange={(time) => {
@@ -544,21 +555,23 @@ export default function PublicSpecialHireForm() {
                   </div>
 
                   <div>
-                    <Label>Drop Date & Time *</Label>
+                    <Label className="text-sm">Drop Date & Time *</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal",
+                            "w-full justify-start text-left font-normal h-11 sm:h-10 text-sm",
                             !formData.dropDateTime && "text-muted-foreground"
                           )}
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {formData.dropDateTime ? format(formData.dropDateTime, "PPP p") : "Select drop date & time"}
+                          <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">
+                            {formData.dropDateTime ? format(formData.dropDateTime, "PPP p") : "Select drop date & time"}
+                          </span>
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
                           selected={formData.dropDateTime}
@@ -574,7 +587,7 @@ export default function PublicSpecialHireForm() {
                         />
                         {formData.dropDateTime && (
                           <div className="p-3 border-t">
-                            <Label htmlFor="dropTime">Time:</Label>
+                            <Label htmlFor="dropTime" className="text-sm">Time:</Label>
                             <WheelTimePicker
                               value={format(formData.dropDateTime, "HH:mm")}
                               onChange={(time) => {
@@ -595,22 +608,24 @@ export default function PublicSpecialHireForm() {
                 </div>
 
                 <div>
-                  <Label htmlFor="specialRequest">Special Requests</Label>
+                  <Label htmlFor="specialRequest" className="text-sm">Special Requests</Label>
                   <Textarea
                     id="specialRequest"
                     value={formData.specialRequest}
                     onChange={(e) => setFormData(prev => ({ ...prev, specialRequest: e.target.value }))}
                     placeholder="Any special requirements, requests, or additional information..."
-                    rows={4}
+                    rows={3}
+                    className="text-base sm:text-sm resize-none"
                   />
                 </div>
               </div>
 
-              <div className="flex gap-4 pt-4">
+              {/* Sticky Submit Button on Mobile */}
+              <div className="flex gap-4 pt-4 sticky bottom-0 bg-background pb-4 sm:relative sm:pb-0 sm:bg-transparent border-t sm:border-t-0 -mx-4 px-4 sm:mx-0 sm:px-0">
                 <Button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="flex-1"
+                  className="flex-1 h-12 sm:h-10 text-base sm:text-sm"
                 >
                   {isSubmitting ? (
                     <>
