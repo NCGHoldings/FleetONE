@@ -1518,19 +1518,19 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   return (
     <>
     <Dialog open={true} onOpenChange={() => onCancel()}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader className="pb-2 sm:pb-4">
+      <DialogContent className="w-[calc(100vw-1rem)] sm:w-[95vw] max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-3 sm:p-4 md:p-6 rounded-none sm:rounded-lg">
+        <DialogHeader className="pb-2 sm:pb-3">
           <div className="flex items-center justify-between gap-2">
-            <DialogTitle className="text-lg sm:text-xl">{isEditing ? 'Edit Special Hire Quotation' : 'New Special Hire Quotation'}</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg md:text-xl">{isEditing ? 'Edit Quotation' : 'New Quotation'}</DialogTitle>
             {showAutoSaveIndicator && (
-              <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Save className="h-3 w-3" />
                 <span className="hidden sm:inline">Auto-saved</span>
               </div>
             )}
             {autoSaved && !showAutoSaveIndicator && (
-              <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Save className="h-3 w-3 sm:h-4 sm:w-4" />
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Save className="h-3 w-3" />
                 <span className="hidden sm:inline">Draft saved</span>
               </div>
             )}
@@ -1538,21 +1538,21 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 sm:space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3 sm:space-y-4 md:space-y-6">
             {/* Customer Details */}
-            <Card>
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-base sm:text-lg">Customer Details</CardTitle>
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6 pt-3 sm:pt-4">
+                <CardTitle className="text-sm sm:text-base md:text-lg">Customer Details</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-6">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 md:p-6">
                 <FormField
                   control={form.control}
                   name="companyName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm">Company (Optional)</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Company (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="Company name" {...field} className="h-10 sm:h-9" />
+                        <Input placeholder="Company name" {...field} className="h-9 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1564,9 +1564,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   name="customerName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm">Customer Name *</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Customer Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Customer name" {...field} className="h-10 sm:h-9" />
+                        <Input placeholder="Customer name" {...field} className="h-9 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1578,9 +1578,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   name="customerPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm">Phone *</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Phone *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Phone number" {...field} className="h-10 sm:h-9" />
+                        <Input placeholder="Phone number" {...field} className="h-9 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1592,9 +1592,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   name="customerEmail"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm">Email (Optional)</FormLabel>
+                      <FormLabel className="text-xs sm:text-sm">Email (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="Email address" {...field} className="h-10 sm:h-9" />
+                        <Input placeholder="Email address" {...field} className="h-9 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1607,9 +1607,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     name="specialRequest"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm">Special Request</FormLabel>
+                        <FormLabel className="text-xs sm:text-sm">Special Request</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Any special requirements..." {...field} className="min-h-[80px] resize-none" />
+                          <Textarea placeholder="Any special requirements..." {...field} className="min-h-[60px] sm:min-h-[80px] resize-none text-sm" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1620,19 +1620,19 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             </Card>
 
             {/* Trip Details */}
-            <Card>
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-base sm:text-lg">Trip Details</CardTitle>
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6 pt-3 sm:pt-4">
+                <CardTitle className="text-sm sm:text-base md:text-lg">Trip Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+              <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-6">
                 {/* Multi-Bus Fleet Mode Toggle */}
-                <div className="sm:col-span-4">
+                <div>
                   <Card className="bg-muted/50">
-                    <CardContent className="pt-4 sm:pt-6 pb-4">
+                    <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <Label className="text-sm sm:text-base font-semibold">Bus Fleet Selection</Label>
-                          <p className="text-xs sm:text-sm text-muted-foreground truncate">Request multiple bus types for this trip</p>
+                          <Label className="text-xs sm:text-sm font-semibold">Bus Fleet Selection</Label>
+                          <p className="text-xs text-muted-foreground">Multiple bus types</p>
                         </div>
                         <Switch 
                           checked={isMultiBusMode}
@@ -2769,21 +2769,24 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           <CostBreakdown data={costData} />
         )}
 
-         <div className="flex justify-between items-center pt-6 border-t">
+         {/* Mobile-friendly action buttons */}
+         <div className="flex flex-col sm:flex-row sm:justify-between items-stretch sm:items-center gap-3 pt-4 sm:pt-6 border-t sticky bottom-0 bg-background pb-2">
            <Button 
              type="button" 
              variant="outline"
-             size="lg"
+             size="default"
+             className="w-full sm:w-auto order-2 sm:order-1 h-10 sm:h-9"
              onClick={() => form.handleSubmit(calculateCosts)()}
            >
+             <Calculator className="h-4 w-4 mr-2" />
              Calculate Costs
            </Button>
-           <div className="flex justify-end space-x-3">
-             <Button type="button" variant="outline" size="lg" onClick={onCancel}>
+           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 order-1 sm:order-2 w-full sm:w-auto">
+             <Button type="button" variant="outline" size="default" onClick={onCancel} className="w-full sm:w-auto h-10 sm:h-9">
                Cancel
              </Button>
-             <Button type="submit" size="lg" disabled={loading || !costData}>
-               {loading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Quotation' : 'Create Quotation')}
+             <Button type="submit" size="default" disabled={loading || !costData} className="w-full sm:w-auto h-10 sm:h-9">
+               {loading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update' : 'Create Quotation')}
              </Button>
            </div>
           </div>
