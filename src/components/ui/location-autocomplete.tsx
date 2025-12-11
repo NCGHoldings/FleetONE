@@ -226,12 +226,12 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute z-50 w-full min-w-[400px] mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto"
+          className="absolute z-[100] w-full sm:min-w-[400px] mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto"
         >
           {suggestions.map((suggestion, index) => (
             <div
               key={suggestion.id}
-              className={`px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground ${
+              className={`px-3 py-3 sm:py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground active:bg-accent/80 ${
                 index === highlightedIndex ? 'bg-accent text-accent-foreground' : ''
               }`}
               onClick={() => handleSuggestionClick(suggestion)}
