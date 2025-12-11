@@ -411,6 +411,8 @@ const handleFilterChange = useCallback((filters: any) => {
                 trips: b.totalTrips,
                 efficiency: b.avgEfficiency,
               }))}
+              startDate={dateRange.startDate}
+              endDate={dateRange.endDate}
             />
           </div>
         </TabsContent>

@@ -26,6 +26,14 @@ interface HistoricalTrendPanelProps {
   growthMetrics: Record<string, GrowthMetrics>;
   selectedPeriod: 7 | 14 | 30;
   onPeriodChange: (period: 7 | 14 | 30) => void;
+  startDate?: Date;
+  endDate?: Date;
+  dataSourceInfo?: {
+    dateRange: { start: string; end: string };
+    totalDays: number;
+    recordsLoaded: number;
+    isRealData: boolean;
+  };
 }
 
 const ENTITY_COLORS = [
@@ -41,7 +49,10 @@ export default function HistoricalTrendPanel({
   historicalData,
   growthMetrics,
   selectedPeriod,
-  onPeriodChange
+  onPeriodChange,
+  startDate,
+  endDate,
+  dataSourceInfo
 }: HistoricalTrendPanelProps) {
   // Prepare chart data
   const chartData = useMemo(() => {
@@ -103,24 +114,38 @@ export default function HistoricalTrendPanel({
       <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-blue-500" />
-              Historical Performance
-            </CardTitle>
-            <div className="flex gap-2">
-              {[7, 14, 30].map((period) => (
-                <Button
-                  key={period}
-                  variant={selectedPeriod === period ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onPeriodChange(period as 7 | 14 | 30)}
-                  className={selectedPeriod === period 
-                    ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0" 
-                    : ""}
-                >
-                  {period}D
-                </Button>
-              ))}
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-500" />
+                Historical Performance
+              </CardTitle>
+              {dataSourceInfo && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Showing data from {dataSourceInfo.dateRange.start} to {dataSourceInfo.dateRange.end} ({dataSourceInfo.totalDays} days)
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {dataSourceInfo?.isRealData && (
+                <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 text-emerald-700 dark:text-emerald-400">
+                  Real Database Data
+                </Badge>
+              )}
+              <div className="flex gap-2">
+                {[7, 14, 30].map((period) => (
+                  <Button
+                    key={period}
+                    variant={selectedPeriod === period ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => onPeriodChange(period as 7 | 14 | 30)}
+                    className={selectedPeriod === period 
+                      ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0" 
+                      : ""}
+                  >
+                    {period}D
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         </CardHeader>

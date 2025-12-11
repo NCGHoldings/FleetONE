@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeftRight, Trophy, Users, Plus, X } from "lucide-react";
+import { ArrowLeftRight, Trophy, Users, Plus, X, Database, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
 import { COMPARISON_COLORS } from "@/lib/comparison-colors";
-import { useComparisonAnalytics } from "@/hooks/useComparisonAnalytics";
+import { useRealComparisonAnalytics } from "@/hooks/useRealComparisonAnalytics";
+import { format } from "date-fns";
 
 // New components
 import InstantComparisonInsights from "./comparison/InstantComparisonInsights";
@@ -37,6 +38,8 @@ interface ComparisonDashboardProps {
   drivers: ComparisonItem[];
   routes: ComparisonItem[];
   buses: ComparisonItem[];
+  startDate?: Date;
+  endDate?: Date;
 }
 
 const ENTITY_COLORS = [
@@ -51,6 +54,8 @@ export default function ComparisonDashboard({
   drivers,
   routes,
   buses,
+  startDate = new Date(new Date().setDate(new Date().getDate() - 30)),
+  endDate = new Date(),
 }: ComparisonDashboardProps) {
   const [comparisonType, setComparisonType] = useState<"drivers" | "routes" | "buses">("drivers");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -59,7 +64,7 @@ export default function ComparisonDashboard({
   const data = comparisonType === "drivers" ? drivers : comparisonType === "routes" ? routes : buses;
   const selectedEntities = data.filter(d => selectedIds.includes(d.id));
 
-  // Use the comparison analytics hook
+  // Use the REAL comparison analytics hook with date range
   const {
     historical,
     growthMetrics,
@@ -67,8 +72,15 @@ export default function ComparisonDashboard({
     insights,
     focusAreas,
     actionItems,
-    performanceScores
-  } = useComparisonAnalytics(selectedEntities);
+    performanceScores,
+    dataSourceInfo,
+    isLoading
+  } = useRealComparisonAnalytics({
+    entities: selectedEntities,
+    comparisonType,
+    startDate,
+    endDate
+  });
 
   const handleAddEntity = (id: string) => {
     if (selectedIds.length < 5 && !selectedIds.includes(id)) {
@@ -90,13 +102,30 @@ export default function ComparisonDashboard({
       {/* Header Card */}
       <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-200 dark:border-blue-800">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2">
-            <ArrowLeftRight className="h-5 w-5 text-purple-500" />
-            Advanced Multi-Comparison Dashboard
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Compare up to 5 {comparisonType} with historical trends, predictions, and actionable insights
-          </p>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowLeftRight className="h-5 w-5 text-purple-500" />
+                Advanced Multi-Comparison Dashboard
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Compare up to 5 {comparisonType} with historical trends, predictions, and actionable insights
+              </p>
+            </div>
+            {/* Date Range & Data Source Indicator */}
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/30 border-blue-200">
+                <Calendar className="h-3 w-3 mr-1" />
+                {format(startDate, 'MMM dd')} - {format(endDate, 'MMM dd, yyyy')}
+              </Badge>
+              {dataSourceInfo.isRealData && (
+                <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 text-emerald-700 dark:text-emerald-400">
+                  <Database className="h-3 w-3 mr-1" />
+                  {dataSourceInfo.recordsLoaded} trips loaded
+                </Badge>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Type Selector */}
@@ -263,6 +292,9 @@ export default function ComparisonDashboard({
                 growthMetrics={growthMetrics}
                 selectedPeriod={historicalPeriod}
                 onPeriodChange={setHistoricalPeriod}
+                startDate={startDate}
+                endDate={endDate}
+                dataSourceInfo={dataSourceInfo}
               />
             </TabsContent>
 
