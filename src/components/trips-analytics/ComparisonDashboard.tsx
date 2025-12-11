@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeftRight, Trophy, Users, Plus, X, Database, Calendar } from "lucide-react";
+import { ArrowLeftRight, Trophy, Users, Plus, X, Database, Calendar, LineChart } from "lucide-react";
 import { motion } from "framer-motion";
 import { COMPARISON_COLORS } from "@/lib/comparison-colors";
 import { useRealComparisonAnalytics } from "@/hooks/useRealComparisonAnalytics";
@@ -19,6 +19,7 @@ import ActionPlanPanel from "./comparison/ActionPlanPanel";
 import PerformanceScorecard from "./comparison/PerformanceScorecard";
 import MultiComparisonMatrix from "./comparison/MultiComparisonMatrix";
 import ComparisonSparklineCard from "./comparison/ComparisonSparklineCard";
+import CrossComparisonAnalytics from "./comparison/CrossComparisonAnalytics";
 
 // Existing components
 import ComparisonBarChart from "./charts/ComparisonBarChart";
@@ -193,38 +194,51 @@ export default function ComparisonDashboard({
         </CardContent>
       </Card>
 
-      {/* Main Content */}
-      {selectedEntities.length < 2 ? (
-        <Card className="py-16">
-          <CardContent className="text-center">
-            <Trophy className="h-16 w-16 mx-auto text-purple-300 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Select Entities to Compare</h3>
-            <p className="text-muted-foreground">
-              Choose at least 2 {comparisonType} from the dropdown above to see comparison analytics
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Instant Insights */}
-          <InstantComparisonInsights 
-            insights={insights}
-            entityNames={selectedEntities.map(e => e.name)}
+      {/* Cross Analysis - Always Available */}
+      <Tabs defaultValue="cross-analysis" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7">
+          <TabsTrigger value="cross-analysis" className="flex items-center gap-1">
+            <LineChart className="h-3 w-3" />
+            Cross Analysis
+          </TabsTrigger>
+          <TabsTrigger value="entity-compare" disabled={selectedEntities.length < 2}>
+            Entity Compare
+          </TabsTrigger>
+          <TabsTrigger value="history" disabled={selectedEntities.length < 2}>History</TabsTrigger>
+          <TabsTrigger value="forecast" disabled={selectedEntities.length < 2}>Forecast</TabsTrigger>
+          <TabsTrigger value="scorecard" disabled={selectedEntities.length < 2}>Scorecard</TabsTrigger>
+          <TabsTrigger value="focus" disabled={selectedEntities.length < 2}>Focus Areas</TabsTrigger>
+          <TabsTrigger value="actions" disabled={selectedEntities.length < 2}>Action Plan</TabsTrigger>
+        </TabsList>
+
+        {/* Cross Analysis Tab - Always Available */}
+        <TabsContent value="cross-analysis" className="space-y-6">
+          <CrossComparisonAnalytics 
+            startDate={startDate} 
+            endDate={endDate} 
           />
+        </TabsContent>
 
-          {/* Tabs */}
-          <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="history">History</TabsTrigger>
-              <TabsTrigger value="forecast">Forecast</TabsTrigger>
-              <TabsTrigger value="scorecard">Scorecard</TabsTrigger>
-              <TabsTrigger value="focus">Focus Areas</TabsTrigger>
-              <TabsTrigger value="actions">Action Plan</TabsTrigger>
-            </TabsList>
+        {/* Entity Compare Tab */}
+        <TabsContent value="entity-compare" className="space-y-6">
+          {selectedEntities.length < 2 ? (
+            <Card className="py-16">
+              <CardContent className="text-center">
+                <Trophy className="h-16 w-16 mx-auto text-purple-300 mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Select Entities to Compare</h3>
+                <p className="text-muted-foreground">
+                  Choose at least 2 {comparisonType} from the dropdown above to see comparison analytics
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Instant Insights */}
+              <InstantComparisonInsights 
+                insights={insights}
+                entityNames={selectedEntities.map(e => e.name)}
+              />
 
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-6">
               <MultiComparisonMatrix entities={selectedEntities} />
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -282,7 +296,9 @@ export default function ComparisonDashboard({
                   }}
                 />
               )}
-            </TabsContent>
+            </>
+          )}
+        </TabsContent>
 
             {/* History Tab */}
             <TabsContent value="history">
@@ -324,8 +340,6 @@ export default function ComparisonDashboard({
               <ActionPlanPanel actionItems={actionItems} />
             </TabsContent>
           </Tabs>
-        </>
-      )}
     </div>
   );
 }
