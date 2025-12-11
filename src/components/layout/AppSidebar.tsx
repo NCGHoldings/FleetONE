@@ -27,7 +27,8 @@ import {
   BookOpen,
   Upload,
   Clock,
-  Activity
+  Activity,
+  Monitor
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -51,6 +52,7 @@ import { usePagePermissions } from "@/hooks/usePagePermissions";
 
 const mainItems = [
   { id: "dashboard", title: "Dashboard", url: "/dashboard", icon: BarChart3 },
+  { id: "executive_dashboard", title: "Executive Dashboard", url: "/executive-dashboard", icon: Monitor },
   { id: "customers", title: "Customers", url: "/customers", icon: DollarSign },
   { id: "daily_trips", title: "Daily Trips", url: "/trips", icon: Calendar },
   { id: "trips_analytics", title: "Trips Analytics", url: "/trips/analytics", icon: TrendingUp },
