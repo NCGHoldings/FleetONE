@@ -114,6 +114,22 @@ export function useExecutiveDashboard(options: UseExecutiveDashboardOptions = {}
     refetchInterval: refreshInterval,
   });
 
+  // Fetch actual expenses from daily_bus_expenses table
+  const { data: expensesData, isLoading: expensesLoading, refetch: refetchExpenses } = useQuery({
+    queryKey: ['executive-expenses-data', startDateStr, endDateStr],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('daily_bus_expenses')
+        .select('expense_date, total_daily_expenses')
+        .gte('expense_date', startDateStr)
+        .lte('expense_date', endDateStr);
+      
+      if (error) throw error;
+      return data;
+    },
+    refetchInterval: refreshInterval,
+  });
+
   // Fetch fleet status from real-time tracking
   const { data: fleetData, isLoading: fleetLoading, refetch: refetchFleet } = useQuery({
     queryKey: ['executive-fleet-status'],
@@ -216,24 +232,38 @@ export function useExecutiveDashboard(options: UseExecutiveDashboardOptions = {}
     });
   };
 
-  // Calculate revenue trend
+  // Calculate revenue trend with real expenses from daily_bus_expenses
   const calculateRevenueTrend = (): RevenueTrendPoint[] => {
     if (!tripData) return [];
 
-    const trendMap = new Map<string, { revenue: number; expenses: number; profit: number }>();
-    
+    // Aggregate revenue by date
+    const revenueMap = new Map<string, number>();
     tripData.forEach(trip => {
       const date = trip.trip_date;
-      const existing = trendMap.get(date) || { revenue: 0, expenses: 0, profit: 0 };
-      trendMap.set(date, {
-        revenue: existing.revenue + (trip.income || 0),
-        expenses: existing.expenses + (trip.total_expenses || 0),
-        profit: existing.profit + (trip.net_income || 0),
-      });
+      revenueMap.set(date, (revenueMap.get(date) || 0) + (trip.income || 0));
     });
 
-    return Array.from(trendMap.entries())
-      .map(([date, values]) => ({ date, ...values }))
+    // Aggregate expenses by date from daily_bus_expenses
+    const expenseMap = new Map<string, number>();
+    expensesData?.forEach(expense => {
+      const date = expense.expense_date;
+      expenseMap.set(date, (expenseMap.get(date) || 0) + (expense.total_daily_expenses || 0));
+    });
+
+    // Combine all dates
+    const allDates = new Set([...revenueMap.keys(), ...expenseMap.keys()]);
+    
+    return Array.from(allDates)
+      .map(date => {
+        const revenue = revenueMap.get(date) || 0;
+        const expenses = expenseMap.get(date) || 0;
+        return {
+          date,
+          revenue,
+          expenses,
+          profit: revenue - expenses,
+        };
+      })
       .sort((a, b) => a.date.localeCompare(b.date));
   };
 
@@ -285,10 +315,10 @@ export function useExecutiveDashboard(options: UseExecutiveDashboardOptions = {}
   const revenueTrend = calculateRevenueTrend();
   const routePerformance = calculateRoutePerformance();
 
-  // Calculate monthly comparison data
+  // Calculate totals with real expenses from daily_bus_expenses
   const totalRevenue = tripData?.reduce((sum, t) => sum + (t.income || 0), 0) || 0;
-  const totalExpenses = tripData?.reduce((sum, t) => sum + (t.total_expenses || 0), 0) || 0;
-  const netProfit = tripData?.reduce((sum, t) => sum + (t.net_income || 0), 0) || 0;
+  const totalExpenses = expensesData?.reduce((sum, e) => sum + (e.total_daily_expenses || 0), 0) || 0;
+  const netProfit = totalRevenue - totalExpenses;
   const tripCount = tripData?.length || 0;
 
   const monthlyComparison = {
@@ -302,7 +332,7 @@ export function useExecutiveDashboard(options: UseExecutiveDashboardOptions = {}
   };
 
   const refetchAll = async () => {
-    await Promise.all([refetchTrips(), refetchFleet()]);
+    await Promise.all([refetchTrips(), refetchFleet(), refetchExpenses()]);
   };
 
   return {
@@ -314,7 +344,7 @@ export function useExecutiveDashboard(options: UseExecutiveDashboardOptions = {}
     monthlyComparison,
     financialSummary,
     tripCount,
-    isLoading: targetsLoading || tripDataLoading || fleetLoading,
+    isLoading: targetsLoading || tripDataLoading || fleetLoading || expensesLoading,
     refetch: refetchAll,
   };
 }

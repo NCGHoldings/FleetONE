@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 
@@ -73,26 +73,12 @@ export function ExecutiveRevenueChart({ data, isLoading }: ExecutiveRevenueChart
             <div className="p-1.5 sm:p-2 rounded-md sm:rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600">
               <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 3xl:w-6 3xl:h-6 text-white" />
             </div>
-            <CardTitle className="text-base sm:text-lg lg:text-xl 3xl:text-2xl font-bold">Revenue & Expenses Trend</CardTitle>
+            <CardTitle className="text-base sm:text-lg lg:text-xl 3xl:text-2xl font-bold">Revenue & Expenses</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="pt-2 sm:pt-4 px-2 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6">
           <ResponsiveContainer width="100%" height={240} className="sm:!h-[280px] lg:!h-[320px] 3xl:!h-[400px]">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="expensesGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
+            <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis 
                 dataKey="date" 
@@ -108,33 +94,27 @@ export function ExecutiveRevenueChart({ data, isLoading }: ExecutiveRevenueChart
               <Tooltip content={<CustomTooltip />} />
               <Legend 
                 wrapperStyle={{ paddingTop: 20 }}
-                iconType="circle"
+                iconType="rect"
               />
-              <Area
-                type="monotone"
+              <Bar
                 dataKey="revenue"
                 name="Revenue"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                fill="url(#revenueGradient)"
+                fill="#3b82f6"
+                radius={[4, 4, 0, 0]}
               />
-              <Area
-                type="monotone"
+              <Bar
                 dataKey="expenses"
                 name="Expenses"
-                stroke="#f43f5e"
-                strokeWidth={3}
-                fill="url(#expensesGradient)"
+                fill="#f43f5e"
+                radius={[4, 4, 0, 0]}
               />
-              <Area
-                type="monotone"
+              <Bar
                 dataKey="profit"
-                name="Profit"
-                stroke="#10b981"
-                strokeWidth={3}
-                fill="url(#profitGradient)"
+                name="Net Profit"
+                fill="#10b981"
+                radius={[4, 4, 0, 0]}
               />
-            </AreaChart>
+            </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
