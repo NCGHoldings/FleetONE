@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Smartphone, 
   Download, 
@@ -15,7 +16,9 @@ import {
   ArrowRight,
   Monitor,
   Apple,
-  Chrome
+  Chrome,
+  AlertTriangle,
+  ExternalLink
 } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -28,19 +31,30 @@ const InstallApp = () => {
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
+  const [isSafari, setIsSafari] = useState(false);
+  const [isInStandaloneMode, setIsInStandaloneMode] = useState(false);
 
   useEffect(() => {
-    // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
-    }
+    // Check if app is already installed (works for both Android and iOS)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         (window.navigator as any).standalone === true;
+    setIsInstalled(isStandalone);
+    setIsInStandaloneMode(isStandalone);
 
     // Detect platform
     const userAgent = navigator.userAgent.toLowerCase();
-    setIsIOS(/iphone|ipad|ipod/.test(userAgent));
+    const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
+    setIsIOS(isIOSDevice);
     setIsAndroid(/android/.test(userAgent));
 
-    // Listen for install prompt
+    // Detect if Safari on iOS (not Chrome, Firefox, etc.)
+    // Safari on iOS doesn't include "chrome", "crios", "fxios", "edgios" in user agent
+    const isSafariBrowser = isIOSDevice && 
+      /safari/i.test(userAgent) && 
+      !/chrome|crios|fxios|edgios|opios/i.test(userAgent);
+    setIsSafari(isSafariBrowser);
+
+    // Listen for install prompt (Android/Chrome only)
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
@@ -63,6 +77,10 @@ const InstallApp = () => {
       setIsInstalled(true);
     }
     setDeferredPrompt(null);
+  };
+
+  const copyUrlToClipboard = () => {
+    navigator.clipboard.writeText(window.location.href);
   };
 
   const features = [
@@ -179,21 +197,52 @@ const InstallApp = () => {
                   <div>
                     <CardTitle className="text-white">iPhone / iPad</CardTitle>
                     <CardDescription className="text-blue-200">
-                      Add to Home Screen
+                      Add to Home Screen via Safari
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
+                {/* Safari Warning for iOS users not in Safari */}
+                {isIOS && !isSafari && (
+                  <Alert className="bg-amber-500/20 border-amber-500/30 mb-4">
+                    <AlertTriangle className="w-5 h-5 text-amber-400" />
+                    <AlertDescription className="text-amber-200 ml-2">
+                      <strong className="block mb-1">Open in Safari Required</strong>
+                      <span className="text-xs">
+                        PWAs can only be installed through Safari on iPhone/iPad. 
+                        Copy this URL and paste it in Safari.
+                      </span>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {isIOS && !isSafari && (
+                  <Button 
+                    onClick={copyUrlToClipboard}
+                    className="w-full mb-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200"
+                    variant="outline"
+                    size="sm"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Copy URL for Safari
+                  </Button>
+                )}
+
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-300">
                       1
                     </div>
                     <div>
-                      <p className="text-sm text-white font-medium">Tap Share button</p>
-                      <p className="text-xs text-blue-200">Bottom of Safari browser</p>
-                      <Share className="w-5 h-5 text-blue-300 mt-1" />
+                      <p className="text-sm text-white font-medium">Open in Safari</p>
+                      <p className="text-xs text-blue-200">Must use Safari browser (not Chrome/Firefox)</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="w-6 h-6 rounded bg-blue-500/30 flex items-center justify-center">
+                          <span className="text-xs">🧭</span>
+                        </div>
+                        <span className="text-xs text-blue-300">Safari</span>
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -201,9 +250,12 @@ const InstallApp = () => {
                       2
                     </div>
                     <div>
-                      <p className="text-sm text-white font-medium">Add to Home Screen</p>
-                      <p className="text-xs text-blue-200">Scroll down in share menu</p>
-                      <Plus className="w-5 h-5 text-blue-300 mt-1" />
+                      <p className="text-sm text-white font-medium">Tap Share button</p>
+                      <p className="text-xs text-blue-200">Bottom center of Safari</p>
+                      <div className="flex items-center gap-2 mt-1 bg-white/10 rounded-lg px-3 py-2">
+                        <Share className="w-5 h-5 text-blue-300" />
+                        <span className="text-xs text-blue-200">Tap this icon ↑</span>
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -211,12 +263,35 @@ const InstallApp = () => {
                       3
                     </div>
                     <div>
-                      <p className="text-sm text-white font-medium">Tap Add</p>
-                      <p className="text-xs text-blue-200">Confirm to install</p>
+                      <p className="text-sm text-white font-medium">Add to Home Screen</p>
+                      <p className="text-xs text-blue-200">Scroll down in share menu and tap</p>
+                      <div className="flex items-center gap-2 mt-1 bg-white/10 rounded-lg px-3 py-2">
+                        <Plus className="w-5 h-5 text-blue-300" />
+                        <span className="text-xs text-blue-200">Add to Home Screen</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-sm font-bold text-green-300">
+                      4
+                    </div>
+                    <div>
+                      <p className="text-sm text-white font-medium">Tap "Add"</p>
+                      <p className="text-xs text-blue-200">Top right corner to confirm</p>
                       <CheckCircle2 className="w-5 h-5 text-green-400 mt-1" />
                     </div>
                   </div>
                 </div>
+
+                {/* Safari confirmation badge */}
+                {isIOS && isSafari && (
+                  <div className="mt-4 p-2 bg-green-500/20 rounded-lg border border-green-500/30">
+                    <div className="flex items-center gap-2 text-green-300 text-sm">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>You're in Safari - Ready to install!</span>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
