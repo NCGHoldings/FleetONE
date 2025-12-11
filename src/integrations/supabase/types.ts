@@ -2422,6 +2422,51 @@ export type Database = {
           },
         ]
       }
+      executive_kpi_targets: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          kpi_key: string
+          kpi_name: string
+          max_value: number | null
+          min_acceptable: number | null
+          target_value: number
+          unit: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          kpi_key: string
+          kpi_name: string
+          max_value?: number | null
+          min_acceptable?: number | null
+          target_value: number
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          kpi_key?: string
+          kpi_name?: string
+          max_value?: number | null
+          min_acceptable?: number | null
+          target_value?: number
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       feedback_comments: {
         Row: {
           comment_text: string
