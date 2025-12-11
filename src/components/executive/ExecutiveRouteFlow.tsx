@@ -30,9 +30,9 @@ export function ExecutiveRouteFlow({ routes, isLoading }: ExecutiveRouteFlowProp
   if (isLoading) {
     return (
       <Card className="h-full">
-        <CardContent className="pt-6 space-y-4">
+        <CardContent className="pt-4 sm:pt-6 space-y-3 sm:space-y-4">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-16 rounded-lg bg-muted animate-pulse" />
+            <div key={i} className="h-12 sm:h-16 rounded-lg bg-muted animate-pulse" />
           ))}
         </CardContent>
       </Card>
@@ -46,17 +46,18 @@ export function ExecutiveRouteFlow({ routes, isLoading }: ExecutiveRouteFlowProp
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.5 }}
+      className="h-full"
     >
       <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20 h-full">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600">
-              <Route className="w-5 h-5 text-white" />
+        <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 rounded-md sm:rounded-lg bg-gradient-to-br from-orange-500 to-amber-600">
+              <Route className="w-4 h-4 sm:w-5 sm:h-5 3xl:w-6 3xl:h-6 text-white" />
             </div>
-            <CardTitle className="text-xl font-bold">Top Routes by Revenue</CardTitle>
+            <CardTitle className="text-base sm:text-lg lg:text-xl 3xl:text-2xl font-bold">Top Routes by Revenue</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="pt-4 space-y-3">
+        <CardContent className="pt-2 sm:pt-4 px-2 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6 space-y-2 sm:space-y-3">
           {routes.slice(0, 5).map((route, index) => {
             const percentage = (route.revenue / maxRevenue) * 100;
             const isHot = index === 0;

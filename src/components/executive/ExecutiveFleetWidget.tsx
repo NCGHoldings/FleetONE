@@ -40,20 +40,21 @@ export function ExecutiveFleetWidget({ data, isLoading }: ExecutiveFleetWidgetPr
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.6 }}
+      className="h-full"
     >
       <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20 h-full">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600">
-              <Bus className="w-5 h-5 text-white" />
+        <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 rounded-md sm:rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600">
+              <Bus className="w-4 h-4 sm:w-5 sm:h-5 3xl:w-6 3xl:h-6 text-white" />
             </div>
-            <CardTitle className="text-xl font-bold">Fleet Status</CardTitle>
+            <CardTitle className="text-base sm:text-lg lg:text-xl 3xl:text-2xl font-bold">Fleet Status</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="pt-4">
-          <div className="flex items-center gap-6">
+        <CardContent className="pt-2 sm:pt-4 px-2 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6">
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
             {/* Donut Chart */}
-            <div className="relative w-36 h-36">
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 lg:w-36 lg:h-36 3xl:w-44 3xl:h-44">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
