@@ -10,7 +10,8 @@ import {
   Lightbulb,
   CheckCircle2
 } from 'lucide-react';
-import { FocusArea } from '@/hooks/useComparisonAnalytics';
+import { FocusArea } from '@/hooks/useRealComparisonAnalytics';
+import { formatLKR, formatLKRCompact } from '@/lib/currency';
 
 interface FocusAreaRecommendationsProps {
   focusAreas: FocusArea[];
@@ -174,8 +175,7 @@ export default function FocusAreaRecommendations({
 }
 
 function formatValue(value: number): string {
-  if (value >= 1000000) return `Rs ${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `Rs ${(value / 1000).toFixed(0)}k`;
+  if (value >= 1000) return formatLKRCompact(value);
   if (value < 100 && value > 0) return value.toFixed(1);
   return value.toLocaleString();
 }

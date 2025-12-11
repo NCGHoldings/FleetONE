@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import HourlyHeatmap from "./charts/HourlyHeatmap";
 import DayOfWeekChart from "./charts/DayOfWeekChart";
 import TimeSlotComparison from "./charts/TimeSlotComparison";
+import { formatLKR } from "@/lib/currency";
 
 interface TimeBasedAnalysisProps {
   startDate?: Date;
@@ -105,7 +106,7 @@ export default function TimeBasedAnalysis({
           <div className="flex flex-wrap gap-2">
             {data.peakHours.map((peak, idx) => (
               <Badge key={idx} variant="secondary" className="text-sm">
-                {peak.hour.toString().padStart(2, '0')}:00 - ₹{peak.profit.toLocaleString()} ({peak.trips} trips)
+                {peak.hour.toString().padStart(2, '0')}:00 - {formatLKR(peak.profit)} ({peak.trips} trips)
               </Badge>
             ))}
           </div>

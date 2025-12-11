@@ -207,15 +207,17 @@ export function useRealComparisonAnalytics({
     return data;
   }, [entities, historicalRawData, comparisonType]);
 
-  // Calculate growth metrics for each entity from real data
+  // Calculate growth metrics for each entity from real data (filtering zero-value days)
   const growthMetrics = useMemo(() => {
     const metrics: Record<string, GrowthMetrics> = {};
-    const totalDays = differenceInDays(endDate, startDate) + 1;
-    const halfDays = Math.floor(totalDays / 2);
     
     entities.forEach(entity => {
       const history = historical[entity.id] || [];
-      if (history.length < 2) {
+      
+      // Filter out days with zero income for accurate growth calculation
+      const validHistory = history.filter(d => d.income > 0 || d.trips > 0);
+      
+      if (validHistory.length < 2) {
         metrics[entity.id] = {
           incomeGrowthRate: 0,
           profitGrowthRate: 0,
@@ -227,31 +229,46 @@ export function useRealComparisonAnalytics({
       }
       
       // Split data into first half and second half
-      const midIndex = Math.floor(history.length / 2);
-      const firstHalf = history.slice(0, midIndex);
-      const secondHalf = history.slice(midIndex);
+      const midIndex = Math.floor(validHistory.length / 2);
+      const firstHalf = validHistory.slice(0, midIndex);
+      const secondHalf = validHistory.slice(midIndex);
       
-      const sumFirstHalf = (arr: HistoricalDataPoint[], key: keyof HistoricalDataPoint) => 
-        arr.reduce((s, d) => s + (Number(d[key]) || 0), 0);
-      const sumSecondHalf = (arr: HistoricalDataPoint[], key: keyof HistoricalDataPoint) => 
+      // Only proceed if both halves have data
+      if (firstHalf.length === 0 || secondHalf.length === 0) {
+        metrics[entity.id] = {
+          incomeGrowthRate: 0,
+          profitGrowthRate: 0,
+          tripsGrowthRate: 0,
+          efficiencyTrend: 0,
+          momentum: 'stable'
+        };
+        return;
+      }
+      
+      const sumData = (arr: HistoricalDataPoint[], key: keyof HistoricalDataPoint) => 
         arr.reduce((s, d) => s + (Number(d[key]) || 0), 0);
       
-      const firstIncome = sumFirstHalf(firstHalf, 'income');
-      const secondIncome = sumSecondHalf(secondHalf, 'income');
-      const firstProfit = sumFirstHalf(firstHalf, 'profit');
-      const secondProfit = sumSecondHalf(secondHalf, 'profit');
-      const firstTrips = sumFirstHalf(firstHalf, 'trips');
-      const secondTrips = sumSecondHalf(secondHalf, 'trips');
+      const firstIncome = sumData(firstHalf, 'income');
+      const secondIncome = sumData(secondHalf, 'income');
+      const firstProfit = sumData(firstHalf, 'profit');
+      const secondProfit = sumData(secondHalf, 'profit');
+      const firstTrips = sumData(firstHalf, 'trips');
+      const secondTrips = sumData(secondHalf, 'trips');
       const firstEfficiency = firstHalf.length > 0 
-        ? sumFirstHalf(firstHalf, 'efficiency') / firstHalf.length : 0;
+        ? sumData(firstHalf, 'efficiency') / firstHalf.length : 0;
       const secondEfficiency = secondHalf.length > 0 
-        ? sumSecondHalf(secondHalf, 'efficiency') / secondHalf.length : 0;
+        ? sumData(secondHalf, 'efficiency') / secondHalf.length : 0;
       
-      const incomeGrowth = firstIncome > 0 ? ((secondIncome - firstIncome) / firstIncome) * 100 : 0;
-      const profitGrowth = firstProfit !== 0 ? ((secondProfit - firstProfit) / Math.abs(firstProfit)) * 100 : 0;
-      const tripsGrowth = firstTrips > 0 ? ((secondTrips - firstTrips) / firstTrips) * 100 : 0;
+      // Calculate growth rates with proper handling
+      const incomeGrowth = firstIncome > 0 ? ((secondIncome - firstIncome) / firstIncome) * 100 : 
+                           secondIncome > 0 ? 100 : 0;
+      const profitGrowth = firstProfit !== 0 ? ((secondProfit - firstProfit) / Math.abs(firstProfit)) * 100 : 
+                           secondProfit !== 0 ? (secondProfit > 0 ? 100 : -100) : 0;
+      const tripsGrowth = firstTrips > 0 ? ((secondTrips - firstTrips) / firstTrips) * 100 : 
+                          secondTrips > 0 ? 100 : 0;
       const effTrend = firstEfficiency > 0 ? ((secondEfficiency - firstEfficiency) / firstEfficiency) * 100 : 0;
       
+      // Determine momentum based on valid data
       let momentum: 'accelerating' | 'stable' | 'decelerating' = 'stable';
       if (incomeGrowth > 5 && profitGrowth > 5) momentum = 'accelerating';
       else if (incomeGrowth < -5 || profitGrowth < -5) momentum = 'decelerating';
@@ -266,7 +283,7 @@ export function useRealComparisonAnalytics({
     });
     
     return metrics;
-  }, [entities, historical, startDate, endDate]);
+  }, [entities, historical]);
 
   // Generate predictions using linear regression on real data
   const predictions = useMemo(() => {

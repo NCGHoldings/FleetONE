@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
@@ -17,7 +17,8 @@ import {
 import { Sparkles, TrendingUp, AlertCircle, Calendar } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { COMPARISON_COLORS } from '@/lib/comparison-colors';
-import { PredictionResult } from '@/hooks/useComparisonAnalytics';
+import { PredictionResult } from '@/hooks/useRealComparisonAnalytics';
+import { formatLKR } from '@/lib/currency';
 
 interface PredictiveForecastPanelProps {
   entities: Array<{ id: string; name: string; income: number; netProfit: number }>;
@@ -78,7 +79,7 @@ export default function PredictiveForecastPanel({
     return totals;
   }, [entities, predictions]);
 
-  const formatCurrency = (value: number) => `₹${((value ?? 0) / 1000).toFixed(0)}k`;
+  const formatCurrency = (value: number) => formatLKR(value, true);
   const formatDate = (date: string) => date ? format(new Date(date), 'MMM dd') : '';
 
   return (
@@ -143,7 +144,7 @@ export default function PredictiveForecastPanel({
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Projected Income</span>
-                        <span className="font-bold text-lg">₹{projected.income.toLocaleString()}</span>
+                        <span className="font-bold text-lg">{formatLKR(projected.income)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Projected Profit</span>
@@ -152,7 +153,7 @@ export default function PredictiveForecastPanel({
                             ? 'text-emerald-600 dark:text-emerald-400' 
                             : 'text-rose-600 dark:text-rose-400'
                         }`}>
-                          ₹{projected.profit.toLocaleString()}
+                          {formatLKR(projected.profit)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
@@ -280,5 +281,3 @@ export default function PredictiveForecastPanel({
     </motion.div>
   );
 }
-
-import React from 'react';
