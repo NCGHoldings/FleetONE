@@ -2,7 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
   BarChart3, TrendingUp, Activity, Gauge, Fuel, Clock, 
-  Truck, AlertTriangle, Zap, Route 
+  Truck, Zap, Route, Database 
 } from 'lucide-react';
 import { FleetKPIs } from '@/hooks/useFleetAnalytics';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,7 +41,7 @@ function KPICard({ title, value, subtitle, icon, trend, gradient, iconBg }: KPIC
           <p className="text-sm font-medium text-white/80">{title}</p>
           <div className="flex items-baseline gap-2">
             <h3 className="text-3xl font-bold text-white">{value}</h3>
-            {trend && (
+            {trend && trend.value !== 0 && (
               <Badge 
                 variant="secondary" 
                 className={cn(
@@ -78,10 +78,6 @@ export function AdvancedFleetKPIs({ kpis, isLoading }: AdvancedFleetKPIsProps) {
     );
   }
 
-  const activePercentage = kpis?.totalVehicles
-    ? Math.round((kpis.activeVehicles / kpis.totalVehicles) * 100)
-    : 0;
-
   const utilizationRate = kpis?.totalVehicles 
     ? Math.round((kpis.activeVehicles / kpis.totalVehicles) * 100)
     : 0;
@@ -90,8 +86,29 @@ export function AdvancedFleetKPIs({ kpis, isLoading }: AdvancedFleetKPIsProps) {
     ? Math.round(kpis.totalDistance / kpis.totalVehicles)
     : 0;
 
+  const totalRecords = (kpis?.dataSource?.mileageRecords || 0) + 
+                       (kpis?.dataSource?.gpsRecords || 0) + 
+                       (kpis?.dataSource?.fuelRecords || 0);
+
   return (
     <div className="space-y-4">
+      {/* Data Source Indicator */}
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <Database className="h-3 w-3" />
+          <span>Data sources:</span>
+        </div>
+        <Badge variant="outline" className="text-xs">
+          {kpis?.dataSource?.mileageRecords || 0} mileage records
+        </Badge>
+        <Badge variant="outline" className="text-xs">
+          {kpis?.dataSource?.gpsRecords || 0} GPS points
+        </Badge>
+        <Badge variant="outline" className="text-xs">
+          {kpis?.dataSource?.fuelRecords || 0} fuel readings
+        </Badge>
+      </div>
+
       {/* Primary KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         <KPICard
@@ -101,7 +118,10 @@ export function AdvancedFleetKPIs({ kpis, isLoading }: AdvancedFleetKPIsProps) {
           icon={<Route className="h-6 w-6 text-white" />}
           gradient="from-blue-600 to-blue-800"
           iconBg="bg-white/20"
-          trend={{ value: 12, isPositive: true }}
+          trend={kpis?.distanceTrend !== undefined ? { 
+            value: kpis.distanceTrend, 
+            isPositive: kpis.distanceTrend > 0 
+          } : undefined}
         />
         
         <KPICard
@@ -111,6 +131,10 @@ export function AdvancedFleetKPIs({ kpis, isLoading }: AdvancedFleetKPIsProps) {
           icon={<Gauge className="h-6 w-6 text-white" />}
           gradient="from-purple-600 to-purple-800"
           iconBg="bg-white/20"
+          trend={kpis?.speedTrend !== undefined ? { 
+            value: kpis.speedTrend, 
+            isPositive: kpis.speedTrend > 0 
+          } : undefined}
         />
         
         <KPICard
@@ -120,7 +144,10 @@ export function AdvancedFleetKPIs({ kpis, isLoading }: AdvancedFleetKPIsProps) {
           icon={<Truck className="h-6 w-6 text-white" />}
           gradient="from-emerald-600 to-emerald-800"
           iconBg="bg-white/20"
-          trend={{ value: 5, isPositive: true }}
+          trend={kpis?.utilizationTrend !== undefined && kpis.utilizationTrend !== 0 ? { 
+            value: kpis.utilizationTrend, 
+            isPositive: kpis.utilizationTrend > 0 
+          } : undefined}
         />
         
         <KPICard
@@ -130,7 +157,10 @@ export function AdvancedFleetKPIs({ kpis, isLoading }: AdvancedFleetKPIsProps) {
           icon={<Fuel className="h-6 w-6 text-white" />}
           gradient="from-amber-600 to-amber-800"
           iconBg="bg-white/20"
-          trend={{ value: 3, isPositive: true }}
+          trend={kpis?.efficiencyTrend !== undefined && kpis.efficiencyTrend !== 0 ? { 
+            value: kpis.efficiencyTrend, 
+            isPositive: kpis.efficiencyTrend > 0 
+          } : undefined}
         />
         
         <KPICard
@@ -140,7 +170,10 @@ export function AdvancedFleetKPIs({ kpis, isLoading }: AdvancedFleetKPIsProps) {
           icon={<Clock className="h-6 w-6 text-white" />}
           gradient="from-rose-600 to-rose-800"
           iconBg="bg-white/20"
-          trend={{ value: 8, isPositive: false }}
+          trend={kpis?.idleTrend !== undefined && kpis.idleTrend !== 0 ? { 
+            value: Math.abs(kpis.idleTrend), 
+            isPositive: kpis.idleTrend < 0 // Less idle time is better
+          } : undefined}
         />
       </div>
 
@@ -188,8 +221,8 @@ export function AdvancedFleetKPIs({ kpis, isLoading }: AdvancedFleetKPIsProps) {
               <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Speed Alerts</p>
-              <p className="text-lg font-bold text-foreground">0 incidents</p>
+              <p className="text-xs text-muted-foreground">Data Points</p>
+              <p className="text-lg font-bold text-foreground">{totalRecords.toLocaleString()}</p>
             </div>
           </div>
         </Card>
