@@ -10,11 +10,34 @@ export default {
 	],
 	prefix: "",
 	theme: {
+		screens: {
+			'xs': '375px',      // Small phones
+			'sm': '640px',      // Large phones / Small tablets
+			'md': '768px',      // Tablets
+			'lg': '1024px',     // Small laptops / Large tablets
+			'xl': '1280px',     // Desktops
+			'2xl': '1536px',    // Large desktops
+			'3xl': '1920px',    // Full HD TVs
+			'4xl': '2560px',    // 2K/QHD TVs
+			'tv': '3840px',     // 4K TVs
+		},
 		container: {
 			center: true,
-			padding: '2rem',
+			padding: {
+				DEFAULT: '1rem',
+				xs: '1rem',
+				sm: '1.5rem',
+				md: '2rem',
+				lg: '2rem',
+				xl: '2rem',
+				'2xl': '2rem',
+				'3xl': '3rem',
+				'4xl': '4rem',
+			},
 			screens: {
-				'2xl': '1400px'
+				'2xl': '1400px',
+				'3xl': '1800px',
+				'4xl': '2200px',
 			}
 		},
 		extend: {

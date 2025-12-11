@@ -34,14 +34,14 @@ function AchievementRing({ kpi, delay }: { kpi: KPIAchievement; delay: number })
       transition={{ delay, duration: 0.5 }}
       className="flex flex-col items-center"
     >
-      <div className="relative w-32 h-32 lg:w-40 lg:h-40">
+      <div className="relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 3xl:w-48 3xl:h-48">
         <ResponsiveContainer width="100%" height="100%">
           <RadialBarChart
             cx="50%"
             cy="50%"
             innerRadius="70%"
             outerRadius="100%"
-            barSize={12}
+            barSize={8}
             data={data}
             startAngle={90}
             endAngle={-270}
@@ -64,7 +64,7 @@ function AchievementRing({ kpi, delay }: { kpi: KPIAchievement; delay: number })
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <motion.span
-            className="text-2xl lg:text-3xl font-bold text-foreground"
+            className="text-lg sm:text-xl md:text-2xl lg:text-3xl 3xl:text-4xl font-bold text-foreground"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: delay + 0.3 }}
@@ -72,18 +72,18 @@ function AchievementRing({ kpi, delay }: { kpi: KPIAchievement; delay: number })
             {kpi.achievement.toFixed(0)}%
           </motion.span>
           {kpi.achievement >= 100 ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-1" />
+            <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-500 mt-0.5 sm:mt-1" />
           ) : kpi.achievement >= 80 ? (
-            <AlertCircle className="w-4 h-4 text-amber-500 mt-1" />
+            <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500 mt-0.5 sm:mt-1" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-red-500 mt-1" />
+            <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 mt-0.5 sm:mt-1" />
           )}
         </div>
       </div>
 
-      <div className="mt-3 text-center">
-        <h4 className="font-semibold text-foreground text-sm lg:text-base">{kpi.name}</h4>
-        <div className={cn("mt-1 px-3 py-1 rounded-full text-xs font-medium", status.bg, status.text)}>
+      <div className="mt-2 sm:mt-3 text-center">
+        <h4 className="font-semibold text-foreground text-xs sm:text-sm lg:text-base 3xl:text-lg">{kpi.name}</h4>
+        <div className={cn("mt-0.5 sm:mt-1 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs 3xl:text-sm font-medium", status.bg, status.text)}>
           {kpi.achievement >= 100 ? "Achieved" : kpi.achievement >= 80 ? "On Track" : "Below Target"}
         </div>
       </div>
@@ -96,7 +96,7 @@ export function ExecutiveAchievementRings({ kpis, isLoading }: ExecutiveAchievem
     return (
       <Card className="h-full">
         <CardContent className="h-full flex items-center justify-center">
-          <div className="animate-pulse bg-muted rounded-xl w-full h-[280px]" />
+          <div className="animate-pulse bg-muted rounded-xl w-full h-[200px] sm:h-[250px] lg:h-[280px]" />
         </CardContent>
       </Card>
     );
@@ -110,18 +110,19 @@ export function ExecutiveAchievementRings({ kpis, isLoading }: ExecutiveAchievem
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 }}
+      className="h-full"
     >
       <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20 h-full">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600">
-              <Target className="w-5 h-5 text-white" />
+        <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 rounded-md sm:rounded-lg bg-gradient-to-br from-purple-500 to-violet-600">
+              <Target className="w-4 h-4 sm:w-5 sm:h-5 3xl:w-6 3xl:h-6 text-white" />
             </div>
-            <CardTitle className="text-xl font-bold">KPI Achievement</CardTitle>
+            <CardTitle className="text-base sm:text-lg lg:text-xl 3xl:text-2xl font-bold">KPI Achievement</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="pt-4">
-          <div className="flex items-center justify-around flex-wrap gap-4">
+        <CardContent className="pt-2 sm:pt-4 px-2 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6">
+          <div className="flex items-center justify-around flex-wrap gap-2 sm:gap-4">
             {displayKpis.map((kpi, index) => (
               <AchievementRing key={kpi.name} kpi={kpi} delay={0.5 + index * 0.15} />
             ))}

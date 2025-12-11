@@ -88,16 +88,16 @@ export function ExecutiveMonthlyComparison({ data, isLoading }: ExecutiveMonthly
       transition={{ delay: 0.7 }}
     >
       <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
-              <CalendarDays className="w-5 h-5 text-white" />
+        <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 rounded-md sm:rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
+              <CalendarDays className="w-4 h-4 sm:w-5 sm:h-5 3xl:w-6 3xl:h-6 text-white" />
             </div>
-            <CardTitle className="text-xl font-bold">Month-to-Month Comparison</CardTitle>
+            <CardTitle className="text-base sm:text-lg lg:text-xl 3xl:text-2xl font-bold">Month-to-Month Comparison</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <CardContent className="pt-2 sm:pt-4 px-2 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
             {metrics.map((metric, index) => {
               const change = calculateChange(metric.current, metric.last);
               const isPositive = metric.invertChange ? change < 0 : change > 0;

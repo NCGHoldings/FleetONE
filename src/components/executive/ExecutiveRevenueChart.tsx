@@ -53,9 +53,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function ExecutiveRevenueChart({ data, isLoading }: ExecutiveRevenueChartProps) {
   if (isLoading) {
     return (
-      <Card className="h-[400px]">
+      <Card className="h-[280px] sm:h-[350px] lg:h-[400px] 3xl:h-[500px]">
         <CardContent className="h-full flex items-center justify-center">
-          <div className="animate-pulse bg-muted rounded-xl w-full h-[320px]" />
+          <div className="animate-pulse bg-muted rounded-xl w-full h-[200px] sm:h-[280px] lg:h-[320px]" />
         </CardContent>
       </Card>
     );
@@ -67,17 +67,17 @@ export function ExecutiveRevenueChart({ data, isLoading }: ExecutiveRevenueChart
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
     >
-      <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600">
-              <TrendingUp className="w-5 h-5 text-white" />
+      <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-card via-card to-muted/20 h-full">
+        <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 lg:pt-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 rounded-md sm:rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 3xl:w-6 3xl:h-6 text-white" />
             </div>
-            <CardTitle className="text-xl font-bold">Revenue & Expenses Trend</CardTitle>
+            <CardTitle className="text-base sm:text-lg lg:text-xl 3xl:text-2xl font-bold">Revenue & Expenses Trend</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="pt-4">
-          <ResponsiveContainer width="100%" height={320}>
+        <CardContent className="pt-2 sm:pt-4 px-2 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6">
+          <ResponsiveContainer width="100%" height={240} className="sm:!h-[280px] lg:!h-[320px] 3xl:!h-[400px]">
             <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
