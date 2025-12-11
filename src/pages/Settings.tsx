@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
@@ -18,6 +18,7 @@ import { MultiDayRouteConfig } from "@/components/trips/MultiDayRouteConfig";
 import { ServiceAlertSettings } from "@/components/settings/ServiceAlertSettings";
 import { SpecialHireSignatureSettings } from "@/components/settings/SpecialHireSignatureSettings";
 import { BusCategoriesSettings } from "@/components/settings/BusCategoriesSettings";
+import { ExecutiveKPISettings } from "@/components/settings/ExecutiveKPISettings";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -102,7 +103,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="account" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-10">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-11">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="display">Display</TabsTrigger>
@@ -113,6 +114,7 @@ export default function Settings() {
           <TabsTrigger value="service-alerts">Service Alerts</TabsTrigger>
           <TabsTrigger value="signatures">Signatures</TabsTrigger>
           <TabsTrigger value="bus-categories">Bus Categories</TabsTrigger>
+          <TabsTrigger value="kpi-targets">KPI Targets</TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="space-y-6 mt-6">
@@ -479,6 +481,23 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <BusCategoriesSettings />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="kpi-targets" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="w-5 h-5" />
+                Executive Dashboard KPI Targets
+              </CardTitle>
+              <CardDescription>
+                Configure target values for KPIs displayed on the Executive Dashboard. Adjust targets to match your business goals.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ExecutiveKPISettings />
             </CardContent>
           </Card>
         </TabsContent>
