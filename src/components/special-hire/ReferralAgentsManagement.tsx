@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -22,7 +23,8 @@ import {
   TrendingUp,
   Clock,
   CheckCircle,
-  DollarSign
+  DollarSign,
+  Link2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +32,7 @@ import { AddReferralAgentModal } from './AddReferralAgentModal';
 import { ReferralAgentHistoryModal } from './ReferralAgentHistoryModal';
 import { RecordCommissionPaymentModal } from './RecordCommissionPaymentModal';
 import { EditReferralAgentModal } from './EditReferralAgentModal';
+import { BulkCommissionManagement } from './BulkCommissionManagement';
 
 interface ReferralAgent {
   id: string;
@@ -153,7 +156,19 @@ export function ReferralAgentsManagement() {
   };
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="agents" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="agents" className="flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Agents
+        </TabsTrigger>
+        <TabsTrigger value="link-trips" className="flex items-center gap-2">
+          <Link2 className="h-4 w-4" />
+          Link Trips
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="agents" className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
@@ -393,6 +408,11 @@ export function ReferralAgentsManagement() {
           onAgentUpdated={fetchAgents}
         />
       )}
-    </div>
+      </TabsContent>
+
+      <TabsContent value="link-trips">
+        <BulkCommissionManagement />
+      </TabsContent>
+    </Tabs>
   );
 }
