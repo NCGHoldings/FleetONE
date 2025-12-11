@@ -73,6 +73,7 @@ import FleetAnalytics from "./pages/FleetAnalytics";
 import VehicleInquiryHub from "./pages/VehicleInquiryHub";
 import ScheduledTasks from "./pages/ScheduledTasks";
 import ApiUsageMonitoring from "./pages/ApiUsageMonitoring";
+import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 
 const queryClient = new QueryClient();
 
@@ -110,6 +111,18 @@ const App = () => (
                   <PageAccessGuard pageId="dashboard">
                     <AppLayout>
                       <Dashboard />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/executive-dashboard" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin', 'supervisor']}>
+                  <PageAccessGuard pageId="executive_dashboard">
+                    <AppLayout>
+                      <ExecutiveDashboard />
                     </AppLayout>
                   </PageAccessGuard>
                 </ProtectedRoute>
