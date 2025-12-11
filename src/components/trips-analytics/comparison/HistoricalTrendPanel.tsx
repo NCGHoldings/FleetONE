@@ -18,7 +18,8 @@ import {
 import { Calendar, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { COMPARISON_COLORS } from '@/lib/comparison-colors';
-import { HistoricalDataPoint, GrowthMetrics } from '@/hooks/useComparisonAnalytics';
+import { HistoricalDataPoint, GrowthMetrics } from '@/hooks/useRealComparisonAnalytics';
+import { formatLKR } from '@/lib/currency';
 
 interface HistoricalTrendPanelProps {
   entities: Array<{ id: string; name: string }>;
@@ -80,7 +81,7 @@ export default function HistoricalTrendPanel({
     );
   }, [entities, historicalData, selectedPeriod]);
 
-  const formatCurrency = (value: number) => `Rs ${((value ?? 0) / 1000).toFixed(0)}k`;
+  const formatCurrency = (value: number) => formatLKR(value, true);
   const formatDate = (date: string) => date ? format(new Date(date), 'MMM dd') : '';
 
   const getMomentumIcon = (momentum: string) => {

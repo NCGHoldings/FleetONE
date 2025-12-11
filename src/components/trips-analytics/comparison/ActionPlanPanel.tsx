@@ -11,7 +11,8 @@ import {
   ArrowRight,
   Rocket
 } from 'lucide-react';
-import { ActionItem } from '@/hooks/useComparisonAnalytics';
+import { ActionItem } from '@/hooks/useRealComparisonAnalytics';
+import { formatLKR } from '@/lib/currency';
 
 interface ActionPlanPanelProps {
   actionItems: ActionItem[];
@@ -63,7 +64,7 @@ export default function ActionPlanPanel({
             <div className="flex items-center gap-2">
               <Badge className="bg-emerald-500 text-white">
                 <DollarSign className="h-3 w-3 mr-1" />
-                ₹{(totalPotentialGain / 1000).toFixed(0)}k Potential
+                {formatLKR(totalPotentialGain, true)} Potential
               </Badge>
             </div>
           </div>
@@ -154,7 +155,7 @@ export default function ActionPlanPanel({
                           <div>
                             <div className="text-xs text-muted-foreground">Potential Gain</div>
                             <div className="font-medium text-emerald-600 dark:text-emerald-400">
-                              ₹{item.potentialGain.toLocaleString()}
+                              {formatLKR(item.potentialGain)}
                             </div>
                           </div>
                         </div>
@@ -184,7 +185,7 @@ export default function ActionPlanPanel({
                     Complete all actions
                   </h4>
                   <p className="text-sm text-emerald-600 dark:text-emerald-500">
-                    Estimated total improvement: ₹{totalPotentialGain.toLocaleString()}
+                    Estimated total improvement: {formatLKR(totalPotentialGain)}
                   </p>
                 </div>
                 <Button className="bg-gradient-to-r from-emerald-500 to-blue-500 text-white border-0">
