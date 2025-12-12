@@ -261,6 +261,12 @@ const handleFilterChange = useCallback((filters: any) => {
       <DataQualityAlert 
         tripsWithExpenses={analytics.tripsWithExpenses || 0}
         totalTrips={analytics.overview.totalTrips}
+        totalExpenses={analytics.overview.totalExpenses}
+        totalRevenue={analytics.overview.totalIncome}
+        dateRange={dateRange.startDate && dateRange.endDate ? {
+          from: dateRange.startDate,
+          to: dateRange.endDate
+        } : undefined}
       />
 
       {/* Animated KPI Cards */}
