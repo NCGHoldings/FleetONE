@@ -57,11 +57,21 @@ const ENTITY_COLORS = [
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload || !payload.length) return null;
 
+  // Get the original ISO date from payload data, fallback to label
+  const originalDate = payload[0]?.payload?.date;
+  let formattedDate = label;
+  
+  if (originalDate) {
+    try {
+      formattedDate = format(parseISO(originalDate), 'MMM dd, yyyy');
+    } catch {
+      formattedDate = label;
+    }
+  }
+
   return (
     <div className="bg-background/95 backdrop-blur-sm border rounded-lg shadow-lg p-3 min-w-[200px]">
-      <p className="font-medium text-sm mb-2">
-        {label ? format(parseISO(label), 'MMM dd, yyyy') : label}
-      </p>
+      <p className="font-medium text-sm mb-2">{formattedDate}</p>
       <div className="space-y-1">
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center justify-between gap-4">
