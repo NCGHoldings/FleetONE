@@ -233,6 +233,21 @@ useEffect(() => {
           )}
         </div>
         <div className="flex gap-2">
+          {activeFilterCount > 0 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                setSelectedRoutes([]);
+                setSelectedDrivers([]);
+                setSelectedBuses([]);
+              }}
+              className="text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Clear Filters
+            </Button>
+          )}
           <Button 
             variant="ghost" 
             size="sm" 
@@ -244,7 +259,7 @@ useEffect(() => {
           </Button>
           <Button variant="ghost" size="sm" onClick={handleReset}>
             <RotateCcw className="w-4 h-4 mr-2" />
-            Reset
+            Reset All
           </Button>
           <Button 
             variant="ghost" 

@@ -459,10 +459,8 @@ function processAnalyticsData(
   const dailyTrends = Object.keys(tripsByDate).map(date => {
     const dayTrips = tripsByDate[date];
     const dayExpenses = expensesByDate[date] || [];
-    const dayTotalExpenses = sumBy(dayExpenses, exp => 
-      (exp.fuel_cost || 0) + (exp.toll_cost || 0) + (exp.repair_cost || 0) + 
-      (exp.driver_salary || 0) + (exp.conductor_salary || 0) + (exp.other_expenses || 0)
-    );
+    // Use the pre-calculated total_daily_expenses column for accuracy
+    const dayTotalExpenses = sumBy(dayExpenses, 'total_daily_expenses');
     const dayIncome = sumBy(dayTrips, 'income');
     
     return {
