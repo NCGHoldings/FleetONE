@@ -443,9 +443,14 @@ useEffect(() => {
                         <Checkbox
                           id={`route-${route}`}
                           checked={selectedRoutes.includes(route)}
+                          onClick={(e) => e.stopPropagation()}
                           onCheckedChange={() => handleRouteToggle(route)}
                         />
-                        <label htmlFor={`route-${route}`} className="text-sm cursor-pointer flex-1">
+                        <label 
+                          htmlFor={`route-${route}`} 
+                          className="text-sm cursor-pointer flex-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {route}
                         </label>
                       </div>
@@ -486,9 +491,14 @@ useEffect(() => {
                         <Checkbox
                           id={`driver-${driver}`}
                           checked={selectedDrivers.includes(driver)}
+                          onClick={(e) => e.stopPropagation()}
                           onCheckedChange={() => handleDriverToggle(driver)}
                         />
-                        <label htmlFor={`driver-${driver}`} className="text-sm cursor-pointer flex-1">
+                        <label 
+                          htmlFor={`driver-${driver}`} 
+                          className="text-sm cursor-pointer flex-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {driver}
                         </label>
                       </div>
@@ -529,9 +539,14 @@ useEffect(() => {
                         <Checkbox
                           id={`bus-${bus}`}
                           checked={selectedBuses.includes(bus)}
+                          onClick={(e) => e.stopPropagation()}
                           onCheckedChange={() => handleBusToggle(bus)}
                         />
-                        <label htmlFor={`bus-${bus}`} className="text-sm cursor-pointer flex-1">
+                        <label 
+                          htmlFor={`bus-${bus}`} 
+                          className="text-sm cursor-pointer flex-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {bus}
                         </label>
                       </div>
@@ -575,9 +590,14 @@ useEffect(() => {
                         <Checkbox
                           id={`time-${time}`}
                           checked={selectedTimes.includes(time)}
+                          onClick={(e) => e.stopPropagation()}
                           onCheckedChange={() => handleTimeToggle(time)}
                         />
-                        <label htmlFor={`time-${time}`} className="text-sm cursor-pointer flex-1">
+                        <label 
+                          htmlFor={`time-${time}`} 
+                          className="text-sm cursor-pointer flex-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {formatTimeDisplay(time)}
                         </label>
                       </div>
