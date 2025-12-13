@@ -13,7 +13,8 @@ import {
   X, 
   ChevronDown,
   Bookmark,
-  Sparkles
+  Sparkles,
+  Clock
 } from 'lucide-react';
 import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,7 @@ interface AdvancedFilterPanelProps {
   availableRoutes?: string[];
   availableDrivers?: string[];
   availableBuses?: string[];
+  availableTimes?: string[];
 }
 
 interface FilterPreset {
@@ -48,7 +50,8 @@ export default function AdvancedFilterPanel({
   onFilterChange, 
   availableRoutes = [], 
   availableDrivers = [], 
-  availableBuses = [] 
+  availableBuses = [],
+  availableTimes = []
 }: AdvancedFilterPanelProps) {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: subDays(new Date(), 30),
@@ -58,6 +61,7 @@ export default function AdvancedFilterPanel({
   const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
   const [selectedDrivers, setSelectedDrivers] = useState<string[]>([]);
   const [selectedBuses, setSelectedBuses] = useState<string[]>([]);
+  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(true);
   const [savedPresets, setSavedPresets] = useState<FilterPreset[]>([]);
@@ -112,6 +116,7 @@ export default function AdvancedFilterPanel({
       routes: selectedRoutes.length > 0 ? selectedRoutes : undefined,
       drivers: selectedDrivers.length > 0 ? selectedDrivers : undefined,
       buses: selectedBuses.length > 0 ? selectedBuses : undefined,
+      times: selectedTimes.length > 0 ? selectedTimes : undefined,
     });
   };
 
@@ -119,8 +124,25 @@ export default function AdvancedFilterPanel({
     setSelectedRoutes([]);
     setSelectedDrivers([]);
     setSelectedBuses([]);
+    setSelectedTimes([]);
     setSearchQuery('');
     applyPreset('30days');
+  };
+
+  const handleTimeToggle = (time: string) => {
+    const newSelection = selectedTimes.includes(time)
+      ? selectedTimes.filter(t => t !== time)
+      : [...selectedTimes, time];
+    setSelectedTimes(newSelection);
+  };
+
+  // Format time for display (e.g., "10:30" -> "10:30 AM")
+  const formatTimeDisplay = (time: string): string => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
   const handleRouteToggle = (route: string) => {
@@ -190,9 +212,9 @@ useEffect(() => {
 useEffect(() => {
   const id = setTimeout(() => emitFilters(), 250);
   return () => clearTimeout(id);
-}, [selectedRoutes, selectedDrivers, selectedBuses]);
+}, [selectedRoutes, selectedDrivers, selectedBuses, selectedTimes]);
 
-  const activeFilterCount = selectedRoutes.length + selectedDrivers.length + selectedBuses.length;
+  const activeFilterCount = selectedRoutes.length + selectedDrivers.length + selectedBuses.length + selectedTimes.length;
 
   const filteredRoutes = availableRoutes.filter(r => 
     r.toLowerCase().includes(searchQuery.toLowerCase())
@@ -241,6 +263,7 @@ useEffect(() => {
                 setSelectedRoutes([]);
                 setSelectedDrivers([]);
                 setSelectedBuses([]);
+                setSelectedTimes([]);
               }}
               className="text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
             >
@@ -388,7 +411,7 @@ useEffect(() => {
           </div>
 
           {/* Multi-Select Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Routes */}
             {availableRoutes.length > 0 && (
               <div className="space-y-2">
@@ -398,39 +421,35 @@ useEffect(() => {
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-routes"
-                        checked={selectedRoutes.length === availableRoutes.length}
+                        checked={selectedRoutes.length === availableRoutes.length && availableRoutes.length > 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedRoutes(availableRoutes);
+                            setSelectedRoutes([...availableRoutes]);
                           } else {
                             setSelectedRoutes([]);
                           }
                         }}
                       />
-                      <label htmlFor="select-all-routes" className="text-sm font-medium">
+                      <label htmlFor="select-all-routes" className="text-sm font-medium cursor-pointer">
                         Select All
                       </label>
                     </div>
-                    <AnimatePresence>
-                      {filteredRoutes.map((route) => (
-                        <motion.div
-                          key={route}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          className="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            id={`route-${route}`}
-                            checked={selectedRoutes.includes(route)}
-                            onCheckedChange={() => handleRouteToggle(route)}
-                          />
-                          <label htmlFor={`route-${route}`} className="text-sm">
-                            {route}
-                          </label>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
+                    {filteredRoutes.map((route) => (
+                      <div
+                        key={route}
+                        className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 rounded p-1"
+                        onClick={() => handleRouteToggle(route)}
+                      >
+                        <Checkbox
+                          id={`route-${route}`}
+                          checked={selectedRoutes.includes(route)}
+                          onCheckedChange={() => handleRouteToggle(route)}
+                        />
+                        <label htmlFor={`route-${route}`} className="text-sm cursor-pointer flex-1">
+                          {route}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </ScrollArea>
               </div>
@@ -445,39 +464,35 @@ useEffect(() => {
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-drivers"
-                        checked={selectedDrivers.length === availableDrivers.length}
+                        checked={selectedDrivers.length === availableDrivers.length && availableDrivers.length > 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedDrivers(availableDrivers);
+                            setSelectedDrivers([...availableDrivers]);
                           } else {
                             setSelectedDrivers([]);
                           }
                         }}
                       />
-                      <label htmlFor="select-all-drivers" className="text-sm font-medium">
+                      <label htmlFor="select-all-drivers" className="text-sm font-medium cursor-pointer">
                         Select All
                       </label>
                     </div>
-                    <AnimatePresence>
-                      {filteredDrivers.map((driver) => (
-                        <motion.div
-                          key={driver}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          className="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            id={`driver-${driver}`}
-                            checked={selectedDrivers.includes(driver)}
-                            onCheckedChange={() => handleDriverToggle(driver)}
-                          />
-                          <label htmlFor={`driver-${driver}`} className="text-sm">
-                            {driver}
-                          </label>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
+                    {filteredDrivers.map((driver) => (
+                      <div
+                        key={driver}
+                        className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 rounded p-1"
+                        onClick={() => handleDriverToggle(driver)}
+                      >
+                        <Checkbox
+                          id={`driver-${driver}`}
+                          checked={selectedDrivers.includes(driver)}
+                          onCheckedChange={() => handleDriverToggle(driver)}
+                        />
+                        <label htmlFor={`driver-${driver}`} className="text-sm cursor-pointer flex-1">
+                          {driver}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </ScrollArea>
               </div>
@@ -492,39 +507,81 @@ useEffect(() => {
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-buses"
-                        checked={selectedBuses.length === availableBuses.length}
+                        checked={selectedBuses.length === availableBuses.length && availableBuses.length > 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedBuses(availableBuses);
+                            setSelectedBuses([...availableBuses]);
                           } else {
                             setSelectedBuses([]);
                           }
                         }}
                       />
-                      <label htmlFor="select-all-buses" className="text-sm font-medium">
+                      <label htmlFor="select-all-buses" className="text-sm font-medium cursor-pointer">
                         Select All
                       </label>
                     </div>
-                    <AnimatePresence>
-                      {filteredBuses.map((bus) => (
-                        <motion.div
-                          key={bus}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          className="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            id={`bus-${bus}`}
-                            checked={selectedBuses.includes(bus)}
-                            onCheckedChange={() => handleBusToggle(bus)}
-                          />
-                          <label htmlFor={`bus-${bus}`} className="text-sm">
-                            {bus}
-                          </label>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
+                    {filteredBuses.map((bus) => (
+                      <div
+                        key={bus}
+                        className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 rounded p-1"
+                        onClick={() => handleBusToggle(bus)}
+                      >
+                        <Checkbox
+                          id={`bus-${bus}`}
+                          checked={selectedBuses.includes(bus)}
+                          onCheckedChange={() => handleBusToggle(bus)}
+                        />
+                        <label htmlFor={`bus-${bus}`} className="text-sm cursor-pointer flex-1">
+                          {bus}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
+            {/* Start Times */}
+            {availableTimes.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Start Times ({selectedTimes.length} selected)
+                </Label>
+                <ScrollArea className="h-48 border rounded-md p-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 pb-2 border-b">
+                      <Checkbox
+                        id="select-all-times"
+                        checked={selectedTimes.length === availableTimes.length && availableTimes.length > 0}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedTimes([...availableTimes]);
+                          } else {
+                            setSelectedTimes([]);
+                          }
+                        }}
+                      />
+                      <label htmlFor="select-all-times" className="text-sm font-medium cursor-pointer">
+                        Select All
+                      </label>
+                    </div>
+                    {availableTimes.map((time) => (
+                      <div
+                        key={time}
+                        className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 rounded p-1"
+                        onClick={() => handleTimeToggle(time)}
+                      >
+                        <Checkbox
+                          id={`time-${time}`}
+                          checked={selectedTimes.includes(time)}
+                          onCheckedChange={() => handleTimeToggle(time)}
+                        />
+                        <label htmlFor={`time-${time}`} className="text-sm cursor-pointer flex-1">
+                          {formatTimeDisplay(time)}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </ScrollArea>
               </div>
@@ -562,6 +619,15 @@ useEffect(() => {
                   <X 
                     className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => handleBusToggle(bus)}
+                  />
+                </Badge>
+              ))}
+              {selectedTimes.map(time => (
+                <Badge key={time} variant="secondary" className="group cursor-pointer bg-primary/10">
+                  Time: {formatTimeDisplay(time)}
+                  <X 
+                    className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => handleTimeToggle(time)}
                   />
                 </Badge>
               ))}

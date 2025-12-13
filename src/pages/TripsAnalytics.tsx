@@ -38,6 +38,7 @@ function TripsAnalyticsContent() {
     routes?: string[];
     drivers?: string[];
     buses?: string[];
+    times?: string[];
   }>({
     startDate: subDays(new Date(), 30),
     endDate: new Date()
@@ -68,7 +69,8 @@ const handleFilterChange = useCallback((filters: any) => {
         sameDates &&
         eq(prev.routes, filters.routes) &&
         eq(prev.drivers, filters.drivers) &&
-        eq(prev.buses, filters.buses)
+        eq(prev.buses, filters.buses) &&
+        eq(prev.times, filters.times)
       ) {
         return prev;
       }
@@ -79,17 +81,19 @@ const handleFilterChange = useCallback((filters: any) => {
         routes: filters.routes,
         drivers: filters.drivers,
         buses: filters.buses,
+        times: filters.times,
       };
     });
   }, []);
 
   // Extract unique values for filters with readable names
-  const { availableRoutes, availableDrivers, availableBuses, routeNameToIdMap, busNameToIdMap, driverNameToIdMap } = useMemo(() => {
+  const { availableRoutes, availableDrivers, availableBuses, availableTimes, routeNameToIdMap, busNameToIdMap, driverNameToIdMap } = useMemo(() => {
     if (!analytics?.rawTrips) {
       return { 
         availableRoutes: [], 
         availableDrivers: [], 
         availableBuses: [],
+        availableTimes: [],
         routeNameToIdMap: new Map<string, string>(),
         busNameToIdMap: new Map<string, string>(),
         driverNameToIdMap: new Map<string, string>()
@@ -139,11 +143,29 @@ const handleFilterChange = useCallback((filters: any) => {
         driverNameToId.set(driverName, t.driver_id || driverName);
       }
     });
+
+    // Extract exact start times (e.g., "10:30", "17:00", "19:15")
+    const startTimes = new Set<string>();
+    analytics.rawTrips.forEach(t => {
+      if (t.start_time) {
+        // Extract HH:MM from start_time (handles both "HH:MM" and "HH:MM:SS" formats)
+        const time = t.start_time.substring(0, 5);
+        startTimes.add(time);
+      }
+    });
+    
+    // Sort times chronologically
+    const sortedTimes = Array.from(startTimes).sort((a, b) => {
+      const [aHours, aMinutes] = a.split(':').map(Number);
+      const [bHours, bMinutes] = b.split(':').map(Number);
+      return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+    });
     
     return {
       availableRoutes: Array.from(routeNames).sort(),
       availableDrivers: Array.from(driverNames).sort(),
       availableBuses: Array.from(busNumbers).sort(),
+      availableTimes: sortedTimes,
       routeNameToIdMap: routeNameToId,
       busNameToIdMap: busNameToId,
       driverNameToIdMap: driverNameToId
@@ -212,6 +234,7 @@ const handleFilterChange = useCallback((filters: any) => {
           availableRoutes={availableRoutes}
           availableDrivers={availableDrivers}
           availableBuses={availableBuses}
+          availableTimes={availableTimes}
         />
         <Card className="mt-6 p-12">
           <div className="text-center space-y-4">
@@ -255,6 +278,7 @@ const handleFilterChange = useCallback((filters: any) => {
         availableRoutes={availableRoutes}
         availableDrivers={availableDrivers}
         availableBuses={availableBuses}
+        availableTimes={availableTimes}
       />
 
       {/* Data Quality Alert with Verification */}
@@ -263,6 +287,7 @@ const handleFilterChange = useCallback((filters: any) => {
         totalTrips={analytics.overview.totalTrips}
         totalExpenses={analytics.overview.totalExpenses}
         totalRevenue={analytics.overview.totalIncome}
+        netProfit={analytics.overview.netProfit}
         dateRange={dateRange.startDate && dateRange.endDate ? {
           from: dateRange.startDate,
           to: dateRange.endDate
@@ -270,7 +295,8 @@ const handleFilterChange = useCallback((filters: any) => {
         activeFilters={{
           routes: dateRange.routes,
           drivers: dateRange.drivers,
-          buses: dateRange.buses
+          buses: dateRange.buses,
+          times: dateRange.times
         }}
       />
 
