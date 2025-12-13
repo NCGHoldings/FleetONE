@@ -257,7 +257,7 @@ const handleFilterChange = useCallback((filters: any) => {
         availableBuses={availableBuses}
       />
 
-      {/* Data Quality Alert */}
+      {/* Data Quality Alert with Verification */}
       <DataQualityAlert 
         tripsWithExpenses={analytics.tripsWithExpenses || 0}
         totalTrips={analytics.overview.totalTrips}
@@ -267,6 +267,11 @@ const handleFilterChange = useCallback((filters: any) => {
           from: dateRange.startDate,
           to: dateRange.endDate
         } : undefined}
+        activeFilters={{
+          routes: dateRange.routes,
+          drivers: dateRange.drivers,
+          buses: dateRange.buses
+        }}
       />
 
       {/* Animated KPI Cards */}
