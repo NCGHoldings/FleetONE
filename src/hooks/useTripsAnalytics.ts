@@ -203,12 +203,11 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
 
       return processAnalyticsData(filteredTrips, filteredExpenses, filters, !!expensesError);
     },
-    staleTime: 30000, // Reduced from 120s to 30s for fresher data on filter changes
+    staleTime: 30000,
     gcTime: 300000,
     refetchOnWindowFocus: false,
     retry: 1,
-    // Keep periodic background updates
-    refetchInterval: 60000,
+    refetchInterval: false, // Disabled to prevent auto-refresh during filtering
   });
 }
 
