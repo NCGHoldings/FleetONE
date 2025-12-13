@@ -136,15 +136,16 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
       // Apply additional filters - match by human-readable names, not UUIDs
       let filteredTrips = trips || [];
       
-      // Filter by route name (e.g., "R001 - Colombo - Kandy")
+      // Filter by route name (EXACT MATCHING - no includes() to avoid false positives)
       if (stableKey.routes && stableKey.routes.length > 0) {
         filteredTrips = filteredTrips.filter(t => {
           if (!t.routes) return false;
           const routeDisplayName = `${t.routes.route_no} - ${t.routes.route_name}`;
+          // Use exact matching only - no includes() which causes wrong matches
           return stableKey.routes!.some(selectedRoute => 
             selectedRoute === routeDisplayName || 
             selectedRoute === t.routes.route_no ||
-            selectedRoute.includes(t.routes.route_no)
+            selectedRoute === t.routes.route_name
           );
         });
       }
@@ -178,7 +179,17 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         });
       }
 
-      return processAnalyticsData(filteredTrips, expenses || [], filters, !!expensesError);
+      // Filter expenses to match only the filtered trips' buses and dates
+      let filteredExpenses = expenses || [];
+      if (filteredTrips.length > 0 && filteredTrips.length < (trips?.length || 0)) {
+        const tripBusIds = new Set(filteredTrips.map(t => t.bus_id));
+        const tripDates = new Set(filteredTrips.map(t => t.trip_date));
+        filteredExpenses = (expenses || []).filter(e => 
+          tripBusIds.has(e.bus_id) && tripDates.has(e.expense_date)
+        );
+      }
+
+      return processAnalyticsData(filteredTrips, filteredExpenses, filters, !!expensesError);
     },
     staleTime: 120000,
     gcTime: 600000,
