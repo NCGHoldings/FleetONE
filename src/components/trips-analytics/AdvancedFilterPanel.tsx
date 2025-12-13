@@ -118,7 +118,7 @@ export default function AdvancedFilterPanel({
     
     setDateRange({ from, to: now });
     setPreset(presetValue);
-    emitFilters({ from, to: now });
+    // Don't auto-emit - user must click "Apply Filters"
   };
 
   const emitFilters = (range?: { from: Date; to: Date }) => {
@@ -516,7 +516,7 @@ useEffect(() => {
                     if (range?.from && range?.to) {
                       setDateRange({ from: range.from, to: range.to });
                       setPreset('custom');
-                      emitFilters({ from: range.from, to: range.to });
+                      // Don't auto-emit - user must click "Apply Filters"
                     }
                   }}
                   numberOfMonths={2}
