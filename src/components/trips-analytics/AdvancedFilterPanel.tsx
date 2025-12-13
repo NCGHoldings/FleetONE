@@ -208,13 +208,13 @@ useEffect(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
 
-// Debounce frequent filter changes
-useEffect(() => {
-  const id = setTimeout(() => emitFilters(), 250);
-  return () => clearTimeout(id);
-}, [selectedRoutes, selectedDrivers, selectedBuses, selectedTimes]);
+// Removed auto-emit useEffect - now using manual "Apply Filters" button
 
   const activeFilterCount = selectedRoutes.length + selectedDrivers.length + selectedBuses.length + selectedTimes.length;
+
+  const handleApplyFilters = () => {
+    emitFilters();
+  };
 
   const filteredRoutes = availableRoutes.filter(r => 
     r.toLowerCase().includes(searchQuery.toLowerCase())
@@ -255,6 +255,19 @@ useEffect(() => {
           )}
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={handleApplyFilters}
+            size="sm" 
+            className="bg-primary hover:bg-primary/90"
+          >
+            <Filter className="w-4 h-4 mr-1" />
+            Apply Filters
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-primary-foreground/20 text-primary-foreground">
+                {activeFilterCount}
+              </Badge>
+            )}
+          </Button>
           {activeFilterCount > 0 && (
             <Button 
               variant="outline" 
@@ -268,7 +281,7 @@ useEffect(() => {
               className="text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
             >
               <X className="w-4 h-4 mr-1" />
-              Clear Filters
+              Clear
             </Button>
           )}
           <Button 
@@ -282,7 +295,7 @@ useEffect(() => {
           </Button>
           <Button variant="ghost" size="sm" onClick={handleReset}>
             <RotateCcw className="w-4 h-4 mr-2" />
-            Reset All
+            Reset
           </Button>
           <Button 
             variant="ghost" 
