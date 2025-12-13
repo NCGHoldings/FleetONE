@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfDay, endOfDay, subDays, differenceInDays, format } from 'date-fns';
@@ -203,12 +203,11 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
 
       return processAnalyticsData(filteredTrips, filteredExpenses, filters, !!expensesError);
     },
-    staleTime: 120000,
-    gcTime: 600000,
-    placeholderData: keepPreviousData,
+    staleTime: 30000, // Reduced from 120s to 30s for fresher data on filter changes
+    gcTime: 300000,
     refetchOnWindowFocus: false,
     retry: 1,
-    // Keep periodic background updates without UI flicker
+    // Keep periodic background updates
     refetchInterval: 60000,
   });
 }
