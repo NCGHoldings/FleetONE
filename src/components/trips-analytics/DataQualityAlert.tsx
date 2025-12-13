@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, CheckCircle2, Database, TrendingUp, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatLKR } from '@/lib/currency';
+import { format } from 'date-fns';
 
 interface DataQualityAlertProps {
   tripsWithExpenses: number;
@@ -63,8 +64,8 @@ export default function DataQualityAlert({
           </Badge>
         </div>
         {dateRange && (
-          <Badge variant="secondary" className="text-xs">
-            {dateRange.from.toLocaleDateString()} - {dateRange.to.toLocaleDateString()}
+          <Badge variant="secondary" className="text-xs font-medium">
+            {format(dateRange.from, 'MMM d, yyyy')} - {format(dateRange.to, 'MMM d, yyyy')}
           </Badge>
         )}
       </div>
