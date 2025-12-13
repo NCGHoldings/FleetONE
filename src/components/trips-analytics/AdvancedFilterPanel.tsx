@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -6,6 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { EnhancedSearch } from '@/components/ui/enhanced-search';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Calendar as CalendarIcon, 
   Filter, 
@@ -14,7 +15,8 @@ import {
   ChevronDown,
   Bookmark,
   Sparkles,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -58,6 +60,41 @@ interface FilterPreset {
   filters: any;
 }
 
+// Helper function to extract driver name from trip
+const extractDriverName = (trip: RawTrip): string => {
+  let driverName = '';
+  if (trip.notes) {
+    try {
+      const notes = typeof trip.notes === 'string' ? JSON.parse(trip.notes || '{}') : trip.notes;
+      driverName = (notes as any).driver || '';
+    } catch {
+      driverName = '';
+    }
+  }
+  if (!driverName && trip.profiles) {
+    driverName = `${trip.profiles.first_name} ${trip.profiles.last_name}`.trim();
+  }
+  return driverName || 'Unknown Driver';
+};
+
+// Helper function to extract bus name from trip
+const extractBusName = (trip: RawTrip): string => {
+  if (!trip.buses) return '';
+  return trip.buses.bus_no || trip.buses.registration_number || '';
+};
+
+// Helper function to extract route name from trip
+const extractRouteName = (trip: RawTrip): string => {
+  if (!trip.routes) return '';
+  return `${trip.routes.route_no} - ${trip.routes.route_name}`;
+};
+
+// Helper function to extract time from trip
+const extractTime = (trip: RawTrip): string => {
+  if (!trip.start_time) return '';
+  return trip.start_time.substring(0, 5);
+};
+
 export default function AdvancedFilterPanel({ 
   onFilterChange, 
   availableRoutes = [], 
@@ -80,6 +117,9 @@ export default function AdvancedFilterPanel({
   const [savedPresets, setSavedPresets] = useState<FilterPreset[]>([]);
   const [showPresetInput, setShowPresetInput] = useState(false);
   const [presetName, setPresetName] = useState('');
+  
+  // Track if we're in the middle of auto-clearing to prevent infinite loops
+  const isAutoClearingRef = useRef(false);
 
   useEffect(() => {
     // Load saved presets from localStorage
@@ -215,13 +255,11 @@ export default function AdvancedFilterPanel({
     localStorage.setItem('trip-analytics-presets', JSON.stringify(updatedPresets));
   };
 
-// Fire once on mount
-useEffect(() => {
-  emitFilters();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-
-// Removed auto-emit useEffect - now using manual "Apply Filters" button
+  // Fire once on mount
+  useEffect(() => {
+    emitFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const activeFilterCount = selectedRoutes.length + selectedDrivers.length + selectedBuses.length + selectedTimes.length;
 
@@ -229,106 +267,155 @@ useEffect(() => {
     emitFilters();
   };
 
-  // Cascading filter logic: filter available options based on current selections
-  const cascadingOptions = useMemo(() => {
+  // ============================================
+  // BIDIRECTIONAL CASCADING FILTER LOGIC
+  // ============================================
+  // This computes valid options for ALL filters based on current selections
+  // Works in ANY direction: Route→Driver→Bus→Time or Time→Bus→Route→Driver etc.
+  
+  const bidirectionalCascading = useMemo(() => {
+    // If no raw trips data, return original lists
     if (!rawTrips || rawTrips.length === 0) {
-      // Fallback to original lists if no rawTrips provided
       return {
+        routes: availableRoutes,
         drivers: availableDrivers,
         buses: availableBuses,
-        times: availableTimes
+        times: availableTimes,
+        hasValidCombinations: true
       };
     }
 
-    let relevantTrips = [...rawTrips];
+    // Start with all trips
+    let filteredTrips = [...rawTrips];
 
-    // Filter by selected routes first
+    // Apply Route filter if selected
     if (selectedRoutes.length > 0) {
-      relevantTrips = relevantTrips.filter(t => {
-        if (!t.routes) return false;
-        const routeName = `${t.routes.route_no} - ${t.routes.route_name}`;
-        return selectedRoutes.includes(routeName);
+      filteredTrips = filteredTrips.filter(t => {
+        const routeName = extractRouteName(t);
+        return routeName && selectedRoutes.includes(routeName);
       });
     }
 
-    // Filter by selected drivers
+    // Apply Driver filter if selected
     if (selectedDrivers.length > 0) {
-      relevantTrips = relevantTrips.filter(t => {
-        let driverName = '';
-        if (t.notes) {
-          const notes = typeof t.notes === 'string' ? JSON.parse(t.notes || '{}') : t.notes;
-          driverName = (notes as any).driver || '';
-        }
-        if (!driverName && t.profiles) {
-          driverName = `${t.profiles.first_name} ${t.profiles.last_name}`.trim();
-        }
-        return selectedDrivers.includes(driverName);
+      filteredTrips = filteredTrips.filter(t => {
+        const driverName = extractDriverName(t);
+        return driverName !== 'Unknown Driver' && selectedDrivers.includes(driverName);
       });
     }
 
-    // Filter by selected buses
+    // Apply Bus filter if selected
     if (selectedBuses.length > 0) {
-      relevantTrips = relevantTrips.filter(t => {
-        if (!t.buses) return false;
-        const busName = t.buses.bus_no || t.buses.registration_number || '';
-        return selectedBuses.includes(busName);
+      filteredTrips = filteredTrips.filter(t => {
+        const busName = extractBusName(t);
+        return busName && selectedBuses.includes(busName);
       });
     }
 
-    // Extract available drivers from filtered trips
-    const driverSet = new Set<string>();
-    relevantTrips.forEach(t => {
-      let driverName = '';
-      if (t.notes) {
-        const notes = typeof t.notes === 'string' ? JSON.parse(t.notes || '{}') : t.notes;
-        driverName = (notes as any).driver || '';
-      }
-      if (!driverName && t.profiles) {
-        driverName = `${t.profiles.first_name} ${t.profiles.last_name}`.trim();
-      }
-      if (driverName && driverName !== 'Unknown Driver') {
-        driverSet.add(driverName);
-      }
-    });
+    // Apply Time filter if selected
+    if (selectedTimes.length > 0) {
+      filteredTrips = filteredTrips.filter(t => {
+        const time = extractTime(t);
+        return time && selectedTimes.includes(time);
+      });
+    }
 
-    // Extract available buses from filtered trips
-    const busSet = new Set<string>();
-    relevantTrips.forEach(t => {
-      if (t.buses) {
-        const busName = t.buses.bus_no || t.buses.registration_number || '';
-        if (busName) busSet.add(busName);
-      }
-    });
+    // Extract VALID options from the filtered trips
+    const validRoutes = new Set<string>();
+    const validDrivers = new Set<string>();
+    const validBuses = new Set<string>();
+    const validTimes = new Set<string>();
 
-    // Extract available times from filtered trips
-    const timeSet = new Set<string>();
-    relevantTrips.forEach(t => {
-      if (t.start_time) {
-        const time = t.start_time.substring(0, 5);
-        timeSet.add(time);
-      }
+    filteredTrips.forEach(t => {
+      const routeName = extractRouteName(t);
+      if (routeName) validRoutes.add(routeName);
+
+      const driverName = extractDriverName(t);
+      if (driverName && driverName !== 'Unknown Driver') validDrivers.add(driverName);
+
+      const busName = extractBusName(t);
+      if (busName) validBuses.add(busName);
+
+      const time = extractTime(t);
+      if (time) validTimes.add(time);
     });
 
     // Sort times chronologically
-    const sortedTimes = Array.from(timeSet).sort((a, b) => {
+    const sortedTimes = Array.from(validTimes).sort((a, b) => {
       const [aHours, aMinutes] = a.split(':').map(Number);
       const [bHours, bMinutes] = b.split(':').map(Number);
       return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
     });
 
     return {
-      drivers: Array.from(driverSet).sort(),
-      buses: Array.from(busSet).sort(),
-      times: sortedTimes
+      routes: Array.from(validRoutes).sort(),
+      drivers: Array.from(validDrivers).sort(),
+      buses: Array.from(validBuses).sort(),
+      times: sortedTimes,
+      hasValidCombinations: filteredTrips.length > 0
     };
-  }, [rawTrips, selectedRoutes, selectedDrivers, selectedBuses, availableDrivers, availableBuses, availableTimes]);
+  }, [rawTrips, selectedRoutes, selectedDrivers, selectedBuses, selectedTimes, availableRoutes, availableDrivers, availableBuses, availableTimes]);
 
-  // Use cascading options or fallback to provided lists
-  const effectiveDrivers = rawTrips.length > 0 ? cascadingOptions.drivers : availableDrivers;
-  const effectiveBuses = rawTrips.length > 0 ? cascadingOptions.buses : availableBuses;
-  const effectiveTimes = rawTrips.length > 0 ? cascadingOptions.times : availableTimes;
+  // Effective options: use cascading results if rawTrips available, otherwise fallback
+  const effectiveRoutes = rawTrips.length > 0 ? bidirectionalCascading.routes : availableRoutes;
+  const effectiveDrivers = rawTrips.length > 0 ? bidirectionalCascading.drivers : availableDrivers;
+  const effectiveBuses = rawTrips.length > 0 ? bidirectionalCascading.buses : availableBuses;
+  const effectiveTimes = rawTrips.length > 0 ? bidirectionalCascading.times : availableTimes;
 
-  const filteredRoutes = availableRoutes.filter(r => 
+  // ============================================
+  // AUTO-CLEAR INVALID SELECTIONS
+  // ============================================
+  // When cascading changes available options, remove selections that are no longer valid
+  
+  useEffect(() => {
+    if (isAutoClearingRef.current || rawTrips.length === 0) return;
+    
+    isAutoClearingRef.current = true;
+    
+    let hasChanges = false;
+    
+    // Check and clear invalid route selections
+    const validRouteSelections = selectedRoutes.filter(r => effectiveRoutes.includes(r));
+    if (validRouteSelections.length !== selectedRoutes.length) {
+      setSelectedRoutes(validRouteSelections);
+      hasChanges = true;
+    }
+    
+    // Check and clear invalid driver selections
+    const validDriverSelections = selectedDrivers.filter(d => effectiveDrivers.includes(d));
+    if (validDriverSelections.length !== selectedDrivers.length) {
+      setSelectedDrivers(validDriverSelections);
+      hasChanges = true;
+    }
+    
+    // Check and clear invalid bus selections
+    const validBusSelections = selectedBuses.filter(b => effectiveBuses.includes(b));
+    if (validBusSelections.length !== selectedBuses.length) {
+      setSelectedBuses(validBusSelections);
+      hasChanges = true;
+    }
+    
+    // Check and clear invalid time selections
+    const validTimeSelections = selectedTimes.filter(t => effectiveTimes.includes(t));
+    if (validTimeSelections.length !== selectedTimes.length) {
+      setSelectedTimes(validTimeSelections);
+      hasChanges = true;
+    }
+    
+    // Reset flag after a short delay to allow state updates
+    setTimeout(() => {
+      isAutoClearingRef.current = false;
+    }, 100);
+    
+  }, [effectiveRoutes, effectiveDrivers, effectiveBuses, effectiveTimes, rawTrips.length]);
+
+  // Check for "no valid combinations" state
+  const noValidCombinations = rawTrips.length > 0 && 
+    activeFilterCount > 0 && 
+    !bidirectionalCascading.hasValidCombinations;
+
+  // Filter lists by search query
+  const filteredRoutes = effectiveRoutes.filter(r => 
     r.toLowerCase().includes(searchQuery.toLowerCase())
   );
   const filteredDrivers = effectiveDrivers.filter(d => 
@@ -537,19 +624,38 @@ useEffect(() => {
 
           {/* Multi-Select Filters */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* No Valid Combinations Alert */}
+            {noValidCombinations && (
+              <div className="col-span-full">
+                <Alert variant="destructive" className="bg-destructive/10 border-destructive/30">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    No valid combinations found for current selection. Try removing some filters.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+
             {/* Routes */}
-            {availableRoutes.length > 0 && (
+            {(availableRoutes.length > 0 || effectiveRoutes.length > 0) && (
               <div className="space-y-2">
-                <Label>Routes ({selectedRoutes.length} selected)</Label>
+                <Label>Routes ({selectedRoutes.length}/{effectiveRoutes.length} available)</Label>
+                {effectiveRoutes.length === 0 && activeFilterCount > 0 && (
+                  <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    No routes match current filters
+                  </div>
+                )}
                 <ScrollArea className="h-48 border rounded-md p-2">
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-routes"
-                        checked={selectedRoutes.length === availableRoutes.length && availableRoutes.length > 0}
+                        checked={selectedRoutes.length === effectiveRoutes.length && effectiveRoutes.length > 0}
+                        disabled={effectiveRoutes.length === 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedRoutes([...availableRoutes]);
+                            setSelectedRoutes([...effectiveRoutes]);
                           } else {
                             setSelectedRoutes([]);
                           }
@@ -587,13 +693,20 @@ useEffect(() => {
             {/* Drivers */}
             {(availableDrivers.length > 0 || effectiveDrivers.length > 0) && (
               <div className="space-y-2">
-                <Label>Drivers ({selectedDrivers.length}/{effectiveDrivers.length} selected)</Label>
+                <Label>Drivers ({selectedDrivers.length}/{effectiveDrivers.length} available)</Label>
+                {effectiveDrivers.length === 0 && activeFilterCount > 0 && (
+                  <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    No drivers match current filters
+                  </div>
+                )}
                 <ScrollArea className="h-48 border rounded-md p-2">
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-drivers"
                         checked={selectedDrivers.length === effectiveDrivers.length && effectiveDrivers.length > 0}
+                        disabled={effectiveDrivers.length === 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
                             setSelectedDrivers([...effectiveDrivers]);
@@ -634,13 +747,20 @@ useEffect(() => {
             {/* Buses */}
             {(availableBuses.length > 0 || effectiveBuses.length > 0) && (
               <div className="space-y-2">
-                <Label>Buses ({selectedBuses.length}/{effectiveBuses.length} selected)</Label>
+                <Label>Buses ({selectedBuses.length}/{effectiveBuses.length} available)</Label>
+                {effectiveBuses.length === 0 && activeFilterCount > 0 && (
+                  <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    No buses match current filters
+                  </div>
+                )}
                 <ScrollArea className="h-48 border rounded-md p-2">
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-buses"
                         checked={selectedBuses.length === effectiveBuses.length && effectiveBuses.length > 0}
+                        disabled={effectiveBuses.length === 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
                             setSelectedBuses([...effectiveBuses]);
@@ -683,14 +803,21 @@ useEffect(() => {
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
-                  Start Times ({selectedTimes.length}/{effectiveTimes.length} selected)
+                  Start Times ({selectedTimes.length}/{effectiveTimes.length} available)
                 </Label>
+                {effectiveTimes.length === 0 && activeFilterCount > 0 && (
+                  <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    No times match current filters
+                  </div>
+                )}
                 <ScrollArea className="h-48 border rounded-md p-2">
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-times"
                         checked={selectedTimes.length === effectiveTimes.length && effectiveTimes.length > 0}
+                        disabled={effectiveTimes.length === 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
                             setSelectedTimes([...effectiveTimes]);
