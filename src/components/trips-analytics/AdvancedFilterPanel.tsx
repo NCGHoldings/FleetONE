@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -33,12 +33,24 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+interface RawTrip {
+  route_id: string;
+  bus_id: string;
+  driver_id?: string;
+  start_time?: string;
+  routes?: { route_no: string; route_name: string };
+  buses?: { bus_no?: string; registration_number?: string };
+  profiles?: { first_name: string; last_name: string };
+  notes?: string | object;
+}
+
 interface AdvancedFilterPanelProps {
   onFilterChange: (filters: any) => void;
   availableRoutes?: string[];
   availableDrivers?: string[];
   availableBuses?: string[];
   availableTimes?: string[];
+  rawTrips?: RawTrip[];
 }
 
 interface FilterPreset {
@@ -51,7 +63,8 @@ export default function AdvancedFilterPanel({
   availableRoutes = [], 
   availableDrivers = [], 
   availableBuses = [],
-  availableTimes = []
+  availableTimes = [],
+  rawTrips = []
 }: AdvancedFilterPanelProps) {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: subDays(new Date(), 30),
@@ -216,13 +229,112 @@ useEffect(() => {
     emitFilters();
   };
 
+  // Cascading filter logic: filter available options based on current selections
+  const cascadingOptions = useMemo(() => {
+    if (!rawTrips || rawTrips.length === 0) {
+      // Fallback to original lists if no rawTrips provided
+      return {
+        drivers: availableDrivers,
+        buses: availableBuses,
+        times: availableTimes
+      };
+    }
+
+    let relevantTrips = [...rawTrips];
+
+    // Filter by selected routes first
+    if (selectedRoutes.length > 0) {
+      relevantTrips = relevantTrips.filter(t => {
+        if (!t.routes) return false;
+        const routeName = `${t.routes.route_no} - ${t.routes.route_name}`;
+        return selectedRoutes.includes(routeName);
+      });
+    }
+
+    // Filter by selected drivers
+    if (selectedDrivers.length > 0) {
+      relevantTrips = relevantTrips.filter(t => {
+        let driverName = '';
+        if (t.notes) {
+          const notes = typeof t.notes === 'string' ? JSON.parse(t.notes || '{}') : t.notes;
+          driverName = (notes as any).driver || '';
+        }
+        if (!driverName && t.profiles) {
+          driverName = `${t.profiles.first_name} ${t.profiles.last_name}`.trim();
+        }
+        return selectedDrivers.includes(driverName);
+      });
+    }
+
+    // Filter by selected buses
+    if (selectedBuses.length > 0) {
+      relevantTrips = relevantTrips.filter(t => {
+        if (!t.buses) return false;
+        const busName = t.buses.bus_no || t.buses.registration_number || '';
+        return selectedBuses.includes(busName);
+      });
+    }
+
+    // Extract available drivers from filtered trips
+    const driverSet = new Set<string>();
+    relevantTrips.forEach(t => {
+      let driverName = '';
+      if (t.notes) {
+        const notes = typeof t.notes === 'string' ? JSON.parse(t.notes || '{}') : t.notes;
+        driverName = (notes as any).driver || '';
+      }
+      if (!driverName && t.profiles) {
+        driverName = `${t.profiles.first_name} ${t.profiles.last_name}`.trim();
+      }
+      if (driverName && driverName !== 'Unknown Driver') {
+        driverSet.add(driverName);
+      }
+    });
+
+    // Extract available buses from filtered trips
+    const busSet = new Set<string>();
+    relevantTrips.forEach(t => {
+      if (t.buses) {
+        const busName = t.buses.bus_no || t.buses.registration_number || '';
+        if (busName) busSet.add(busName);
+      }
+    });
+
+    // Extract available times from filtered trips
+    const timeSet = new Set<string>();
+    relevantTrips.forEach(t => {
+      if (t.start_time) {
+        const time = t.start_time.substring(0, 5);
+        timeSet.add(time);
+      }
+    });
+
+    // Sort times chronologically
+    const sortedTimes = Array.from(timeSet).sort((a, b) => {
+      const [aHours, aMinutes] = a.split(':').map(Number);
+      const [bHours, bMinutes] = b.split(':').map(Number);
+      return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+    });
+
+    return {
+      drivers: Array.from(driverSet).sort(),
+      buses: Array.from(busSet).sort(),
+      times: sortedTimes
+    };
+  }, [rawTrips, selectedRoutes, selectedDrivers, selectedBuses, availableDrivers, availableBuses, availableTimes]);
+
+  // Use cascading options or fallback to provided lists
+  const effectiveDrivers = rawTrips.length > 0 ? cascadingOptions.drivers : availableDrivers;
+  const effectiveBuses = rawTrips.length > 0 ? cascadingOptions.buses : availableBuses;
+  const effectiveTimes = rawTrips.length > 0 ? cascadingOptions.times : availableTimes;
+
   const filteredRoutes = availableRoutes.filter(r => 
     r.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const filteredDrivers = availableDrivers.filter(d => 
+  const filteredDrivers = effectiveDrivers.filter(d => 
     d.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const filteredBuses = availableBuses.filter(b => 
+  const filteredBuses = effectiveBuses.filter(b => 
     b.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -457,7 +569,6 @@ useEffect(() => {
                           id={`route-${route}`}
                           checked={selectedRoutes.includes(route)}
                           onClick={(e) => e.stopPropagation()}
-                          onCheckedChange={() => handleRouteToggle(route)}
                         />
                         <label 
                           htmlFor={`route-${route}`} 
@@ -474,18 +585,18 @@ useEffect(() => {
             )}
 
             {/* Drivers */}
-            {availableDrivers.length > 0 && (
+            {(availableDrivers.length > 0 || effectiveDrivers.length > 0) && (
               <div className="space-y-2">
-                <Label>Drivers ({selectedDrivers.length} selected)</Label>
+                <Label>Drivers ({selectedDrivers.length}/{effectiveDrivers.length} selected)</Label>
                 <ScrollArea className="h-48 border rounded-md p-2">
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-drivers"
-                        checked={selectedDrivers.length === availableDrivers.length && availableDrivers.length > 0}
+                        checked={selectedDrivers.length === effectiveDrivers.length && effectiveDrivers.length > 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedDrivers([...availableDrivers]);
+                            setSelectedDrivers([...effectiveDrivers]);
                           } else {
                             setSelectedDrivers([]);
                           }
@@ -505,7 +616,6 @@ useEffect(() => {
                           id={`driver-${driver}`}
                           checked={selectedDrivers.includes(driver)}
                           onClick={(e) => e.stopPropagation()}
-                          onCheckedChange={() => handleDriverToggle(driver)}
                         />
                         <label 
                           htmlFor={`driver-${driver}`} 
@@ -522,18 +632,18 @@ useEffect(() => {
             )}
 
             {/* Buses */}
-            {availableBuses.length > 0 && (
+            {(availableBuses.length > 0 || effectiveBuses.length > 0) && (
               <div className="space-y-2">
-                <Label>Buses ({selectedBuses.length} selected)</Label>
+                <Label>Buses ({selectedBuses.length}/{effectiveBuses.length} selected)</Label>
                 <ScrollArea className="h-48 border rounded-md p-2">
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-buses"
-                        checked={selectedBuses.length === availableBuses.length && availableBuses.length > 0}
+                        checked={selectedBuses.length === effectiveBuses.length && effectiveBuses.length > 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedBuses([...availableBuses]);
+                            setSelectedBuses([...effectiveBuses]);
                           } else {
                             setSelectedBuses([]);
                           }
@@ -553,7 +663,6 @@ useEffect(() => {
                           id={`bus-${bus}`}
                           checked={selectedBuses.includes(bus)}
                           onClick={(e) => e.stopPropagation()}
-                          onCheckedChange={() => handleBusToggle(bus)}
                         />
                         <label 
                           htmlFor={`bus-${bus}`} 
@@ -570,21 +679,21 @@ useEffect(() => {
             )}
 
             {/* Start Times */}
-            {availableTimes.length > 0 && (
+            {(availableTimes.length > 0 || effectiveTimes.length > 0) && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
-                  Start Times ({selectedTimes.length} selected)
+                  Start Times ({selectedTimes.length}/{effectiveTimes.length} selected)
                 </Label>
                 <ScrollArea className="h-48 border rounded-md p-2">
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2 pb-2 border-b">
                       <Checkbox
                         id="select-all-times"
-                        checked={selectedTimes.length === availableTimes.length && availableTimes.length > 0}
+                        checked={selectedTimes.length === effectiveTimes.length && effectiveTimes.length > 0}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedTimes([...availableTimes]);
+                            setSelectedTimes([...effectiveTimes]);
                           } else {
                             setSelectedTimes([]);
                           }
@@ -594,7 +703,7 @@ useEffect(() => {
                         Select All
                       </label>
                     </div>
-                    {availableTimes.map((time) => (
+                    {effectiveTimes.map((time) => (
                       <div
                         key={time}
                         className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 rounded p-1"
@@ -604,7 +713,6 @@ useEffect(() => {
                           id={`time-${time}`}
                           checked={selectedTimes.includes(time)}
                           onClick={(e) => e.stopPropagation()}
-                          onCheckedChange={() => handleTimeToggle(time)}
                         />
                         <label 
                           htmlFor={`time-${time}`} 
