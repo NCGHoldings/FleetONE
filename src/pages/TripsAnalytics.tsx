@@ -235,6 +235,7 @@ const handleFilterChange = useCallback((filters: any) => {
           availableDrivers={availableDrivers}
           availableBuses={availableBuses}
           availableTimes={availableTimes}
+          rawTrips={analytics?.rawTrips || []}
         />
         <Card className="mt-6 p-12">
           <div className="text-center space-y-4">
@@ -279,6 +280,7 @@ const handleFilterChange = useCallback((filters: any) => {
         availableDrivers={availableDrivers}
         availableBuses={availableBuses}
         availableTimes={availableTimes}
+        rawTrips={analytics?.rawTrips || []}
       />
 
       {/* Data Quality Alert with Verification */}
