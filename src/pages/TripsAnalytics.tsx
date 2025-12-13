@@ -3,7 +3,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Download, TrendingUp, DollarSign, Fuel, Bus, Users, Route, Calendar, AlertCircle } from 'lucide-react';
-import { subDays } from 'date-fns';
+import { subDays, format } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useTripsAnalytics } from '@/hooks/useTripsAnalytics';
 import AnimatedKPICard from '@/components/trips-analytics/AnimatedKPICard';
 import AdvancedFilterPanel from '@/components/trips-analytics/AdvancedFilterPanel';
@@ -46,6 +48,32 @@ function TripsAnalyticsContent() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const { data: analytics, isLoading, error } = useTripsAnalytics(dateRange);
+
+  // Fetch ALL trips for cascading filter options (past 1 year)
+  // This is separate from the main query so cascading shows all available options
+  const { data: allTripsForCascading } = useQuery({
+    queryKey: ['all-trips-for-cascading'],
+    queryFn: async () => {
+      const oneYearAgo = format(subDays(new Date(), 365), 'yyyy-MM-dd');
+      const { data } = await supabase
+        .from('daily_trips')
+        .select(`
+          trip_date,
+          start_time,
+          route_id,
+          bus_id,
+          driver_id,
+          buses(bus_no, registration_number),
+          routes(route_no, route_name),
+          notes
+        `)
+        .gte('trip_date', oneYearAgo)
+        .order('trip_date', { ascending: false });
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchOnWindowFocus: false,
+  });
 
 const handleFilterChange = useCallback((filters: any) => {
     setDateRange((prev) => {
@@ -229,13 +257,13 @@ const handleFilterChange = useCallback((filters: any) => {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">Trip Analytics</h1>
         </div>
-        <AdvancedFilterPanel
+      <AdvancedFilterPanel
           onFilterChange={handleFilterChange}
           availableRoutes={availableRoutes}
           availableDrivers={availableDrivers}
           availableBuses={availableBuses}
           availableTimes={availableTimes}
-          rawTrips={analytics?.rawTrips || []}
+          rawTrips={allTripsForCascading || []}
         />
         <Card className="mt-6 p-12">
           <div className="text-center space-y-4">
@@ -280,7 +308,7 @@ const handleFilterChange = useCallback((filters: any) => {
         availableDrivers={availableDrivers}
         availableBuses={availableBuses}
         availableTimes={availableTimes}
-        rawTrips={analytics?.rawTrips || []}
+        rawTrips={allTripsForCascading || []}
       />
 
       {/* Data Quality Alert with Verification */}
