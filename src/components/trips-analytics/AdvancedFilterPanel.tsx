@@ -40,6 +40,7 @@ interface RawTrip {
   bus_id: string;
   driver_id?: string;
   start_time?: string;
+  trip_date?: string;
   routes?: { route_no: string; route_name: string };
   buses?: { bus_no?: string; registration_number?: string };
   profiles?: { first_name: string; last_name: string };
@@ -281,12 +282,22 @@ export default function AdvancedFilterPanel({
         drivers: availableDrivers,
         buses: availableBuses,
         times: availableTimes,
-        hasValidCombinations: true
+        hasValidCombinations: true,
+        tripCount: 0
       };
     }
 
-    // Start with all trips
-    let filteredTrips = [...rawTrips];
+    // FIRST: Filter by current local date range selection
+    let filteredTrips = rawTrips.filter(t => {
+      if (!t.trip_date) return true;
+      const tripDate = new Date(t.trip_date);
+      const fromDate = new Date(dateRange.from);
+      const toDate = new Date(dateRange.to);
+      // Set to start/end of day for inclusive comparison
+      fromDate.setHours(0, 0, 0, 0);
+      toDate.setHours(23, 59, 59, 999);
+      return tripDate >= fromDate && tripDate <= toDate;
+    });
 
     // Apply Route filter if selected
     if (selectedRoutes.length > 0) {
@@ -326,16 +337,121 @@ export default function AdvancedFilterPanel({
     const validBuses = new Set<string>();
     const validTimes = new Set<string>();
 
-    filteredTrips.forEach(t => {
+    // For cascading, we need to show what's available BEFORE applying each filter type
+    // This means we compute options based on date range + OTHER filters (not the filter itself)
+    
+    // Get trips filtered by date + drivers + buses + times (for route options)
+    const tripsForRouteOptions = rawTrips.filter(t => {
+      if (t.trip_date) {
+        const tripDate = new Date(t.trip_date);
+        const fromDate = new Date(dateRange.from);
+        const toDate = new Date(dateRange.to);
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(23, 59, 59, 999);
+        if (tripDate < fromDate || tripDate > toDate) return false;
+      }
+      if (selectedDrivers.length > 0) {
+        const driverName = extractDriverName(t);
+        if (!selectedDrivers.includes(driverName)) return false;
+      }
+      if (selectedBuses.length > 0) {
+        const busName = extractBusName(t);
+        if (!selectedBuses.includes(busName)) return false;
+      }
+      if (selectedTimes.length > 0) {
+        const time = extractTime(t);
+        if (!time || !selectedTimes.includes(time)) return false;
+      }
+      return true;
+    });
+    tripsForRouteOptions.forEach(t => {
       const routeName = extractRouteName(t);
       if (routeName) validRoutes.add(routeName);
+    });
 
+    // Get trips filtered by date + routes + buses + times (for driver options)
+    const tripsForDriverOptions = rawTrips.filter(t => {
+      if (t.trip_date) {
+        const tripDate = new Date(t.trip_date);
+        const fromDate = new Date(dateRange.from);
+        const toDate = new Date(dateRange.to);
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(23, 59, 59, 999);
+        if (tripDate < fromDate || tripDate > toDate) return false;
+      }
+      if (selectedRoutes.length > 0) {
+        const routeName = extractRouteName(t);
+        if (!routeName || !selectedRoutes.includes(routeName)) return false;
+      }
+      if (selectedBuses.length > 0) {
+        const busName = extractBusName(t);
+        if (!selectedBuses.includes(busName)) return false;
+      }
+      if (selectedTimes.length > 0) {
+        const time = extractTime(t);
+        if (!time || !selectedTimes.includes(time)) return false;
+      }
+      return true;
+    });
+    tripsForDriverOptions.forEach(t => {
       const driverName = extractDriverName(t);
       if (driverName && driverName !== 'Unknown Driver') validDrivers.add(driverName);
+    });
 
+    // Get trips filtered by date + routes + drivers + times (for bus options)
+    const tripsForBusOptions = rawTrips.filter(t => {
+      if (t.trip_date) {
+        const tripDate = new Date(t.trip_date);
+        const fromDate = new Date(dateRange.from);
+        const toDate = new Date(dateRange.to);
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(23, 59, 59, 999);
+        if (tripDate < fromDate || tripDate > toDate) return false;
+      }
+      if (selectedRoutes.length > 0) {
+        const routeName = extractRouteName(t);
+        if (!routeName || !selectedRoutes.includes(routeName)) return false;
+      }
+      if (selectedDrivers.length > 0) {
+        const driverName = extractDriverName(t);
+        if (!selectedDrivers.includes(driverName)) return false;
+      }
+      if (selectedTimes.length > 0) {
+        const time = extractTime(t);
+        if (!time || !selectedTimes.includes(time)) return false;
+      }
+      return true;
+    });
+    tripsForBusOptions.forEach(t => {
       const busName = extractBusName(t);
       if (busName) validBuses.add(busName);
+    });
 
+    // Get trips filtered by date + routes + drivers + buses (for time options)
+    const tripsForTimeOptions = rawTrips.filter(t => {
+      if (t.trip_date) {
+        const tripDate = new Date(t.trip_date);
+        const fromDate = new Date(dateRange.from);
+        const toDate = new Date(dateRange.to);
+        fromDate.setHours(0, 0, 0, 0);
+        toDate.setHours(23, 59, 59, 999);
+        if (tripDate < fromDate || tripDate > toDate) return false;
+      }
+      if (selectedRoutes.length > 0) {
+        const routeName = extractRouteName(t);
+        if (!routeName || !selectedRoutes.includes(routeName)) return false;
+      }
+      if (selectedDrivers.length > 0) {
+        const driverName = extractDriverName(t);
+        if (!selectedDrivers.includes(driverName)) return false;
+      }
+      if (selectedBuses.length > 0) {
+        const busName = extractBusName(t);
+        if (!selectedBuses.includes(busName)) return false;
+      }
+      return true;
+    });
+    tripsForTimeOptions.forEach(t => {
       const time = extractTime(t);
       if (time) validTimes.add(time);
     });
@@ -352,9 +468,10 @@ export default function AdvancedFilterPanel({
       drivers: Array.from(validDrivers).sort(),
       buses: Array.from(validBuses).sort(),
       times: sortedTimes,
-      hasValidCombinations: filteredTrips.length > 0
+      hasValidCombinations: filteredTrips.length > 0,
+      tripCount: filteredTrips.length
     };
-  }, [rawTrips, selectedRoutes, selectedDrivers, selectedBuses, selectedTimes, availableRoutes, availableDrivers, availableBuses, availableTimes]);
+  }, [rawTrips, dateRange, selectedRoutes, selectedDrivers, selectedBuses, selectedTimes, availableRoutes, availableDrivers, availableBuses, availableTimes]);
 
   // Effective options: use cascading results if rawTrips available, otherwise fallback
   const effectiveRoutes = rawTrips.length > 0 ? bidirectionalCascading.routes : availableRoutes;
@@ -674,12 +791,11 @@ export default function AdvancedFilterPanel({
                         <Checkbox
                           id={`route-${route}`}
                           checked={selectedRoutes.includes(route)}
-                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={() => handleRouteToggle(route)}
                         />
                         <label 
                           htmlFor={`route-${route}`} 
                           className="text-sm cursor-pointer flex-1"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           {route}
                         </label>
@@ -728,12 +844,11 @@ export default function AdvancedFilterPanel({
                         <Checkbox
                           id={`driver-${driver}`}
                           checked={selectedDrivers.includes(driver)}
-                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={() => handleDriverToggle(driver)}
                         />
                         <label 
                           htmlFor={`driver-${driver}`} 
                           className="text-sm cursor-pointer flex-1"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           {driver}
                         </label>
@@ -782,12 +897,11 @@ export default function AdvancedFilterPanel({
                         <Checkbox
                           id={`bus-${bus}`}
                           checked={selectedBuses.includes(bus)}
-                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={() => handleBusToggle(bus)}
                         />
                         <label 
                           htmlFor={`bus-${bus}`} 
                           className="text-sm cursor-pointer flex-1"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           {bus}
                         </label>
@@ -839,12 +953,11 @@ export default function AdvancedFilterPanel({
                         <Checkbox
                           id={`time-${time}`}
                           checked={selectedTimes.includes(time)}
-                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={() => handleTimeToggle(time)}
                         />
                         <label 
                           htmlFor={`time-${time}`} 
                           className="text-sm cursor-pointer flex-1"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           {formatTimeDisplay(time)}
                         </label>
