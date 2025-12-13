@@ -10,11 +10,13 @@ interface DataQualityAlertProps {
   totalTrips: number;
   totalExpenses?: number;
   totalRevenue?: number;
+  netProfit?: number;
   dateRange?: { from: Date; to: Date };
   activeFilters?: {
     routes?: string[];
     drivers?: string[];
     buses?: string[];
+    times?: string[];
   };
 }
 
@@ -23,19 +25,31 @@ export default function DataQualityAlert({
   totalTrips,
   totalExpenses = 0,
   totalRevenue = 0,
+  netProfit: netProfitProp,
   dateRange,
   activeFilters
 }: DataQualityAlertProps) {
   const navigate = useNavigate();
   const dataQuality = totalTrips > 0 ? (tripsWithExpenses / totalTrips) * 100 : 0;
   const missingExpenses = totalTrips - tripsWithExpenses;
-  const netProfit = totalRevenue - totalExpenses;
+  // Use prop if provided, otherwise calculate locally
+  const netProfit = netProfitProp !== undefined ? netProfitProp : (totalRevenue - totalExpenses);
   const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100) : 0;
 
   // Count active filters
   const activeFilterCount = (activeFilters?.routes?.length || 0) + 
                            (activeFilters?.drivers?.length || 0) + 
-                           (activeFilters?.buses?.length || 0);
+                           (activeFilters?.buses?.length || 0) +
+                           (activeFilters?.times?.length || 0);
+
+  // Format time for display (e.g., "10:30" -> "10:30 AM")
+  const formatTimeDisplay = (time: string): string => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
 
   return (
     <div className="p-4 border rounded-lg bg-card space-y-3">
@@ -72,6 +86,11 @@ export default function DataQualityAlert({
           {activeFilters?.buses?.map(bus => (
             <Badge key={bus} variant="outline" className="text-xs bg-orange-500/10">
               Bus: {bus}
+            </Badge>
+          ))}
+          {activeFilters?.times?.map(time => (
+            <Badge key={time} variant="outline" className="text-xs bg-green-500/10">
+              Time: {formatTimeDisplay(time)}
             </Badge>
           ))}
         </div>

@@ -11,6 +11,7 @@ export interface AnalyticsFilters {
   drivers?: string[];
   conductors?: string[];
   buses?: string[];
+  times?: string[];
   status?: string;
 }
 
@@ -91,6 +92,7 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
     routes: (filters.routes ?? []).slice().sort(),
     drivers: (filters.drivers ?? []).slice().sort(),
     buses: (filters.buses ?? []).slice().sort(),
+    times: (filters.times ?? []).slice().sort(),
     status: filters.status ?? null,
   };
 
@@ -176,6 +178,16 @@ export function useTripsAnalytics(filters: AnalyticsFilters) {
         filteredTrips = filteredTrips.filter(t => {
           const busName = t.buses?.bus_no || t.buses?.registration_number || '';
           return stableKey.buses!.includes(busName);
+        });
+      }
+
+      // Filter by start time (exact match, e.g., "10:30", "17:00")
+      if (stableKey.times && stableKey.times.length > 0) {
+        filteredTrips = filteredTrips.filter(t => {
+          if (!t.start_time) return false;
+          // Extract HH:MM from start_time (handles both "HH:MM" and "HH:MM:SS" formats)
+          const tripTime = t.start_time.substring(0, 5);
+          return stableKey.times!.includes(tripTime);
         });
       }
 
