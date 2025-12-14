@@ -117,7 +117,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     try {
       const amount = parseFloat(paymentForm.amount);
       if (isNaN(amount) || amount <= 0) {
-        toast.error('Please enter a valid amount');
+        toast.error('Please enter a valid payment amount');
         return;
       }
 
@@ -126,32 +126,44 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         return;
       }
 
-      // Insert payment record
+      // Get current user for created_by field
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        toast.error('Authentication error. Please log in again.');
+        return;
+      }
+
+      // Insert payment record with created_by
       const { data: payment, error: paymentError } = await supabase
         .from('yutong_customer_payments')
         .insert({
           order_id: selectedOrderId,
-          payment_schedule_id: selectedSchedule?.id,
+          payment_schedule_id: selectedSchedule?.id || null,
           payment_amount: amount,
           payment_date: paymentForm.payment_date,
           payment_method: paymentForm.payment_method,
-          payment_reference: paymentForm.reference_no,
-          notes: paymentForm.notes,
-          status: 'pending'
+          payment_reference: paymentForm.reference_no || null,
+          notes: paymentForm.notes || null,
+          status: 'pending',
+          created_by: user.id
         })
         .select()
         .single();
 
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('Payment insert error:', paymentError);
+        toast.error(`Failed to record payment: ${paymentError.message}`);
+        return;
+      }
 
-      toast.success('Payment recorded successfully');
+      toast.success('Payment recorded successfully. Please verify the payment to update financials.');
       setIsRecordModalOpen(false);
       resetForm();
       loadPaymentData();
       onRefresh();
     } catch (error: any) {
       console.error('Error recording payment:', error);
-      toast.error('Failed to record payment');
+      toast.error(`Failed to record payment: ${error.message || 'Unknown error'}`);
     }
   };
 

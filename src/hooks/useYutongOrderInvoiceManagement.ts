@@ -314,21 +314,36 @@ export function useYutongOrderInvoiceManagement() {
     orderId: string
   ): Promise<{ success: boolean; documents?: YutongStoredDocument[]; error?: any }> => {
     try {
-      // Fetch documents with their related invoice records
+      // First get invoice records for this specific order
+      const { data: invoiceRecords, error: recordsError } = await supabase
+        .from('yutong_invoice_records')
+        .select('id')
+        .eq('order_id', orderId);
+
+      if (recordsError) throw recordsError;
+
+      if (!invoiceRecords || invoiceRecords.length === 0) {
+        return { success: true, documents: [] };
+      }
+
+      // Then get documents for those specific invoice records
+      const recordIds = invoiceRecords.map(r => r.id);
       const { data, error } = await supabase
         .from('yutong_invoice_documents')
         .select(`
           *,
           yutong_invoice_records!invoice_record_id (
             order_id,
-            quotation_id
+            quotation_id,
+            invoice_no,
+            status
           )
         `)
-        .eq('yutong_invoice_records.order_id', orderId)
+        .in('invoice_record_id', recordIds)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
+
       return { success: true, documents: data as any };
     } catch (error: any) {
       console.error('Error fetching invoice documents:', error);
