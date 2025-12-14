@@ -25,6 +25,7 @@ import { YutongOrder } from '@/hooks/useYutongOrderManagement';
 import { YutongOrderJourney } from './YutongOrderJourney';
 import { ProcessManagement } from './ProcessManagement';
 import { YutongOrderInvoiceGenerator } from './YutongOrderInvoiceGenerator';
+import { YutongPaymentTracking } from './YutongPaymentTracking';
 
 interface EnhancedYutongOrderDetailsModalProps {
   order: YutongOrder | null;
@@ -189,54 +190,12 @@ export function EnhancedYutongOrderDetailsModal({
             />
           </TabsContent>
 
-          {/* Financial Tab */}
+          {/* Financial Tab - Now with full Payment Tracking */}
           <TabsContent value="financial" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Total Amount</span>
-                      <span className="font-bold text-lg">LKR {order.total_amount.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Total Paid</span>
-                      <span className="font-bold text-lg text-green-600">LKR {order.total_paid.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Balance Due</span>
-                      <span className="font-bold text-lg text-orange-600">LKR {order.balance_due.toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <Progress 
-                      value={(order.total_paid / order.total_amount) * 100} 
-                      className="w-full h-4" 
-                    />
-                    <p className="text-center text-sm text-muted-foreground mt-2">
-                      {Math.round((order.total_paid / order.total_amount) * 100)}% Paid
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment Mode</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Badge 
-                    variant={order.payment_mode === 'cash' ? 'default' : 'secondary'}
-                    className="text-base px-3 py-1"
-                  >
-                    {order.payment_mode.toUpperCase()}
-                  </Badge>
-                </CardContent>
-              </Card>
-            </div>
+            <YutongPaymentTracking 
+              orderId={order.id} 
+              onRefresh={onRefresh} 
+            />
           </TabsContent>
 
           {/* Operations Tab with Process Management */}
