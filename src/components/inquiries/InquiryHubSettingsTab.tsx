@@ -110,7 +110,7 @@ export const InquiryHubSettingsTab = () => {
           "x-api-key": apiKey,
         },
         body: JSON.stringify({
-          source: "test",
+          source: "website",
           product_type: "yutong",
           customer_name: "Test Customer (Webhook Test)",
           customer_phone: "+94771234567",
