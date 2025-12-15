@@ -6,11 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ColumnDef } from '@tanstack/react-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, CreditCard, Truck, FileText } from 'lucide-react';
+import { Eye, Edit, CreditCard, Truck, FileText, LayoutGrid, List, Ship, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { useYutongOrderManagement, YutongOrder } from '@/hooks/useYutongOrderManagement';
 import { EnhancedYutongOrderDetailsModal } from './EnhancedYutongOrderDetailsModal';
 import { YutongCreateOrderModal } from './YutongCreateOrderModal';
+import { YutongOrderCard } from './YutongOrderCard';
+import { YutongShipmentGroupManagement } from './YutongShipmentGroupManagement';
 
 const phaseLabels = {
   'order_confirmation': 'Order Confirmation',
@@ -46,6 +48,8 @@ export function YutongOrdersList() {
   const [selectedOrder, setSelectedOrder] = useState<YutongOrder | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [showShipments, setShowShipments] = useState(false);
   const { getOrdersWithDetails, updateOrderPhase } = useYutongOrderManagement();
 
   const loadOrders = async () => {
@@ -248,6 +252,18 @@ export function YutongOrdersList() {
     },
   ];
 
+  // Show Shipment Management if toggled
+  if (showShipments) {
+    return (
+      <div className="space-y-4">
+        <Button variant="outline" onClick={() => setShowShipments(false)} className="gap-2">
+          ← Back to Orders
+        </Button>
+        <YutongShipmentGroupManagement />
+      </div>
+    );
+  }
+
   return (
     <>
       <Card>
@@ -256,17 +272,56 @@ export function YutongOrdersList() {
             <Truck className="h-5 w-5" />
             Yutong Orders Management
           </CardTitle>
-          <Button onClick={() => setShowCreateOrder(true)} className="gap-2">
-            <FileText className="h-4 w-4" />
-            Create Order
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowShipments(true)} className="gap-2">
+              <Ship className="h-4 w-4" />
+              Manage Shipments
+            </Button>
+            <div className="flex border rounded-md">
+              <Button
+                variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className="rounded-r-none"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'card' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('card')}
+                className="rounded-l-none"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button onClick={() => setShowCreateOrder(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Order
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <DataTable 
-            columns={columns} 
-            data={orders}
-            searchKey="order_no"
-          />
+          {viewMode === 'table' ? (
+            <DataTable 
+              columns={columns} 
+              data={orders}
+              searchKey="order_no"
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {orders.map(order => (
+                <YutongOrderCard
+                  key={order.id}
+                  order={order}
+                  onViewDetails={(o) => {
+                    setSelectedOrder(o);
+                    setShowOrderDetails(true);
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
