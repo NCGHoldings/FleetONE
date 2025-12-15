@@ -14,13 +14,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, RefreshCw, ExternalLink } from "lucide-react";
+import { Copy, RefreshCw, ExternalLink, Play, CheckCircle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+
+// Production Supabase URL
+const SUPABASE_URL = "https://wwjpdszkmtnzshbulkon.supabase.co";
 
 export const InquiryHubSettingsTab = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [generatingKey, setGeneratingKey] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["inquiry-hub-settings"],
@@ -80,8 +85,70 @@ export const InquiryHubSettingsTab = () => {
     toast({ title: "Copied to clipboard" });
   };
 
-  const webhookUrl = `${window.location.origin.replace("localhost:8080", "127.0.0.1:54321")}/functions/v1/receive-vehicle-inquiry`;
+  // Use the production Supabase URL for webhook
+  const webhookUrl = `${SUPABASE_URL}/functions/v1/receive-vehicle-inquiry`;
   const apiKey = settings?.webhook_secret?.api_key || "";
+
+  const testWebhook = async () => {
+    if (!apiKey) {
+      toast({ 
+        title: "No API key configured", 
+        description: "Please generate an API key first",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setTestingWebhook(true);
+    setTestResult(null);
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          source: "test",
+          product_type: "yutong",
+          customer_name: "Test Customer (Webhook Test)",
+          customer_phone: "+94771234567",
+          customer_email: "test@example.com",
+          inquiry_message: "This is a test inquiry from the webhook test button",
+          interested_model: "Test Model",
+          quantity: 1,
+        }),
+      });
+
+      if (response.ok) {
+        setTestResult('success');
+        toast({ 
+          title: "Webhook test successful!", 
+          description: "Test inquiry was created successfully. Check the Inquiries list.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["vehicle-inquiries"] });
+      } else {
+        const errorData = await response.json();
+        setTestResult('error');
+        toast({ 
+          title: "Webhook test failed", 
+          description: errorData.error || "Unknown error occurred",
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      setTestResult('error');
+      toast({ 
+        title: "Webhook test failed", 
+        description: "Network error - check console for details",
+        variant: "destructive" 
+      });
+      console.error("Webhook test error:", error);
+    } finally {
+      setTestingWebhook(false);
+    }
+  };
 
   if (isLoading) {
     return <div className="text-center py-8">Loading settings...</div>;
@@ -144,6 +211,38 @@ export const InquiryHubSettingsTab = () => {
             <p className="text-sm text-muted-foreground">
               Include this API key in the <code>x-api-key</code> header when making requests
             </p>
+          </div>
+
+          {/* Test Webhook Button */}
+          <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
+            <div className="flex-1">
+              <p className="text-sm font-medium">Test Webhook Connection</p>
+              <p className="text-xs text-muted-foreground">
+                Send a test inquiry to verify your webhook is working correctly
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {testResult === 'success' && (
+                <Badge variant="default" className="bg-green-500">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Success
+                </Badge>
+              )}
+              {testResult === 'error' && (
+                <Badge variant="destructive">
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Failed
+                </Badge>
+              )}
+              <Button
+                onClick={testWebhook}
+                disabled={testingWebhook || !apiKey}
+                variant="secondary"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                {testingWebhook ? "Testing..." : "Test Webhook"}
+              </Button>
+            </div>
           </div>
 
           <div className="p-4 bg-muted rounded-lg">
