@@ -256,11 +256,8 @@ export default function AdvancedFilterPanel({
     localStorage.setItem('trip-analytics-presets', JSON.stringify(updatedPresets));
   };
 
-  // Fire once on mount
-  useEffect(() => {
-    emitFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // NOTE: Removed auto-emit on mount - user must explicitly click "Apply Filters"
+  // This prevents unwanted 30-day resets when filters are being selected
 
   const activeFilterCount = selectedRoutes.length + selectedDrivers.length + selectedBuses.length + selectedTimes.length;
 
