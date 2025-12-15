@@ -10359,6 +10359,48 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_shipment_orders: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          id: string
+          order_id: string
+          sequence_order: number
+          shipment_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          order_id: string
+          sequence_order?: number
+          shipment_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          order_id?: string
+          sequence_order?: number
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_shipment_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_shipment_orders_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_shipment_tracking: {
         Row: {
           created_at: string | null
@@ -10414,21 +10456,33 @@ export type Database = {
           actual_arrival_date: string | null
           actual_departure_date: string | null
           arrival_port: string | null
+          bill_of_lading_no: string | null
           container_number: string | null
+          container_numbers: string[] | null
           created_at: string | null
+          created_by: string | null
+          current_phase:
+            | Database["public"]["Enums"]["yutong_order_phase"]
+            | null
           current_status: string | null
           departure_port: string | null
           estimated_arrival_date: string | null
+          expected_arrival_date: string | null
+          expected_departure_date: string | null
           id: string
           insurance_amount: number | null
-          order_id: string
+          notes: string | null
+          order_id: string | null
           scheduled_arrival_date: string | null
           scheduled_departure_date: string | null
+          shipment_name: string | null
+          shipment_no: string | null
           shipment_reference: string | null
           shipping_cost: number | null
           shipping_method: Database["public"]["Enums"]["shipping_method"]
           shipping_partner_id: string | null
           special_instructions: string | null
+          status: Database["public"]["Enums"]["yutong_shipment_status"]
           supplier_order_id: string | null
           tracking_number: string | null
           updated_at: string | null
@@ -10438,21 +10492,33 @@ export type Database = {
           actual_arrival_date?: string | null
           actual_departure_date?: string | null
           arrival_port?: string | null
+          bill_of_lading_no?: string | null
           container_number?: string | null
+          container_numbers?: string[] | null
           created_at?: string | null
+          created_by?: string | null
+          current_phase?:
+            | Database["public"]["Enums"]["yutong_order_phase"]
+            | null
           current_status?: string | null
           departure_port?: string | null
           estimated_arrival_date?: string | null
+          expected_arrival_date?: string | null
+          expected_departure_date?: string | null
           id?: string
           insurance_amount?: number | null
-          order_id: string
+          notes?: string | null
+          order_id?: string | null
           scheduled_arrival_date?: string | null
           scheduled_departure_date?: string | null
+          shipment_name?: string | null
+          shipment_no?: string | null
           shipment_reference?: string | null
           shipping_cost?: number | null
           shipping_method: Database["public"]["Enums"]["shipping_method"]
           shipping_partner_id?: string | null
           special_instructions?: string | null
+          status?: Database["public"]["Enums"]["yutong_shipment_status"]
           supplier_order_id?: string | null
           tracking_number?: string | null
           updated_at?: string | null
@@ -10462,21 +10528,33 @@ export type Database = {
           actual_arrival_date?: string | null
           actual_departure_date?: string | null
           arrival_port?: string | null
+          bill_of_lading_no?: string | null
           container_number?: string | null
+          container_numbers?: string[] | null
           created_at?: string | null
+          created_by?: string | null
+          current_phase?:
+            | Database["public"]["Enums"]["yutong_order_phase"]
+            | null
           current_status?: string | null
           departure_port?: string | null
           estimated_arrival_date?: string | null
+          expected_arrival_date?: string | null
+          expected_departure_date?: string | null
           id?: string
           insurance_amount?: number | null
-          order_id?: string
+          notes?: string | null
+          order_id?: string | null
           scheduled_arrival_date?: string | null
           scheduled_departure_date?: string | null
+          shipment_name?: string | null
+          shipment_no?: string | null
           shipment_reference?: string | null
           shipping_cost?: number | null
           shipping_method?: Database["public"]["Enums"]["shipping_method"]
           shipping_partner_id?: string | null
           special_instructions?: string | null
+          status?: Database["public"]["Enums"]["yutong_shipment_status"]
           supplier_order_id?: string | null
           tracking_number?: string | null
           updated_at?: string | null
@@ -11012,6 +11090,7 @@ export type Database = {
       generate_yutong_quotation_no:
         | { Args: never; Returns: string }
         | { Args: { quotation_date?: string }; Returns: string }
+      generate_yutong_shipment_no: { Args: never; Returns: string }
       generate_yutong_ticket_number: { Args: never; Returns: string }
       generate_yutong_warranty_number: { Args: never; Returns: string }
       get_cron_jobs: {
@@ -11240,6 +11319,13 @@ export type Database = {
       yutong_payment_mode: "cash" | "lease"
       yutong_payment_status: "pending" | "paid" | "overdue" | "cancelled"
       yutong_payment_type: "advance" | "interim" | "balance" | "full"
+      yutong_shipment_status:
+        | "planning"
+        | "confirmed"
+        | "in_transit"
+        | "customs"
+        | "delivered"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -11546,6 +11632,14 @@ export const Constants = {
       yutong_payment_mode: ["cash", "lease"],
       yutong_payment_status: ["pending", "paid", "overdue", "cancelled"],
       yutong_payment_type: ["advance", "interim", "balance", "full"],
+      yutong_shipment_status: [
+        "planning",
+        "confirmed",
+        "in_transit",
+        "customs",
+        "delivered",
+        "cancelled",
+      ],
     },
   },
 } as const

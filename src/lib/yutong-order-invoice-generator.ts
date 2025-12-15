@@ -94,13 +94,14 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   ` : ''}
 
   .invoice-page {
-    width: 1080px;
-    margin: 30px auto;
+    width: 794px;
+    margin: 0 auto;
     box-sizing: border-box;
     border: 2px solid #0b2f66;
     box-shadow: 0 0 8px rgba(0,0,0,0.1);
     padding-bottom: 30px;
     position: relative;
+    background: #ffffff;
   }
 
   .header-section {
@@ -670,17 +671,17 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
   try {
     console.log('🎨 Rendering HTML to canvas...');
     const canvas = await html2canvas(container, {
-      scale: 1.5, // Reduced from 2 to optimize file size
+      scale: 2, // Higher quality rendering
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
-      logging: false // Disable verbose logging
+      logging: false
     });
     
     console.log('✅ Canvas rendered. Size:', canvas.width, 'x', canvas.height);
 
-    // Use JPEG with compression for smaller file size
-    const imgData = canvas.toDataURL('image/jpeg', 0.85); // 85% quality
+    // Use JPEG with higher quality for professional output
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
     console.log('🖼️ Converting canvas to image data...');
     
     const pdf = new jsPDF('p', 'mm', 'a4');
@@ -690,9 +691,15 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
     const imgHeight = canvas.height;
     const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
     
-    console.log('📊 PDF dimensions:', { pdfWidth, pdfHeight, imgWidth, imgHeight, ratio });
+    // Calculate center position for proper alignment
+    const scaledWidth = imgWidth * ratio;
+    const scaledHeight = imgHeight * ratio;
+    const imgX = (pdfWidth - scaledWidth) / 2; // Center horizontally
+    const imgY = 5; // Small top margin
     
-    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth * ratio, imgHeight * ratio);
+    console.log('📊 PDF dimensions:', { pdfWidth, pdfHeight, imgWidth, imgHeight, ratio, imgX, imgY });
+    
+    pdf.addImage(imgData, 'JPEG', imgX, imgY, scaledWidth, scaledHeight);
     const blob = pdf.output('blob');
     
     console.log('✅ PDF generated successfully. Blob size:', blob.size, 'bytes');
