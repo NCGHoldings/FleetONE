@@ -305,6 +305,81 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
     }
   };
 
+  const handleSetActiveVersion = async (version: { id: string; parent_quotation_id?: string }) => {
+    try {
+      // Find the root parent by following the chain
+      let rootId = version.id;
+      let currentId = version.id;
+      
+      // First, get this version's parent
+      const { data: versionData } = await supabase
+        .from('yutong_quotations')
+        .select('parent_quotation_id')
+        .eq('id', version.id)
+        .single();
+      
+      if (versionData?.parent_quotation_id) {
+        // Follow the parent chain to find the root
+        currentId = versionData.parent_quotation_id;
+        while (true) {
+          const { data: parentData } = await supabase
+            .from('yutong_quotations')
+            .select('id, parent_quotation_id')
+            .eq('id', currentId)
+            .single();
+          
+          if (!parentData?.parent_quotation_id) {
+            rootId = parentData?.id || currentId;
+            break;
+          }
+          currentId = parentData.parent_quotation_id;
+        }
+      }
+      
+      // Deactivate all versions in the family (root and all children)
+      await supabase
+        .from('yutong_quotations')
+        .update({ is_active_version: false })
+        .or(`id.eq.${rootId},parent_quotation_id.eq.${rootId}`);
+      
+      // Also deactivate any nested children
+      const { data: children } = await supabase
+        .from('yutong_quotations')
+        .select('id')
+        .eq('parent_quotation_id', rootId);
+      
+      if (children) {
+        for (const child of children) {
+          await supabase
+            .from('yutong_quotations')
+            .update({ is_active_version: false })
+            .eq('parent_quotation_id', child.id);
+        }
+      }
+      
+      // Activate the selected version
+      const { error } = await supabase
+        .from('yutong_quotations')
+        .update({ is_active_version: true })
+        .eq('id', version.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Version is now active"
+      });
+      
+      loadQuotations();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to set active version",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleGenerateInvoice = (quotation: YutongQuotation) => {
     setSelectedQuotation(quotation);
     setInvoiceGeneratorOpen(true);
@@ -334,6 +409,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
               allVersions={versions}
               onViewVersion={handleViewQuotation}
               onEditVersion={handleEditQuotation}
+              onSetActiveVersion={handleSetActiveVersion}
               onLoadVersions={async () => {
                 // Step 1: Find the root parent by following the chain backwards
                 let currentId = quotation.parent_quotation_id || quotation.id;

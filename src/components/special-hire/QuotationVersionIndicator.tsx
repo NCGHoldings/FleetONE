@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, History, Eye, Edit } from 'lucide-react';
+import { ChevronDown, History, Eye, Edit, Check } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface QuotationVersion {
@@ -20,6 +20,7 @@ interface QuotationVersion {
   is_active_version: boolean;
   created_at: string;
   created_by_name?: string;
+  parent_quotation_id?: string;
 }
 
 interface Props {
@@ -28,6 +29,7 @@ interface Props {
   onViewVersion: (version: QuotationVersion) => void;
   onEditVersion: (version: QuotationVersion) => void;
   onLoadVersions?: () => Promise<void>;
+  onSetActiveVersion?: (version: QuotationVersion) => void;
   showEditOption?: boolean;
 }
 
@@ -37,6 +39,7 @@ export function QuotationVersionIndicator({
   onViewVersion, 
   onEditVersion,
   onLoadVersions,
+  onSetActiveVersion,
   showEditOption = true
 }: Props) {
   const [isLoading, setIsLoading] = useState(false);
@@ -175,6 +178,21 @@ export function QuotationVersionIndicator({
                       >
                         <Edit className="h-3.5 w-3.5 mr-1" />
                         Edit
+                      </Button>
+                    )}
+                    
+                    {!version.is_active_version && onSetActiveVersion && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs hover:bg-green-100 text-green-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSetActiveVersion(version);
+                        }}
+                      >
+                        <Check className="h-3.5 w-3.5 mr-1" />
+                        Set Active
                       </Button>
                     )}
                   </div>
