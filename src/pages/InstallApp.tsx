@@ -30,9 +30,11 @@ const InstallApp = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isIPad, setIsIPad] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
   const [isSafari, setIsSafari] = useState(false);
   const [isInStandaloneMode, setIsInStandaloneMode] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   useEffect(() => {
     // Check if app is already installed (works for both Android and iOS)
@@ -43,11 +45,20 @@ const InstallApp = () => {
 
     // Detect platform
     const userAgent = navigator.userAgent.toLowerCase();
-    const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
+    
+    // Enhanced iPad detection for iPadOS 13+ (reports as MacIntel with touch)
+    const isIPadDevice = /ipad/.test(userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+      (/macintosh/.test(userAgent) && 'ontouchend' in document);
+    
+    const isIPhoneDevice = /iphone|ipod/.test(userAgent);
+    const isIOSDevice = isIPhoneDevice || isIPadDevice;
+    
+    setIsIPad(isIPadDevice);
     setIsIOS(isIOSDevice);
     setIsAndroid(/android/.test(userAgent));
 
-    // Detect if Safari on iOS (not Chrome, Firefox, etc.)
+    // Detect if Safari on iOS/iPadOS (not Chrome, Firefox, etc.)
     // Safari on iOS doesn't include "chrome", "crios", "fxios", "edgios" in user agent
     const isSafariBrowser = isIOSDevice && 
       /safari/i.test(userAgent) && 
@@ -79,8 +90,27 @@ const InstallApp = () => {
     setDeferredPrompt(null);
   };
 
-  const copyUrlToClipboard = () => {
-    navigator.clipboard.writeText(window.location.href);
+  const copyUrlToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = window.location.href;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    }
+  };
+
+  const openInSafari = () => {
+    // Copy URL first, then show instructions
+    copyUrlToClipboard();
   };
 
   const features = [
@@ -187,7 +217,7 @@ const InstallApp = () => {
               </CardContent>
             </Card>
 
-            {/* iOS Install */}
+            {/* iOS/iPadOS Install */}
             <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -195,7 +225,9 @@ const InstallApp = () => {
                     <Apple className="w-6 h-6 text-blue-400" />
                   </div>
                   <div>
-                    <CardTitle className="text-white">iPhone / iPad</CardTitle>
+                    <CardTitle className="text-white">
+                      {isIPad ? 'iPad' : 'iPhone / iPad'}
+                    </CardTitle>
                     <CardDescription className="text-blue-200">
                       Add to Home Screen via Safari
                     </CardDescription>
@@ -203,15 +235,16 @@ const InstallApp = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {/* Safari Warning for iOS users not in Safari */}
+                {/* Safari Warning for iOS/iPadOS users not in Safari */}
                 {isIOS && !isSafari && (
                   <Alert className="bg-amber-500/20 border-amber-500/30 mb-4">
                     <AlertTriangle className="w-5 h-5 text-amber-400" />
                     <AlertDescription className="text-amber-200 ml-2">
-                      <strong className="block mb-1">Open in Safari Required</strong>
+                      <strong className="block mb-1">⚠️ Safari Required</strong>
                       <span className="text-xs">
-                        PWAs can only be installed through Safari on iPhone/iPad. 
-                        Copy this URL and paste it in Safari.
+                        {isIPad ? 'iPad' : 'iPhone'} can only install apps through Safari browser.
+                        <br />
+                        <strong>Copy this URL and open it in Safari.</strong>
                       </span>
                     </AlertDescription>
                   </Alert>
@@ -219,13 +252,22 @@ const InstallApp = () => {
 
                 {isIOS && !isSafari && (
                   <Button 
-                    onClick={copyUrlToClipboard}
-                    className="w-full mb-4 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200"
+                    onClick={openInSafari}
+                    className={`w-full mb-4 ${urlCopied ? 'bg-green-500/30 border-green-500/50 text-green-200' : 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200'}`}
                     variant="outline"
-                    size="sm"
+                    size="lg"
                   >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Copy URL for Safari
+                    {urlCopied ? (
+                      <>
+                        <CheckCircle2 className="w-5 h-5 mr-2" />
+                        URL Copied! Now open Safari
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="w-5 h-5 mr-2" />
+                        Copy URL & Open Safari
+                      </>
+                    )}
                   </Button>
                 )}
 
@@ -251,10 +293,43 @@ const InstallApp = () => {
                     </div>
                     <div>
                       <p className="text-sm text-white font-medium">Tap Share button</p>
-                      <p className="text-xs text-blue-200">Bottom center of Safari</p>
-                      <div className="flex items-center gap-2 mt-1 bg-white/10 rounded-lg px-3 py-2">
-                        <Share className="w-5 h-5 text-blue-300" />
-                        <span className="text-xs text-blue-200">Tap this icon ↑</span>
+                      <p className="text-xs text-blue-200">
+                        {isIPad ? 'Top right corner or URL bar on iPad' : 'Bottom center of Safari'}
+                      </p>
+                      {/* Visual Share button indicator */}
+                      <div className="mt-2 relative">
+                        <div className="bg-gray-800/80 rounded-lg p-3 border border-white/10">
+                          <div className="flex items-center justify-between">
+                            {isIPad ? (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="px-2 py-1 bg-white/10 rounded text-xs text-blue-200">
+                                    ncgspeed.app/install
+                                  </div>
+                                  <div className="p-1.5 bg-blue-500 rounded-lg animate-pulse">
+                                    <Share className="w-4 h-4 text-white" />
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex items-center justify-center w-full gap-4">
+                                <div className="text-white/40">◄</div>
+                                <div className="p-2 bg-blue-500 rounded-lg animate-pulse">
+                                  <Share className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="text-white/40">►</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-center text-blue-300 mt-1">
+                          {isIPad ? '↑ Share button is here on iPad' : '↑ Share button is here on iPhone'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -264,10 +339,24 @@ const InstallApp = () => {
                     </div>
                     <div>
                       <p className="text-sm text-white font-medium">Add to Home Screen</p>
-                      <p className="text-xs text-blue-200">Scroll down in share menu and tap</p>
-                      <div className="flex items-center gap-2 mt-1 bg-white/10 rounded-lg px-3 py-2">
-                        <Plus className="w-5 h-5 text-blue-300" />
-                        <span className="text-xs text-blue-200">Add to Home Screen</span>
+                      <p className="text-xs text-blue-200">
+                        <strong className="text-amber-300">Scroll down</strong> in share menu to find it
+                      </p>
+                      <div className="mt-2 bg-gray-800/80 rounded-lg p-2 border border-white/10">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-white/60">
+                            <span>📋</span> Copy
+                          </div>
+                          <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-white/60">
+                            <span>📱</span> AirDrop
+                          </div>
+                          <div className="flex items-center gap-2 px-2 py-1.5 bg-blue-500/30 rounded text-xs text-white border border-blue-400/50 animate-pulse">
+                            <Plus className="w-4 h-4" /> Add to Home Screen
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-center text-amber-300 mt-1">
+                          ↑ Scroll down to find this option
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -285,11 +374,16 @@ const InstallApp = () => {
 
                 {/* Safari confirmation badge */}
                 {isIOS && isSafari && (
-                  <div className="mt-4 p-2 bg-green-500/20 rounded-lg border border-green-500/30">
-                    <div className="flex items-center gap-2 text-green-300 text-sm">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>You're in Safari - Ready to install!</span>
+                  <div className="mt-4 p-3 bg-green-500/20 rounded-lg border border-green-500/30">
+                    <div className="flex items-center gap-2 text-green-300">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span className="font-medium">
+                        You're in Safari on {isIPad ? 'iPad' : 'iPhone'} - Ready to install!
+                      </span>
                     </div>
+                    <p className="text-xs text-green-200 mt-1 ml-7">
+                      Follow the steps above to add to your Home Screen
+                    </p>
                   </div>
                 )}
               </CardContent>
