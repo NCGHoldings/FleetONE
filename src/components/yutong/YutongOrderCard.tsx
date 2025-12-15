@@ -42,6 +42,8 @@ interface YutongOrderCardProps {
 }
 
 export function YutongOrderCard({ order, onViewDetails, compact = false }: YutongOrderCardProps) {
+  if (!order) return null;
+  
   const quotation = order.yutong_quotations;
   const customerName = quotation?.customer_name || 'N/A';
   const companyName = quotation?.company_name;
