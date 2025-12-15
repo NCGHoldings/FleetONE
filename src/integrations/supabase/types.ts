@@ -10359,6 +10359,105 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_shipment_group_orders: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          id: string
+          order_id: string
+          sequence_order: number
+          shipment_group_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          order_id: string
+          sequence_order?: number
+          shipment_group_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          id?: string
+          order_id?: string
+          sequence_order?: number
+          shipment_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_shipment_group_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_shipment_group_orders_shipment_group_id_fkey"
+            columns: ["shipment_group_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipment_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_shipment_groups: {
+        Row: {
+          actual_arrival_date: string | null
+          actual_departure_date: string | null
+          bill_of_lading_no: string | null
+          container_numbers: string[] | null
+          created_at: string
+          created_by: string | null
+          current_phase: string | null
+          expected_arrival_date: string | null
+          expected_departure_date: string | null
+          id: string
+          notes: string | null
+          shipment_name: string
+          shipment_no: string
+          status: string
+          updated_at: string
+          vessel_name: string | null
+        }
+        Insert: {
+          actual_arrival_date?: string | null
+          actual_departure_date?: string | null
+          bill_of_lading_no?: string | null
+          container_numbers?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          current_phase?: string | null
+          expected_arrival_date?: string | null
+          expected_departure_date?: string | null
+          id?: string
+          notes?: string | null
+          shipment_name: string
+          shipment_no: string
+          status?: string
+          updated_at?: string
+          vessel_name?: string | null
+        }
+        Update: {
+          actual_arrival_date?: string | null
+          actual_departure_date?: string | null
+          bill_of_lading_no?: string | null
+          container_numbers?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          current_phase?: string | null
+          expected_arrival_date?: string | null
+          expected_departure_date?: string | null
+          id?: string
+          notes?: string | null
+          shipment_name?: string
+          shipment_no?: string
+          status?: string
+          updated_at?: string
+          vessel_name?: string | null
+        }
+        Relationships: []
+      }
       yutong_shipment_orders: {
         Row: {
           added_at: string
@@ -11090,6 +11189,7 @@ export type Database = {
       generate_yutong_quotation_no:
         | { Args: never; Returns: string }
         | { Args: { quotation_date?: string }; Returns: string }
+      generate_yutong_shipment_group_no: { Args: never; Returns: string }
       generate_yutong_shipment_no: { Args: never; Returns: string }
       generate_yutong_ticket_number: { Args: never; Returns: string }
       generate_yutong_warranty_number: { Args: never; Returns: string }
