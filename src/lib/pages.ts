@@ -14,6 +14,7 @@ export type PageCategories = {
   finance: PageItem[];
   yutong: PageItem[];
   sinotruck: PageItem[];
+  lightvehicle: PageItem[];
   nsp: PageItem[];
   governance: PageItem[];
 };
@@ -65,6 +66,13 @@ export const PAGES: PageCategories = {
     { id: "sinotruck_truck_models", title: "Truck Models", url: "/sinotruck-quotations?tab=truck-models" },
     { id: "sinotruck_customers", title: "Customers", url: "/sinotruck-quotations?tab=customers" },
   ],
+  lightvehicle: [
+    { id: "lightvehicle_quotations", title: "Quotations", url: "/lightvehicle-quotations" },
+    { id: "lightvehicle_vehicle_models", title: "Vehicle Models", url: "/lightvehicle-quotations?tab=vehicle-models" },
+    { id: "lightvehicle_addons", title: "Add-ons", url: "/lightvehicle-quotations?tab=addons" },
+    { id: "lightvehicle_vehicle_data", title: "Vehicle Data", url: "/lightvehicle-quotations?tab=vehicle-data" },
+    { id: "lightvehicle_referral", title: "Referral Agents", url: "/lightvehicle-quotations?tab=referral" },
+  ],
   nsp: [
     { id: "nsp_daily_sales", title: "Daily Sales", url: "/nsp-daily-sales" },
     { id: "nsp_summary", title: "Summary & Reports", url: "/nsp-summary" },
@@ -85,6 +93,7 @@ export const ALL_PAGES_FLAT: PageItem[] = [
   ...PAGES.finance,
   ...PAGES.yutong,
   ...PAGES.sinotruck,
+  ...PAGES.lightvehicle,
   ...PAGES.nsp,
   ...PAGES.governance,
 ];
