@@ -42,6 +42,7 @@ import ReceiptUpload from "./pages/ReceiptUpload";
 import SchoolReports from "./pages/SchoolReports";
 import YutongQuotations from "./pages/YutongQuotations";
 import SinotruckQuotations from "./pages/SinotruckQuotations";
+import LightVehicleQuotations from "./pages/LightVehicleQuotations";
 import Complaints from "./pages/Complaints";
 import StaffPerformance from "./pages/StaffPerformance";
 import PublicComplaint from "./pages/PublicComplaint";
@@ -601,6 +602,19 @@ const App = () => (
                   <PageAccessGuard pageId="sinotruck_quotations">
                     <AppLayout>
                       <SinotruckQuotations />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/lightvehicle-quotations" 
+              element={
+                <ProtectedRoute>
+                  <PageAccessGuard pageId="lightvehicle_quotations">
+                    <AppLayout>
+                      <LightVehicleQuotations />
                     </AppLayout>
                   </PageAccessGuard>
                 </ProtectedRoute>

@@ -28,7 +28,8 @@ import {
   Upload,
   Clock,
   Activity,
-  Monitor
+  Monitor,
+  Car
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -113,6 +114,14 @@ const sinotruckItems = [
   { id: "sinotruck_customers", title: "Customers", url: "/sinotruck-quotations?tab=customers", icon: Users },
 ];
 
+const lightVehicleItems = [
+  { id: "lightvehicle_quotations", title: "Quotations", url: "/lightvehicle-quotations", icon: FileText },
+  { id: "lightvehicle_vehicle_models", title: "Vehicle Models", url: "/lightvehicle-quotations?tab=vehicle-models", icon: Car },
+  { id: "lightvehicle_addons", title: "Add-ons", url: "/lightvehicle-quotations?tab=addons", icon: Package },
+  { id: "lightvehicle_vehicle_data", title: "Vehicle Data", url: "/lightvehicle-quotations?tab=vehicle-data", icon: FileSpreadsheet },
+  { id: "lightvehicle_referral", title: "Referral Agents", url: "/lightvehicle-quotations?tab=referral", icon: Users },
+];
+
 const nspItems = [
   { id: "nsp_daily_sales", title: "Daily Sales", url: "/nsp-daily-sales", icon: ShoppingCart },
   { id: "nsp_summary", title: "Summary & Reports", url: "/nsp-summary", icon: FileSpreadsheet },
@@ -174,6 +183,7 @@ const visibleBusiness = businessItems.filter((i) => hasAccess(i.id));
 const visibleFinance = financeItems.filter((i) => hasAccess(i.id));
 const visibleYutong = yutongItems.filter((i) => hasAccess(i.id));
 const visibleSinotruck = sinotruckItems.filter((i) => hasAccess(i.id));
+const visibleLightVehicle = lightVehicleItems.filter((i) => hasAccess(i.id));
 const visibleNSP = nspItems.filter((i) => hasAccess(i.id));
 const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
 
@@ -301,6 +311,27 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
           <SidebarGroupContent>
             <SidebarMenu>
 {visibleSinotruck.map((item) => (
+  <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-full animate-pulse"></div>
+            Light Vehicle Sales
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+{visibleLightVehicle.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
       <NavLink to={item.url} className={getNavCls}>
