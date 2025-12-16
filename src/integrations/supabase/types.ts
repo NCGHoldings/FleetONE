@@ -10153,6 +10153,69 @@ export type Database = {
           },
         ]
       }
+      yutong_referral_commission_payments: {
+        Row: {
+          commission_amount: number
+          commission_pct: number | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          paid_at: string | null
+          paid_by: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_status: string | null
+          referral_agent_id: string
+          updated_at: string | null
+          yutong_quotation_id: string
+        }
+        Insert: {
+          commission_amount?: number
+          commission_pct?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: string | null
+          referral_agent_id: string
+          updated_at?: string | null
+          yutong_quotation_id: string
+        }
+        Update: {
+          commission_amount?: number
+          commission_pct?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: string | null
+          referral_agent_id?: string
+          updated_at?: string | null
+          yutong_quotation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_referral_commission_payments_referral_agent_id_fkey"
+            columns: ["referral_agent_id"]
+            isOneToOne: false
+            referencedRelation: "referral_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_referral_commission_payments_yutong_quotation_id_fkey"
+            columns: ["yutong_quotation_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_responsible_persons: {
         Row: {
           created_at: string

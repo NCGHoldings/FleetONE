@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Link2 } from 'lucide-react';
+import { FileText, Link2, Plus } from 'lucide-react';
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { QuotationAddOnsSection } from './QuotationAddOnsSection';
 import { InlineAddOnsSection } from './InlineAddOnsSection';
+import { AddReferralAgentModal } from '@/components/special-hire/AddReferralAgentModal';
 
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
@@ -106,6 +107,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
   const [responsiblePersons, setResponsiblePersons] = useState<any[]>([]);
   const [customizationOptions, setCustomizationOptions] = useState<any[]>([]);
   const [referralAgents, setReferralAgents] = useState<any[]>([]);
+  const [showAddAgentModal, setShowAddAgentModal] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -664,20 +666,31 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Referral Agent (Internal Only)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select referral agent (optional)" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {referralAgents.map((agent) => (
-                          <SelectItem key={agent.id} value={agent.id}>
-                            {agent.agent_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-2">
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Select referral agent (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {referralAgents.map((agent) => (
+                            <SelectItem key={agent.id} value={agent.id}>
+                              {agent.agent_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowAddAgentModal(true)}
+                        title="Add New Agent"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground">For internal tracking only - will not appear on quotation</p>
                     <FormMessage />
                   </FormItem>
@@ -1040,6 +1053,16 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
           </form>
         </Form>
       </DialogContent>
+
+      {/* Add Referral Agent Modal */}
+      <AddReferralAgentModal
+        open={showAddAgentModal}
+        onOpenChange={setShowAddAgentModal}
+        onAgentAdded={(agentId) => {
+          loadReferralAgents();
+          if (agentId) form.setValue('referral_agent_id', agentId);
+        }}
+      />
     </Dialog>
   );
 }
