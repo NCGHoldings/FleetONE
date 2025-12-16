@@ -9965,6 +9965,7 @@ export type Database = {
           bus_model_id: string | null
           business_registration_number: string | null
           company_name: string | null
+          contact_person: string | null
           created_at: string
           created_by: string | null
           curtain_colour: string | null
@@ -9989,6 +9990,7 @@ export type Database = {
           payment_terms: string | null
           quantity: number
           quotation_no: string
+          referral_agent_id: string | null
           relationship_notes: string | null
           responsible_person: string | null
           responsible_person_id: string | null
@@ -10013,6 +10015,7 @@ export type Database = {
           bus_model_id?: string | null
           business_registration_number?: string | null
           company_name?: string | null
+          contact_person?: string | null
           created_at?: string
           created_by?: string | null
           curtain_colour?: string | null
@@ -10037,6 +10040,7 @@ export type Database = {
           payment_terms?: string | null
           quantity?: number
           quotation_no: string
+          referral_agent_id?: string | null
           relationship_notes?: string | null
           responsible_person?: string | null
           responsible_person_id?: string | null
@@ -10061,6 +10065,7 @@ export type Database = {
           bus_model_id?: string | null
           business_registration_number?: string | null
           company_name?: string | null
+          contact_person?: string | null
           created_at?: string
           created_by?: string | null
           curtain_colour?: string | null
@@ -10085,6 +10090,7 @@ export type Database = {
           payment_terms?: string | null
           quantity?: number
           quotation_no?: string
+          referral_agent_id?: string | null
           relationship_notes?: string | null
           responsible_person?: string | null
           responsible_person_id?: string | null
@@ -10129,6 +10135,13 @@ export type Database = {
             columns: ["parent_quotation_id"]
             isOneToOne: false
             referencedRelation: "yutong_quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_quotations_referral_agent_id_fkey"
+            columns: ["referral_agent_id"]
+            isOneToOne: false
+            referencedRelation: "referral_agents"
             referencedColumns: ["id"]
           },
           {

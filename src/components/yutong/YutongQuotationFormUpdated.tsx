@@ -24,10 +24,12 @@ const formSchema = z.object({
   customer_email: z.string().email('Valid email is required').optional().or(z.literal('')),
   company_name: z.string().optional(),
   customer_address: z.string().optional(),
+  contact_person: z.string().optional(),
   finance_company: z.string().optional(),
   customer_type: z.enum(['personal', 'company']).default('personal'),
   business_registration_number: z.string().optional(),
   tax_registration_number: z.string().optional(),
+  referral_agent_id: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
@@ -103,6 +105,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
   const [tempAddOns, setTempAddOns] = useState<TempAddOn[]>([]);
   const [responsiblePersons, setResponsiblePersons] = useState<any[]>([]);
   const [customizationOptions, setCustomizationOptions] = useState<any[]>([]);
+  const [referralAgents, setReferralAgents] = useState<any[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -118,6 +121,9 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
       customer_email: initialData?.customerEmail || '',
       company_name: initialData?.companyName || '',
       customer_address: initialData?.address || '',
+      contact_person: '',
+      finance_company: '',
+      referral_agent_id: '',
     }
   });
 
@@ -126,6 +132,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
     loadCustomers();
     loadResponsiblePersons();
     loadCustomizationOptions();
+    loadReferralAgents();
   }, []);
 
   const loadCustomizationOptions = async () => {
@@ -213,16 +220,39 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
     }
   };
 
+  const loadReferralAgents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('referral_agents')
+        .select('id, agent_name')
+        .eq('status', 'active')
+        .order('agent_name');
+
+      if (error) throw error;
+      setReferralAgents(data || []);
+    } catch (error: any) {
+      console.error('Error loading referral agents:', error);
+    }
+  };
+
   const handleCustomerChange = (customerId: string) => {
     const customer = customers.find(c => c.id === customerId);
     setSelectedCustomer(customer);
     
     if (customer) {
-      // Auto-fill customer details
-      form.setValue('customer_name', customer.contact_person || '');
+      // Auto-fill customer details based on customer type
+      form.setValue('company_name', customer.company_name);
       form.setValue('customer_phone', customer.phone);
       form.setValue('customer_email', customer.email || '');
-      form.setValue('company_name', customer.company_name);
+      form.setValue('contact_person', customer.contact_person || '');
+      // Set customer_name based on type
+      if (customer.company_name) {
+        form.setValue('customer_type', 'company');
+        form.setValue('customer_name', customer.company_name);
+      } else {
+        form.setValue('customer_type', 'personal');
+        form.setValue('customer_name', customer.contact_person || '');
+      }
     }
   };
 
@@ -267,6 +297,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
         customer_email: data.customer_email || null,
         company_name: data.company_name,
         customer_address: data.customer_address || null,
+        contact_person: data.contact_person || null,
         bus_model: selectedModel ? `${selectedModel.bus_name} ${selectedModel.model_name}` : 'Unknown Model',
         bus_model_id: data.bus_model_id,
         quantity: data.quantity,
@@ -289,6 +320,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
         customer_type: data.customer_type || 'personal',
         business_registration_number: data.business_registration_number || null,
         tax_registration_number: data.tax_registration_number || null,
+        referral_agent_id: data.referral_agent_id || null,
         inquiry_id: initialData?.inquiryId || null,
       };
 
@@ -379,6 +411,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Customer Information</h3>
               
+              {/* 1. Select Existing Customer */}
               <FormField
                 name="existing_customer"
                 render={({ field }) => (
@@ -402,84 +435,41 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="company_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Company Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="finance_company"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Finance Company</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Optional" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
+              {/* 2. Customer Type Selection */}
               <FormField
                 control={form.control}
-                name="customer_address"
+                name="customer_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Customer Address</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} placeholder="Enter customer address" rows={2} />
-                    </FormControl>
+                    <FormLabel>Customer Type *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select customer type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="personal">Personal Customer</SelectItem>
+                        <SelectItem value="company">Company</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="customer_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Customer Type *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select customer type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="personal">Personal Customer</SelectItem>
-                          <SelectItem value="company">Company</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {form.watch('customer_type') === 'company' && (
-                <div className="grid grid-cols-2 gap-4">
+              {/* 3. Dynamic Fields Based on Customer Type */}
+              {form.watch('customer_type') === 'personal' ? (
+                <>
+                  {/* Personal Customer Fields */}
                   <FormField
                     control={form.control}
-                    name="business_registration_number"
+                    name="customer_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Business Registration Number</FormLabel>
+                        <FormLabel>Customer Name *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Business registration number" {...field} />
+                          <Input {...field} placeholder="Enter customer name" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -488,65 +478,212 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
 
                   <FormField
                     control={form.control}
-                    name="tax_registration_number"
+                    name="customer_address"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tax Registration Number</FormLabel>
+                        <FormLabel>Customer Address</FormLabel>
                         <FormControl>
-                          <Input placeholder="Tax registration number" {...field} />
+                          <Textarea {...field} placeholder="Enter customer address" rows={2} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="customer_phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number *</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter phone number" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="customer_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} placeholder="Optional" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="contact_person"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Person (Optional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Enter contact person name if different" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Company Fields */}
+                  <FormField
+                    control={form.control}
+                    name="customer_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Name *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Enter company name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="business_registration_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Business Registration Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Business registration number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="tax_registration_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tax Registration Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Tax registration number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="contact_person"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Person (Optional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Enter contact person name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customer_address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Address</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="Enter company address" rows={2} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="customer_phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number *</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter phone number" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="customer_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} placeholder="Optional" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="customer_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Contact Person *</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {/* Finance Company - Available for Both Types */}
+              <FormField
+                control={form.control}
+                name="finance_company"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Finance Company (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Enter finance company name if applicable" />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">If financed, enter the finance company name</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="customer_phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number *</FormLabel>
+              {/* Referral Agent - Internal Only */}
+              <FormField
+                control={form.control}
+                name="referral_agent_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Referral Agent (Internal Only)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <Input {...field} />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select referral agent (optional)" />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="customer_email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" {...field} placeholder="Optional" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {referralAgents.map((agent) => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            {agent.agent_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">For internal tracking only - will not appear on quotation</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             {/* Bus Information */}
