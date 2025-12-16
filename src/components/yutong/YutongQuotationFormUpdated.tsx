@@ -31,6 +31,8 @@ const formSchema = z.object({
   business_registration_number: z.string().optional(),
   tax_registration_number: z.string().optional(),
   referral_agent_id: z.string().optional(),
+  representative_name: z.string().optional(),
+  designation: z.string().optional(),
   bus_model_id: z.string().min(1, 'Bus model is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
@@ -126,6 +128,8 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
       contact_person: '',
       finance_company: '',
       referral_agent_id: '',
+      representative_name: '',
+      designation: '',
     }
   });
 
@@ -324,6 +328,8 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
         tax_registration_number: data.tax_registration_number || null,
         referral_agent_id: data.referral_agent_id || null,
         inquiry_id: initialData?.inquiryId || null,
+        representative_name: data.representative_name || null,
+        designation: data.designation || null,
       };
 
       const { data: quotation, error } = await supabase
@@ -537,61 +543,19 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
                   />
                 </>
               ) : (
-                <>
-                  {/* Company Fields */}
+              <>
+                {/* Company Fields - Customer Name and Designation first (optional) */}
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="customer_name"
+                    name="representative_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company Name *</FormLabel>
+                        <FormLabel>Customer Name (Optional)</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Enter company name" />
+                          <Input {...field} placeholder="Enter buyer's name if applicable" />
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="business_registration_number"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Business Registration Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Business registration number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="tax_registration_number"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tax Registration Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Tax registration number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="contact_person"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact Person (Optional)</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter contact person name" />
-                        </FormControl>
+                        <p className="text-xs text-muted-foreground">The person making the purchase</p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -599,49 +563,126 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
 
                   <FormField
                     control={form.control}
-                    name="customer_address"
+                    name="designation"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company Address</FormLabel>
+                        <FormLabel>Designation (Optional)</FormLabel>
                         <FormControl>
-                          <Textarea {...field} placeholder="Enter company address" rows={2} />
+                          <Input {...field} placeholder="Enter designation/role" />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">Their role/title at the company</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Company Name - Required */}
+                <FormField
+                  control={form.control}
+                  name="customer_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Name *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter company name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="business_registration_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Registration Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Business registration number" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="customer_phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number *</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Enter phone number" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <FormField
+                    control={form.control}
+                    name="tax_registration_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tax Registration Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Tax registration number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-                    <FormField
-                      control={form.control}
-                      name="customer_email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" {...field} placeholder="Optional" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </>
-              )}
+                <FormField
+                  control={form.control}
+                  name="customer_address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Address</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Enter company address" rows={2} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="customer_phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Enter phone number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customer_email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" {...field} placeholder="Optional" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Contact Person - Internal Only */}
+                <FormField
+                  control={form.control}
+                  name="contact_person"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Person (Internal Only)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter contact person name" />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">For internal records only - will not appear on quotation</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
 
               {/* Finance Company - Available for Both Types */}
               <FormField

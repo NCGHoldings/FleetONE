@@ -27,6 +27,8 @@ const formSchema = z.object({
   business_registration_number: z.string().optional(),
   tax_registration_number: z.string().optional(),
   referral_agent_id: z.string().optional(),
+  representative_name: z.string().optional(),
+  designation: z.string().optional(),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.number().min(1, 'Unit price is required'),
   discount_amount: z.number().min(0).optional(),
@@ -57,6 +59,8 @@ interface YutongQuotation {
   business_registration_number?: string;
   tax_registration_number?: string;
   referral_agent_id?: string;
+  representative_name?: string;
+  designation?: string;
   bus_model: string;
   quantity: number;
   unit_price: number;
@@ -113,6 +117,8 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
       business_registration_number: '',
       tax_registration_number: '',
       referral_agent_id: '',
+      representative_name: '',
+      designation: '',
       quantity: 1,
       unit_price: 0,
       discount_amount: 0,
@@ -167,6 +173,8 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
         business_registration_number: quotation.business_registration_number || '',
         tax_registration_number: quotation.tax_registration_number || '',
         referral_agent_id: quotation.referral_agent_id || '',
+        representative_name: quotation.representative_name || '',
+        designation: quotation.designation || '',
         quantity: quotation.quantity || 1,
         unit_price: quotation.unit_price || 0,
         discount_amount: quotation.discount_amount || 0,
@@ -340,6 +348,8 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
           business_registration_number: data.business_registration_number || null,
           tax_registration_number: data.tax_registration_number || null,
           referral_agent_id: data.referral_agent_id || null,
+          representative_name: data.representative_name || null,
+          designation: data.designation || null,
           status: quotation.status,
           valid_until: quotation.valid_until,
           created_by: user.id,
@@ -523,7 +533,40 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                 </>
               ) : (
                 <>
-                  {/* Company Fields */}
+                  {/* Company Fields - Customer Name and Designation first (optional) */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="representative_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Customer Name (Optional)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter buyer's name if applicable" />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">The person making the purchase</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="designation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Designation (Optional)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter designation/role" />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Their role/title at the company</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Company Name - Required */}
                   <FormField
                     control={form.control}
                     name="customer_name"
@@ -570,20 +613,6 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
 
                   <FormField
                     control={form.control}
-                    name="contact_person"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact Person (Optional)</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter contact person name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="customer_address"
                     render={({ field }) => (
                       <FormItem>
@@ -625,6 +654,22 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                       )}
                     />
                   </div>
+
+                  {/* Contact Person - Internal Only */}
+                  <FormField
+                    control={form.control}
+                    name="contact_person"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Person (Internal Only)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Enter contact person name" />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">For internal records only - will not appear on quotation</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </>
               )}
 
