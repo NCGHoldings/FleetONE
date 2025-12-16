@@ -34,6 +34,8 @@ interface YutongQuotation {
   customer_type?: string;
   business_registration_number?: string;
   tax_registration_number?: string;
+  representative_name?: string;
+  designation?: string;
 }
 
 interface BusModelDetails {
@@ -263,6 +265,16 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           <div style={{ marginBottom: "20px" }}>
             {quotation.customer_type === "company" ? (
               <>
+                {quotation.representative_name && (
+                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                    <b>CUSTOMER :</b> {quotation.representative_name}
+                  </p>
+                )}
+                {quotation.designation && (
+                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                    <b>DESIGNATION :</b> {quotation.designation}
+                  </p>
+                )}
                 <p style={{ margin: "4px 0", fontSize: "14px" }}>
                   <b>COMPANY :</b> {quotation.customer_name}
                 </p>
@@ -274,11 +286,6 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                 {quotation.tax_registration_number && (
                   <p style={{ margin: "4px 0", fontSize: "14px" }}>
                     <b>TAX REG NO :</b> {quotation.tax_registration_number}
-                  </p>
-                )}
-                {quotation.contact_person && (
-                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
-                    <b>CONTACT PERSON :</b> {quotation.contact_person}
                   </p>
                 )}
                 <p style={{ margin: "4px 0", fontSize: "14px" }}>
@@ -293,11 +300,6 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                 <p style={{ margin: "4px 0", fontSize: "14px" }}>
                   <b>ADDRESS :</b> {quotation.customer_address || ""}
                 </p>
-                {quotation.contact_person && (
-                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
-                    <b>CONTACT PERSON :</b> {quotation.contact_person}
-                  </p>
-                )}
               </>
             )}
             <p style={{ margin: "4px 0", fontSize: "14px" }}>
