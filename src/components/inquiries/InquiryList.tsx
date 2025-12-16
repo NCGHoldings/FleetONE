@@ -18,7 +18,7 @@ import { InquiryDetailsModal } from "./InquiryDetailsModal";
 import { CustomerClassBadge } from "./CustomerClassBadge";
 
 interface InquiryListProps {
-  filter: "all" | "yutong" | "sinotruck" | "manual";
+  filter: "all" | "yutong" | "sinotruck" | "lightvehicle" | "general" | "manual";
   customerClassFilter?: "all" | "C0" | "C1" | "C2" | "C3";
 }
 
@@ -41,7 +41,14 @@ export const InquiryList = ({ filter, customerClassFilter = "all" }: InquiryList
       if (filter === "yutong") {
         query = query.eq("product_type", "yutong");
       } else if (filter === "sinotruck") {
-        query = query.eq("product_type", "sinotruck");
+        // Handle both spellings for compatibility
+        query = query.in("product_type", ["sinotruck", "sinotruk"]);
+      } else if (filter === "lightvehicle") {
+        // Light vehicle brands
+        query = query.in("product_type", ["honda", "toyota", "mitsubishi", "suzuki", "lightvehicle"]);
+      } else if (filter === "general") {
+        // General = not any specific product type
+        query = query.not("product_type", "in", '("yutong","sinotruck","sinotruk","honda","toyota","mitsubishi","suzuki","lightvehicle")');
       } else if (filter === "manual") {
         query = query.in("source", ["phone", "walk-in"]);
       }

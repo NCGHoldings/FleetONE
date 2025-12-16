@@ -49,7 +49,7 @@ export const ManualInquiryForm = ({
 
   // Fetch available models based on product type
   const { data: models } = useQuery({
-    queryKey: ["models", formData.product_type],
+    queryKey: ["vehicle-models", formData.product_type],
     queryFn: async () => {
       if (formData.product_type === "yutong") {
         const { data } = await supabase
@@ -57,15 +57,24 @@ export const ManualInquiryForm = ({
           .select("id, model_name")
           .eq("is_active", true);
         return data || [];
-      } else {
+      } else if (formData.product_type === "sinotruk") {
         const { data } = await supabase
           .from("sinotruck_truck_models")
           .select("id, model_name")
           .eq("is_active", true);
         return data || [];
+      } else if (["honda", "toyota", "mitsubishi", "suzuki"].includes(formData.product_type)) {
+        // Light vehicle brands - fetch from lightvehicle_models
+        const { data } = await supabase
+          .from("lightvehicle_models")
+          .select("id, model_name")
+          .eq("brand", formData.product_type)
+          .eq("is_active", true);
+        return data || [];
       }
+      return [];
     },
-    enabled: open,
+    enabled: open && !!formData.product_type && !["general"].includes(formData.product_type),
   });
 
   const createInquiryMutation = useMutation({
@@ -160,15 +169,19 @@ export const ManualInquiryForm = ({
               <Label>Product Type *</Label>
               <Select
                 value={formData.product_type}
-                onValueChange={(value) => setFormData({ ...formData, product_type: value })}
+                onValueChange={(value) => setFormData({ ...formData, product_type: value, interested_model: "" })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yutong">Yutong</SelectItem>
-                  <SelectItem value="sinotruck">Sinotruck</SelectItem>
-                  <SelectItem value="both">Both</SelectItem>
+                  <SelectItem value="yutong">Yutong Bus</SelectItem>
+                  <SelectItem value="sinotruk">Sinotruck</SelectItem>
+                  <SelectItem value="honda">Honda</SelectItem>
+                  <SelectItem value="toyota">Toyota</SelectItem>
+                  <SelectItem value="mitsubishi">Mitsubishi</SelectItem>
+                  <SelectItem value="suzuki">Suzuki</SelectItem>
+                  <SelectItem value="general">General Inquiry</SelectItem>
                 </SelectContent>
               </Select>
             </div>

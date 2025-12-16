@@ -393,6 +393,62 @@ export const InquiryHubSettingsTab = () => {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="space-y-2">
+            <Label>Default Assignee for Light Vehicle Inquiries</Label>
+            <Select
+              value={settings?.default_assignees?.lightvehicle || "none"}
+              onValueChange={(value) =>
+                updateSettingMutation.mutate({
+                  key: "default_assignees",
+                  value: {
+                    ...settings?.default_assignees,
+                    lightvehicle: value === "none" ? null : value,
+                  },
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="No auto-assignment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No auto-assignment</SelectItem>
+                {users?.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.first_name} {user.last_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Default Assignee for General Inquiries</Label>
+            <Select
+              value={settings?.default_assignees?.general || "none"}
+              onValueChange={(value) =>
+                updateSettingMutation.mutate({
+                  key: "default_assignees",
+                  value: {
+                    ...settings?.default_assignees,
+                    general: value === "none" ? null : value,
+                  },
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="No auto-assignment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No auto-assignment</SelectItem>
+                {users?.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.first_name} {user.last_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardContent>
       </Card>
     </div>
