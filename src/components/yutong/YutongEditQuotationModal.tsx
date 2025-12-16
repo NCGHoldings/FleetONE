@@ -648,14 +648,13 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Referral Agent (Internal Only)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select referral agent (optional)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
                         {referralAgents.map((agent) => (
                           <SelectItem key={agent.id} value={agent.id}>
                             {agent.agent_name}
