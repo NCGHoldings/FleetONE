@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { PAGES, PageItem } from "@/lib/pages";
 import { usePagePermissions } from "@/hooks/usePagePermissions";
 import { useAuth } from "@/hooks/useAuth";
@@ -59,40 +60,42 @@ export function PageAccessModal({ open, onOpenChange, userId, userName }: PageAc
           <DialogTitle>Page Access{userName ? ` — ${userName}` : ''}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {categories.map((cat, idx) => (
-            <div key={cat.key} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">{cat.label}</h3>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => toggleAll(cat.items, true)}>Select all</Button>
-                  <Button variant="ghost" size="sm" onClick={() => toggleAll(cat.items, false)}>Clear</Button>
+        <ScrollArea className="max-h-[60vh] pr-4">
+          <div className="space-y-6">
+            {categories.map((cat, idx) => (
+              <div key={cat.key} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">{cat.label}</h3>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => toggleAll(cat.items, true)}>Select all</Button>
+                    <Button variant="ghost" size="sm" onClick={() => toggleAll(cat.items, false)}>Clear</Button>
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {cat.items.map((page) => (
+                    <label key={page.id} className="flex items-center gap-3 rounded-md border p-3 hover:bg-accent/10 cursor-pointer">
+                      <Checkbox
+                        checked={hasAccess(page.id)}
+                        onCheckedChange={(v) => setAccess(page.id, !!v)}
+                      />
+                      <div>
+                        <div className="font-medium">{page.title}</div>
+                        <div className="text-xs text-muted-foreground">{page.url}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {idx < categories.length - 1 && <Separator className="my-2" />}
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {cat.items.map((page) => (
-                  <label key={page.id} className="flex items-center gap-3 rounded-md border p-3 hover:bg-accent/10 cursor-pointer">
-                    <Checkbox
-                      checked={hasAccess(page.id)}
-                      onCheckedChange={(v) => setAccess(page.id, !!v)}
-                    />
-                    <div>
-                      <div className="font-medium">{page.title}</div>
-                      <div className="text-xs text-muted-foreground">{page.url}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-
-              {idx < categories.length - 1 && <Separator className="my-2" />}
-            </div>
-          ))}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={onSave} disabled={loading}>Save</Button>
+            ))}
           </div>
+        </ScrollArea>
+
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={onSave} disabled={loading}>Save</Button>
         </div>
       </DialogContent>
     </Dialog>
