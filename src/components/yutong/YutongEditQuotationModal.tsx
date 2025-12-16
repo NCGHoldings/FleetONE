@@ -402,7 +402,8 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
     }
   };
 
-  if (!quotation) return null;
+  // Return null if no quotation or modal is not open
+  if (!quotation || !open) return null;
 
   // Show edit type selection modal first
   if (showEditTypeModal) {
