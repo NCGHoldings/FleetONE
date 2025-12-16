@@ -11039,6 +11039,65 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_vehicle_data_sheets: {
+        Row: {
+          column_mapping: Json | null
+          created_at: string | null
+          file_name: string
+          id: string
+          matched_vehicles: number | null
+          notes: string | null
+          pending_vehicles: number | null
+          sheet_name: string
+          shipment_group_id: string | null
+          status: string | null
+          total_vehicles: number | null
+          updated_at: string | null
+          upload_date: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          column_mapping?: Json | null
+          created_at?: string | null
+          file_name: string
+          id?: string
+          matched_vehicles?: number | null
+          notes?: string | null
+          pending_vehicles?: number | null
+          sheet_name: string
+          shipment_group_id?: string | null
+          status?: string | null
+          total_vehicles?: number | null
+          updated_at?: string | null
+          upload_date?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          column_mapping?: Json | null
+          created_at?: string | null
+          file_name?: string
+          id?: string
+          matched_vehicles?: number | null
+          notes?: string | null
+          pending_vehicles?: number | null
+          sheet_name?: string
+          shipment_group_id?: string | null
+          status?: string | null
+          total_vehicles?: number | null
+          updated_at?: string | null
+          upload_date?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_vehicle_data_sheets_shipment_group_id_fkey"
+            columns: ["shipment_group_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipment_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_vehicle_processing: {
         Row: {
           accessories_installed: Json | null
@@ -11155,6 +11214,100 @@ export type Database = {
             columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "yutong_shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_vehicle_records: {
+        Row: {
+          chassis_no: string | null
+          color: string | null
+          country_of_origin: string | null
+          created_at: string | null
+          customer_name: string | null
+          data_sheet_id: string | null
+          engine_capacity: number | null
+          engine_no: string | null
+          fuel_type: string | null
+          id: string
+          is_matched: boolean | null
+          match_status: string | null
+          model: string
+          order_id: string | null
+          raw_data: Json | null
+          seat_config: string | null
+          shipment_group_id: string | null
+          updated_at: string | null
+          vehicle_condition: string | null
+          vehicle_no: string | null
+          year_of_manufacture: number | null
+        }
+        Insert: {
+          chassis_no?: string | null
+          color?: string | null
+          country_of_origin?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          data_sheet_id?: string | null
+          engine_capacity?: number | null
+          engine_no?: string | null
+          fuel_type?: string | null
+          id?: string
+          is_matched?: boolean | null
+          match_status?: string | null
+          model: string
+          order_id?: string | null
+          raw_data?: Json | null
+          seat_config?: string | null
+          shipment_group_id?: string | null
+          updated_at?: string | null
+          vehicle_condition?: string | null
+          vehicle_no?: string | null
+          year_of_manufacture?: number | null
+        }
+        Update: {
+          chassis_no?: string | null
+          color?: string | null
+          country_of_origin?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          data_sheet_id?: string | null
+          engine_capacity?: number | null
+          engine_no?: string | null
+          fuel_type?: string | null
+          id?: string
+          is_matched?: boolean | null
+          match_status?: string | null
+          model?: string
+          order_id?: string | null
+          raw_data?: Json | null
+          seat_config?: string | null
+          shipment_group_id?: string | null
+          updated_at?: string | null
+          vehicle_condition?: string | null
+          vehicle_no?: string | null
+          year_of_manufacture?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_vehicle_records_data_sheet_id_fkey"
+            columns: ["data_sheet_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_vehicle_data_sheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_vehicle_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_vehicle_records_shipment_group_id_fkey"
+            columns: ["shipment_group_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_shipment_groups"
             referencedColumns: ["id"]
           },
         ]
