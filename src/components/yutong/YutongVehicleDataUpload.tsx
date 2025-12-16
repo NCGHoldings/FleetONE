@@ -262,12 +262,12 @@ export function YutongVehicleDataUpload({ onUploadComplete }: Props) {
             </div>
             <div>
               <Label>Link to Shipment (Optional)</Label>
-              <Select value={selectedShipment} onValueChange={setSelectedShipment}>
+              <Select value={selectedShipment || 'none'} onValueChange={(v) => setSelectedShipment(v === 'none' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select shipment..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No Shipment</SelectItem>
+                  <SelectItem value="none">No Shipment</SelectItem>
                   {shipments.map(s => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.shipment_number} - {s.shipment_name}
