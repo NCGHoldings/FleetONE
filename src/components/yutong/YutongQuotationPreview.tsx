@@ -11,6 +11,7 @@ interface YutongQuotation {
   customer_email: string;
   company_name?: string;
   customer_address?: string;
+  contact_person?: string;
   bus_model: string;
   bus_model_id?: string;
   quantity: number;
@@ -254,11 +255,31 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
               />
             </div>
 
-            {/* Customer Info */}
+            {/* Customer Info - Dynamic based on customer_type */}
             <div style={{ marginBottom: '20px' }}>
-              <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CUSTOMER :</b> {quotation.customer_name}</p>
-              <p style={{ margin: '4px 0', fontSize: '14px' }}><b>COMPANY :</b> {quotation.company_name || ''}</p>
-              <p style={{ margin: '4px 0', fontSize: '14px' }}><b>ADDRESS :</b> {quotation.customer_address || ''}</p>
+              {quotation.customer_type === 'company' ? (
+                <>
+                  <p style={{ margin: '4px 0', fontSize: '14px' }}><b>COMPANY :</b> {quotation.customer_name}</p>
+                  {quotation.business_registration_number && (
+                    <p style={{ margin: '4px 0', fontSize: '14px' }}><b>BUSINESS REG NO :</b> {quotation.business_registration_number}</p>
+                  )}
+                  {quotation.tax_registration_number && (
+                    <p style={{ margin: '4px 0', fontSize: '14px' }}><b>TAX REG NO :</b> {quotation.tax_registration_number}</p>
+                  )}
+                  {quotation.contact_person && (
+                    <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CONTACT PERSON :</b> {quotation.contact_person}</p>
+                  )}
+                  <p style={{ margin: '4px 0', fontSize: '14px' }}><b>ADDRESS :</b> {quotation.customer_address || ''}</p>
+                </>
+              ) : (
+                <>
+                  <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CUSTOMER :</b> {quotation.customer_name}</p>
+                  <p style={{ margin: '4px 0', fontSize: '14px' }}><b>ADDRESS :</b> {quotation.customer_address || ''}</p>
+                  {quotation.contact_person && (
+                    <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CONTACT PERSON :</b> {quotation.contact_person}</p>
+                  )}
+                </>
+              )}
               <p style={{ margin: '4px 0', fontSize: '14px' }}><b>CONTACT :</b> {quotation.customer_phone} / {quotation.customer_email}</p>
               <p style={{ margin: '4px 0', fontSize: '14px' }}><b>DATE :</b> {formattedDate}</p>
               {quotation.finance_company && (
