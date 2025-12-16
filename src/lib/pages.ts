@@ -57,6 +57,8 @@ export const PAGES: PageCategories = {
     { id: "yutong_quotations", title: "Quotations", url: "/yutong-quotations" },
     { id: "yutong_bus_models", title: "Bus Models", url: "/yutong-quotations?tab=bus-models" },
     { id: "yutong_addons", title: "Add-ons", url: "/yutong-quotations?tab=addons" },
+    { id: "yutong_vehicle_data", title: "Vehicle Data", url: "/yutong-quotations?tab=vehicle-data" },
+    { id: "yutong_referral", title: "Referral Agents", url: "/yutong-quotations?tab=referral" },
   ],
   sinotruck: [
     { id: "sinotruck_quotations", title: "Quotations", url: "/sinotruck-quotations" },
