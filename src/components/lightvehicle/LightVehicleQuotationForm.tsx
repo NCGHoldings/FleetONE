@@ -103,7 +103,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
 
   const loadReferralAgents = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('referral_agents')
         .select('id, name, phone')
         .eq('is_active', true)
