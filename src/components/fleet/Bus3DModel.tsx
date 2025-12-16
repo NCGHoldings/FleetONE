@@ -1,5 +1,6 @@
 import { useRef, useMemo } from "react";
 import * as THREE from "three";
+import { Line } from "@react-three/drei";
 import { Tyre3D } from "./Tyre3D";
 import { BusTyre } from "@/hooks/useTyreManagement";
 
@@ -32,10 +33,10 @@ export const Bus3DModel = ({ tyres, onTyreClick }: Bus3DModelProps) => {
     // Coach side profile - smooth curves
     shape.moveTo(-7, 0.3);
     shape.lineTo(-7, 1.8);
-    shape.quadraticCurveTo(-7, 2.8, -6.2, 3.0); // Front windshield curve
+    shape.quadraticCurveTo(-7, 2.8, -6.2, 3.0);
     shape.lineTo(-5.8, 3.2);
-    shape.lineTo(6.5, 3.2); // Roof line
-    shape.quadraticCurveTo(7, 3.2, 7, 2.8); // Rear curve
+    shape.lineTo(6.5, 3.2);
+    shape.quadraticCurveTo(7, 3.2, 7, 2.8);
     shape.lineTo(7, 0.3);
     shape.lineTo(-7, 0.3);
     
@@ -51,124 +52,90 @@ export const Bus3DModel = ({ tyres, onTyreClick }: Bus3DModelProps) => {
     return new THREE.ExtrudeGeometry(shape, extrudeSettings);
   }, []);
 
-  // Window line geometry
-  const windowLineGeometry = useMemo(() => {
-    const points = [];
-    for (let x = -5.5; x <= 6; x += 0.3) {
-      points.push(new THREE.Vector3(x, 2.4, -1.26));
-    }
-    return new THREE.BufferGeometry().setFromPoints(points);
-  }, []);
-
-  // Create grid lines for wireframe effect
+  // Generate grid line points for wireframe effect
   const gridLines = useMemo(() => {
-    const lines: THREE.Vector3[][] = [];
+    const lines: [number, number, number][][] = [];
     
     // Horizontal lines on sides
-    for (let y = 0.5; y <= 3.2; y += 0.25) {
-      lines.push([
-        new THREE.Vector3(-7, y, -1.25),
-        new THREE.Vector3(7, y, -1.25)
-      ]);
-      lines.push([
-        new THREE.Vector3(-7, y, 1.25),
-        new THREE.Vector3(7, y, 1.25)
-      ]);
+    for (let y = 0.5; y <= 3.2; y += 0.3) {
+      lines.push([[-7, y, -1.25], [7, y, -1.25]]);
+      lines.push([[-7, y, 1.25], [7, y, 1.25]]);
     }
     
     // Vertical lines on sides
-    for (let x = -7; x <= 7; x += 0.5) {
+    for (let x = -7; x <= 7; x += 0.6) {
       const topY = x < -6 ? 2.0 + (x + 7) * 1.2 : 3.2;
-      lines.push([
-        new THREE.Vector3(x, 0.5, -1.25),
-        new THREE.Vector3(x, Math.min(topY, 3.2), -1.25)
-      ]);
-      lines.push([
-        new THREE.Vector3(x, 0.5, 1.25),
-        new THREE.Vector3(x, Math.min(topY, 3.2), 1.25)
-      ]);
+      lines.push([[x, 0.5, -1.25], [x, Math.min(topY, 3.2), -1.25]]);
+      lines.push([[x, 0.5, 1.25], [x, Math.min(topY, 3.2), 1.25]]);
     }
     
-    // Top roof lines
-    for (let z = -1.25; z <= 1.25; z += 0.25) {
-      lines.push([
-        new THREE.Vector3(-5.8, 3.2, z),
-        new THREE.Vector3(6.5, 3.2, z)
-      ]);
+    // Top roof lines (front to back)
+    for (let z = -1.25; z <= 1.25; z += 0.3) {
+      lines.push([[-5.8, 3.2, z], [6.5, 3.2, z]]);
     }
     
-    // Front face lines
-    for (let z = -1.25; z <= 1.25; z += 0.25) {
-      lines.push([
-        new THREE.Vector3(-7, 0.5, z),
-        new THREE.Vector3(-7, 2.0, z)
-      ]);
+    // Front face horizontal lines
+    for (let y = 0.5; y <= 2.5; y += 0.3) {
+      lines.push([[-7, y, -1.25], [-7, y, 1.25]]);
     }
     
-    // Rear face lines
-    for (let z = -1.25; z <= 1.25; z += 0.25) {
-      lines.push([
-        new THREE.Vector3(7, 0.5, z),
-        new THREE.Vector3(7, 2.8, z)
-      ]);
+    // Rear face horizontal lines
+    for (let y = 0.5; y <= 2.8; y += 0.3) {
+      lines.push([[7, y, -1.25], [7, y, 1.25]]);
+    }
+    
+    // Cross lines on roof
+    for (let x = -5.5; x <= 6.5; x += 0.6) {
+      lines.push([[x, 3.2, -1.25], [x, 3.2, 1.25]]);
     }
     
     return lines;
   }, []);
 
-  // Window rectangles
+  // Window positions
   const windows = useMemo(() => {
-    const windowPositions: { x: number; width: number }[] = [];
+    const positions: number[] = [];
     for (let x = -4.5; x <= 5.5; x += 1.5) {
-      windowPositions.push({ x, width: 1.2 });
+      positions.push(x);
     }
-    return windowPositions;
+    return positions;
   }, []);
 
   return (
     <group ref={groupRef} position={[0, 0, -0.5]}>
-      {/* Main bus body - wireframe style */}
-      <mesh geometry={coachGeometry} position={[0, 0, -1.25]}>
-        <meshBasicMaterial 
-          color="#e5e7eb"
-          wireframe
-          wireframeLinewidth={1}
-        />
-      </mesh>
-      
-      {/* Solid semi-transparent body for depth */}
+      {/* Main bus body - solid with transparency */}
       <mesh geometry={coachGeometry} position={[0, 0, -1.25]}>
         <meshStandardMaterial 
           color="#f8fafc"
           transparent
-          opacity={0.15}
+          opacity={0.2}
           side={THREE.DoubleSide}
         />
       </mesh>
 
+      {/* Bus body wireframe overlay */}
+      <mesh geometry={coachGeometry} position={[0, 0, -1.25]}>
+        <meshBasicMaterial 
+          color="#cbd5e1"
+          wireframe
+        />
+      </mesh>
+
       {/* Dense grid lines for professional wireframe look */}
-      {gridLines.map((line, i) => (
-        <line key={`grid-${i}`}>
-          <bufferGeometry>
-            <bufferAttribute
-              attach="attributes-position"
-              count={2}
-              array={new Float32Array([
-                line[0].x, line[0].y, line[0].z,
-                line[1].x, line[1].y, line[1].z
-              ])}
-              itemSize={3}
-            />
-          </bufferGeometry>
-          <lineBasicMaterial color="#d1d5db" linewidth={1} />
-        </line>
+      {gridLines.map((points, i) => (
+        <Line
+          key={`grid-${i}`}
+          points={points}
+          color="#d1d5db"
+          lineWidth={1}
+        />
       ))}
 
       {/* Windows - left side */}
-      {windows.map((win, i) => (
+      {windows.map((x, i) => (
         <group key={`window-left-${i}`}>
-          <mesh position={[win.x, 2.3, -1.26]}>
-            <planeGeometry args={[win.width, 0.9]} />
+          <mesh position={[x, 2.3, -1.26]}>
+            <planeGeometry args={[1.2, 0.9]} />
             <meshBasicMaterial 
               color="#94a3b8"
               transparent
@@ -177,30 +144,25 @@ export const Bus3DModel = ({ tyres, onTyreClick }: Bus3DModelProps) => {
             />
           </mesh>
           {/* Window frame */}
-          <lineLoop position={[win.x, 2.3, -1.27]}>
-            <bufferGeometry>
-              <bufferAttribute
-                attach="attributes-position"
-                count={4}
-                array={new Float32Array([
-                  -win.width/2, -0.45, 0,
-                  win.width/2, -0.45, 0,
-                  win.width/2, 0.45, 0,
-                  -win.width/2, 0.45, 0
-                ])}
-                itemSize={3}
-              />
-            </bufferGeometry>
-            <lineBasicMaterial color="#9ca3af" />
-          </lineLoop>
+          <Line
+            points={[
+              [x - 0.6, 1.85, -1.27],
+              [x + 0.6, 1.85, -1.27],
+              [x + 0.6, 2.75, -1.27],
+              [x - 0.6, 2.75, -1.27],
+              [x - 0.6, 1.85, -1.27],
+            ]}
+            color="#9ca3af"
+            lineWidth={1}
+          />
         </group>
       ))}
 
       {/* Windows - right side */}
-      {windows.map((win, i) => (
+      {windows.map((x, i) => (
         <group key={`window-right-${i}`}>
-          <mesh position={[win.x, 2.3, 1.26]}>
-            <planeGeometry args={[win.width, 0.9]} />
+          <mesh position={[x, 2.3, 1.26]}>
+            <planeGeometry args={[1.2, 0.9]} />
             <meshBasicMaterial 
               color="#94a3b8"
               transparent
@@ -208,22 +170,17 @@ export const Bus3DModel = ({ tyres, onTyreClick }: Bus3DModelProps) => {
               side={THREE.DoubleSide}
             />
           </mesh>
-          <lineLoop position={[win.x, 2.3, 1.27]}>
-            <bufferGeometry>
-              <bufferAttribute
-                attach="attributes-position"
-                count={4}
-                array={new Float32Array([
-                  -win.width/2, -0.45, 0,
-                  win.width/2, -0.45, 0,
-                  win.width/2, 0.45, 0,
-                  -win.width/2, 0.45, 0
-                ])}
-                itemSize={3}
-              />
-            </bufferGeometry>
-            <lineBasicMaterial color="#9ca3af" />
-          </lineLoop>
+          <Line
+            points={[
+              [x - 0.6, 1.85, 1.27],
+              [x + 0.6, 1.85, 1.27],
+              [x + 0.6, 2.75, 1.27],
+              [x - 0.6, 2.75, 1.27],
+              [x - 0.6, 1.85, 1.27],
+            ]}
+            color="#9ca3af"
+            lineWidth={1}
+          />
         </group>
       ))}
 
@@ -274,7 +231,7 @@ export const Bus3DModel = ({ tyres, onTyreClick }: Bus3DModelProps) => {
         );
       })}
 
-      {/* Ground plane with subtle grid */}
+      {/* Ground plane */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <planeGeometry args={[20, 12]} />
         <meshBasicMaterial color="#f1f5f9" transparent opacity={0.8} />
