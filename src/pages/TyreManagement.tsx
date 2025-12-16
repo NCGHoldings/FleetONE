@@ -10,9 +10,10 @@ import { AddTyreModal } from "@/components/fleet/AddTyreModal";
 import { TyreInspectionForm } from "@/components/fleet/TyreInspectionForm";
 import { TyreAlertPanel } from "@/components/fleet/TyreAlertPanel";
 import { NSPTyreInventory } from "@/components/fleet/NSPTyreInventory";
+import { Bus3DViewer } from "@/components/fleet/Bus3DViewer";
 import { 
   Plus, Search, Filter, TrendingUp, AlertTriangle, 
-  RotateCcw, DollarSign, BarChart3, Package
+  RotateCcw, DollarSign, BarChart3, Package, Grid3X3, Box
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -27,6 +28,7 @@ export default function TyreManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInspectionForm, setShowInspectionForm] = useState(false);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
 
   // Fetch all buses
   const { data: buses } = useQuery({
@@ -193,7 +195,29 @@ export default function TyreManagement() {
                 </Select>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
+                {/* View Mode Toggle */}
+                <div className="flex border rounded-lg p-1 bg-muted/50">
+                  <Button 
+                    variant={viewMode === "2d" ? "default" : "ghost"} 
+                    size="sm"
+                    onClick={() => setViewMode("2d")}
+                    className="gap-1"
+                  >
+                    <Grid3X3 className="w-4 h-4" />
+                    2D
+                  </Button>
+                  <Button 
+                    variant={viewMode === "3d" ? "default" : "ghost"} 
+                    size="sm"
+                    onClick={() => setViewMode("3d")}
+                    className="gap-1"
+                  >
+                    <Box className="w-4 h-4" />
+                    3D
+                  </Button>
+                </div>
+
                 <Button 
                   onClick={() => syncAllConditions()} 
                   variant="outline"
@@ -218,12 +242,17 @@ export default function TyreManagement() {
               </div>
             </div>
 
-            {/* Bus Tyre Grids */}
+            {/* Bus Tyre Grids / 3D View */}
             {tyresLoading ? (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
                 <p className="mt-4 text-muted-foreground">Loading tyre data...</p>
               </div>
+            ) : viewMode === "3d" ? (
+              <Bus3DViewer 
+                buses={filteredBuses || []} 
+                tyresByBus={tyresByBus || {}}
+              />
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredBuses?.map(bus => (
