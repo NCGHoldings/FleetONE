@@ -56,14 +56,24 @@ serve(async (req) => {
       .eq('setting_key', 'default_assignees')
       .single();
 
+    // Define light vehicle brands for matching
+    const lightVehicleBrands = ['honda', 'toyota', 'mitsubishi', 'suzuki', 'lightvehicle'];
+    const productType = (inquiryData.product_type || '').toLowerCase();
+
     let assignedTo = null;
     if (assignSettings?.setting_value) {
-      if (inquiryData.product_type === 'yutong') {
+      if (productType === 'yutong') {
         assignedTo = assignSettings.setting_value.yutong;
-      } else if (inquiryData.product_type === 'sinotruck') {
+      } else if (productType === 'sinotruck' || productType === 'sinotruk') {
         assignedTo = assignSettings.setting_value.sinotruck;
+      } else if (lightVehicleBrands.includes(productType)) {
+        assignedTo = assignSettings.setting_value.lightvehicle;
+      } else {
+        // General or unknown product types
+        assignedTo = assignSettings.setting_value.general;
       }
     }
+    console.log('Auto-assigned to:', assignedTo, 'for product type:', productType);
 
     // Insert inquiry into database
     const { data: inquiry, error: insertError } = await supabase

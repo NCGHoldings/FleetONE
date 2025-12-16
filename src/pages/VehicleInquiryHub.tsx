@@ -79,7 +79,7 @@ const VehicleInquiryHub = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Vehicle Inquiry Hub</h1>
           <p className="text-muted-foreground">
-            Manage customer inquiries for Yutong and Sinotruck products
+            Manage customer inquiries for Yutong, Sinotruck, Light Vehicle and General products
           </p>
         </div>
         <div className="flex gap-2">
@@ -143,17 +143,19 @@ const VehicleInquiryHub = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="all">All Inquiries</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-8">
+          <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="yutong">Yutong</TabsTrigger>
           <TabsTrigger value="sinotruck">Sinotruck</TabsTrigger>
+          <TabsTrigger value="lightvehicle">Light Vehicle</TabsTrigger>
+          <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="manual">Phone/Walk-in</TabsTrigger>
           <TabsTrigger value="planning">Planning</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
         {/* Customer Class Filter Tabs - Show for inquiry tabs only */}
-        {["all", "yutong", "sinotruck", "manual"].includes(activeTab) && (
+        {["all", "yutong", "sinotruck", "lightvehicle", "general", "manual"].includes(activeTab) && (
           <div className="flex gap-2 mt-4 mb-2">
             <span className="text-sm text-muted-foreground self-center mr-2">Filter by Class:</span>
             {[
@@ -188,6 +190,14 @@ const VehicleInquiryHub = () => {
 
         <TabsContent value="sinotruck" className="space-y-4">
           <InquiryList filter="sinotruck" customerClassFilter={activeClassFilter} />
+        </TabsContent>
+
+        <TabsContent value="lightvehicle" className="space-y-4">
+          <InquiryList filter="lightvehicle" customerClassFilter={activeClassFilter} />
+        </TabsContent>
+
+        <TabsContent value="general" className="space-y-4">
+          <InquiryList filter="general" customerClassFilter={activeClassFilter} />
         </TabsContent>
 
         <TabsContent value="manual" className="space-y-4">
