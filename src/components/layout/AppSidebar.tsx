@@ -103,6 +103,8 @@ const yutongItems = [
   { id: "yutong_quotations", title: "Quotations", url: "/yutong-quotations", icon: FileText },
   { id: "yutong_bus_models", title: "Bus Models", url: "/yutong-quotations?tab=bus-models", icon: Truck },
   { id: "yutong_addons", title: "Add-ons", url: "/yutong-quotations?tab=addons", icon: Package },
+  { id: "yutong_vehicle_data", title: "Vehicle Data", url: "/yutong-quotations?tab=vehicle-data", icon: FileSpreadsheet },
+  { id: "yutong_referral", title: "Referral Agents", url: "/yutong-quotations?tab=referral", icon: Users },
 ];
 
 const sinotruckItems = [
