@@ -26,11 +26,11 @@ export const Bus3DViewer = ({ buses, tyresByBus }: Bus3DViewerProps) => {
   };
 
   return (
-    <div className="relative w-full h-[650px] rounded-xl overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100 border border-slate-200">
+    <div className="relative w-full h-[700px] rounded-xl overflow-hidden bg-gradient-to-br from-slate-100 via-slate-50 to-blue-50 border border-slate-200 shadow-lg">
       {/* Bus Selector */}
       <div className="absolute top-4 left-4 z-10">
         <Select value={selectedBusId} onValueChange={setSelectedBusId}>
-          <SelectTrigger className="w-[200px] bg-white/95 backdrop-blur shadow-sm border-slate-200">
+          <SelectTrigger className="w-[200px] bg-white/95 backdrop-blur-sm shadow-md border-slate-200">
             <SelectValue placeholder="Select Bus" />
           </SelectTrigger>
           <SelectContent>
@@ -53,28 +53,74 @@ export const Bus3DViewer = ({ buses, tyresByBus }: Bus3DViewerProps) => {
       )}
 
       {/* Controls hint */}
-      <div className="absolute bottom-4 left-4 z-10 text-xs text-slate-500">
-        Drag to rotate • Scroll to zoom • Click tyre for details
+      <div className="absolute bottom-4 left-4 z-10 text-xs text-slate-500 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm">
+        🖱️ Drag to rotate • Scroll to zoom • Click tyre for details
       </div>
 
       {/* 3D Canvas */}
       <Canvas
         shadows
-        gl={{ antialias: true, alpha: true }}
+        gl={{ 
+          antialias: true, 
+          alpha: true,
+          powerPreference: "high-performance"
+        }}
         style={{ background: 'transparent' }}
       >
         <Suspense fallback={null}>
-          <PerspectiveCamera makeDefault position={[0, 8, 14]} fov={45} />
+          <PerspectiveCamera makeDefault position={[-4, 6, 12]} fov={50} />
           
-          {/* Lighting - soft for wireframe visibility */}
-          <ambientLight intensity={0.8} />
+          {/* ============ ENHANCED LIGHTING ============ */}
+          
+          {/* Soft ambient light for overall illumination */}
+          <ambientLight intensity={0.5} color="#f8fafc" />
+          
+          {/* Main key light (sun-like) */}
           <directionalLight 
-            position={[10, 15, 10]} 
-            intensity={1.0}
+            position={[12, 18, 10]} 
+            intensity={1.2}
             castShadow
+            shadow-mapSize-width={2048}
+            shadow-mapSize-height={2048}
           />
-          <directionalLight position={[-10, 10, -5]} intensity={0.4} />
-          <pointLight position={[0, 10, 0]} intensity={0.3} />
+          
+          {/* Fill light (softer, opposite side) */}
+          <directionalLight 
+            position={[-12, 10, -8]} 
+            intensity={0.5}
+            color="#e0f2fe"
+          />
+          
+          {/* Rim light (back lighting for depth) */}
+          <directionalLight 
+            position={[0, 8, -15]} 
+            intensity={0.4}
+            color="#dbeafe"
+          />
+          
+          {/* Top spotlight for dramatic effect */}
+          <spotLight
+            position={[0, 15, 0]}
+            angle={0.5}
+            penumbra={0.8}
+            intensity={0.6}
+            castShadow
+            color="#ffffff"
+          />
+          
+          {/* Front accent light */}
+          <pointLight 
+            position={[-10, 4, 0]} 
+            intensity={0.3}
+            color="#f0f9ff"
+          />
+          
+          {/* Hemisphere light for natural outdoor feel */}
+          <hemisphereLight
+            color="#f0f9ff"
+            groundColor="#e2e8f0"
+            intensity={0.4}
+          />
 
           {/* Bus Model */}
           <Bus3DModel 
@@ -88,10 +134,12 @@ export const Bus3DViewer = ({ buses, tyresByBus }: Bus3DViewerProps) => {
             enableZoom={true}
             enableRotate={true}
             minDistance={8}
-            maxDistance={25}
-            minPolarAngle={0.2}
-            maxPolarAngle={Math.PI / 2.2}
+            maxDistance={28}
+            minPolarAngle={0.15}
+            maxPolarAngle={Math.PI / 2.1}
             target={[0, 1.5, 0]}
+            enableDamping={true}
+            dampingFactor={0.05}
           />
         </Suspense>
       </Canvas>
