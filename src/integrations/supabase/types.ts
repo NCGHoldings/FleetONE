@@ -3675,6 +3675,1190 @@ export type Database = {
           },
         ]
       }
+      lightvehicle_addons: {
+        Row: {
+          addon_name: string
+          category: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          addon_name: string
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          addon_name?: string
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      lightvehicle_customer_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          payment_date: string
+          payment_method: string | null
+          payment_schedule_id: string | null
+          receipt_url: string | null
+          reference_number: string | null
+          verified: boolean | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          payment_date: string
+          payment_method?: string | null
+          payment_schedule_id?: string | null
+          receipt_url?: string | null
+          reference_number?: string | null
+          verified?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          payment_schedule_id?: string | null
+          receipt_url?: string | null
+          reference_number?: string | null
+          verified?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_customer_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_customer_payments_payment_schedule_id_fkey"
+            columns: ["payment_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_payment_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_customers: {
+        Row: {
+          address: string | null
+          business_registration: string | null
+          company_name: string | null
+          created_at: string | null
+          customer_name: string
+          customer_type: string | null
+          email: string | null
+          id: string
+          is_active: boolean | null
+          nic_number: string | null
+          notes: string | null
+          phone: string | null
+          tax_registration: string | null
+          total_orders: number | null
+          total_purchases: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          business_registration?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          customer_name: string
+          customer_type?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          nic_number?: string | null
+          notes?: string | null
+          phone?: string | null
+          tax_registration?: string | null
+          total_orders?: number | null
+          total_purchases?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          business_registration?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          customer_name?: string
+          customer_type?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          nic_number?: string | null
+          notes?: string | null
+          phone?: string | null
+          tax_registration?: string | null
+          total_orders?: number | null
+          total_purchases?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      lightvehicle_customization_options: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          option_type: string
+          option_value: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          option_type: string
+          option_value: string
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          option_type?: string
+          option_value?: string
+        }
+        Relationships: []
+      }
+      lightvehicle_invoice_documents: {
+        Row: {
+          created_at: string | null
+          document_data: string | null
+          document_type: string | null
+          file_name: string | null
+          file_size: number | null
+          id: string
+          invoice_record_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_data?: string | null
+          document_type?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          invoice_record_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          document_data?: string | null
+          document_type?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          invoice_record_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_invoice_documents_invoice_record_id_fkey"
+            columns: ["invoice_record_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_invoice_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_invoice_records: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          generated_at: string | null
+          generated_by: string | null
+          id: string
+          invoice_data: Json | null
+          invoice_number: string
+          invoice_type: string | null
+          order_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          invoice_data?: Json | null
+          invoice_number: string
+          invoice_type?: string | null
+          order_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          invoice_data?: Json | null
+          invoice_number?: string
+          invoice_type?: string | null
+          order_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_invoice_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_invoice_signatures: {
+        Row: {
+          id: string
+          invoice_record_id: string | null
+          signature_data: string | null
+          signature_role: string
+          signature_type: string | null
+          signed_at: string | null
+          signed_by: string | null
+          signer_name: string
+        }
+        Insert: {
+          id?: string
+          invoice_record_id?: string | null
+          signature_data?: string | null
+          signature_role: string
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          signer_name: string
+        }
+        Update: {
+          id?: string
+          invoice_record_id?: string | null
+          signature_data?: string | null
+          signature_role?: string
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          signer_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_invoice_signatures_invoice_record_id_fkey"
+            columns: ["invoice_record_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_invoice_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_model_images: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          id: string
+          image_url: string
+          is_primary: boolean | null
+          model_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          image_url: string
+          is_primary?: boolean | null
+          model_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          image_url?: string
+          is_primary?: boolean | null
+          model_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_model_images_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_models: {
+        Row: {
+          base_price: number | null
+          brand: string
+          category: string
+          color_options: string[] | null
+          created_at: string | null
+          drive_type: string | null
+          engine_cc: string | null
+          features: string | null
+          fuel_type: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          mileage: number | null
+          model_name: string
+          specifications: Json | null
+          transmission: string | null
+          updated_at: string | null
+          vehicle_name: string
+          year: number | null
+        }
+        Insert: {
+          base_price?: number | null
+          brand?: string
+          category?: string
+          color_options?: string[] | null
+          created_at?: string | null
+          drive_type?: string | null
+          engine_cc?: string | null
+          features?: string | null
+          fuel_type?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          mileage?: number | null
+          model_name: string
+          specifications?: Json | null
+          transmission?: string | null
+          updated_at?: string | null
+          vehicle_name: string
+          year?: number | null
+        }
+        Update: {
+          base_price?: number | null
+          brand?: string
+          category?: string
+          color_options?: string[] | null
+          created_at?: string | null
+          drive_type?: string | null
+          engine_cc?: string | null
+          features?: string | null
+          fuel_type?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          mileage?: number | null
+          model_name?: string
+          specifications?: Json | null
+          transmission?: string | null
+          updated_at?: string | null
+          vehicle_name?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
+      lightvehicle_order_tasks: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          priority: string | null
+          process_type: string | null
+          status: string | null
+          task_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          priority?: string | null
+          process_type?: string | null
+          status?: string | null
+          task_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          priority?: string | null
+          process_type?: string | null
+          status?: string | null
+          task_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_order_tasks_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_orders: {
+        Row: {
+          actual_delivery_date: string | null
+          balance_due: number | null
+          brand: string | null
+          category: string | null
+          company_name: string | null
+          created_at: string | null
+          created_by: string | null
+          current_phase: string | null
+          customer_name: string
+          expected_delivery_date: string | null
+          id: string
+          notes: string | null
+          order_number: string
+          payment_mode: string | null
+          payment_structure: Json | null
+          progress_percentage: number | null
+          quantity: number | null
+          quotation_id: string | null
+          status: string | null
+          total_amount: number | null
+          total_paid: number | null
+          unit_price: number | null
+          updated_at: string | null
+          vehicle_name: string | null
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          balance_due?: number | null
+          brand?: string | null
+          category?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_phase?: string | null
+          customer_name: string
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          order_number: string
+          payment_mode?: string | null
+          payment_structure?: Json | null
+          progress_percentage?: number | null
+          quantity?: number | null
+          quotation_id?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_paid?: number | null
+          unit_price?: number | null
+          updated_at?: string | null
+          vehicle_name?: string | null
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          balance_due?: number | null
+          brand?: string | null
+          category?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_phase?: string | null
+          customer_name?: string
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          order_number?: string
+          payment_mode?: string | null
+          payment_structure?: Json | null
+          progress_percentage?: number | null
+          quantity?: number | null
+          quotation_id?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_paid?: number | null
+          unit_price?: number | null
+          updated_at?: string | null
+          vehicle_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_orders_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_payment_schedules: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          payment_type: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          payment_type: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          payment_type?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_payment_schedules_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_quotation_addons: {
+        Row: {
+          addon_id: string | null
+          addon_name: string | null
+          created_at: string | null
+          id: string
+          quantity: number | null
+          quotation_id: string | null
+          total_price: number | null
+          unit_price: number | null
+        }
+        Insert: {
+          addon_id?: string | null
+          addon_name?: string | null
+          created_at?: string | null
+          id?: string
+          quantity?: number | null
+          quotation_id?: string | null
+          total_price?: number | null
+          unit_price?: number | null
+        }
+        Update: {
+          addon_id?: string | null
+          addon_name?: string | null
+          created_at?: string | null
+          id?: string
+          quantity?: number | null
+          quotation_id?: string | null
+          total_price?: number | null
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_quotation_addons_addon_id_fkey"
+            columns: ["addon_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_addons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_quotation_addons_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_quotation_signatures: {
+        Row: {
+          id: string
+          quotation_id: string | null
+          signature_data: string | null
+          signature_role: string
+          signature_type: string | null
+          signed_at: string | null
+          signed_by: string | null
+          signer_name: string
+        }
+        Insert: {
+          id?: string
+          quotation_id?: string | null
+          signature_data?: string | null
+          signature_role: string
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          signer_name: string
+        }
+        Update: {
+          id?: string
+          quotation_id?: string | null
+          signature_data?: string | null
+          signature_role?: string
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          signer_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_quotation_signatures_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_quotations: {
+        Row: {
+          additional_charges: number | null
+          additional_charges_description: string | null
+          brand: string | null
+          business_registration: string | null
+          category: string | null
+          color: string | null
+          company_name: string | null
+          contact_person: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_address: string | null
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          customer_type: string | null
+          delivery_terms: string | null
+          designation: string | null
+          discount: number | null
+          engine_cc: string | null
+          finance_company: string | null
+          fuel_type: string | null
+          grand_total: number | null
+          id: string
+          is_active_version: boolean | null
+          is_sub_customer: boolean | null
+          main_customer_name: string | null
+          model_id: string | null
+          notes: string | null
+          parent_quotation_id: string | null
+          payment_terms: string | null
+          quantity: number | null
+          quotation_number: string
+          referral_agent_id: string | null
+          relationship_notes: string | null
+          representative_name: string | null
+          status: string | null
+          tax_registration: string | null
+          total_price: number | null
+          transmission: string | null
+          unit_price: number | null
+          updated_at: string | null
+          validity_period: string | null
+          vehicle_name: string | null
+          version_number: number | null
+          warranty_terms: string | null
+          year: number | null
+        }
+        Insert: {
+          additional_charges?: number | null
+          additional_charges_description?: string | null
+          brand?: string | null
+          business_registration?: string | null
+          category?: string | null
+          color?: string | null
+          company_name?: string | null
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          customer_type?: string | null
+          delivery_terms?: string | null
+          designation?: string | null
+          discount?: number | null
+          engine_cc?: string | null
+          finance_company?: string | null
+          fuel_type?: string | null
+          grand_total?: number | null
+          id?: string
+          is_active_version?: boolean | null
+          is_sub_customer?: boolean | null
+          main_customer_name?: string | null
+          model_id?: string | null
+          notes?: string | null
+          parent_quotation_id?: string | null
+          payment_terms?: string | null
+          quantity?: number | null
+          quotation_number: string
+          referral_agent_id?: string | null
+          relationship_notes?: string | null
+          representative_name?: string | null
+          status?: string | null
+          tax_registration?: string | null
+          total_price?: number | null
+          transmission?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+          validity_period?: string | null
+          vehicle_name?: string | null
+          version_number?: number | null
+          warranty_terms?: string | null
+          year?: number | null
+        }
+        Update: {
+          additional_charges?: number | null
+          additional_charges_description?: string | null
+          brand?: string | null
+          business_registration?: string | null
+          category?: string | null
+          color?: string | null
+          company_name?: string | null
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          customer_type?: string | null
+          delivery_terms?: string | null
+          designation?: string | null
+          discount?: number | null
+          engine_cc?: string | null
+          finance_company?: string | null
+          fuel_type?: string | null
+          grand_total?: number | null
+          id?: string
+          is_active_version?: boolean | null
+          is_sub_customer?: boolean | null
+          main_customer_name?: string | null
+          model_id?: string | null
+          notes?: string | null
+          parent_quotation_id?: string | null
+          payment_terms?: string | null
+          quantity?: number | null
+          quotation_number?: string
+          referral_agent_id?: string | null
+          relationship_notes?: string | null
+          representative_name?: string | null
+          status?: string | null
+          tax_registration?: string | null
+          total_price?: number | null
+          transmission?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+          validity_period?: string | null
+          vehicle_name?: string | null
+          version_number?: number | null
+          warranty_terms?: string | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_quotations_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_quotations_parent_quotation_id_fkey"
+            columns: ["parent_quotation_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_quotations_referral_agent_id_fkey"
+            columns: ["referral_agent_id"]
+            isOneToOne: false
+            referencedRelation: "referral_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_referral_commission_payments: {
+        Row: {
+          agent_id: string | null
+          agent_name: string | null
+          commission_amount: number | null
+          commission_percentage: number | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          payment_date: string | null
+          payment_reference: string | null
+          quotation_id: string | null
+          quotation_value: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          agent_name?: string | null
+          commission_amount?: number | null
+          commission_percentage?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_reference?: string | null
+          quotation_id?: string | null
+          quotation_value?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          agent_name?: string | null
+          commission_amount?: number | null
+          commission_percentage?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_reference?: string | null
+          quotation_id?: string | null
+          quotation_value?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_referral_commission_payments_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "referral_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_referral_commission_payments_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_responsible_persons: {
+        Row: {
+          created_at: string | null
+          designation: string | null
+          id: string
+          is_active: boolean | null
+          person_name: string
+          role: string
+          signature_data: string | null
+          signature_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          designation?: string | null
+          id?: string
+          is_active?: boolean | null
+          person_name: string
+          role: string
+          signature_data?: string | null
+          signature_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          designation?: string | null
+          id?: string
+          is_active?: boolean | null
+          person_name?: string
+          role?: string
+          signature_data?: string | null
+          signature_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      lightvehicle_shipment_group_orders: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          id: string
+          order_id: string | null
+          shipment_group_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          order_id?: string | null
+          shipment_group_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          id?: string
+          order_id?: string | null
+          shipment_group_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_shipment_group_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "lightvehicle_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_shipment_group_orders_shipment_group_id_fkey"
+            columns: ["shipment_group_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_shipment_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lightvehicle_shipment_groups: {
+        Row: {
+          actual_arrival: string | null
+          actual_departure: string | null
+          bl_number: string | null
+          container_number: string | null
+          created_at: string | null
+          created_by: string | null
+          destination_port: string | null
+          expected_arrival: string | null
+          expected_departure: string | null
+          id: string
+          notes: string | null
+          origin_port: string | null
+          shipment_name: string | null
+          shipment_number: string
+          status: string | null
+          updated_at: string | null
+          vessel_name: string | null
+        }
+        Insert: {
+          actual_arrival?: string | null
+          actual_departure?: string | null
+          bl_number?: string | null
+          container_number?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          destination_port?: string | null
+          expected_arrival?: string | null
+          expected_departure?: string | null
+          id?: string
+          notes?: string | null
+          origin_port?: string | null
+          shipment_name?: string | null
+          shipment_number: string
+          status?: string | null
+          updated_at?: string | null
+          vessel_name?: string | null
+        }
+        Update: {
+          actual_arrival?: string | null
+          actual_departure?: string | null
+          bl_number?: string | null
+          container_number?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          destination_port?: string | null
+          expected_arrival?: string | null
+          expected_departure?: string | null
+          id?: string
+          notes?: string | null
+          origin_port?: string | null
+          shipment_name?: string | null
+          shipment_number?: string
+          status?: string | null
+          updated_at?: string | null
+          vessel_name?: string | null
+        }
+        Relationships: []
+      }
+      lightvehicle_vehicle_data_sheets: {
+        Row: {
+          created_at: string | null
+          file_name: string | null
+          file_url: string | null
+          id: string
+          matched_vehicles: number | null
+          sheet_name: string
+          shipment_reference: string | null
+          status: string | null
+          total_vehicles: number | null
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          matched_vehicles?: number | null
+          sheet_name: string
+          shipment_reference?: string | null
+          status?: string | null
+          total_vehicles?: number | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          matched_vehicles?: number | null
+          sheet_name?: string
+          shipment_reference?: string | null
+          status?: string | null
+          total_vehicles?: number | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      lightvehicle_vehicle_records: {
+        Row: {
+          brand: string | null
+          category: string | null
+          chassis_number: string | null
+          color: string | null
+          created_at: string | null
+          customer_name: string | null
+          data_sheet_id: string | null
+          engine_number: string | null
+          id: string
+          is_matched: boolean | null
+          match_type: string | null
+          matched_at: string | null
+          matched_by: string | null
+          mileage: number | null
+          model_name: string | null
+          order_id: string | null
+          updated_at: string | null
+          vehicle_number: string | null
+          year: number | null
+        }
+        Insert: {
+          brand?: string | null
+          category?: string | null
+          chassis_number?: string | null
+          color?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          data_sheet_id?: string | null
+          engine_number?: string | null
+          id?: string
+          is_matched?: boolean | null
+          match_type?: string | null
+          matched_at?: string | null
+          matched_by?: string | null
+          mileage?: number | null
+          model_name?: string | null
+          order_id?: string | null
+          updated_at?: string | null
+          vehicle_number?: string | null
+          year?: number | null
+        }
+        Update: {
+          brand?: string | null
+          category?: string | null
+          chassis_number?: string | null
+          color?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          data_sheet_id?: string | null
+          engine_number?: string | null
+          id?: string
+          is_matched?: boolean | null
+          match_type?: string | null
+          matched_at?: string | null
+          matched_by?: string | null
+          mileage?: number | null
+          model_name?: string | null
+          order_id?: string | null
+          updated_at?: string | null
+          vehicle_number?: string | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_vehicle_records_data_sheet_id_fkey"
+            columns: ["data_sheet_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_vehicle_data_sheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_vehicle_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maintenance_bays: {
         Row: {
           bay_name: string
@@ -11407,6 +12591,9 @@ export type Database = {
       generate_employee_id: { Args: never; Returns: string }
       generate_inquiry_number: { Args: never; Returns: string }
       generate_journal_entry_number: { Args: never; Returns: string }
+      generate_lightvehicle_order_number: { Args: never; Returns: string }
+      generate_lightvehicle_quotation_number: { Args: never; Returns: string }
+      generate_lightvehicle_shipment_number: { Args: never; Returns: string }
       generate_next_version_number: {
         Args: { p_parent_id: string }
         Returns: string
