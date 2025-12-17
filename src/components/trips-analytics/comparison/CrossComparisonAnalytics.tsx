@@ -5,7 +5,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import CrossComparisonFilterPanel from "./CrossComparisonFilterPanel";
 import CrossComparisonTrendCharts from "./CrossComparisonTrendCharts";
-import { useCrossComparisonAnalytics, TimeSlotValue } from "@/hooks/useCrossComparisonAnalytics";
+import { useCrossComparisonAnalytics } from "@/hooks/useCrossComparisonAnalytics";
 
 interface CrossComparisonAnalyticsProps {
   startDate: Date;
@@ -19,13 +19,13 @@ export default function CrossComparisonAnalytics({
   // Filter states
   const [selectedBuses, setSelectedBuses] = useState<string[]>([]);
   const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
-  const [selectedTimeSlots, setSelectedTimeSlots] = useState<TimeSlotValue[]>([]);
+  const [selectedStartTimes, setSelectedStartTimes] = useState<string[]>([]);
   
   // Applied filters (used for querying)
   const [appliedFilters, setAppliedFilters] = useState({
     buses: [] as string[],
     routes: [] as string[],
-    timeSlots: [] as TimeSlotValue[],
+    startTimes: [] as string[],
   });
 
   // Fetch data with applied filters
@@ -33,7 +33,7 @@ export default function CrossComparisonAnalytics({
     startDate,
     endDate,
     routes: appliedFilters.routes,
-    timeSlots: appliedFilters.timeSlots,
+    startTimes: appliedFilters.startTimes,
     buses: appliedFilters.buses,
   });
 
@@ -41,23 +41,23 @@ export default function CrossComparisonAnalytics({
   useEffect(() => {
     setSelectedBuses([]);
     setSelectedRoutes([]);
-    setSelectedTimeSlots([]);
-    setAppliedFilters({ buses: [], routes: [], timeSlots: [] });
+    setSelectedStartTimes([]);
+    setAppliedFilters({ buses: [], routes: [], startTimes: [] });
   }, [startDate, endDate]);
 
   const handleApplyFilters = () => {
     setAppliedFilters({
       buses: selectedBuses,
       routes: selectedRoutes,
-      timeSlots: selectedTimeSlots,
+      startTimes: selectedStartTimes,
     });
   };
 
   const handleClearFilters = () => {
     setSelectedBuses([]);
     setSelectedRoutes([]);
-    setSelectedTimeSlots([]);
-    setAppliedFilters({ buses: [], routes: [], timeSlots: [] });
+    setSelectedStartTimes([]);
+    setAppliedFilters({ buses: [], routes: [], startTimes: [] });
   };
 
   if (error) {
@@ -103,12 +103,13 @@ export default function CrossComparisonAnalytics({
       <CrossComparisonFilterPanel
         availableBuses={data.availableBuses}
         availableRoutes={data.availableRoutes}
+        availableStartTimes={data.availableStartTimes}
         selectedBuses={selectedBuses}
         selectedRoutes={selectedRoutes}
-        selectedTimeSlots={selectedTimeSlots}
+        selectedStartTimes={selectedStartTimes}
         onBusesChange={setSelectedBuses}
         onRoutesChange={setSelectedRoutes}
-        onTimeSlotsChange={setSelectedTimeSlots}
+        onStartTimesChange={setSelectedStartTimes}
         onApplyFilters={handleApplyFilters}
         onClearFilters={handleClearFilters}
         matchingTrips={data.dataSourceInfo.filteredRecords}

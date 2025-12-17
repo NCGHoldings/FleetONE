@@ -1,22 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo } from "react";
-
-// Time slot definitions
-export const TIME_SLOTS = [
-  { label: 'Morning (6AM-12PM)', value: 'morning', start: 6, end: 12 },
-  { label: 'Afternoon (12PM-6PM)', value: 'afternoon', start: 12, end: 18 },
-  { label: 'Evening (6PM-10PM)', value: 'evening', start: 18, end: 22 },
-  { label: 'Night (10PM-6AM)', value: 'night', start: 22, end: 6 }
-] as const;
-
-export type TimeSlotValue = typeof TIME_SLOTS[number]['value'];
 
 export interface CrossComparisonFilters {
   startDate: Date;
   endDate: Date;
   routes: string[];
-  timeSlots: TimeSlotValue[];
+  startTimes: string[];
   buses: string[];
 }
 
@@ -30,6 +19,12 @@ export interface TrendDataPoint {
   fuelCost: number;
   fuelLiters: number;
   avgEfficiency: number;
+}
+
+export interface AvailableStartTime {
+  value: string;
+  label: string;
+  tripCount: number;
 }
 
 export interface CrossComparisonData {
@@ -48,6 +43,7 @@ export interface CrossComparisonData {
   byRoute: Record<string, TrendDataPoint[]>;
   availableBuses: { id: string; name: string; tripCount: number }[];
   availableRoutes: { id: string; name: string; tripCount: number }[];
+  availableStartTimes: AvailableStartTime[];
   dataSourceInfo: {
     totalRecords: number;
     filteredRecords: number;
@@ -55,57 +51,81 @@ export interface CrossComparisonData {
   };
 }
 
-function getTimeSlot(startTime: string | null): TimeSlotValue | null {
-  if (!startTime) return null;
+// Format time for display (e.g., "10:30" -> "10:30 AM")
+function formatTimeLabel(time: string): string {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':').map(Number);
+  if (isNaN(hours)) return time;
   
-  const [hours] = startTime.split(':').map(Number);
-  if (isNaN(hours)) return null;
-  
-  if (hours >= 6 && hours < 12) return 'morning';
-  if (hours >= 12 && hours < 18) return 'afternoon';
-  if (hours >= 18 && hours < 22) return 'evening';
-  return 'night';
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${minutes?.toString().padStart(2, '0') || '00'} ${period}`;
 }
 
 export function useCrossComparisonAnalytics(filters: CrossComparisonFilters) {
-  const { startDate, endDate, routes, timeSlots, buses } = filters;
+  const { startDate, endDate, routes, startTimes, buses } = filters;
 
   const query = useQuery({
-    queryKey: ['cross-comparison-analytics', startDate.toISOString(), endDate.toISOString(), routes, timeSlots, buses],
+    queryKey: ['cross-comparison-analytics', startDate.toISOString(), endDate.toISOString(), routes, startTimes, buses],
     queryFn: async () => {
-      // Fetch all trips in date range with related data
-      const { data: trips, error } = await supabase
-        .from('daily_trips')
-        .select(`
-          id,
-          trip_date,
-          income,
-          total_expenses,
-          net_income,
-          fuel_cost,
-          fuel_liters,
-          km_per_liter,
-          distance_km,
-          start_time,
-          bus_id,
-          route_id,
-          notes,
-          buses!inner(id, bus_no, registration_number),
-          routes(id, route_no, route_name)
-        `)
-        .gte('trip_date', startDate.toISOString().split('T')[0])
-        .lte('trip_date', endDate.toISOString().split('T')[0])
-        .order('trip_date', { ascending: true });
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
 
-      if (error) throw error;
+      // Fetch trips and expenses in parallel
+      const [tripsResult, expensesResult] = await Promise.all([
+        supabase
+          .from('daily_trips')
+          .select(`
+            id,
+            trip_date,
+            income,
+            total_expenses,
+            net_income,
+            fuel_cost,
+            fuel_liters,
+            km_per_liter,
+            distance_km,
+            start_time,
+            bus_id,
+            route_id,
+            notes,
+            buses!inner(id, bus_no, registration_number),
+            routes(id, route_no, route_name)
+          `)
+          .gte('trip_date', startDateStr)
+          .lte('trip_date', endDateStr)
+          .order('trip_date', { ascending: true }),
+        
+        supabase
+          .from('daily_bus_expenses')
+          .select('expense_date, bus_id, total_daily_expenses, fuel_cost')
+          .gte('expense_date', startDateStr)
+          .lte('expense_date', endDateStr)
+      ]);
 
-      const totalRecords = trips?.length || 0;
+      if (tripsResult.error) throw tripsResult.error;
+
+      const trips = tripsResult.data || [];
+      const expenses = expensesResult.data || [];
+      const totalRecords = trips.length;
+
+      // Create expense lookup map (bus_id + date -> total expenses)
+      const expenseMap = new Map<string, { totalExpenses: number; fuelCost: number }>();
+      expenses.forEach(exp => {
+        const key = `${exp.bus_id}_${exp.expense_date}`;
+        const existing = expenseMap.get(key) || { totalExpenses: 0, fuelCost: 0 };
+        expenseMap.set(key, {
+          totalExpenses: existing.totalExpenses + (Number(exp.total_daily_expenses) || 0),
+          fuelCost: existing.fuelCost + (Number(exp.fuel_cost) || 0),
+        });
+      });
 
       // Build available options with trip counts
       const busMap = new Map<string, { name: string; count: number }>();
       const routeMap = new Map<string, { name: string; count: number }>();
+      const startTimeMap = new Map<string, number>();
 
-      trips?.forEach(trip => {
+      trips.forEach(trip => {
         // Bus mapping
         if (trip.buses) {
           const busName = trip.buses.bus_no || trip.buses.registration_number || '';
@@ -121,10 +141,25 @@ export function useCrossComparisonAnalytics(filters: CrossComparisonFilters) {
           const existing = routeMap.get(trip.route_id || '') || { name: routeName, count: 0 };
           routeMap.set(trip.route_id || '', { name: routeName, count: existing.count + 1 });
         }
+
+        // Start time mapping (extract actual times)
+        if (trip.start_time) {
+          const time = trip.start_time.substring(0, 5); // Get HH:MM
+          startTimeMap.set(time, (startTimeMap.get(time) || 0) + 1);
+        }
       });
 
+      // Build available start times sorted by time
+      const availableStartTimes: AvailableStartTime[] = Array.from(startTimeMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([time, count]) => ({
+          value: time,
+          label: formatTimeLabel(time),
+          tripCount: count,
+        }));
+
       // Apply filters
-      let filteredTrips = trips || [];
+      let filteredTrips = trips;
 
       // Filter by buses (match by bus name)
       if (buses.length > 0) {
@@ -143,27 +178,44 @@ export function useCrossComparisonAnalytics(filters: CrossComparisonFilters) {
         });
       }
 
-      // Filter by time slots
-      if (timeSlots.length > 0) {
+      // Filter by exact start times
+      if (startTimes.length > 0) {
         filteredTrips = filteredTrips.filter(trip => {
-          const slot = getTimeSlot(trip.start_time);
-          return slot && timeSlots.includes(slot);
+          if (!trip.start_time) return false;
+          const tripTime = trip.start_time.substring(0, 5);
+          return startTimes.includes(tripTime);
         });
       }
+
+      // Get filtered bus IDs for expense filtering
+      const filteredBusIds = new Set(filteredTrips.map(t => t.bus_id));
 
       // Group by date for trend data
       const dateMap = new Map<string, TrendDataPoint>();
       const byBusMap = new Map<string, Map<string, TrendDataPoint>>();
       const byRouteMap = new Map<string, Map<string, TrendDataPoint>>();
 
+      // Track which bus/date combinations we've already added expenses for
+      const processedExpenses = new Set<string>();
+
       filteredTrips.forEach(trip => {
         const date = trip.trip_date;
         const revenue = Number(trip.income) || 0;
-        const expenses = Number(trip.total_expenses) || 0;
-        const netProfit = Number(trip.net_income) || 0;
-        const fuelCost = Number(trip.fuel_cost) || 0;
         const fuelLiters = Number(trip.fuel_liters) || 0;
         const efficiency = Number(trip.km_per_liter) || 0;
+
+        // Get real expenses from daily_bus_expenses table
+        const expenseKey = `${trip.bus_id}_${date}`;
+        const expenseData = expenseMap.get(expenseKey);
+        
+        // Only add expenses once per bus/date combination
+        let expensesToAdd = 0;
+        let fuelCostToAdd = 0;
+        if (expenseData && !processedExpenses.has(expenseKey)) {
+          expensesToAdd = expenseData.totalExpenses;
+          fuelCostToAdd = expenseData.fuelCost;
+          processedExpenses.add(expenseKey);
+        }
 
         // Aggregate by date
         const existing = dateMap.get(date) || {
@@ -179,14 +231,11 @@ export function useCrossComparisonAnalytics(filters: CrossComparisonFilters) {
         };
 
         existing.revenue += revenue;
-        existing.expenses += expenses;
-        existing.netProfit += netProfit;
+        existing.expenses += expensesToAdd;
+        existing.fuelCost += fuelCostToAdd;
+        existing.netProfit = existing.revenue - existing.expenses;
         existing.tripCount += 1;
-        existing.fuelCost += fuelCost;
         existing.fuelLiters += fuelLiters;
-        existing.avgEfficiency = existing.fuelLiters > 0 
-          ? (existing.revenue / existing.expenses) * 100 
-          : 0;
         existing.profitMargin = existing.revenue > 0 
           ? (existing.netProfit / existing.revenue) * 100 
           : 0;
@@ -210,11 +259,23 @@ export function useCrossComparisonAnalytics(filters: CrossComparisonFilters) {
           fuelLiters: 0,
           avgEfficiency: 0,
         };
+        
+        // For per-bus aggregation, get expenses for this specific bus
+        const busExpenseData = expenseMap.get(expenseKey);
+        const busExpenseKey = `bus_${busName}_${date}`;
+        let busExpensesToAdd = 0;
+        let busFuelCostToAdd = 0;
+        if (busExpenseData && !processedExpenses.has(busExpenseKey)) {
+          busExpensesToAdd = busExpenseData.totalExpenses;
+          busFuelCostToAdd = busExpenseData.fuelCost;
+          processedExpenses.add(busExpenseKey);
+        }
+
         busExisting.revenue += revenue;
-        busExisting.expenses += expenses;
-        busExisting.netProfit += netProfit;
+        busExisting.expenses += busExpensesToAdd;
+        busExisting.fuelCost += busFuelCostToAdd;
+        busExisting.netProfit = busExisting.revenue - busExisting.expenses;
         busExisting.tripCount += 1;
-        busExisting.fuelCost += fuelCost;
         busExisting.fuelLiters += fuelLiters;
         busExisting.profitMargin = busExisting.revenue > 0 
           ? (busExisting.netProfit / busExisting.revenue) * 100 
@@ -239,11 +300,23 @@ export function useCrossComparisonAnalytics(filters: CrossComparisonFilters) {
             fuelLiters: 0,
             avgEfficiency: 0,
           };
+
+          // For routes, distribute expenses proportionally to trips
+          const routeExpenseKey = `route_${routeName}_${expenseKey}`;
+          let routeExpensesToAdd = 0;
+          let routeFuelCostToAdd = 0;
+          if (busExpenseData && !processedExpenses.has(routeExpenseKey)) {
+            // Estimate route's share of bus expenses based on trip count
+            routeExpensesToAdd = busExpenseData.totalExpenses;
+            routeFuelCostToAdd = busExpenseData.fuelCost;
+            processedExpenses.add(routeExpenseKey);
+          }
+
           routeExisting.revenue += revenue;
-          routeExisting.expenses += expenses;
-          routeExisting.netProfit += netProfit;
+          routeExisting.expenses += routeExpensesToAdd;
+          routeExisting.fuelCost += routeFuelCostToAdd;
+          routeExisting.netProfit = routeExisting.revenue - routeExisting.expenses;
           routeExisting.tripCount += 1;
-          routeExisting.fuelCost += fuelCost;
           routeExisting.fuelLiters += fuelLiters;
           routeExisting.profitMargin = routeExisting.revenue > 0 
             ? (routeExisting.netProfit / routeExisting.revenue) * 100 
@@ -317,6 +390,7 @@ export function useCrossComparisonAnalytics(filters: CrossComparisonFilters) {
           name: data.name,
           tripCount: data.count,
         })).sort((a, b) => b.tripCount - a.tripCount),
+        availableStartTimes,
         dataSourceInfo: {
           totalRecords,
           filteredRecords: filteredTrips.length,

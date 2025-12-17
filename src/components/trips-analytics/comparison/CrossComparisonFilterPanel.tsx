@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,17 +6,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Filter, Bus, Route, Clock, ChevronDown, ChevronUp, X, RefreshCw } from "lucide-react";
-import { TIME_SLOTS, TimeSlotValue } from "@/hooks/useCrossComparisonAnalytics";
+import { AvailableStartTime } from "@/hooks/useCrossComparisonAnalytics";
 
 interface CrossComparisonFilterPanelProps {
   availableBuses: { id: string; name: string; tripCount: number }[];
   availableRoutes: { id: string; name: string; tripCount: number }[];
+  availableStartTimes: AvailableStartTime[];
   selectedBuses: string[];
   selectedRoutes: string[];
-  selectedTimeSlots: TimeSlotValue[];
+  selectedStartTimes: string[];
   onBusesChange: (buses: string[]) => void;
   onRoutesChange: (routes: string[]) => void;
-  onTimeSlotsChange: (slots: TimeSlotValue[]) => void;
+  onStartTimesChange: (times: string[]) => void;
   onApplyFilters: () => void;
   onClearFilters: () => void;
   matchingTrips: number;
@@ -26,12 +27,13 @@ interface CrossComparisonFilterPanelProps {
 export default function CrossComparisonFilterPanel({
   availableBuses,
   availableRoutes,
+  availableStartTimes,
   selectedBuses,
   selectedRoutes,
-  selectedTimeSlots,
+  selectedStartTimes,
   onBusesChange,
   onRoutesChange,
-  onTimeSlotsChange,
+  onStartTimesChange,
   onApplyFilters,
   onClearFilters,
   matchingTrips,
@@ -39,7 +41,7 @@ export default function CrossComparisonFilterPanel({
 }: CrossComparisonFilterPanelProps) {
   const [busesOpen, setBusesOpen] = useState(true);
   const [routesOpen, setRoutesOpen] = useState(true);
-  const [timeSlotsOpen, setTimeSlotsOpen] = useState(true);
+  const [timesOpen, setTimesOpen] = useState(true);
 
   const handleBusToggle = (busName: string) => {
     if (selectedBuses.includes(busName)) {
@@ -57,19 +59,19 @@ export default function CrossComparisonFilterPanel({
     }
   };
 
-  const handleTimeSlotToggle = (slot: TimeSlotValue) => {
-    if (selectedTimeSlots.includes(slot)) {
-      onTimeSlotsChange(selectedTimeSlots.filter(s => s !== slot));
+  const handleTimeToggle = (time: string) => {
+    if (selectedStartTimes.includes(time)) {
+      onStartTimesChange(selectedStartTimes.filter(t => t !== time));
     } else {
-      onTimeSlotsChange([...selectedTimeSlots, slot]);
+      onStartTimesChange([...selectedStartTimes, time]);
     }
   };
 
   const selectAllBuses = () => onBusesChange(availableBuses.map(b => b.name));
   const selectAllRoutes = () => onRoutesChange(availableRoutes.map(r => r.name));
-  const selectAllTimeSlots = () => onTimeSlotsChange(TIME_SLOTS.map(t => t.value));
+  const selectAllTimes = () => onStartTimesChange(availableStartTimes.map(t => t.value));
 
-  const totalSelected = selectedBuses.length + selectedRoutes.length + selectedTimeSlots.length;
+  const totalSelected = selectedBuses.length + selectedRoutes.length + selectedStartTimes.length;
 
   return (
     <Card className="border-2 border-dashed border-primary/30 bg-gradient-to-br from-primary/5 to-purple-500/5">
@@ -200,44 +202,54 @@ export default function CrossComparisonFilterPanel({
             </div>
           </Collapsible>
 
-          {/* Time Slots Filter */}
-          <Collapsible open={timeSlotsOpen} onOpenChange={setTimeSlotsOpen}>
+          {/* Start Times Filter - Real times from database */}
+          <Collapsible open={timesOpen} onOpenChange={setTimesOpen}>
             <div className="border rounded-lg p-3 bg-background">
               <CollapsibleTrigger className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-purple-500" />
-                  <span className="font-medium">Time Slots</span>
-                  {selectedTimeSlots.length > 0 && (
+                  <span className="font-medium">Start Times</span>
+                  {selectedStartTimes.length > 0 && (
                     <Badge variant="secondary" className="ml-2">
-                      {selectedTimeSlots.length}
+                      {selectedStartTimes.length}
                     </Badge>
                   )}
                 </div>
-                {timeSlotsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {timesOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3">
                 <div className="flex justify-between mb-2">
-                  <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={selectAllTimeSlots}>
+                  <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={selectAllTimes}>
                     Select All
                   </Button>
-                  <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => onTimeSlotsChange([])}>
+                  <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => onStartTimesChange([])}>
                     Clear
                   </Button>
                 </div>
-                <div className="space-y-2">
-                  {TIME_SLOTS.map(slot => (
-                    <label
-                      key={slot.value}
-                      className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer"
-                    >
-                      <Checkbox
-                        checked={selectedTimeSlots.includes(slot.value)}
-                        onCheckedChange={() => handleTimeSlotToggle(slot.value)}
-                      />
-                      <span className="text-sm">{slot.label}</span>
-                    </label>
-                  ))}
-                </div>
+                <ScrollArea className="h-[180px]">
+                  <div className="space-y-2">
+                    {availableStartTimes.map(time => (
+                      <label
+                        key={time.value}
+                        className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={selectedStartTimes.includes(time.value)}
+                          onCheckedChange={() => handleTimeToggle(time.value)}
+                        />
+                        <span className="flex-1 text-sm font-mono">{time.label}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {time.tripCount}
+                        </Badge>
+                      </label>
+                    ))}
+                    {availableStartTimes.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No start times available
+                      </p>
+                    )}
+                  </div>
+                </ScrollArea>
               </CollapsibleContent>
             </div>
           </Collapsible>
@@ -272,17 +284,17 @@ export default function CrossComparisonFilterPanel({
                 </button>
               </Badge>
             ))}
-            {selectedTimeSlots.map(slot => {
-              const slotInfo = TIME_SLOTS.find(s => s.value === slot);
+            {selectedStartTimes.map(time => {
+              const timeInfo = availableStartTimes.find(t => t.value === time);
               return (
                 <Badge 
-                  key={slot} 
+                  key={time} 
                   variant="secondary"
                   className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                 >
                   <Clock className="h-3 w-3 mr-1" />
-                  {slotInfo?.label.split(' ')[0]}
-                  <button className="ml-1 hover:opacity-70" onClick={() => handleTimeSlotToggle(slot)}>
+                  {timeInfo?.label || time}
+                  <button className="ml-1 hover:opacity-70" onClick={() => handleTimeToggle(time)}>
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
