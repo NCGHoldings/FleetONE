@@ -12658,6 +12658,7 @@ export type Database = {
         Args: { p_name: string }
         Returns: undefined
       }
+      storage_apply_conservative_policies: { Args: never; Returns: undefined }
       sync_all_tyre_conditions: { Args: never; Returns: undefined }
       update_active_seasonal_themes: { Args: never; Returns: undefined }
       update_all_tyre_conditions: { Args: never; Returns: undefined }

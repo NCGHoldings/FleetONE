@@ -113,7 +113,7 @@ export default function CrossComparisonTrendCharts({
     }));
   }, [trendData]);
 
-  // Prepare multi-entity comparison data
+  // Prepare multi-entity comparison data with expenses
   const multiEntityData = useMemo(() => {
     if (selectedBuses.length === 0 && selectedRoutes.length === 0) {
       return chartData;
@@ -132,21 +132,25 @@ export default function CrossComparisonTrendCharts({
         dateLabel: format(parseISO(date), 'MMM dd') 
       };
 
-      // Add bus data
+      // Add bus data including expenses
       selectedBuses.forEach(busName => {
         const busData = byBus[busName]?.find(d => d.date === date);
         result[`${busName}_revenue`] = busData?.revenue || 0;
+        result[`${busName}_expenses`] = busData?.expenses || 0;
         result[`${busName}_netProfit`] = busData?.netProfit || 0;
         result[`${busName}_trips`] = busData?.tripCount || 0;
+        result[`${busName}_fuelCost`] = busData?.fuelCost || 0;
       });
 
-      // Add route data
+      // Add route data including expenses
       selectedRoutes.forEach(routeName => {
         const routeData = byRoute[routeName]?.find(d => d.date === date);
         const shortName = routeName.split(' - ')[0];
         result[`${shortName}_revenue`] = routeData?.revenue || 0;
+        result[`${shortName}_expenses`] = routeData?.expenses || 0;
         result[`${shortName}_netProfit`] = routeData?.netProfit || 0;
         result[`${shortName}_trips`] = routeData?.tripCount || 0;
+        result[`${shortName}_fuelCost`] = routeData?.fuelCost || 0;
       });
 
       return result;
@@ -454,7 +458,10 @@ export default function CrossComparisonTrendCharts({
                 <div className="space-y-6">
                   {/* Revenue Comparison */}
                   <div>
-                    <h4 className="text-sm font-medium mb-3">Revenue Comparison</h4>
+                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-blue-500" />
+                      Revenue Comparison
+                    </h4>
                     <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={multiEntityData}>
@@ -494,9 +501,57 @@ export default function CrossComparisonTrendCharts({
                     </div>
                   </div>
 
+                  {/* Expenses Comparison - NEW */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <TrendingDown className="h-4 w-4 text-red-500" />
+                      Expenses Comparison
+                    </h4>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={multiEntityData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                          <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                          <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => formatLKRCompact(v)} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend />
+                          {selectedBuses.map((bus, index) => (
+                            <Line 
+                              key={bus}
+                              type="monotone" 
+                              dataKey={`${bus}_expenses`} 
+                              name={`${bus} Expenses`}
+                              stroke={ENTITY_COLORS[index % ENTITY_COLORS.length]}
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          ))}
+                          {selectedRoutes.map((route, index) => {
+                            const shortName = route.split(' - ')[0];
+                            return (
+                              <Line 
+                                key={route}
+                                type="monotone" 
+                                dataKey={`${shortName}_expenses`} 
+                                name={`${shortName} Expenses`}
+                                stroke={ENTITY_COLORS[(selectedBuses.length + index) % ENTITY_COLORS.length]}
+                                strokeWidth={2}
+                                strokeDasharray="5 5"
+                                dot={false}
+                              />
+                            );
+                          })}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
                   {/* Net Profit Comparison */}
                   <div>
-                    <h4 className="text-sm font-medium mb-3">Net Profit Comparison</h4>
+                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-green-500" />
+                      Net Profit Comparison
+                    </h4>
                     <div className="h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={multiEntityData}>
@@ -533,6 +588,48 @@ export default function CrossComparisonTrendCharts({
                             );
                           })}
                         </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Trip Count Comparison */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Bus className="h-4 w-4 text-yellow-500" />
+                      Trip Count Comparison
+                    </h4>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={multiEntityData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                          <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                          <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend />
+                          {selectedBuses.map((bus, index) => (
+                            <Bar 
+                              key={bus}
+                              dataKey={`${bus}_trips`} 
+                              name={`${bus} Trips`}
+                              fill={ENTITY_COLORS[index % ENTITY_COLORS.length]}
+                              opacity={0.8}
+                              radius={[4, 4, 0, 0]}
+                            />
+                          ))}
+                          {selectedRoutes.map((route, index) => {
+                            const shortName = route.split(' - ')[0];
+                            return (
+                              <Bar 
+                                key={route}
+                                dataKey={`${shortName}_trips`} 
+                                name={`${shortName} Trips`}
+                                fill={ENTITY_COLORS[(selectedBuses.length + index) % ENTITY_COLORS.length]}
+                                opacity={0.6}
+                                radius={[4, 4, 0, 0]}
+                              />
+                            );
+                          })}
+                        </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
