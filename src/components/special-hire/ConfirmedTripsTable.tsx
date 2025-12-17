@@ -1049,11 +1049,16 @@ export function ConfirmedTripsTable() {
                           </div>
                         </TableCell>
 
-                        {/* Workflow Column - Combined Email & Signatures */}
+                        {/* Workflow Column - Combined Email & Signatures with Quick Preview */}
                         <TableCell>
                           <SignatureWorkflowIndicator 
                             quotationId={trip.id}
                             documents={documentsData[trip.id] || []}
+                            onPreviewDocument={(doc) => {
+                              setCurrentDocument(doc);
+                              setSelectedTrip(trip);
+                              setDocumentViewerOpen(true);
+                            }}
                           />
                         </TableCell>
 
