@@ -463,6 +463,11 @@ export function ConfirmedTripsTable() {
         .select(`
           id,
           document_type,
+          payment_type,
+          document_status,
+          document_data,
+          file_name,
+          generated_at,
           email_status,
           ready_to_send,
           email_sent_at,
@@ -470,6 +475,8 @@ export function ConfirmedTripsTable() {
             id,
             approval_type,
             approver_name,
+            signature_data,
+            approval_date,
             user_id
           )
         `)
@@ -491,7 +498,7 @@ export function ConfirmedTripsTable() {
     }));
   };
 
-  // Load document statuses for all confirmed quotations
+  // Load document statuses for all confirmed quotations - force reload to avoid stale cache
   useEffect(() => {
     const loadAllDocuments = async () => {
       const confirmedQuotations = quotations.filter(q => q.status === 'confirmed');
@@ -499,12 +506,10 @@ export function ConfirmedTripsTable() {
       
       setDocumentsLoading(true);
       
-      // Load documents for all quotations that don't have data yet
-      const loadPromises = confirmedQuotations
-        .filter(q => !documentsData[q.id])
-        .map(q => loadDocumentStatus(q.id));
-      
+      // Force reload ALL confirmed quotations to ensure fresh data
+      const loadPromises = confirmedQuotations.map(q => loadDocumentStatus(q.id));
       await Promise.all(loadPromises);
+      
       setDocumentsLoading(false);
     };
     
@@ -1068,9 +1073,16 @@ export function ConfirmedTripsTable() {
                             hasPayments={(trip.payments?.length || 0) > 0}
                             documentsLoading={!documentsData[trip.id] && documentsLoading}
                             onPreviewDocument={(doc) => {
-                              setCurrentDocument(doc);
-                              setSelectedTrip(trip);
-                              setDocumentViewerOpen(true);
+                              if (doc) {
+                                setCurrentDocument(doc);
+                                setSelectedTrip(trip);
+                                setDocumentViewerOpen(true);
+                              } else {
+                                // Open documents modal when no specific document
+                                loadDocuments(trip.id);
+                                setSelectedTrip(trip);
+                                setDocumentsModalOpen(true);
+                              }
                             }}
                           />
                         </TableCell>
