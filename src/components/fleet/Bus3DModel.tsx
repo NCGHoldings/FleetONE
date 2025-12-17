@@ -12,103 +12,140 @@ interface Bus3DModelProps {
 export const Bus3DModel = ({ tyres, onTyreClick }: Bus3DModelProps) => {
   const groupRef = useRef<THREE.Group>(null);
 
-  // Tyre positions - 6 total (2 front, 4 rear on 2 axles)
+  // Tyre positions - 6 total (2 front, 4 rear on 2 axles) - adjusted for larger tyres
   const tyrePositions = {
-    "Front Left": { position: [-5.2, 0.55, -1.4] as [number, number, number] },
-    "Front Right": { position: [-5.2, 0.55, 1.4] as [number, number, number] },
-    "Rear Left 1": { position: [4.2, 0.55, -1.4] as [number, number, number] },
-    "Rear Right 1": { position: [4.2, 0.55, 1.4] as [number, number, number] },
-    "Rear Left 2": { position: [5.5, 0.55, -1.4] as [number, number, number] },
-    "Rear Right 2": { position: [5.5, 0.55, 1.4] as [number, number, number] },
+    "Front Left": { position: [-5.5, 0.75, -1.5] as [number, number, number] },
+    "Front Right": { position: [-5.5, 0.75, 1.5] as [number, number, number] },
+    "Rear Left 1": { position: [4.5, 0.75, -1.5] as [number, number, number] },
+    "Rear Right 1": { position: [4.5, 0.75, 1.5] as [number, number, number] },
+    "Rear Left 2": { position: [6.0, 0.75, -1.5] as [number, number, number] },
+    "Rear Right 2": { position: [6.0, 0.75, 1.5] as [number, number, number] },
   };
 
   const getTyreByPosition = (position: string) => {
     return tyres.find(t => t.position === position);
   };
 
-  // Create smooth coach body shape with better curves
+  // Create smooth aerodynamic coach body shape
   const coachGeometry = useMemo(() => {
     const shape = new THREE.Shape();
     
-    // Coach side profile - aerodynamic curves like luxury coach
-    shape.moveTo(-7.2, 0.3);
-    shape.lineTo(-7.2, 1.6);
-    // Front windshield curve
-    shape.quadraticCurveTo(-7.2, 2.4, -6.8, 2.8);
-    shape.quadraticCurveTo(-6.4, 3.1, -5.8, 3.25);
-    // Roof line
-    shape.lineTo(6.5, 3.25);
+    // Professional coach profile with smooth aerodynamic curves
+    shape.moveTo(-7.8, 0.3);
+    shape.lineTo(-7.8, 1.4);
+    // Smooth front windshield curve - aerodynamic nose
+    shape.bezierCurveTo(-7.8, 2.0, -7.6, 2.6, -7.2, 3.0);
+    shape.bezierCurveTo(-6.8, 3.3, -6.2, 3.5, -5.5, 3.55);
+    // Roof line - slight curve
+    shape.quadraticCurveTo(0, 3.65, 6.8, 3.55);
     // Rear curve
-    shape.quadraticCurveTo(7.0, 3.25, 7.2, 2.9);
-    shape.lineTo(7.2, 0.3);
-    shape.lineTo(-7.2, 0.3);
+    shape.quadraticCurveTo(7.4, 3.5, 7.8, 3.2);
+    shape.lineTo(7.8, 0.3);
+    shape.lineTo(-7.8, 0.3);
     
     const extrudeSettings = {
-      depth: 2.6,
+      depth: 2.8,
       bevelEnabled: true,
-      bevelThickness: 0.08,
-      bevelSize: 0.08,
-      bevelSegments: 4,
-      curveSegments: 48,
+      bevelThickness: 0.1,
+      bevelSize: 0.1,
+      bevelSegments: 6,
+      curveSegments: 64,
     };
     
     return new THREE.ExtrudeGeometry(shape, extrudeSettings);
   }, []);
 
-  // Generate dense grid lines for professional wireframe look
+  // Generate VERY dense grid lines for professional CAD-quality wireframe
   const gridLines = useMemo(() => {
     const lines: [number, number, number][][] = [];
+    const busLength = 15.6; // -7.8 to 7.8
+    const busHeight = 3.25;
+    const busWidth = 2.8;
     
-    // Horizontal lines on sides (denser)
-    for (let y = 0.4; y <= 3.25; y += 0.2) {
-      lines.push([[-7.2, y, -1.3], [7.2, y, -1.3]]);
-      lines.push([[-7.2, y, 1.3], [7.2, y, 1.3]]);
+    // ==== SIDE PANELS - Extremely dense horizontal lines ====
+    for (let y = 0.35; y <= 3.55; y += 0.08) {
+      // Adjust x bounds based on height for curved front
+      const frontX = y < 1.5 ? -7.8 : y < 2.5 ? -7.5 : y < 3.0 ? -7.0 : -6.0;
+      lines.push([[frontX, y, -1.4], [7.8, y, -1.4]]);
+      lines.push([[frontX, y, 1.4], [7.8, y, 1.4]]);
     }
     
-    // Vertical lines on sides (denser)
-    for (let x = -7.2; x <= 7.2; x += 0.4) {
-      const topY = x < -6 ? 1.8 + (x + 7.2) * 1.1 : 3.25;
-      lines.push([[x, 0.4, -1.3], [x, Math.min(topY, 3.25), -1.3]]);
-      lines.push([[x, 0.4, 1.3], [x, Math.min(topY, 3.25), 1.3]]);
+    // ==== SIDE PANELS - Extremely dense vertical lines ====
+    for (let x = -7.8; x <= 7.8; x += 0.18) {
+      // Calculate top Y based on front curve
+      let topY = 3.55;
+      if (x < -6.5) {
+        topY = 1.5 + (x + 7.8) * 1.5;
+      } else if (x < -5.5) {
+        topY = 3.0 + (x + 6.5) * 0.55;
+      }
+      lines.push([[x, 0.35, -1.4], [x, Math.min(topY, 3.55), -1.4]]);
+      lines.push([[x, 0.35, 1.4], [x, Math.min(topY, 3.55), 1.4]]);
     }
     
-    // Top roof lines (front to back)
-    for (let z = -1.3; z <= 1.3; z += 0.2) {
-      lines.push([[-5.8, 3.25, z], [6.5, 3.25, z]]);
+    // ==== ROOF - Dense grid ====
+    // Longitudinal lines (front to back)
+    for (let z = -1.4; z <= 1.4; z += 0.12) {
+      lines.push([[-5.5, 3.55, z], [6.8, 3.55, z]]);
+    }
+    // Lateral lines (side to side)
+    for (let x = -5.5; x <= 6.8; x += 0.18) {
+      lines.push([[x, 3.55, -1.4], [x, 3.55, 1.4]]);
     }
     
-    // Front face horizontal lines
-    for (let y = 0.4; y <= 2.8; y += 0.2) {
-      lines.push([[-7.2, y, -1.3], [-7.2, y, 1.3]]);
+    // ==== FRONT FACE - Dense horizontal lines ====
+    for (let y = 0.35; y <= 3.0; y += 0.1) {
+      const halfWidth = y < 1.5 ? 1.4 : Math.max(0.5, 1.4 - (y - 1.5) * 0.3);
+      lines.push([[-7.8, y, -halfWidth], [-7.8, y, halfWidth]]);
     }
     
-    // Rear face horizontal lines
-    for (let y = 0.4; y <= 2.9; y += 0.2) {
-      lines.push([[7.2, y, -1.3], [7.2, y, 1.3]]);
+    // ==== FRONT FACE - Dense vertical lines ====
+    for (let z = -1.4; z <= 1.4; z += 0.12) {
+      lines.push([[-7.8, 0.35, z], [-7.8, 2.0, z]]);
     }
     
-    // Cross lines on roof (denser)
-    for (let x = -5.5; x <= 6.5; x += 0.4) {
-      lines.push([[x, 3.25, -1.3], [x, 3.25, 1.3]]);
+    // ==== REAR FACE - Dense horizontal lines ====
+    for (let y = 0.35; y <= 3.2; y += 0.1) {
+      lines.push([[7.8, y, -1.4], [7.8, y, 1.4]]);
     }
     
-    // Front vertical lines
-    for (let z = -1.3; z <= 1.3; z += 0.2) {
-      lines.push([[-7.2, 0.4, z], [-7.2, 2.6, z]]);
+    // ==== REAR FACE - Dense vertical lines ====
+    for (let z = -1.4; z <= 1.4; z += 0.12) {
+      lines.push([[7.8, 0.35, z], [7.8, 3.2, z]]);
     }
     
-    // Rear vertical lines
-    for (let z = -1.3; z <= 1.3; z += 0.2) {
-      lines.push([[7.2, 0.4, z], [7.2, 2.9, z]]);
+    // ==== WINDSHIELD CURVE LINES ====
+    // Curved front profile lines
+    for (let z = -1.2; z <= 1.2; z += 0.15) {
+      lines.push([
+        [-7.8, 1.5, z],
+        [-7.5, 2.2, z],
+        [-7.0, 2.8, z],
+        [-6.2, 3.3, z],
+        [-5.5, 3.55, z]
+      ]);
+    }
+    
+    // ==== BOTTOM EDGE LINES ====
+    lines.push([[-7.8, 0.35, -1.4], [7.8, 0.35, -1.4]]);
+    lines.push([[-7.8, 0.35, 1.4], [7.8, 0.35, 1.4]]);
+    lines.push([[-7.8, 0.35, -1.4], [-7.8, 0.35, 1.4]]);
+    lines.push([[7.8, 0.35, -1.4], [7.8, 0.35, 1.4]]);
+    
+    // ==== DIAGONAL STRUCTURAL LINES (for realistic look) ====
+    // Cross bracing pattern on sides
+    for (let x = -7; x <= 7; x += 1.5) {
+      lines.push([[x, 0.5, -1.4], [x + 0.8, 1.8, -1.4]]);
+      lines.push([[x, 0.5, 1.4], [x + 0.8, 1.8, 1.4]]);
     }
     
     return lines;
   }, []);
 
-  // Window positions
+  // Window positions for side windows
   const windows = useMemo(() => {
     const positions: number[] = [];
-    for (let x = -4.2; x <= 5.5; x += 1.3) {
+    for (let x = -4.5; x <= 6.0; x += 1.4) {
       positions.push(x);
     }
     return positions;
@@ -116,251 +153,243 @@ export const Bus3DModel = ({ tyres, onTyreClick }: Bus3DModelProps) => {
 
   return (
     <group ref={groupRef} position={[0, 0, -0.5]}>
-      {/* Main bus body - solid with transparency */}
-      <mesh geometry={coachGeometry} position={[0, 0, -1.3]}>
+      {/* ============ MAIN BUS BODY ============ */}
+      {/* Solid body with very subtle fill */}
+      <mesh geometry={coachGeometry} position={[0, 0, -1.4]}>
         <meshStandardMaterial 
-          color="#e2e8f0"
+          color="#f1f5f9"
           transparent
-          opacity={0.15}
+          opacity={0.08}
           side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* Bus body wireframe overlay */}
-      <mesh geometry={coachGeometry} position={[0, 0, -1.3]}>
+      {/* Primary wireframe overlay */}
+      <mesh geometry={coachGeometry} position={[0, 0, -1.4]}>
         <meshBasicMaterial 
-          color="#94a3b8"
+          color="#cbd5e1"
           wireframe
           transparent
-          opacity={0.4}
+          opacity={0.25}
         />
       </mesh>
 
-      {/* Dense grid lines for professional wireframe look */}
+      {/* ============ DENSE GRID LINES (CAD-Quality Wireframe) ============ */}
       {gridLines.map((points, i) => (
         <Line
           key={`grid-${i}`}
           points={points}
           color="#9ca3af"
-          lineWidth={0.8}
+          lineWidth={0.6}
           transparent
-          opacity={0.6}
+          opacity={0.7}
         />
       ))}
 
+      {/* ============ MAIN STRUCTURAL OUTLINE (Bold) ============ */}
+      {/* Bottom outline */}
+      <Line
+        points={[[-7.8, 0.35, -1.4], [7.8, 0.35, -1.4]]}
+        color="#64748b"
+        lineWidth={1.5}
+      />
+      <Line
+        points={[[-7.8, 0.35, 1.4], [7.8, 0.35, 1.4]]}
+        color="#64748b"
+        lineWidth={1.5}
+      />
+      
+      {/* Top/roof outline */}
+      <Line
+        points={[[-5.5, 3.55, -1.4], [6.8, 3.55, -1.4]]}
+        color="#64748b"
+        lineWidth={1.5}
+      />
+      <Line
+        points={[[-5.5, 3.55, 1.4], [6.8, 3.55, 1.4]]}
+        color="#64748b"
+        lineWidth={1.5}
+      />
+
+      {/* Vertical corner edges */}
+      <Line points={[[7.8, 0.35, -1.4], [7.8, 3.2, -1.4]]} color="#64748b" lineWidth={1.5} />
+      <Line points={[[7.8, 0.35, 1.4], [7.8, 3.2, 1.4]]} color="#64748b" lineWidth={1.5} />
+      
+      {/* Front curve outline */}
+      <Line
+        points={[
+          [-7.8, 0.35, -1.4],
+          [-7.8, 1.5, -1.4],
+          [-7.5, 2.2, -1.4],
+          [-7.0, 2.8, -1.4],
+          [-6.2, 3.3, -1.4],
+          [-5.5, 3.55, -1.4]
+        ]}
+        color="#64748b"
+        lineWidth={1.5}
+      />
+      <Line
+        points={[
+          [-7.8, 0.35, 1.4],
+          [-7.8, 1.5, 1.4],
+          [-7.5, 2.2, 1.4],
+          [-7.0, 2.8, 1.4],
+          [-6.2, 3.3, 1.4],
+          [-5.5, 3.55, 1.4]
+        ]}
+        color="#64748b"
+        lineWidth={1.5}
+      />
+
       {/* ============ SIDE MIRRORS ============ */}
       {/* Left Side Mirror */}
-      <group position={[-6.4, 2.3, -1.55]}>
-        {/* Mirror arm */}
-        <mesh position={[0, 0, -0.15]} rotation={[0, 0, Math.PI / 12]}>
-          <cylinderGeometry args={[0.03, 0.03, 0.4, 8]} />
+      <group position={[-6.8, 2.5, -1.7]}>
+        <mesh position={[0, 0, -0.2]} rotation={[0, 0, Math.PI / 10]}>
+          <cylinderGeometry args={[0.035, 0.035, 0.5, 8]} />
           <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
         </mesh>
-        {/* Mirror housing */}
-        <mesh position={[0.05, -0.05, -0.35]}>
-          <boxGeometry args={[0.18, 0.28, 0.1]} />
+        <mesh position={[0.08, -0.08, -0.45]}>
+          <boxGeometry args={[0.22, 0.35, 0.12]} />
           <meshStandardMaterial color="#1f2937" metalness={0.4} roughness={0.5} />
         </mesh>
-        {/* Mirror glass */}
-        <mesh position={[0.05, -0.05, -0.41]}>
-          <planeGeometry args={[0.14, 0.22]} />
+        <mesh position={[0.08, -0.08, -0.52]}>
+          <planeGeometry args={[0.18, 0.28]} />
           <meshStandardMaterial color="#64748b" metalness={0.9} roughness={0.1} />
         </mesh>
       </group>
 
       {/* Right Side Mirror */}
-      <group position={[-6.4, 2.3, 1.55]}>
-        {/* Mirror arm */}
-        <mesh position={[0, 0, 0.15]} rotation={[0, 0, Math.PI / 12]}>
-          <cylinderGeometry args={[0.03, 0.03, 0.4, 8]} />
+      <group position={[-6.8, 2.5, 1.7]}>
+        <mesh position={[0, 0, 0.2]} rotation={[0, 0, Math.PI / 10]}>
+          <cylinderGeometry args={[0.035, 0.035, 0.5, 8]} />
           <meshStandardMaterial color="#374151" metalness={0.6} roughness={0.4} />
         </mesh>
-        {/* Mirror housing */}
-        <mesh position={[0.05, -0.05, 0.35]}>
-          <boxGeometry args={[0.18, 0.28, 0.1]} />
+        <mesh position={[0.08, -0.08, 0.45]}>
+          <boxGeometry args={[0.22, 0.35, 0.12]} />
           <meshStandardMaterial color="#1f2937" metalness={0.4} roughness={0.5} />
         </mesh>
-        {/* Mirror glass */}
-        <mesh position={[0.05, -0.05, 0.41]}>
-          <planeGeometry args={[0.14, 0.22]} />
+        <mesh position={[0.08, -0.08, 0.52]}>
+          <planeGeometry args={[0.18, 0.28]} />
           <meshStandardMaterial color="#64748b" metalness={0.9} roughness={0.1} />
         </mesh>
       </group>
 
-      {/* ============ FRONT WINDSHIELD (Enhanced) ============ */}
-      {/* Main windshield - curved appearance */}
-      <mesh position={[-6.7, 2.1, 0]} rotation={[0, 0, -Math.PI / 7]}>
-        <planeGeometry args={[2.0, 2.4]} />
+      {/* ============ FRONT WINDSHIELD ============ */}
+      <mesh position={[-7.0, 2.3, 0]} rotation={[0, 0, -Math.PI / 5.5]}>
+        <planeGeometry args={[2.2, 2.6]} />
         <meshStandardMaterial 
-          color="#475569"
+          color="#334155"
           transparent
-          opacity={0.35}
+          opacity={0.3}
           side={THREE.DoubleSide}
           metalness={0.3}
           roughness={0.2}
         />
       </mesh>
 
-      {/* Windshield frame/border */}
+      {/* Windshield frame */}
       <Line
         points={[
-          [-7.1, 1.0, -1.1],
-          [-7.1, 1.0, 1.1],
-          [-6.2, 2.9, 1.1],
-          [-6.2, 2.9, -1.1],
-          [-7.1, 1.0, -1.1],
+          [-7.75, 1.0, -1.2],
+          [-7.75, 1.0, 1.2],
+          [-6.5, 3.2, 1.2],
+          [-6.5, 3.2, -1.2],
+          [-7.75, 1.0, -1.2],
         ]}
-        color="#374151"
-        lineWidth={2}
+        color="#1f2937"
+        lineWidth={2.5}
       />
 
-      {/* Sun visor strip above windshield */}
-      <mesh position={[-6.3, 2.95, 0]}>
-        <boxGeometry args={[0.3, 0.15, 2.2]} />
-        <meshStandardMaterial color="#1f2937" />
+      {/* Destination display above windshield */}
+      <mesh position={[-6.6, 3.35, 0]}>
+        <boxGeometry args={[0.4, 0.2, 2.0]} />
+        <meshStandardMaterial color="#1e293b" />
       </mesh>
 
       {/* ============ HEADLIGHTS ============ */}
-      {/* Left headlight */}
-      <group position={[-7.15, 1.0, -0.9]}>
-        <mesh>
-          <boxGeometry args={[0.1, 0.25, 0.4]} />
-          <meshStandardMaterial color="#1f2937" />
-        </mesh>
-        <mesh position={[-0.05, 0, 0]}>
-          <boxGeometry args={[0.02, 0.2, 0.35]} />
-          <meshStandardMaterial 
-            color="#fef9c3" 
-            emissive="#fef08a"
-            emissiveIntensity={0.3}
-          />
-        </mesh>
-      </group>
-
-      {/* Right headlight */}
-      <group position={[-7.15, 1.0, 0.9]}>
-        <mesh>
-          <boxGeometry args={[0.1, 0.25, 0.4]} />
-          <meshStandardMaterial color="#1f2937" />
-        </mesh>
-        <mesh position={[-0.05, 0, 0]}>
-          <boxGeometry args={[0.02, 0.2, 0.35]} />
-          <meshStandardMaterial 
-            color="#fef9c3" 
-            emissive="#fef08a"
-            emissiveIntensity={0.3}
-          />
-        </mesh>
-      </group>
+      {[-1.0, 1.0].map((z, i) => (
+        <group key={`headlight-${i}`} position={[-7.82, 1.1, z]}>
+          <mesh>
+            <boxGeometry args={[0.1, 0.35, 0.5]} />
+            <meshStandardMaterial color="#1f2937" />
+          </mesh>
+          <mesh position={[-0.05, 0, 0]}>
+            <boxGeometry args={[0.02, 0.28, 0.42]} />
+            <meshStandardMaterial 
+              color="#fef9c3" 
+              emissive="#fef08a"
+              emissiveIntensity={0.4}
+            />
+          </mesh>
+        </group>
+      ))}
 
       {/* ============ REAR LIGHTS ============ */}
-      {/* Left rear light */}
-      <mesh position={[7.15, 1.2, -0.9]}>
-        <boxGeometry args={[0.08, 0.35, 0.25]} />
-        <meshStandardMaterial 
-          color="#dc2626" 
-          emissive="#ef4444"
-          emissiveIntensity={0.2}
-        />
-      </mesh>
+      {[-1.0, 1.0].map((z, i) => (
+        <mesh key={`rearlight-${i}`} position={[7.82, 1.3, z]}>
+          <boxGeometry args={[0.08, 0.45, 0.35]} />
+          <meshStandardMaterial 
+            color="#dc2626" 
+            emissive="#ef4444"
+            emissiveIntensity={0.3}
+          />
+        </mesh>
+      ))}
 
-      {/* Right rear light */}
-      <mesh position={[7.15, 1.2, 0.9]}>
-        <boxGeometry args={[0.08, 0.35, 0.25]} />
-        <meshStandardMaterial 
-          color="#dc2626" 
-          emissive="#ef4444"
-          emissiveIntensity={0.2}
-        />
-      </mesh>
-
-      {/* ============ AIR INTAKE GRILLE (Front) ============ */}
-      <mesh position={[-7.18, 0.7, 0]}>
-        <boxGeometry args={[0.05, 0.5, 1.8]} />
+      {/* ============ FRONT GRILLE ============ */}
+      <mesh position={[-7.85, 0.7, 0]}>
+        <boxGeometry args={[0.05, 0.6, 2.0]} />
         <meshStandardMaterial color="#1f2937" />
       </mesh>
-      {/* Grille slats */}
-      {[-0.6, -0.3, 0, 0.3, 0.6].map((z, i) => (
-        <mesh key={`grille-${i}`} position={[-7.2, 0.7, z]}>
-          <boxGeometry args={[0.02, 0.4, 0.08]} />
+      {[-0.7, -0.35, 0, 0.35, 0.7].map((z, i) => (
+        <mesh key={`grille-${i}`} position={[-7.88, 0.7, z]}>
+          <boxGeometry args={[0.02, 0.5, 0.1]} />
           <meshStandardMaterial color="#374151" />
         </mesh>
       ))}
 
       {/* ============ ROOF AC UNIT ============ */}
-      <mesh position={[0, 3.4, 0]}>
-        <boxGeometry args={[3.5, 0.25, 1.8]} />
+      <mesh position={[0.5, 3.72, 0]}>
+        <boxGeometry args={[4.0, 0.3, 2.0]} />
         <meshStandardMaterial color="#d1d5db" metalness={0.3} roughness={0.6} />
       </mesh>
-      {/* AC unit vents */}
-      {[-1.2, 0, 1.2].map((x, i) => (
-        <mesh key={`ac-vent-${i}`} position={[x, 3.55, 0]}>
-          <boxGeometry args={[0.8, 0.08, 1.4]} />
+      {[-1.4, 0, 1.4].map((x, i) => (
+        <mesh key={`ac-vent-${i}`} position={[x + 0.5, 3.9, 0]}>
+          <boxGeometry args={[0.9, 0.1, 1.6]} />
           <meshStandardMaterial color="#9ca3af" />
         </mesh>
       ))}
 
-      {/* ============ PASSENGER DOOR (Right side) ============ */}
-      <group position={[-3.5, 1.4, 1.31]}>
-        {/* Door outline */}
+      {/* ============ PASSENGER DOOR ============ */}
+      <group position={[-3.8, 1.6, 1.41]}>
         <Line
           points={[
-            [-0.6, -1.05, 0],
-            [0.6, -1.05, 0],
-            [0.6, 1.3, 0],
-            [-0.6, 1.3, 0],
-            [-0.6, -1.05, 0],
+            [-0.7, -1.2, 0],
+            [0.7, -1.2, 0],
+            [0.7, 1.5, 0],
+            [-0.7, 1.5, 0],
+            [-0.7, -1.2, 0],
           ]}
           color="#64748b"
           lineWidth={2}
         />
-        {/* Door center line (folding door) */}
         <Line
-          points={[[0, -1.05, 0], [0, 1.3, 0]]}
+          points={[[0, -1.2, 0], [0, 1.5, 0]]}
           color="#64748b"
           lineWidth={1.5}
         />
       </group>
 
-      {/* ============ WINDOWS (Enhanced) ============ */}
-      {/* Windows - left side */}
+      {/* ============ SIDE WINDOWS ============ */}
       {windows.map((x, i) => (
-        <group key={`window-left-${i}`}>
-          <mesh position={[x, 2.35, -1.31]}>
-            <planeGeometry args={[1.0, 0.85]} />
+        <group key={`window-pair-${i}`}>
+          {/* Left window */}
+          <mesh position={[x, 2.5, -1.41]}>
+            <planeGeometry args={[1.1, 0.95]} />
             <meshStandardMaterial 
               color="#64748b"
               transparent
-              opacity={0.25}
-              side={THREE.DoubleSide}
-              metalness={0.4}
-              roughness={0.2}
-            />
-          </mesh>
-          {/* Window frame */}
-          <Line
-            points={[
-              [x - 0.5, 1.92, -1.32],
-              [x + 0.5, 1.92, -1.32],
-              [x + 0.5, 2.77, -1.32],
-              [x - 0.5, 2.77, -1.32],
-              [x - 0.5, 1.92, -1.32],
-            ]}
-            color="#475569"
-            lineWidth={1.5}
-          />
-        </group>
-      ))}
-
-      {/* Windows - right side */}
-      {windows.map((x, i) => (
-        <group key={`window-right-${i}`}>
-          <mesh position={[x, 2.35, 1.31]}>
-            <planeGeometry args={[1.0, 0.85]} />
-            <meshStandardMaterial 
-              color="#64748b"
-              transparent
-              opacity={0.25}
+              opacity={0.2}
               side={THREE.DoubleSide}
               metalness={0.4}
               roughness={0.2}
@@ -368,53 +397,74 @@ export const Bus3DModel = ({ tyres, onTyreClick }: Bus3DModelProps) => {
           </mesh>
           <Line
             points={[
-              [x - 0.5, 1.92, 1.32],
-              [x + 0.5, 1.92, 1.32],
-              [x + 0.5, 2.77, 1.32],
-              [x - 0.5, 2.77, 1.32],
-              [x - 0.5, 1.92, 1.32],
+              [x - 0.55, 2.02, -1.42],
+              [x + 0.55, 2.02, -1.42],
+              [x + 0.55, 2.97, -1.42],
+              [x - 0.55, 2.97, -1.42],
+              [x - 0.55, 2.02, -1.42],
             ]}
             color="#475569"
-            lineWidth={1.5}
+            lineWidth={1.2}
+          />
+          
+          {/* Right window */}
+          <mesh position={[x, 2.5, 1.41]}>
+            <planeGeometry args={[1.1, 0.95]} />
+            <meshStandardMaterial 
+              color="#64748b"
+              transparent
+              opacity={0.2}
+              side={THREE.DoubleSide}
+              metalness={0.4}
+              roughness={0.2}
+            />
+          </mesh>
+          <Line
+            points={[
+              [x - 0.55, 2.02, 1.42],
+              [x + 0.55, 2.02, 1.42],
+              [x + 0.55, 2.97, 1.42],
+              [x - 0.55, 2.97, 1.42],
+              [x - 0.55, 2.02, 1.42],
+            ]}
+            color="#475569"
+            lineWidth={1.2}
           />
         </group>
       ))}
 
-      {/* ============ WHEEL ARCHES (Enhanced) ============ */}
-      {/* Front wheel arches */}
-      <mesh position={[-5.2, 0.7, -1.32]}>
-        <boxGeometry args={[1.6, 1.1, 0.08]} />
-        <meshStandardMaterial color="#374151" transparent opacity={0.6} />
+      {/* ============ WHEEL ARCHES (Darker areas) ============ */}
+      {/* Front arches */}
+      <mesh position={[-5.5, 0.8, -1.42]}>
+        <boxGeometry args={[2.0, 1.4, 0.08]} />
+        <meshStandardMaterial color="#374151" transparent opacity={0.5} />
       </mesh>
-      <mesh position={[-5.2, 0.7, 1.32]}>
-        <boxGeometry args={[1.6, 1.1, 0.08]} />
-        <meshStandardMaterial color="#374151" transparent opacity={0.6} />
+      <mesh position={[-5.5, 0.8, 1.42]}>
+        <boxGeometry args={[2.0, 1.4, 0.08]} />
+        <meshStandardMaterial color="#374151" transparent opacity={0.5} />
       </mesh>
 
-      {/* Rear wheel arches (double) */}
-      <mesh position={[4.85, 0.7, -1.32]}>
-        <boxGeometry args={[3.0, 1.1, 0.08]} />
-        <meshStandardMaterial color="#374151" transparent opacity={0.6} />
+      {/* Rear arches (larger for dual wheels) */}
+      <mesh position={[5.25, 0.8, -1.42]}>
+        <boxGeometry args={[3.8, 1.4, 0.08]} />
+        <meshStandardMaterial color="#374151" transparent opacity={0.5} />
       </mesh>
-      <mesh position={[4.85, 0.7, 1.32]}>
-        <boxGeometry args={[3.0, 1.1, 0.08]} />
-        <meshStandardMaterial color="#374151" transparent opacity={0.6} />
+      <mesh position={[5.25, 0.8, 1.42]}>
+        <boxGeometry args={[3.8, 1.4, 0.08]} />
+        <meshStandardMaterial color="#374151" transparent opacity={0.5} />
       </mesh>
 
       {/* ============ BUMPERS ============ */}
-      {/* Front bumper */}
-      <mesh position={[-7.25, 0.4, 0]}>
-        <boxGeometry args={[0.15, 0.25, 2.4]} />
+      <mesh position={[-7.9, 0.45, 0]}>
+        <boxGeometry args={[0.2, 0.3, 2.6]} />
+        <meshStandardMaterial color="#1f2937" />
+      </mesh>
+      <mesh position={[7.9, 0.45, 0]}>
+        <boxGeometry args={[0.2, 0.3, 2.6]} />
         <meshStandardMaterial color="#1f2937" />
       </mesh>
 
-      {/* Rear bumper */}
-      <mesh position={[7.25, 0.4, 0]}>
-        <boxGeometry args={[0.15, 0.25, 2.4]} />
-        <meshStandardMaterial color="#1f2937" />
-      </mesh>
-
-      {/* ============ TYRES ============ */}
+      {/* ============ TYRES (Large, Realistic) ============ */}
       {Object.entries(tyrePositions).map(([posLabel, { position }]) => {
         const tyre = getTyreByPosition(posLabel);
         return (
@@ -431,14 +481,12 @@ export const Bus3DModel = ({ tyres, onTyreClick }: Bus3DModelProps) => {
       })}
 
       {/* ============ GROUND ============ */}
-      {/* Ground plane */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <planeGeometry args={[22, 14]} />
-        <meshStandardMaterial color="#f1f5f9" transparent opacity={0.9} />
+        <planeGeometry args={[26, 16]} />
+        <meshStandardMaterial color="#f8fafc" transparent opacity={0.95} />
       </mesh>
       
-      {/* Ground grid */}
-      <gridHelper args={[22, 44, "#cbd5e1", "#e2e8f0"]} position={[0, 0.02, 0]} />
+      <gridHelper args={[26, 52, "#e2e8f0", "#f1f5f9"]} position={[0, 0.02, 0]} />
     </group>
   );
 };

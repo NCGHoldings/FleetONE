@@ -26,11 +26,11 @@ export const Bus3DViewer = ({ buses, tyresByBus }: Bus3DViewerProps) => {
   };
 
   return (
-    <div className="relative w-full h-[700px] rounded-xl overflow-hidden bg-gradient-to-br from-slate-100 via-slate-50 to-blue-50 border border-slate-200 shadow-lg">
+    <div className="relative w-full h-[750px] rounded-xl overflow-hidden bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50 border border-slate-200 shadow-xl">
       {/* Bus Selector */}
       <div className="absolute top-4 left-4 z-10">
         <Select value={selectedBusId} onValueChange={setSelectedBusId}>
-          <SelectTrigger className="w-[200px] bg-white/95 backdrop-blur-sm shadow-md border-slate-200">
+          <SelectTrigger className="w-[220px] bg-white/95 backdrop-blur-sm shadow-md border-slate-200">
             <SelectValue placeholder="Select Bus" />
           </SelectTrigger>
           <SelectContent>
@@ -53,7 +53,7 @@ export const Bus3DViewer = ({ buses, tyresByBus }: Bus3DViewerProps) => {
       )}
 
       {/* Controls hint */}
-      <div className="absolute bottom-4 left-4 z-10 text-xs text-slate-500 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm">
+      <div className="absolute bottom-4 left-4 z-10 text-xs text-slate-500 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm border border-slate-200">
         🖱️ Drag to rotate • Scroll to zoom • Click tyre for details
       </div>
 
@@ -63,63 +63,70 @@ export const Bus3DViewer = ({ buses, tyresByBus }: Bus3DViewerProps) => {
         gl={{ 
           antialias: true, 
           alpha: true,
-          powerPreference: "high-performance"
+          powerPreference: "high-performance",
+          pixelRatio: Math.min(window.devicePixelRatio, 2)
         }}
         style={{ background: 'transparent' }}
       >
         <Suspense fallback={null}>
-          <PerspectiveCamera makeDefault position={[-4, 6, 12]} fov={50} />
+          {/* Camera positioned for optimal 3/4 front-right view like reference */}
+          <PerspectiveCamera 
+            makeDefault 
+            position={[-14, 8, 14]} 
+            fov={42} 
+          />
           
-          {/* ============ ENHANCED LIGHTING ============ */}
+          {/* ============ ENHANCED STUDIO LIGHTING ============ */}
           
-          {/* Soft ambient light for overall illumination */}
-          <ambientLight intensity={0.5} color="#f8fafc" />
+          {/* Soft ambient for base illumination */}
+          <ambientLight intensity={0.55} color="#f8fafc" />
           
-          {/* Main key light (sun-like) */}
+          {/* Main key light (top-front-right) */}
           <directionalLight 
-            position={[12, 18, 10]} 
-            intensity={1.2}
+            position={[15, 20, 12]} 
+            intensity={1.4}
             castShadow
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
+            color="#ffffff"
           />
           
-          {/* Fill light (softer, opposite side) */}
+          {/* Fill light (opposite side, softer) */}
           <directionalLight 
-            position={[-12, 10, -8]} 
-            intensity={0.5}
+            position={[-15, 12, -10]} 
+            intensity={0.55}
             color="#e0f2fe"
           />
           
-          {/* Rim light (back lighting for depth) */}
+          {/* Rim/back light for depth separation */}
           <directionalLight 
-            position={[0, 8, -15]} 
-            intensity={0.4}
+            position={[0, 10, -18]} 
+            intensity={0.45}
             color="#dbeafe"
+          />
+          
+          {/* Front accent light for details */}
+          <pointLight 
+            position={[-12, 5, 0]} 
+            intensity={0.4}
+            color="#f0f9ff"
           />
           
           {/* Top spotlight for dramatic effect */}
           <spotLight
-            position={[0, 15, 0]}
-            angle={0.5}
-            penumbra={0.8}
-            intensity={0.6}
+            position={[0, 18, 0]}
+            angle={0.6}
+            penumbra={0.9}
+            intensity={0.7}
             castShadow
             color="#ffffff"
-          />
-          
-          {/* Front accent light */}
-          <pointLight 
-            position={[-10, 4, 0]} 
-            intensity={0.3}
-            color="#f0f9ff"
           />
           
           {/* Hemisphere light for natural outdoor feel */}
           <hemisphereLight
             color="#f0f9ff"
             groundColor="#e2e8f0"
-            intensity={0.4}
+            intensity={0.45}
           />
 
           {/* Bus Model */}
@@ -128,18 +135,18 @@ export const Bus3DViewer = ({ buses, tyresByBus }: Bus3DViewerProps) => {
             onTyreClick={handleTyreClick}
           />
 
-          {/* Controls */}
+          {/* Controls - optimized for 3/4 view */}
           <OrbitControls 
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
-            minDistance={8}
-            maxDistance={28}
-            minPolarAngle={0.15}
-            maxPolarAngle={Math.PI / 2.1}
-            target={[0, 1.5, 0]}
+            minDistance={10}
+            maxDistance={35}
+            minPolarAngle={0.2}
+            maxPolarAngle={Math.PI / 2.05}
+            target={[0, 1.8, 0]}
             enableDamping={true}
-            dampingFactor={0.05}
+            dampingFactor={0.06}
           />
         </Suspense>
       </Canvas>
