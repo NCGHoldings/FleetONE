@@ -12,7 +12,7 @@ interface SignatureWorkflowIndicatorProps {
   documents: any[];
   hasPayments: boolean;
   documentsLoading?: boolean;
-  onPreviewDocument?: (document: any) => void;
+  onPreviewDocument?: (document: any | null) => void;
 }
 
 interface SignerSetting {
@@ -125,45 +125,78 @@ export function SignatureWorkflowIndicator({
     );
   };
 
-  // Loading state
+  // Always-visible preview button component
+  const PreviewButton = ({ doc }: { doc?: any }) => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 w-5 p-0 hover:bg-primary/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPreviewDocument?.(doc || null);
+            }}
+          >
+            <Eye className="w-3 h-3 text-primary" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <p className="text-xs">{doc ? 'Quick Preview' : 'View Documents'}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+
+  // Loading state - still show preview button
   if (documentsLoading) {
     return (
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        <span className="text-xs">Loading...</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span className="text-xs">Loading...</span>
+        </div>
+        <PreviewButton />
       </div>
     );
   }
 
-  // No payments yet - use prop from parent
+  // No payments yet - show preview button anyway
   if (!hasPayments) {
     return (
-      <div className="flex flex-col gap-1">
-        <Badge variant="outline" className="bg-muted/50 text-muted-foreground text-xs px-2 py-1 w-fit">
-          <CreditCard className="w-3 h-3 mr-1" />
-          Awaiting Payment
-        </Badge>
-        <span className="text-[10px] text-muted-foreground">Confirm payment first</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col gap-1">
+          <Badge variant="outline" className="bg-muted/50 text-muted-foreground text-xs px-2 py-1 w-fit">
+            <CreditCard className="w-3 h-3 mr-1" />
+            Awaiting Payment
+          </Badge>
+          <span className="text-[10px] text-muted-foreground">Confirm payment first</span>
+        </div>
+        <PreviewButton />
       </div>
     );
   }
 
-  // Has payments but no documents yet
+  // Has payments but no documents yet - show preview button
   if (!documents || documents.length === 0) {
     return (
-      <div className="flex flex-col gap-1">
-        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs px-2 py-1 w-fit">
-          <FileText className="w-3 h-3 mr-1" />
-          Generating...
-        </Badge>
-        <span className="text-[10px] text-muted-foreground">Document pending</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col gap-1">
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 text-xs px-2 py-1 w-fit">
+            <FileText className="w-3 h-3 mr-1" />
+            No Documents
+          </Badge>
+          <span className="text-[10px] text-muted-foreground">Generate documents</span>
+        </div>
+        <PreviewButton />
       </div>
     );
   }
 
-  // Show per-document status
+  // Show per-document status with always-visible preview
   return (
-    <div className="flex flex-col gap-2 max-w-[180px]">
+    <div className="flex flex-col gap-2 max-w-[200px]">
       {documents.slice(0, 2).map((doc) => {
         const sig = getSignatureStatus(doc);
         const allComplete = sig.count === 3;
@@ -172,7 +205,7 @@ export function SignatureWorkflowIndicator({
         
         return (
           <div key={doc.id} className="flex flex-col gap-1 p-1.5 rounded bg-muted/40 border border-border/40">
-            {/* Document type + preview button */}
+            {/* Document type + preview button - ALWAYS VISIBLE */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
                 {allComplete ? (
@@ -187,25 +220,8 @@ export function SignatureWorkflowIndicator({
                 </span>
               </div>
               
-              {onPreviewDocument && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-5 w-5 p-0 hover:bg-primary/10"
-                        onClick={() => onPreviewDocument(doc)}
-                      >
-                        <Eye className="w-3 h-3 text-primary" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p className="text-xs">Quick Preview</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
+              {/* Preview button - ALWAYS visible */}
+              <PreviewButton doc={doc} />
             </div>
 
             {/* Signature progress */}
@@ -253,9 +269,12 @@ export function SignatureWorkflowIndicator({
       })}
       
       {documents.length > 2 && (
-        <span className="text-[10px] text-muted-foreground">
-          +{documents.length - 2} more document(s)
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">
+            +{documents.length - 2} more document(s)
+          </span>
+          <PreviewButton />
+        </div>
       )}
     </div>
   );
