@@ -3,14 +3,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
-  CheckCircle, Mail, Clock, FileText, FileCheck, UserCheck, CreditCard, 
-  Eye, Send, Lock, AlertCircle 
+  CheckCircle, Mail, Clock, FileText, Eye, Send, Lock, AlertCircle, CreditCard, Loader2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SignatureWorkflowIndicatorProps {
   quotationId: string;
   documents: any[];
+  hasPayments: boolean;
+  documentsLoading?: boolean;
   onPreviewDocument?: (document: any) => void;
 }
 
@@ -20,32 +21,30 @@ interface SignerSetting {
   isEnabled: boolean;
 }
 
-export function SignatureWorkflowIndicator({ quotationId, documents, onPreviewDocument }: SignatureWorkflowIndicatorProps) {
+export function SignatureWorkflowIndicator({ 
+  quotationId, 
+  documents, 
+  hasPayments,
+  documentsLoading = false,
+  onPreviewDocument 
+}: SignatureWorkflowIndicatorProps) {
   const [signerSettings, setSignerSettings] = useState<Record<string, SignerSetting>>({});
-  const [hasPayments, setHasPayments] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [settingsLoading, setSettingsLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
-  }, [quotationId]);
+    loadSignerSettings();
+  }, []);
 
-  const loadData = async () => {
+  const loadSignerSettings = async () => {
     try {
-      // Load signature settings with signer names
       const { data: settings } = await supabase
         .from('special_hire_signature_settings')
-        .select(`
-          signature_role,
-          default_user_id,
-          is_enabled
-        `);
+        .select('signature_role, default_user_id, is_enabled');
 
       const signerMap: Record<string, SignerSetting> = {};
       
       if (settings) {
-        const userIds = settings
-          .filter(s => s.default_user_id)
-          .map(s => s.default_user_id);
+        const userIds = settings.filter(s => s.default_user_id).map(s => s.default_user_id);
         
         let profilesMap: Record<string, string> = {};
         if (userIds.length > 0) {
@@ -57,9 +56,7 @@ export function SignatureWorkflowIndicator({ quotationId, documents, onPreviewDo
           if (profiles) {
             profiles.forEach(p => {
               const fullName = [p.first_name, p.last_name].filter(Boolean).join(' ');
-              if (fullName) {
-                profilesMap[p.id] = fullName;
-              }
+              if (fullName) profilesMap[p.id] = fullName;
             });
           }
         }
@@ -75,26 +72,19 @@ export function SignatureWorkflowIndicator({ quotationId, documents, onPreviewDo
       }
       
       setSignerSettings(signerMap);
-
-      const { count } = await supabase
-        .from('special_hire_payments')
-        .select('id', { count: 'exact', head: true })
-        .eq('quotation_id', quotationId);
-      
-      setHasPayments((count || 0) > 0);
     } catch (error) {
-      console.error('Error loading workflow data:', error);
+      console.error('Error loading signer settings:', error);
     } finally {
-      setLoading(false);
+      setSettingsLoading(false);
     }
   };
 
   const getRoleFallbackLabel = (role: string): string => {
     switch (role) {
-      case 'prepared_by': return 'Assign Preparer';
-      case 'checked_by': return 'Assign Checker';
-      case 'approved_by': return 'Assign Approver';
-      default: return 'Not Configured';
+      case 'prepared_by': return 'Preparer';
+      case 'checked_by': return 'Checker';
+      case 'approved_by': return 'Finance';
+      default: return 'Not Set';
     }
   };
 
@@ -135,15 +125,17 @@ export function SignatureWorkflowIndicator({ quotationId, documents, onPreviewDo
     );
   };
 
-  if (loading) {
+  // Loading state
+  if (documentsLoading) {
     return (
-      <div className="flex items-center gap-1">
-        <div className="w-24 h-6 bg-muted animate-pulse rounded" />
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        <span className="text-xs">Loading...</span>
       </div>
     );
   }
 
-  // No payments yet
+  // No payments yet - use prop from parent
   if (!hasPayments) {
     return (
       <div className="flex flex-col gap-1">
@@ -156,15 +148,15 @@ export function SignatureWorkflowIndicator({ quotationId, documents, onPreviewDo
     );
   }
 
-  // No documents
+  // Has payments but no documents yet
   if (!documents || documents.length === 0) {
     return (
       <div className="flex flex-col gap-1">
         <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs px-2 py-1 w-fit">
           <FileText className="w-3 h-3 mr-1" />
-          No Document
+          Generating...
         </Badge>
-        <span className="text-[10px] text-muted-foreground">Awaiting generation</span>
+        <span className="text-[10px] text-muted-foreground">Document pending</span>
       </div>
     );
   }
@@ -237,10 +229,19 @@ export function SignatureWorkflowIndicator({ quotationId, documents, onPreviewDo
                 </div>
               )
             ) : isAwaitingFinance ? (
-              <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
-                <Lock className="w-3 h-3" />
-                <span>Awaiting Finance</span>
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium cursor-help">
+                      <Lock className="w-3 h-3" />
+                      <span>Awaiting Finance</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+                    <p>Final signature from Finance department required before document can be sent</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             ) : (
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 <AlertCircle className="w-3 h-3" />
