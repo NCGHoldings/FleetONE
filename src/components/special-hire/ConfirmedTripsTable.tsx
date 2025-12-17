@@ -491,13 +491,24 @@ export function ConfirmedTripsTable() {
     }));
   };
 
-  // Load document statuses - only for quotations not yet loaded
+  // Load document statuses for all confirmed quotations
   useEffect(() => {
-    quotations.forEach(quotation => {
-      if (quotation.status === 'confirmed' && !documentsData[quotation.id]) {
-        loadDocumentStatus(quotation.id);
-      }
-    });
+    const loadAllDocuments = async () => {
+      const confirmedQuotations = quotations.filter(q => q.status === 'confirmed');
+      if (confirmedQuotations.length === 0) return;
+      
+      setDocumentsLoading(true);
+      
+      // Load documents for all quotations that don't have data yet
+      const loadPromises = confirmedQuotations
+        .filter(q => !documentsData[q.id])
+        .map(q => loadDocumentStatus(q.id));
+      
+      await Promise.all(loadPromises);
+      setDocumentsLoading(false);
+    };
+    
+    loadAllDocuments();
   }, [quotations]);
 
   // Subscribe to realtime changes for documents and signatures
@@ -1054,6 +1065,8 @@ export function ConfirmedTripsTable() {
                           <SignatureWorkflowIndicator 
                             quotationId={trip.id}
                             documents={documentsData[trip.id] || []}
+                            hasPayments={(trip.payments?.length || 0) > 0}
+                            documentsLoading={!documentsData[trip.id] && documentsLoading}
                             onPreviewDocument={(doc) => {
                               setCurrentDocument(doc);
                               setSelectedTrip(trip);
