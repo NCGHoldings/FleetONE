@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Mail, Clock, FileText, FileCheck, UserCheck, CreditCard } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { 
+  CheckCircle, Mail, Clock, FileText, FileCheck, UserCheck, CreditCard, 
+  Eye, Send, Lock, AlertCircle 
+} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SignatureWorkflowIndicatorProps {
   quotationId: string;
   documents: any[];
+  onPreviewDocument?: (document: any) => void;
 }
 
 interface SignerSetting {
@@ -14,7 +20,7 @@ interface SignerSetting {
   isEnabled: boolean;
 }
 
-export function SignatureWorkflowIndicator({ quotationId, documents }: SignatureWorkflowIndicatorProps) {
+export function SignatureWorkflowIndicator({ quotationId, documents, onPreviewDocument }: SignatureWorkflowIndicatorProps) {
   const [signerSettings, setSignerSettings] = useState<Record<string, SignerSetting>>({});
   const [hasPayments, setHasPayments] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,12 +43,10 @@ export function SignatureWorkflowIndicator({ quotationId, documents }: Signature
       const signerMap: Record<string, SignerSetting> = {};
       
       if (settings) {
-        // Get all unique user IDs that are not null
         const userIds = settings
           .filter(s => s.default_user_id)
           .map(s => s.default_user_id);
         
-        // Fetch profiles in one query
         let profilesMap: Record<string, string> = {};
         if (userIds.length > 0) {
           const { data: profiles } = await supabase
@@ -60,7 +64,6 @@ export function SignatureWorkflowIndicator({ quotationId, documents }: Signature
           }
         }
         
-        // Build signer settings map
         settings.forEach(setting => {
           const name = setting.default_user_id ? profilesMap[setting.default_user_id] : undefined;
           signerMap[setting.signature_role] = {
@@ -73,7 +76,6 @@ export function SignatureWorkflowIndicator({ quotationId, documents }: Signature
       
       setSignerSettings(signerMap);
 
-      // Check if quotation has any payments
       const { count } = await supabase
         .from('special_hire_payments')
         .select('id', { count: 'exact', head: true })
@@ -96,137 +98,164 @@ export function SignatureWorkflowIndicator({ quotationId, documents }: Signature
     }
   };
 
-  // Get all approvals from all documents
-  const allApprovals = documents?.flatMap(doc => doc.document_approvals || []) || [];
-  
-  const hasPreparedBy = allApprovals.some(a => a.approval_type === 'prepared_by');
-  const hasCheckedBy = allApprovals.some(a => a.approval_type === 'checked_by');
-  const hasApprovedBy = allApprovals.some(a => a.approval_type === 'approved_by');
-  
-  // Check email status
-  const hasEmailSent = documents?.some(d => d.email_status === 'sent');
-  const hasDocuments = documents && documents.length > 0;
-  
-  // Determine workflow stage
-  const allComplete = hasPreparedBy && hasCheckedBy && hasApprovedBy;
-  
-  const getWorkflowInfo = (): { stage: string; signer: string; color: string; icon: React.ReactNode; description: string } => {
-    // No payments yet - waiting for payment confirmation
-    if (!hasPayments) {
-      return {
-        stage: 'Awaiting Payment',
-        signer: '',
-        color: 'bg-gray-100 text-gray-700 border-gray-300',
-        icon: <CreditCard className="w-3.5 h-3.5" />,
-        description: 'Confirm payment to generate document'
-      };
-    }
-    
-    // Has payments but no document generated yet
-    if (!hasDocuments) {
-      return {
-        stage: 'Generate Document',
-        signer: '',
-        color: 'bg-amber-100 text-amber-800 border-amber-300',
-        icon: <FileText className="w-3.5 h-3.5" />,
-        description: 'Document pending generation'
-      };
-    }
-    
-    // Document exists, check signature progress
-    if (!hasPreparedBy) {
-      const setting = signerSettings['prepared_by'];
-      return {
-        stage: 'Prepared By',
-        signer: setting?.name || 'Not Configured',
-        color: 'bg-blue-100 text-blue-800 border-blue-300',
-        icon: <FileText className="w-3.5 h-3.5" />,
-        description: 'Awaiting preparation signature'
-      };
-    }
-    
-    if (!hasCheckedBy) {
-      const setting = signerSettings['checked_by'];
-      return {
-        stage: 'Checked By',
-        signer: setting?.name || 'Not Configured',
-        color: 'bg-purple-100 text-purple-800 border-purple-300',
-        icon: <FileCheck className="w-3.5 h-3.5" />,
-        description: 'Awaiting verification signature'
-      };
-    }
-    
-    if (!hasApprovedBy) {
-      const setting = signerSettings['approved_by'];
-      return {
-        stage: 'Approved By',
-        signer: setting?.name || 'Not Configured',
-        color: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-        icon: <UserCheck className="w-3.5 h-3.5" />,
-        description: 'Awaiting final approval'
-      };
-    }
-    
-    // All signatures complete
-    return {
-      stage: 'Complete',
-      signer: '',
-      color: 'bg-green-100 text-green-800 border-green-300',
-      icon: <CheckCircle className="w-3.5 h-3.5" />,
-      description: hasEmailSent ? 'Document sent to customer' : 'Ready to send'
-    };
+  const getDocumentTypeLabel = (doc: any) => {
+    if (doc.payment_type === 'advance') return 'Sales Receipt';
+    if (doc.payment_type === 'balance' || doc.payment_type === 'full') return 'Invoice';
+    return doc.document_type === 'sales_receipt' ? 'Sales Receipt' : 'Invoice';
   };
 
-  const workflow = getWorkflowInfo();
-  
+  const getSignatureStatus = (doc: any) => {
+    const approvals = doc.document_approvals || [];
+    const hasPrepared = approvals.some((a: any) => a.approval_type === 'prepared_by');
+    const hasChecked = approvals.some((a: any) => a.approval_type === 'checked_by');
+    const hasApproved = approvals.some((a: any) => a.approval_type === 'approved_by');
+    return { hasPrepared, hasChecked, hasApproved, count: [hasPrepared, hasChecked, hasApproved].filter(Boolean).length };
+  };
+
+  // Signature badge component
+  const SignatureBadge = ({ done, label }: { done: boolean; label: string }) => {
+    const tooltipText = label === 'P' ? 'Prepared By' : label === 'C' ? 'Checked By' : 'Approved By (Finance)';
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold transition-all ${
+              done 
+                ? 'bg-green-500 text-white shadow-sm' 
+                : 'bg-muted text-muted-foreground border border-border'
+            }`}>
+              {done ? '✓' : label}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            <p>{tooltipText}{done ? ' ✓' : ' (pending)'}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center gap-1">
-        <div className="w-20 h-5 bg-muted animate-pulse rounded" />
+        <div className="w-24 h-6 bg-muted animate-pulse rounded" />
       </div>
     );
   }
 
+  // No payments yet
+  if (!hasPayments) {
+    return (
+      <div className="flex flex-col gap-1">
+        <Badge variant="outline" className="bg-muted/50 text-muted-foreground text-xs px-2 py-1 w-fit">
+          <CreditCard className="w-3 h-3 mr-1" />
+          Awaiting Payment
+        </Badge>
+        <span className="text-[10px] text-muted-foreground">Confirm payment first</span>
+      </div>
+    );
+  }
+
+  // No documents
+  if (!documents || documents.length === 0) {
+    return (
+      <div className="flex flex-col gap-1">
+        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs px-2 py-1 w-fit">
+          <FileText className="w-3 h-3 mr-1" />
+          No Document
+        </Badge>
+        <span className="text-[10px] text-muted-foreground">Awaiting generation</span>
+      </div>
+    );
+  }
+
+  // Show per-document status
   return (
-    <div className="flex flex-col gap-1.5">
-      {/* Main workflow indicator */}
-      <Badge 
-        variant="outline" 
-        className={`${workflow.color} text-xs font-medium px-2 py-1 flex items-center gap-1.5 border`}
-      >
-        {workflow.icon}
-        <span>
-          {allComplete ? 'Complete' : workflow.stage}
-        </span>
-      </Badge>
+    <div className="flex flex-col gap-2 max-w-[180px]">
+      {documents.slice(0, 2).map((doc) => {
+        const sig = getSignatureStatus(doc);
+        const allComplete = sig.count === 3;
+        const isAwaitingFinance = sig.hasPrepared && sig.hasChecked && !sig.hasApproved;
+        const emailSent = doc.email_status === 'sent';
+        
+        return (
+          <div key={doc.id} className="flex flex-col gap-1 p-1.5 rounded bg-muted/40 border border-border/40">
+            {/* Document type + preview button */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                {allComplete ? (
+                  <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0" />
+                ) : isAwaitingFinance ? (
+                  <Lock className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                ) : (
+                  <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                )}
+                <span className="text-[10px] font-medium truncate">
+                  {getDocumentTypeLabel(doc)}
+                </span>
+              </div>
+              
+              {onPreviewDocument && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0 hover:bg-primary/10"
+                        onClick={() => onPreviewDocument(doc)}
+                      >
+                        <Eye className="w-3 h-3 text-primary" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs">Quick Preview</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+
+            {/* Signature progress */}
+            <div className="flex items-center gap-0.5">
+              <SignatureBadge done={sig.hasPrepared} label="P" />
+              <SignatureBadge done={sig.hasChecked} label="C" />
+              <SignatureBadge done={sig.hasApproved} label="A" />
+            </div>
+
+            {/* Status indicator */}
+            {allComplete ? (
+              emailSent ? (
+                <div className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
+                  <Mail className="w-3 h-3" />
+                  <span>Sent to Customer</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                  <Send className="w-3 h-3" />
+                  <span>Ready to Send</span>
+                </div>
+              )
+            ) : isAwaitingFinance ? (
+              <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                <Lock className="w-3 h-3" />
+                <span>Awaiting Finance</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <AlertCircle className="w-3 h-3" />
+                <span>{sig.count}/3 Signatures</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
       
-      {/* Secondary info: signer name or email status */}
-      {allComplete ? (
-        <div className="flex items-center gap-1 text-xs">
-          {hasEmailSent ? (
-            <span className="text-green-600 flex items-center gap-1">
-              <Mail className="w-3 h-3" />
-              Sent
-            </span>
-          ) : (
-            <span className="text-amber-600 flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              Not Sent
-            </span>
-          )}
-        </div>
-      ) : workflow.signer ? (
-        <span 
-          className="text-xs text-muted-foreground truncate max-w-[120px]" 
-          title={workflow.signer}
-        >
-          {workflow.signer}
+      {documents.length > 2 && (
+        <span className="text-[10px] text-muted-foreground">
+          +{documents.length - 2} more document(s)
         </span>
-      ) : workflow.stage !== 'Awaiting Payment' && workflow.description ? (
-        <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-          {workflow.description}
-        </span>
-      ) : null}
+      )}
     </div>
   );
 }
