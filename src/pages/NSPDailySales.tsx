@@ -16,7 +16,8 @@ export interface OtherIncomeItem {
 
 export interface TyreEntry {
   type: string;
-  quantity?: string;
+  quantity: number;
+  unitPrice: number;
   amount: number;
 }
 
@@ -136,8 +137,10 @@ const NSPDailySales = () => {
     message += `Tyre sale        = ${formatCurrency(tyreSaleTotal)}\n`;
     if (data.tyre_entries.length > 0) {
       data.tyre_entries.forEach(tyre => {
-        const qtyInfo = tyre.quantity ? ` (${tyre.quantity})` : '';
-        message += `  ${tyre.type}${qtyInfo}: ${formatCurrency(tyre.amount)}\n`;
+        // Handle both old (string) and new (number) quantity formats
+        const qty = typeof tyre.quantity === 'number' ? tyre.quantity : parseInt(String(tyre.quantity)) || 1;
+        const unitPriceInfo = tyre.unitPrice ? ` @ Rs.${tyre.unitPrice.toLocaleString()}` : '';
+        message += `  ${tyre.type} (${qty} pcs${unitPriceInfo}): ${formatCurrency(tyre.amount)}\n`;
       });
       message += `\n`;
     } else {

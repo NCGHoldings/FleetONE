@@ -229,31 +229,35 @@ export function DailySalesForm({ onSave, isSaving, initialDate }: DailySalesForm
 
             {tyreEntries.length > 0 ? (
               <div className="space-y-2">
-                {tyreEntries.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-lg border"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium">{item.type}</p>
-                      {item.quantity && (
-                        <p className="text-xs text-muted-foreground">
-                          Qty: {item.quantity}
-                        </p>
-                      )}
-                      <p className="text-sm text-green-600 font-semibold">
-                        Rs. {item.amount.toLocaleString()}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveTyre(index)}
+                {tyreEntries.map((item, index) => {
+                  // Handle both old (string) and new (number) quantity formats
+                  const qty = typeof item.quantity === 'number' ? item.quantity : parseInt(String(item.quantity)) || 1;
+                  const hasUnitPrice = typeof item.unitPrice === 'number' && item.unitPrice > 0;
+                  
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-lg border"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex-1">
+                        <p className="font-medium">{item.type}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {qty} pcs {hasUnitPrice && `× Rs. ${item.unitPrice.toLocaleString()}`}
+                        </p>
+                        <p className="text-sm text-green-600 font-semibold">
+                          Total: Rs. {item.amount.toLocaleString()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveTyre(index)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  );
+                })}
                 <div className="flex items-center justify-between p-3 bg-green-100 dark:bg-green-900/30 rounded-lg border-2 border-green-500/50 mt-3">
                   <span className="font-semibold">Total Tyre Sale:</span>
                   <span className="text-lg font-bold text-green-600">
