@@ -106,19 +106,26 @@ export const NSPTyreInventory = ({ buses }: NSPTyreInventoryProps) => {
               </div>
 
               <div className="space-y-2 mb-3">
-                {tyreEntries.map((entry: any, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{entry.type}</span>
-                      {entry.quantity && (
-                        <Badge variant="outline">Qty: {entry.quantity}</Badge>
-                      )}
+                {tyreEntries.map((entry: any, idx: number) => {
+                  // Handle both old (string) and new (number) quantity formats
+                  const qty = typeof entry.quantity === 'number' ? entry.quantity : parseInt(String(entry.quantity)) || 1;
+                  const hasUnitPrice = typeof entry.unitPrice === 'number' && entry.unitPrice > 0;
+                  
+                  return (
+                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{entry.type}</span>
+                        <Badge variant="outline">{qty} pcs</Badge>
+                        {hasUnitPrice && (
+                          <Badge variant="secondary">@ Rs. {entry.unitPrice.toLocaleString()}/ea</Badge>
+                        )}
+                      </div>
+                      <span className="font-semibold text-primary">
+                        LKR {entry.amount.toLocaleString()}
+                      </span>
                     </div>
-                    <span className="font-semibold text-primary">
-                      LKR {entry.amount.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="flex gap-2">
