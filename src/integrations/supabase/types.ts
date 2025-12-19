@@ -8503,6 +8503,48 @@ export type Database = {
         }
         Relationships: []
       }
+      system_health_logs: {
+        Row: {
+          check_name: string
+          check_type: string
+          created_at: string | null
+          created_by: string | null
+          error_details: Json | null
+          id: string
+          is_test_data: boolean | null
+          message: string | null
+          metadata: Json | null
+          response_time_ms: number | null
+          status: string
+        }
+        Insert: {
+          check_name: string
+          check_type: string
+          created_at?: string | null
+          created_by?: string | null
+          error_details?: Json | null
+          id?: string
+          is_test_data?: boolean | null
+          message?: string | null
+          metadata?: Json | null
+          response_time_ms?: number | null
+          status: string
+        }
+        Update: {
+          check_name?: string
+          check_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          error_details?: Json | null
+          id?: string
+          is_test_data?: boolean | null
+          message?: string | null
+          metadata?: Json | null
+          response_time_ms?: number | null
+          status?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           category: string | null
