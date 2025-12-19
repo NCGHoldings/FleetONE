@@ -75,6 +75,7 @@ import VehicleInquiryHub from "./pages/VehicleInquiryHub";
 import ScheduledTasks from "./pages/ScheduledTasks";
 import ApiUsageMonitoring from "./pages/ApiUsageMonitoring";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+import SystemHealthDashboard from "./pages/SystemHealthDashboard";
 
 const queryClient = new QueryClient();
 
@@ -752,6 +753,15 @@ const App = () => (
                   <AppLayout>
                     <ApiUsageMonitoring />
                   </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/system-health" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
+                  <SystemHealthDashboard />
                 </ProtectedRoute>
               } 
             />
