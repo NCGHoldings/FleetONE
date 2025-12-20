@@ -55,6 +55,7 @@ export const PAGES: PageCategories = {
     { id: "accounting", title: "Accounting & GL", url: "/accounting" },
     { id: "budgeting", title: "Budgeting", url: "/budgeting" },
     { id: "api_usage", title: "API Usage", url: "/api-usage" },
+    { id: "system_health", title: "System Health", url: "/system-health" },
   ],
   yutong: [
     { id: "yutong_quotations", title: "Quotations", url: "/yutong-quotations" },
