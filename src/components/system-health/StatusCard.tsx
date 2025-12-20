@@ -1,13 +1,17 @@
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { HealthStatus } from '@/hooks/useSystemHealthChecks';
-import { Shield, Database, HardDrive, Wifi, Clock } from 'lucide-react';
+import { Shield, Database, HardDrive, Wifi, Clock, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface StatusCardProps {
+  id: string;
   checkType: string;
   checkName: string;
   status: HealthStatus;
   message: string;
   latency: number;
+  errorDetails?: string;
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -48,12 +52,23 @@ const statusConfig = {
   }
 };
 
-export function StatusCard({ checkType, checkName, status, message, latency }: StatusCardProps) {
+export function StatusCard({ id, checkType, checkName, status, message, latency, errorDetails }: StatusCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
   const config = statusConfig[status];
   const icon = iconMap[checkType] || <Wifi className="h-5 w-5" />;
 
+  const handleCopyError = async () => {
+    if (errorDetails) {
+      await navigator.clipboard.writeText(errorDetails);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <div
+      id={`status-card-${id}`}
       className={cn(
         'cyber-card relative overflow-hidden p-4 rounded-xl border transition-all duration-300',
         config.bg,
@@ -97,6 +112,37 @@ export function StatusCard({ checkType, checkName, status, message, latency }: S
         <Clock className="h-3 w-3" />
         <span className="font-mono">{latency}ms</span>
       </div>
+
+      {/* Error Details (expandable) */}
+      {errorDetails && status === 'error' && (
+        <div className="mt-3 pt-3 border-t border-red-500/20">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-2 text-xs text-red-400 hover:text-red-300 transition-colors w-full"
+          >
+            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            <span>Error Details</span>
+          </button>
+          
+          {isExpanded && (
+            <div className="mt-2 p-2 bg-red-950/30 rounded-lg">
+              <div className="flex items-start justify-between gap-2">
+                <pre className="text-xs text-red-300/80 font-mono whitespace-pre-wrap break-all flex-1">
+                  {errorDetails}
+                </pre>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  onClick={handleCopyError}
+                >
+                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Decorative corner */}
       <div className="absolute -bottom-1 -right-1 h-8 w-8 border-r-2 border-b-2 border-cyan-500/20 rounded-br-lg" />

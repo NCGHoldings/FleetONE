@@ -12,6 +12,7 @@ export interface HealthCheckResult {
   latency: number;
   timestamp: Date;
   error?: unknown;
+  errorDetails?: string;
 }
 
 export interface ConsoleLog {
@@ -28,6 +29,7 @@ interface UseSystemHealthChecksReturn {
   isRunning: boolean;
   lastRunTime: Date | null;
   autoRefreshEnabled: boolean;
+  criticalErrorCount: number;
   runFullHealthCheck: () => Promise<void>;
   clearLogs: () => void;
   toggleAutoRefresh: () => void;
@@ -88,16 +90,18 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
       }
     } catch (error) {
       const latency = Math.round(performance.now() - start);
-      addLog('error', `Auth check failed: ${error instanceof Error ? error.message : 'Unknown error'}`, latency);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', `Auth check failed: ${errorMessage}`, latency);
       return {
         id,
         checkType: 'auth',
         checkName: 'Session Validity',
         status: 'error',
-        message: error instanceof Error ? error.message : 'Auth check failed',
+        message: 'Auth check failed',
         latency,
         timestamp: new Date(),
-        error
+        error,
+        errorDetails: errorMessage
       };
     }
   }, [addLog]);
@@ -148,16 +152,18 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
       };
     } catch (error) {
       const latency = Math.round(performance.now() - start);
-      addLog('error', `Storage test failed: ${error instanceof Error ? error.message : 'Unknown error'}`, latency);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', `Storage test failed: ${errorMessage}`, latency);
       return {
         id,
         checkType: 'storage',
         checkName: 'Storage Upload',
         status: 'error',
-        message: error instanceof Error ? error.message : 'Storage test failed',
+        message: 'Storage test failed',
         latency,
         timestamp: new Date(),
-        error
+        error,
+        errorDetails: errorMessage
       };
     }
   }, [addLog]);
@@ -199,16 +205,18 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
       };
     } catch (error) {
       const latency = Math.round(performance.now() - start);
-      addLog('error', `Database query failed: ${error instanceof Error ? error.message : 'Unknown error'}`, latency);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', `Database query failed: ${errorMessage}`, latency);
       return {
         id,
         checkType: 'database',
         checkName: 'DB Latency',
         status: 'error',
-        message: error instanceof Error ? error.message : 'Query failed',
+        message: 'Query failed',
         latency,
         timestamp: new Date(),
-        error
+        error,
+        errorDetails: errorMessage
       };
     }
   }, [addLog]);
@@ -268,17 +276,146 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
       await supabase.from('system_health_logs').delete().eq('id', testId);
       
       const latency = Math.round(performance.now() - start);
-      addLog('error', `Database write failed: ${error instanceof Error ? error.message : 'Unknown error'}`, latency);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', `Database write failed: ${errorMessage}`, latency);
       
       return {
         id,
         checkType: 'database',
         checkName: 'DB Write',
         status: 'error',
-        message: error instanceof Error ? error.message : 'Write test failed',
+        message: 'Write test failed',
         latency,
         timestamp: new Date(),
-        error
+        error,
+        errorDetails: errorMessage
+      };
+    }
+  }, [addLog]);
+
+  // Test RLS Policies on Critical Tables
+  const testRLSPolicies = useCallback(async (): Promise<HealthCheckResult> => {
+    const start = performance.now();
+    const id = crypto.randomUUID();
+    const tableResults: string[] = [];
+    
+    try {
+      // Test each table explicitly
+      const { error: busError } = await supabase
+        .from('buses')
+        .select('id', { count: 'exact', head: true });
+      tableResults.push(busError ? 'buses: FAIL' : 'buses: OK');
+      
+      const { error: tripsError } = await supabase
+        .from('daily_trips')
+        .select('id', { count: 'exact', head: true });
+      tableResults.push(tripsError ? 'daily_trips: FAIL' : 'daily_trips: OK');
+      
+      const { error: profilesError } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true });
+      tableResults.push(profilesError ? 'profiles: FAIL' : 'profiles: OK');
+      
+      const latency = Math.round(performance.now() - start);
+      const hasErrors = tableResults.some(r => r.includes('FAIL'));
+      const status: HealthStatus = hasErrors ? 'error' : 'success';
+      
+      addLog(status, `RLS check: ${tableResults.join(', ')} (${latency}ms)`, latency);
+      
+      return {
+        id,
+        checkType: 'database',
+        checkName: 'RLS Policies',
+        status,
+        message: hasErrors ? 'Some tables inaccessible' : 'All tables accessible',
+        latency,
+        timestamp: new Date(),
+        errorDetails: hasErrors ? tableResults.filter(r => r.includes('FAIL')).join(', ') : undefined
+      };
+    } catch (error) {
+      const latency = Math.round(performance.now() - start);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', `RLS check failed: ${errorMessage}`, latency);
+      
+      return {
+        id,
+        checkType: 'database',
+        checkName: 'RLS Policies',
+        status: 'error',
+        message: 'RLS check failed',
+        latency,
+        timestamp: new Date(),
+        error,
+        errorDetails: errorMessage
+      };
+    }
+  }, [addLog]);
+
+  // Test Real-time Connection
+  const testRealtimeConnection = useCallback(async (): Promise<HealthCheckResult> => {
+    const start = performance.now();
+    const id = crypto.randomUUID();
+    
+    try {
+      // Check if we can establish a channel
+      const channel = supabase.channel('health-check-' + Date.now());
+      
+      const subscribePromise = new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve(false);
+        }, 5000);
+        
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            clearTimeout(timeout);
+            resolve(true);
+          }
+        });
+      });
+      
+      const success = await subscribePromise;
+      await supabase.removeChannel(channel);
+      
+      const latency = Math.round(performance.now() - start);
+      
+      if (success) {
+        addLog('success', `Realtime connected (${latency}ms)`, latency);
+        return {
+          id,
+          checkType: 'api',
+          checkName: 'Realtime',
+          status: 'success',
+          message: 'Connected',
+          latency,
+          timestamp: new Date()
+        };
+      } else {
+        addLog('warning', `Realtime timeout (${latency}ms)`, latency);
+        return {
+          id,
+          checkType: 'api',
+          checkName: 'Realtime',
+          status: 'warning',
+          message: 'Connection timeout',
+          latency,
+          timestamp: new Date()
+        };
+      }
+    } catch (error) {
+      const latency = Math.round(performance.now() - start);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', `Realtime failed: ${errorMessage}`, latency);
+      
+      return {
+        id,
+        checkType: 'api',
+        checkName: 'Realtime',
+        status: 'error',
+        message: 'Connection failed',
+        latency,
+        timestamp: new Date(),
+        error,
+        errorDetails: errorMessage
       };
     }
   }, [addLog]);
@@ -292,14 +429,16 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
     
     try {
       // Run all tests in parallel
-      const [authResult, storageResult, dbLatencyResult, dbWriteResult] = await Promise.all([
+      const [authResult, storageResult, dbLatencyResult, dbWriteResult, rlsResult, realtimeResult] = await Promise.all([
         testAuthSession(),
         testStorageUpload(),
         testDatabaseLatency(),
-        testDatabaseWrite()
+        testDatabaseWrite(),
+        testRLSPolicies(),
+        testRealtimeConnection()
       ]);
       
-      const allResults = [authResult, storageResult, dbLatencyResult, dbWriteResult];
+      const allResults = [authResult, storageResult, dbLatencyResult, dbWriteResult, rlsResult, realtimeResult];
       setResults(allResults);
       setLastRunTime(new Date());
       
@@ -312,13 +451,13 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
         `Health check complete: ${passed} passed, ${warnings} warnings, ${errors} errors`
       );
       
-      // Persist results to database
+      // Persist results to database (without error_details as it may not exist in schema)
       const logEntries = allResults.map(result => ({
         check_type: result.checkType,
         check_name: result.checkName,
         status: result.status,
         response_time_ms: result.latency,
-        message: result.message,
+        message: result.errorDetails ? `${result.message} - ${result.errorDetails}` : result.message,
         is_test_data: false
       }));
       
@@ -329,7 +468,7 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
     } finally {
       setIsRunning(false);
     }
-  }, [isRunning, addLog, testAuthSession, testStorageUpload, testDatabaseLatency, testDatabaseWrite]);
+  }, [isRunning, addLog, testAuthSession, testStorageUpload, testDatabaseLatency, testDatabaseWrite, testRLSPolicies, testRealtimeConnection]);
 
   const clearLogs = useCallback(() => {
     setConsoleLogs([]);
@@ -338,6 +477,9 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
   const toggleAutoRefresh = useCallback(() => {
     setAutoRefreshEnabled(prev => !prev);
   }, []);
+
+  // Calculate critical error count
+  const criticalErrorCount = results.filter(r => r.status === 'error').length;
 
   // Auto-refresh every 5 minutes
   useEffect(() => {
@@ -365,6 +507,7 @@ export function useSystemHealthChecks(): UseSystemHealthChecksReturn {
     isRunning,
     lastRunTime,
     autoRefreshEnabled,
+    criticalErrorCount,
     runFullHealthCheck,
     clearLogs,
     toggleAutoRefresh
