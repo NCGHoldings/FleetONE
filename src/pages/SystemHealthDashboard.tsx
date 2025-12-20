@@ -1,8 +1,9 @@
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Shield, RefreshCw, Clock, Zap } from 'lucide-react';
+import { Shield, RefreshCw, Clock, Zap, AlertTriangle } from 'lucide-react';
 import { useSystemHealthChecks } from '@/hooks/useSystemHealthChecks';
 import { StatusCard } from '@/components/system-health/StatusCard';
 import { LiveConsole } from '@/components/system-health/LiveConsole';
@@ -10,6 +11,7 @@ import { LatencySparkline } from '@/components/system-health/LatencySparkline';
 import { HealthHistoryTable } from '@/components/system-health/HealthHistoryTable';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function SystemHealthDashboard() {
   const {
@@ -18,10 +20,43 @@ export default function SystemHealthDashboard() {
     isRunning,
     lastRunTime,
     autoRefreshEnabled,
+    criticalErrorCount,
     runFullHealthCheck,
     clearLogs,
     toggleAutoRefresh
   } = useSystemHealthChecks();
+  
+  const previousErrorCount = useRef(0);
+
+  // Show toast alerts for critical errors
+  useEffect(() => {
+    if (results.length === 0) return;
+    
+    const currentErrors = results.filter(r => r.status === 'error');
+    
+    // Only alert on new errors (not on initial load)
+    if (currentErrors.length > 0 && previousErrorCount.current !== currentErrors.length) {
+      if (previousErrorCount.current > 0 || results.length > currentErrors.length) {
+        // Show individual error toasts
+        currentErrors.forEach(error => {
+          toast.error(`${error.checkName} Failed`, {
+            description: error.errorDetails || error.message,
+            duration: 10000,
+            action: {
+              label: 'Details',
+              onClick: () => {
+                // Scroll to the status card
+                const element = document.getElementById(`status-card-${error.id}`);
+                element?.scrollIntoView({ behavior: 'smooth' });
+              }
+            }
+          });
+        });
+      }
+    }
+    
+    previousErrorCount.current = currentErrors.length;
+  }, [results]);
 
   // Calculate overall status
   const overallStatus = results.length === 0 
@@ -54,6 +89,33 @@ export default function SystemHealthDashboard() {
       />
 
       <div className="relative z-10 p-6 max-w-7xl mx-auto space-y-6">
+        {/* Critical Alert Banner */}
+        {criticalErrorCount > 0 && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-4 animate-pulse">
+            <div className="p-2 rounded-lg bg-red-500/20">
+              <AlertTriangle className="h-6 w-6 text-red-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-red-400">
+                {criticalErrorCount} Critical Issue{criticalErrorCount > 1 ? 's' : ''} Detected
+              </h3>
+              <p className="text-sm text-red-400/80">
+                {results.filter(r => r.status === 'error').map(r => r.checkName).join(', ')} - Immediate attention required
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+              onClick={runFullHealthCheck}
+              disabled={isRunning}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", isRunning && "animate-spin")} />
+              Recheck
+            </Button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -123,24 +185,27 @@ export default function SystemHealthDashboard() {
         </div>
 
         {/* Status Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {results.length > 0 ? (
             results.map(result => (
               <StatusCard
                 key={result.id}
+                id={result.id}
                 checkType={result.checkType}
                 checkName={result.checkName}
                 status={result.status}
                 message={result.message}
                 latency={result.latency}
+                errorDetails={result.errorDetails}
               />
             ))
           ) : (
             // Placeholder cards while loading
-            ['Auth', 'Storage', 'DB Latency', 'DB Write'].map((name, idx) => (
+            ['Auth', 'Storage', 'DB Latency', 'DB Write', 'RLS Policies', 'Realtime'].map((name, idx) => (
               <StatusCard
                 key={idx}
-                checkType={['auth', 'storage', 'database', 'database'][idx]}
+                id={`placeholder-${idx}`}
+                checkType={['auth', 'storage', 'database', 'database', 'database', 'api'][idx]}
                 checkName={name}
                 status="pending"
                 message="Waiting..."
@@ -164,7 +229,7 @@ export default function SystemHealthDashboard() {
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground font-mono pt-4 border-t border-cyan-500/10">
-          <span className="text-cyan-600">SYNTHETIC MONITORING</span> • Auto-testing auth, storage, database connectivity
+          <span className="text-cyan-600">SYNTHETIC MONITORING</span> • Auto-testing auth, storage, database, RLS, realtime connectivity
         </div>
       </div>
     </div>
