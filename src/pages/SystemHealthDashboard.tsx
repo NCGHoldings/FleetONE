@@ -40,10 +40,10 @@ export default function SystemHealthDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-foreground">
+    <div className="min-h-full bg-slate-950 text-foreground rounded-lg overflow-hidden">
       {/* Cyber grid background */}
       <div 
-        className="fixed inset-0 opacity-[0.02] pointer-events-none"
+        className="absolute inset-0 opacity-[0.02] pointer-events-none"
         style={{
           backgroundImage: `
             linear-gradient(rgba(6, 182, 212, 0.3) 1px, transparent 1px),

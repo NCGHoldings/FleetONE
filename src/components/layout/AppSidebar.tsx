@@ -132,6 +132,7 @@ const financeItems = [
   { id: "accounting", title: "Accounting & GL", url: "/accounting", icon: BookOpen },
   { id: "budgeting", title: "Budgeting", url: "/budgeting", icon: BookOpen },
   { id: "api_usage", title: "API Usage", url: "/api-usage", icon: Activity },
+  { id: "system_health", title: "System Health", url: "/system-health", icon: Monitor },
 ];
 
 export function AppSidebar() {
