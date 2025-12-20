@@ -761,7 +761,9 @@ const App = () => (
               path="/system-health" 
               element={
                 <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
-                  <SystemHealthDashboard />
+                  <AppLayout>
+                    <SystemHealthDashboard />
+                  </AppLayout>
                 </ProtectedRoute>
               } 
             />
