@@ -1,14 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Shield, RefreshCw, Clock, Zap, AlertTriangle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Shield, RefreshCw, Clock, Zap, AlertTriangle, Activity, Workflow } from 'lucide-react';
 import { useSystemHealthChecks } from '@/hooks/useSystemHealthChecks';
+import { useBusinessFlowTests } from '@/hooks/useBusinessFlowTests';
 import { StatusCard } from '@/components/system-health/StatusCard';
 import { LiveConsole } from '@/components/system-health/LiveConsole';
 import { LatencySparkline } from '@/components/system-health/LatencySparkline';
 import { HealthHistoryTable } from '@/components/system-health/HealthHistoryTable';
+import { BusinessFlowCard } from '@/components/system-health/BusinessFlowCard';
+import { CriticalAlertBanner } from '@/components/system-health/CriticalAlertBanner';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -25,6 +29,17 @@ export default function SystemHealthDashboard() {
     clearLogs,
     toggleAutoRefresh
   } = useSystemHealthChecks();
+
+  const {
+    results: flowResults,
+    isRunning: isFlowRunning,
+    lastRunTime: flowLastRunTime,
+    runAllTests: runFlowTests,
+    runCategoryTests,
+    criticalIssues
+  } = useBusinessFlowTests();
+
+  const [activeTab, setActiveTab] = useState('infrastructure');
   
   const previousErrorCount = useRef(0);
 
@@ -89,15 +104,22 @@ export default function SystemHealthDashboard() {
       />
 
       <div className="relative z-10 p-6 max-w-7xl mx-auto space-y-6">
-        {/* Critical Alert Banner */}
+        {/* Business Flow Critical Alert Banner */}
+        <CriticalAlertBanner
+          issues={criticalIssues}
+          onRecheck={runFlowTests}
+          isRunning={isFlowRunning}
+        />
+
+        {/* Infrastructure Critical Alert Banner */}
         {criticalErrorCount > 0 && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-4 animate-pulse">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-4">
             <div className="p-2 rounded-lg bg-red-500/20">
               <AlertTriangle className="h-6 w-6 text-red-400" />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-red-400">
-                {criticalErrorCount} Critical Issue{criticalErrorCount > 1 ? 's' : ''} Detected
+                {criticalErrorCount} Infrastructure Issue{criticalErrorCount > 1 ? 's' : ''} Detected
               </h3>
               <p className="text-sm text-red-400/80">
                 {results.filter(r => r.status === 'error').map(r => r.checkName).join(', ')} - Immediate attention required
@@ -168,68 +190,145 @@ export default function SystemHealthDashboard() {
               </Label>
             </div>
 
-            {/* Run check button */}
+            {/* Run All Tests button */}
             <Button
-              onClick={runFullHealthCheck}
-              disabled={isRunning}
+              onClick={() => {
+                runFullHealthCheck();
+                runFlowTests();
+              }}
+              disabled={isRunning || isFlowRunning}
               className="bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-mono uppercase tracking-wider shadow-lg shadow-cyan-500/20"
             >
-              {isRunning ? (
+              {isRunning || isFlowRunning ? (
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Zap className="h-4 w-4 mr-2" />
               )}
-              {isRunning ? 'Running...' : 'Run Full Check'}
+              {isRunning || isFlowRunning ? 'Running...' : 'Run All Tests'}
             </Button>
           </div>
         </div>
 
-        {/* Status Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {results.length > 0 ? (
-            results.map(result => (
-              <StatusCard
-                key={result.id}
-                id={result.id}
-                checkType={result.checkType}
-                checkName={result.checkName}
-                status={result.status}
-                message={result.message}
-                latency={result.latency}
-                errorDetails={result.errorDetails}
-              />
-            ))
-          ) : (
-            // Placeholder cards while loading
-            ['Auth', 'Storage', 'DB Latency', 'DB Write', 'RLS Policies', 'Realtime'].map((name, idx) => (
-              <StatusCard
-                key={idx}
-                id={`placeholder-${idx}`}
-                checkType={['auth', 'storage', 'database', 'database', 'database', 'api'][idx]}
-                checkName={name}
-                status="pending"
-                message="Waiting..."
-                latency={0}
-              />
-            ))
-          )}
-        </div>
+        {/* Tabs for Infrastructure vs Business Flows */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="bg-slate-900/50 border border-slate-700/50 p-1">
+            <TabsTrigger 
+              value="infrastructure" 
+              className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Infrastructure ({results.length})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="business-flows"
+              className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400"
+            >
+              <Workflow className="h-4 w-4 mr-2" />
+              Business Flows ({flowResults.length})
+              {criticalIssues.length > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                  {criticalIssues.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Charts and Console Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Latency Chart */}
-          <LatencySparkline />
+          {/* Infrastructure Tab */}
+          <TabsContent value="infrastructure" className="mt-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {results.length > 0 ? (
+                results.map(result => (
+                  <StatusCard
+                    key={result.id}
+                    id={result.id}
+                    checkType={result.checkType}
+                    checkName={result.checkName}
+                    status={result.status}
+                    message={result.message}
+                    latency={result.latency}
+                    errorDetails={result.errorDetails}
+                  />
+                ))
+              ) : (
+                ['Auth', 'Storage', 'DB Latency', 'DB Write', 'RLS Policies', 'Realtime'].map((name, idx) => (
+                  <StatusCard
+                    key={idx}
+                    id={`placeholder-${idx}`}
+                    checkType={['auth', 'storage', 'database', 'database', 'database', 'api'][idx]}
+                    checkName={name}
+                    status="pending"
+                    message="Waiting..."
+                    latency={0}
+                  />
+                ))
+              )}
+            </div>
 
-          {/* Live Console */}
-          <LiveConsole logs={consoleLogs} onClear={clearLogs} />
-        </div>
+            {/* Charts and Console Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LatencySparkline />
+              <LiveConsole logs={consoleLogs} onClear={clearLogs} />
+            </div>
 
-        {/* Health History Table */}
-        <HealthHistoryTable />
+            {/* Health History Table */}
+            <HealthHistoryTable />
+          </TabsContent>
+
+          {/* Business Flows Tab */}
+          <TabsContent value="business-flows" className="mt-6 space-y-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-100">Business Flow Tests</h2>
+                <p className="text-sm text-slate-400">
+                  Automated tests for critical business operations
+                  {flowLastRunTime && (
+                    <span className="ml-2">
+                      • Last run: {format(flowLastRunTime, 'HH:mm:ss')}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={runFlowTests}
+                disabled={isFlowRunning}
+                className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", isFlowRunning && "animate-spin")} />
+                Run All Flow Tests
+              </Button>
+            </div>
+
+            {flowResults.length === 0 ? (
+              <div className="text-center py-12 bg-slate-900/30 rounded-lg border border-slate-700/30">
+                <Workflow className="h-12 w-12 text-slate-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-300">No Tests Run Yet</h3>
+                <p className="text-slate-400 mb-4">Click "Run All Flow Tests" to test all business flows</p>
+                <Button onClick={runFlowTests} disabled={isFlowRunning}>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Start Testing
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Group results by category */}
+                {Array.from(new Set(flowResults.map(r => r.category))).map(category => (
+                  <BusinessFlowCard
+                    key={category}
+                    category={category}
+                    results={flowResults.filter(r => r.category === category)}
+                    onRetest={() => runCategoryTests(category)}
+                    isRetesting={isFlowRunning}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground font-mono pt-4 border-t border-cyan-500/10">
-          <span className="text-cyan-600">SYNTHETIC MONITORING</span> • Auto-testing auth, storage, database, RLS, realtime connectivity
+          <span className="text-cyan-600">PROACTIVE MONITORING</span> • Testing infrastructure + business flows for Sinotruck, Special Hire, Yutong, School Bus, Fleet, Daily Trips
         </div>
       </div>
     </div>

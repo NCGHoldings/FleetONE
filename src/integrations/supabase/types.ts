@@ -1480,6 +1480,42 @@ export type Database = {
           },
         ]
       }
+      business_flow_logs: {
+        Row: {
+          created_at: string
+          error_details: string | null
+          flow_category: string
+          flow_name: string
+          id: string
+          latency_ms: number | null
+          message: string | null
+          status: string
+          tested_at: string
+        }
+        Insert: {
+          created_at?: string
+          error_details?: string | null
+          flow_category: string
+          flow_name: string
+          id?: string
+          latency_ms?: number | null
+          message?: string | null
+          status: string
+          tested_at?: string
+        }
+        Update: {
+          created_at?: string
+          error_details?: string | null
+          flow_category?: string
+          flow_name?: string
+          id?: string
+          latency_ms?: number | null
+          message?: string | null
+          status?: string
+          tested_at?: string
+        }
+        Relationships: []
+      }
       cached_locations: {
         Row: {
           coordinates: Json | null
