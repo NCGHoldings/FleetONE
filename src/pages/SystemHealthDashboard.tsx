@@ -13,6 +13,8 @@ import { LatencySparkline } from '@/components/system-health/LatencySparkline';
 import { HealthHistoryTable } from '@/components/system-health/HealthHistoryTable';
 import { BusinessFlowCard } from '@/components/system-health/BusinessFlowCard';
 import { CriticalAlertBanner } from '@/components/system-health/CriticalAlertBanner';
+import { HealthSummary } from '@/components/system-health/HealthSummary';
+import { IssueCard } from '@/components/system-health/IssueCard';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -30,6 +32,7 @@ export default function SystemHealthDashboard() {
     toggleAutoRefresh
   } = useSystemHealthChecks();
 
+  // Auto-run tests on mount
   const {
     results: flowResults,
     isRunning: isFlowRunning,
@@ -37,7 +40,7 @@ export default function SystemHealthDashboard() {
     runAllTests: runFlowTests,
     runCategoryTests,
     criticalIssues
-  } = useBusinessFlowTests();
+  } = useBusinessFlowTests(true);
 
   const [activeTab, setActiveTab] = useState('infrastructure');
   
@@ -104,6 +107,13 @@ export default function SystemHealthDashboard() {
       />
 
       <div className="relative z-10 p-6 max-w-7xl mx-auto space-y-6">
+        {/* Health Summary */}
+        <HealthSummary
+          flowResults={flowResults}
+          infrastructureErrors={criticalErrorCount}
+          infrastructureWarnings={results.filter(r => r.status === 'warning').length}
+        />
+
         {/* Business Flow Critical Alert Banner */}
         <CriticalAlertBanner
           issues={criticalIssues}
