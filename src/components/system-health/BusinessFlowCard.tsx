@@ -10,17 +10,17 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  Copy,
   RefreshCw,
   Truck,
   Bus,
   GraduationCap,
   Wallet,
   Route,
-  Wrench
+  Wrench,
+  ExternalLink
 } from 'lucide-react';
 import { BusinessFlowResult, FlowStatus } from '@/hooks/useBusinessFlowTests';
-import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface BusinessFlowCardProps {
   category: string;
@@ -72,6 +72,7 @@ export const BusinessFlowCard: React.FC<BusinessFlowCardProps> = ({
   onRetest,
   isRetesting
 }) => {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   
   const overallStatus: FlowStatus = results.some(r => r.status === 'error')
@@ -84,15 +85,8 @@ export const BusinessFlowCard: React.FC<BusinessFlowCardProps> = ({
     ? 'pending'
     : 'success';
 
-  const errorCount = results.filter(r => r.status === 'error').length;
   const successCount = results.filter(r => r.status === 'success').length;
   const config = statusConfig[overallStatus];
-
-  const copyError = (result: BusinessFlowResult) => {
-    const errorText = `${result.category} - ${result.name}\nStatus: ${result.status}\nMessage: ${result.message}${result.errorDetails ? `\nError: ${result.errorDetails}` : ''}`;
-    navigator.clipboard.writeText(errorText);
-    toast.success('Error details copied to clipboard');
-  };
 
   return (
     <Card className={`bg-slate-900/50 border-slate-700/50 ${overallStatus === 'error' ? 'border-red-500/50' : ''}`}>
@@ -147,24 +141,36 @@ export const BusinessFlowCard: React.FC<BusinessFlowCardProps> = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-slate-400 text-sm">{result.latency}ms</span>
-                    {result.status === 'error' && (
+                    {result.status === 'error' && result.location?.path && (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => copyError(result)}
+                        onClick={() => navigate(result.location.path)}
+                        title="Go to page"
                       >
-                        <Copy className="h-3 w-3" />
+                        <ExternalLink className="h-3 w-3" />
                       </Button>
                     )}
                   </div>
                 </div>
+                
+                {/* Location breadcrumb for errors */}
+                {result.status === 'error' && result.location && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    📍 {result.location.breadcrumb}
+                  </p>
+                )}
+                
+                {/* User-friendly message */}
                 <p className={`text-sm mt-1 ${result.status === 'error' ? 'text-red-300/80' : 'text-slate-400'}`}>
-                  {result.message}
+                  {result.friendlyError || result.message}
                 </p>
-                {result.errorDetails && (
-                  <p className="text-xs text-red-400/70 mt-1 font-mono bg-red-500/10 p-2 rounded">
-                    {result.errorDetails}
+                
+                {/* Impact for errors */}
+                {result.status === 'error' && result.location?.userImpact && (
+                  <p className="text-xs text-red-400/70 mt-1">
+                    👤 {result.location.userImpact}
                   </p>
                 )}
               </div>
@@ -187,7 +193,7 @@ export const BusinessFlowCard: React.FC<BusinessFlowCardProps> = ({
             ) : (
               <>
                 <ChevronDown className="h-4 w-4 mr-1" />
-                Show {results.length - 2} More Tests
+                Show {results.length - 2} More
               </>
             )}
           </Button>
