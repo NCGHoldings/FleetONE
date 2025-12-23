@@ -118,15 +118,40 @@ export const PaymentConfirmationModal = ({
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
 
   const handleFileUpload = async (file: File) => {
+    // Check authentication first
+    if (!user?.id) {
+      toast.error('Please log in to upload payment proof');
+      setUploadStatus('error');
+      return;
+    }
+
     try {
       setIsUploadingProof(true);
       setUploadStatus('uploading');
-      const userId = user?.id || 'anonymous';
-      const key = `payment-proofs/${userId}/${quotationData.quotation_no || 'quotation'}/${Date.now()}-${file.name}`;
+      
+      const key = `${user.id}/${quotationData.quotation_no || 'quotation'}/${Date.now()}-${file.name}`;
+      
       const { error: uploadError } = await supabase.storage
         .from('payment-proofs')
         .upload(key, file, { upsert: true, contentType: file.type });
-      if (uploadError) throw uploadError;
+      
+      if (uploadError) {
+        console.error('Upload error details:', uploadError);
+        
+        // Provide user-friendly error messages
+        if (uploadError.message?.includes('policy') || uploadError.message?.includes('permission')) {
+          toast.error('Permission denied. Please contact administrator to fix storage permissions.');
+        } else if (uploadError.message?.includes('size')) {
+          toast.error('File is too large. Please upload a smaller file (max 5MB).');
+        } else if (uploadError.message?.includes('type') || uploadError.message?.includes('format')) {
+          toast.error('Invalid file type. Please upload an image or PDF.');
+        } else {
+          toast.error(`Upload failed: ${uploadError.message}`);
+        }
+        setUploadStatus('error');
+        return;
+      }
+      
       setPaymentProofUrl(key);
       const { data: signed } = await supabase.storage
         .from('payment-proofs')
@@ -134,10 +159,16 @@ export const PaymentConfirmationModal = ({
       if (signed?.signedUrl) setProofPreviewUrl(signed.signedUrl);
       setUploadStatus('success');
       toast.success('Payment proof uploaded successfully');
-    } catch (e) {
+    } catch (e: any) {
       console.error('Upload failed:', e);
       setUploadStatus('error');
-      toast.error('Failed to upload payment proof. Please try again.');
+      
+      // Handle unexpected errors
+      if (e?.message?.includes('policy') || e?.message?.includes('denied')) {
+        toast.error('Storage permission error. Please contact administrator.');
+      } else {
+        toast.error('Failed to upload payment proof. Please try again.');
+      }
     } finally {
       setIsUploadingProof(false);
     }
