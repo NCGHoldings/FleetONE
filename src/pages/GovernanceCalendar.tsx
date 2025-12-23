@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Calendar, List, Filter, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Calendar, List, Filter, ChevronLeft, ChevronRight, RefreshCw, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { format, addMonths, subMonths, startOfMonth } from 'date-fns';
@@ -12,6 +12,7 @@ import { FilterSidebar, useGovernanceFilters } from '@/components/governance/Fil
 import { useGovernanceOccurrences, type GovernanceOccurrence } from '@/hooks/useGovernanceOccurrences';
 import { useScheduleGovernance } from '@/hooks/useScheduleGovernance';
 import { useAuth } from '@/hooks/useAuth';
+import { CalendarPDFModal } from '@/components/governance/CalendarPDFModal';
 
 const GovernanceCalendar = () => {
   const [view, setView] = useState<'month' | 'list'>('month');
@@ -19,6 +20,7 @@ const GovernanceCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedOccurrence, setSelectedOccurrence] = useState<GovernanceOccurrence | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
 
   const { hasRole } = useAuth();
   const { generateSchedule, isGenerating } = useScheduleGovernance();
@@ -89,6 +91,17 @@ const GovernanceCalendar = () => {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Download PDF Button */}
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setPdfModalOpen(true)}
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Download PDF
+                </Button>
+
                 {isAdmin && (
                   <Button 
                     variant="default" 
@@ -148,6 +161,20 @@ const GovernanceCalendar = () => {
           occurrence={selectedOccurrence}
           open={detailsModalOpen}
           onOpenChange={setDetailsModalOpen}
+        />
+
+        {/* PDF Export Modal */}
+        <CalendarPDFModal
+          open={pdfModalOpen}
+          onOpenChange={setPdfModalOpen}
+          currentDate={currentDate}
+          filters={{
+            selectedCompanies: filters.selectedCompanies,
+            selectedSBUs: filters.selectedSBUs,
+            selectedTypes: filters.selectedTypes,
+            selectedCategories: filters.selectedCategories,
+            selectedStatuses: filters.selectedStatuses,
+          }}
         />
     </TooltipProvider>
   );
