@@ -2154,6 +2154,59 @@ export type Database = {
           },
         ]
       }
+      document_versions: {
+        Row: {
+          change_reason: string | null
+          changed_by: string | null
+          changes_made: Json | null
+          created_at: string
+          document_data: Json
+          document_status: string
+          document_type: string
+          generated_pdf_path: string | null
+          id: string
+          quotation_id: string
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_by?: string | null
+          changes_made?: Json | null
+          created_at?: string
+          document_data: Json
+          document_status?: string
+          document_type: string
+          generated_pdf_path?: string | null
+          id?: string
+          quotation_id: string
+          updated_at?: string
+          version_number?: number
+        }
+        Update: {
+          change_reason?: string | null
+          changed_by?: string | null
+          changes_made?: Json | null
+          created_at?: string
+          document_data?: Json
+          document_status?: string
+          document_type?: string
+          generated_pdf_path?: string | null
+          id?: string
+          quotation_id?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_versions_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           description: string | null
