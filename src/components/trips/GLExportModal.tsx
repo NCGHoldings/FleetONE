@@ -372,15 +372,16 @@ export function GLExportModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
             Export to GL Format
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-6 py-4">
           {/* Date Selection Mode */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Date Selection</Label>
@@ -720,9 +721,10 @@ export function GLExportModal({
             </div>
           </div>
         </div>
+        </ScrollArea>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 flex-shrink-0 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
