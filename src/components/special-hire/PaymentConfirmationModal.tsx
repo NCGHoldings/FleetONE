@@ -8,8 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Eye, Edit, FileCheck, AlertCircle } from 'lucide-react';
 
 interface PaymentConfirmationModalProps {
   isOpen: boolean;
@@ -224,9 +227,11 @@ export const PaymentConfirmationModal = ({
     }
   };
 
+  const [activeTab, setActiveTab] = useState<'details' | 'preview'>('details');
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {adjustmentData && !balanceInvoiceSent 
@@ -520,12 +525,22 @@ export const PaymentConfirmationModal = ({
             </div>
           </div>
 
+          {/* Receipt Preview Alert */}
+          <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+            <Eye className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 dark:text-blue-300">
+              <strong>Preview:</strong> A receipt will be generated with the above details. 
+              You can edit and preview the document after confirming payment in the Document Flow.
+            </AlertDescription>
+          </Alert>
+
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm} disabled={loading || amount <= 0}>
+            <Button onClick={handleConfirm} disabled={loading || amount <= 0} className="gap-2">
+              <FileCheck className="h-4 w-4" />
               {loading ? 'Processing...' : 'Confirm Payment'}
             </Button>
           </div>

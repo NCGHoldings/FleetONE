@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2, Loader2, Calculator } from 'lucide-react';
+import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2, Loader2, Calculator, GitBranch } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { QuotationModal } from './QuotationModal';
@@ -16,6 +16,13 @@ import { EditQuotationModal } from './EditQuotationModal';
 import { SpecialHireExportModal } from './SpecialHireExportModal';
 import { QuotationPreview } from './QuotationPreview';
 import { QuotationVersionIndicator } from './QuotationVersionIndicator';
+import { DocumentFlowDashboard } from './DocumentFlowDashboard';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
@@ -128,6 +135,8 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showDocumentFlow, setShowDocumentFlow] = useState(false);
+  const [documentFlowQuotation, setDocumentFlowQuotation] = useState<Quotation | null>(null);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
   const [emailingQuotationId, setEmailingQuotationId] = useState<string | null>(null);
 
@@ -269,6 +278,11 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
   const handleViewQuotation = (quotation: Quotation) => {
     setSelectedQuotation(quotation);
     setShowModal(true);
+  };
+
+  const handleViewDocumentFlow = (quotation: Quotation) => {
+    setDocumentFlowQuotation(quotation);
+    setShowDocumentFlow(true);
   };
 
   const loadVersionsForQuotation = async (quotationId: string) => {
@@ -749,6 +763,15 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
               <Button 
                 variant="outline" 
                 size="sm" 
+                onClick={() => handleViewDocumentFlow(quotation)}
+                title="Document Flow"
+                className="text-purple-600 hover:text-purple-700"
+              >
+                <GitBranch className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
                 onClick={() => onViewInCalculator?.(quotation.id)}
                 title="View Cost Breakdown"
                 className="text-primary hover:text-primary"
@@ -1033,6 +1056,32 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
         onClose={() => setShowExportModal(false)}
         data={quotations}
       />
+
+      {/* Document Flow Dialog */}
+      {showDocumentFlow && documentFlowQuotation && (
+        <Dialog open={showDocumentFlow} onOpenChange={setShowDocumentFlow}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <GitBranch className="h-5 w-5 text-purple-600" />
+                Document Flow - {documentFlowQuotation.quotation_no}
+              </DialogTitle>
+            </DialogHeader>
+            <DocumentFlowDashboard
+              quotationId={documentFlowQuotation.id}
+              quotationData={documentFlowQuotation}
+              onDocumentGenerated={() => {
+                loadQuotations();
+                onRefresh();
+              }}
+              onDocumentEdited={() => {
+                loadQuotations();
+                onRefresh();
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

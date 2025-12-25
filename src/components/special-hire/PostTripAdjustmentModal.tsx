@@ -29,6 +29,8 @@ import {
   CheckCircle,
   AlertCircle,
   FileText,
+  Eye,
+  GitBranch
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -504,13 +506,23 @@ export const PostTripAdjustmentModal = ({
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            <Alert className="bg-green-50 border-green-200">
+          <div className="space-y-4">
+            <Alert className="bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800">
               <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
+              <AlertDescription className="text-green-800 dark:text-green-300">
                 Adjustment finalized successfully! You can now generate and send the balance invoice to the customer.
               </AlertDescription>
             </Alert>
+            
+            {/* Document Flow Info */}
+            <Alert className="bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-800">
+              <GitBranch className="h-4 w-4 text-purple-600" />
+              <AlertDescription className="text-purple-800 dark:text-purple-300">
+                <strong>Document Flow:</strong> This adjustment has been saved to the document flow. 
+                You can view, edit, or regenerate the adjustment document from the Document Flow dashboard.
+              </AlertDescription>
+            </Alert>
+            
             <div className="flex gap-3 justify-end">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
