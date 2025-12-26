@@ -1,31 +1,31 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Eye, 
   Edit, 
   Save, 
   Download, 
   AlertTriangle, 
-  CheckCircle2,
   Loader2,
   RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { DocumentType, DocumentVersion, useDocumentFlow } from '@/hooks/useDocumentFlow';
 import { ChangeImpactPreview } from './ChangeImpactPreview';
 import { QuotationPreview } from './QuotationPreview';
+import { AdvanceReceiptPreview } from './AdvanceReceiptPreview';
+import { BalanceInvoicePreview } from './BalanceInvoicePreview';
+import { PostTripAdjustmentPreview } from './PostTripAdjustmentPreview';
 import { format } from 'date-fns';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
@@ -96,6 +96,7 @@ export function DocumentPreviewModal({
   const [showImpactPreview, setShowImpactPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const { saveDocumentVersion, calculateChangeImpact, updateDocumentStatus } = useDocumentFlow(quotationData.id);
 
@@ -180,9 +181,40 @@ export function DocumentPreviewModal({
         await saveDocumentVersion(documentType, editedData, changeReason || 'Generated PDF', originalData);
       }
       
-      // Here you would trigger PDF generation
-      // For now we just show a success message
-      toast.success('PDF generated successfully');
+      // Generate PDF from the preview
+      if (previewRef.current) {
+        const canvas = await html2canvas(previewRef.current, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        });
+
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+        const imgX = (pdfWidth - imgWidth * ratio) / 2;
+
+        pdf.addImage(imgData, 'PNG', imgX, 10, imgWidth * ratio, imgHeight * ratio);
+
+        // Download the PDF
+        const fileName = `${documentType.replace(/_/g, '-')}-${quotationData.quotation_no || 'document'}.pdf`;
+        pdf.save(fileName);
+        
+        toast.success('PDF generated and downloaded successfully');
+      } else {
+        toast.error('Preview not available for PDF generation');
+      }
+      
       onSave?.();
     } catch (error) {
       console.error('Generate error:', error);
@@ -190,6 +222,33 @@ export function DocumentPreviewModal({
     } finally {
       setGenerating(false);
     }
+  };
+
+  // Render the appropriate preview component based on document type
+  const renderDocumentPreview = () => {
+    switch (documentType) {
+      case 'quotation':
+        if (editedData.id) {
+          return <QuotationPreview quotation={editedData as any} />;
+        }
+        break;
+      case 'advance_receipt':
+      case 'sales_receipt':
+        return <AdvanceReceiptPreview data={editedData} />;
+      case 'balance_invoice':
+        return <BalanceInvoicePreview data={editedData} />;
+      case 'post_trip_adjustment':
+        return <PostTripAdjustmentPreview data={editedData} />;
+    }
+    
+    // Fallback - shouldn't happen if data is properly loaded
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+        <p>Document preview for {documentType.replace(/_/g, ' ')}</p>
+        <p className="text-sm mt-2">Loading preview...</p>
+      </div>
+    );
   };
 
   const renderField = (field: typeof editableFieldsConfig.quotation[0]) => {
@@ -332,16 +391,8 @@ export function DocumentPreviewModal({
             <div className={mode === 'edit' ? 'w-2/3' : 'w-full'}>
               <ScrollArea className="h-[65vh]">
                 <div className="p-4">
-                <div className="bg-muted/30 rounded-lg p-4 border">
-                  {documentType === 'quotation' && editedData.id ? (
-                    <QuotationPreview quotation={editedData as any} />
-                  ) : (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Document preview for {documentType.replace(/_/g, ' ')}</p>
-                      <p className="text-sm mt-2">Preview will be generated based on current data</p>
-                    </div>
-                  )}
+                  <div ref={previewRef} className="bg-white rounded-lg border shadow-sm">
+                    {renderDocumentPreview()}
                   </div>
                 </div>
               </ScrollArea>
