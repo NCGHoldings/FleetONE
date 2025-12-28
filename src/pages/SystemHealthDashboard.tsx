@@ -4,9 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, RefreshCw, Clock, Zap, AlertTriangle, Activity, Workflow } from 'lucide-react';
+import { Shield, RefreshCw, Clock, Zap, AlertTriangle, Activity, Workflow, Database, FileCheck, Link2, LayoutGrid } from 'lucide-react';
 import { useSystemHealthChecks } from '@/hooks/useSystemHealthChecks';
 import { useBusinessFlowTests } from '@/hooks/useBusinessFlowTests';
+import { useDataQualityChecks } from '@/hooks/useDataQualityChecks';
+import { useBusinessRulesChecks } from '@/hooks/useBusinessRulesChecks';
+import { useCrossModuleChecks } from '@/hooks/useCrossModuleChecks';
 import { StatusCard } from '@/components/system-health/StatusCard';
 import { LiveConsole } from '@/components/system-health/LiveConsole';
 import { LatencySparkline } from '@/components/system-health/LatencySparkline';
@@ -14,7 +17,8 @@ import { HealthHistoryTable } from '@/components/system-health/HealthHistoryTabl
 import { BusinessFlowCard } from '@/components/system-health/BusinessFlowCard';
 import { CriticalAlertBanner } from '@/components/system-health/CriticalAlertBanner';
 import { HealthSummary } from '@/components/system-health/HealthSummary';
-import { IssueCard } from '@/components/system-health/IssueCard';
+import { DataQualityPanel } from '@/components/system-health/DataQualityPanel';
+import { RealDataSummary } from '@/components/system-health/RealDataSummary';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -32,7 +36,6 @@ export default function SystemHealthDashboard() {
     toggleAutoRefresh
   } = useSystemHealthChecks();
 
-  // Auto-run tests on mount
   const {
     results: flowResults,
     isRunning: isFlowRunning,
@@ -42,9 +45,43 @@ export default function SystemHealthDashboard() {
     criticalIssues
   } = useBusinessFlowTests(true);
 
+  const {
+    results: dataQualityResults,
+    isRunning: isDataQualityRunning,
+    lastRunTime: dataQualityLastRunTime,
+    runAllChecks: runDataQualityChecks,
+    errorCount: dataQualityErrors,
+    warningCount: dataQualityWarnings
+  } = useDataQualityChecks();
+
+  const {
+    results: businessRulesResults,
+    isRunning: isBusinessRulesRunning,
+    lastRunTime: businessRulesLastRunTime,
+    runAllChecks: runBusinessRulesChecks,
+    errorCount: businessRulesErrors,
+    warningCount: businessRulesWarnings
+  } = useBusinessRulesChecks();
+
+  const {
+    results: crossModuleResults,
+    isRunning: isCrossModuleRunning,
+    lastRunTime: crossModuleLastRunTime,
+    runAllChecks: runCrossModuleChecks,
+    errorCount: crossModuleErrors,
+    warningCount: crossModuleWarnings
+  } = useCrossModuleChecks();
+
   const [activeTab, setActiveTab] = useState('infrastructure');
   
   const previousErrorCount = useRef(0);
+
+  // Auto-run data checks on mount
+  useEffect(() => {
+    runDataQualityChecks();
+    runBusinessRulesChecks();
+    runCrossModuleChecks();
+  }, []);
 
   // Show toast alerts for critical errors
   useEffect(() => {
@@ -52,10 +89,8 @@ export default function SystemHealthDashboard() {
     
     const currentErrors = results.filter(r => r.status === 'error');
     
-    // Only alert on new errors (not on initial load)
     if (currentErrors.length > 0 && previousErrorCount.current !== currentErrors.length) {
       if (previousErrorCount.current > 0 || results.length > currentErrors.length) {
-        // Show individual error toasts
         currentErrors.forEach(error => {
           toast.error(`${error.checkName} Failed`, {
             description: error.errorDetails || error.message,
@@ -63,7 +98,6 @@ export default function SystemHealthDashboard() {
             action: {
               label: 'Details',
               onClick: () => {
-                // Scroll to the status card
                 const element = document.getElementById(`status-card-${error.id}`);
                 element?.scrollIntoView({ behavior: 'smooth' });
               }
@@ -77,20 +111,33 @@ export default function SystemHealthDashboard() {
   }, [results]);
 
   // Calculate overall status
+  const totalErrors = criticalErrorCount + dataQualityErrors + businessRulesErrors + crossModuleErrors;
+  const totalWarnings = results.filter(r => r.status === 'warning').length + dataQualityWarnings + businessRulesWarnings + crossModuleWarnings;
+  
   const overallStatus = results.length === 0 
     ? 'pending' 
-    : results.some(r => r.status === 'error') 
+    : totalErrors > 0
       ? 'error' 
-      : results.some(r => r.status === 'warning') 
+      : totalWarnings > 0
         ? 'warning' 
         : 'success';
 
   const statusText = {
     success: 'All Systems Operational',
-    warning: 'Some Systems Degraded',
+    warning: 'Some Issues Detected',
     error: 'Critical Issues Detected',
     pending: 'Initializing...'
   };
+
+  const runAllHealthChecks = () => {
+    runFullHealthCheck();
+    runFlowTests();
+    runDataQualityChecks();
+    runBusinessRulesChecks();
+    runCrossModuleChecks();
+  };
+
+  const isAnyRunning = isRunning || isFlowRunning || isDataQualityRunning || isBusinessRulesRunning || isCrossModuleRunning;
 
   return (
     <div className="min-h-full bg-slate-950 text-foreground rounded-lg overflow-hidden">
@@ -121,29 +168,29 @@ export default function SystemHealthDashboard() {
           isRunning={isFlowRunning}
         />
 
-        {/* Infrastructure Critical Alert Banner */}
-        {criticalErrorCount > 0 && (
+        {/* Combined Critical Alert Banner */}
+        {totalErrors > 0 && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-4">
             <div className="p-2 rounded-lg bg-red-500/20">
               <AlertTriangle className="h-6 w-6 text-red-400" />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-red-400">
-                {criticalErrorCount} Infrastructure Issue{criticalErrorCount > 1 ? 's' : ''} Detected
+                {totalErrors} Critical Issue{totalErrors > 1 ? 's' : ''} Detected
               </h3>
               <p className="text-sm text-red-400/80">
-                {results.filter(r => r.status === 'error').map(r => r.checkName).join(', ')} - Immediate attention required
+                Infrastructure: {criticalErrorCount} • Data Quality: {dataQualityErrors} • Business Rules: {businessRulesErrors} • Cross-Module: {crossModuleErrors}
               </p>
             </div>
             <Button
               variant="outline"
               size="sm"
               className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-              onClick={runFullHealthCheck}
-              disabled={isRunning}
+              onClick={runAllHealthChecks}
+              disabled={isAnyRunning}
             >
-              <RefreshCw className={cn("h-4 w-4 mr-2", isRunning && "animate-spin")} />
-              Recheck
+              <RefreshCw className={cn("h-4 w-4 mr-2", isAnyRunning && "animate-spin")} />
+              Recheck All
             </Button>
           </div>
         )}
@@ -188,7 +235,6 @@ export default function SystemHealthDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Auto-refresh toggle */}
             <div className="flex items-center gap-2">
               <Switch
                 id="auto-refresh"
@@ -200,28 +246,24 @@ export default function SystemHealthDashboard() {
               </Label>
             </div>
 
-            {/* Run All Tests button */}
             <Button
-              onClick={() => {
-                runFullHealthCheck();
-                runFlowTests();
-              }}
-              disabled={isRunning || isFlowRunning}
+              onClick={runAllHealthChecks}
+              disabled={isAnyRunning}
               className="bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-mono uppercase tracking-wider shadow-lg shadow-cyan-500/20"
             >
-              {isRunning || isFlowRunning ? (
+              {isAnyRunning ? (
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Zap className="h-4 w-4 mr-2" />
               )}
-              {isRunning || isFlowRunning ? 'Running...' : 'Run All Tests'}
+              {isAnyRunning ? 'Running...' : 'Run All Tests'}
             </Button>
           </div>
         </div>
 
-        {/* Tabs for Infrastructure vs Business Flows */}
+        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="bg-slate-900/50 border border-slate-700/50 p-1">
+          <TabsList className="bg-slate-900/50 border border-slate-700/50 p-1 flex-wrap h-auto gap-1">
             <TabsTrigger 
               value="infrastructure" 
               className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400"
@@ -240,6 +282,49 @@ export default function SystemHealthDashboard() {
                   {criticalIssues.length}
                 </Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="data-quality"
+              className="data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400"
+            >
+              <Database className="h-4 w-4 mr-2" />
+              Data Quality ({dataQualityResults.length})
+              {dataQualityErrors > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                  {dataQualityErrors}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="business-rules"
+              className="data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400"
+            >
+              <FileCheck className="h-4 w-4 mr-2" />
+              Business Rules ({businessRulesResults.length})
+              {businessRulesErrors > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                  {businessRulesErrors}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="cross-module"
+              className="data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-400"
+            >
+              <Link2 className="h-4 w-4 mr-2" />
+              Cross-Module ({crossModuleResults.length})
+              {crossModuleErrors > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 px-1.5">
+                  {crossModuleErrors}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="module-overview"
+              className="data-[state=active]:bg-teal-500/20 data-[state=active]:text-teal-400"
+            >
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Module Overview
             </TabsTrigger>
           </TabsList>
 
@@ -274,13 +359,11 @@ export default function SystemHealthDashboard() {
               )}
             </div>
 
-            {/* Charts and Console Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <LatencySparkline />
               <LiveConsole logs={consoleLogs} onClear={clearLogs} />
             </div>
 
-            {/* Health History Table */}
             <HealthHistoryTable />
           </TabsContent>
 
@@ -321,7 +404,6 @@ export default function SystemHealthDashboard() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Group results by category */}
                 {Array.from(new Set(flowResults.map(r => r.category))).map(category => (
                   <BusinessFlowCard
                     key={category}
@@ -334,11 +416,55 @@ export default function SystemHealthDashboard() {
               </div>
             )}
           </TabsContent>
+
+          {/* Data Quality Tab */}
+          <TabsContent value="data-quality" className="mt-6 space-y-6">
+            <DataQualityPanel
+              title="Data Quality Checks"
+              description="Monitor missing, stale, and invalid data across all modules"
+              results={dataQualityResults}
+              isRunning={isDataQualityRunning}
+              lastRunTime={dataQualityLastRunTime}
+              onRefresh={runDataQualityChecks}
+              accentColor="blue"
+            />
+          </TabsContent>
+
+          {/* Business Rules Tab */}
+          <TabsContent value="business-rules" className="mt-6 space-y-6">
+            <DataQualityPanel
+              title="Business Rules Validation"
+              description="Check for violations of critical business rules and policies"
+              results={businessRulesResults}
+              isRunning={isBusinessRulesRunning}
+              lastRunTime={businessRulesLastRunTime}
+              onRefresh={runBusinessRulesChecks}
+              accentColor="purple"
+            />
+          </TabsContent>
+
+          {/* Cross-Module Tab */}
+          <TabsContent value="cross-module" className="mt-6 space-y-6">
+            <DataQualityPanel
+              title="Cross-Module Integrity"
+              description="Verify data relationships and dependencies between modules"
+              results={crossModuleResults}
+              isRunning={isCrossModuleRunning}
+              lastRunTime={crossModuleLastRunTime}
+              onRefresh={runCrossModuleChecks}
+              accentColor="orange"
+            />
+          </TabsContent>
+
+          {/* Module Overview Tab */}
+          <TabsContent value="module-overview" className="mt-6 space-y-6">
+            <RealDataSummary />
+          </TabsContent>
         </Tabs>
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground font-mono pt-4 border-t border-cyan-500/10">
-          <span className="text-cyan-600">PROACTIVE MONITORING</span> • Testing infrastructure + business flows for Sinotruck, Special Hire, Yutong, School Bus, Fleet, Daily Trips
+          <span className="text-cyan-600">PROACTIVE MONITORING</span> • Testing infrastructure + business flows + data quality + business rules + cross-module integrity
         </div>
       </div>
     </div>

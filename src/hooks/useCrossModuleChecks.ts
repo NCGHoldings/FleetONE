@@ -23,6 +23,8 @@ export interface UseCrossModuleChecksReturn {
   lastRunTime: Date | null;
   runAllChecks: () => Promise<void>;
   issueCount: number;
+  errorCount: number;
+  warningCount: number;
 }
 
 export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
@@ -230,12 +232,16 @@ export const useCrossModuleChecks = (): UseCrossModuleChecksReturn => {
   }, []);
 
   const issueCount = results.filter(r => r.status !== 'success').length;
+  const errorCount = results.filter(r => r.status === 'error').length;
+  const warningCount = results.filter(r => r.status === 'warning').length;
 
   return {
     results,
     isRunning,
     lastRunTime,
     runAllChecks,
-    issueCount
+    issueCount,
+    errorCount,
+    warningCount
   };
 };
