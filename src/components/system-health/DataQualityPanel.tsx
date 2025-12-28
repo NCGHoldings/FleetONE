@@ -42,7 +42,7 @@ export const DataQualityPanel = ({
   };
 
   const groupedResults = results.reduce((acc, result) => {
-    const category = result.category;
+    const category = 'category' in result ? result.category : 'Cross-Module';
     if (!acc[category]) acc[category] = [];
     acc[category].push(result);
     return acc;
