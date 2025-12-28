@@ -25,6 +25,8 @@ export interface UseBusinessRulesChecksReturn {
   runAllChecks: () => Promise<void>;
   criticalCount: number;
   highCount: number;
+  errorCount: number;
+  warningCount: number;
 }
 
 export const useBusinessRulesChecks = (): UseBusinessRulesChecksReturn => {
@@ -244,6 +246,8 @@ export const useBusinessRulesChecks = (): UseBusinessRulesChecksReturn => {
 
   const criticalCount = results.filter(r => r.status === 'error' && r.severity === 'critical').length;
   const highCount = results.filter(r => r.status !== 'success' && r.severity === 'high').length;
+  const errorCount = results.filter(r => r.status === 'error').length;
+  const warningCount = results.filter(r => r.status === 'warning').length;
 
   return {
     results,
@@ -251,6 +255,8 @@ export const useBusinessRulesChecks = (): UseBusinessRulesChecksReturn => {
     lastRunTime,
     runAllChecks,
     criticalCount,
-    highCount
+    highCount,
+    errorCount,
+    warningCount
   };
 };
