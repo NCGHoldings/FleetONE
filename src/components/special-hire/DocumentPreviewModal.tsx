@@ -338,7 +338,7 @@ export function DocumentPreviewModal({
             {/* Left Side - Edit Form (when in edit mode) */}
             {mode === 'edit' && (
               <div className="w-1/3 border-r overflow-hidden flex flex-col">
-                <ScrollArea className="flex-1 p-4">
+                <ScrollArea className="h-[65vh] p-4">
                   <div className="space-y-6">
                     {Object.entries(fieldsBySection).map(([section, fields]) => (
                       <Card key={section}>
