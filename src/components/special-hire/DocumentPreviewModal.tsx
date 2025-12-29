@@ -133,11 +133,35 @@ export function DocumentPreviewModal({
     return sections;
   }, [documentType]);
 
+  // Recalculate customerTotalWithFuel when pricing fields change
+  const recalculateCustomerTotal = (data: Record<string, any>): number => {
+    const grossRevenue = Number(data.gross_revenue) || 0;
+    const fuelCostTotal = Number(data.fuel_cost_fuel_only) || 0;
+    const commissionPassThrough = Number(data.commission_pass_through_amount) || 0;
+    const additionalCharges = Number(data.total_additional_charges) || 0;
+    const discount = Number(data.discount_amount_lkr) || 0;
+    const percentageAdjustment = Number(data.percentage_adjustment) || 0;
+
+    const customerTotalBeforeAdjustment =
+      grossRevenue + fuelCostTotal + commissionPassThrough + additionalCharges - discount;
+    const adjustmentAmount = customerTotalBeforeAdjustment * (percentageAdjustment / 100);
+    
+    return Math.round(customerTotalBeforeAdjustment + adjustmentAmount);
+  };
+
   const handleFieldChange = (key: string, value: any) => {
-    setEditedData(prev => ({
-      ...prev,
-      [key]: value
-    }));
+    const pricingFields = ['gross_revenue', 'fuel_cost_fuel_only', 'discount_amount_lkr', 'total_additional_charges', 'commission_pass_through_amount', 'percentage_adjustment'];
+    
+    setEditedData(prev => {
+      const updated = { ...prev, [key]: value };
+      
+      // Recalculate customerTotalWithFuel if any pricing field changed
+      if (pricingFields.includes(key)) {
+        updated.customerTotalWithFuel = recalculateCustomerTotal(updated);
+      }
+      
+      return updated;
+    });
   };
 
   const handlePreviewImpact = () => {

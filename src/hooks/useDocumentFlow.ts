@@ -226,6 +226,32 @@ export function useDocumentFlow(quotationId: string | null) {
 
       if (error) throw error;
 
+      // If saving quotation type, also update the main quotation record
+      if (documentType === 'quotation') {
+        const { error: updateError } = await supabase
+          .from('special_hire_quotations')
+          .update({
+            customer_name: documentData.customer_name,
+            customer_phone: documentData.customer_phone,
+            customer_email: documentData.customer_email,
+            company_name: documentData.company_name,
+            pickup_location: documentData.pickup_location,
+            drop_location: documentData.drop_location,
+            pickup_datetime: documentData.pickup_datetime,
+            drop_datetime: documentData.drop_datetime,
+            gross_revenue: documentData.gross_revenue,
+            fuel_cost_fuel_only: documentData.fuel_cost_fuel_only,
+            discount_amount_lkr: documentData.discount_amount_lkr,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', quotationId);
+
+        if (updateError) {
+          console.error('Error updating quotation:', updateError);
+          toast.error('Changes saved to version history but failed to update quotation');
+        }
+      }
+
       await fetchDocumentFlow();
       return data as DocumentVersion;
 

@@ -142,21 +142,16 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
     };
   };
 
-  // Use the exact same value that CostBreakdown displays
+  // Always recalculate from current field values to reflect edits in real-time
   const calculateFinalCustomerTotal = (quot: QuotationData): number => {
-    // The customerTotalWithFuel is already calculated for ALL buses in CostCalculator
-    // and stored correctly in the database. Just use it directly.
-    if (quot.customerTotalWithFuel !== undefined && quot.customerTotalWithFuel !== null) {
-      return quot.customerTotalWithFuel;
-    }
-
-    // Fallback (total for ALL buses). Note: fuel_cost_fuel_only is already total across buses
-    const grossRevenue = parsedQuotation.gross_revenue || 0; // Already for all buses
-    const fuelCostTotal = parsedQuotation.fuel_cost_fuel_only || 0; // Do NOT multiply by buses
-    const commissionPassThrough = parsedQuotation.commission_pass_through_amount || 0;
-    const additionalCharges = parsedQuotation.total_additional_charges || 0;
-    const discount = parsedQuotation.discount_amount_lkr || 0;
-    const percentageAdjustment = parsedQuotation.percentage_adjustment || 0;
+    // Always calculate from component values - don't use stored customerTotalWithFuel
+    // This ensures edited values are reflected in preview immediately
+    const grossRevenue = Number(quot.gross_revenue) || 0;
+    const fuelCostTotal = Number(quot.fuel_cost_fuel_only) || 0;
+    const commissionPassThrough = Number(quot.commission_pass_through_amount) || 0;
+    const additionalCharges = Number(quot.total_additional_charges) || 0;
+    const discount = Number(quot.discount_amount_lkr) || 0;
+    const percentageAdjustment = Number(quot.percentage_adjustment) || 0;
 
     const customerTotalBeforeAdjustment =
       grossRevenue + fuelCostTotal + commissionPassThrough + additionalCharges - discount;
