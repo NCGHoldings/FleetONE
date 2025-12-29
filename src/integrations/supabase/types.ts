@@ -8592,6 +8592,42 @@ export type Database = {
         }
         Relationships: []
       }
+      system_flow_diagrams: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          diagram_name: string
+          flow_config: Json
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          module_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          diagram_name?: string
+          flow_config?: Json
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          module_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          diagram_name?: string
+          flow_config?: Json
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          module_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       system_health_logs: {
         Row: {
           check_name: string
