@@ -459,6 +459,13 @@ export default function SpecialHire() {
             </TabsTrigger>
 
             {isAdmin && (
+              <TabsTrigger value="system-flow" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+                <Workflow className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span>Flow</span>
+              </TabsTrigger>
+            )}
+
+            {isAdmin && (
               <TabsTrigger value="approvals" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
                 <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span>Approvals</span>
@@ -527,7 +534,12 @@ export default function SpecialHire() {
           <ReferralAgentsManagement />
         </TabsContent>
 
-        {/* Admin-only content */}
+        {/* System Flow Diagram - Admin only */}
+        {isAdmin && (
+          <TabsContent value="system-flow" className="space-y-6">
+            <SpecialHireFlowDiagram />
+          </TabsContent>
+        )}
         {isAdmin && (
           <TabsContent value="approvals" className="space-y-6">
             <AdminApprovalInterface onRefresh={loadStats} />
