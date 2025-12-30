@@ -13,7 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { BusDailySummary } from "@/hooks/useDailyBusGroupedTrips";
 import { format } from "date-fns";
-
+import { ExpenseBreakdownPreview } from "./ExpenseBreakdownPreview";
 interface BusDailySummaryTableProps {
   summaries: BusDailySummary[];
   onRefresh: () => void;
@@ -253,6 +253,14 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
                     ))}
                   </div>
 
+                  {/* Expense Breakdown Preview */}
+                  <ExpenseBreakdownPreview
+                    expenses={summary.daily_expenses}
+                    busId={summary.bus_id}
+                    busNo={summary.bus_no}
+                    date={summary.date}
+                  />
+
                   <div className="flex gap-2 mt-4">
                     <Button
                       variant="outline"
@@ -260,13 +268,6 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
                       onClick={() => navigate(`/trips/quick-entry?date=${summary.date}`)}
                     >
                       Quick Entry
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/daily-bus-expenses?bus=${summary.bus_id}&date=${summary.date}`)}
-                    >
-                      Edit Daily Expenses
                     </Button>
                     <Button
                       variant="outline"
