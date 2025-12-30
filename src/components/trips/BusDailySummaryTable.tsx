@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -13,7 +13,9 @@ import {
 import { useNavigate } from "react-router-dom";
 import { BusDailySummary } from "@/hooks/useDailyBusGroupedTrips";
 import { format } from "date-fns";
-import { ExpenseBreakdownPreview } from "./ExpenseBreakdownPreview";
+import { ExpenseBreakdownPreview, DailyExpenseData } from "./ExpenseBreakdownPreview";
+import { InlineExpenseEditor } from "./InlineExpenseEditor";
+import { InlineRevenueEditor } from "./InlineRevenueEditor";
 interface BusDailySummaryTableProps {
   summaries: BusDailySummary[];
   onRefresh: () => void;
@@ -22,6 +24,26 @@ interface BusDailySummaryTableProps {
 export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTableProps) {
   const navigate = useNavigate();
   const [expandedBuses, setExpandedBuses] = useState<Set<string>>(new Set());
+  
+  // Inline editor states
+  const [editingExpenseBus, setEditingExpenseBus] = useState<{
+    busId: string;
+    busNo: string;
+    date: string;
+    expenses: DailyExpenseData | null;
+  } | null>(null);
+  
+  const [editingTrip, setEditingTrip] = useState<{
+    id: string;
+    trip_no: string;
+    route_name: string;
+    driver_name?: string;
+    conductor_name?: string;
+    income: number;
+    distance_km?: number;
+    start_time?: string;
+    end_time?: string;
+  } | null>(null);
 
   const toggleExpanded = (busId: string) => {
     const newExpanded = new Set(expandedBuses);
@@ -221,6 +243,24 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
                             <div className="text-muted-foreground">Revenue</div>
                             <div className="font-medium flex items-center gap-2">
                               {formatCurrency(trip.income)}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => setEditingTrip({
+                                  id: trip.id,
+                                  trip_no: trip.trip_no,
+                                  route_name: trip.route_name,
+                                  driver_name: trip.driver_name,
+                                  conductor_name: trip.conductor_name,
+                                  income: trip.income,
+                                  distance_km: trip.distance_km,
+                                  start_time: trip.start_time,
+                                  end_time: trip.end_time,
+                                })}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
                               {trip.income === 0 && (
                                 <Badge variant="outline" className="text-xs">
                                   Awaiting Entry
@@ -259,6 +299,12 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
                     busId={summary.bus_id}
                     busNo={summary.bus_no}
                     date={summary.date}
+                    onEditExpenses={() => setEditingExpenseBus({
+                      busId: summary.bus_id,
+                      busNo: summary.bus_no,
+                      date: summary.date,
+                      expenses: summary.daily_expenses,
+                    })}
                   />
 
                   <div className="flex gap-2 mt-4">
@@ -283,6 +329,25 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
           </Collapsible>
         );
       })}
+
+      {/* Inline Expense Editor */}
+      <InlineExpenseEditor
+        isOpen={!!editingExpenseBus}
+        onClose={() => setEditingExpenseBus(null)}
+        busId={editingExpenseBus?.busId || ''}
+        busNo={editingExpenseBus?.busNo || ''}
+        date={editingExpenseBus?.date || ''}
+        existingExpenses={editingExpenseBus?.expenses}
+        onSaved={onRefresh}
+      />
+
+      {/* Inline Revenue Editor */}
+      <InlineRevenueEditor
+        isOpen={!!editingTrip}
+        onClose={() => setEditingTrip(null)}
+        trip={editingTrip}
+        onSaved={onRefresh}
+      />
     </div>
   );
 }
