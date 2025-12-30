@@ -380,7 +380,7 @@ export function GLExportModal({
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="max-h-[calc(90vh-140px)] pr-4">
           <div className="space-y-6 py-4">
           {/* Date Selection Mode */}
           <div className="space-y-3">
