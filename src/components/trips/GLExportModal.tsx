@@ -372,7 +372,7 @@ export function GLExportModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
@@ -423,7 +423,7 @@ export function GLExportModal({
           {dateSelectionMode === 'range' && datesInRange.length > 0 && (
             <div className="space-y-3">
               <Label className="text-sm font-medium">Select Buses for Each Date</Label>
-              <ScrollArea className="max-h-[400px] rounded-md border p-4">
+              <ScrollArea className="max-h-[200px] rounded-md border p-4">
                 <div className="space-y-4">
                   {datesInRange.map((date, index) => {
                     const dateStr = format(date, 'yyyy-MM-dd');
