@@ -1,8 +1,7 @@
 import { Fuel, Utensils, Wrench, FileText, Car, AlertTriangle, Plus, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 
-interface DailyExpenseData {
+export interface DailyExpenseData {
   fuel_cost?: number | null;
   fuel_liters?: number | null;
   salary?: number | null;
@@ -33,6 +32,7 @@ interface ExpenseBreakdownPreviewProps {
   busId: string;
   busNo: string;
   date: string;
+  onEditExpenses?: () => void;
 }
 
 const expenseCategories = [
@@ -59,9 +59,7 @@ const expenseCategories = [
   { key: 'other', label: 'Other', icon: null, color: 'text-slate-600 dark:text-slate-400' },
 ];
 
-export function ExpenseBreakdownPreview({ expenses, busId, busNo, date }: ExpenseBreakdownPreviewProps) {
-  const navigate = useNavigate();
-
+export function ExpenseBreakdownPreview({ expenses, busId, busNo, date, onEditExpenses }: ExpenseBreakdownPreviewProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
@@ -71,8 +69,10 @@ export function ExpenseBreakdownPreview({ expenses, busId, busNo, date }: Expens
     }).format(amount);
   };
 
-  const handleNavigateToExpenses = () => {
-    navigate(`/daily-bus-expenses?bus=${busId}&date=${date}`);
+  const handleEditClick = () => {
+    if (onEditExpenses) {
+      onEditExpenses();
+    }
   };
 
   // No expenses entered
@@ -88,7 +88,7 @@ export function ExpenseBreakdownPreview({ expenses, busId, busNo, date }: Expens
           <p className="text-sm text-muted-foreground mb-3">
             Add daily expenses to calculate accurate profit margins
           </p>
-          <Button onClick={handleNavigateToExpenses} size="sm">
+          <Button onClick={handleEditClick} size="sm">
             <Plus className="mr-2 h-4 w-4" />
             Add Expenses for {busNo}
           </Button>
@@ -109,7 +109,7 @@ export function ExpenseBreakdownPreview({ expenses, busId, busNo, date }: Expens
     <div className="mt-4 border-t pt-4">
       <div className="flex items-center justify-between mb-3">
         <h5 className="font-medium text-sm text-muted-foreground">Daily Expense Breakdown</h5>
-        <Button variant="outline" size="sm" onClick={handleNavigateToExpenses}>
+        <Button variant="outline" size="sm" onClick={handleEditClick}>
           <Edit className="mr-2 h-3 w-3" />
           Edit Expenses
         </Button>
