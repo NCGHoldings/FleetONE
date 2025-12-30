@@ -370,6 +370,26 @@ export function GLExportModal({
     });
   };
 
+  // Check if all buses are selected for all dates
+  const isAllDatesSelected = useMemo(() => {
+    if (datesInRange.length === 0 || availableBuses.length === 0) return false;
+    return datesInRange.every(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const selectedForDate = dateWiseBusSelection[dateStr] || [];
+      return selectedForDate.length === availableBuses.length;
+    });
+  }, [datesInRange, dateWiseBusSelection, availableBuses]);
+
+  // Toggle all buses for all dates
+  const handleSelectAllDates = () => {
+    const newSelection: Record<string, string[]> = {};
+    datesInRange.forEach(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      newSelection[dateStr] = isAllDatesSelected ? [] : [...availableBuses];
+    });
+    setDateWiseBusSelection(newSelection);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] h-[85vh] flex flex-col overflow-hidden">
@@ -380,8 +400,9 @@ export function GLExportModal({
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 pr-4">
-          <div className="space-y-6 py-4">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full pr-4">
+            <div className="space-y-6 py-4">
           {/* Date Selection Mode */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Date Selection</Label>
@@ -422,7 +443,18 @@ export function GLExportModal({
           {/* Bus Selection - Date Wise for Range Mode */}
           {dateSelectionMode === 'range' && datesInRange.length > 0 && (
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Select Buses for Each Date</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Select Buses for Each Date</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAllDates}
+                  className="h-7 text-xs"
+                >
+                  {isAllDatesSelected ? 'Deselect All Dates' : 'Select All Dates'}
+                </Button>
+              </div>
               <ScrollArea className="max-h-[300px] rounded-md border p-4">
                 <div className="space-y-4">
                   {datesInRange.map((date, index) => {
@@ -621,7 +653,7 @@ export function GLExportModal({
                   <div className="text-xs text-muted-foreground mb-2">
                     Verify each date's data before export:
                   </div>
-                  <ScrollArea className="max-h-[200px] border rounded-md p-2 bg-muted/20">
+                  <ScrollArea className="max-h-[250px] border rounded-md p-2 bg-muted/20">
                     <div className="space-y-4">
                       {datesInRange.map(date => {
                         const dateStr = format(date, 'yyyy-MM-dd');
@@ -720,8 +752,9 @@ export function GLExportModal({
               )}
             </div>
           </div>
+          </div>
+          </ScrollArea>
         </div>
-        </ScrollArea>
 
         {/* Actions */}
         <div className="flex justify-end gap-3 flex-shrink-0 pt-4 border-t">
