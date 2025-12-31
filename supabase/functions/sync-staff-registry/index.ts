@@ -70,57 +70,84 @@ serve(async (req) => {
       console.log(`Found ${trips?.length || 0} trips with notes`);
       
       for (const trip of trips || []) {
-        // Try to parse notes as JSON
+        // Try to parse notes as JSON - format is {"driver":"Name","conductor":"Name"}
         if (trip.notes) {
           try {
-            // Check if notes contains driver/conductor info
-            const notesLower = trip.notes.toLowerCase();
+            const notesJson = JSON.parse(trip.notes);
             
-            // Common patterns: "Driver: Name", "Conductor: Name", etc.
+            // Extract driver from JSON
+            if (notesJson.driver && notesJson.driver !== 'N/A' && notesJson.driver.trim().length > 1) {
+              candidates.push({ 
+                name: notesJson.driver.trim(), 
+                type: 'driver', 
+                source: 'daily_trips_notes' 
+              });
+            }
+            
+            // Extract conductor from JSON
+            if (notesJson.conductor && notesJson.conductor !== 'N/A' && notesJson.conductor.trim().length > 1) {
+              candidates.push({ 
+                name: notesJson.conductor.trim(), 
+                type: 'conductor', 
+                source: 'daily_trips_notes' 
+              });
+            }
+            
+            // Also check for driver_name/conductor_name keys
+            if (notesJson.driver_name && notesJson.driver_name !== 'N/A' && notesJson.driver_name.trim().length > 1) {
+              candidates.push({ 
+                name: notesJson.driver_name.trim(), 
+                type: 'driver', 
+                source: 'daily_trips_notes' 
+              });
+            }
+            
+            if (notesJson.conductor_name && notesJson.conductor_name !== 'N/A' && notesJson.conductor_name.trim().length > 1) {
+              candidates.push({ 
+                name: notesJson.conductor_name.trim(), 
+                type: 'conductor', 
+                source: 'daily_trips_notes' 
+              });
+            }
+          } catch {
+            // Not valid JSON, try regex patterns as fallback
             const driverMatch = trip.notes.match(/driver[:\s]+([A-Za-z\s]+)/i);
             const conductorMatch = trip.notes.match(/conductor[:\s]+([A-Za-z\s]+)/i);
             
             if (driverMatch && driverMatch[1]) {
               const name = driverMatch[1].trim().split(/[,\n]/)[0].trim();
               if (name.length > 1) {
-                candidates.push({ name, type: 'driver', source: 'daily_trips_notes' });
+                candidates.push({ name, type: 'driver', source: 'daily_trips_notes_regex' });
               }
             }
             
             if (conductorMatch && conductorMatch[1]) {
               const name = conductorMatch[1].trim().split(/[,\n]/)[0].trim();
               if (name.length > 1) {
-                candidates.push({ name, type: 'conductor', source: 'daily_trips_notes' });
+                candidates.push({ name, type: 'conductor', source: 'daily_trips_notes_regex' });
               }
             }
-          } catch {
-            // Not JSON, skip
           }
         }
 
         // Try income_details JSON
         if (trip.income_details && typeof trip.income_details === 'object') {
           const details = trip.income_details as Record<string, any>;
-          if (details.driver_name) {
+          if (details.driver_name && details.driver_name !== 'N/A') {
             candidates.push({ name: details.driver_name, type: 'driver', source: 'income_details' });
           }
-          if (details.conductor_name) {
+          if (details.conductor_name && details.conductor_name !== 'N/A') {
             candidates.push({ name: details.conductor_name, type: 'conductor', source: 'income_details' });
           }
         }
       }
     }
 
-    // 2. Extract from driver_allocations
+    // 2. Extract from driver_allocations - check notes for excel_driver/excel_conductor
     console.log('Fetching driver_allocations...');
     const { data: allocations, error: allocError } = await supabase
       .from('driver_allocations')
-      .select(`
-        driver_id,
-        conductor_id,
-        driver:profiles!driver_allocations_driver_id_fkey(full_name),
-        conductor:profiles!driver_allocations_conductor_id_fkey(full_name)
-      `);
+      .select('notes');
 
     if (allocError) {
       console.error('Error fetching allocations:', allocError);
@@ -128,40 +155,69 @@ serve(async (req) => {
       console.log(`Found ${allocations?.length || 0} allocations`);
       
       for (const alloc of allocations || []) {
-        if (alloc.driver && (alloc.driver as any).full_name) {
-          candidates.push({ 
-            name: (alloc.driver as any).full_name, 
-            type: 'driver', 
-            source: 'driver_allocations' 
-          });
-        }
-        if (alloc.conductor && (alloc.conductor as any).full_name) {
-          candidates.push({ 
-            name: (alloc.conductor as any).full_name, 
-            type: 'conductor', 
-            source: 'driver_allocations' 
-          });
+        if (alloc.notes) {
+          try {
+            const notesJson = JSON.parse(alloc.notes);
+            
+            // Extract excel_driver
+            if (notesJson.excel_driver && notesJson.excel_driver !== 'N/A' && notesJson.excel_driver.trim().length > 1) {
+              candidates.push({ 
+                name: notesJson.excel_driver.trim(), 
+                type: 'driver', 
+                source: 'driver_allocations' 
+              });
+            }
+            
+            // Extract excel_conductor
+            if (notesJson.excel_conductor && notesJson.excel_conductor !== 'N/A' && notesJson.excel_conductor.trim().length > 1) {
+              candidates.push({ 
+                name: notesJson.excel_conductor.trim(), 
+                type: 'conductor', 
+                source: 'driver_allocations' 
+              });
+            }
+            
+            // Also check for driver/conductor keys
+            if (notesJson.driver && notesJson.driver !== 'N/A' && notesJson.driver.trim().length > 1) {
+              candidates.push({ 
+                name: notesJson.driver.trim(), 
+                type: 'driver', 
+                source: 'driver_allocations' 
+              });
+            }
+            
+            if (notesJson.conductor && notesJson.conductor !== 'N/A' && notesJson.conductor.trim().length > 1) {
+              candidates.push({ 
+                name: notesJson.conductor.trim(), 
+                type: 'conductor', 
+                source: 'driver_allocations' 
+              });
+            }
+          } catch {
+            // Not JSON, skip
+          }
         }
       }
     }
 
-    // 3. Extract from profiles with driver/conductor roles
+    // 3. Extract from profiles - use first_name + last_name
     console.log('Fetching profiles...');
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('full_name, role')
-      .or('role.eq.driver,role.eq.conductor');
+      .select('first_name, last_name');
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
     } else {
-      console.log(`Found ${profiles?.length || 0} profiles with driver/conductor roles`);
+      console.log(`Found ${profiles?.length || 0} profiles`);
       
       for (const profile of profiles || []) {
-        if (profile.full_name && profile.role) {
+        const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+        if (fullName && fullName.length > 1) {
+          // Add as driver by default (can be changed later)
           candidates.push({ 
-            name: profile.full_name, 
-            type: profile.role as 'driver' | 'conductor', 
+            name: fullName, 
+            type: 'driver', 
             source: 'profiles' 
           });
         }
