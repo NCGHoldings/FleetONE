@@ -5534,6 +5534,33 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_settings: {
+        Row: {
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       pending_invites: {
         Row: {
           created_at: string
@@ -6179,6 +6206,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      route_targets: {
+        Row: {
+          conductor_commission_percent: number
+          created_at: string
+          driver_commission_percent: number
+          effective_from: string
+          effective_to: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          revenue_target: number
+          route_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          conductor_commission_percent?: number
+          created_at?: string
+          driver_commission_percent?: number
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          revenue_target?: number
+          route_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          conductor_commission_percent?: number
+          created_at?: string
+          driver_commission_percent?: number
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          revenue_target?: number
+          route_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_targets_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       routes: {
         Row: {
@@ -8482,15 +8559,20 @@ export type Database = {
         Row: {
           attendance_date: string
           auto_generated: boolean | null
+          auto_synced: boolean | null
           bus_no: string | null
+          commission_earned: number | null
           created_at: string
+          daily_rate: number | null
           end_time: string | null
           hours_worked: number | null
           id: string
           overtime_hours: number | null
           route: string | null
+          salary_type: Database["public"]["Enums"]["salary_type"] | null
           staff_id: string
           staff_name: string
+          staff_registry_id: string | null
           start_time: string | null
           status: string
           trip_id: string | null
@@ -8499,15 +8581,20 @@ export type Database = {
         Insert: {
           attendance_date?: string
           auto_generated?: boolean | null
+          auto_synced?: boolean | null
           bus_no?: string | null
+          commission_earned?: number | null
           created_at?: string
+          daily_rate?: number | null
           end_time?: string | null
           hours_worked?: number | null
           id?: string
           overtime_hours?: number | null
           route?: string | null
+          salary_type?: Database["public"]["Enums"]["salary_type"] | null
           staff_id: string
           staff_name: string
+          staff_registry_id?: string | null
           start_time?: string | null
           status?: string
           trip_id?: string | null
@@ -8516,21 +8603,116 @@ export type Database = {
         Update: {
           attendance_date?: string
           auto_generated?: boolean | null
+          auto_synced?: boolean | null
           bus_no?: string | null
+          commission_earned?: number | null
           created_at?: string
+          daily_rate?: number | null
           end_time?: string | null
           hours_worked?: number | null
           id?: string
           overtime_hours?: number | null
           route?: string | null
+          salary_type?: Database["public"]["Enums"]["salary_type"] | null
           staff_id?: string
           staff_name?: string
+          staff_registry_id?: string | null
           start_time?: string | null
           status?: string
           trip_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "staff_attendance_staff_registry_id_fkey"
+            columns: ["staff_registry_id"]
+            isOneToOne: false
+            referencedRelation: "staff_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_commissions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          commission_amount: number
+          commission_percent: number
+          created_at: string
+          excess_revenue: number
+          id: string
+          notes: string | null
+          paid_at: string | null
+          route_id: string | null
+          route_revenue: number
+          staff_id: string
+          status: Database["public"]["Enums"]["commission_status"] | null
+          target_amount: number
+          trip_date: string
+          trip_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          commission_amount?: number
+          commission_percent?: number
+          created_at?: string
+          excess_revenue?: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          route_id?: string | null
+          route_revenue?: number
+          staff_id: string
+          status?: Database["public"]["Enums"]["commission_status"] | null
+          target_amount?: number
+          trip_date: string
+          trip_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          commission_amount?: number
+          commission_percent?: number
+          created_at?: string
+          excess_revenue?: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          route_id?: string | null
+          route_revenue?: number
+          staff_id?: string
+          status?: Database["public"]["Enums"]["commission_status"] | null
+          target_amount?: number
+          trip_date?: string
+          trip_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_commissions_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_commissions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_commissions_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "daily_trips"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_performance: {
         Row: {
@@ -8567,6 +8749,68 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      staff_registry: {
+        Row: {
+          address: string | null
+          contact_number: string | null
+          created_at: string
+          daily_rate: number | null
+          emergency_contact: string | null
+          id: string
+          is_active: boolean | null
+          monthly_salary: number | null
+          nic_number: string | null
+          notes: string | null
+          profile_id: string | null
+          salary_type: Database["public"]["Enums"]["salary_type"]
+          staff_name: string
+          staff_type: Database["public"]["Enums"]["staff_type"]
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_number?: string | null
+          created_at?: string
+          daily_rate?: number | null
+          emergency_contact?: string | null
+          id?: string
+          is_active?: boolean | null
+          monthly_salary?: number | null
+          nic_number?: string | null
+          notes?: string | null
+          profile_id?: string | null
+          salary_type?: Database["public"]["Enums"]["salary_type"]
+          staff_name: string
+          staff_type: Database["public"]["Enums"]["staff_type"]
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_number?: string | null
+          created_at?: string
+          daily_rate?: number | null
+          emergency_contact?: string | null
+          id?: string
+          is_active?: boolean | null
+          monthly_salary?: number | null
+          nic_number?: string | null
+          notes?: string | null
+          profile_id?: string | null
+          salary_type?: Database["public"]["Enums"]["salary_type"]
+          staff_name?: string
+          staff_type?: Database["public"]["Enums"]["staff_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_registry_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       submission_rules: {
         Row: {
@@ -12862,6 +13106,7 @@ export type Database = {
         | "governance_viewer"
       approval_status: "pending" | "approved" | "rejected"
       ar_ap_status: "unpaid" | "partial" | "paid" | "overdue"
+      commission_status: "pending" | "approved" | "paid"
       conductor_submission_status:
         | "pending"
         | "processing"
@@ -12956,6 +13201,7 @@ export type Database = {
         | "cr_print_collected"
         | "registration_completed"
         | "rejected"
+      salary_type: "monthly" | "daily"
       shipping_document_type:
         | "commercial_invoice"
         | "packing_list"
@@ -12964,6 +13210,7 @@ export type Database = {
         | "insurance_certificate"
         | "customs_declaration"
       shipping_method: "roro" | "container"
+      staff_type: "driver" | "conductor"
       submission_rule_type:
         | "SAME_AS_FREQUENCY"
         | "FIXED_DAY_EACH_MONTH"
@@ -13159,6 +13406,7 @@ export const Constants = {
       ],
       approval_status: ["pending", "approved", "rejected"],
       ar_ap_status: ["unpaid", "partial", "paid", "overdue"],
+      commission_status: ["pending", "approved", "paid"],
       conductor_submission_status: [
         "pending",
         "processing",
@@ -13263,6 +13511,7 @@ export const Constants = {
         "registration_completed",
         "rejected",
       ],
+      salary_type: ["monthly", "daily"],
       shipping_document_type: [
         "commercial_invoice",
         "packing_list",
@@ -13272,6 +13521,7 @@ export const Constants = {
         "customs_declaration",
       ],
       shipping_method: ["roro", "container"],
+      staff_type: ["driver", "conductor"],
       submission_rule_type: [
         "SAME_AS_FREQUENCY",
         "FIXED_DAY_EACH_MONTH",
