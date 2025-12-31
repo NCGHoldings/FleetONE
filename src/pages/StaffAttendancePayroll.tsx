@@ -8,14 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { 
   Calendar, Download, RefreshCcw, Settings, Users, TrendingUp, 
   Clock, DollarSign, CheckCircle2, AlertCircle, Loader2, Play, 
-  Check, X, User
+  Check, X, User, LayoutGrid, List, AlertTriangle
 } from "lucide-react";
 import { useStaffRegistry } from "@/hooks/useStaffRegistry";
 import { useCommissions } from "@/hooks/useCommissions";
+import { AttendanceCalendar } from "@/components/staff/AttendanceCalendar";
 
 interface AttendanceRow {
   id: string;
@@ -61,6 +63,8 @@ export default function StaffAttendancePayroll() {
   const [syncing, setSyncing] = useState(false);
   const [calculatingCommissions, setCalculatingCommissions] = useState(false);
   const [generatingPayroll, setGeneratingPayroll] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('calendar');
+  const [tripsWithoutStaff, setTripsWithoutStaff] = useState<string[]>([]);
 
   const [period, setPeriod] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10),
@@ -172,6 +176,11 @@ export default function StaffAttendancePayroll() {
         : `No new records to sync. ${data.tripsProcessed} trips processed.`;
       
       toast.success(msg);
+      
+      // Store trips without staff for warning display
+      if (data.tripsWithoutStaff?.length > 0) {
+        setTripsWithoutStaff(data.tripsWithoutStaff);
+      }
       
       // Show warnings for unmatched staff
       if (data.unmatchedDrivers?.length > 0) {
@@ -350,13 +359,36 @@ export default function StaffAttendancePayroll() {
         <TabsContent value="attendance">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Daily Attendance
-              </CardTitle>
-              <CardDescription>
-                Auto-synced from completed trips
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Daily Attendance
+                  </CardTitle>
+                  <CardDescription>
+                    Auto-synced from completed trips
+                  </CardDescription>
+                </div>
+                {/* View Toggle */}
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                  <Button 
+                    variant={viewMode === 'calendar' ? 'default' : 'ghost'} 
+                    size="sm"
+                    onClick={() => setViewMode('calendar')}
+                  >
+                    <LayoutGrid className="h-4 w-4 mr-1" />
+                    Calendar
+                  </Button>
+                  <Button 
+                    variant={viewMode === 'table' ? 'default' : 'ghost'} 
+                    size="sm"
+                    onClick={() => setViewMode('table')}
+                  >
+                    <List className="h-4 w-4 mr-1" />
+                    Table
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Period Filters & Actions */}
@@ -388,69 +420,91 @@ export default function StaffAttendancePayroll() {
                 </div>
               </div>
 
-              {/* Attendance Table */}
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : attendance.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p className="font-medium">No attendance records found</p>
-                  <p className="text-sm">Click "Sync from Trips" to pull attendance from daily trips</p>
-                </div>
+              {/* Warning for trips without staff */}
+              {tripsWithoutStaff.length > 0 && (
+                <Alert className="border-orange-200 bg-orange-50">
+                  <AlertTriangle className="h-4 w-4 text-orange-600" />
+                  <AlertDescription className="text-orange-800">
+                    <span className="font-medium">{tripsWithoutStaff.length} trips have no staff assigned.</span>
+                    <span className="text-sm ml-2">
+                      These trips cannot be synced. Please add driver/conductor info in Daily Trips.
+                    </span>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Calendar View */}
+              {viewMode === 'calendar' ? (
+                <AttendanceCalendar 
+                  attendance={attendance} 
+                  selectedMonth={new Date(period.start)} 
+                  loading={loading}
+                />
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Staff Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Bus</TableHead>
-                      <TableHead>Route</TableHead>
-                      <TableHead>Hours</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Source</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendance.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-medium">
-                          {new Date(row.attendance_date).toLocaleDateString('en-GB', { 
-                            day: '2-digit', 
-                            month: 'short', 
-                            year: 'numeric' 
-                          })}
-                        </TableCell>
-                        <TableCell className="font-medium">{row.staff_name}</TableCell>
-                        <TableCell>
-                          {row.staff_type ? (
-                            <Badge variant={row.staff_type === 'driver' ? 'default' : 'secondary'}>
-                              {row.staff_type}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{row.bus_no || '-'}</TableCell>
-                        <TableCell>{row.route || '-'}</TableCell>
-                        <TableCell>{row.hours_worked || 0}h</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(row.status)}
-                            {getStatusBadge(row.status)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {row.auto_synced ? 'Auto' : 'Manual'}
-                          </Badge>
-                        </TableCell>
+                /* Table View */
+                loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : attendance.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium">No attendance records found</p>
+                    <p className="text-sm">Click "Sync from Trips" to pull attendance from daily trips</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Staff Name</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Bus</TableHead>
+                        <TableHead>Route</TableHead>
+                        <TableHead>Hours</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Source</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {attendance.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-medium">
+                            {new Date(row.attendance_date).toLocaleDateString('en-GB', { 
+                              day: '2-digit', 
+                              month: 'short', 
+                              year: 'numeric' 
+                            })}
+                          </TableCell>
+                          <TableCell className="font-medium">{row.staff_name}</TableCell>
+                          <TableCell>
+                            {row.staff_type ? (
+                              <Badge variant={row.staff_type === 'driver' ? 'default' : 'secondary'}>
+                                {row.staff_type}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{row.bus_no || '-'}</TableCell>
+                          <TableCell>{row.route || '-'}</TableCell>
+                          <TableCell>{row.hours_worked || 0}h</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(row.status)}
+                              {getStatusBadge(row.status)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {row.auto_synced ? 'Auto' : 'Manual'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )
               )}
             </CardContent>
           </Card>

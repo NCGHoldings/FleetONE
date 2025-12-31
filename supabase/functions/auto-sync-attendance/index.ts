@@ -118,7 +118,7 @@ serve(async (req) => {
     // Fetch existing attendance records for the date range
     const { data: existingAttendance, error: existingError } = await supabase
       .from('staff_attendance')
-      .select('id, staff_registry_id, trip_id, auto_generated')
+      .select('id, staff_id, staff_registry_id, trip_id, auto_generated')
       .gte('attendance_date', queryStartDate)
       .lte('attendance_date', queryEndDate);
 
@@ -140,8 +140,9 @@ serve(async (req) => {
 
     const routeMap = new Map((routes || []).map(r => [r.id, r.name]));
     
+    // Use staff_id for checking existing records (since unique constraint is on staff_id, not staff_registry_id)
     const existingKeys = new Set(
-      (existingAttendance || []).map(a => `${a.staff_registry_id}-${a.trip_id}`)
+      (existingAttendance || []).map(a => `${a.staff_id}-${a.trip_id}`)
     );
     
     const attendanceRecords: any[] = [];
@@ -149,6 +150,7 @@ serve(async (req) => {
     let matchedConductors = 0;
     let unmatchedDrivers: string[] = [];
     let unmatchedConductors: string[] = [];
+    const tripsWithoutStaff: string[] = [];
 
     for (const trip of trips || []) {
       const busInfo = busMap.get(trip.bus_id) || { bus_no: 'Unknown', route: null };
@@ -173,6 +175,13 @@ serve(async (req) => {
         }
       }
 
+      // Track trips without staff
+      const hasStaffInNotes = (driverName && driverName !== 'N/A') || (conductorName && conductorName !== 'N/A');
+      const hasStaffIds = trip.driver_id || trip.conductor_id;
+      if (!hasStaffInNotes && !hasStaffIds) {
+        tripsWithoutStaff.push(`${trip.trip_date} - ${busInfo.bus_no}`);
+      }
+
       // Calculate hours worked from start_time and end_time
       let hoursWorked = 12; // Default
       if (trip.start_time && trip.end_time) {
@@ -186,6 +195,26 @@ serve(async (req) => {
         }
       }
 
+      // Helper to create attendance record with required staff_id field
+      const createRecord = (staffMember: StaffRegistry) => ({
+        staff_id: staffMember.id, // Required NOT NULL field - use staff_registry.id
+        staff_registry_id: staffMember.id,
+        staff_name: staffMember.staff_name,
+        attendance_date: trip.trip_date,
+        status: 'present',
+        salary_type: staffMember.salary_type,
+        daily_rate: staffMember.salary_type === 'daily' ? staffMember.daily_rate : 0,
+        trip_id: trip.id,
+        bus_no: busInfo.bus_no,
+        route: routeName || '',
+        hours_worked: Math.round(hoursWorked * 10) / 10,
+        overtime_hours: hoursWorked > 8 ? Math.round((hoursWorked - 8) * 10) / 10 : 0,
+        start_time: trip.start_time || '06:00:00',
+        end_time: trip.end_time || '18:00:00',
+        auto_generated: true,
+        auto_synced: true,
+      });
+
       // Match driver
       if (driverName && driverName !== 'N/A') {
         const matchedDriver = (staffRegistry || []).find(
@@ -196,24 +225,8 @@ serve(async (req) => {
           const key = `${matchedDriver.id}-${trip.id}`;
           if (!forceSync && existingKeys.has(key)) {
             // Already exists, skip
-          } else if (!attendanceRecords.some(r => r.staff_registry_id === matchedDriver.id && r.trip_id === trip.id)) {
-            attendanceRecords.push({
-              staff_registry_id: matchedDriver.id,
-              staff_name: matchedDriver.staff_name,
-              attendance_date: trip.trip_date,
-              status: 'present',
-              salary_type: matchedDriver.salary_type,
-              daily_rate: matchedDriver.salary_type === 'daily' ? matchedDriver.daily_rate : 0,
-              trip_id: trip.id,
-              bus_no: busInfo.bus_no,
-              route: routeName || '',
-              hours_worked: Math.round(hoursWorked * 10) / 10,
-              overtime_hours: hoursWorked > 8 ? Math.round((hoursWorked - 8) * 10) / 10 : 0,
-              start_time: trip.start_time || '06:00:00',
-              end_time: trip.end_time || '18:00:00',
-              auto_generated: true,
-              auto_synced: true,
-            });
+          } else if (!attendanceRecords.some(r => r.staff_id === matchedDriver.id && r.trip_id === trip.id)) {
+            attendanceRecords.push(createRecord(matchedDriver));
             matchedDrivers++;
             console.log(`[auto-sync-attendance] Matched driver: ${driverName} -> ${matchedDriver.staff_name}`);
           }
@@ -235,24 +248,8 @@ serve(async (req) => {
           const key = `${matchedConductor.id}-${trip.id}`;
           if (!forceSync && existingKeys.has(key)) {
             // Already exists, skip
-          } else if (!attendanceRecords.some(r => r.staff_registry_id === matchedConductor.id && r.trip_id === trip.id)) {
-            attendanceRecords.push({
-              staff_registry_id: matchedConductor.id,
-              staff_name: matchedConductor.staff_name,
-              attendance_date: trip.trip_date,
-              status: 'present',
-              salary_type: matchedConductor.salary_type,
-              daily_rate: matchedConductor.salary_type === 'daily' ? matchedConductor.daily_rate : 0,
-              trip_id: trip.id,
-              bus_no: busInfo.bus_no,
-              route: routeName || '',
-              hours_worked: Math.round(hoursWorked * 10) / 10,
-              overtime_hours: hoursWorked > 8 ? Math.round((hoursWorked - 8) * 10) / 10 : 0,
-              start_time: trip.start_time || '06:00:00',
-              end_time: trip.end_time || '18:00:00',
-              auto_generated: true,
-              auto_synced: true,
-            });
+          } else if (!attendanceRecords.some(r => r.staff_id === matchedConductor.id && r.trip_id === trip.id)) {
+            attendanceRecords.push(createRecord(matchedConductor));
             matchedConductors++;
             console.log(`[auto-sync-attendance] Matched conductor: ${conductorName} -> ${matchedConductor.staff_name}`);
           }
@@ -272,24 +269,8 @@ serve(async (req) => {
 
         if (driverStaff) {
           const key = `${driverStaff.id}-${trip.id}`;
-          if (!existingKeys.has(key) && !attendanceRecords.some(r => r.staff_registry_id === driverStaff.id && r.trip_id === trip.id)) {
-            attendanceRecords.push({
-              staff_registry_id: driverStaff.id,
-              staff_name: driverStaff.staff_name,
-              attendance_date: trip.trip_date,
-              status: 'present',
-              salary_type: driverStaff.salary_type,
-              daily_rate: driverStaff.salary_type === 'daily' ? driverStaff.daily_rate : 0,
-              trip_id: trip.id,
-              bus_no: busInfo.bus_no,
-              route: routeName || '',
-              hours_worked: Math.round(hoursWorked * 10) / 10,
-              overtime_hours: hoursWorked > 8 ? Math.round((hoursWorked - 8) * 10) / 10 : 0,
-              start_time: trip.start_time || '06:00:00',
-              end_time: trip.end_time || '18:00:00',
-              auto_generated: true,
-              auto_synced: true,
-            });
+          if (!existingKeys.has(key) && !attendanceRecords.some(r => r.staff_id === driverStaff.id && r.trip_id === trip.id)) {
+            attendanceRecords.push(createRecord(driverStaff));
             matchedDrivers++;
           }
         }
@@ -302,24 +283,8 @@ serve(async (req) => {
 
         if (conductorStaff) {
           const key = `${conductorStaff.id}-${trip.id}`;
-          if (!existingKeys.has(key) && !attendanceRecords.some(r => r.staff_registry_id === conductorStaff.id && r.trip_id === trip.id)) {
-            attendanceRecords.push({
-              staff_registry_id: conductorStaff.id,
-              staff_name: conductorStaff.staff_name,
-              attendance_date: trip.trip_date,
-              status: 'present',
-              salary_type: conductorStaff.salary_type,
-              daily_rate: conductorStaff.salary_type === 'daily' ? conductorStaff.daily_rate : 0,
-              trip_id: trip.id,
-              bus_no: busInfo.bus_no,
-              route: routeName || '',
-              hours_worked: Math.round(hoursWorked * 10) / 10,
-              overtime_hours: hoursWorked > 8 ? Math.round((hoursWorked - 8) * 10) / 10 : 0,
-              start_time: trip.start_time || '06:00:00',
-              end_time: trip.end_time || '18:00:00',
-              auto_generated: true,
-              auto_synced: true,
-            });
+          if (!existingKeys.has(key) && !attendanceRecords.some(r => r.staff_id === conductorStaff.id && r.trip_id === trip.id)) {
+            attendanceRecords.push(createRecord(conductorStaff));
             matchedConductors++;
           }
         }
@@ -331,17 +296,22 @@ serve(async (req) => {
     // Insert attendance records one by one to avoid conflicts
     let insertedCount = 0;
     let errorCount = 0;
+    const insertErrors: string[] = [];
+    
     for (const record of attendanceRecords) {
       const { error: insertError } = await supabase
         .from('staff_attendance')
         .upsert(record, {
-          onConflict: 'staff_registry_id,attendance_date,trip_id',
+          onConflict: 'staff_id,attendance_date,trip_id', // Correct unique constraint
           ignoreDuplicates: true,
         });
       
       if (insertError) {
-        console.log(`[auto-sync-attendance] Insert error:`, insertError.message);
+        console.log(`[auto-sync-attendance] Insert error for ${record.staff_name}:`, insertError.message);
         errorCount++;
+        if (insertErrors.length < 5) {
+          insertErrors.push(`${record.staff_name}: ${insertError.message}`);
+        }
       } else {
         insertedCount++;
       }
@@ -360,7 +330,9 @@ serve(async (req) => {
         matchedConductors,
         unmatchedDrivers: unmatchedDrivers.slice(0, 10),
         unmatchedConductors: unmatchedConductors.slice(0, 10),
+        tripsWithoutStaff: tripsWithoutStaff.slice(0, 20),
         errors: errorCount,
+        errorDetails: insertErrors,
         message: insertedCount > 0 
           ? `Successfully synced ${insertedCount} attendance records from ${trips?.length || 0} trips`
           : `No new attendance records to sync (${trips?.length || 0} trips processed)`,
