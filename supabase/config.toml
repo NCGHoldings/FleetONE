@@ -53,3 +53,12 @@ verify_jwt = false
 
 [functions.service-callback]
 verify_jwt = false
+
+[functions.auto-sync-attendance]
+verify_jwt = false
+
+[functions.calculate-commissions]
+verify_jwt = false
+
+[functions.generate-payroll]
+verify_jwt = false
