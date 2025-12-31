@@ -38,9 +38,24 @@ export interface StaffFormData {
   is_active?: boolean;
 }
 
+export interface SyncResult {
+  success: boolean;
+  message: string;
+  summary: {
+    totalCandidates: number;
+    uniqueCandidates: number;
+    existingStaff: number;
+    newStaffFound: number;
+    addedCount: number;
+    errors?: string[];
+  };
+  newStaff: Array<{ name: string; type: string; source: string }>;
+}
+
 export function useStaffRegistry() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchStaff = async () => {
@@ -60,6 +75,37 @@ export function useStaffRegistry() {
       toast.error('Failed to load staff registry');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const syncFromDataSources = async (): Promise<SyncResult | null> => {
+    try {
+      setSyncing(true);
+      
+      const { data, error } = await supabase.functions.invoke('sync-staff-registry');
+      
+      if (error) throw error;
+      
+      const result = data as SyncResult;
+      
+      if (result.success) {
+        if (result.summary.addedCount > 0) {
+          toast.success(`Added ${result.summary.addedCount} new staff members`);
+        } else {
+          toast.info('No new staff found to add');
+        }
+        await fetchStaff();
+      } else {
+        toast.error('Sync failed');
+      }
+      
+      return result;
+    } catch (err: any) {
+      console.error('Error syncing staff:', err);
+      toast.error(err.message || 'Failed to sync staff from data sources');
+      return null;
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -143,12 +189,14 @@ export function useStaffRegistry() {
   return {
     staff,
     loading,
+    syncing,
     error,
     fetchStaff,
     addStaff,
     updateStaff,
     deleteStaff,
     toggleActive,
+    syncFromDataSources,
     drivers: staff.filter(s => s.staff_type === 'driver' && s.is_active),
     conductors: staff.filter(s => s.staff_type === 'conductor' && s.is_active),
   };

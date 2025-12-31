@@ -3,16 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ColumnDef } from "@tanstack/react-table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { 
   Calendar, Download, RefreshCcw, Settings, Users, TrendingUp, 
-  Clock, DollarSign, CheckCircle2, AlertCircle, Loader2, Play
+  Clock, DollarSign, CheckCircle2, AlertCircle, Loader2, Play, 
+  Check, X, User
 } from "lucide-react";
 import { useStaffRegistry } from "@/hooks/useStaffRegistry";
 import { useCommissions } from "@/hooks/useCommissions";
@@ -22,6 +22,7 @@ interface AttendanceRow {
   staff_registry_id: string | null;
   staff_id: string;
   staff_name: string;
+  staff_type?: string;
   attendance_date: string;
   trip_id?: string;
   bus_no?: string;
@@ -52,7 +53,7 @@ interface PayrollRow {
 export default function StaffAttendancePayroll() {
   const { hasRole, user } = useAuth();
   const isAdmin = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
-  const { staff, drivers, conductors } = useStaffRegistry();
+  const { staff, drivers, conductors, syncFromDataSources, syncing: syncingStaff } = useStaffRegistry();
 
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
   const [payroll, setPayroll] = useState<PayrollRow[]>([]);
@@ -71,14 +72,13 @@ export default function StaffAttendancePayroll() {
     loading: commissionsLoading, 
     pendingCommissions, 
     approvedCommissions,
-    getCommissionSummary,
     approveCommission,
     bulkApprove,
     triggerCalculation 
   } = useCommissions({ start: period.start, end: period.end });
 
   useEffect(() => {
-    document.title = "Attendance & Payroll | NCG Speed";
+    document.title = "Staff Attendance | NCG Speed";
   }, []);
 
   useEffect(() => {
@@ -105,10 +105,10 @@ export default function StaffAttendancePayroll() {
       
       if (error) throw error;
       
-      // Transform data to include staff info
       const transformed = (data || []).map((a: any) => ({
         ...a,
         staff_name: a.staff_registry?.staff_name || a.staff_name || 'Unknown',
+        staff_type: a.staff_registry?.staff_type,
         salary_type: a.staff_registry?.salary_type || a.salary_type,
       }));
       
@@ -207,206 +207,49 @@ export default function StaffAttendancePayroll() {
   };
 
   // Calculate summary stats
-  const totalDaysWorked = attendance.filter(a => a.status === 'present').length;
-  const uniqueStaff = new Set(attendance.map(a => a.staff_registry_id || a.staff_id)).size;
+  const presentCount = attendance.filter(a => a.status === 'present').length;
+  const absentCount = attendance.filter(a => a.status === 'absent').length;
+  const lateCount = attendance.filter(a => a.status === 'late').length;
   const totalCommissionPending = pendingCommissions.reduce((sum, c) => sum + c.commission_amount, 0);
   const totalCommissionApproved = approvedCommissions.reduce((sum, c) => sum + c.commission_amount, 0);
 
-  const attendanceCols: ColumnDef<AttendanceRow>[] = [
-    { 
-      accessorKey: 'attendance_date', 
-      header: 'Date',
-      cell: ({ row }) => new Date(row.original.attendance_date).toLocaleDateString()
-    },
-    { accessorKey: 'staff_name', header: 'Name' },
-    { 
-      accessorKey: 'salary_type', 
-      header: 'Type',
-      cell: ({ row }) => (
-        <Badge variant={row.original.salary_type === 'monthly' ? 'default' : 'secondary'}>
-          {row.original.salary_type || 'N/A'}
-        </Badge>
-      )
-    },
-    { accessorKey: 'bus_no', header: 'Bus' },
-    { accessorKey: 'route', header: 'Route' },
-    { 
-      accessorKey: 'hours_worked', 
-      header: 'Hours',
-      cell: ({ row }) => `${row.original.hours_worked || 0}h`
-    },
-    { 
-      accessorKey: 'status', 
-      header: 'Status',
-      cell: ({ row }) => (
-        <Badge variant={row.original.status === 'present' ? 'default' : 'outline'}>
-          {row.original.status}
-        </Badge>
-      )
-    },
-    { 
-      accessorKey: 'auto_synced', 
-      header: 'Source',
-      cell: ({ row }) => (
-        <Badge variant="outline" className="text-xs">
-          {row.original.auto_synced ? 'Auto' : 'Manual'}
-        </Badge>
-      )
-    },
-  ];
-
-  const commissionCols: ColumnDef<any>[] = [
-    { 
-      accessorKey: 'trip_date', 
-      header: 'Date',
-      cell: ({ row }) => new Date(row.original.trip_date).toLocaleDateString()
-    },
-    { 
-      accessorKey: 'staff_registry.staff_name', 
-      header: 'Staff',
-      cell: ({ row }) => row.original.staff_registry?.staff_name || 'Unknown'
-    },
-    { 
-      accessorKey: 'routes.route_name', 
-      header: 'Route',
-      cell: ({ row }) => row.original.routes?.route_name || '-'
-    },
-    { 
-      accessorKey: 'route_revenue', 
-      header: 'Revenue',
-      cell: ({ row }) => `LKR ${row.original.route_revenue.toLocaleString()}`
-    },
-    { 
-      accessorKey: 'target_amount', 
-      header: 'Target',
-      cell: ({ row }) => `LKR ${row.original.target_amount.toLocaleString()}`
-    },
-    { 
-      accessorKey: 'excess_revenue', 
-      header: 'Excess',
-      cell: ({ row }) => (
-        <span className="text-green-600 font-medium">
-          +LKR {row.original.excess_revenue.toLocaleString()}
-        </span>
-      )
-    },
-    { 
-      accessorKey: 'commission_amount', 
-      header: 'Commission',
-      cell: ({ row }) => (
-        <span className="font-semibold">
-          LKR {row.original.commission_amount.toLocaleString()}
-        </span>
-      )
-    },
-    { 
-      accessorKey: 'status', 
-      header: 'Status',
-      cell: ({ row }) => (
-        <Badge 
-          variant={
-            row.original.status === 'approved' ? 'default' : 
-            row.original.status === 'paid' ? 'secondary' : 'outline'
-          }
-        >
-          {row.original.status}
-        </Badge>
-      )
-    },
-    {
-      id: 'actions',
-      header: '',
-      cell: ({ row }) => (
-        row.original.status === 'pending' && (
-          <Button 
-            size="sm" 
-            variant="ghost"
-            onClick={() => approveCommission(row.original.id, user?.id || '')}
-          >
-            <CheckCircle2 className="h-4 w-4" />
-          </Button>
-        )
-      )
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'present':
+        return <Check className="h-4 w-4 text-green-600" />;
+      case 'absent':
+        return <X className="h-4 w-4 text-red-600" />;
+      case 'late':
+        return <Clock className="h-4 w-4 text-orange-600" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
     }
-  ];
+  };
 
-  const payrollCols: ColumnDef<PayrollRow>[] = [
-    { accessorKey: 'staff_name', header: 'Staff' },
-    { accessorKey: 'pay_period_start', header: 'From' },
-    { accessorKey: 'pay_period_end', header: 'To' },
-    { 
-      accessorKey: 'base_salary', 
-      header: 'Base',
-      cell: ({ row }) => `LKR ${row.original.base_salary.toLocaleString()}`
-    },
-    { 
-      accessorKey: 'overtime_pay', 
-      header: 'OT',
-      cell: ({ row }) => `LKR ${row.original.overtime_pay.toLocaleString()}`
-    },
-    { 
-      accessorKey: 'allowances', 
-      header: 'Allowances',
-      cell: ({ row }) => `LKR ${row.original.allowances.toLocaleString()}`
-    },
-    { 
-      accessorKey: 'deductions', 
-      header: 'Deductions',
-      cell: ({ row }) => `LKR ${row.original.deductions.toLocaleString()}`
-    },
-    { 
-      accessorKey: 'net_pay', 
-      header: 'Net Pay',
-      cell: ({ row }) => (
-        <span className="font-semibold">
-          LKR {(row.original.base_salary + row.original.overtime_pay + row.original.allowances - row.original.deductions).toLocaleString()}
-        </span>
-      )
-    },
-    { 
-      accessorKey: 'status', 
-      header: 'Status',
-      cell: ({ row }) => (
-        <Badge variant={row.original.status === 'paid' ? 'default' : 'outline'}>
-          {row.original.status}
-        </Badge>
-      )
-    },
-  ];
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'present':
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Present</Badge>;
+      case 'absent':
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Absent</Badge>;
+      case 'late':
+        return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">Late</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Attendance & Payroll</h1>
-          <p className="text-muted-foreground">
-            Auto-sync attendance from trips, calculate commissions, and generate payroll
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm whitespace-nowrap">Period</Label>
-            <Input 
-              type="date" 
-              value={period.start} 
-              onChange={(e) => setPeriod(p => ({...p, start: e.target.value}))} 
-              className="w-36"
-            />
-            <span className="text-muted-foreground">to</span>
-            <Input 
-              type="date" 
-              value={period.end} 
-              onChange={(e) => setPeriod(p => ({...p, end: e.target.value}))} 
-              className="w-36"
-            />
-          </div>
-          <Button variant="outline" onClick={fetchAttendance}>
-            <RefreshCcw className="h-4 w-4 mr-2"/>Refresh
-          </Button>
-        </div>
+      {/* Page Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Staff Attendance</h1>
+        <p className="text-muted-foreground">
+          Track daily attendance synced from trips and allocations
+        </p>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -416,7 +259,7 @@ export default function StaffAttendancePayroll() {
               </div>
               <div>
                 <p className="text-2xl font-bold">{staff.length}</p>
-                <p className="text-sm text-muted-foreground">Registered Staff</p>
+                <p className="text-sm text-muted-foreground">Total Staff</p>
               </div>
             </div>
           </CardContent>
@@ -425,11 +268,24 @@ export default function StaffAttendancePayroll() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 rounded-lg">
-                <Clock className="h-5 w-5 text-green-600" />
+                <Check className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{totalDaysWorked}</p>
-                <p className="text-sm text-muted-foreground">Attendance Records</p>
+                <p className="text-2xl font-bold">{presentCount}</p>
+                <p className="text-sm text-muted-foreground">Present</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <X className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{absentCount}</p>
+                <p className="text-sm text-muted-foreground">Absent</p>
               </div>
             </div>
           </CardContent>
@@ -438,24 +294,11 @@ export default function StaffAttendancePayroll() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-orange-100 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-orange-600" />
+                <Clock className="h-5 w-5 text-orange-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">LKR {totalCommissionPending.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">Pending Commission</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">LKR {totalCommissionApproved.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">Approved Commission</p>
+                <p className="text-2xl font-bold">{lateCount}</p>
+                <p className="text-sm text-muted-foreground">Late</p>
               </div>
             </div>
           </CardContent>
@@ -472,25 +315,107 @@ export default function StaffAttendancePayroll() {
         <TabsContent value="attendance">
           <Card>
             <CardHeader>
-              <CardTitle>Attendance Records</CardTitle>
-              <CardDescription>Auto-generated from Daily Trips. Sync to pull latest data.</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Daily Attendance
+              </CardTitle>
+              <CardDescription>
+                Auto-synced from completed trips
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button onClick={syncAttendanceFromTrips} disabled={syncing}>
-                  {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Calendar className="h-4 w-4 mr-2"/>}
-                  Sync from Trips
-                </Button>
-                <Button variant="outline" onClick={() => exportCSV(attendance, 'attendance.csv')}>
-                  <Download className="h-4 w-4 mr-2"/>Export CSV
-                </Button>
+              {/* Period Filters & Actions */}
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Period:</Label>
+                  <Input 
+                    type="date" 
+                    value={period.start} 
+                    onChange={(e) => setPeriod(p => ({...p, start: e.target.value}))} 
+                    className="w-36"
+                  />
+                  <span className="text-muted-foreground">to</span>
+                  <Input 
+                    type="date" 
+                    value={period.end} 
+                    onChange={(e) => setPeriod(p => ({...p, end: e.target.value}))} 
+                    className="w-36"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button onClick={syncAttendanceFromTrips} disabled={syncing}>
+                    {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-2"/>}
+                    Sync from Trips
+                  </Button>
+                  <Button variant="outline" onClick={() => exportCSV(attendance, 'attendance.csv')}>
+                    <Download className="h-4 w-4 mr-2"/>Export
+                  </Button>
+                </div>
               </div>
+
+              {/* Attendance Table */}
               {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+              ) : attendance.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No attendance records found</p>
+                  <p className="text-sm">Click "Sync from Trips" to pull attendance from daily trips</p>
+                </div>
               ) : (
-                <DataTable columns={attendanceCols} data={attendance} searchKey="staff_name" />
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Staff Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Bus</TableHead>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Hours</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Source</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attendance.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-medium">
+                          {new Date(row.attendance_date).toLocaleDateString('en-GB', { 
+                            day: '2-digit', 
+                            month: 'short', 
+                            year: 'numeric' 
+                          })}
+                        </TableCell>
+                        <TableCell className="font-medium">{row.staff_name}</TableCell>
+                        <TableCell>
+                          {row.staff_type ? (
+                            <Badge variant={row.staff_type === 'driver' ? 'default' : 'secondary'}>
+                              {row.staff_type}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{row.bus_no || '-'}</TableCell>
+                        <TableCell>{row.route || '-'}</TableCell>
+                        <TableCell>{row.hours_worked || 0}h</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(row.status)}
+                            {getStatusBadge(row.status)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {row.auto_synced ? 'Auto' : 'Manual'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
@@ -499,12 +424,40 @@ export default function StaffAttendancePayroll() {
         <TabsContent value="commissions">
           <Card>
             <CardHeader>
-              <CardTitle>Commission Tracking</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Commission Tracking
+              </CardTitle>
               <CardDescription>
                 Commissions are calculated when trip revenue exceeds route targets
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Commission Summary */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-orange-600" />
+                    <span className="text-sm font-medium text-orange-900">Pending</span>
+                  </div>
+                  <p className="text-xl font-bold text-orange-900 mt-1">
+                    LKR {totalCommissionPending.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-orange-700">{pendingCommissions.length} commission(s)</p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-900">Approved</span>
+                  </div>
+                  <p className="text-xl font-bold text-green-900 mt-1">
+                    LKR {totalCommissionApproved.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-green-700">{approvedCommissions.length} commission(s)</p>
+                </div>
+              </div>
+
+              {/* Actions */}
               <div className="flex items-center gap-2 flex-wrap">
                 <Button onClick={handleCalculateCommissions} disabled={calculatingCommissions}>
                   {calculatingCommissions ? (
@@ -521,21 +474,79 @@ export default function StaffAttendancePayroll() {
                   </Button>
                 )}
                 <Button variant="outline" onClick={() => exportCSV(commissions, 'commissions.csv')}>
-                  <Download className="h-4 w-4 mr-2"/>Export CSV
+                  <Download className="h-4 w-4 mr-2"/>Export
                 </Button>
               </div>
+
+              {/* Commissions Table */}
               {commissionsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : commissions.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <DollarSign className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No commissions for this period</p>
+                <div className="text-center py-12 text-muted-foreground">
+                  <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No commissions for this period</p>
                   <p className="text-sm">Click "Calculate Commissions" after trips exceed their route targets</p>
                 </div>
               ) : (
-                <DataTable columns={commissionCols} data={commissions} searchKey="staff_registry.staff_name" />
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Staff</TableHead>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Revenue</TableHead>
+                      <TableHead>Target</TableHead>
+                      <TableHead>Excess</TableHead>
+                      <TableHead>Commission</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {commissions.map((c: any) => (
+                      <TableRow key={c.id}>
+                        <TableCell>
+                          {new Date(c.trip_date).toLocaleDateString('en-GB', { 
+                            day: '2-digit', 
+                            month: 'short' 
+                          })}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {c.staff_registry?.staff_name || 'Unknown'}
+                        </TableCell>
+                        <TableCell>{c.routes?.route_name || '-'}</TableCell>
+                        <TableCell>LKR {c.route_revenue?.toLocaleString()}</TableCell>
+                        <TableCell>LKR {c.target_amount?.toLocaleString()}</TableCell>
+                        <TableCell className="text-green-600 font-medium">
+                          +LKR {c.excess_revenue?.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          LKR {c.commission_amount?.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={c.status === 'approved' ? 'default' : c.status === 'paid' ? 'secondary' : 'outline'}
+                          >
+                            {c.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {c.status === 'pending' && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => approveCommission(c.id, user?.id || '')}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
@@ -544,8 +555,13 @@ export default function StaffAttendancePayroll() {
         <TabsContent value="payroll">
           <Card>
             <CardHeader>
-              <CardTitle>Monthly Payroll</CardTitle>
-              <CardDescription>Generate payroll based on attendance and commissions</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Monthly Payroll
+              </CardTitle>
+              <CardDescription>
+                Generate payroll based on attendance and commissions
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2 flex-wrap">
@@ -558,17 +574,53 @@ export default function StaffAttendancePayroll() {
                   Generate Payroll
                 </Button>
                 <Button variant="outline" onClick={() => exportCSV(payroll, 'payroll.csv')}>
-                  <Download className="h-4 w-4 mr-2"/>Export CSV
+                  <Download className="h-4 w-4 mr-2"/>Export
                 </Button>
               </div>
+              
               {payroll.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <DollarSign className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No payroll records for this period</p>
+                <div className="text-center py-12 text-muted-foreground">
+                  <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No payroll records for this period</p>
                   <p className="text-sm">Click "Generate Payroll" to calculate salaries</p>
                 </div>
               ) : (
-                <DataTable columns={payrollCols} data={payroll} searchKey="staff_name" />
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Staff</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Base Salary</TableHead>
+                      <TableHead>Overtime</TableHead>
+                      <TableHead>Allowances</TableHead>
+                      <TableHead>Deductions</TableHead>
+                      <TableHead>Net Pay</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payroll.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-medium">{row.staff_name}</TableCell>
+                        <TableCell>
+                          {new Date(row.pay_period_start).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} - {new Date(row.pay_period_end).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                        </TableCell>
+                        <TableCell>LKR {row.base_salary?.toLocaleString()}</TableCell>
+                        <TableCell>LKR {row.overtime_pay?.toLocaleString()}</TableCell>
+                        <TableCell>LKR {row.allowances?.toLocaleString()}</TableCell>
+                        <TableCell className="text-red-600">-LKR {row.deductions?.toLocaleString()}</TableCell>
+                        <TableCell className="font-semibold">
+                          LKR {(row.base_salary + row.overtime_pay + row.allowances - row.deductions).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={row.status === 'paid' ? 'default' : 'outline'}>
+                            {row.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
