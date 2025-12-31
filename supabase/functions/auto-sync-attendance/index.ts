@@ -53,23 +53,41 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { date, forceSync } = await req.json().catch(() => ({}));
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    // Support both single date and date range
+    const { date, startDate, endDate, forceSync } = await req.json().catch(() => ({}));
+    
+    // Determine date range
+    let queryStartDate: string;
+    let queryEndDate: string;
+    
+    if (startDate && endDate) {
+      queryStartDate = startDate;
+      queryEndDate = endDate;
+    } else if (date) {
+      queryStartDate = date;
+      queryEndDate = date;
+    } else {
+      // Default to current month
+      const now = new Date();
+      queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      queryEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    }
 
-    console.log(`[auto-sync-attendance] Starting sync for date: ${targetDate}`);
+    console.log(`[auto-sync-attendance] Starting sync for date range: ${queryStartDate} to ${queryEndDate}`);
 
-    // Fetch all trips for the date (not just completed - any trip with data)
+    // Fetch all trips for the date range
     const { data: trips, error: tripsError } = await supabase
       .from('daily_trips')
-      .select('id, bus_id, trip_date, driver_id, conductor_id, route_id, income, status, notes')
-      .eq('trip_date', targetDate);
+      .select('id, bus_id, trip_date, driver_id, conductor_id, route_id, income, status, notes, start_time, end_time')
+      .gte('trip_date', queryStartDate)
+      .lte('trip_date', queryEndDate);
 
     if (tripsError) {
       console.error('[auto-sync-attendance] Error fetching trips:', tripsError);
       throw tripsError;
     }
 
-    console.log(`[auto-sync-attendance] Found ${trips?.length || 0} trips for date ${targetDate}`);
+    console.log(`[auto-sync-attendance] Found ${trips?.length || 0} trips for date range ${queryStartDate} to ${queryEndDate}`);
 
     // Fetch staff registry
     const { data: staffRegistry, error: staffError } = await supabase
@@ -84,11 +102,25 @@ serve(async (req) => {
 
     console.log(`[auto-sync-attendance] Found ${staffRegistry?.length || 0} staff in registry`);
 
-    // Fetch existing attendance records for the date
+    if (!staffRegistry || staffRegistry.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'No staff in registry. Please sync staff registry first.',
+          tripsProcessed: trips?.length || 0,
+          staffInRegistry: 0,
+          attendanceSynced: 0,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Fetch existing attendance records for the date range
     const { data: existingAttendance, error: existingError } = await supabase
       .from('staff_attendance')
-      .select('id, staff_registry_id, trip_id, auto_synced')
-      .eq('attendance_date', targetDate);
+      .select('id, staff_registry_id, trip_id, auto_generated')
+      .gte('attendance_date', queryStartDate)
+      .lte('attendance_date', queryEndDate);
 
     if (existingError) {
       console.error('[auto-sync-attendance] Error fetching existing attendance:', existingError);
@@ -97,20 +129,30 @@ serve(async (req) => {
     // Get buses for display
     const { data: buses } = await supabase
       .from('buses')
-      .select('id, bus_no');
+      .select('id, bus_no, route');
 
-    const busMap = new Map((buses || []).map(b => [b.id, b.bus_no]));
+    const busMap = new Map((buses || []).map(b => [b.id, { bus_no: b.bus_no, route: b.route }]));
+    
+    // Get routes for display
+    const { data: routes } = await supabase
+      .from('routes')
+      .select('id, name');
+
+    const routeMap = new Map((routes || []).map(r => [r.id, r.name]));
     
     const existingKeys = new Set(
       (existingAttendance || []).map(a => `${a.staff_registry_id}-${a.trip_id}`)
     );
     
     const attendanceRecords: any[] = [];
-    let synced = 0;
-    let skipped = 0;
+    let matchedDrivers = 0;
+    let matchedConductors = 0;
+    let unmatchedDrivers: string[] = [];
+    let unmatchedConductors: string[] = [];
 
     for (const trip of trips || []) {
-      const busNo = busMap.get(trip.bus_id) || trip.bus_id;
+      const busInfo = busMap.get(trip.bus_id) || { bus_no: 'Unknown', route: null };
+      const routeName = trip.route_id ? routeMap.get(trip.route_id) : busInfo.route || '';
       
       // Parse notes JSON to get driver/conductor names
       let driverName = '';
@@ -121,9 +163,26 @@ serve(async (req) => {
           const notesJson = JSON.parse(trip.notes);
           driverName = notesJson.driver || notesJson.driver_name || '';
           conductorName = notesJson.conductor || notesJson.conductor_name || '';
-          console.log(`[auto-sync-attendance] Trip ${trip.id}: Driver=${driverName}, Conductor=${conductorName}`);
+          console.log(`[auto-sync-attendance] Trip ${trip.id} (${trip.trip_date}): Driver=${driverName}, Conductor=${conductorName}`);
         } catch {
-          // Not JSON
+          // Not JSON - try regex fallback
+          const driverMatch = trip.notes.match(/driver[:\s]+([A-Za-z\s]+)/i);
+          const conductorMatch = trip.notes.match(/conductor[:\s]+([A-Za-z\s]+)/i);
+          driverName = driverMatch?.[1]?.trim() || '';
+          conductorName = conductorMatch?.[1]?.trim() || '';
+        }
+      }
+
+      // Calculate hours worked from start_time and end_time
+      let hoursWorked = 12; // Default
+      if (trip.start_time && trip.end_time) {
+        try {
+          const start = new Date(`1970-01-01T${trip.start_time}`);
+          const end = new Date(`1970-01-01T${trip.end_time}`);
+          hoursWorked = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+          if (hoursWorked > 24) hoursWorked = 12; // Sanity check
+        } catch {
+          hoursWorked = 12;
         }
       }
 
@@ -136,24 +195,31 @@ serve(async (req) => {
         if (matchedDriver) {
           const key = `${matchedDriver.id}-${trip.id}`;
           if (!forceSync && existingKeys.has(key)) {
-            skipped++;
-          } else {
+            // Already exists, skip
+          } else if (!attendanceRecords.some(r => r.staff_registry_id === matchedDriver.id && r.trip_id === trip.id)) {
             attendanceRecords.push({
               staff_registry_id: matchedDriver.id,
-              attendance_date: targetDate,
+              attendance_date: trip.trip_date,
               status: 'present',
               salary_type: matchedDriver.salary_type,
               daily_rate: matchedDriver.salary_type === 'daily' ? matchedDriver.daily_rate : 0,
               trip_id: trip.id,
-              auto_synced: true,
-              notes: `Auto-synced: ${driverName} on ${busNo}`,
-              check_in_time: '06:00:00',
-              check_out_time: '18:00:00',
+              bus_no: busInfo.bus_no,
+              route: routeName || '',
+              hours_worked: Math.round(hoursWorked * 10) / 10,
+              overtime_hours: hoursWorked > 8 ? Math.round((hoursWorked - 8) * 10) / 10 : 0,
+              start_time: trip.start_time || '06:00:00',
+              end_time: trip.end_time || '18:00:00',
+              auto_generated: true,
+              notes: `Auto-synced: ${driverName} on ${busInfo.bus_no}`,
             });
-            synced++;
+            matchedDrivers++;
             console.log(`[auto-sync-attendance] Matched driver: ${driverName} -> ${matchedDriver.staff_name}`);
           }
         } else {
+          if (!unmatchedDrivers.includes(driverName)) {
+            unmatchedDrivers.push(driverName);
+          }
           console.log(`[auto-sync-attendance] No match found for driver: ${driverName}`);
         }
       }
@@ -167,24 +233,31 @@ serve(async (req) => {
         if (matchedConductor) {
           const key = `${matchedConductor.id}-${trip.id}`;
           if (!forceSync && existingKeys.has(key)) {
-            skipped++;
-          } else {
+            // Already exists, skip
+          } else if (!attendanceRecords.some(r => r.staff_registry_id === matchedConductor.id && r.trip_id === trip.id)) {
             attendanceRecords.push({
               staff_registry_id: matchedConductor.id,
-              attendance_date: targetDate,
+              attendance_date: trip.trip_date,
               status: 'present',
               salary_type: matchedConductor.salary_type,
               daily_rate: matchedConductor.salary_type === 'daily' ? matchedConductor.daily_rate : 0,
               trip_id: trip.id,
-              auto_synced: true,
-              notes: `Auto-synced: ${conductorName} on ${busNo}`,
-              check_in_time: '06:00:00',
-              check_out_time: '18:00:00',
+              bus_no: busInfo.bus_no,
+              route: routeName || '',
+              hours_worked: Math.round(hoursWorked * 10) / 10,
+              overtime_hours: hoursWorked > 8 ? Math.round((hoursWorked - 8) * 10) / 10 : 0,
+              start_time: trip.start_time || '06:00:00',
+              end_time: trip.end_time || '18:00:00',
+              auto_generated: true,
+              notes: `Auto-synced: ${conductorName} on ${busInfo.bus_no}`,
             });
-            synced++;
+            matchedConductors++;
             console.log(`[auto-sync-attendance] Matched conductor: ${conductorName} -> ${matchedConductor.staff_name}`);
           }
         } else {
+          if (!unmatchedConductors.includes(conductorName)) {
+            unmatchedConductors.push(conductorName);
+          }
           console.log(`[auto-sync-attendance] No match found for conductor: ${conductorName}`);
         }
       }
@@ -200,17 +273,21 @@ serve(async (req) => {
           if (!existingKeys.has(key) && !attendanceRecords.some(r => r.staff_registry_id === driverStaff.id && r.trip_id === trip.id)) {
             attendanceRecords.push({
               staff_registry_id: driverStaff.id,
-              attendance_date: targetDate,
+              attendance_date: trip.trip_date,
               status: 'present',
               salary_type: driverStaff.salary_type,
               daily_rate: driverStaff.salary_type === 'daily' ? driverStaff.daily_rate : 0,
               trip_id: trip.id,
-              auto_synced: true,
-              notes: `Auto-synced from driver_id on ${busNo}`,
-              check_in_time: '06:00:00',
-              check_out_time: '18:00:00',
+              bus_no: busInfo.bus_no,
+              route: routeName || '',
+              hours_worked: Math.round(hoursWorked * 10) / 10,
+              overtime_hours: hoursWorked > 8 ? Math.round((hoursWorked - 8) * 10) / 10 : 0,
+              start_time: trip.start_time || '06:00:00',
+              end_time: trip.end_time || '18:00:00',
+              auto_generated: true,
+              notes: `Auto-synced from driver_id on ${busInfo.bus_no}`,
             });
-            synced++;
+            matchedDrivers++;
           }
         }
       }
@@ -225,17 +302,21 @@ serve(async (req) => {
           if (!existingKeys.has(key) && !attendanceRecords.some(r => r.staff_registry_id === conductorStaff.id && r.trip_id === trip.id)) {
             attendanceRecords.push({
               staff_registry_id: conductorStaff.id,
-              attendance_date: targetDate,
+              attendance_date: trip.trip_date,
               status: 'present',
               salary_type: conductorStaff.salary_type,
               daily_rate: conductorStaff.salary_type === 'daily' ? conductorStaff.daily_rate : 0,
               trip_id: trip.id,
-              auto_synced: true,
-              notes: `Auto-synced from conductor_id on ${busNo}`,
-              check_in_time: '06:00:00',
-              check_out_time: '18:00:00',
+              bus_no: busInfo.bus_no,
+              route: routeName || '',
+              hours_worked: Math.round(hoursWorked * 10) / 10,
+              overtime_hours: hoursWorked > 8 ? Math.round((hoursWorked - 8) * 10) / 10 : 0,
+              start_time: trip.start_time || '06:00:00',
+              end_time: trip.end_time || '18:00:00',
+              auto_generated: true,
+              notes: `Auto-synced from conductor_id on ${busInfo.bus_no}`,
             });
-            synced++;
+            matchedConductors++;
           }
         }
       }
@@ -245,6 +326,7 @@ serve(async (req) => {
 
     // Insert attendance records one by one to avoid conflicts
     let insertedCount = 0;
+    let errorCount = 0;
     for (const record of attendanceRecords) {
       const { error: insertError } = await supabase
         .from('staff_attendance')
@@ -254,23 +336,30 @@ serve(async (req) => {
         });
       
       if (insertError) {
-        console.log(`[auto-sync-attendance] Insert error (may be duplicate):`, insertError.message);
+        console.log(`[auto-sync-attendance] Insert error:`, insertError.message);
+        errorCount++;
       } else {
         insertedCount++;
       }
     }
 
-    console.log(`[auto-sync-attendance] Sync complete. Inserted: ${insertedCount}, Skipped: ${skipped}`);
+    console.log(`[auto-sync-attendance] Sync complete. Inserted: ${insertedCount}, Errors: ${errorCount}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        date: targetDate,
+        dateRange: { start: queryStartDate, end: queryEndDate },
         tripsProcessed: trips?.length || 0,
         staffInRegistry: staffRegistry?.length || 0,
         attendanceSynced: insertedCount,
-        skipped: skipped,
-        message: `Successfully synced ${insertedCount} attendance records from ${trips?.length || 0} trips`,
+        matchedDrivers,
+        matchedConductors,
+        unmatchedDrivers: unmatchedDrivers.slice(0, 10),
+        unmatchedConductors: unmatchedConductors.slice(0, 10),
+        errors: errorCount,
+        message: insertedCount > 0 
+          ? `Successfully synced ${insertedCount} attendance records from ${trips?.length || 0} trips`
+          : `No new attendance records to sync (${trips?.length || 0} trips processed)`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
