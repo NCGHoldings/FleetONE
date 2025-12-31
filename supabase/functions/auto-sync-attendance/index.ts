@@ -199,6 +199,7 @@ serve(async (req) => {
           } else if (!attendanceRecords.some(r => r.staff_registry_id === matchedDriver.id && r.trip_id === trip.id)) {
             attendanceRecords.push({
               staff_registry_id: matchedDriver.id,
+              staff_name: matchedDriver.staff_name,
               attendance_date: trip.trip_date,
               status: 'present',
               salary_type: matchedDriver.salary_type,
@@ -211,7 +212,7 @@ serve(async (req) => {
               start_time: trip.start_time || '06:00:00',
               end_time: trip.end_time || '18:00:00',
               auto_generated: true,
-              notes: `Auto-synced: ${driverName} on ${busInfo.bus_no}`,
+              auto_synced: true,
             });
             matchedDrivers++;
             console.log(`[auto-sync-attendance] Matched driver: ${driverName} -> ${matchedDriver.staff_name}`);
@@ -237,6 +238,7 @@ serve(async (req) => {
           } else if (!attendanceRecords.some(r => r.staff_registry_id === matchedConductor.id && r.trip_id === trip.id)) {
             attendanceRecords.push({
               staff_registry_id: matchedConductor.id,
+              staff_name: matchedConductor.staff_name,
               attendance_date: trip.trip_date,
               status: 'present',
               salary_type: matchedConductor.salary_type,
@@ -249,7 +251,7 @@ serve(async (req) => {
               start_time: trip.start_time || '06:00:00',
               end_time: trip.end_time || '18:00:00',
               auto_generated: true,
-              notes: `Auto-synced: ${conductorName} on ${busInfo.bus_no}`,
+              auto_synced: true,
             });
             matchedConductors++;
             console.log(`[auto-sync-attendance] Matched conductor: ${conductorName} -> ${matchedConductor.staff_name}`);
@@ -273,6 +275,7 @@ serve(async (req) => {
           if (!existingKeys.has(key) && !attendanceRecords.some(r => r.staff_registry_id === driverStaff.id && r.trip_id === trip.id)) {
             attendanceRecords.push({
               staff_registry_id: driverStaff.id,
+              staff_name: driverStaff.staff_name,
               attendance_date: trip.trip_date,
               status: 'present',
               salary_type: driverStaff.salary_type,
@@ -285,7 +288,7 @@ serve(async (req) => {
               start_time: trip.start_time || '06:00:00',
               end_time: trip.end_time || '18:00:00',
               auto_generated: true,
-              notes: `Auto-synced from driver_id on ${busInfo.bus_no}`,
+              auto_synced: true,
             });
             matchedDrivers++;
           }
@@ -302,6 +305,7 @@ serve(async (req) => {
           if (!existingKeys.has(key) && !attendanceRecords.some(r => r.staff_registry_id === conductorStaff.id && r.trip_id === trip.id)) {
             attendanceRecords.push({
               staff_registry_id: conductorStaff.id,
+              staff_name: conductorStaff.staff_name,
               attendance_date: trip.trip_date,
               status: 'present',
               salary_type: conductorStaff.salary_type,
@@ -314,7 +318,7 @@ serve(async (req) => {
               start_time: trip.start_time || '06:00:00',
               end_time: trip.end_time || '18:00:00',
               auto_generated: true,
-              notes: `Auto-synced from conductor_id on ${busInfo.bus_no}`,
+              auto_synced: true,
             });
             matchedConductors++;
           }
