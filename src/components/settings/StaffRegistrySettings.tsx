@@ -2,20 +2,21 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useStaffRegistry, StaffFormData, StaffType, SalaryType } from "@/hooks/useStaffRegistry";
-import { Plus, Edit, Trash2, User, Users, Loader2 } from "lucide-react";
+import { useStaffRegistry, StaffFormData, StaffType, SalaryType, SyncResult } from "@/hooks/useStaffRegistry";
+import { Plus, Edit, Trash2, User, Users, Loader2, RefreshCcw, Download } from "lucide-react";
 import { toast } from "sonner";
 
 export function StaffRegistrySettings() {
-  const { staff, loading, addStaff, updateStaff, deleteStaff, toggleActive } = useStaffRegistry();
+  const { staff, loading, syncing, addStaff, updateStaff, deleteStaff, toggleActive, syncFromDataSources } = useStaffRegistry();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [formData, setFormData] = useState<StaffFormData>({
     staff_name: "",
     staff_type: "driver",
@@ -82,6 +83,13 @@ export function StaffRegistrySettings() {
     }
   };
 
+  const handleSyncFromTrips = async () => {
+    const result = await syncFromDataSources();
+    if (result) {
+      setSyncResult(result);
+    }
+  };
+
   const drivers = staff.filter(s => s.staff_type === "driver");
   const conductors = staff.filter(s => s.staff_type === "conductor");
 
@@ -95,128 +103,156 @@ export function StaffRegistrySettings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <User className="h-5 w-5 text-blue-500" />
-            <span className="font-medium">{drivers.length} Drivers</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-green-500" />
-            <span className="font-medium">{conductors.length} Conductors</span>
-          </div>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Staff
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{editingId ? "Edit Staff Member" : "Add Staff Member"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Name *</Label>
-                <Input
-                  value={formData.staff_name}
-                  onChange={(e) => setFormData({ ...formData, staff_name: e.target.value })}
-                  placeholder="Enter staff name"
-                />
+      <Card>
+        <CardHeader>
+          <CardTitle>Staff Registry</CardTitle>
+          <CardDescription>
+            Manage drivers and conductors. Auto-sync from Daily Trips, Driver Allocations, and Profiles.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
+                <User className="h-4 w-4 text-blue-600" />
+                <span className="font-medium text-blue-900">{drivers.length} Drivers</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select
-                    value={formData.staff_type}
-                    onValueChange={(v) => setFormData({ ...formData, staff_type: v as StaffType })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="driver">Driver</SelectItem>
-                      <SelectItem value="conductor">Conductor</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Salary Type</Label>
-                  <Select
-                    value={formData.salary_type}
-                    onValueChange={(v) => setFormData({ ...formData, salary_type: v as SalaryType })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="daily">Daily</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {formData.salary_type === "monthly" ? (
-                <div className="space-y-2">
-                  <Label>Monthly Salary (LKR)</Label>
-                  <Input
-                    type="number"
-                    value={formData.monthly_salary}
-                    onChange={(e) => setFormData({ ...formData, monthly_salary: Number(e.target.value) })}
-                    placeholder="e.g., 50000"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label>Daily Rate (LKR)</Label>
-                  <Input
-                    type="number"
-                    value={formData.daily_rate}
-                    onChange={(e) => setFormData({ ...formData, daily_rate: Number(e.target.value) })}
-                    placeholder="e.g., 2500"
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Contact Number</Label>
-                  <Input
-                    value={formData.contact_number}
-                    onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
-                    placeholder="07X XXX XXXX"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>NIC Number</Label>
-                  <Input
-                    value={formData.nic_number}
-                    onChange={(e) => setFormData({ ...formData, nic_number: e.target.value })}
-                    placeholder="XXXXXXXXXV"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmit}>
-                  {editingId ? "Update" : "Add"} Staff
-                </Button>
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg">
+                <Users className="h-4 w-4 text-green-600" />
+                <span className="font-medium text-green-900">{conductors.length} Conductors</span>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleSyncFromTrips}
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Sync from Trips
+              </Button>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={() => handleOpenDialog()}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Staff
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>{editingId ? "Edit Staff Member" : "Add Staff Member"}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Name *</Label>
+                      <Input
+                        value={formData.staff_name}
+                        onChange={(e) => setFormData({ ...formData, staff_name: e.target.value })}
+                        placeholder="Enter staff name"
+                      />
+                    </div>
 
-      <Card>
-        <CardContent className="p-0">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <Select
+                          value={formData.staff_type}
+                          onValueChange={(v) => setFormData({ ...formData, staff_type: v as StaffType })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="driver">Driver</SelectItem>
+                            <SelectItem value="conductor">Conductor</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Salary Type</Label>
+                        <Select
+                          value={formData.salary_type}
+                          onValueChange={(v) => setFormData({ ...formData, salary_type: v as SalaryType })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="daily">Daily</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {formData.salary_type === "monthly" ? (
+                      <div className="space-y-2">
+                        <Label>Monthly Salary (LKR)</Label>
+                        <Input
+                          type="number"
+                          value={formData.monthly_salary}
+                          onChange={(e) => setFormData({ ...formData, monthly_salary: Number(e.target.value) })}
+                          placeholder="e.g., 50000"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>Daily Rate (LKR)</Label>
+                        <Input
+                          type="number"
+                          value={formData.daily_rate}
+                          onChange={(e) => setFormData({ ...formData, daily_rate: Number(e.target.value) })}
+                          placeholder="e.g., 2500"
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Contact Number</Label>
+                        <Input
+                          value={formData.contact_number}
+                          onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
+                          placeholder="07X XXX XXXX"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>NIC Number</Label>
+                        <Input
+                          value={formData.nic_number}
+                          onChange={(e) => setFormData({ ...formData, nic_number: e.target.value })}
+                          placeholder="XXXXXXXXXV"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSubmit}>
+                        {editingId ? "Update" : "Add"} Staff
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {syncResult && syncResult.summary.addedCount > 0 && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800">
+                <strong>Sync Complete:</strong> Added {syncResult.summary.addedCount} new staff from {syncResult.summary.totalCandidates} candidates found.
+              </p>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow>
@@ -233,7 +269,7 @@ export function StaffRegistrySettings() {
               {staff.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No staff members registered. Click "Add Staff" to get started.
+                    No staff members registered. Click "Sync from Trips" to auto-import or "Add Staff" manually.
                   </TableCell>
                 </TableRow>
               ) : (

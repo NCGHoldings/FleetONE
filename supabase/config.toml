@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.generate-payroll]
 verify_jwt = false
+
+[functions.sync-staff-registry]
+verify_jwt = false
