@@ -138,14 +138,49 @@ export default function StaffAttendancePayroll() {
 
   const syncAttendanceFromTrips = async () => {
     if (!isAdmin) return toast.error('Access denied');
+    
+    // Validate date range
+    if (!period.start || !period.end) {
+      return toast.error('Please select a valid date range');
+    }
+    
+    if (new Date(period.start) > new Date(period.end)) {
+      return toast.error('Start date must be before end date');
+    }
+    
     setSyncing(true);
     try {
+      // Call with full date range
       const { data, error } = await supabase.functions.invoke('auto-sync-attendance', {
-        body: { date: period.start, forceSync: false },
+        body: { 
+          startDate: period.start, 
+          endDate: period.end, 
+          forceSync: false 
+        },
       });
       
       if (error) throw error;
-      toast.success(data.message || 'Attendance synced from trips');
+      
+      if (!data.success && data.error) {
+        toast.error(data.error);
+        return;
+      }
+      
+      // Show detailed results
+      const msg = data.attendanceSynced > 0
+        ? `Synced ${data.attendanceSynced} attendance records from ${data.tripsProcessed} trips (${data.matchedDrivers || 0} drivers, ${data.matchedConductors || 0} conductors)`
+        : `No new records to sync. ${data.tripsProcessed} trips processed.`;
+      
+      toast.success(msg);
+      
+      // Show warnings for unmatched staff
+      if (data.unmatchedDrivers?.length > 0) {
+        toast.warning(`Unmatched drivers: ${data.unmatchedDrivers.join(', ')}`);
+      }
+      if (data.unmatchedConductors?.length > 0) {
+        toast.warning(`Unmatched conductors: ${data.unmatchedConductors.join(', ')}`);
+      }
+      
       await fetchAttendance();
     } catch (e: any) {
       console.error(e);
