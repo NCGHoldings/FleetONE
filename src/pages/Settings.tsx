@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target, Users, Wallet } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
@@ -19,6 +19,9 @@ import { ServiceAlertSettings } from "@/components/settings/ServiceAlertSettings
 import { SpecialHireSignatureSettings } from "@/components/settings/SpecialHireSignatureSettings";
 import { BusCategoriesSettings } from "@/components/settings/BusCategoriesSettings";
 import { ExecutiveKPISettings } from "@/components/settings/ExecutiveKPISettings";
+import { StaffRegistrySettings } from "@/components/settings/StaffRegistrySettings";
+import { RouteTargetSettings } from "@/components/settings/RouteTargetSettings";
+import { PayrollSettingsComponent } from "@/components/settings/PayrollSettingsComponent";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -103,18 +106,22 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="account" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-11">
+        <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="display">Display</TabsTrigger>
           <TabsTrigger value="admin">Admin</TabsTrigger>
           <TabsTrigger value="data-entry">Data Entry</TabsTrigger>
           <TabsTrigger value="qr-codes">QR Codes</TabsTrigger>
-          <TabsTrigger value="multi-day-routes">Multi-Day Routes</TabsTrigger>
+          <TabsTrigger value="multi-day-routes">Multi-Day</TabsTrigger>
           <TabsTrigger value="service-alerts">Service Alerts</TabsTrigger>
           <TabsTrigger value="signatures">Signatures</TabsTrigger>
           <TabsTrigger value="bus-categories">Bus Categories</TabsTrigger>
           <TabsTrigger value="kpi-targets">KPI Targets</TabsTrigger>
+          <TabsTrigger value="staff-payroll" className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            Staff & Payroll
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="space-y-6 mt-6">
@@ -500,6 +507,55 @@ export default function Settings() {
               <ExecutiveKPISettings />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="staff-payroll" className="space-y-6 mt-6">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Staff Registry
+                </CardTitle>
+                <CardDescription>
+                  Manage drivers and conductors with their salary types (monthly/daily) and rates
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <StaffRegistrySettings />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  Route Revenue Targets
+                </CardTitle>
+                <CardDescription>
+                  Set daily revenue targets per route for commission calculation. Staff earns commission when revenue exceeds target.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RouteTargetSettings />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="w-5 h-5" />
+                  Payroll Settings
+                </CardTitle>
+                <CardDescription>
+                  Configure working days, overtime rates, and commission payout settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PayrollSettingsComponent />
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
