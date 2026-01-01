@@ -1,498 +1,88 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
-import { DocumentUpload } from "@/components/documents/DocumentUpload";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useStaffPerformance, StaffMemberPerformance } from "@/hooks/useStaffPerformance";
+import { PerformanceInsightsPanel } from "@/components/staff/PerformanceInsightsPanel";
+import { StaffPerformanceCharts } from "@/components/staff/StaffPerformanceCharts";
+import { CommissionHistory } from "@/components/staff/CommissionHistory";
+import { AttendanceCalendar } from "@/components/staff/AttendanceCalendar";
 import { useToast } from "@/hooks/use-toast";
-import { User, Phone, Bus, Star, FileText, Eye, Clock, Award, TrendingUp, Plus, Edit, Trash2, Save, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { 
+  User, Phone, Bus, Star, Eye, Clock, Award, TrendingUp, 
+  RefreshCw, Users, DollarSign, AlertTriangle, Filter,
+  Calendar, Fuel, Route, MapPin
+} from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
-import { StaffDetailView } from "@/components/staff/StaffDetailView";
-
-interface StaffMember {
-  id: string;
-  staff_id: string;
-  name: string;
-  phone?: string;
-  license_number?: string;
-  role: 'driver' | 'conductor' | 'both';
-  status: 'active' | 'inactive' | 'suspended';
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface StaffPerformanceData {
-  totalKm: number;
-  totalTrips: number;
-  performanceScore: number;
-  complaints: number;
-  fuelEfficiency: number;
-  rating: number;
-  onTimePercentage?: number; // Keep for compatibility with StaffDetailView
-}
-
-// Helper to safely parse notes field (could be JSON string or object)
-const parseNotes = (raw: any): any => {
-  if (!raw) return {};
-  if (typeof raw === 'object') return raw;
-  try {
-    return JSON.parse(raw as string);
-  } catch {
-    return {};
-  }
-};
 
 export default function StaffPerformance() {
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [performanceData, setPerformanceData] = useState<Record<string, StaffPerformanceData>>({});
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    license_number: '',
-    role: 'driver' as 'driver' | 'conductor' | 'both',
-    status: 'active' as 'active' | 'inactive' | 'suspended'
-  });
+  const { staffPerformance, loading, summary, insights, refetch } = useStaffPerformance();
+  const [selectedStaff, setSelectedStaff] = useState<StaffMemberPerformance | null>(null);
+  const [staffTypeFilter, setStaffTypeFilter] = useState<string>("all");
+  const [tierFilter, setTierFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [attendanceData, setAttendanceData] = useState<any[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchStaff();
-  }, []);
-
-  // Create staff table if it doesn't exist and populate with existing data
-  const initializeStaffTable = async () => {
-    // This will be handled by the migration that was just run
-    console.log('Staff performance table created via migration');
-  };
-
-  const fetchStaff = async () => {
+  // Fetch attendance when staff is selected
+  const fetchStaffAttendance = async (staffId: string) => {
+    setAttendanceLoading(true);
     try {
-      // Always sync with daily trips data to ensure real-time accuracy
-      await syncStaffFromTripsData();
+      const { data, error } = await supabase
+        .from('staff_attendance')
+        .select('*')
+        .or(`staff_id.eq.${staffId},staff_registry_id.eq.${staffId}`)
+        .order('attendance_date', { ascending: false });
+
+      if (error) throw error;
+      setAttendanceData(data || []);
     } catch (error) {
-      console.error('Error fetching staff:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load staff data from trips",
-        variant: "destructive",
-      });
+      console.error('Error fetching attendance:', error);
     } finally {
-      setLoading(false);
+      setAttendanceLoading(false);
     }
   };
 
-  const syncStaffFromTripsData = async () => {
-    try {
-      console.log('Starting staff sync from daily trips...');
+  // Filter staff based on filters
+  const filteredStaff = useMemo(() => {
+    return staffPerformance.filter(staff => {
+      // Type filter
+      if (staffTypeFilter !== "all" && staff.staff_type !== staffTypeFilter) return false;
       
-      // Get all daily trips with driver and conductor profile information
-      const { data: trips, error: tripsError } = await supabase
-        .from('daily_trips')
-        .select(`
-          *,
-          driver:profiles!daily_trips_driver_id_fkey(id, first_name, last_name, phone, license_number),
-          conductor:profiles!daily_trips_conductor_id_fkey(id, first_name, last_name, phone)
-        `);
-
-      if (tripsError) {
-        console.error('Error fetching trips:', tripsError);
-        throw tripsError;
-      }
-
-      console.log('Trips found:', trips?.length || 0);
-
-      const staffMap = new Map<string, { 
-        id: string;
-        name: string; 
-        phone?: string;
-        license_number?: string;
-        roles: Set<string>;
-        tripIds: string[];
-      }>();
-
-      // Process trips and extract driver/conductor information
-      trips?.forEach(trip => {
-        const notes = parseNotes((trip as any).notes);
-
-        // Process driver - try profile first, fallback to notes
-        const driverProfile = (trip as any).driver;
-        let driverKey: string | null = null;
-        let driverName: string | null = null;
-        let driverPhone: string | undefined;
-        let driverLicense: string | undefined;
-
-        if (driverProfile && driverProfile.id) {
-          // Real profile exists
-          driverKey = driverProfile.id;
-          driverName = `${driverProfile.first_name || ''} ${driverProfile.last_name || ''}`.trim() || driverProfile.first_name || driverProfile.last_name;
-          driverPhone = driverProfile.phone;
-          driverLicense = driverProfile.license_number;
-        }
-
-        // Fallback to name in notes if no profile id
-        if (!driverKey && notes?.driver && notes.driver.toString().trim().toUpperCase() !== 'N/A') {
-          driverName = notes.driver.toString().trim();
-          driverKey = `name-${driverName.toLowerCase()}`; // virtual ID keyed by name
-        }
-
-        if (driverKey && driverName) {
-          if (!staffMap.has(driverKey)) {
-            staffMap.set(driverKey, {
-              id: driverKey,
-              name: driverName,
-              phone: driverPhone,
-              license_number: driverLicense,
-              roles: new Set(['driver']),
-              tripIds: [trip.id],
-            });
-          } else {
-            const existing = staffMap.get(driverKey)!;
-            existing.roles.add('driver');
-            if (!existing.tripIds.includes(trip.id)) {
-              existing.tripIds.push(trip.id);
-            }
-          }
-        }
-
-        // Process conductor - try profile first, fallback to notes
-        const conductorProfile = (trip as any).conductor;
-        let conductorKey: string | null = null;
-        let conductorName: string | null = null;
-        let conductorPhone: string | undefined;
-
-        if (conductorProfile && conductorProfile.id) {
-          // Real profile exists
-          conductorKey = conductorProfile.id;
-          conductorName = `${conductorProfile.first_name || ''} ${conductorProfile.last_name || ''}`.trim() || conductorProfile.first_name || conductorProfile.last_name;
-          conductorPhone = conductorProfile.phone;
-        }
-
-        // Fallback to name in notes if no profile id
-        if (!conductorKey && notes?.conductor && notes.conductor.toString().trim().toUpperCase() !== 'N/A') {
-          conductorName = notes.conductor.toString().trim();
-          conductorKey = `name-${conductorName.toLowerCase()}`;
-        }
-
-        if (conductorKey && conductorName) {
-          if (!staffMap.has(conductorKey)) {
-            staffMap.set(conductorKey, {
-              id: conductorKey,
-              name: conductorName,
-              phone: conductorPhone,
-              license_number: undefined,
-              roles: new Set(['conductor']),
-              tripIds: [trip.id],
-            });
-          } else {
-            const existing = staffMap.get(conductorKey)!;
-            existing.roles.add('conductor');
-            if (!existing.tripIds.includes(trip.id)) {
-              existing.tripIds.push(trip.id);
-            }
-          }
-        }
-      });
-
-      console.log('Staff extracted from daily trips:', staffMap.size);
-
-      // Convert to staff members array with real-time performance data
-      const staffMembers: StaffMember[] = [];
-      let empCounter = 1;
-
-      const performancePromises = Array.from(staffMap.entries()).map(async ([profileId, data]) => {
-        const roleArray = Array.from(data.roles);
-        const role = roleArray.length > 1 ? 'both' : roleArray[0] as 'driver' | 'conductor';
-        
-        const staffId = `EMP${empCounter.toString().padStart(3, '0')}`;
-        empCounter++;
-        
-        const staffMember: StaffMember = {
-          id: profileId, // Use actual profile ID from database
-          staff_id: staffId,
-          name: data.name,
-          phone: data.phone,
-          license_number: data.license_number,
-          role,
-          status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-
-        // Calculate real-time performance data based on actual trips
-        const performance = await calculateStaffPerformanceById(profileId, data.tripIds, trips || []);
-        
-        return { staffMember, performance };
-      });
-
-      const staffWithPerformance = await Promise.all(performancePromises);
+      // Tier filter
+      if (tierFilter !== "all" && staff.performanceTier !== tierFilter) return false;
       
-      // Set staff data
-      const finalStaff = staffWithPerformance.map(item => item.staffMember);
-      setStaff(finalStaff);
+      // Search
+      if (searchQuery && !staff.staff_name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       
-      console.log('Final staff count:', finalStaff.length);
-      
-      // Set performance data
-      const performanceMap = staffWithPerformance.reduce((acc, { staffMember, performance }) => {
-        acc[staffMember.staff_id] = performance;
-        return acc;
-      }, {} as Record<string, StaffPerformanceData>);
-      
-      setPerformanceData(performanceMap);
+      return true;
+    });
+  }, [staffPerformance, staffTypeFilter, tierFilter, searchQuery]);
 
-      if (finalStaff.length === 0) {
-        toast({
-          title: "No Staff Found",
-          description: "No driver or conductor data found in Daily Trips. Please check your daily trip entries.",
-          variant: "destructive",
-        });
-      }
-
-    } catch (error) {
-      console.error('Error syncing staff from trips data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to sync staff data from trips",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const calculateStaffPerformanceById = async (profileId: string, tripIds: string[], trips: any[]): Promise<StaffPerformanceData> => {
-    try {
-      // Get all trips for this staff member by trip IDs
-      const staffTrips = trips.filter(trip => tripIds.includes(trip.id));
-
-      // Fetch complaints related to this staff member
-      const isVirtualNameId = profileId.startsWith('name-');
-      let complaintsCount = 0;
-
-      if (!isVirtualNameId) {
-        // Real profile ID - use containedBy with related_persons array
-        const { data: complaints } = await supabase
-          .from('feedback_complaints')
-          .select('*')
-          .containedBy('related_persons', [profileId]);
-        complaintsCount = complaints?.length || 0;
-      } else {
-        // Virtual name-based ID - fallback to name search in title/description
-        const displayName = profileId.replace(/^name-/, '');
-        const { data: complaintsByName } = await supabase
-          .from('feedback_complaints')
-          .select('*')
-          .or(`title.ilike.%${displayName}%,description.ilike.%${displayName}%`);
-        complaintsCount = complaintsByName?.length || 0;
-      }
-
-      const totalKm = staffTrips.reduce((sum, trip) => sum + (parseFloat(trip.distance_km) || 0), 0);
-      const totalTrips = staffTrips.length;
-      
-      // Calculate fuel efficiency (average km per liter) - only for completed trips with fuel data
-      const fuelEfficiencyTrips = staffTrips.filter(trip => 
-        trip.km_per_liter && parseFloat(trip.km_per_liter) > 0
-      );
-      const avgFuelEfficiency = fuelEfficiencyTrips.length > 0 
-        ? fuelEfficiencyTrips.reduce((sum, trip) => sum + parseFloat(trip.km_per_liter), 0) / fuelEfficiencyTrips.length 
-        : 0;
-
-      // Calculate performance score based on fuel efficiency and trips
-      let performanceScore = 50; // Base score
-      
-      if (avgFuelEfficiency > 0) {
-        // Expected efficiency baseline is 8 km/l
-        const efficiencyScore = Math.min(50, (avgFuelEfficiency / 8) * 50);
-        performanceScore = efficiencyScore;
-      }
-      
-      // Add bonus points for completed trips
-      const tripBonus = Math.min(30, totalTrips * 2);
-      performanceScore += tripBonus;
-      
-      // Deduct points for complaints
-      const complaintPenalty = Math.min(40, complaintsCount * 10);
-      performanceScore = Math.max(0, performanceScore - complaintPenalty);
-
-      // Calculate rating based on performance score
-      const rating = performanceScore > 0 ? (performanceScore / 100) * 5 : 0;
-      
-      // Calculate on-time percentage based on completed vs cancelled trips
-      const completedTrips = staffTrips.filter(trip => trip.status === 'completed').length;
-      const onTimePercentage = totalTrips > 0 ? (completedTrips / totalTrips) * 100 : 85; // Default to 85% if no status data
-      
-      return {
-        totalKm: Math.round(totalKm * 10) / 10,
-        totalTrips,
-        performanceScore: Math.round(performanceScore * 10) / 10,
-        complaints: complaintsCount,
-        fuelEfficiency: Math.round(avgFuelEfficiency * 10) / 10,
-        rating: Math.round(rating * 10) / 10,
-        onTimePercentage: Math.round(onTimePercentage * 10) / 10
-      };
-    } catch (error) {
-      console.error('Error calculating staff performance for profile', profileId, ':', error);
-      return {
-        totalKm: 0,
-        totalTrips: 0,
-        performanceScore: 50, // Default base score
-        complaints: 0,
-        fuelEfficiency: 0,
-        rating: 2.5, // Default rating
-        onTimePercentage: 85 // Default on-time percentage
-      };
-    }
-  };
-
-  const handleAddStaff = async () => {
-    if (!formData.name.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter staff name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      // Generate next staff ID
-      const { data: lastStaff } = await supabase
-        .from('staff_performance' as any)
-        .select('staff_id')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      let nextNumber = 1;
-      if (lastStaff && lastStaff.length > 0) {
-        const lastId = (lastStaff[0] as any).staff_id;
-        const match = lastId?.match(/EMP(\d+)/);
-        if (match) {
-          nextNumber = parseInt(match[1]) + 1;
-        }
-      }
-
-      const newStaffId = `EMP${nextNumber.toString().padStart(3, '0')}`;
-
-      const newStaffData = {
-        staff_id: newStaffId,
-        name: formData.name.trim(),
-        phone: formData.phone.trim() || null,
-        license_number: formData.license_number.trim() || null,
-        role: formData.role,
-        status: formData.status
-      };
-
-      const { data: newStaff, error } = await supabase
-        .from('staff_performance' as any)
-        .insert([newStaffData])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Insert error:', error);
-        // Create mock entry if database insert fails
-        const mockStaff = {
-          ...newStaffData,
-          id: `mock-${Date.now()}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setStaff([...staff, mockStaff as StaffMember]);
-      } else {
-        setStaff([...staff, (newStaff as unknown) as StaffMember]);
-      }
-
-      setShowAddForm(false);
-      setFormData({ name: '', phone: '', license_number: '', role: 'driver', status: 'active' });
-      
-      toast({
-        title: "Success",
-        description: "Staff member added successfully",
-      });
-    } catch (error) {
-      console.error('Error adding staff:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add staff member",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleUpdateStaff = async (staffMember: StaffMember) => {
-    try {
-      const { error } = await supabase
-        .from('staff_performance' as any)
-        .update({
-          name: staffMember.name,
-          phone: staffMember.phone,
-          license_number: staffMember.license_number,
-          role: staffMember.role,
-          status: staffMember.status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', staffMember.id);
-
-      if (error) {
-        console.error('Update error:', error);
-      }
-
-      setStaff(staff.map(s => s.id === staffMember.id ? { ...s, ...staffMember } : s));
-      setEditingStaff(null);
-      
-      toast({
-        title: "Success",
-        description: "Staff member updated successfully",
-      });
-    } catch (error) {
-      console.error('Error updating staff:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update staff member",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteStaff = async (staffId: string) => {
-    try {
-      const { error } = await supabase
-        .from('staff_performance' as any)
-        .delete()
-        .eq('id', staffId);
-
-      if (error) {
-        console.error('Delete error:', error);
-      }
-
-      setStaff(staff.filter(s => s.id !== staffId));
-      
-      toast({
-        title: "Success",
-        description: "Staff member deleted successfully",
-      });
-    } catch (error) {
-      console.error('Error deleting staff:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete staff member",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'active': return 'bg-success text-success-foreground';
-      case 'inactive': return 'bg-secondary text-secondary-foreground';
-      case 'suspended': return 'bg-destructive text-destructive-foreground';
+  const getStatusColor = (tier: string) => {
+    switch (tier) {
+      case 'excellent': return 'bg-green-500/10 text-green-600 border-green-500/20';
+      case 'good': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+      case 'average': return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20';
+      case 'needs_improvement': return 'bg-red-500/10 text-red-600 border-red-500/20';
       default: return 'bg-secondary text-secondary-foreground';
+    }
+  };
+
+  const getTierLabel = (tier: string) => {
+    switch (tier) {
+      case 'excellent': return 'Excellent';
+      case 'good': return 'Good';
+      case 'average': return 'Average';
+      case 'needs_improvement': return 'Needs Improvement';
+      default: return tier;
     }
   };
 
@@ -501,7 +91,7 @@ export default function StaffPerformance() {
     const hasHalfStar = rating % 1 >= 0.5;
     
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {Array.from({ length: 5 }, (_, i) => (
           <Star
             key={i}
@@ -510,408 +100,513 @@ export default function StaffPerformance() {
                 ? 'fill-yellow-400 text-yellow-400'
                 : i === fullStars && hasHalfStar
                 ? 'fill-yellow-400/50 text-yellow-400'
-                : 'text-gray-300'
+                : 'text-muted-foreground/30'
             }`}
           />
         ))}
-        <span className="ml-1 text-sm text-muted-foreground">
-          {rating.toFixed(1)}
-        </span>
+        <span className="ml-1 text-sm font-medium">{rating.toFixed(1)}</span>
       </div>
     );
   };
 
-  const columns: ColumnDef<StaffMember>[] = [
+  const handleStaffClick = (staff: StaffMemberPerformance) => {
+    setSelectedStaff(staff);
+    fetchStaffAttendance(staff.id);
+  };
+
+  const columns: ColumnDef<StaffMemberPerformance>[] = [
     {
-      accessorKey: "staff_id",
-      header: "Staff ID",
+      accessorKey: "staff_name",
+      header: "Staff Member",
       cell: ({ row }) => (
-        <div className="font-medium font-mono">{row.getValue("staff_id")}</div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button
+              variant="link"
+              className="p-0 h-auto font-medium text-primary hover:underline flex items-center gap-2"
+              onClick={() => handleStaffClick(row.original)}
+            >
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="h-4 w-4 text-primary" />
+              </div>
+              <div className="text-left">
+                <div>{row.getValue("staff_name")}</div>
+                <div className="text-xs text-muted-foreground capitalize">
+                  {row.original.staff_type}
+                </div>
+              </div>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <div>{row.original.staff_name}</div>
+                  <div className="text-sm font-normal text-muted-foreground capitalize">
+                    {row.original.staff_type} • {getTierLabel(row.original.performanceTier)}
+                  </div>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            <StaffDetailContent 
+              staff={row.original} 
+              attendance={attendanceData}
+              attendanceLoading={attendanceLoading}
+            />
+          </DialogContent>
+        </Dialog>
       ),
     },
     {
-      accessorKey: "name",
-      header: "Name",
+      accessorKey: "staff_type",
+      header: "Type",
       cell: ({ row }) => (
-        editingStaff?.id === row.original.id ? (
-          <Input
-            value={editingStaff.name}
-            onChange={(e) => setEditingStaff({ ...editingStaff, name: e.target.value })}
-            className="w-full"
-          />
-        ) : (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                variant="link"
-                className="p-0 h-auto font-medium text-primary hover:underline"
-                onClick={() => setSelectedStaff(row.original)}
-              >
-                {row.getValue("name")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <StaffDetailView 
-                staff={{
-                  ...row.original,
-                  user_id: row.original.id,
-                  employee_id: row.original.staff_id,
-                  first_name: row.original.name.split(' ')[0] || row.original.name,
-                  last_name: row.original.name.split(' ').slice(1).join(' ') || '',
-                } as any} 
-                performanceData={performanceData[row.original.staff_id] as any}
-              />
-            </DialogContent>
-          </Dialog>
-        )
-      ),
-    },
-    {
-      accessorKey: "license_number",
-      header: "License No.",
-      cell: ({ row }) => (
-        editingStaff?.id === row.original.id ? (
-          <Input
-            value={editingStaff.license_number || ''}
-            onChange={(e) => setEditingStaff({ ...editingStaff, license_number: e.target.value })}
-            placeholder="License number"
-            className="w-full"
-          />
-        ) : (
-          <div className="text-sm">{row.getValue("license_number") || "N/A"}</div>
-        )
-      ),
-    },
-    {
-      accessorKey: "phone",
-      header: "Phone",
-      cell: ({ row }) => (
-        editingStaff?.id === row.original.id ? (
-          <Input
-            value={editingStaff.phone || ''}
-            onChange={(e) => setEditingStaff({ ...editingStaff, phone: e.target.value })}
-            placeholder="Phone number"
-            className="w-full"
-          />
-        ) : (
-          <div className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-muted-foreground" />
-            {row.getValue("phone") || "N/A"}
-          </div>
-        )
-      ),
-    },
-    {
-      accessorKey: "role",
-      header: "Role",
-      cell: ({ row }) => (
-        editingStaff?.id === row.original.id ? (
-          <Select value={editingStaff.role} onValueChange={(value) => setEditingStaff({ ...editingStaff, role: value as any })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="driver">Driver</SelectItem>
-              <SelectItem value="conductor">Conductor</SelectItem>
-              <SelectItem value="both">Both</SelectItem>
-            </SelectContent>
-          </Select>
-        ) : (
-          <Badge variant="outline" className="capitalize">
-            {row.getValue("role")}
-          </Badge>
-        )
+        <Badge variant={row.getValue("staff_type") === 'driver' ? 'default' : 'secondary'} className="capitalize">
+          {row.getValue("staff_type")}
+        </Badge>
       ),
     },
     {
       id: "performance",
       header: "Performance",
-      cell: ({ row }) => {
-        const perf = performanceData[row.original.staff_id];
-        return (
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-success" />
-            <span className="text-sm font-medium">{perf?.performanceScore?.toFixed(1) || "0.0"}%</span>
-            {perf?.fuelEfficiency > 0 && (
-              <div className="text-xs text-muted-foreground">
-                ({perf.fuelEfficiency} km/L)
-              </div>
-            )}
+            <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className={`h-full rounded-full ${
+                  row.original.performanceScore >= 80 ? 'bg-green-500' :
+                  row.original.performanceScore >= 60 ? 'bg-blue-500' :
+                  row.original.performanceScore >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                }`}
+                style={{ width: `${row.original.performanceScore}%` }}
+              />
+            </div>
+            <span className="text-sm font-medium">{row.original.performanceScore}%</span>
           </div>
-        );
-      },
+          <Badge className={`text-xs w-fit ${getStatusColor(row.original.performanceTier)}`}>
+            {getTierLabel(row.original.performanceTier)}
+          </Badge>
+        </div>
+      ),
     },
     {
-      id: "totalKm",
-      header: "Total KM",
-      cell: ({ row }) => {
-        const perf = performanceData[row.original.staff_id];
-        return (
-          <div className="text-sm font-medium">
-            {perf?.totalKm?.toLocaleString() || "0"} km
-            {perf?.totalTrips > 0 && (
-              <div className="text-xs text-muted-foreground">
-                {perf.totalTrips} trips
-              </div>
-            )}
-          </div>
-        );
-      },
+      id: "trips",
+      header: "Trips / KM",
+      cell: ({ row }) => (
+        <div className="text-sm">
+          <div className="font-medium">{row.original.totalTrips} trips</div>
+          <div className="text-muted-foreground">{row.original.totalKm.toLocaleString()} km</div>
+        </div>
+      ),
+    },
+    {
+      id: "efficiency",
+      header: "Fuel Efficiency",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Fuel className="h-4 w-4 text-muted-foreground" />
+          <span className={`font-medium ${
+            row.original.avgFuelEfficiency >= 8 ? 'text-green-600' :
+            row.original.avgFuelEfficiency >= 6 ? 'text-yellow-600' : 'text-red-600'
+          }`}>
+            {row.original.avgFuelEfficiency > 0 ? `${row.original.avgFuelEfficiency} km/L` : '-'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: "attendance",
+      header: "Attendance",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <span className={`font-medium ${
+            row.original.attendanceRate >= 80 ? 'text-green-600' :
+            row.original.attendanceRate >= 60 ? 'text-yellow-600' : 'text-red-600'
+          }`}>
+            {row.original.attendanceRate}%
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: "commission",
+      header: "Commission",
+      cell: ({ row }) => (
+        <div className="text-sm">
+          {row.original.commissionEarned > 0 ? (
+            <span className="font-medium text-green-600">
+              LKR {row.original.commissionEarned.toLocaleString()}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "complaints",
+      header: "Complaints",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          {row.original.complaintsCount > 0 ? (
+            <>
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+              <span className="text-red-600 font-medium">{row.original.complaintsCount}</span>
+            </>
+          ) : (
+            <span className="text-green-600 text-sm">None</span>
+          )}
+        </div>
+      ),
     },
     {
       id: "rating",
       header: "Rating",
-      cell: ({ row }) => {
-        const perf = performanceData[row.original.staff_id];
-        return getRatingStars(perf?.rating || 0);
-      },
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => (
-        editingStaff?.id === row.original.id ? (
-          <Select value={editingStaff.status} onValueChange={(value) => setEditingStaff({ ...editingStaff, status: value as any })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-              <SelectItem value="suspended">Suspended</SelectItem>
-            </SelectContent>
-          </Select>
-        ) : (
-          <Badge className={getStatusColor(row.getValue("status"))}>
-            {row.getValue("status")}
-          </Badge>
-        )
-      ),
+      cell: ({ row }) => getRatingStars(row.original.rating),
     },
     {
       id: "actions",
-      header: "Actions",
+      header: "",
       cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          {editingStaff?.id === row.original.id ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => handleUpdateStaff(editingStaff)}>
-                <Save className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setEditingStaff(null)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            <>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <StaffDetailView 
-                    staff={{
-                      ...row.original,
-                      user_id: row.original.id,
-                      employee_id: row.original.staff_id,
-                      first_name: row.original.name.split(' ')[0] || row.original.name,
-                      last_name: row.original.name.split(' ').slice(1).join(' ') || '',
-                    } as any} 
-                    performanceData={performanceData[row.original.staff_id] as any} 
-                  />
-                </DialogContent>
-              </Dialog>
-              <Button variant="ghost" size="sm" onClick={() => setEditingStaff(row.original)}>
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleDeleteStaff(row.original.id)}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-              <DocumentUpload
-                linkedTable="staff_performance"
-                linkedRowId={row.original.id}
-              />
-            </>
-          )}
-        </div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="sm" onClick={() => handleStaffClick(row.original)}>
+              <Eye className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <div>{row.original.staff_name}</div>
+                  <div className="text-sm font-normal text-muted-foreground capitalize">
+                    {row.original.staff_type} • {getTierLabel(row.original.performanceTier)}
+                  </div>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            <StaffDetailContent 
+              staff={row.original} 
+              attendance={attendanceData}
+              attendanceLoading={attendanceLoading}
+            />
+          </DialogContent>
+        </Dialog>
       ),
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Enhanced Hero Header */}
+    <div className="space-y-6 animate-fade-in">
+      {/* Hero Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent via-primary to-primary-hover p-8 text-accent-foreground">
         <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent" />
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm animate-logo-glow">
-              <User className="w-10 h-10 animate-bounce-subtle" />
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+              <TrendingUp className="w-10 h-10" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent animate-slide-in-right">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
                 Staff Performance
               </h1>
-              <p className="text-accent-foreground/80 text-lg animate-slide-in-right" style={{ animationDelay: '0.1s' }}>
-                Monitor and evaluate staff performance metrics
+              <p className="text-accent-foreground/80 text-lg">
+                Real-time performance metrics from all modules
               </p>
             </div>
           </div>
+          <Button 
+            variant="secondary" 
+            onClick={refetch}
+            disabled={loading}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh Data
+          </Button>
         </div>
-        
-        {/* Animated Background Elements */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-pulse-subtle" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl animate-bounce-subtle" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-primary/20 rounded-full blur-2xl" />
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{staff.length}</div>
-          </CardContent>
-        </Card>
+      {/* Summary Stats */}
+      <div className="grid gap-4 md:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Staff</CardTitle>
-            <User className="h-4 w-4 text-success" />
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {staff.filter(s => s.status === 'active').length}
-            </div>
+            <div className="text-2xl font-bold">{summary.totalActiveStaff}</div>
+            <p className="text-xs text-muted-foreground">
+              {summary.totalDrivers} drivers, {summary.totalConductors} conductors
+            </p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Drivers</CardTitle>
-            <Bus className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Hours This Month</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {staff.filter(s => s.role === 'driver' || s.role === 'both').length}
-            </div>
+            <div className="text-2xl font-bold">{summary.totalHoursThisMonth.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Total hours worked</p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Commissions</CardTitle>
+            <DollarSign className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              LKR {summary.totalCommissionsEarned.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">Total earned</p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg Performance</CardTitle>
-            <Award className="h-4 w-4 text-warning" />
+            <Award className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {Object.values(performanceData).length > 0
-                ? (Object.values(performanceData).reduce((sum, p) => sum + p.performanceScore, 0) / 
-                   Object.values(performanceData).length).toFixed(1) + '%'
-                : "0.0%"}
-            </div>
+            <div className="text-2xl font-bold">{summary.avgPerformanceScore.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Across all staff</p>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Top Performers</CardTitle>
             <Star className="h-4 w-4 text-yellow-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {Object.values(performanceData).filter(p => p.performanceScore >= 80).length}
+            <div className="text-2xl font-bold text-green-600">{summary.topPerformersCount}</div>
+            <p className="text-xs text-muted-foreground">Scoring 80%+</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Complaints</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${summary.complaintsThisMonth > 0 ? 'text-red-600' : 'text-green-600'}`}>
+              {summary.complaintsThisMonth}
             </div>
+            <p className="text-xs text-muted-foreground">This month</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Staff Members</h2>
-        <Button onClick={() => setShowAddForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Staff
-        </Button>
+      {/* Main Content */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Staff Table - 2 columns */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Filters */}
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[200px]">
+                  <Input
+                    placeholder="Search by name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <Select value={staffTypeFilter} onValueChange={setStaffTypeFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Staff Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="driver">Drivers</SelectItem>
+                    <SelectItem value="conductor">Conductors</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={tierFilter} onValueChange={setTierFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Performance Tier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Tiers</SelectItem>
+                    <SelectItem value="excellent">Excellent (80%+)</SelectItem>
+                    <SelectItem value="good">Good (60-79%)</SelectItem>
+                    <SelectItem value="average">Average (40-59%)</SelectItem>
+                    <SelectItem value="needs_improvement">Needs Improvement</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <DataTable
+            columns={columns}
+            data={filteredStaff}
+            searchKey="staff_name"
+            title=""
+          />
+        </div>
+
+        {/* Insights Panel - 1 column */}
+        <div>
+          <PerformanceInsightsPanel 
+            insights={insights}
+            onInsightClick={(staffId) => {
+              const staff = staffPerformance.find(s => s.id === staffId);
+              if (staff) handleStaffClick(staff);
+            }}
+          />
+        </div>
       </div>
-
-      <DataTable
-        columns={columns}
-        data={staff}
-        searchKey="name"
-        title=""
-      />
-
-      {/* Add Staff Dialog */}
-      <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Staff Member</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter staff name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="Enter phone number"
-              />
-            </div>
-            <div>
-              <Label htmlFor="license">License Number</Label>
-              <Input
-                id="license"
-                value={formData.license_number}
-                onChange={(e) => setFormData({ ...formData, license_number: e.target.value })}
-                placeholder="Enter license number"
-              />
-            </div>
-            <div>
-              <Label>Role</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as any })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="driver">Driver</SelectItem>
-                  <SelectItem value="conductor">Conductor</SelectItem>
-                  <SelectItem value="both">Both</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value as any })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowAddForm(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddStaff}>
-                Add Staff
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
+  );
+}
+
+// Staff Detail Content Component
+function StaffDetailContent({ 
+  staff, 
+  attendance,
+  attendanceLoading 
+}: { 
+  staff: StaffMemberPerformance;
+  attendance: any[];
+  attendanceLoading: boolean;
+}) {
+  return (
+    <Tabs defaultValue="overview" className="mt-4">
+      <TabsList className="grid w-full grid-cols-4">
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="attendance">Attendance</TabsTrigger>
+        <TabsTrigger value="performance">Performance</TabsTrigger>
+        <TabsTrigger value="commissions">Commissions</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="overview" className="space-y-4 mt-4">
+        {/* KPI Cards */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card className="border-l-4 border-l-blue-500">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Route className="h-4 w-4 text-blue-500" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Trips</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{staff.totalTrips}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-green-500">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-green-500" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total KM</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{staff.totalKm.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-yellow-500">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Fuel className="h-4 w-4 text-yellow-500" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">Fuel Efficiency</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{staff.avgFuelEfficiency} km/L</div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-purple-500">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-purple-500" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">LKR {staff.totalRevenue.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Personal Info */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Personal Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Phone:</span>
+                  <span>{staff.phone || "Not provided"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">NIC:</span>
+                  <span>{staff.nic || "Not provided"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Address:</span>
+                  <span className="truncate">{staff.address || "Not provided"}</span>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Salary Type:</span>
+                  <Badge variant="outline" className="capitalize">{staff.salary_type || '-'}</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Daily Rate:</span>
+                  <span>{staff.daily_rate ? `LKR ${staff.daily_rate.toLocaleString()}` : '-'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Monthly Salary:</span>
+                  <span>{staff.monthly_salary ? `LKR ${staff.monthly_salary.toLocaleString()}` : '-'}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="attendance" className="mt-4">
+        <AttendanceCalendar 
+          attendance={attendance} 
+          selectedMonth={new Date()} 
+          loading={attendanceLoading}
+        />
+      </TabsContent>
+
+      <TabsContent value="performance" className="mt-4">
+        <StaffPerformanceCharts staffId={staff.id} staffName={staff.staff_name} />
+      </TabsContent>
+
+      <TabsContent value="commissions" className="mt-4">
+        <CommissionHistory staffId={staff.id} />
+      </TabsContent>
+    </Tabs>
   );
 }
