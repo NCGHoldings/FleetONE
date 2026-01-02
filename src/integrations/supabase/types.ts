@@ -2741,6 +2741,253 @@ export type Database = {
           },
         ]
       }
+      feedback_item_history: {
+        Row: {
+          action_by: string | null
+          action_by_name: string | null
+          action_type: string
+          created_at: string | null
+          feedback_item_id: string
+          id: string
+          level: number
+          metadata: Json | null
+          new_status: string | null
+          notes: string | null
+          previous_status: string | null
+        }
+        Insert: {
+          action_by?: string | null
+          action_by_name?: string | null
+          action_type: string
+          created_at?: string | null
+          feedback_item_id: string
+          id?: string
+          level: number
+          metadata?: Json | null
+          new_status?: string | null
+          notes?: string | null
+          previous_status?: string | null
+        }
+        Update: {
+          action_by?: string | null
+          action_by_name?: string | null
+          action_type?: string
+          created_at?: string | null
+          feedback_item_id?: string
+          id?: string
+          level?: number
+          metadata?: Json | null
+          new_status?: string | null
+          notes?: string | null
+          previous_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_item_history_feedback_item_id_fkey"
+            columns: ["feedback_item_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_items: {
+        Row: {
+          action_taken: string | null
+          assigned_to: string | null
+          assigned_to_name: string | null
+          category: string | null
+          created_at: string | null
+          current_level: number
+          description: string | null
+          due_date: string | null
+          escalation_reason: string | null
+          feedback_complaint_id: string | null
+          id: string
+          item_number: number
+          meeting_id: string | null
+          priority: string | null
+          raised_by_name: string | null
+          raised_by_staff_id: string | null
+          resolution: string | null
+          resolved_at: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          assigned_to?: string | null
+          assigned_to_name?: string | null
+          category?: string | null
+          created_at?: string | null
+          current_level?: number
+          description?: string | null
+          due_date?: string | null
+          escalation_reason?: string | null
+          feedback_complaint_id?: string | null
+          id?: string
+          item_number?: number
+          meeting_id?: string | null
+          priority?: string | null
+          raised_by_name?: string | null
+          raised_by_staff_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          assigned_to?: string | null
+          assigned_to_name?: string | null
+          category?: string | null
+          created_at?: string | null
+          current_level?: number
+          description?: string | null
+          due_date?: string | null
+          escalation_reason?: string | null
+          feedback_complaint_id?: string | null
+          id?: string
+          item_number?: number
+          meeting_id?: string | null
+          priority?: string | null
+          raised_by_name?: string | null
+          raised_by_staff_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_items_feedback_complaint_id_fkey"
+            columns: ["feedback_complaint_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_complaints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_items_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_levels: {
+        Row: {
+          can_escalate_to: number | null
+          color_code: string | null
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          level_name: string
+          level_number: number
+          required_role: Database["public"]["Enums"]["app_role"] | null
+          sla_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          can_escalate_to?: number | null
+          color_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          level_name: string
+          level_number: number
+          required_role?: Database["public"]["Enums"]["app_role"] | null
+          sla_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          can_escalate_to?: number | null
+          color_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          level_name?: string
+          level_number?: number
+          required_role?: Database["public"]["Enums"]["app_role"] | null
+          sla_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      feedback_meetings: {
+        Row: {
+          action_items: Json | null
+          attendees: Json | null
+          conducted_by: string | null
+          conducted_by_name: string | null
+          created_at: string | null
+          id: string
+          level: number
+          meeting_date: string
+          meeting_time: string | null
+          meeting_type: string
+          notes: string | null
+          previous_meeting_id: string | null
+          status: string | null
+          summary: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          action_items?: Json | null
+          attendees?: Json | null
+          conducted_by?: string | null
+          conducted_by_name?: string | null
+          created_at?: string | null
+          id?: string
+          level: number
+          meeting_date: string
+          meeting_time?: string | null
+          meeting_type?: string
+          notes?: string | null
+          previous_meeting_id?: string | null
+          status?: string | null
+          summary?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          action_items?: Json | null
+          attendees?: Json | null
+          conducted_by?: string | null
+          conducted_by_name?: string | null
+          created_at?: string | null
+          id?: string
+          level?: number
+          meeting_date?: string
+          meeting_time?: string | null
+          meeting_type?: string
+          notes?: string | null
+          previous_meeting_id?: string | null
+          status?: string | null
+          summary?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_meetings_previous_meeting_id_fkey"
+            columns: ["previous_meeting_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_periods: {
         Row: {
           closed_at: string | null
