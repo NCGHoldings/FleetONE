@@ -48,7 +48,7 @@ export const PAGES: PageCategories = {
     { id: "special_hire", title: "Special Hire", url: "/special-hire" },
     { id: "business_ideas", title: "Business Ideas", url: "/business" },
     { id: "document_manager", title: "Document Manager", url: "/documents" },
-    { id: "feedback", title: "Feedback", url: "/feedback" },
+    { id: "feedback", title: "Feedback Module", url: "/feedback-module" },
     { id: "vehicle_inquiries", title: "Vehicle Inquiries", url: "/vehicle-inquiries" },
   ],
   finance: [
