@@ -44,6 +44,7 @@ import YutongQuotations from "./pages/YutongQuotations";
 import SinotruckQuotations from "./pages/SinotruckQuotations";
 import LightVehicleQuotations from "./pages/LightVehicleQuotations";
 import Complaints from "./pages/Complaints";
+import FeedbackModule from "./pages/FeedbackModule";
 import StaffPerformance from "./pages/StaffPerformance";
 import PublicComplaint from "./pages/PublicComplaint";
 import PublicSpecialHire from "./pages/PublicSpecialHire";
@@ -576,9 +577,23 @@ const App = () => (
               path="/feedback" 
               element={
                 <ProtectedRoute>
-                  <AppLayout>
-                    <div className="p-8 text-center text-muted-foreground">Feedback module coming soon...</div>
-                  </AppLayout>
+                  <PageAccessGuard pageId="feedback_module">
+                    <AppLayout>
+                      <FeedbackModule />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/feedback-module" 
+              element={
+                <ProtectedRoute>
+                  <PageAccessGuard pageId="feedback_module">
+                    <AppLayout>
+                      <FeedbackModule />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
