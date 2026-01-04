@@ -96,7 +96,7 @@ const businessItems = [
   { id: "special_hire", title: "Special Hire", url: "/special-hire", icon: Star },
   { id: "business_ideas", title: "Business Ideas", url: "/business", icon: Lightbulb },
   { id: "document_manager", title: "Document Manager", url: "/documents", icon: FileText },
-  { id: "feedback", title: "Feedback", url: "/feedback", icon: MessageSquare },
+  { id: "feedback_module", title: "Feedback Module", url: "/feedback-module", icon: MessageSquare },
   { id: "vehicle_inquiries", title: "Vehicle Inquiries", url: "/vehicle-inquiries", icon: Users },
 ];
 
