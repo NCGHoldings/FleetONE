@@ -3,7 +3,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus, Loader2, Eye, Edit, History, CalendarPlus, UserX, CreditCard } from "lucide-react";
+import { Bus, Wrench, DollarSign, Calendar, MoreHorizontal, Plus, Loader2, Eye, Edit, History, CalendarPlus, UserX, CreditCard, FileSpreadsheet, ExternalLink } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
@@ -31,6 +31,9 @@ import { ScheduleMaintenanceModal } from "@/components/fleet/ScheduleMaintenance
 import { BusLoanModal } from "@/components/fleet/BusLoanModal";
 import { BusLoanDashboardModal } from "@/components/fleet/BusLoanDashboardModal";
 import { BusCategoryBadge } from "@/components/fleet/BusCategoryBadge";
+import { BusMasterDataSheet } from "@/components/fleet/BusMasterDataSheet";
+import { FleetAlertsPanel } from "@/components/fleet/FleetAlertsPanel";
+import { useNavigate } from "react-router-dom";
 
 interface Fleet {
   id: string;
@@ -76,6 +79,7 @@ const getStatusBadge = (status: Fleet['status']) => {
 };
 
 const FleetManagementComponent = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<Fleet[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBus, setSelectedBus] = useState<Fleet | null>(null);
@@ -86,7 +90,18 @@ const FleetManagementComponent = () => {
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
   const [loanModalOpen, setLoanModalOpen] = useState(false);
   const [loanDashboardModalOpen, setLoanDashboardModalOpen] = useState(false);
+  const [masterDataSheetOpen, setMasterDataSheetOpen] = useState(false);
+  const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const handleOpenMasterDataSheet = (busId: string) => {
+    setSelectedBusId(busId);
+    setMasterDataSheetOpen(true);
+  };
+
+  const handleViewInDailyTrips = (busNo: string) => {
+    navigate(`/daily-trips?bus=${busNo}`);
+  };
 
   const handleViewDetails = (bus: Fleet) => {
     setSelectedBus(bus);
@@ -293,9 +308,18 @@ const FleetManagementComponent = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => handleOpenMasterDataSheet(fleet.id)} className="gap-2 font-medium text-primary">
+                <FileSpreadsheet className="w-4 h-4" />
+                View Full Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleViewInDailyTrips(fleet.bus_no)} className="gap-2">
+                <ExternalLink className="w-4 h-4" />
+                View in Daily Trips
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleViewDetails(fleet)} className="gap-2">
                 <Eye className="w-4 h-4" />
-                View Details
+                Quick View
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleEditBus(fleet)} className="gap-2">
                 <Edit className="w-4 h-4" />
@@ -707,6 +731,9 @@ const FleetManagementComponent = () => {
         </div>
       </div>
 
+      {/* Fleet Alerts Panel */}
+      <FleetAlertsPanel onBusClick={handleOpenMasterDataSheet} />
+
       {/* Data Table */}
       <DataTable
         columns={columns}
@@ -714,6 +741,16 @@ const FleetManagementComponent = () => {
         searchKey="bus_no"
         title={`Fleet Overview (${data.length} buses)`}
         onExport={handleExport}
+      />
+
+      {/* Bus Master Data Sheet */}
+      <BusMasterDataSheet
+        busId={selectedBusId}
+        open={masterDataSheetOpen}
+        onClose={() => {
+          setMasterDataSheetOpen(false);
+          setSelectedBusId(null);
+        }}
       />
 
       {/* Modals */}
