@@ -574,18 +574,6 @@ const App = () => (
               } 
             />
             <Route 
-              path="/feedback" 
-              element={
-                <ProtectedRoute>
-                  <PageAccessGuard pageId="feedback_module">
-                    <AppLayout>
-                      <FeedbackModule />
-                    </AppLayout>
-                  </PageAccessGuard>
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
               path="/feedback-module" 
               element={
                 <ProtectedRoute>
