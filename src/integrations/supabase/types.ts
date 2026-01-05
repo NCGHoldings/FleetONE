@@ -10154,6 +10154,108 @@ export type Database = {
         }
         Relationships: []
       }
+      yutong_cash_receipts: {
+        Row: {
+          amount: number
+          amount_in_words: string | null
+          created_at: string
+          created_by: string | null
+          customer_address: string | null
+          customer_contact: string | null
+          customer_name: string | null
+          customer_signature_data: string | null
+          customer_signature_type: string | null
+          customer_signed_at: string | null
+          customer_signer_name: string | null
+          finance_signature_data: string | null
+          finance_signature_type: string | null
+          finance_signed_at: string | null
+          finance_signer_name: string | null
+          id: string
+          order_id: string
+          payment_id: string
+          payment_method: string
+          pdf_url: string | null
+          product_description: string | null
+          quotation_no: string | null
+          receipt_date: string
+          receipt_no: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          amount_in_words?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_address?: string | null
+          customer_contact?: string | null
+          customer_name?: string | null
+          customer_signature_data?: string | null
+          customer_signature_type?: string | null
+          customer_signed_at?: string | null
+          customer_signer_name?: string | null
+          finance_signature_data?: string | null
+          finance_signature_type?: string | null
+          finance_signed_at?: string | null
+          finance_signer_name?: string | null
+          id?: string
+          order_id: string
+          payment_id: string
+          payment_method: string
+          pdf_url?: string | null
+          product_description?: string | null
+          quotation_no?: string | null
+          receipt_date?: string
+          receipt_no: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          amount_in_words?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_address?: string | null
+          customer_contact?: string | null
+          customer_name?: string | null
+          customer_signature_data?: string | null
+          customer_signature_type?: string | null
+          customer_signed_at?: string | null
+          customer_signer_name?: string | null
+          finance_signature_data?: string | null
+          finance_signature_type?: string | null
+          finance_signed_at?: string | null
+          finance_signer_name?: string | null
+          id?: string
+          order_id?: string
+          payment_id?: string
+          payment_method?: string
+          pdf_url?: string | null
+          product_description?: string | null
+          quotation_no?: string | null
+          receipt_date?: string
+          receipt_no?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_cash_receipts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_cash_receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: true
+            referencedRelation: "yutong_customer_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       yutong_compliance_certificates: {
         Row: {
           application_date: string | null

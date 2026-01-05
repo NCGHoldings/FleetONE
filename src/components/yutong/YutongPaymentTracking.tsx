@@ -8,10 +8,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, Download, MoreHorizontal, Receipt } from 'lucide-react';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
+import { useYutongCashReceipts, YutongCashReceipt } from '@/hooks/useYutongCashReceipts';
+import { YutongCashReceiptModal } from './YutongCashReceiptModal';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface YutongPaymentTrackingProps {
   orderId?: string;
@@ -28,6 +33,12 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const { regenerateInvoice } = useYutongOrderInvoiceManagement();
+  const { createCashReceipt, getCashReceiptByPaymentId } = useYutongCashReceipts();
+  
+  // Cash receipt states
+  const [cashReceipts, setCashReceipts] = useState<Record<string, YutongCashReceipt>>({});
+  const [selectedReceipt, setSelectedReceipt] = useState<YutongCashReceipt | null>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -104,6 +115,22 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
 
       if (paymentError) throw paymentError;
       setPayments(paymentData || []);
+
+      // Load cash receipts for each payment
+      if (paymentData && paymentData.length > 0) {
+        const { data: receiptsData, error: receiptsError } = await supabase
+          .from('yutong_cash_receipts')
+          .select('*')
+          .eq('order_id', selectedOrderId);
+
+        if (!receiptsError && receiptsData) {
+          const receiptsMap: Record<string, YutongCashReceipt> = {};
+          receiptsData.forEach((receipt: YutongCashReceipt) => {
+            receiptsMap[receipt.payment_id] = receipt;
+          });
+          setCashReceipts(receiptsMap);
+        }
+      }
 
     } catch (error: any) {
       console.error('Error loading payment data:', error);
@@ -269,6 +296,59 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     setSelectedSchedule(null);
   };
 
+  // Cash Receipt handlers
+  const handleGenerateReceipt = async (payment: any) => {
+    if (!selectedOrderId) return;
+    
+    const receipt = await createCashReceipt(
+      payment.id,
+      selectedOrderId,
+      payment.payment_amount,
+      payment.payment_method,
+      payment.payment_date
+    );
+    
+    if (receipt) {
+      setCashReceipts(prev => ({ ...prev, [payment.id]: receipt }));
+      setSelectedReceipt(receipt);
+      setIsReceiptModalOpen(true);
+    }
+  };
+
+  const handleViewReceipt = (paymentId: string) => {
+    const receipt = cashReceipts[paymentId];
+    if (receipt) {
+      setSelectedReceipt(receipt);
+      setIsReceiptModalOpen(true);
+    }
+  };
+
+  const handleRefreshReceipts = async () => {
+    // Reload cash receipts
+    if (selectedOrderId) {
+      const { data: receiptsData, error } = await supabase
+        .from('yutong_cash_receipts')
+        .select('*')
+        .eq('order_id', selectedOrderId);
+
+      if (!error && receiptsData) {
+        const receiptsMap: Record<string, YutongCashReceipt> = {};
+        receiptsData.forEach((receipt: YutongCashReceipt) => {
+          receiptsMap[receipt.payment_id] = receipt;
+        });
+        setCashReceipts(receiptsMap);
+        
+        // Update selected receipt if it's open
+        if (selectedReceipt) {
+          const updatedReceipt = receiptsData.find((r: YutongCashReceipt) => r.id === selectedReceipt.id);
+          if (updatedReceipt) {
+            setSelectedReceipt(updatedReceipt);
+          }
+        }
+      }
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: any; icon: any }> = {
       pending: { variant: 'outline', icon: Clock },
@@ -422,16 +502,50 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                       </TableCell>
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell>
-                        {payment.status === 'pending' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleVerifyPayment(payment.id)}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Verify
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {payment.status === 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleVerifyPayment(payment.id)}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Verify
+                            </Button>
+                          )}
+                          
+                          {/* Cash Receipt Actions */}
+                          {payment.status === 'verified' && (
+                            <>
+                              {cashReceipts[payment.id] ? (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="sm" variant="outline">
+                                      <Receipt className="h-4 w-4 mr-1" />
+                                      Receipt
+                                      <MoreHorizontal className="h-4 w-4 ml-1" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleViewReceipt(payment.id)}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View Receipt
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleGenerateReceipt(payment)}
+                                >
+                                  <Receipt className="h-4 w-4 mr-1" />
+                                  Generate Receipt
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -512,6 +626,14 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cash Receipt Modal */}
+      <YutongCashReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+        receipt={selectedReceipt}
+        onRefresh={handleRefreshReceipts}
+      />
     </>
   );
 }
