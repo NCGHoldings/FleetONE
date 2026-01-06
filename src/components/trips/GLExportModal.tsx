@@ -15,6 +15,14 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { BusDailySummary } from '@/hooks/useDailyBusGroupedTrips';
@@ -42,16 +50,48 @@ export function GLExportModal({
   const [selectAllBuses, setSelectAllBuses] = useState(true);
   const [dateWiseBusSelection, setDateWiseBusSelection] = useState<Record<string, string[]>>({});
 
-  // Get unique buses from busSummaries
-  const availableBuses = useMemo(() => {
-    return Array.from(new Set(busSummaries.map(s => s.bus_no))).sort();
-  }, [busSummaries]);
-
   // Get dates in range for date-wise selection
   const datesInRange = useMemo(() => {
     if (!customDateRange?.from || !customDateRange?.to) return [];
     return eachDayOfInterval({ start: customDateRange.from, end: customDateRange.to });
   }, [customDateRange]);
+
+  // Fetch buses that have trips in the selected date range
+  const { data: busesInRange, isLoading: isLoadingBuses } = useQuery({
+    queryKey: ['gl-buses-in-range', customDateRange?.from?.toISOString(), customDateRange?.to?.toISOString()],
+    queryFn: async () => {
+      if (!customDateRange?.from || !customDateRange?.to) return [];
+      
+      const startDate = format(customDateRange.from, 'yyyy-MM-dd');
+      const endDate = format(customDateRange.to, 'yyyy-MM-dd');
+      
+      console.log('🔍 Fetching buses with trips in range:', startDate, 'to', endDate);
+      
+      const { data: trips, error } = await supabase
+        .from('daily_trips')
+        .select('buses(bus_no)')
+        .gte('trip_date', startDate)
+        .lte('trip_date', endDate);
+      
+      if (error) {
+        console.error('Error fetching buses in range:', error);
+        return [];
+      }
+      
+      const buses = [...new Set(trips?.map(t => t.buses?.bus_no).filter(Boolean) as string[])].sort();
+      console.log('📊 Buses found in date range:', buses.length, buses);
+      return buses;
+    },
+    enabled: open && dateSelectionMode === 'range' && !!customDateRange?.from && !!customDateRange?.to,
+  });
+
+  // Get unique buses - use dynamic buses for range mode, or busSummaries for single date
+  const availableBuses = useMemo(() => {
+    if (dateSelectionMode === 'range' && busesInRange && busesInRange.length > 0) {
+      return busesInRange;
+    }
+    return Array.from(new Set(busSummaries.map(s => s.bus_no))).sort();
+  }, [busSummaries, dateSelectionMode, busesInRange]);
 
   // Initialize selected buses when modal opens
   useMemo(() => {
@@ -425,7 +465,7 @@ export function GLExportModal({
             </RadioGroup>
 
             {dateSelectionMode === 'range' && (
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 <DateRangePicker 
                   onDateRangeChange={(range) => {
                     setCustomDateRange(range);
@@ -433,8 +473,15 @@ export function GLExportModal({
                   }}
                   className="w-full"
                 />
-                {isLoadingMultiDate && (
+                {(isLoadingMultiDate || isLoadingBuses) && (
                   <p className="text-xs text-muted-foreground mt-2">Loading data...</p>
+                )}
+                {/* Warning when no trips found in date range */}
+                {dateSelectionMode === 'range' && !isLoadingBuses && busesInRange && busesInRange.length === 0 && customDateRange?.from && customDateRange?.to && (
+                  <div className="p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-md text-yellow-800 dark:text-yellow-200 text-sm">
+                    <strong>⚠️ No trips found</strong> for the selected date range ({format(customDateRange.from, 'MMM dd')} - {format(customDateRange.to, 'MMM dd, yyyy')}). 
+                    Please select dates that have trip data.
+                  </div>
                 )}
               </div>
             )}
@@ -596,29 +643,50 @@ export function GLExportModal({
                 <span className="font-medium">{summary.entryCount} rows</span>
               </div>
               
-              {/* Show date-wise bus selection summary */}
-              {dateSelectionMode === 'range' && Object.keys(dateWiseBusSelection).length > 0 && (
+              {/* Selected Buses Summary Table */}
+              {dateSelectionMode === 'range' && datesInRange.length > 0 && (
                 <div className="pt-2 border-t mt-2">
-                  <div className="text-xs text-muted-foreground mb-2 font-medium">Buses by Date:</div>
-                  <ScrollArea className="max-h-[100px]">
-                    <div className="space-y-1 text-xs">
-                      {datesInRange.map(date => {
-                        const dateStr = format(date, 'yyyy-MM-dd');
-                        const buses = dateWiseBusSelection[dateStr] || [];
-                        if (buses.length === 0) return null;
-                        return (
-                          <div key={dateStr} className="flex gap-2">
-                            <span className="font-medium text-primary min-w-[80px]">
-                              {format(date, 'MMM dd')}:
-                            </span>
-                            <span className="text-muted-foreground">
-                              {buses.join(', ')}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
+                  <div className="text-xs text-muted-foreground mb-2 font-medium">📋 Selected Buses Summary:</div>
+                  <div className="rounded-md border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="text-xs py-2">Date</TableHead>
+                          <TableHead className="text-xs py-2">Buses Selected</TableHead>
+                          <TableHead className="text-xs py-2 text-right">Count</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {datesInRange.map(date => {
+                          const dateStr = format(date, 'yyyy-MM-dd');
+                          const buses = dateWiseBusSelection[dateStr] || [];
+                          return (
+                            <TableRow key={dateStr} className={buses.length === 0 ? 'text-muted-foreground' : ''}>
+                              <TableCell className="text-xs py-1.5 font-medium">
+                                {format(date, 'MMM dd, yyyy')}
+                              </TableCell>
+                              <TableCell className="text-xs py-1.5 max-w-[200px] truncate" title={buses.join(', ')}>
+                                {buses.length > 0 ? buses.join(', ') : <span className="italic">No buses selected</span>}
+                              </TableCell>
+                              <TableCell className="text-xs py-1.5 text-right font-semibold">
+                                {buses.length}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {/* Total Row */}
+                        <TableRow className="bg-muted/30 font-semibold">
+                          <TableCell className="text-xs py-1.5">Total Unique Buses</TableCell>
+                          <TableCell className="text-xs py-1.5">
+                            {Array.from(new Set(Object.values(dateWiseBusSelection).flat())).join(', ') || '-'}
+                          </TableCell>
+                          <TableCell className="text-xs py-1.5 text-right">
+                            {Array.from(new Set(Object.values(dateWiseBusSelection).flat())).length}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
 
