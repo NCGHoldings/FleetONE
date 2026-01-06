@@ -118,18 +118,25 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
 
       // Load cash receipts for each payment
       if (paymentData && paymentData.length > 0) {
+        console.log('Loading cash receipts for order:', selectedOrderId);
         const { data: receiptsData, error: receiptsError } = await supabase
           .from('yutong_cash_receipts')
           .select('*')
           .eq('order_id', selectedOrderId);
 
-        if (!receiptsError && receiptsData) {
+        if (receiptsError) {
+          console.error('Error loading cash receipts:', receiptsError);
+        } else if (receiptsData) {
+          console.log('Loaded cash receipts:', receiptsData.length, 'receipts');
           const receiptsMap: Record<string, YutongCashReceipt> = {};
           receiptsData.forEach((receipt: YutongCashReceipt) => {
             receiptsMap[receipt.payment_id] = receipt;
           });
           setCashReceipts(receiptsMap);
         }
+      } else {
+        // Clear cash receipts if no payments
+        setCashReceipts({});
       }
 
     } catch (error: any) {
@@ -495,7 +502,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                   {payments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{payment.reference_no || '-'}</TableCell>
+                      <TableCell>{payment.payment_reference || '-'}</TableCell>
                       <TableCell className="capitalize">{payment.payment_method?.replace('_', ' ')}</TableCell>
                       <TableCell className="text-right font-semibold">
                         LKR {payment.payment_amount.toLocaleString()}
@@ -530,6 +537,13 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                                     <DropdownMenuItem onClick={() => handleViewReceipt(payment.id)}>
                                       <Eye className="h-4 w-4 mr-2" />
                                       View Receipt
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => {
+                                      setSelectedReceipt(cashReceipts[payment.id]);
+                                      setIsReceiptModalOpen(true);
+                                    }}>
+                                      <Download className="h-4 w-4 mr-2" />
+                                      Download PDF
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
