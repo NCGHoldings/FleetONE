@@ -77,6 +77,17 @@ export function YutongQuotationRepeatModal({
 
     setLoading(true);
     try {
+      // Fetch the COMPLETE quotation data from database to get ALL fields
+      const { data: fullQuotation, error: fetchError } = await supabase
+        .from('yutong_quotations')
+        .select('*')
+        .eq('id', quotation.id)
+        .single();
+
+      if (fetchError || !fullQuotation) {
+        throw new Error('Failed to fetch quotation details');
+      }
+
       // Fetch add-ons for this quotation
       const { data: addOns } = await supabase
         .from('yutong_quotation_addons')
@@ -89,27 +100,67 @@ export function YutongQuotationRepeatModal({
       for (let i = 0; i < numberOfCopies; i++) {
         const quotationNo = await generateQuotationNo(i);
         
+        // Copy ALL fields from the original quotation except system fields
         const duplicateData = {
+          // New quotation identifiers
           quotation_no: quotationNo,
-          customer_name: quotation.customer_name,
-          customer_phone: quotation.customer_phone,
-          customer_email: quotation.customer_email || '',
-          company_name: quotation.company_name,
-          bus_model: quotation.bus_model,
-          bus_model_id: quotation.bus_model_id,
-          quantity: 1,
-          unit_price: quotation.unit_price,
-          total_price: quotation.unit_price,
-          valid_until: quotation.valid_until,
-          special_features: quotation.special_features,
-          delivery_timeline: quotation.delivery_timeline,
-          payment_terms: quotation.payment_terms,
-          warranty_terms: quotation.warranty_terms,
-          discount_percentage: quotation.discount_percentage,
           status: 'draft',
           version_number: '1.0',
           is_active_version: true,
           created_by: user.id,
+          
+          // Customer information
+          customer_name: fullQuotation.customer_name,
+          customer_phone: fullQuotation.customer_phone,
+          customer_email: fullQuotation.customer_email || '',
+          company_name: fullQuotation.company_name,
+          customer_address: fullQuotation.customer_address,
+          customer_id: fullQuotation.customer_id,
+          customer_type: fullQuotation.customer_type,
+          attention_to: fullQuotation.attention_to,
+          contact_person: fullQuotation.contact_person,
+          main_customer_name: fullQuotation.main_customer_name,
+          is_sub_customer: fullQuotation.is_sub_customer,
+          relationship_notes: fullQuotation.relationship_notes,
+          business_registration_number: fullQuotation.business_registration_number,
+          tax_registration_number: fullQuotation.tax_registration_number,
+          
+          // Bus details
+          bus_model: fullQuotation.bus_model,
+          bus_model_id: fullQuotation.bus_model_id,
+          seating_capacity: fullQuotation.seating_capacity,
+          
+          // Customization options
+          seat_colour: fullQuotation.seat_colour,
+          curtain_colour: fullQuotation.curtain_colour,
+          body_colour: fullQuotation.body_colour,
+          seat_headrest_logo: fullQuotation.seat_headrest_logo,
+          special_features: fullQuotation.special_features,
+          
+          // Pricing
+          quantity: 1,
+          unit_price: fullQuotation.unit_price,
+          total_price: fullQuotation.unit_price,
+          discount_percentage: fullQuotation.discount_percentage,
+          discount_amount: fullQuotation.discount_amount,
+          
+          // Terms and validity
+          valid_until: fullQuotation.valid_until,
+          valid_days: fullQuotation.valid_days,
+          delivery_timeline: fullQuotation.delivery_timeline,
+          payment_terms: fullQuotation.payment_terms,
+          warranty_terms: fullQuotation.warranty_terms,
+          finance_company: fullQuotation.finance_company,
+          
+          // Staff/Representative
+          responsible_person: fullQuotation.responsible_person,
+          responsible_person_id: fullQuotation.responsible_person_id,
+          representative_name: fullQuotation.representative_name,
+          designation: fullQuotation.designation,
+          
+          // References
+          inquiry_id: fullQuotation.inquiry_id,
+          referral_agent_id: fullQuotation.referral_agent_id,
         };
 
         const { data, error } = await supabase
