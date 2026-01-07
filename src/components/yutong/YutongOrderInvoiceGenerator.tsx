@@ -2,13 +2,19 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Download, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, Download, RefreshCw, CheckCircle, AlertCircle, ChevronDown, User, Building } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
 import { YutongInvoiceDataModal } from './YutongInvoiceDataModal';
 import { YutongOrderInvoiceViewModal } from './YutongOrderInvoiceViewModal';
 import { YutongInvoiceTypeModal, ProformaInvoiceConfig } from './YutongInvoiceTypeModal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { YutongOrderInvoiceData } from '@/lib/yutong-order-invoice-generator';
 
 interface YutongOrder {
@@ -41,6 +47,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
   const [invoices, setInvoices] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [quotation, setQuotation] = useState<any>(null);
+  const [defaultInvoiceType, setDefaultInvoiceType] = useState<'direct_invoice' | 'proforma_invoice'>('direct_invoice');
   const [loadingInvoices, setLoadingInvoices] = useState(true);
 
   const {
@@ -145,8 +152,8 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     };
   };
 
-  const handleGenerateInvoiceClick = () => {
-    console.log('🎬 Generate Invoice button clicked');
+  const handleGenerateInvoice = (invoiceType: 'direct_invoice' | 'proforma_invoice') => {
+    console.log('🎬 Generate Invoice clicked, type:', invoiceType);
     console.log('📦 Order data:', order);
     console.log('📋 Quotation data:', quotation);
     
@@ -163,7 +170,8 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       return;
     }
 
-    // Show invoice type modal to select Direct or Proforma
+    // Set the default type and show modal
+    setDefaultInvoiceType(invoiceType);
     setShowInvoiceTypeModal(true);
   };
 
@@ -340,10 +348,31 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
               </div>
               
               {vehicleDetailsComplete ? (
-                <Button onClick={handleGenerateInvoiceClick} disabled={isLoading}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Generate Invoice
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button disabled={isLoading}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Generate Invoice
+                      <ChevronDown className="h-4 w-4 ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={() => handleGenerateInvoice('direct_invoice')}>
+                      <User className="h-4 w-4 mr-2" />
+                      <div>
+                        <div className="font-medium">Customer Invoice</div>
+                        <div className="text-xs text-muted-foreground">Direct invoice to customer</div>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleGenerateInvoice('proforma_invoice')}>
+                      <Building className="h-4 w-4 mr-2" />
+                      <div>
+                        <div className="font-medium">Proforma Invoice</div>
+                        <div className="text-xs text-muted-foreground">For bank/finance company</div>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : (
                 <Button onClick={() => setShowVehicleDataModal(true)}>
                   Complete Vehicle Details
@@ -454,6 +483,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
         totalAmount={order.total_amount}
         onConfirm={handleInvoiceTypeConfirm}
         isLoading={isLoading}
+        defaultInvoiceType={defaultInvoiceType}
       />
     </>
   );
