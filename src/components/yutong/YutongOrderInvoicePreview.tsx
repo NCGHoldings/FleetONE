@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useYutongInvoiceSignatures, YutongInvoiceSignature } from '@/hooks/useYutongInvoiceSignatures';
 import { generateYutongOrderInvoiceHTML } from '@/lib/yutong-order-invoice-generator';
+import { sanitizeHTML } from '@/lib/sanitize';
 
 interface YutongOrderInvoicePreviewProps {
   invoiceRecordId: string;
@@ -55,7 +56,7 @@ export function YutongOrderInvoicePreview({ invoiceRecordId, invoiceData }: Yuto
   return (
     <div 
       className="border rounded-lg p-6 overflow-auto max-h-[calc(90vh-280px)] bg-background"
-      dangerouslySetInnerHTML={{ __html: invoiceHTML }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHTML(invoiceHTML) }}
     />
   );
 }

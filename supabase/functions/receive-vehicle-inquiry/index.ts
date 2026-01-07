@@ -30,16 +30,16 @@ serve(async (req) => {
     const configuredApiKey = settings?.setting_value?.api_key;
     
     if (!configuredApiKey || apiKey !== configuredApiKey) {
-      console.error('Invalid API key');
+      console.error('Invalid API key attempt');
       return new Response(
-        JSON.stringify({ error: 'Unauthorized: Invalid API key' }),
+        JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Parse request body
     const inquiryData = await req.json();
-    console.log('Received inquiry data:', inquiryData);
+    console.log('Received inquiry from:', inquiryData.customer_name);
 
     // Validate required fields
     if (!inquiryData.customer_name || !inquiryData.product_type) {
@@ -48,6 +48,20 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Input validation - sanitize strings
+    const sanitizedData = {
+      customer_name: String(inquiryData.customer_name || '').slice(0, 200),
+      product_type: String(inquiryData.product_type || '').slice(0, 100),
+      customer_phone: String(inquiryData.customer_phone || '').slice(0, 20),
+      customer_email: String(inquiryData.customer_email || '').slice(0, 255),
+      company_name: String(inquiryData.company_name || '').slice(0, 200),
+      address: String(inquiryData.address || '').slice(0, 500),
+      inquiry_message: String(inquiryData.inquiry_message || '').slice(0, 2000),
+      interested_model: String(inquiryData.interested_model || '').slice(0, 100),
+      budget_range: String(inquiryData.budget_range || '').slice(0, 100),
+      notes: String(inquiryData.notes || '').slice(0, 1000),
+    };
 
     // Get auto-assignment settings
     const { data: assignSettings } = await supabase
@@ -58,7 +72,7 @@ serve(async (req) => {
 
     // Define light vehicle brands for matching
     const lightVehicleBrands = ['honda', 'toyota', 'mitsubishi', 'suzuki', 'lightvehicle'];
-    const productType = (inquiryData.product_type || '').toLowerCase();
+    const productType = sanitizedData.product_type.toLowerCase();
 
     let assignedTo = null;
     if (assignSettings?.setting_value) {
@@ -79,52 +93,51 @@ serve(async (req) => {
     const { data: inquiry, error: insertError } = await supabase
       .from('vehicle_inquiries')
       .insert({
-        source: inquiryData.source || 'website',
-        product_type: inquiryData.product_type,
-        customer_name: inquiryData.customer_name,
-        customer_phone: inquiryData.customer_phone,
-        customer_email: inquiryData.customer_email,
-        company_name: inquiryData.company_name,
-        address: inquiryData.address,
-        inquiry_message: inquiryData.inquiry_message,
-        interested_model: inquiryData.interested_model,
-        quantity: inquiryData.quantity || 1,
-        budget_range: inquiryData.budget_range,
+        source: String(inquiryData.source || 'website').slice(0, 50),
+        product_type: sanitizedData.product_type,
+        customer_name: sanitizedData.customer_name,
+        customer_phone: sanitizedData.customer_phone || null,
+        customer_email: sanitizedData.customer_email || null,
+        company_name: sanitizedData.company_name || null,
+        address: sanitizedData.address || null,
+        inquiry_message: sanitizedData.inquiry_message || null,
+        interested_model: sanitizedData.interested_model || null,
+        quantity: Math.min(Math.max(1, parseInt(inquiryData.quantity) || 1), 1000),
+        budget_range: sanitizedData.budget_range || null,
         status: 'new',
-        priority: inquiryData.priority || 'medium',
+        priority: ['low', 'medium', 'high', 'urgent'].includes(inquiryData.priority) ? inquiryData.priority : 'medium',
         assigned_to: assignedTo,
-        external_ref_id: inquiryData.external_ref_id,
-        notes: inquiryData.notes,
+        external_ref_id: String(inquiryData.external_ref_id || '').slice(0, 100) || null,
+        notes: sanitizedData.notes || null,
       })
       .select()
       .single();
 
     if (insertError) {
-      console.error('Error inserting inquiry:', insertError);
+      const errorId = crypto.randomUUID().slice(0, 8);
+      console.error(`Error ${errorId} inserting inquiry:`, insertError);
       return new Response(
-        JSON.stringify({ error: 'Failed to create inquiry', details: insertError.message }),
+        JSON.stringify({ error: 'Failed to create inquiry', errorId }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log('Inquiry created successfully:', inquiry.inquiry_number);
 
-    // TODO: Send notifications if enabled in settings
-
     return new Response(
       JSON.stringify({
         success: true,
         inquiry_number: inquiry.inquiry_number,
         message: 'Inquiry received successfully',
-        data: inquiry,
       }),
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Unexpected error:', error);
+    const errorId = crypto.randomUUID().slice(0, 8);
+    console.error(`Error ${errorId} in receive-vehicle-inquiry:`, error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({ error: 'An error occurred processing your request', errorId }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { sanitizeHTML } from '@/lib/sanitize';
 
 interface YutongInvoiceViewModalProps {
   isOpen: boolean;
@@ -219,7 +220,7 @@ export const YutongInvoiceViewModal: React.FC<YutongInvoiceViewModalProps> = ({
           <TabsContent value="preview" className="flex-1 overflow-auto">
             <div 
               className="border rounded-lg p-4 bg-white"
-              dangerouslySetInnerHTML={{ __html: generateYutongInvoiceHTML(displayData) }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHTML(generateYutongInvoiceHTML(displayData)) }}
             />
           </TabsContent>
 
