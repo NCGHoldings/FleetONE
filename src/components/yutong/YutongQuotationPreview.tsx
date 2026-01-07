@@ -173,79 +173,165 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
   const grandTotal = busSubtotal + addOnsTotal;
 
   const pageHeaderFooterStyles = `
+      @page {
+        size: A4 portrait;
+        margin: 8mm;
+      }
+      
       @media print {
-        .page {
-          page-break-after: always;
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          border: none !important;
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
+        
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        
+        .page {
+          width: 100% !important;
+          max-width: none !important;
+          height: 277mm;
+          max-height: 277mm;
+          min-height: 277mm;
+          page-break-after: always;
+          page-break-inside: avoid;
+          display: flex !important;
+          flex-direction: column !important;
+          border: none !important;
+          margin: 0 !important;
+          padding: 5mm !important;
+          box-sizing: border-box;
+          overflow: hidden;
+          background: white !important;
+        }
+        
         .page:last-child {
           page-break-after: avoid;
         }
+        
         .page-header {
-          margin-bottom: 20px;
+          flex-shrink: 0;
+          margin-bottom: 8px !important;
         }
-        .page-footer {
-          margin-top: auto;
-          padding-top: 20px;
+        
+        .page-header img {
+          max-height: 80px !important;
         }
+        
         .page-content {
           flex: 1;
+          overflow: hidden;
+          padding: 0 !important;
+        }
+        
+        .page-footer {
+          flex-shrink: 0;
+          margin-top: auto !important;
+          padding-top: 8px !important;
+        }
+        
+        .signatures {
+          margin-top: 15px !important;
+          margin-bottom: 10px !important;
+          page-break-inside: avoid;
+        }
+        
+        .signature-field {
+          min-height: 70px !important;
+        }
+        
+        .signature-content {
+          height: 50px !important;
+        }
+        
+        .footer-contact {
+          page-break-inside: avoid;
+          padding: 6px 10px !important;
+          font-size: 11px !important;
+        }
+        
+        table {
+          page-break-inside: avoid;
+        }
+        
+        /* Compact spacing for print */
+        .customer-info p {
+          margin: 2px 0 !important;
+          font-size: 12px !important;
+        }
+        
+        .payment-details p {
+          margin: 2px 0 !important;
+          font-size: 12px !important;
+        }
+        
+        .vehicle-customization {
+          margin-top: 10px !important;
+          padding: 8px !important;
+        }
+        
+        .terms-section p {
+          margin-bottom: 8px !important;
+          font-size: 11px !important;
+          line-height: 1.3 !important;
         }
       }
+      
+      /* Screen preview styles */
       .page {
-        min-height: 100vh;
+        min-height: auto;
         display: flex;
         flex-direction: column;
         background: white;
         border: 2px solid #003366;
         margin-bottom: 20px;
         position: relative;
+        padding: 15px;
       }
       .page-header {
-        margin-bottom: 20px;
+        margin-bottom: 15px;
       }
       .page-footer {
         margin-top: auto;
-        padding-top: 20px;
+        padding-top: 15px;
       }
       .page-content {
         flex: 1;
-        padding: 20px;
+        padding: 15px;
       }
       .signatures {
         display: flex;
         justify-content: space-between;
         font-size: 14px;
-        margin-top: 40px;
-        margin-bottom: 20px;
+        margin-top: 25px;
+        margin-bottom: 15px;
       }
       .signature-field {
         text-align: center;
         width: 30%;
-        min-height: 100px;
+        min-height: 80px;
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
       }
       .signature-content {
-        height: 70px;
+        height: 55px;
         display: flex;
         align-items: flex-end;
         justify-content: center;
       }
       .signature-line {
         border-top: 1px dotted #000;
-        padding-top: 5px;
-        margin-top: 10px;
+        padding-top: 4px;
+        margin-top: 8px;
       }
       .footer-contact {
         background: #003366;
         color: white;
-        padding: 10px;
-        font-size: 13px;
+        padding: 8px;
+        font-size: 12px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -272,54 +358,54 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           </div>
 
           {/* Customer Info - Dynamic based on customer_type */}
-          <div style={{ marginBottom: "20px" }}>
+          <div className="customer-info" style={{ marginBottom: "12px" }}>
             {quotation.customer_type === "company" ? (
               <>
                 {quotation.representative_name && (
-                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
                     <b>CUSTOMER :</b> {quotation.representative_name}
                   </p>
                 )}
                 {quotation.designation && (
-                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
                     <b>DESIGNATION :</b> {quotation.designation}
                   </p>
                 )}
-                <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                <p style={{ margin: "3px 0", fontSize: "13px" }}>
                   <b>COMPANY :</b> {quotation.customer_name}
                 </p>
                 {quotation.business_registration_number && (
-                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
                     <b>BUSINESS REG NO :</b> {quotation.business_registration_number}
                   </p>
                 )}
                 {quotation.tax_registration_number && (
-                  <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                  <p style={{ margin: "3px 0", fontSize: "13px" }}>
                     <b>TAX REG NO :</b> {quotation.tax_registration_number}
                   </p>
                 )}
-                <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                <p style={{ margin: "3px 0", fontSize: "13px" }}>
                   <b>ADDRESS :</b> {quotation.customer_address || ""}
                 </p>
               </>
             ) : (
               <>
-                <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                <p style={{ margin: "3px 0", fontSize: "13px" }}>
                   <b>CUSTOMER :</b> {quotation.customer_name}
                 </p>
-                <p style={{ margin: "4px 0", fontSize: "14px" }}>
+                <p style={{ margin: "3px 0", fontSize: "13px" }}>
                   <b>ADDRESS :</b> {quotation.customer_address || ""}
                 </p>
               </>
             )}
-            <p style={{ margin: "4px 0", fontSize: "14px" }}>
+            <p style={{ margin: "3px 0", fontSize: "13px" }}>
               <b>CONTACT :</b> {quotation.customer_phone}{quotation.customer_email ? ` / ${quotation.customer_email}` : ''}
             </p>
-            <p style={{ margin: "4px 0", fontSize: "14px" }}>
+            <p style={{ margin: "3px 0", fontSize: "13px" }}>
               <b>DATE :</b> {formattedDate}
             </p>
             {quotation.finance_company && (
-              <p style={{ margin: "4px 0", fontSize: "14px" }}>
+              <p style={{ margin: "3px 0", fontSize: "13px" }}>
                 <b>FINANCE COMPANY :</b> {quotation.finance_company}
               </p>
             )}
@@ -619,30 +705,15 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           </table>
 
           {/* Payment Details */}
-          <div style={{ fontSize: "14px", marginTop: "10px" }}>
-            <p style={{ margin: "3px 0" }}>
+          <div className="payment-details" style={{ fontSize: "12px", marginTop: "8px" }}>
+            <p style={{ margin: "2px 0" }}>
               <b>Payment Terms :</b> {quotation.payment_terms || "Payment method – by Cheque or bank transfer"}
             </p>
-            <p style={{ margin: "3px 0" }}>
-              <b>Account Name :</b> NCG HOLDINGS (PRIVATE) LIMITED
+            <p style={{ margin: "2px 0" }}>
+              <b>Account Name :</b> NCG HOLDINGS (PRIVATE) LIMITED | <b>Account Number :</b> 2000511791
             </p>
-            <p style={{ margin: "3px 0" }}>
-              <b>Account Number :</b> 2000511791
-            </p>
-            <p style={{ margin: "3px 0" }}>
-              <b>Bank Name :</b> Commercial Bank of Ceylon PLC
-            </p>
-            <p style={{ margin: "3px 0" }}>
-              <b>Bank Code :</b> 7056
-            </p>
-            <p style={{ margin: "3px 0" }}>
-              <b>Branch :</b> Nugegoda Branch
-            </p>
-            <p style={{ margin: "3px 0" }}>
-              <b>Branch Code :</b> 020
-            </p>
-            <p style={{ margin: "3px 0" }}>
-              <b>Swift Code :</b> CCEYLKLX
+            <p style={{ margin: "2px 0" }}>
+              <b>Bank :</b> Commercial Bank of Ceylon PLC (7056) | <b>Branch :</b> Nugegoda (020) | <b>Swift :</b> CCEYLKLX
             </p>
           </div>
 
@@ -652,36 +723,37 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
             quotation.body_colour ||
             quotation.seat_headrest_logo) && (
             <div
+              className="vehicle-customization"
               style={{
-                fontSize: "14px",
-                marginTop: "20px",
-                padding: "15px",
-                border: "2px solid #003366",
-                borderRadius: "8px",
+                fontSize: "12px",
+                marginTop: "12px",
+                padding: "10px",
+                border: "1px solid #003366",
+                borderRadius: "6px",
                 background: "#f8f9fa",
               }}
             >
-              <h3 style={{ margin: "0 0 10px 0", color: "#003366", fontSize: "16px", fontWeight: "bold" }}>
+              <h3 style={{ margin: "0 0 6px 0", color: "#003366", fontSize: "13px", fontWeight: "bold" }}>
                 VEHICLE CUSTOMIZATION
               </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
                 {quotation.seat_colour && (
-                  <p style={{ margin: "4px 0" }}>
+                  <p style={{ margin: "2px 0" }}>
                     <b>Seat Colour:</b> {quotation.seat_colour}
                   </p>
                 )}
                 {quotation.curtain_colour && (
-                  <p style={{ margin: "4px 0" }}>
+                  <p style={{ margin: "2px 0" }}>
                     <b>Curtain Colour:</b> {quotation.curtain_colour}
                   </p>
                 )}
                 {quotation.body_colour && (
-                  <p style={{ margin: "4px 0" }}>
+                  <p style={{ margin: "2px 0" }}>
                     <b>Body Colour:</b> {quotation.body_colour}
                   </p>
                 )}
                 {quotation.seat_headrest_logo && (
-                  <p style={{ margin: "4px 0" }}>
+                  <p style={{ margin: "2px 0" }}>
                     <b>Seat Headrest Logo:</b> {quotation.seat_headrest_logo}
                   </p>
                 )}
@@ -794,93 +866,57 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
           </div>
 
           {/* Terms & Conditions */}
-          {/* Terms & Conditions */}
-          <div style={{ fontSize: "13px", lineHeight: "1.5", color: "#003366" }}>
+          <div className="terms-section" style={{ fontSize: "11px", lineHeight: "1.35", color: "#003366" }}>
             <h3
               style={{
                 color: "#003366",
                 borderBottom: "2px solid #003366",
-                paddingBottom: "5px",
-                marginBottom: "15px",
+                paddingBottom: "4px",
+                marginBottom: "10px",
+                fontSize: "14px",
               }}
             >
               Terms & Conditions
             </h3>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>1. Payment & Order Confirmation</b>
-              <br />A non-refundable advance payment of 10% of the total value is required to confirm the order. The
-              balance payment must be settled prior to delivery, unless otherwise agreed in writing. The vehicle will
-              not be released until full payment is received.
+            <p style={{ marginBottom: "6px" }}>
+              <b>1. Payment & Order Confirmation:</b> A non-refundable advance payment of 10% of the total value is required to confirm the order. The balance payment must be settled prior to delivery, unless otherwise agreed in writing. The vehicle will not be released until full payment is received.
             </p>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>2. Delivery Timeline</b>
-              <br />
-              Estimated delivery is 120 days, subject to stock availability, colour availability, production schedules,
-              shipping conditions, and regulatory approvals. Delivery delays beyond the seller’s control shall not be
-              the seller’s liability.
+            <p style={{ marginBottom: "6px" }}>
+              <b>2. Delivery Timeline:</b> Estimated delivery is 120 days, subject to stock availability, colour availability, production schedules, shipping conditions, and regulatory approvals. Delivery delays beyond the seller's control shall not be the seller's liability.
             </p>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>3. Customisations</b>
-              <br />
-              Any customer-requested customisations or specification changes will incur additional costs and may affect
-              delivery timelines.
+            <p style={{ marginBottom: "6px" }}>
+              <b>3. Customisations:</b> Any customer-requested customisations or specification changes will incur additional costs and may affect delivery timelines.
             </p>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>4. USD Exchange Rate Variations</b>
-              <br />
-              Prices are based on the prevailing USD exchange rate at the time of quotation. Any exchange rate
-              fluctuation may result in a price adjustment. If not accepted, the order will be cancelled, and the
-              advance payment forfeited.
+            <p style={{ marginBottom: "6px" }}>
+              <b>4. USD Exchange Rate Variations:</b> Prices are based on the prevailing USD exchange rate at the time of quotation. Any exchange rate fluctuation may result in a price adjustment. If not accepted, the order will be cancelled, and the advance payment forfeited.
             </p>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>5. Import Regulations & Government Policies</b>
-              <br />
-              Changes in import laws, duties, taxes, or trade restrictions in Sri Lanka may impact pricing and delivery.
-              Any additional costs arising from such changes shall be borne by the buyer. In the event of an import ban,
-              the advance remains non-refundable.
+            <p style={{ marginBottom: "6px" }}>
+              <b>5. Import Regulations & Government Policies:</b> Changes in import laws, duties, taxes, or trade restrictions in Sri Lanka may impact pricing and delivery. Any additional costs arising from such changes shall be borne by the buyer. In the event of an import ban, the advance remains non-refundable.
             </p>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>6. Vehicle Registration & Statutory Costs</b>
-              <br />
-              Vehicle registration will commence only after full payment or receipt of a valid Purchase Order. All
-              related costs including taxes, special number plates, revenue licence, and insurance are the buyer’s
-              responsibility. Once registered, no returns or refunds will be allowed.
+            <p style={{ marginBottom: "6px" }}>
+              <b>6. Vehicle Registration & Statutory Costs:</b> Vehicle registration will commence only after full payment or receipt of a valid Purchase Order. All related costs including taxes, special number plates, revenue licence, and insurance are the buyer's responsibility. Once registered, no returns or refunds will be allowed.
             </p>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>7. Inspection & Acceptance</b>
-              <br />
-              The buyer must inspect the vehicle at delivery. Any defects or discrepancies must be reported immediately.
-              Once accepted, no claims for damages or missing items will be entertained.
+            <p style={{ marginBottom: "6px" }}>
+              <b>7. Inspection & Acceptance:</b> The buyer must inspect the vehicle at delivery. Any defects or discrepancies must be reported immediately. Once accepted, no claims for damages or missing items will be entertained.
             </p>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>8. Warranty & Maintenance</b>
-              <br />
-              The vehicle is covered under the manufacturer’s warranty, subject to their terms. Maintenance outside the
-              warranty scope is the buyer’s responsibility. The seller may assist with warranty claims but bears no
-              liability for outcomes or costs.
+            <p style={{ marginBottom: "6px" }}>
+              <b>8. Warranty & Maintenance:</b> The vehicle is covered under the manufacturer's warranty, subject to their terms. Maintenance outside the warranty scope is the buyer's responsibility. The seller may assist with warranty claims but bears no liability for outcomes or costs.
             </p>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>9. Risk & Liability</b>
-              <br />
-              Risk of loss or damage transfers to the buyer upon delivery and acceptance. The seller shall not be liable
-              for any loss, damage, or misuse after delivery.
+            <p style={{ marginBottom: "6px" }}>
+              <b>9. Risk & Liability:</b> Risk of loss or damage transfers to the buyer upon delivery and acceptance. The seller shall not be liable for any loss, damage, or misuse after delivery.
             </p>
 
-            <p style={{ marginBottom: "12px" }}>
-              <b>10. Indemnity, Marketing & Assignment</b>
-              <br />
-              The buyer agrees to indemnify the seller against any claims arising from use or resale of the vehicle. The
-              seller may use vehicle images for promotional purposes. The buyer may not assign or transfer this
-              agreement without written consent.
+            <p style={{ marginBottom: "6px" }}>
+              <b>10. Indemnity, Marketing & Assignment:</b> The buyer agrees to indemnify the seller against any claims arising from use or resale of the vehicle. The seller may use vehicle images for promotional purposes. The buyer may not assign or transfer this agreement without written consent.
             </p>
           </div>
         </div>
