@@ -142,7 +142,7 @@ export function useYutongOrderInvoiceManagement() {
       }
       console.log('✅ PDF uploaded successfully to:', uploadResult.data?.path || filePath);
       
-      // Create invoice record
+      // Create invoice record with proforma fields
       console.log('💾 Step 4: Creating invoice record...');
       const { data: invoice, error: invoiceError } = await supabase
         .from('yutong_invoice_records')
@@ -151,8 +151,17 @@ export function useYutongOrderInvoiceManagement() {
           order_id: orderId,
           quotation_id: quotationId,
           invoice_date: fullInvoiceData.invoice_date,
-          invoice_amount: fullInvoiceData.total,
-          status: 'draft'
+          invoice_amount: fullInvoiceData.invoice_category === 'proforma_invoice' 
+            ? fullInvoiceData.proforma_amount || fullInvoiceData.total 
+            : fullInvoiceData.total,
+          status: 'draft',
+          // Proforma invoice fields
+          invoice_category: fullInvoiceData.invoice_category || 'direct_invoice',
+          proforma_amount_percentage: fullInvoiceData.proforma_amount_percentage,
+          proforma_amount: fullInvoiceData.proforma_amount,
+          finance_company_name: fullInvoiceData.finance_company_name,
+          finance_company_address: fullInvoiceData.finance_company_address,
+          proforma_purpose: fullInvoiceData.proforma_purpose
         })
         .select()
         .single();

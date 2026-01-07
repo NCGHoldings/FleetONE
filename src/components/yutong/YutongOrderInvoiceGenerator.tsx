@@ -145,7 +145,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     };
   };
 
-  const handleGenerateInvoice = async () => {
+  const handleGenerateInvoiceClick = () => {
     console.log('🎬 Generate Invoice button clicked');
     console.log('📦 Order data:', order);
     console.log('📋 Quotation data:', quotation);
@@ -162,6 +162,14 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       toast.error('No quotation linked to this order');
       return;
     }
+
+    // Show invoice type modal to select Direct or Proforma
+    setShowInvoiceTypeModal(true);
+  };
+
+  const handleInvoiceTypeConfirm = async (config: ProformaInvoiceConfig) => {
+    console.log('📋 Invoice type confirmed:', config);
+    setShowInvoiceTypeModal(false);
 
     console.log('✅ Pre-checks passed, validating invoice data...');
     // Validate invoice data with specific error messages
@@ -215,7 +223,15 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       subtotal: order.total_amount,
       total: order.total_amount,
       
-      invoice_status: 'draft'
+      invoice_status: 'draft',
+      
+      // Proforma invoice fields
+      invoice_category: config.invoiceCategory,
+      proforma_amount_percentage: config.proformaAmountPercentage,
+      proforma_amount: config.proformaAmount,
+      finance_company_name: config.financeCompanyName,
+      finance_company_address: config.financeCompanyAddress,
+      proforma_purpose: config.proformaPurpose
     };
     
     console.log('📋 Final invoice data prepared:', invoiceData);
@@ -224,14 +240,16 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     const result = await generateAndStoreDraftInvoice(
       invoiceData,
       order.id,
-      order.quotation_id
+      order.quotation_id!
     );
     
     console.log('📊 Invoice generation result:', result);
 
     if (result.success) {
       console.log('✅ Invoice generated successfully!');
-      toast.success('Invoice generated successfully');
+      toast.success(config.invoiceCategory === 'proforma_invoice' 
+        ? 'Proforma invoice generated successfully' 
+        : 'Invoice generated successfully');
       await loadData();
       if (onRefresh) onRefresh();
     } else {
@@ -322,7 +340,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
               </div>
               
               {vehicleDetailsComplete ? (
-                <Button onClick={handleGenerateInvoice} disabled={isLoading}>
+                <Button onClick={handleGenerateInvoiceClick} disabled={isLoading}>
                   <FileText className="h-4 w-4 mr-2" />
                   Generate Invoice
                 </Button>
@@ -429,6 +447,14 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
           }}
         />
       )}
+
+      <YutongInvoiceTypeModal
+        isOpen={showInvoiceTypeModal}
+        onClose={() => setShowInvoiceTypeModal(false)}
+        totalAmount={order.total_amount}
+        onConfirm={handleInvoiceTypeConfirm}
+        isLoading={isLoading}
+      />
     </>
   );
 }
