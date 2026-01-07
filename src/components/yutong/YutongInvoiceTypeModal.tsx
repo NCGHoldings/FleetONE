@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ interface YutongInvoiceTypeModalProps {
   totalAmount: number;
   onConfirm: (config: ProformaInvoiceConfig) => void;
   isLoading?: boolean;
+  defaultInvoiceType?: 'direct_invoice' | 'proforma_invoice';
 }
 
 const FINANCE_PURPOSES = [
@@ -41,13 +42,19 @@ export function YutongInvoiceTypeModal({
   onClose,
   totalAmount,
   onConfirm,
-  isLoading = false
+  isLoading = false,
+  defaultInvoiceType = 'direct_invoice'
 }: YutongInvoiceTypeModalProps) {
-  const [invoiceCategory, setInvoiceCategory] = useState<'direct_invoice' | 'proforma_invoice'>('direct_invoice');
+  const [invoiceCategory, setInvoiceCategory] = useState<'direct_invoice' | 'proforma_invoice'>(defaultInvoiceType);
   const [proformaPercentage, setProformaPercentage] = useState(70);
   const [financeCompanyName, setFinanceCompanyName] = useState('');
   const [financeCompanyAddress, setFinanceCompanyAddress] = useState('');
   const [proformaPurpose, setProformaPurpose] = useState('bank_leasing');
+
+  // Update invoice category when defaultInvoiceType changes
+  useEffect(() => {
+    setInvoiceCategory(defaultInvoiceType);
+  }, [defaultInvoiceType, isOpen]);
 
   const proformaAmount = Math.round((totalAmount * proformaPercentage) / 100);
 
