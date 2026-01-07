@@ -217,11 +217,15 @@ export const YutongInvoiceViewModal: React.FC<YutongInvoiceViewModalProps> = ({
             <TabsTrigger value="signatures">Signatures</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="preview" className="flex-1 overflow-auto">
-            <div 
-              className="border rounded-lg p-4 bg-white"
-              dangerouslySetInnerHTML={{ __html: sanitizeHTML(generateYutongInvoiceHTML(displayData)) }}
-            />
+          <TabsContent value="preview" className="flex-1 overflow-hidden">
+            <div className="border rounded-lg overflow-hidden bg-white" style={{ height: 'calc(90vh - 300px)' }}>
+              <iframe
+                srcDoc={generateYutongInvoiceHTML(displayData)}
+                title="Invoice Preview"
+                className="w-full h-full border-0"
+                style={{ minHeight: '500px', background: 'white' }}
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="signatures" className="flex-1 overflow-auto">
