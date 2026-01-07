@@ -108,7 +108,7 @@ export const useYutongInvoiceSignatures = () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('signature_data, signature_type')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error) throw error;
@@ -140,7 +140,7 @@ export const useYutongInvoiceSignatures = () => {
           signature_data: signatureData,
           signature_type: signatureType
         })
-        .eq('id', user.id);
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
