@@ -89,18 +89,25 @@ export default function RealTimeTracking() {
   const [isLoadingApiKey, setIsLoadingApiKey] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [gpsSettings, setGpsSettings] = useState<GPSSettings>(() => {
-    // Load settings from localStorage if available
+    // Load non-sensitive settings from localStorage
+    // SECURITY: API key is NOT stored in localStorage - fetched from secure edge function
     const savedSettings = localStorage.getItem('gpsSettings');
     if (savedSettings) {
       try {
-        return JSON.parse(savedSettings);
+        const parsed = JSON.parse(savedSettings);
+        // Only restore non-sensitive settings, never the API key
+        return {
+          apiEndpoint: parsed.apiEndpoint || 'https://fios-api.kloudip.com',
+          apiKey: '', // Always empty - fetched securely from edge function
+          refreshInterval: parsed.refreshInterval || 30
+        };
       } catch (e) {
         console.warn('Invalid saved GPS settings');
       }
     }
     return {
       apiEndpoint: 'https://fios-api.kloudip.com',
-      apiKey: '',
+      apiKey: '', // Never stored in localStorage
       refreshInterval: 30
     };
   });

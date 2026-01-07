@@ -2,13 +2,38 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
+
+// Validate cron secret for scheduled job security
+function validateCronSecret(req: Request): boolean {
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  if (!cronSecret) {
+    console.warn('CRON_SECRET not configured - skipping auth check');
+    return true; // Allow if not configured (for backward compatibility)
+  }
+  
+  const authHeader = req.headers.get('x-cron-secret') || req.headers.get('authorization');
+  const providedSecret = authHeader?.startsWith('Bearer ') 
+    ? authHeader.replace('Bearer ', '') 
+    : authHeader;
+  
+  return providedSecret === cronSecret;
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Validate cron authentication
+  if (!validateCronSecret(req)) {
+    console.error('Unauthorized cron request attempt');
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   try {
@@ -79,11 +104,13 @@ Deno.serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in refresh-seasonal-themes:', error);
+    const errorId = crypto.randomUUID().slice(0, 8);
+    console.error(`Error ${errorId} in refresh-seasonal-themes:`, error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: 'An error occurred processing your request',
+        errorId
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

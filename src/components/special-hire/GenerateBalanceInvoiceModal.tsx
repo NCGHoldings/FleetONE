@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { sanitizeHTML } from '@/lib/sanitize';
 
 interface GenerateBalanceInvoiceModalProps {
   open: boolean;
@@ -459,7 +460,7 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
             <CardContent className="p-6">
               <div
                 className="invoice-preview border rounded-lg p-4 bg-white"
-                dangerouslySetInnerHTML={{ __html: generateInvoiceHTML(invoiceData) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHTML(generateInvoiceHTML(invoiceData)) }}
               />
             </CardContent>
           </Card>

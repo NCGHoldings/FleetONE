@@ -4,6 +4,7 @@ import { Download, Loader2 } from 'lucide-react';
 import { generateAdvanceDetailsHTML, generateAdvanceDetailsPDF, downloadAdvanceDetailsPDF } from '@/lib/advance-details-generator';
 import type { AdvanceDetailsData } from '@/lib/advance-details-generator';
 import { toast } from 'sonner';
+import { sanitizeHTML } from '@/lib/sanitize';
 
 interface AdvanceDetailsPreviewProps {
   data: AdvanceDetailsData;
@@ -64,7 +65,7 @@ export default function AdvanceDetailsPreview({ data, onDownload }: AdvanceDetai
       <div
         ref={previewRef}
         className="bg-white border rounded-lg p-8 shadow-sm"
-        dangerouslySetInnerHTML={{ __html: htmlContent }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHTML(htmlContent) }}
       />
     </div>
   );

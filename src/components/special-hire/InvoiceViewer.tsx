@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ApprovalSignatureModal } from './ApprovalSignatureModal';
 import { format } from 'date-fns';
+import { sanitizeHTML } from '@/lib/sanitize';
 
 interface InvoiceViewerProps {
   isOpen: boolean;
@@ -201,7 +202,7 @@ export const InvoiceViewer = ({ isOpen, onClose, invoiceData }: InvoiceViewerPro
             <TabsContent value="preview" className="flex-1 overflow-auto border rounded-lg bg-background mt-2">
               <div 
                 className="text-foreground p-4"
-                dangerouslySetInnerHTML={{ __html: generateInvoiceHTML(displayData) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHTML(generateInvoiceHTML(displayData)) }}
               />
             </TabsContent>
 

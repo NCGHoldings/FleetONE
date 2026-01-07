@@ -85,36 +85,8 @@ const handler = async (req: Request): Promise<Response> => {
           createError.message?.includes("email_exists")) {
         console.log("User already exists, attempting to update password...");
         
-        // Get user by email using a different approach
-        const { data: usersData, error: listError } = await supabaseAdmin
-          .from('profiles')
-          .select('user_id')
-          .eq('user_id', (
-            await supabaseAdmin.auth.admin.listUsers({ 
-              filter: `email.eq.${invite.email}` 
-            })
-          ).data?.users?.[0]?.id)
-          .single();
-
         // Try to find user by iterating (fallback for broken listUsers)
         let existingUserId: string | null = null;
-        
-        try {
-          // Use getUserById won't work, try to update by email directly
-          const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-            '', // We don't have the ID yet
-            { password: password }
-          );
-        } catch (e) {
-          // Expected to fail, we need another approach
-        }
-
-        // Since listUsers is broken, create a workaround:
-        // Look up the user via the invite's email in our profiles table
-        const { data: profileData } = await supabaseAdmin
-          .from('profiles')
-          .select('user_id')
-          .limit(100);
         
         // Get all users and find matching email
         const { data: allUsersResp } = await supabaseAdmin.auth.admin.listUsers();
@@ -141,9 +113,10 @@ const handler = async (req: Request): Promise<Response> => {
           );
 
           if (updateError) {
-            console.error("Error updating existing user:", updateError);
+            const errorId = crypto.randomUUID().slice(0, 8);
+            console.error(`Error ${errorId} updating existing user:`, updateError);
             return new Response(
-              JSON.stringify({ error: "Failed to update account. Please contact support." }),
+              JSON.stringify({ error: "Failed to update account. Please contact support.", errorId }),
               { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
             );
           }
@@ -158,10 +131,11 @@ const handler = async (req: Request): Promise<Response> => {
           );
         }
       } else {
-        // Some other error
-        console.error("Error creating user:", createError);
+        // Some other error - log details server-side, return generic message
+        const errorId = crypto.randomUUID().slice(0, 8);
+        console.error(`Error ${errorId} creating user:`, createError);
         return new Response(
-          JSON.stringify({ error: createError.message || "Failed to create user account" }),
+          JSON.stringify({ error: "Failed to create user account. Please try again or contact support.", errorId }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
@@ -169,8 +143,10 @@ const handler = async (req: Request): Promise<Response> => {
       console.log("New user created:", newUser.user.id);
       userId = newUser.user.id;
     } else {
+      const errorId = crypto.randomUUID().slice(0, 8);
+      console.error(`Error ${errorId}: User creation returned no user object`);
       return new Response(
-        JSON.stringify({ error: "Failed to create user account" }),
+        JSON.stringify({ error: "Failed to create user account. Please try again.", errorId }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -195,9 +171,10 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
   } catch (error: any) {
-    console.error("Error in accept-staff-invite:", error);
+    const errorId = crypto.randomUUID().slice(0, 8);
+    console.error(`Error ${errorId} in accept-staff-invite:`, error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: "An error occurred processing your request", errorId }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
