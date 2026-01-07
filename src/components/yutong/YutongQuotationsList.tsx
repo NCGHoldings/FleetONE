@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ColumnDef } from '@tanstack/react-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, Trash2, FileText, LayoutGrid, Table, PenTool } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText, LayoutGrid, Table, PenTool, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -14,6 +14,7 @@ import { YutongQuotationViewModal } from './YutongQuotationViewModal';
 import { YutongInvoiceGenerator } from './YutongInvoiceGenerator';
 import { YutongEditQuotationModal } from './YutongEditQuotationModal';
 import { YutongCustomerCardView } from './YutongCustomerCardView';
+import { YutongQuotationRepeatModal } from './YutongQuotationRepeatModal';
 import { useAuth } from '@/hooks/useAuth';
 import { QuotationVersionIndicator } from '../special-hire/QuotationVersionIndicator';
 
@@ -56,6 +57,7 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [invoiceGeneratorOpen, setInvoiceGeneratorOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [repeatModalOpen, setRepeatModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'card'>(() => {
     return (localStorage.getItem('yutong_quotation_view_mode') as 'table' | 'card') || 'table';
   });
@@ -385,6 +387,11 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
     setInvoiceGeneratorOpen(true);
   };
 
+  const handleRepeatQuotation = (quotation: YutongQuotation) => {
+    setSelectedQuotation(quotation);
+    setRepeatModalOpen(true);
+  };
+
   const columns: ColumnDef<YutongQuotation>[] = [
     {
       accessorKey: "quotation_no",
@@ -588,6 +595,14 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
             <Button variant="outline" size="sm" onClick={() => handleEditQuotation(quotation)} title="Edit Quotation">
               <Edit className="h-4 w-4" />
             </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleRepeatQuotation(quotation)}
+              title="Repeat Quotation"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
             <Select
               value={quotation.status}
               onValueChange={(value) => handleStatusUpdate(quotation.id, value)}
@@ -676,6 +691,19 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
         open={editModalOpen}
         onClose={() => {
           setEditModalOpen(false);
+          setSelectedQuotation(null);
+        }}
+        onSuccess={() => {
+          loadQuotations();
+          onRefresh();
+        }}
+      />
+
+      <YutongQuotationRepeatModal
+        quotation={selectedQuotation}
+        open={repeatModalOpen}
+        onClose={() => {
+          setRepeatModalOpen(false);
           setSelectedQuotation(null);
         }}
         onSuccess={() => {
