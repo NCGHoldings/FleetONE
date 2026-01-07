@@ -190,6 +190,28 @@ export function YutongQuotationRepeatModal({
         }
       }
 
+      // Copy signatures from original quotation to each new quotation
+      const { data: originalSignatures } = await supabase
+        .from('yutong_quotation_signatures')
+        .select('*')
+        .eq('quotation_id', quotation.id);
+
+      if (originalSignatures && originalSignatures.length > 0 && newQuotations.length > 0) {
+        for (const newQuotation of newQuotations) {
+          const signaturesCopy = originalSignatures.map(sig => ({
+            quotation_id: newQuotation.id,
+            signature_role: sig.signature_role,
+            signer_name: sig.signer_name,
+            signature_data: sig.signature_data,
+            signature_type: sig.signature_type,
+            signed_by: sig.signed_by,
+            signed_at: sig.signed_at,
+          }));
+
+          await supabase.from('yutong_quotation_signatures').insert(signaturesCopy);
+        }
+      }
+
       toast({
         title: "Success",
         description: `${numberOfCopies} quotation${numberOfCopies > 1 ? 's' : ''} created successfully`,
@@ -261,13 +283,14 @@ export function YutongQuotationRepeatModal({
 
           <div className="rounded-lg bg-muted p-3 text-sm">
             <p className="font-medium mb-1">This will create {numberOfCopies} new quotation{numberOfCopies > 1 ? 's' : ''} with:</p>
-            <ul className="list-disc list-inside text-muted-foreground space-y-1">
-              <li>Same customer details</li>
-              <li>Same bus model and price</li>
-              <li>Same add-ons and customizations</li>
-              <li>New unique quotation numbers</li>
-              <li>Status set to "Draft"</li>
-            </ul>
+                <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                  <li>Same customer details</li>
+                  <li>Same bus model and price</li>
+                  <li>Same add-ons and customizations</li>
+                  <li>Same signatures (if any)</li>
+                  <li>New unique quotation numbers</li>
+                  <li>Status set to "Draft"</li>
+                </ul>
           </div>
         </div>
 
