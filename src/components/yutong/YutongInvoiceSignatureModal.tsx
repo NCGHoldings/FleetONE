@@ -107,6 +107,11 @@ export function YutongInvoiceSignatureModal({
   const [textSignature, setTextSignature] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('profile');
+  const [profileSignature, setProfileSignature] = useState<{
+    data: string | null;
+    type: string | null;
+  }>({ data: null, type: null });
+  const [loadingProfile, setLoadingProfile] = useState(false);
   const signatureCanvasRef = useRef<SignatureCanvasRef>(null);
   const { loading, saveSignature, getProfileSignature, saveProfileSignature } = useYutongInvoiceSignatures();
 
@@ -119,9 +124,17 @@ export function YutongInvoiceSignatureModal({
   }, [isOpen, defaultRole, defaultSignerName]);
 
   const loadProfileSignature = async () => {
-    const profile = await getProfileSignature();
-    if (profile.signature_data && profile.signature_type === 'profile') {
-      // Profile signature is available
+    setLoadingProfile(true);
+    try {
+      const profile = await getProfileSignature();
+      setProfileSignature({
+        data: profile.signature_data || null,
+        type: profile.signature_type || null
+      });
+    } catch (error) {
+      console.error('Error loading profile signature:', error);
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
@@ -135,13 +148,12 @@ export function YutongInvoiceSignatureModal({
     let signatureType: 'drawing' | 'text' | 'image' = 'drawing';
 
     if (activeTab === 'profile') {
-      const profile = await getProfileSignature();
-      if (!profile.signature_data) {
+      if (!profileSignature.data) {
         toast.error('No profile signature found. Please create one first.');
         return;
       }
-      signatureData = profile.signature_data;
-      signatureType = profile.signature_type as 'drawing' | 'text' | 'image';
+      signatureData = profileSignature.data;
+      signatureType = profileSignature.type as 'drawing' | 'text' | 'image';
     } else if (activeTab === 'draw') {
       if (signatureCanvasRef.current?.isEmpty()) {
         toast.error('Please draw a signature');
@@ -288,9 +300,38 @@ export function YutongInvoiceSignatureModal({
             </TabsList>
 
             <TabsContent value="profile" className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Use your saved profile signature
-              </p>
+              {loadingProfile ? (
+                <div className="flex items-center justify-center p-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Loading profile signature...</span>
+                </div>
+              ) : profileSignature.data ? (
+                <div className="p-6 border rounded-lg bg-muted/50">
+                  <Label className="text-sm font-medium mb-3 block">Your Profile Signature</Label>
+                  <div className="flex items-center justify-center min-h-[150px] bg-background rounded-md p-4">
+                    {profileSignature.type === 'drawing' || profileSignature.type === 'image' ? (
+                      <img 
+                        src={profileSignature.data} 
+                        alt="Profile signature" 
+                        className="max-h-[120px] object-contain"
+                      />
+                    ) : (
+                      <div className="text-3xl font-serif italic">
+                        {profileSignature.data}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    This signature will be applied to the invoice
+                  </p>
+                </div>
+              ) : (
+                <div className="p-6 border rounded-lg bg-muted/50 text-center">
+                  <p className="text-muted-foreground">
+                    No profile signature found. Please use the Draw, Text, or Image tab to create one and save it to your profile.
+                  </p>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="draw" className="space-y-4">
