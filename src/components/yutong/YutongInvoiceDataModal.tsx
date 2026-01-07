@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface YutongInvoiceDataModalProps {
   isOpen: boolean;
@@ -30,6 +31,8 @@ export function YutongInvoiceDataModal({
   existingData,
   onSuccess
 }: YutongInvoiceDataModalProps) {
+  const queryClient = useQueryClient();
+  
   const [formData, setFormData] = useState({
     engine_number: existingData?.engine_number || '',
     chassis_number: existingData?.chassis_number || '',
@@ -40,6 +43,20 @@ export function YutongInvoiceDataModal({
     engine_capacity: existingData?.engine_capacity || 0,
     color_scheme: existingData?.color_scheme || ''
   });
+
+  // Update form data when existingData changes
+  useEffect(() => {
+    setFormData({
+      engine_number: existingData?.engine_number || '',
+      chassis_number: existingData?.chassis_number || '',
+      year_of_manufacture: existingData?.year_of_manufacture || new Date().getFullYear(),
+      country_of_origin: existingData?.country_of_origin || 'CHINA',
+      vehicle_condition: existingData?.vehicle_condition || 'BRAND NEW',
+      fuel_type: existingData?.fuel_type || 'DIESEL',
+      engine_capacity: existingData?.engine_capacity || 0,
+      color_scheme: existingData?.color_scheme || ''
+    });
+  }, [existingData, isOpen]);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -69,6 +86,10 @@ export function YutongInvoiceDataModal({
 
       if (error) throw error;
 
+      // Invalidate all yutong orders queries to trigger UI refresh
+      await queryClient.invalidateQueries({ queryKey: ['yutong-orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['yutong-order', orderId] });
+      
       toast.success('Vehicle details saved successfully');
       onSuccess();
       onClose();

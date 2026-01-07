@@ -11097,15 +11097,21 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           created_at: string
+          finance_company_address: string | null
+          finance_company_name: string | null
           generated_at: string
           generated_by: string | null
           id: string
           invoice_amount: number
+          invoice_category: string | null
           invoice_date: string
           invoice_no: string
           invoice_type: string
           notes: string | null
           order_id: string
+          proforma_amount: number | null
+          proforma_amount_percentage: number | null
+          proforma_purpose: string | null
           quotation_id: string
           status: string
           updated_at: string
@@ -11114,15 +11120,21 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
+          finance_company_address?: string | null
+          finance_company_name?: string | null
           generated_at?: string
           generated_by?: string | null
           id?: string
           invoice_amount: number
+          invoice_category?: string | null
           invoice_date?: string
           invoice_no: string
           invoice_type?: string
           notes?: string | null
           order_id: string
+          proforma_amount?: number | null
+          proforma_amount_percentage?: number | null
+          proforma_purpose?: string | null
           quotation_id: string
           status?: string
           updated_at?: string
@@ -11131,15 +11143,21 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
+          finance_company_address?: string | null
+          finance_company_name?: string | null
           generated_at?: string
           generated_by?: string | null
           id?: string
           invoice_amount?: number
+          invoice_category?: string | null
           invoice_date?: string
           invoice_no?: string
           invoice_type?: string
           notes?: string | null
           order_id?: string
+          proforma_amount?: number | null
+          proforma_amount_percentage?: number | null
+          proforma_purpose?: string | null
           quotation_id?: string
           status?: string
           updated_at?: string

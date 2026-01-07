@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Mail, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, Download, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
 import { YutongInvoiceDataModal } from './YutongInvoiceDataModal';
 import { YutongOrderInvoiceViewModal } from './YutongOrderInvoiceViewModal';
+import { YutongInvoiceTypeModal, ProformaInvoiceConfig } from './YutongInvoiceTypeModal';
 import { YutongOrderInvoiceData } from '@/lib/yutong-order-invoice-generator';
 
 interface YutongOrder {
@@ -35,6 +36,7 @@ interface YutongOrderInvoiceGeneratorProps {
 export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInvoiceGeneratorProps) {
   const [showVehicleDataModal, setShowVehicleDataModal] = useState(false);
   const [showInvoiceViewModal, setShowInvoiceViewModal] = useState(false);
+  const [showInvoiceTypeModal, setShowInvoiceTypeModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
@@ -243,18 +245,18 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     setShowInvoiceViewModal(true);
   };
 
-  const handleDownloadInvoice = async (document: any) => {
+  const handleDownloadInvoice = async (doc: any) => {
     try {
       const { data, error } = await supabase.storage
-        .from('documents')
-        .download(document.file_path);
+        .from('yutong-invoices')
+        .download(doc.file_path);
       
       if (error) throw error;
       
       const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
-      a.download = document.file_name;
+      a.download = doc.file_name;
       a.click();
       URL.revokeObjectURL(url);
       

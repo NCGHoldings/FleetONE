@@ -27,6 +27,13 @@ export interface YutongOrderInvoiceData {
   subtotal: number;
   total: number;
   invoice_status: 'draft' | 'approved';
+  // Invoice category - direct or proforma
+  invoice_category?: 'direct_invoice' | 'proforma_invoice';
+  proforma_amount_percentage?: number;
+  proforma_amount?: number;
+  finance_company_name?: string;
+  finance_company_address?: string;
+  proforma_purpose?: string;
   // Payment tracking
   paymentsReceived?: Array<{
     payment_date: string;
@@ -61,7 +68,10 @@ export interface YutongOrderInvoiceData {
 
 export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): string {
   const isDraft = data.invoice_status === 'draft';
-  const amountInWords = convertNumberToWords(data.total);
+  const isProforma = data.invoice_category === 'proforma_invoice';
+  const displayAmount = isProforma && data.proforma_amount ? data.proforma_amount : data.total;
+  const amountInWords = convertNumberToWords(displayAmount);
+  const invoiceTitle = isProforma ? 'PROFORMA INVOICE' : 'INVOICE';
 
   return `<!doctype html>
 <html lang="en">
@@ -94,6 +104,45 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
     z-index: 9999;
     pointer-events: none;
     user-select: none;
+  }
+  ` : ''}
+
+  ${isProforma ? `
+  .proforma-badge {
+    position: absolute;
+    top: 120px;
+    right: 40px;
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    color: white;
+    padding: 10px 25px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+  }
+  .proforma-info {
+    background: #fff7ed;
+    border: 2px solid #f97316;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 20px 40px 0;
+  }
+  .proforma-info h4 {
+    color: #ea580c;
+    margin: 0 0 10px 0;
+    font-size: 16px;
+  }
+  .proforma-info p {
+    margin: 4px 0;
+    font-size: 14px;
+    color: #9a3412;
+  }
+  .proforma-amount-display {
+    background: #fff7ed;
+    border: 2px solid #f97316;
+    color: #ea580c;
   }
   ` : ''}
 
@@ -556,6 +605,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   <!-- PAGE 1: Product & Pricing Information -->
   <div class="page">
     ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
+    ${isProforma ? '<div class="proforma-badge">Proforma Invoice</div>' : ''}
     <div class="page-content">
       <div class="header-section">
         <img src="/lovable-uploads/yutong-invoice-header.png" alt="Invoice Header" class="header-image">
@@ -564,15 +614,22 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
       <div class="section">
         <div class="meta">
           <div class="meta-left">
-            <div class="row"><span class="label">CUSTOMER :</span><span>${data.customer_name}</span></div>
+            ${isProforma && data.finance_company_name ? `
+              <div class="row"><span class="label">TO :</span><span>${data.finance_company_name}</span></div>
+              ${data.finance_company_address ? `<div class="row"><span class="label">ADDRESS :</span><span>${data.finance_company_address}</span></div>` : ''}
+              <div class="row"><span class="label">RE: CUSTOMER :</span><span>${data.customer_name}</span></div>
+            ` : `
+              <div class="row"><span class="label">CUSTOMER :</span><span>${data.customer_name}</span></div>
+            `}
             <div class="row"><span class="label">COMPANY :</span><span>${data.company_name || ''}</span></div>
-            <div class="row"><span class="label">ADDRESS :</span><span>${data.address}</span></div>
+            ${!isProforma || !data.finance_company_name ? `<div class="row"><span class="label">ADDRESS :</span><span>${data.address}</span></div>` : ''}
             <div class="row"><span class="label">CONTACT :</span><span>${data.contact || ''}</span></div>
             <div class="row"><span class="label">DATE :</span><span>${data.invoice_date}</span></div>
           </div>
           <div class="meta-right">
-            <div class="row"><span class="label">INVOICE NO :</span><span>${data.invoice_no}</span></div>
+            <div class="row"><span class="label">${isProforma ? 'PROFORMA NO' : 'INVOICE NO'} :</span><span>${data.invoice_no}</span></div>
             <div class="row"><span class="label">QUOTATION NO :</span><span>${data.quotation_no}</span></div>
+            ${isProforma ? `<div class="row"><span class="label">PURPOSE :</span><span style="text-transform: capitalize;">${(data.proforma_purpose || 'Bank Leasing').replace('_', ' ')}</span></div>` : ''}
           </div>
         </div>
         <div class="attn">${data.attn ? 'ATTN : ' + data.attn : 'ATTN :'}</div>
@@ -604,29 +661,49 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
                 <tr><td>CHASIS NO</td><td>${data.chassis_number}</td></tr>
               </table>
             </td>
-            <td class="price">${data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+            <td class="price">${isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
             <td class="qty">${data.quantity}</td>
-            <td class="total">${data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+            <td class="total">${displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
           </tr>
         </tbody>
       </table>
 
       <div class="bottom-section">
-        <div class="amount-words">
-          AMOUNT IN WORD
+        <div class="amount-words${isProforma ? ' proforma-amount-display' : ''}">
+          AMOUNT IN WORD${isProforma ? ` (${data.proforma_amount_percentage || 0}% OF TOTAL)` : ''}
           <span>${amountInWords}</span>
         </div>
         <div class="totals">
-          <div class="totals-row">
-            <div class="label">SUBTOTAL</div>
-            <div class="value">${data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-          </div>
-          <div class="totals-row">
-            <div class="label">TOTAL</div>
-            <div class="value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-          </div>
+          ${isProforma ? `
+            <div class="totals-row">
+              <div class="label">FULL PRICE</div>
+              <div class="value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+            </div>
+            <div class="totals-row proforma-amount-display">
+              <div class="label">PROFORMA (${data.proforma_amount_percentage || 0}%)</div>
+              <div class="value" style="font-size: 20px;">${displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+            </div>
+          ` : `
+            <div class="totals-row">
+              <div class="label">SUBTOTAL</div>
+              <div class="value">${data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+            </div>
+            <div class="totals-row">
+              <div class="label">TOTAL</div>
+              <div class="value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+            </div>
+          `}
         </div>
       </div>
+
+      ${isProforma ? `
+        <div class="proforma-info">
+          <h4>⚠️ PROFORMA INVOICE NOTICE</h4>
+          <p>This is a proforma invoice issued for ${(data.proforma_purpose || 'financing').replace('_', ' ')} purposes only.</p>
+          <p>The amount shown represents ${data.proforma_amount_percentage || 0}% of the total vehicle price.</p>
+          <p>This document is not a demand for payment and should not be used for tax purposes.</p>
+        </div>
+      ` : ''}
     </div>
     <div class="page-indicator">Page 1 of 2</div>
   </div>

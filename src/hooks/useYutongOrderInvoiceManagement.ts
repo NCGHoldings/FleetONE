@@ -113,16 +113,16 @@ export function useYutongOrderInvoiceManagement() {
       const pdfBlob = await generateYutongOrderInvoicePDF(fullInvoiceData);
       console.log('✅ PDF generated successfully. Size:', pdfBlob.size, 'bytes');
       
-      // Upload to storage
+      // Upload to storage - use yutong-invoices bucket
       console.log('☁️ Step 3: Uploading to storage...');
       const fileName = `${invoiceNo}_draft.pdf`;
-      const filePath = `yutong-invoices/${orderId}/${fileName}`;
+      const filePath = `${orderId}/${fileName}`;
       console.log('📁 Upload path:', filePath);
       console.log('📦 File size:', pdfBlob.size, 'bytes (', (pdfBlob.size / 1024 / 1024).toFixed(2), 'MB)');
       
-      // Add timeout to storage upload
+      // Add timeout to storage upload - use yutong-invoices bucket
       const uploadPromise = supabase.storage
-        .from('documents')
+        .from('yutong-invoices')
         .upload(filePath, pdfBlob, {
           contentType: 'application/pdf',
           upsert: true
@@ -237,12 +237,12 @@ export function useYutongOrderInvoiceManagement() {
       
       const pdfBlob = await generateYutongOrderInvoicePDF(invoiceData);
       
-      // Upload approved version
+      // Upload approved version - use yutong-invoices bucket
       const fileName = `${invoice.invoice_no}_approved.pdf`;
-      const filePath = `yutong-invoices/${invoice.order_id}/${fileName}`;
+      const filePath = `${invoice.order_id}/${fileName}`;
       
       const { error: uploadError } = await supabase.storage
-        .from('documents')
+        .from('yutong-invoices')
         .upload(filePath, pdfBlob, {
           contentType: 'application/pdf',
           upsert: true
@@ -448,9 +448,9 @@ export function useYutongOrderInvoiceManagement() {
       // Regenerate PDF with updated data
       const pdfBlob = await generateYutongOrderInvoicePDF(updatedInvoiceData);
       
-      // Re-upload with same path
+      // Re-upload with same path - use yutong-invoices bucket
       const { error: uploadError } = await supabase.storage
-        .from('documents')
+        .from('yutong-invoices')
         .upload(document.file_path, pdfBlob, {
           contentType: 'application/pdf',
           upsert: true
