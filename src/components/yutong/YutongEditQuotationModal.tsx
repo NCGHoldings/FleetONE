@@ -385,6 +385,33 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
         if (insertError) throw insertError;
       }
 
+      // Copy signatures from original quotation to new version
+      try {
+        const { data: originalSignatures, error: sigFetchError } = await supabase
+          .from('yutong_quotation_signatures')
+          .select('*')
+          .eq('quotation_id', quotation.id);
+
+        if (!sigFetchError && originalSignatures && originalSignatures.length > 0) {
+          const signaturesToCopy = originalSignatures.map(sig => ({
+            quotation_id: newQuotation.id,
+            signature_role: sig.signature_role,
+            signer_name: sig.signer_name,
+            signature_data: sig.signature_data,
+            signature_type: sig.signature_type,
+            signed_by: sig.signed_by,
+            signed_at: sig.signed_at,
+          }));
+
+          await supabase
+            .from('yutong_quotation_signatures')
+            .insert(signaturesToCopy);
+        }
+      } catch (sigError) {
+        console.error('Error copying signatures:', sigError);
+        // Don't fail the edit if signature copy fails, just log it
+      }
+
       toast({
         title: "Success",
         description: `New quotation version ${nextVersion} created successfully`,
