@@ -54,9 +54,13 @@ export function YutongOrderInvoicePreview({ invoiceRecordId, invoiceData }: Yuto
   const invoiceHTML = generateYutongOrderInvoiceHTML(mergedInvoiceData);
 
   return (
-    <div 
-      className="border rounded-lg p-6 overflow-auto max-h-[calc(90vh-280px)] bg-background"
-      dangerouslySetInnerHTML={{ __html: sanitizeHTML(invoiceHTML) }}
-    />
+    <div className="border rounded-lg overflow-hidden bg-white" style={{ height: 'calc(90vh - 280px)' }}>
+      <iframe
+        srcDoc={invoiceHTML}
+        title="Invoice Preview"
+        className="w-full h-full border-0"
+        style={{ minHeight: '600px', background: 'white' }}
+      />
+    </div>
   );
 }
