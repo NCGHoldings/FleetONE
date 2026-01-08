@@ -31,6 +31,10 @@ interface PaymentConfirmationModalProps {
     commission_pass_through_amount?: number;
     discount_amount_lkr?: number;
     total_additional_charges?: number;
+    // Pre-existing vehicle assignment data
+    assigned_driver_name?: string | null;
+    assigned_conductor_name?: string | null;
+    assigned_bus_no?: string | null;
   };
   adjustmentData?: {
     extra_km?: number;
@@ -99,9 +103,10 @@ export const PaymentConfirmationModal = ({
   );
   const [method, setMethod] = useState<string>('cash');
   const [reference, setReference] = useState<string>('');
-  const [driverName, setDriverName] = useState<string>('');
-  const [conductorName, setConductorName] = useState<string>('');
-  const [busNo, setBusNo] = useState<string>('');
+  // Pre-populate from existing assignment if available
+  const [driverName, setDriverName] = useState<string>(quotationData.assigned_driver_name || '');
+  const [conductorName, setConductorName] = useState<string>(quotationData.assigned_conductor_name || '');
+  const [busNo, setBusNo] = useState<string>(quotationData.assigned_bus_no || '');
   const [paymentProofUrl, setPaymentProofUrl] = useState<string>('');
   const [proofPreviewUrl, setProofPreviewUrl] = useState<string>('');
   const [isUploadingProof, setIsUploadingProof] = useState<boolean>(false);

@@ -22,6 +22,13 @@ interface AdvanceReceiptData {
   // Additional fields from payment
   paidAmount?: number;
   totalAmount?: number;
+  // Vehicle assignment data
+  assigned_driver_name?: string | null;
+  assigned_conductor_name?: string | null;
+  assigned_bus_no?: string | null;
+  // Trip distance
+  km_trip?: number;
+  total_distance_km?: number;
 }
 
 interface Props {
@@ -146,9 +153,24 @@ export function AdvanceReceiptPreview({ data, className = '' }: Props) {
       </div>
 
       {/* Trip Details */}
-      <p className="italic text-sm mb-4">
+      <p className="italic text-sm mb-2">
         Trip Details: {formatDateTime(data.pickup_datetime)} - {formatDateTime(data.drop_datetime)} | {data.pickup_location} to {data.drop_location} | {data.seating_capacity || 'N/A'} Pax | {data.bus_type}
       </p>
+
+      {/* Vehicle Assignment Details */}
+      {(data.assigned_driver_name || data.assigned_conductor_name || data.assigned_bus_no || data.km_trip || data.total_distance_km) && (
+        <div className="text-sm mb-4 p-2 bg-gray-50 border border-gray-200 rounded">
+          <strong>Vehicle Assignment:</strong>
+          <span className="ml-2">
+            {data.assigned_bus_no && <span>Bus: {data.assigned_bus_no}</span>}
+            {data.assigned_driver_name && <span className="ml-3">Driver: {data.assigned_driver_name}</span>}
+            {data.assigned_conductor_name && <span className="ml-3">Conductor: {data.assigned_conductor_name}</span>}
+            {(data.km_trip || data.total_distance_km) && (
+              <span className="ml-3">Distance: {data.km_trip || data.total_distance_km} km</span>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Note */}
       <p className="text-xs mb-6">
