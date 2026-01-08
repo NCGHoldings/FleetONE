@@ -42,9 +42,9 @@ export const MarketingDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Performance Overview */}
+      {/* Performance Overview - Unified Blue Theme */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white border-0">
+        <Card className="bg-primary text-primary-foreground border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -53,11 +53,11 @@ export const MarketingDashboard = () => {
               </div>
               <Target className="h-12 w-12 opacity-50" />
             </div>
-            <Progress value={completionRate} className="mt-4 bg-white/20" />
+            <Progress value={completionRate} className="mt-4 bg-primary-foreground/20" />
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white border-0">
+        <Card className="bg-primary/90 text-primary-foreground border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -70,7 +70,7 @@ export const MarketingDashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-amber-500 to-orange-600 text-white border-0">
+        <Card className="bg-primary/80 text-primary-foreground border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -87,9 +87,9 @@ export const MarketingDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Task Status Breakdown */}
         <Card>
-          <CardHeader>
+        <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-purple-500" />
+              <TrendingUp className="h-5 w-5 text-primary" />
               Task Status Breakdown
             </CardTitle>
           </CardHeader>
@@ -122,9 +122,9 @@ export const MarketingDashboard = () => {
 
         {/* Top Performers */}
         <Card>
-          <CardHeader>
+        <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Award className="h-5 w-5 text-yellow-500" />
+              <Award className="h-5 w-5 text-primary" />
               Top Performers
             </CardTitle>
           </CardHeader>
@@ -134,14 +134,14 @@ export const MarketingDashboard = () => {
                 {teamMembers.map((member, index) => (
                   <div 
                     key={member.id} 
-                    className="flex items-center gap-4 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20"
+                    className="flex items-center gap-4 p-3 rounded-lg bg-primary/5"
                   >
                     <div className={`
-                      w-10 h-10 rounded-full flex items-center justify-center font-bold text-white
-                      ${index === 0 ? 'bg-gradient-to-br from-yellow-400 to-amber-500' : 
-                        index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400' : 
-                        index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700' : 
-                        'bg-gradient-to-br from-purple-500 to-pink-500'}
+                      w-10 h-10 rounded-full flex items-center justify-center font-bold text-primary-foreground
+                      ${index === 0 ? 'bg-primary' : 
+                        index === 1 ? 'bg-primary/80' : 
+                        index === 2 ? 'bg-primary/60' : 
+                        'bg-primary/40'}
                     `}>
                       {index + 1}
                     </div>
@@ -150,7 +150,7 @@ export const MarketingDashboard = () => {
                       <p className="text-sm text-muted-foreground">{member.designation || 'Team Member'}</p>
                     </div>
                     <div className="text-right">
-                      <div className="flex items-center gap-1 text-yellow-600">
+                      <div className="flex items-center gap-1 text-primary">
                         <Star className="h-4 w-4 fill-current" />
                         <span className="font-bold">{member.total_credits}</span>
                       </div>
