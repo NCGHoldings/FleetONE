@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { SinotruckQuotationForm } from "@/components/sinotruck/SinotruckQuotationForm";
 import { SinotruckQuotationsList } from "@/components/sinotruck/SinotruckQuotationsList";
+import { SinotrukOrdersList } from "@/components/sinotruck/SinotrukOrdersList";
 import { SinotruckTruckModelsAdmin } from "@/components/sinotruck/SinotruckTruckModelsAdmin";
 import { SinotruckCustomersAdmin } from "@/components/sinotruck/SinotruckCustomersAdmin";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,7 +82,7 @@ const SinotruckQuotations = () => {
       };
       setInquiryData(data);
       setShowForm(true);
-      
+
       // Clear the URL params after reading
       const newParams = new URLSearchParams();
       if (activeTab !== 'quotations') newParams.set('tab', activeTab);
@@ -179,6 +180,10 @@ const SinotruckQuotations = () => {
             <FileText className="w-4 h-4" />
             Quotations
           </TabsTrigger>
+          <TabsTrigger value="orders" className="gap-2">
+            <Truck className="w-4 h-4" />
+            Orders
+          </TabsTrigger>
           <TabsTrigger value="truck-models" className="gap-2">
             <Truck className="w-4 h-4" />
             Truck Models
@@ -194,6 +199,10 @@ const SinotruckQuotations = () => {
 
         <TabsContent value="quotations" className="space-y-4">
           <SinotruckQuotationsList onRefresh={loadStats} />
+        </TabsContent>
+
+        <TabsContent value="orders" className="space-y-4">
+          <SinotrukOrdersList />
         </TabsContent>
 
         <TabsContent value="truck-models" className="space-y-4">
