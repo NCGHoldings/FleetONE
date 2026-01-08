@@ -639,18 +639,6 @@ const App = () => (
               } 
             />
             
-            <Route
-              path="/marketing" 
-              element={
-                <ProtectedRoute>
-                  <PageAccessGuard pageId="marketing_dashboard">
-                    <AppLayout>
-                      <Marketing />
-                    </AppLayout>
-                  </PageAccessGuard>
-                </ProtectedRoute>
-              } 
-            />
             
             <Route
               path="/nsp-daily-sales"
