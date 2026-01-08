@@ -25,6 +25,7 @@ import { InvoiceViewer } from './InvoiceViewer';
 import AdvanceDetailsModal from './AdvanceDetailsModal';
 import { PostTripAdjustmentModal } from './PostTripAdjustmentModal';
 import { GenerateBalanceInvoiceModal } from './GenerateBalanceInvoiceModal';
+import { VehicleAssignmentModal } from './VehicleAssignmentModal';
 import { generateInvoiceHTML, generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -62,6 +63,7 @@ export function ConfirmedTripsTable() {
   const [adjustmentsData, setAdjustmentsData] = useState<Record<string, any>>({});
   const [balanceInvoiceModalOpen, setBalanceInvoiceModalOpen] = useState(false);
   const [selectedAdjustment, setSelectedAdjustment] = useState<any | null>(null);
+  const [vehicleAssignmentModalOpen, setVehicleAssignmentModalOpen] = useState(false);
   
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -749,6 +751,9 @@ export function ConfirmedTripsTable() {
         vehicleNo: quotation.assigned_bus_no,
         driverName: quotation.assigned_driver_name,
         conductorName: quotation.assigned_conductor_name,
+        // Real trip distance from quotation
+        tripDistance: (quotation as any).km_trip || (quotation as any).total_distance_km,
+        totalKm: (quotation as any).km_parking + (quotation as any).km_trip + (quotation as any).km_return,
         // Include adjustment data if available
         hasAdjustments: !!adjustment,
         originalQuotedKm: adjustment?.original_quoted_km,
@@ -1020,8 +1025,15 @@ export function ConfirmedTripsTable() {
                           </div>
                         </TableCell>
 
-                        {/* Vehicle Assignment */}
-                        <TableCell>
+                        {/* Vehicle Assignment - Clickable */}
+                        <TableCell 
+                          className="cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => {
+                            setSelectedTrip(trip);
+                            setVehicleAssignmentModalOpen(true);
+                          }}
+                          title="Click to edit vehicle assignment"
+                        >
                           <div className="space-y-1 text-xs">
                             {trip.assigned_driver_name && (
                               <div className="flex items-center space-x-1">
@@ -1042,7 +1054,7 @@ export function ConfirmedTripsTable() {
                               </div>
                             )}
                             {!trip.assigned_driver_name && !trip.assigned_conductor_name && !trip.assigned_bus_no && (
-                              <span className="text-muted-foreground">Not assigned</span>
+                              <span className="text-muted-foreground italic">Click to assign →</span>
                             )}
                           </div>
                         </TableCell>
@@ -1645,6 +1657,24 @@ export function ConfirmedTripsTable() {
           advancePaid={selectedTrip.advance_paid || 0}
           onAdjustmentSaved={() => {
             loadAdjustmentData(selectedTrip.id);
+            refetch();
+          }}
+        />
+      )}
+
+      {/* Vehicle Assignment Quick Edit Modal */}
+      {selectedTrip && (
+        <VehicleAssignmentModal
+          isOpen={vehicleAssignmentModalOpen}
+          onClose={() => setVehicleAssignmentModalOpen(false)}
+          quotationId={selectedTrip.id}
+          quotationNo={selectedTrip.quotation_no}
+          currentAssignment={{
+            driver_name: selectedTrip.assigned_driver_name,
+            conductor_name: selectedTrip.assigned_conductor_name,
+            bus_no: selectedTrip.assigned_bus_no,
+          }}
+          onSave={() => {
             refetch();
           }}
         />

@@ -34,6 +34,9 @@ export interface InvoiceData {
   conductorName?: string;
   itemDetail?: string;
   discountAmount?: number;
+  // Trip distance field - real mileage from quotation
+  tripDistance?: number; // km_trip from quotation
+  totalKm?: number; // Total km (parking + trip + return)
   // Enhanced fields for the multi-step workflow
   invoice_status?: 'draft' | 'approved';
   document_type?: 'sales_receipt' | 'invoice';
@@ -215,7 +218,8 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
     const totalPaid = data.paidAmount || 0;
     const balanceDue = priceAfterDiscount - totalPaid;
     const itemDetail = data.itemDetail || `${data.pickupLocation} to ${data.dropLocation}`;
-    const mileage = data.numberOfBuses * 100; // Placeholder mileage calculation
+    // Use real trip distance from quotation, fallback to actual km traveled if post-trip done, or totalKm
+    const mileage = data.actualKmTraveled || data.tripDistance || data.totalKm || (data.numberOfBuses * 100);
 
     return `
       <div style="font-family: Arial, sans-serif; margin: 0; padding: 15px 15px 25px 15px; background: #fff; color: #000; width: 100%; max-width: 210mm; box-sizing: border-box; position: relative;">
