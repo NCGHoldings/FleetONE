@@ -77,6 +77,7 @@ import ScheduledTasks from "./pages/ScheduledTasks";
 import ApiUsageMonitoring from "./pages/ApiUsageMonitoring";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import SystemHealthDashboard from "./pages/SystemHealthDashboard";
+import Marketing from "./pages/Marketing";
 
 const queryClient = new QueryClient();
 
@@ -632,6 +633,19 @@ const App = () => (
                   <PageAccessGuard pageId="vehicle_inquiries">
                     <AppLayout>
                       <VehicleInquiryHub />
+                    </AppLayout>
+                  </PageAccessGuard>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route
+              path="/marketing" 
+              element={
+                <ProtectedRoute>
+                  <PageAccessGuard pageId="marketing_dashboard">
+                    <AppLayout>
+                      <Marketing />
                     </AppLayout>
                   </PageAccessGuard>
                 </ProtectedRoute>
