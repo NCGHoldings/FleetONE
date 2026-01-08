@@ -11,10 +11,12 @@ import { Switch } from "@/components/ui/switch";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Users, Star, CheckSquare, Trophy, Settings } from "lucide-react";
+import { Plus, Users, Star, CheckSquare, Trophy, Settings, Eye } from "lucide-react";
+import { MemberProfileModal } from "./MemberProfileModal";
 
 export const TeamTab = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
   const [formData, setFormData] = useState({
     display_name: '',
     designation: '',
@@ -174,7 +176,11 @@ export const TeamTab = () => {
       ) : teamMembers && teamMembers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {teamMembers.map((member, index) => (
-            <Card key={member.id} className="relative overflow-hidden hover:shadow-xl transition-all">
+            <Card 
+              key={member.id} 
+              className="relative overflow-hidden hover:shadow-xl transition-all cursor-pointer group"
+              onClick={() => setSelectedMember(member)}
+            >
               {/* Rank Badge for Top 3 */}
               {index < 3 && (
                 <div className="absolute top-3 right-3">
@@ -253,6 +259,19 @@ export const TeamTab = () => {
                     )}
                   </div>
                 )}
+                {/* View Profile Button */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full mt-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedMember(member);
+                  }}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Profile
+                </Button>
               </CardContent>
             </Card>
           ))}
@@ -265,6 +284,15 @@ export const TeamTab = () => {
             <p className="text-muted-foreground">Add your first team member to get started</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Member Profile Modal */}
+      {selectedMember && (
+        <MemberProfileModal
+          member={selectedMember}
+          open={!!selectedMember}
+          onOpenChange={(open) => !open && setSelectedMember(null)}
+        />
       )}
     </div>
   );
