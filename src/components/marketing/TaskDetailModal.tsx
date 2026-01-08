@@ -78,6 +78,7 @@ export const TaskDetailModal = ({ task, open, onOpenChange, onStatusChange }: Ta
                 .from('marketing_team_members')
                 .update({ total_credits: (assignee.member.total_credits || 0) + creditsPerMember })
                 .eq('id', assignee.member.id);
+            }
           }
         }
       }

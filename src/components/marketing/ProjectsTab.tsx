@@ -56,9 +56,13 @@ export const ProjectsTab = () => {
   const createMutation = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
+      const year = new Date().getFullYear();
+      const projectNumber = `MKT-PRJ-${year}-${Date.now().toString().slice(-6)}`;
+      
       const { error } = await supabase
         .from('marketing_projects')
         .insert([{
+          project_number: projectNumber,
           title: formData.title,
           description: formData.description || null,
           company_id: formData.company_id || null,

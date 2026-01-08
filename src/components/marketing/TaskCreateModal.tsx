@@ -85,9 +85,13 @@ export const TaskCreateModal = ({ open, onOpenChange, onSuccess }: TaskCreateMod
       }
 
       // Create task
+      const year = new Date().getFullYear();
+      const taskNumber = `MKT-TASK-${year}-${Date.now().toString().slice(-6)}`;
+      
       const { data: task, error: taskError } = await supabase
         .from('marketing_tasks')
         .insert([{
+          task_number: taskNumber,
           title: formData.title,
           description: formData.description || null,
           category_id: formData.category_id || null,

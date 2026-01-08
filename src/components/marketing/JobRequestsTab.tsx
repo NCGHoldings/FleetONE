@@ -54,9 +54,13 @@ export const JobRequestsTab = () => {
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const { data: user } = await supabase.auth.getUser();
+      const year = new Date().getFullYear();
+      const requestNumber = `MKT-HR-${year}-${Date.now().toString().slice(-6)}`;
+      
       const { error } = await supabase
         .from('marketing_job_requests')
         .insert([{
+          request_number: requestNumber,
           job_title: data.job_title,
           job_description: data.job_description,
           required_completion_date: data.required_completion_date,

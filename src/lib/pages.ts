@@ -12,6 +12,7 @@ export type PageCategories = {
   operations: PageItem[];
   business: PageItem[];
   finance: PageItem[];
+  marketing: PageItem[];
   yutong: PageItem[];
   sinotruck: PageItem[];
   lightvehicle: PageItem[];
@@ -57,6 +58,14 @@ export const PAGES: PageCategories = {
     { id: "api_usage", title: "API Usage", url: "/api-usage" },
     { id: "system_health", title: "System Health", url: "/system-health" },
   ],
+  marketing: [
+    { id: "marketing_dashboard", title: "Marketing Dashboard", url: "/marketing" },
+    { id: "marketing_job_requests", title: "Job Requests", url: "/marketing?tab=job-requests" },
+    { id: "marketing_tasks", title: "Tasks", url: "/marketing?tab=tasks" },
+    { id: "marketing_projects", title: "Projects", url: "/marketing?tab=projects" },
+    { id: "marketing_team", title: "Team Profiles", url: "/marketing?tab=team" },
+    { id: "marketing_social", title: "Social Media", url: "/marketing?tab=social" },
+  ],
   yutong: [
     { id: "yutong_quotations", title: "Quotations", url: "/yutong-quotations" },
     { id: "yutong_bus_models", title: "Bus Models", url: "/yutong-quotations?tab=bus-models" },
@@ -94,6 +103,7 @@ export const ALL_PAGES_FLAT: PageItem[] = [
   ...PAGES.operations,
   ...PAGES.business,
   ...PAGES.finance,
+  ...PAGES.marketing,
   ...PAGES.yutong,
   ...PAGES.sinotruck,
   ...PAGES.lightvehicle,
