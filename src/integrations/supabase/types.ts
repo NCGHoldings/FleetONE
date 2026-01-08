@@ -5510,6 +5510,531 @@ export type Database = {
         }
         Relationships: []
       }
+      marketing_credit_settings: {
+        Row: {
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: number
+          updated_at: string | null
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value: number
+          updated_at?: string | null
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      marketing_job_requests: {
+        Row: {
+          additional_notes: string | null
+          company_id: string | null
+          created_at: string | null
+          id: string
+          job_description: string
+          job_title: string
+          request_number: string
+          requested_by: string | null
+          requested_date: string
+          required_completion_date: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          additional_notes?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          job_description: string
+          job_title: string
+          request_number: string
+          requested_by?: string | null
+          requested_date?: string
+          required_completion_date: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          additional_notes?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          job_description?: string
+          job_title?: string
+          request_number?: string
+          requested_by?: string | null
+          requested_date?: string
+          required_completion_date?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_job_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_projects: {
+        Row: {
+          actual_end_date: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          project_lead_id: string | null
+          project_number: string
+          start_date: string | null
+          status: string | null
+          target_end_date: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          actual_end_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          project_lead_id?: string | null
+          project_number: string
+          start_date?: string | null
+          status?: string | null
+          target_end_date?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          actual_end_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          project_lead_id?: string | null
+          project_number?: string
+          start_date?: string | null
+          status?: string | null
+          target_end_date?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_projects_project_lead_id_fkey"
+            columns: ["project_lead_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_social_accounts: {
+        Row: {
+          access_token: string | null
+          account_id: string | null
+          account_name: string
+          account_url: string | null
+          company_id: string | null
+          created_at: string | null
+          id: string
+          is_connected: boolean | null
+          last_sync_at: string | null
+          platform: string
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          account_id?: string | null
+          account_name: string
+          account_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_connected?: boolean | null
+          last_sync_at?: string | null
+          platform: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          account_id?: string | null
+          account_name?: string
+          account_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_connected?: boolean | null
+          last_sync_at?: string | null
+          platform?: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_social_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_social_stats: {
+        Row: {
+          account_id: string | null
+          comments_total: number | null
+          engagement_rate: number | null
+          followers_count: number | null
+          following_count: number | null
+          id: string
+          impressions: number | null
+          likes_total: number | null
+          posts_count: number | null
+          raw_data: Json | null
+          reach: number | null
+          recorded_at: string | null
+          shares_total: number | null
+          views_total: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          comments_total?: number | null
+          engagement_rate?: number | null
+          followers_count?: number | null
+          following_count?: number | null
+          id?: string
+          impressions?: number | null
+          likes_total?: number | null
+          posts_count?: number | null
+          raw_data?: Json | null
+          reach?: number | null
+          recorded_at?: string | null
+          shares_total?: number | null
+          views_total?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          comments_total?: number | null
+          engagement_rate?: number | null
+          followers_count?: number | null
+          following_count?: number | null
+          id?: string
+          impressions?: number | null
+          likes_total?: number | null
+          posts_count?: number | null
+          raw_data?: Json | null
+          reach?: number | null
+          recorded_at?: string | null
+          shares_total?: number | null
+          views_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_social_stats_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_social_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_task_assignees: {
+        Row: {
+          created_at: string | null
+          credits_earned: number | null
+          id: string
+          member_id: string | null
+          role: string | null
+          task_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          credits_earned?: number | null
+          id?: string
+          member_id?: string | null
+          role?: string | null
+          task_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          credits_earned?: number | null
+          id?: string
+          member_id?: string | null
+          role?: string | null
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_task_assignees_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_task_assignees_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_task_categories: {
+        Row: {
+          average_hours: number
+          category_name: string
+          created_at: string | null
+          credit_multiplier: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+        }
+        Insert: {
+          average_hours?: number
+          category_name: string
+          created_at?: string | null
+          credit_multiplier?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+        }
+        Update: {
+          average_hours?: number
+          category_name?: string
+          created_at?: string | null
+          credit_multiplier?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+        }
+        Relationships: []
+      }
+      marketing_task_feedback: {
+        Row: {
+          attachments: Json | null
+          created_at: string | null
+          feedback_type: string
+          given_by: string | null
+          id: string
+          message: string | null
+          task_id: string | null
+        }
+        Insert: {
+          attachments?: Json | null
+          created_at?: string | null
+          feedback_type: string
+          given_by?: string | null
+          id?: string
+          message?: string | null
+          task_id?: string | null
+        }
+        Update: {
+          attachments?: Json | null
+          created_at?: string | null
+          feedback_type?: string
+          given_by?: string | null
+          id?: string
+          message?: string | null
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_task_feedback_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_tasks: {
+        Row: {
+          actual_hours_spent: number | null
+          assigned_by: string | null
+          assigned_hours: number | null
+          category_id: string | null
+          company_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          credits_awarded: number | null
+          deadline: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          job_request_id: string | null
+          priority: string | null
+          project_id: string | null
+          started_at: string | null
+          status: string | null
+          task_number: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          actual_hours_spent?: number | null
+          assigned_by?: string | null
+          assigned_hours?: number | null
+          category_id?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          credits_awarded?: number | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          job_request_id?: string | null
+          priority?: string | null
+          project_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          task_number: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          actual_hours_spent?: number | null
+          assigned_by?: string | null
+          assigned_hours?: number | null
+          category_id?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          credits_awarded?: number | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          job_request_id?: string | null
+          priority?: string | null
+          project_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          task_number?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_tasks_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_task_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_tasks_job_request_id_fkey"
+            columns: ["job_request_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_job_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_team_members: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string | null
+          department: string | null
+          designation: string | null
+          display_name: string
+          id: string
+          is_active: boolean | null
+          is_task_assigner: boolean | null
+          is_task_confirmer: boolean | null
+          profile_id: string | null
+          skills: string[] | null
+          total_credits: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          department?: string | null
+          designation?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean | null
+          is_task_assigner?: boolean | null
+          is_task_confirmer?: boolean | null
+          profile_id?: string | null
+          skills?: string[] | null
+          total_credits?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          department?: string | null
+          designation?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean | null
+          is_task_assigner?: boolean | null
+          is_task_confirmer?: boolean | null
+          profile_id?: string | null
+          skills?: string[] | null
+          total_credits?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_team_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       multi_day_route_config: {
         Row: {
           created_at: string | null
