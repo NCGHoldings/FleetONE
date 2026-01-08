@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { 
   Megaphone, 
   FileText, 
@@ -27,7 +26,18 @@ import { SocialMediaTab } from "@/components/marketing/SocialMediaTab";
 import { MarketingSettingsTab } from "@/components/marketing/MarketingSettingsTab";
 
 const Marketing = () => {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
+
+  // Sync tab when URL changes
+  useEffect(() => {
+    if (tabFromUrl) {
+      setActiveTab(tabFromUrl);
+    } else {
+      setActiveTab("dashboard");
+    }
+  }, [tabFromUrl]);
 
   // Fetch dashboard stats
   const { data: stats } = useQuery({

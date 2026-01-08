@@ -785,6 +785,17 @@ const App = () => (
               } 
             />
             
+            <Route 
+              path="/marketing" 
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Marketing />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
