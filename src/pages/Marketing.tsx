@@ -60,16 +60,16 @@ const Marketing = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 dark:from-gray-900 dark:via-purple-900/20 dark:to-gray-900">
+<div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
       <div className="container mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg">
-              <Megaphone className="h-8 w-8 text-white" />
+            <div className="p-3 rounded-xl bg-primary shadow-lg">
+              <Megaphone className="h-8 w-8 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold text-primary">
                 Marketing Hub
               </h1>
               <p className="text-muted-foreground">Manage tasks, projects, and team performance</p>
@@ -77,11 +77,11 @@ const Marketing = () => {
           </div>
         </div>
 
-        {/* Quick Stats */}
+        {/* Quick Stats - Unified Blue Theme */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+          <Card className="bg-primary text-primary-foreground border-0 shadow-lg">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 bg-white/20 rounded-lg">
+              <div className="p-3 bg-primary-foreground/20 rounded-lg">
                 <CheckSquare className="h-6 w-6" />
               </div>
               <div>
@@ -91,9 +91,9 @@ const Marketing = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-orange-500 to-red-500 text-white border-0 shadow-lg">
+          <Card className="bg-primary/90 text-primary-foreground border-0 shadow-lg">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 bg-white/20 rounded-lg">
+              <div className="p-3 bg-primary-foreground/20 rounded-lg">
                 <FileText className="h-6 w-6" />
               </div>
               <div>
@@ -103,9 +103,9 @@ const Marketing = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-green-500 to-emerald-500 text-white border-0 shadow-lg">
+          <Card className="bg-primary/80 text-primary-foreground border-0 shadow-lg">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 bg-white/20 rounded-lg">
+              <div className="p-3 bg-primary-foreground/20 rounded-lg">
                 <FolderKanban className="h-6 w-6" />
               </div>
               <div>
@@ -115,9 +115,9 @@ const Marketing = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-500 to-pink-500 text-white border-0 shadow-lg">
+          <Card className="bg-primary/70 text-primary-foreground border-0 shadow-lg">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 bg-white/20 rounded-lg">
+              <div className="p-3 bg-primary-foreground/20 rounded-lg">
                 <Users className="h-6 w-6" />
               </div>
               <div>
@@ -130,32 +130,32 @@ const Marketing = () => {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-1 rounded-xl shadow-sm">
-            <TabsTrigger value="dashboard" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg">
+          <TabsList className="bg-card/80 backdrop-blur-sm p-1 rounded-xl shadow-sm border">
+            <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg">
               <TrendingUp className="h-4 w-4 mr-2" />
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="job-requests" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg">
+            <TabsTrigger value="job-requests" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg">
               <FileText className="h-4 w-4 mr-2" />
               Job Requests
             </TabsTrigger>
-            <TabsTrigger value="tasks" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg">
+            <TabsTrigger value="tasks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg">
               <CheckSquare className="h-4 w-4 mr-2" />
               Tasks
             </TabsTrigger>
-            <TabsTrigger value="projects" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg">
+            <TabsTrigger value="projects" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg">
               <FolderKanban className="h-4 w-4 mr-2" />
               Projects
             </TabsTrigger>
-            <TabsTrigger value="team" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg">
+            <TabsTrigger value="team" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg">
               <Users className="h-4 w-4 mr-2" />
               Team
             </TabsTrigger>
-            <TabsTrigger value="social" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg">
+            <TabsTrigger value="social" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg">
               <Share2 className="h-4 w-4 mr-2" />
               Social Media
             </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg">
+            <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-lg">
               <Settings className="h-4 w-4 mr-2" />
               Settings
             </TabsTrigger>

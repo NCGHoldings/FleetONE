@@ -1,24 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckSquare, Users, Clock } from "lucide-react";
+import { CheckSquare, Users, Clock, X, Check, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
+
+interface PreFillData {
+  title: string;
+  description: string;
+  company_id: string;
+  job_request_id: string;
+}
 
 interface TaskCreateModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  preFillData?: PreFillData | null;
 }
 
-export const TaskCreateModal = ({ open, onOpenChange, onSuccess }: TaskCreateModalProps) => {
+export const TaskCreateModal = ({ open, onOpenChange, onSuccess, preFillData }: TaskCreateModalProps) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -28,6 +38,19 @@ export const TaskCreateModal = ({ open, onOpenChange, onSuccess }: TaskCreateMod
     assigned_hours: '',
   });
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
+
+  // Pre-fill form when preFillData changes
+  useEffect(() => {
+    if (preFillData) {
+      setFormData(prev => ({
+        ...prev,
+        title: preFillData.title,
+        description: preFillData.description,
+        company_id: preFillData.company_id,
+      }));
+    }
+  }, [preFillData]);
 
   const { data: categories } = useQuery({
     queryKey: ['marketing-categories'],
@@ -162,8 +185,8 @@ export const TaskCreateModal = ({ open, onOpenChange, onSuccess }: TaskCreateMod
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CheckSquare className="h-5 w-5 text-purple-500" />
-            Create New Task
+            <CheckSquare className="h-5 w-5 text-primary" />
+            {preFillData ? 'Create Task from Job Request' : 'Create New Task'}
           </DialogTitle>
         </DialogHeader>
 
@@ -270,45 +293,80 @@ export const TaskCreateModal = ({ open, onOpenChange, onSuccess }: TaskCreateMod
             </div>
           </div>
 
-          {/* Team Member Selection */}
+          {/* Team Member Selection - Dropdown Based */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1">
               <Users className="h-3 w-3" />
               Assign Team Members
             </Label>
-            <div className="border rounded-lg p-3 max-h-48 overflow-y-auto">
-              {teamMembers && teamMembers.length > 0 ? (
-                <div className="space-y-2">
-                  {teamMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer"
-                      onClick={() => toggleMember(member.id)}
-                    >
-                      <Checkbox
-                        checked={selectedMembers.includes(member.id)}
-                        onCheckedChange={() => toggleMember(member.id)}
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{member.display_name}</p>
-                        <p className="text-xs text-muted-foreground">{member.designation}</p>
-                      </div>
-                      {member.is_task_assigner && (
-                        <Badge variant="secondary" className="text-xs">Assigner</Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground text-sm py-4">
-                  No team members yet. Add team members first.
-                </p>
-              )}
-            </div>
+            
+            <Popover open={memberDropdownOpen} onOpenChange={setMemberDropdownOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={memberDropdownOpen}
+                  className="w-full justify-between"
+                >
+                  {selectedMembers.length > 0 
+                    ? `${selectedMembers.length} member(s) selected` 
+                    : "Select team members..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0 bg-popover" align="start">
+                <Command>
+                  <CommandInput placeholder="Search members..." />
+                  <CommandList>
+                    <CommandEmpty>No members found.</CommandEmpty>
+                    <CommandGroup>
+                      {teamMembers?.map((member) => (
+                        <CommandItem
+                          key={member.id}
+                          value={member.display_name}
+                          onSelect={() => toggleMember(member.id)}
+                          className="cursor-pointer"
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedMembers.includes(member.id) ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{member.display_name}</p>
+                            <p className="text-xs text-muted-foreground">{member.designation}</p>
+                          </div>
+                          {member.is_task_assigner && (
+                            <Badge variant="secondary" className="text-xs ml-2">Assigner</Badge>
+                          )}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            {/* Selected members as removable badges */}
             {selectedMembers.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {selectedMembers.length} member(s) selected
-              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {selectedMembers.map((memberId) => {
+                  const member = teamMembers?.find(m => m.id === memberId);
+                  return (
+                    <Badge key={memberId} variant="secondary" className="gap-1 pr-1">
+                      {member?.display_name}
+                      <button
+                        type="button"
+                        onClick={() => toggleMember(memberId)}
+                        className="ml-1 rounded-full hover:bg-muted p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  );
+                })}
+              </div>
             )}
           </div>
 

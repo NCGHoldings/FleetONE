@@ -10,11 +10,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, FileText, Calendar, Building2, ArrowRight, CheckCircle, XCircle } from "lucide-react";
+import { Plus, FileText, Calendar, Building2, ArrowRight, CheckCircle, XCircle, ListPlus } from "lucide-react";
 import { format } from "date-fns";
+import { TaskCreateModal } from "./TaskCreateModal";
 
 export const JobRequestsTab = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [taskPreFill, setTaskPreFill] = useState<{
+    title: string;
+    description: string;
+    company_id: string;
+    job_request_id: string;
+  } | null>(null);
   const [formData, setFormData] = useState({
     job_title: '',
     job_description: '',
@@ -112,13 +120,36 @@ export const JobRequestsTab = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-amber-500';
-      case 'approved': return 'bg-blue-500';
-      case 'converted_to_task': return 'bg-green-500';
-      case 'converted_to_project': return 'bg-purple-500';
-      case 'rejected': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case 'pending': return 'bg-primary/60';
+      case 'approved': return 'bg-primary';
+      case 'converted_to_task': return 'bg-primary/80';
+      case 'converted_to_project': return 'bg-primary/70';
+      case 'rejected': return 'bg-destructive';
+      default: return 'bg-muted-foreground';
     }
+  };
+
+  const handleConvertToTask = (request: any) => {
+    setTaskPreFill({
+      title: request.job_title,
+      description: request.job_description || '',
+      company_id: request.company_id || '',
+      job_request_id: request.id,
+    });
+    setIsTaskModalOpen(true);
+  };
+
+  const handleTaskCreated = () => {
+    setIsTaskModalOpen(false);
+    setTaskPreFill(null);
+    // Update job request status to converted_to_task
+    if (taskPreFill?.job_request_id) {
+      updateStatusMutation.mutate({ 
+        id: taskPreFill.job_request_id, 
+        status: 'converted_to_task' 
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ['marketing-job-requests'] });
   };
 
   return (
@@ -131,7 +162,7 @@ export const JobRequestsTab = () => {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
+            <Button className="bg-primary hover:bg-primary/90">
               <Plus className="h-4 w-4 mr-2" />
               New Job Request
             </Button>
@@ -139,7 +170,7 @@ export const JobRequestsTab = () => {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-purple-500" />
+                <FileText className="h-5 w-5 text-primary" />
                 New Job Request (MKT-HR)
               </DialogTitle>
             </DialogHeader>
@@ -262,28 +293,39 @@ export const JobRequestsTab = () => {
                     </div>
                   </div>
 
-                  {request.status === 'pending' && (
-                    <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    {request.status === 'pending' && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="bg-primary hover:bg-primary/90"
+                          onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'approved' })}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive border-destructive hover:bg-destructive/10"
+                          onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'rejected' })}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                    {request.status === 'approved' && (
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="text-green-600 border-green-600 hover:bg-green-50"
-                        onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'approved' })}
+                        className="bg-primary hover:bg-primary/90"
+                        onClick={() => handleConvertToTask(request)}
                       >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Approve
+                        <ListPlus className="h-4 w-4 mr-1" />
+                        Create Task
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-600 border-red-600 hover:bg-red-50"
-                        onClick={() => updateStatusMutation.mutate({ id: request.id, status: 'rejected' })}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Reject
-                      </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -298,6 +340,17 @@ export const JobRequestsTab = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Task Create Modal with pre-filled data */}
+      <TaskCreateModal
+        open={isTaskModalOpen}
+        onOpenChange={(open) => {
+          setIsTaskModalOpen(open);
+          if (!open) setTaskPreFill(null);
+        }}
+        onSuccess={handleTaskCreated}
+        preFillData={taskPreFill}
+      />
     </div>
   );
 };
