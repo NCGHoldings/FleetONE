@@ -155,7 +155,7 @@ export function AppSidebar() {
   const currentPath = location.pathname;
   const [logoUrl, setLogoUrl] = useState<string>('');
   const { user } = useAuth();
-  const { hasAccess } = usePagePermissions(user?.id);
+  const { hasAccess } = usePagePermissions();
 
 
   // Load company logo on mount
@@ -297,14 +297,15 @@ const visibleMarketing = marketingItems.filter((i) => hasAccess(i.id));
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
-            <div className="w-2 h-2 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full animate-pulse"></div>
-            Marketing
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-{marketingItems.map((item) => (
+        {visibleMarketing.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+              <div className="w-2 h-2 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full animate-pulse"></div>
+              Marketing
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+{visibleMarketing.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
       <NavLink to={item.url} className={getNavCls}>
@@ -314,9 +315,10 @@ const visibleMarketing = marketingItems.filter((i) => hasAccess(i.id));
     </SidebarMenuButton>
   </SidebarMenuItem>
 ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
