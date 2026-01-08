@@ -30,7 +30,10 @@ import {
   Activity,
   Monitor,
   Car,
-  Megaphone
+  Megaphone,
+  CheckSquare,
+  FolderKanban,
+  Share2
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -138,6 +141,11 @@ const financeItems = [
 
 const marketingItems = [
   { id: "marketing_dashboard", title: "Marketing Hub", url: "/marketing", icon: Megaphone },
+  { id: "marketing_job_requests", title: "Job Requests", url: "/marketing?tab=job-requests", icon: FileText },
+  { id: "marketing_tasks", title: "Tasks", url: "/marketing?tab=tasks", icon: CheckSquare },
+  { id: "marketing_projects", title: "Projects", url: "/marketing?tab=projects", icon: FolderKanban },
+  { id: "marketing_team", title: "Team Profiles", url: "/marketing?tab=team", icon: Users },
+  { id: "marketing_social", title: "Social Media", url: "/marketing?tab=social", icon: Share2 },
 ];
 
 export function AppSidebar() {
@@ -289,15 +297,14 @@ const visibleMarketing = marketingItems.filter((i) => hasAccess(i.id));
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {visibleMarketing.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
-              <div className="w-2 h-2 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full animate-pulse"></div>
-              Marketing
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-{visibleMarketing.map((item) => (
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full animate-pulse"></div>
+            Marketing
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+{marketingItems.map((item) => (
   <SidebarMenuItem key={item.title}>
     <SidebarMenuButton asChild>
       <NavLink to={item.url} className={getNavCls}>
@@ -307,10 +314,9 @@ const visibleMarketing = marketingItems.filter((i) => hasAccess(i.id));
     </SidebarMenuButton>
   </SidebarMenuItem>
 ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
