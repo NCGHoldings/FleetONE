@@ -29,7 +29,8 @@ import {
   Clock,
   Activity,
   Monitor,
-  Car
+  Car,
+  Megaphone
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -135,6 +136,10 @@ const financeItems = [
   { id: "system_health", title: "System Health", url: "/system-health", icon: Monitor },
 ];
 
+const marketingItems = [
+  { id: "marketing_dashboard", title: "Marketing Hub", url: "/marketing", icon: Megaphone },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -187,6 +192,7 @@ const visibleSinotruck = sinotruckItems.filter((i) => hasAccess(i.id));
 const visibleLightVehicle = lightVehicleItems.filter((i) => hasAccess(i.id));
 const visibleNSP = nspItems.filter((i) => hasAccess(i.id));
 const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
+const visibleMarketing = marketingItems.filter((i) => hasAccess(i.id));
 
   return (
     <Sidebar className={collapsed ? "w-16" : "w-64"} collapsible="icon">
@@ -282,6 +288,29 @@ const visibleGovernance = governanceItems.filter((i) => hasAccess(i.id));
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {visibleMarketing.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">
+              <div className="w-2 h-2 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full animate-pulse"></div>
+              Marketing
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+{visibleMarketing.map((item) => (
+  <SidebarMenuItem key={item.title}>
+    <SidebarMenuButton asChild>
+      <NavLink to={item.url} className={getNavCls}>
+        <item.icon className="w-5 h-5 transition-all duration-300" />
+        {!collapsed && <span className="font-medium transition-all duration-300">{item.title}</span>}
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-sidebar-foreground/80 font-semibold uppercase tracking-wider text-xs mb-2 flex items-center gap-2">

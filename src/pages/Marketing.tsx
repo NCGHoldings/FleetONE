@@ -13,7 +13,8 @@ import {
   TrendingUp,
   Clock,
   Star,
-  Target
+  Target,
+  Settings
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,7 @@ import { TasksTab } from "@/components/marketing/TasksTab";
 import { ProjectsTab } from "@/components/marketing/ProjectsTab";
 import { TeamTab } from "@/components/marketing/TeamTab";
 import { SocialMediaTab } from "@/components/marketing/SocialMediaTab";
+import { MarketingSettingsTab } from "@/components/marketing/MarketingSettingsTab";
 
 const Marketing = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -143,6 +145,10 @@ const Marketing = () => {
               <Share2 className="h-4 w-4 mr-2" />
               Social Media
             </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white rounded-lg">
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="mt-4">
@@ -167,6 +173,10 @@ const Marketing = () => {
 
           <TabsContent value="social" className="mt-4">
             <SocialMediaTab />
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-4">
+            <MarketingSettingsTab />
           </TabsContent>
         </Tabs>
       </div>
