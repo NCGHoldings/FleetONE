@@ -1,4 +1,3 @@
-import { useAuth } from "@/hooks/useAuth";
 import { usePagePermissions } from "@/hooks/usePagePermissions";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -11,8 +10,7 @@ interface PageAccessGuardProps {
 }
 
 export function PageAccessGuard({ children, pageId }: PageAccessGuardProps) {
-  const { user } = useAuth();
-  const { hasAccess, loading } = usePagePermissions(user?.id);
+  const { hasAccess, loading } = usePagePermissions();
   const navigate = useNavigate();
 
   if (loading) {
