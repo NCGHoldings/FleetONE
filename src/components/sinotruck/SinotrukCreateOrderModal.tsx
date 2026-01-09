@@ -62,11 +62,11 @@ export function SinotrukCreateOrderModal({ open, onClose, onSuccess }: SinotrukC
             if (error) throw error;
 
             // Filter out quotations that already have orders
-            const { data: existingOrders } = await supabase
+            const { data: existingOrders } = await (supabase as any)
                 .from('sinotruck_orders')
                 .select('quotation_id');
 
-            const existingQuotationIds = new Set(existingOrders?.map(o => o.quotation_id));
+            const existingQuotationIds = new Set(existingOrders?.map((o: any) => o.quotation_id) || []);
             const availableQuotations = data?.filter(q => !existingQuotationIds.has(q.id)) || [];
 
             setQuotations(availableQuotations);
