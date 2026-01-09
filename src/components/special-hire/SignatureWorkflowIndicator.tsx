@@ -194,9 +194,23 @@ export function SignatureWorkflowIndicator({
     );
   }
 
+  // Check if ALL documents have all signatures
+  const allDocumentsComplete = documents.length > 0 && documents.every((doc) => {
+    const sig = getSignatureStatus(doc);
+    return sig.count === 3;
+  });
+
   // Show per-document status with always-visible preview
   return (
     <div className="flex flex-col gap-2 max-w-[200px]">
+      {/* All Signed Summary Badge - shown when ALL documents complete */}
+      {allDocumentsComplete && (
+        <Badge className="gap-1.5 bg-green-600 hover:bg-green-700 text-white px-2 py-1 w-fit">
+          <CheckCircle className="h-4 w-4" />
+          All Signed ✓
+        </Badge>
+      )}
+      
       {documents.slice(0, 2).map((doc) => {
         const sig = getSignatureStatus(doc);
         const allComplete = sig.count === 3;
@@ -204,18 +218,22 @@ export function SignatureWorkflowIndicator({
         const emailSent = doc.email_status === 'sent';
         
         return (
-          <div key={doc.id} className="flex flex-col gap-1 p-1.5 rounded bg-muted/40 border border-border/40">
+          <div key={doc.id} className={`flex flex-col gap-1 p-1.5 rounded border ${
+            allComplete 
+              ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+              : 'bg-muted/40 border-border/40'
+          }`}>
             {/* Document type + preview button - ALWAYS VISIBLE */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
                 {allComplete ? (
-                  <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0" />
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
                 ) : isAwaitingFinance ? (
                   <Lock className="w-3 h-3 text-amber-500 flex-shrink-0" />
                 ) : (
                   <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                 )}
-                <span className="text-[10px] font-medium truncate">
+                <span className={`text-[10px] font-medium truncate ${allComplete ? 'text-green-700 dark:text-green-400' : ''}`}>
                   {getDocumentTypeLabel(doc)}
                 </span>
               </div>

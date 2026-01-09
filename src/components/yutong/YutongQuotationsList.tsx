@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ColumnDef } from '@tanstack/react-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, Trash2, FileText, LayoutGrid, Table, PenTool, Copy } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText, LayoutGrid, Table, PenTool, Copy, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -560,10 +560,17 @@ export function YutongQuotationsList({ onRefresh }: YutongQuotationsListProps) {
       header: "Signatures",
       cell: ({ row }) => {
         const count = signatureCounts.get(row.original.id) || 0;
-        return (
-          <Badge variant={count === 3 ? "default" : "secondary"} className="gap-1">
-            <PenTool className="h-3 w-3" />
-            {count}/3
+        const allSigned = count === 3;
+        
+        return allSigned ? (
+          <Badge className="gap-1 bg-green-600 hover:bg-green-700 text-white">
+            <CheckCircle className="h-4 w-4" />
+            All Signed
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300 bg-amber-50">
+            <Clock className="h-3 w-3" />
+            {count}/3 Pending
           </Badge>
         );
       },
