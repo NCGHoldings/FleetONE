@@ -223,8 +223,19 @@ export const useYutongOldSalesManagement = () => {
 
       if (fetchError) throw fetchError;
 
+      // Generate quotation number
+      const now = new Date();
+      const quotationNo = `YQ-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Date.now().toString().slice(-6)}`;
+      
+      // Set valid_until to 30 days from now
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + 30);
+
       // Create quotation from old sale data
       const quotationData = {
+        quotation_no: quotationNo,
+        customer_name: oldSale.customer_name || 'Unknown Customer',
+        valid_until: validUntil.toISOString().split('T')[0],
         bus_model: oldSale.bus_model || 'Unknown Model',
         quantity: oldSale.quantity || 1,
         unit_price: oldSale.base_price || 0,
@@ -244,7 +255,7 @@ export const useYutongOldSalesManagement = () => {
 
       const { data: quotation, error: quotationError } = await supabase
         .from('yutong_quotations')
-        .insert(quotationData)
+        .insert([quotationData])
         .select()
         .single();
 
@@ -303,18 +314,25 @@ export const useYutongOldSalesManagement = () => {
 
       if (quotationError) throw quotationError;
 
+      // Generate order number
+      const now = new Date();
+      const orderNo = `YO-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Date.now().toString().slice(-6)}`;
+
       // Create order from quotation
       const orderData = {
+        order_no: orderNo,
+        quotation_id: quotationId,
         bus_model: quotation.bus_model,
         quantity: quotation.quantity || 1,
         unit_price: quotation.unit_price || 0,
         total_price: quotation.total_price || 0,
+        total_amount: quotation.total_price || 0,
         order_status: 'confirmed' as const,
       };
 
       const { data: order, error: orderError } = await supabase
         .from('yutong_orders')
-        .insert(orderData)
+        .insert([orderData])
         .select()
         .single();
 
