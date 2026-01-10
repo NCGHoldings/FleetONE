@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useYutongOldSalesManagement, OldSalesRecord } from '@/hooks/useYutongOldSalesManagement';
 
-// Column mapping from Excel headers to database fields
+// Column mapping from Excel headers to database fields (includes typo variants for parsing)
 const COLUMN_MAPPING: Record<string, keyof OldSalesRecord> = {
   'no': 'row_number',
   'quotation id': 'quotation_no',
@@ -20,7 +20,7 @@ const COLUMN_MAPPING: Record<string, keyof OldSalesRecord> = {
   'company': 'company_name',
   'address': 'customer_address',
   'contact no': 'customer_phone',
-  'email adress': 'customer_email',
+  'email adress': 'customer_email', // typo variant
   'email address': 'customer_email',
   'model': 'bus_model',
   'optional specifications': 'optional_specifications',
@@ -35,6 +35,15 @@ const COLUMN_MAPPING: Record<string, keyof OldSalesRecord> = {
   'sales person': 'sales_person',
   'quotation status': 'quotation_status',
 };
+
+// Unique headers for UI display (no duplicates)
+const DISPLAY_HEADERS = [
+  'no', 'quotation id', 'quoted date', 'entered by', 'name', 
+  'company', 'address', 'contact no', 'email address', 'model', 
+  'optional specifications', 'no of units', 'base price', 'total', 
+  'discount', 'price', 'vat', 'advance payment', 'final price', 
+  'sales person', 'quotation status'
+];
 
 interface YutongOldSalesImportProps {
   onImportComplete: () => void;
@@ -52,13 +61,29 @@ export const YutongOldSalesImport: React.FC<YutongOldSalesImportProps> = ({ onIm
   const parseExcelDate = (value: unknown): string | undefined => {
     if (!value) return undefined;
     
-    // If it's already a string date
+    // If it's a string date
     if (typeof value === 'string') {
+      // Handle DD/MM/YYYY format (e.g., "19/02/2025")
+      const ddmmyyyy = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (ddmmyyyy) {
+        const [, day, month, year] = ddmmyyyy;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      
+      // Handle MM-DD-YYYY format
+      const mmddyyyy = value.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+      if (mmddyyyy) {
+        const [, month, day, year] = mmddyyyy;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      
+      // Try standard Date parsing
       const parsed = new Date(value);
       if (!isNaN(parsed.getTime())) {
         return parsed.toISOString().split('T')[0];
       }
-      return value;
+      
+      return undefined;
     }
     
     // If it's an Excel date number
@@ -269,13 +294,13 @@ export const YutongOldSalesImport: React.FC<YutongOldSalesImportProps> = ({ onIm
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            {Object.keys(COLUMN_MAPPING).map((header) => (
+            {DISPLAY_HEADERS.map((header) => (
               <Badge 
                 key={header} 
-                variant={headers.includes(header) ? 'default' : 'outline'}
+                variant={headers.includes(header) || (header === 'email address' && headers.includes('email adress')) ? 'default' : 'outline'}
                 className="capitalize"
               >
-                {headers.includes(header) && <Check className="h-3 w-3 mr-1" />}
+                {(headers.includes(header) || (header === 'email address' && headers.includes('email adress'))) && <Check className="h-3 w-3 mr-1" />}
                 {header}
               </Badge>
             ))}
