@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useYutongOldSalesManagement, OldSalesRecord } from '@/hooks/useYutongOldSalesManagement';
 import { YutongOldSalesDetailModal } from './YutongOldSalesDetailModal';
+import { YutongOldSalesConvertModal } from './YutongOldSalesConvertModal';
 import { format } from 'date-fns';
 
 export const YutongOldSalesList: React.FC = () => {
@@ -20,13 +21,16 @@ export const YutongOldSalesList: React.FC = () => {
     fetchOldSales, 
     convertToQuotation, 
     createOrderFromOldSale,
-    deleteOldSale 
+    deleteOldSale,
+    getMissingFields
   } = useYutongOldSalesManagement();
   
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedRecord, setSelectedRecord] = useState<OldSalesRecord | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [conversionType, setConversionType] = useState<'quotation' | 'order'>('quotation');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,13 +55,39 @@ export const YutongOldSalesList: React.FC = () => {
     setShowDetailModal(true);
   };
 
-  const handleConvertToQuotation = async (id: string) => {
-    await convertToQuotation(id);
+  const handleConvertToQuotation = async (record: OldSalesRecord) => {
+    const missing = getMissingFields(record);
+    if (missing.length > 0) {
+      setSelectedRecord(record);
+      setConversionType('quotation');
+      setShowConvertModal(true);
+    } else if (record.id) {
+      await convertToQuotation(record.id);
+      fetchOldSales();
+    }
+  };
+
+  const handleCreateOrder = async (record: OldSalesRecord) => {
+    const missing = getMissingFields(record);
+    if (missing.length > 0) {
+      setSelectedRecord(record);
+      setConversionType('order');
+      setShowConvertModal(true);
+    } else if (record.id) {
+      await createOrderFromOldSale(record.id);
+      fetchOldSales();
+    }
+  };
+
+  const handleConvertWithData = async (additionalData: Partial<OldSalesRecord>) => {
+    if (!selectedRecord?.id) return;
+    await convertToQuotation(selectedRecord.id, additionalData);
     fetchOldSales();
   };
 
-  const handleCreateOrder = async (id: string) => {
-    await createOrderFromOldSale(id);
+  const handleCreateOrderWithData = async (additionalData: Partial<OldSalesRecord>) => {
+    if (!selectedRecord?.id) return;
+    await createOrderFromOldSale(selectedRecord.id, additionalData);
     fetchOldSales();
   };
 
@@ -232,14 +262,14 @@ export const YutongOldSalesList: React.FC = () => {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
-                              onClick={() => record.id && handleConvertToQuotation(record.id)}
+                              onClick={() => handleConvertToQuotation(record)}
                               disabled={!!record.converted_to_quotation_id}
                             >
                               <FileText className="h-4 w-4 mr-2" />
                               Convert to Quotation
                             </DropdownMenuItem>
                             <DropdownMenuItem 
-                              onClick={() => record.id && handleCreateOrder(record.id)}
+                              onClick={() => handleCreateOrder(record)}
                               disabled={!!record.converted_to_order_id}
                             >
                               <ShoppingCart className="h-4 w-4 mr-2" />
@@ -278,13 +308,23 @@ export const YutongOldSalesList: React.FC = () => {
             setShowDetailModal(false);
             setSelectedRecord(null);
           }}
-          onConvert={() => {
-            if (selectedRecord.id) {
-              handleConvertToQuotation(selectedRecord.id);
-            }
-          }}
+          onConvert={() => handleConvertToQuotation(selectedRecord)}
+          onCreateOrder={() => handleCreateOrder(selectedRecord)}
         />
       )}
+
+      {/* Convert Modal for Missing Data */}
+      <YutongOldSalesConvertModal
+        record={selectedRecord}
+        open={showConvertModal}
+        onClose={() => {
+          setShowConvertModal(false);
+          setSelectedRecord(null);
+        }}
+        onConvert={handleConvertWithData}
+        onCreateOrder={handleCreateOrderWithData}
+        conversionType={conversionType}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
