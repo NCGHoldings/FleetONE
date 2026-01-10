@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, FileText, Calculator, Truck, ShoppingCart, DollarSign, Package, Shield, Cog, FileCheck, MapPin, Wrench, Users, Bus, BarChart3, UserPlus, FileSpreadsheet } from 'lucide-react';
+import { Plus, FileText, Calculator, Truck, ShoppingCart, DollarSign, Package, Shield, Cog, FileCheck, MapPin, Wrench, Users, Bus, BarChart3, UserPlus, FileSpreadsheet, History, Upload } from 'lucide-react';
 import { YutongQuotationsList } from "@/components/yutong/YutongQuotationsList";
 import { YutongQuotationForm } from "@/components/yutong/YutongQuotationFormUpdated";
 import { YutongBusModelsAdmin } from "@/components/yutong/YutongBusModelsAdmin";
@@ -22,6 +22,8 @@ import { YutongDeliveryManagement } from '@/components/yutong/YutongDeliveryMana
 import { YutongAfterSalesManagement } from '@/components/yutong/YutongAfterSalesManagement';
 import { YutongReferralManagement } from '@/components/yutong/YutongReferralManagement';
 import { YutongVehicleDataManagement } from '@/components/yutong/YutongVehicleDataManagement';
+import { YutongOldSalesImport } from '@/components/yutong/YutongOldSalesImport';
+import { YutongOldSalesList } from '@/components/yutong/YutongOldSalesList';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -50,6 +52,7 @@ export default function YutongQuotations() {
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [inquiryData, setInquiryData] = useState<InquiryInitialData | null>(null);
+  const [oldSalesSubTab, setOldSalesSubTab] = useState<'list' | 'import'>('list');
   const activeTab = searchParams.get('tab') || 'quotations';
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
@@ -190,7 +193,7 @@ export default function YutongQuotations() {
 
       {/* Main Content - Simplified to Core Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 lg:grid-cols-9">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 lg:grid-cols-10">
           <TabsTrigger value="quotations" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Quotations</span>
@@ -202,6 +205,10 @@ export default function YutongQuotations() {
           <TabsTrigger value="finance" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             <span className="hidden sm:inline">Finance</span>
+          </TabsTrigger>
+          <TabsTrigger value="old-sales" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            <span className="hidden sm:inline">Old Sales</span>
           </TabsTrigger>
           <TabsTrigger value="referral" className="flex items-center gap-2">
             <UserPlus className="h-4 w-4" />
@@ -239,6 +246,32 @@ export default function YutongQuotations() {
 
         <TabsContent value="finance" className="space-y-4">
           <YutongFinanceDashboard />
+        </TabsContent>
+
+        <TabsContent value="old-sales" className="space-y-4">
+          <div className="flex gap-2 mb-4">
+            <Button 
+              variant={oldSalesSubTab === 'list' ? 'default' : 'outline'}
+              onClick={() => setOldSalesSubTab('list')}
+              className="gap-2"
+            >
+              <History className="h-4 w-4" />
+              View Records
+            </Button>
+            <Button 
+              variant={oldSalesSubTab === 'import' ? 'default' : 'outline'}
+              onClick={() => setOldSalesSubTab('import')}
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Import Data
+            </Button>
+          </div>
+          {oldSalesSubTab === 'list' ? (
+            <YutongOldSalesList />
+          ) : (
+            <YutongOldSalesImport onImportComplete={() => setOldSalesSubTab('list')} />
+          )}
         </TabsContent>
 
         <TabsContent value="referral" className="space-y-4">
