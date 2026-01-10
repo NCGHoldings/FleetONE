@@ -12,6 +12,7 @@ interface YutongOldSalesDetailModalProps {
   open: boolean;
   onClose: () => void;
   onConvert: () => void;
+  onCreateOrder: () => void;
 }
 
 export const YutongOldSalesDetailModal: React.FC<YutongOldSalesDetailModalProps> = ({
@@ -19,6 +20,7 @@ export const YutongOldSalesDetailModal: React.FC<YutongOldSalesDetailModalProps>
   open,
   onClose,
   onConvert,
+  onCreateOrder,
 }) => {
   const formatCurrency = (value: number | undefined) => {
     if (!value) return 'LKR 0';
@@ -211,7 +213,7 @@ export const YutongOldSalesDetailModal: React.FC<YutongOldSalesDetailModalProps>
             </Button>
           )}
           {!record.converted_to_order_id && (
-            <Button variant="secondary">
+            <Button variant="secondary" onClick={onCreateOrder}>
               <ShoppingCart className="h-4 w-4 mr-2" />
               Create Order
             </Button>

@@ -210,8 +210,26 @@ export const useYutongOldSalesManagement = () => {
     }
   }, [toast]);
 
-  // Convert old sale to quotation
-  const convertToQuotation = useCallback(async (oldSaleId: string) => {
+  // Helper to check if a value is empty
+  const isFieldEmpty = (value: unknown): boolean => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string' && (value.trim() === '' || value.trim() === '-')) return true;
+    if (typeof value === 'number' && (value === 0 || isNaN(value))) return true;
+    return false;
+  };
+
+  // Get list of missing required fields for a record
+  const getMissingFields = useCallback((record: OldSalesRecord): string[] => {
+    const missing: string[] = [];
+    if (isFieldEmpty(record.customer_phone)) missing.push('customer_phone');
+    if (isFieldEmpty(record.bus_model)) missing.push('bus_model');
+    if (isFieldEmpty(record.base_price)) missing.push('base_price');
+    if (isFieldEmpty(record.quantity)) missing.push('quantity');
+    return missing;
+  }, []);
+
+  // Convert old sale to quotation with optional additional data
+  const convertToQuotation = useCallback(async (oldSaleId: string, additionalData?: Partial<OldSalesRecord>) => {
     setLoading(true);
     try {
       // Fetch the old sale record
@@ -223,6 +241,15 @@ export const useYutongOldSalesManagement = () => {
 
       if (fetchError) throw fetchError;
 
+      // Merge with additional data provided from modal
+      const mergedData = { ...oldSale, ...additionalData };
+
+      // Validate required fields after merge
+      const missingFields = getMissingFields(mergedData as OldSalesRecord);
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+
       // Generate quotation number
       const now = new Date();
       const quotationNo = `YQ-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Date.now().toString().slice(-6)}`;
@@ -231,26 +258,26 @@ export const useYutongOldSalesManagement = () => {
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
 
-      // Create quotation from old sale data
+      // Create quotation from merged data
       const quotationData = {
         quotation_no: quotationNo,
-        customer_name: oldSale.customer_name || 'Unknown Customer',
+        customer_name: mergedData.customer_name || 'Unknown Customer',
         valid_until: validUntil.toISOString().split('T')[0],
-        bus_model: oldSale.bus_model || 'Unknown Model',
-        quantity: oldSale.quantity || 1,
-        unit_price: oldSale.base_price || 0,
-        discount_amount: oldSale.discount_amount || 0,
-        vat_amount: oldSale.vat_amount || 0,
-        total_price: oldSale.final_price || 0,
-        advance_payment: oldSale.advance_payment || 0,
-        responsible_person: oldSale.sales_person || null,
+        bus_model: mergedData.bus_model || 'Unknown Model',
+        quantity: mergedData.quantity || 1,
+        unit_price: mergedData.base_price || 0,
+        discount_amount: mergedData.discount_amount || 0,
+        vat_amount: mergedData.vat_amount || 0,
+        total_price: mergedData.final_price || 0,
+        advance_payment: mergedData.advance_payment || 0,
+        responsible_person: mergedData.sales_person || null,
         status: 'draft' as const,
-        notes: `Converted from old sale: ${oldSale.quotation_no || 'N/A'}`,
-        company_name: oldSale.company_name || null,
-        customer_address: oldSale.customer_address || null,
-        customer_phone: oldSale.customer_phone || null,
-        customer_email: oldSale.customer_email || null,
-        special_features: oldSale.optional_specifications || null,
+        notes: `Converted from old sale: ${mergedData.quotation_no || 'N/A'}`,
+        company_name: mergedData.company_name || null,
+        customer_address: mergedData.customer_address || null,
+        customer_phone: mergedData.customer_phone || null,
+        customer_email: mergedData.customer_email || null,
+        special_features: mergedData.optional_specifications || null,
       };
 
       const { data: quotation, error: quotationError } = await supabase
@@ -284,10 +311,10 @@ export const useYutongOldSalesManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, getMissingFields]);
 
-  // Create order from old sale
-  const createOrderFromOldSale = useCallback(async (oldSaleId: string) => {
+  // Create order from old sale with optional additional data
+  const createOrderFromOldSale = useCallback(async (oldSaleId: string, additionalData?: Partial<OldSalesRecord>) => {
     setLoading(true);
     try {
       // First convert to quotation if not already
@@ -300,7 +327,7 @@ export const useYutongOldSalesManagement = () => {
       let quotationId = oldSale?.converted_to_quotation_id;
 
       if (!quotationId) {
-        const quotation = await convertToQuotation(oldSaleId);
+        const quotation = await convertToQuotation(oldSaleId, additionalData);
         if (!quotation) throw new Error('Failed to create quotation');
         quotationId = quotation.id;
       }
@@ -428,5 +455,6 @@ export const useYutongOldSalesManagement = () => {
     createOrderFromOldSale,
     deleteOldSale,
     deleteImportBatch,
+    getMissingFields,
   };
 };
