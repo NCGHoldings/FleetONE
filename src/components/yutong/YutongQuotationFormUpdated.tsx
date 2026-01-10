@@ -306,6 +306,7 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
         contact_person: data.contact_person || null,
         bus_model: selectedModel ? `${selectedModel.bus_name} ${selectedModel.model_name}` : 'Unknown Model',
         bus_model_id: data.bus_model_id,
+        seating_capacity: selectedModel?.capacity || null,
         quantity: data.quantity,
         unit_price: data.unit_price,
         discount_amount: data.discount_amount || 0,
