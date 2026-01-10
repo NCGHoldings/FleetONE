@@ -68,6 +68,7 @@ export const PAGES: PageCategories = {
   ],
   yutong: [
     { id: "yutong_quotations", title: "Quotations", url: "/yutong-quotations" },
+    { id: "yutong_old_sales", title: "Old Sales", url: "/yutong-quotations?tab=old-sales" },
     { id: "yutong_bus_models", title: "Bus Models", url: "/yutong-quotations?tab=bus-models" },
     { id: "yutong_addons", title: "Add-ons", url: "/yutong-quotations?tab=addons" },
     { id: "yutong_vehicle_data", title: "Vehicle Data", url: "/yutong-quotations?tab=vehicle-data" },

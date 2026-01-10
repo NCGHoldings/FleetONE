@@ -11882,6 +11882,154 @@ export type Database = {
           },
         ]
       }
+      yutong_old_sales: {
+        Row: {
+          advance_payment: number | null
+          base_price: number | null
+          bus_model: string | null
+          company_name: string | null
+          converted_to_order_id: string | null
+          converted_to_quotation_id: string | null
+          created_at: string | null
+          customer_address: string | null
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          discount_amount: number | null
+          entered_by: string | null
+          final_price: number | null
+          id: string
+          import_batch_id: string | null
+          imported_at: string | null
+          notes: string | null
+          optional_specifications: string | null
+          quantity: number | null
+          quotation_no: string | null
+          quotation_status: string | null
+          quoted_date: string | null
+          raw_data: Json | null
+          row_number: number | null
+          sales_person: string | null
+          subtotal_price: number | null
+          total_before_discount: number | null
+          updated_at: string | null
+          vat_amount: number | null
+        }
+        Insert: {
+          advance_payment?: number | null
+          base_price?: number | null
+          bus_model?: string | null
+          company_name?: string | null
+          converted_to_order_id?: string | null
+          converted_to_quotation_id?: string | null
+          created_at?: string | null
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          discount_amount?: number | null
+          entered_by?: string | null
+          final_price?: number | null
+          id?: string
+          import_batch_id?: string | null
+          imported_at?: string | null
+          notes?: string | null
+          optional_specifications?: string | null
+          quantity?: number | null
+          quotation_no?: string | null
+          quotation_status?: string | null
+          quoted_date?: string | null
+          raw_data?: Json | null
+          row_number?: number | null
+          sales_person?: string | null
+          subtotal_price?: number | null
+          total_before_discount?: number | null
+          updated_at?: string | null
+          vat_amount?: number | null
+        }
+        Update: {
+          advance_payment?: number | null
+          base_price?: number | null
+          bus_model?: string | null
+          company_name?: string | null
+          converted_to_order_id?: string | null
+          converted_to_quotation_id?: string | null
+          created_at?: string | null
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          discount_amount?: number | null
+          entered_by?: string | null
+          final_price?: number | null
+          id?: string
+          import_batch_id?: string | null
+          imported_at?: string | null
+          notes?: string | null
+          optional_specifications?: string | null
+          quantity?: number | null
+          quotation_no?: string | null
+          quotation_status?: string | null
+          quoted_date?: string | null
+          raw_data?: Json | null
+          row_number?: number | null
+          sales_person?: string | null
+          subtotal_price?: number | null
+          total_before_discount?: number | null
+          updated_at?: string | null
+          vat_amount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_old_sales_converted_to_order_id_fkey"
+            columns: ["converted_to_order_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_old_sales_converted_to_quotation_id_fkey"
+            columns: ["converted_to_quotation_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_old_sales_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "yutong_old_sales_imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_old_sales_imports: {
+        Row: {
+          file_name: string
+          id: string
+          imported_at: string | null
+          imported_by: string | null
+          status: string | null
+          total_records: number | null
+        }
+        Insert: {
+          file_name: string
+          id?: string
+          imported_at?: string | null
+          imported_by?: string | null
+          status?: string | null
+          total_records?: number | null
+        }
+        Update: {
+          file_name?: string
+          id?: string
+          imported_at?: string | null
+          imported_by?: string | null
+          status?: string | null
+          total_records?: number | null
+        }
+        Relationships: []
+      }
       yutong_order_tasks: {
         Row: {
           assigned_to: string | null
