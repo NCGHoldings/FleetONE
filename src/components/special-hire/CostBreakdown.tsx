@@ -120,7 +120,7 @@ export function CostBreakdown({ data }: Props) {
     overnightCharge: data.overnightCharge || 0,
     exceedingDistanceCharge: data.exceedingDistanceCharge || 0,
     maintenanceCost: data.maintenanceCost || 0,
-    totalTripDistance: data.totalDistance || ((data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0)),
+    totalTripDistance: data.totalTripDistance || ((data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0)),
     busTypeEfficiency: data.busTypeEfficiency || 8,
     fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 350,
     maintenanceRatePerKm: data.maintenanceRatePerKm || 20,
