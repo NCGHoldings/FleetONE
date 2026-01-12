@@ -106,20 +106,35 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i] as HTMLElement;
       
+      // Store original styles
+      const originalWidth = page.style.width;
+      const originalMinHeight = page.style.minHeight;
+      const originalMaxWidth = page.style.maxWidth;
+      
+      // Set A4 dimensions for accurate capture
+      page.style.width = '210mm';
+      page.style.minHeight = '297mm';
+      page.style.maxWidth = '210mm';
+      
       // Create canvas for each page individually
       const canvas = await html2canvas(page, {
         scale: 2,
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
-        width: page.offsetWidth,
-        height: page.offsetHeight,
+        width: 794, // A4 width in pixels at 96dpi
+        height: page.scrollHeight,
         scrollX: 0,
         scrollY: 0,
         foreignObjectRendering: false,
         removeContainer: true,
         logging: false
       });
+      
+      // Restore original styles
+      page.style.width = originalWidth;
+      page.style.minHeight = originalMinHeight;
+      page.style.maxWidth = originalMaxWidth;
 
       const imgData = canvas.toDataURL('image/png');
       
@@ -128,7 +143,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
         pdf.addPage();
       }
       
-      // Calculate dimensions to fit A4 while maintaining aspect ratio
+      // Calculate dimensions to fit A4 width, position at TOP (not centered)
       const imgWidth = pageWidth;
       const imgHeight = (canvas.height * pageWidth) / canvas.width;
       
@@ -138,9 +153,8 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
         const scaledWidth = (canvas.width * pageHeight) / canvas.height;
         pdf.addImage(imgData, 'PNG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
       } else {
-        // Center the image vertically if it's smaller than page height
-        const yOffset = (pageHeight - imgHeight) / 2;
-        pdf.addImage(imgData, 'PNG', 0, yOffset, imgWidth, imgHeight);
+        // Position at TOP of page (not centered)
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       }
     }
 

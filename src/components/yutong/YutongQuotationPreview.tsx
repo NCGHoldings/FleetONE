@@ -279,27 +279,33 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
         }
       }
       
-      /* Screen preview styles */
+      /* Screen preview styles - A4 proportioned */
       .page {
-        min-height: auto;
+        width: 210mm;
+        min-height: 297mm;
+        max-width: 210mm;
         display: flex;
         flex-direction: column;
         background: white;
         border: 2px solid #003366;
-        margin-bottom: 20px;
+        margin: 0 auto 20px auto;
         position: relative;
-        padding: 15px;
+        padding: 15mm;
+        box-sizing: border-box;
       }
       .page-header {
+        flex-shrink: 0;
         margin-bottom: 15px;
       }
       .page-footer {
+        flex-shrink: 0;
         margin-top: auto;
         padding-top: 15px;
       }
       .page-content {
         flex: 1;
-        padding: 15px;
+        display: flex;
+        flex-direction: column;
       }
       .signatures {
         display: flex;
@@ -346,7 +352,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
       <style dangerouslySetInnerHTML={{ __html: pageHeaderFooterStyles }} />
 
       {/* Page 1 - Main Quotation */}
-      <div className="page" style={{ maxWidth: "900px", margin: "0 auto 20px auto" }}>
+      <div className="page">
         <div className="page-content">
           {/* Header */}
           <div className="page-header">
@@ -849,7 +855,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
       </div>
 
       {/* Page 2 - Terms & Conditions */}
-      <div className="page" style={{ maxWidth: "900px", margin: "0 auto" }}>
+      <div className="page">
         <div className="page-content">
           {/* Header */}
           <div className="page-header">
