@@ -93,6 +93,7 @@ interface CostData {
   exceedingDistanceCharge: number;
   maintenanceCost?: number;
   totalTripDistance?: number;
+  totalDistance?: number; // Total distance including additional distance from charges
   busTypeEfficiency?: number;
   fuelPricePerLiter?: number;
   maintenanceRatePerKm?: number;
@@ -125,6 +126,7 @@ interface CostData {
   additionalCharges?: Array<{ 
     type: string; 
     amount: number; 
+    distance?: number; // For additional_distance type
     reason?: string;
   }>;
   totalAdditionalCharges?: number;
@@ -269,7 +271,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         .maybeSingle();
 
       // Parse additional charges from quotation (stored as JSONB)
-      let additionalCharges: Array<{ type: string; amount: number; reason?: string }> = [];
+      let additionalCharges: Array<{ type: string; amount: number; distance?: number; reason?: string }> = [];
       if (quotation.additional_charges) {
         try {
           additionalCharges = Array.isArray(quotation.additional_charges) 
@@ -314,6 +316,14 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
       const recalculatedCommissionAmount = preCommissionTotal * (commissionPct / 100);
       const recalculatedPassThroughAmount = preCommissionTotal * (commissionPassThroughPct / 100);
 
+      // Calculate base trip distance (without additional distance from charges)
+      const baseTripDistance = (quotation.km_parking_to_pickup || 0) + (quotation.km_trip || 0) + (quotation.km_drop_to_parking || 0);
+      
+      // Calculate additional distance from charges
+      const additionalDistanceFromCharges = additionalCharges
+        .filter(charge => charge.type === 'additional_distance')
+        .reduce((sum, charge) => sum + (charge.distance || 0), 0);
+      
       // Prepare the cost breakdown data from the quotation to match CostBreakdown props
       const data: CostData = {
         kmParkingToPickup: quotation.km_parking_to_pickup || 0,
@@ -326,7 +336,10 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         overnightCharge: quotation.overnight_charge || 0,
         exceedingDistanceCharge: exceedingDistanceCharge,
         maintenanceCost: quotation.maintenance_cost || 0,
-        totalTripDistance: quotation.total_distance_km || 0,
+        // Use base trip distance for totalTripDistance (without additional km)
+        totalTripDistance: baseTripDistance,
+        // Use full distance including additional km for totalDistance
+        totalDistance: baseTripDistance + additionalDistanceFromCharges,
         busTypeEfficiency: quotation.avg_km_per_l || 8,
         fuelPricePerLiter: fuelPricePerLiter,
         maintenanceRatePerKm: maintenanceRatePerKm,
@@ -608,7 +621,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
                           <p className="text-muted-foreground text-sm">↓</p>
                           <p className="font-medium text-sm">{selectedQuotation.drop_location}</p>
                           <p className="text-sm text-muted-foreground mt-1">
-                            Total: {selectedQuotation.total_distance_km || 0} km
+                            Total: {(selectedQuotation.km_parking_to_pickup || 0) + (selectedQuotation.km_trip || 0) + (selectedQuotation.km_drop_to_parking || 0)} km
                           </p>
                         </div>
                       </div>
