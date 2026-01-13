@@ -14053,6 +14053,10 @@ export type Database = {
       generate_lightvehicle_order_number: { Args: never; Returns: string }
       generate_lightvehicle_quotation_number: { Args: never; Returns: string }
       generate_lightvehicle_shipment_number: { Args: never; Returns: string }
+      generate_next_lightvehicle_version_number: {
+        Args: { p_parent_id: string }
+        Returns: string
+      }
       generate_next_version_number: {
         Args: { p_parent_id: string }
         Returns: string
