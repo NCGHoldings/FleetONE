@@ -109,6 +109,16 @@ interface Props {
 
 export function CostBreakdown({ data }: Props) {
   // Provide default values to prevent undefined errors
+  // Calculate base trip distance (parking + trip + drop - without additional km from charges)
+  const baseTripDistance = (data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0);
+  
+  // Calculate additional distance from charges if not already provided
+  const additionalDistanceFromChargesCalc = Array.isArray(data.additionalCharges) 
+    ? data.additionalCharges
+        .filter(charge => charge.type === 'additional_distance')
+        .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+    : 0;
+  
   const safeData = {
     kmParkingToPickup: data.kmParkingToPickup || 0,
     kmTrip: data.kmTrip || 0,
@@ -120,7 +130,10 @@ export function CostBreakdown({ data }: Props) {
     overnightCharge: data.overnightCharge || 0,
     exceedingDistanceCharge: data.exceedingDistanceCharge || 0,
     maintenanceCost: data.maintenanceCost || 0,
-    totalTripDistance: data.totalTripDistance || ((data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0)),
+    // totalTripDistance = base distance WITHOUT additional km from charges
+    totalTripDistance: data.totalTripDistance || baseTripDistance,
+    // totalDistance = full distance WITH additional km (for fuel/maintenance calculations)
+    totalDistance: data.totalDistance || (baseTripDistance + additionalDistanceFromChargesCalc),
     busTypeEfficiency: data.busTypeEfficiency || 8,
     fuelPricePerLiter: data.fuelPricePerLiter || data.fuelPrice || 350,
     maintenanceRatePerKm: data.maintenanceRatePerKm || 20,
