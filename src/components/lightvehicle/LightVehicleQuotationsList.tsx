@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ColumnDef } from '@tanstack/react-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, Trash2, FileText } from 'lucide-react';
+import { Eye, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { LightVehicleQuotationViewModal } from './LightVehicleQuotationViewModal';
 
 interface LightVehicleQuotation {
   id: string;
@@ -16,15 +17,31 @@ interface LightVehicleQuotation {
   customer_name: string;
   customer_phone: string;
   customer_email: string;
-  company_name: string;
+  customer_address?: string;
+  company_name?: string;
+  customer_type?: string;
+  business_registration_number?: string;
+  tax_registration_number?: string;
+  representative_name?: string;
+  designation?: string;
   vehicle_name: string;
   brand: string;
   category: string;
+  engine_cc?: string;
+  transmission?: string;
+  fuel_type?: string;
+  color?: string;
   quantity: number;
   unit_price: number;
+  discount_amount?: number;
   grand_total: number;
   status: string;
+  valid_until?: string;
   created_at: string;
+  notes?: string;
+  payment_terms?: string;
+  warranty_terms?: string;
+  delivery_timeline?: string;
 }
 
 interface LightVehicleQuotationsListProps {
@@ -34,6 +51,8 @@ interface LightVehicleQuotationsListProps {
 export function LightVehicleQuotationsList({ onRefresh }: LightVehicleQuotationsListProps) {
   const [quotations, setQuotations] = useState<LightVehicleQuotation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedQuotation, setSelectedQuotation] = useState<LightVehicleQuotation | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const { toast } = useToast();
 
   const loadQuotations = async () => {
@@ -149,6 +168,11 @@ export function LightVehicleQuotationsList({ onRefresh }: LightVehicleQuotations
     }
   };
 
+  const handleViewQuotation = (quotation: LightVehicleQuotation) => {
+    setSelectedQuotation(quotation);
+    setIsViewModalOpen(true);
+  };
+
   const columns: ColumnDef<LightVehicleQuotation>[] = [
     {
       accessorKey: "quotation_number",
@@ -225,7 +249,12 @@ export function LightVehicleQuotationsList({ onRefresh }: LightVehicleQuotations
                 <SelectItem value="expired">Expired</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="icon" title="View">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              title="View"
+              onClick={() => handleViewQuotation(quotation)}
+            >
               <Eye className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" title="Edit">
@@ -261,18 +290,29 @@ export function LightVehicleQuotationsList({ onRefresh }: LightVehicleQuotations
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Light Vehicle Quotations</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <DataTable columns={columns} data={quotations} />
-        {quotations.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            No quotations found. Create your first quotation to get started.
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Light Vehicle Quotations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable columns={columns} data={quotations} />
+          {quotations.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No quotations found. Create your first quotation to get started.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <LightVehicleQuotationViewModal
+        quotation={selectedQuotation}
+        open={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedQuotation(null);
+        }}
+      />
+    </>
   );
 }
