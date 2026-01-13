@@ -204,7 +204,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
         display: flex;
         flex-direction: column;
         background: white;
-        border: 2px solid #8B0000;
+        border: 2px solid #1e40af;
         margin: 0 auto 20px auto;
         position: relative;
         padding: 15mm;
@@ -251,7 +251,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
         margin-top: 8px;
       }
       .footer-contact {
-        background: #8B0000;
+        background: #1e40af;
         color: white;
         padding: 8px;
         font-size: 12px;
@@ -275,7 +275,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             <div className="page-header">
               <img
                 src="/lovable-uploads/lightvehicle-quotation-header.png"
-                alt="Prime Auto - Light Vehicle Quotation Header"
+                alt="NCG Holdings - Light Vehicle Quotation Header"
                 style={{ width: "100%", height: "auto", display: "block" }}
               />
             </div>
@@ -308,7 +308,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                     </p>
                   )}
                   <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>ADDRESS :</b> {quotation.customer_address || ""}
+                    <b>ADDRESS :</b> {quotation.customer_address || "N/A"}
                   </p>
                 </>
               ) : (
@@ -317,7 +317,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                     <b>CUSTOMER :</b> {quotation.customer_name}
                   </p>
                   <p style={{ margin: "3px 0", fontSize: "13px" }}>
-                    <b>ADDRESS :</b> {quotation.customer_address || ""}
+                    <b>ADDRESS :</b> {quotation.customer_address || "N/A"}
                   </p>
                 </>
               )}
@@ -337,50 +337,50 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
 
             {/* Quotation Table */}
             <table
-              style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px", border: "1px solid #8B0000" }}
+              style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px", border: "1px solid #3b82f6" }}
             >
               <thead>
                 <tr>
                   <th
                     style={{
-                      background: "#8B0000",
+                      background: "#1e40af",
                       color: "white",
                       padding: "8px",
                       textAlign: "center",
-                      border: "1px solid #8B0000",
+                      border: "1px solid #3b82f6",
                     }}
                   >
                     PRODUCT
                   </th>
                   <th
                     style={{
-                      background: "#8B0000",
+                      background: "#1e40af",
                       color: "white",
                       padding: "8px",
                       textAlign: "center",
-                      border: "1px solid #8B0000",
+                      border: "1px solid #3b82f6",
                     }}
                   >
                     UNIT PRICE (LKR)
                   </th>
                   <th
                     style={{
-                      background: "#8B0000",
+                      background: "#1e40af",
                       color: "white",
                       padding: "8px",
                       textAlign: "center",
-                      border: "1px solid #8B0000",
+                      border: "1px solid #3b82f6",
                     }}
                   >
                     QTY
                   </th>
                   <th
                     style={{
-                      background: "#8B0000",
+                      background: "#1e40af",
                       color: "white",
                       padding: "8px",
                       textAlign: "center",
-                      border: "1px solid #8B0000",
+                      border: "1px solid #3b82f6",
                     }}
                   >
                     TOTAL (LKR)
@@ -390,7 +390,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
               <tbody>
                 {/* Main Vehicle Product */}
                 <tr>
-                  <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #8B0000" }}>
+                  <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #3b82f6" }}>
                     <b>VEHICLE:</b> {quotation.brand} - {quotation.vehicle_name}
                     <br />
                     <b>CATEGORY:</b> {quotation.category}
@@ -419,13 +419,13 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                       </>
                     )}
                   </td>
-                  <td style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #8B0000" }}>
+                  <td style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #3b82f6" }}>
                     {quotation.unit_price.toLocaleString()}
                   </td>
-                  <td style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #8B0000" }}>
+                  <td style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #3b82f6" }}>
                     {quotation.quantity}
                   </td>
-                  <td style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #8B0000" }}>
+                  <td style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #3b82f6" }}>
                     {vehicleSubtotalBeforeDiscount.toLocaleString()}
                   </td>
                 </tr>
@@ -441,7 +441,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                           textAlign: "right",
                           padding: "8px",
                           fontSize: "14px",
-                          border: "1px solid #8B0000",
+                          border: "1px solid #3b82f6",
                           color: "#d32f2f",
                         }}
                       >
@@ -452,7 +452,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                           textAlign: "center",
                           padding: "8px",
                           fontSize: "14px",
-                          border: "1px solid #8B0000",
+                          border: "1px solid #3b82f6",
                           color: "#d32f2f",
                           fontWeight: "bold",
                         }}
@@ -468,8 +468,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                           textAlign: "right",
                           padding: "8px",
                           fontSize: "14px",
-                          border: "1px solid #8B0000",
-                          background: "#f5f5f5",
+                          border: "1px solid #3b82f6",
+                          background: "#dbeafe",
                         }}
                       >
                         Net Vehicle Subtotal
@@ -479,8 +479,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                           textAlign: "center",
                           padding: "8px",
                           fontSize: "14px",
-                          border: "1px solid #8B0000",
-                          background: "#f5f5f5",
+                          border: "1px solid #3b82f6",
+                          background: "#dbeafe",
                           fontWeight: "bold",
                         }}
                       >
@@ -497,8 +497,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                         textAlign: "right",
                         padding: "8px",
                         fontSize: "14px",
-                        border: "1px solid #8B0000",
-                        background: "#f5f5f5",
+                        border: "1px solid #3b82f6",
+                        background: "#dbeafe",
                       }}
                     >
                       Vehicle Subtotal
@@ -508,8 +508,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                         textAlign: "center",
                         padding: "8px",
                         fontSize: "14px",
-                        border: "1px solid #8B0000",
-                        background: "#f5f5f5",
+                        border: "1px solid #3b82f6",
+                        background: "#dbeafe",
                         fontWeight: "bold",
                       }}
                     >
@@ -527,8 +527,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                         style={{
                           padding: "8px",
                           fontSize: "14px",
-                          border: "1px solid #8B0000",
-                          background: "#8B0000",
+                          border: "1px solid #3b82f6",
+                          background: "#1e40af",
                           color: "white",
                           textAlign: "center",
                           fontWeight: "bold",
@@ -539,7 +539,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                     </tr>
                     {addOns.map((addon, index) => (
                       <tr key={index}>
-                        <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #8B0000" }}>
+                        <td style={{ padding: "8px", fontSize: "14px", border: "1px solid #3b82f6" }}>
                           <b>ADD-ON:</b> {addon.addon_name}
                           {addon.is_free_of_charge && (
                             <span style={{ marginLeft: "8px", color: "#22c55e", fontWeight: "bold" }}>
@@ -554,17 +554,17 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                           )}
                         </td>
                         <td
-                          style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #8B0000" }}
+                          style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #3b82f6" }}
                         >
                           {addon.is_free_of_charge ? "FREE" : addon.unit_price.toLocaleString()}
                         </td>
                         <td
-                          style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #8B0000" }}
+                          style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #3b82f6" }}
                         >
                           {addon.quantity}
                         </td>
                         <td
-                          style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #8B0000" }}
+                          style={{ textAlign: "center", padding: "8px", fontSize: "14px", border: "1px solid #3b82f6" }}
                         >
                           {addon.is_free_of_charge ? "FREE" : (addon.quantity * addon.unit_price).toLocaleString()}
                         </td>
@@ -580,8 +580,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                           textAlign: "right",
                           padding: "8px",
                           fontSize: "14px",
-                          border: "1px solid #8B0000",
-                          background: "#f5f5f5",
+                          border: "1px solid #3b82f6",
+                          background: "#dbeafe",
                         }}
                       >
                         Add-ons Subtotal
@@ -591,8 +591,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                           textAlign: "center",
                           padding: "8px",
                           fontSize: "14px",
-                          border: "1px solid #8B0000",
-                          background: "#f5f5f5",
+                          border: "1px solid #3b82f6",
+                          background: "#dbeafe",
                           fontWeight: "bold",
                         }}
                       >
@@ -611,8 +611,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                       textAlign: "right",
                       padding: "12px 8px",
                       fontSize: "16px",
-                      border: "2px solid #8B0000",
-                      background: "#8B0000",
+                      border: "2px solid #1e40af",
+                      background: "#1e40af",
                       color: "white",
                     }}
                   >
@@ -623,8 +623,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
                       textAlign: "center",
                       padding: "12px 8px",
                       fontSize: "16px",
-                      border: "2px solid #8B0000",
-                      background: "#8B0000",
+                      border: "2px solid #1e40af",
+                      background: "#1e40af",
                       color: "white",
                       fontWeight: "bold",
                     }}
@@ -638,19 +638,19 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             {/* Payment Details */}
             <div className="payment-details" style={{ fontSize: "12px", marginTop: "8px" }}>
               <p style={{ margin: "2px 0" }}>
-                <b>Payment Terms :</b> {quotation.payment_terms || "Payment method – by Cheque or bank transfer"}
+                <b>Payment Terms :</b> Payment method - by Cheque or bank transfer
               </p>
               <p style={{ margin: "2px 0" }}>
-                <b>Account Name :</b> PRIME AUTO (PVT) LTD | <b>Account Number :</b> 008310009371
+                <b>NCG HOLDINGS (PRIVATE) LIMITED</b>
               </p>
               <p style={{ margin: "2px 0" }}>
-                <b>Bank :</b> Sampath Bank PLC | <b>Branch :</b> Nugegoda | <b>Swift :</b> BABORKLX
+                <b>Account No :</b> 2000511791 | <b>Bank :</b> Commercial Bank Nugegoda
               </p>
             </div>
 
             {/* Notes */}
             {quotation.notes && (
-              <div style={{ fontSize: "12px", marginTop: "12px", padding: "10px", border: "1px solid #8B0000", borderRadius: "6px", background: "#f8f9fa" }}>
+              <div style={{ fontSize: "12px", marginTop: "12px", padding: "10px", border: "1px solid #3b82f6", borderRadius: "6px", background: "#f8f9fa" }}>
                 <p style={{ margin: "0" }}>
                   <b>Notes:</b> {quotation.notes}
                 </p>
@@ -700,7 +700,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             <div className="footer-contact">
               <div style={{ display: "flex", alignItems: "center" }}>📞 +94 77 123 4567</div>
               <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
-              <div style={{ display: "flex", alignItems: "center" }}>✉️ info@primeauto.lk</div>
+              <div style={{ display: "flex", alignItems: "center" }}>✉️ info@ncgholdings.lk</div>
             </div>
           </div>
         </div>
@@ -712,11 +712,11 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             <div className="page-header">
               <img
                 src="/lovable-uploads/lightvehicle-quotation-header.png"
-                alt="Prime Auto - Light Vehicle Quotation Header"
+                alt="NCG Holdings - Light Vehicle Quotation Header"
                 style={{ width: "100%", height: "auto", display: "block" }}
               />
               <div
-                style={{ textAlign: "center", fontWeight: "bold", fontSize: "16px", marginTop: "10px", color: "#8B0000" }}
+                style={{ textAlign: "center", fontWeight: "bold", fontSize: "16px", marginTop: "10px", color: "#1e40af" }}
               >
                 QUOTATION NO: {quotation.quotation_number} - Terms & Conditions
               </div>
@@ -726,8 +726,8 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             <div className="terms-section" style={{ fontSize: "11px", lineHeight: "1.35", color: "#333" }}>
               <h3
                 style={{
-                  color: "#8B0000",
-                  borderBottom: "2px solid #8B0000",
+                  color: "#1e40af",
+                  borderBottom: "2px solid #1e40af",
                   paddingBottom: "4px",
                   marginBottom: "10px",
                   fontSize: "14px",
@@ -737,56 +737,52 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
               </h3>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>1. Payment & Order Confirmation:</b> A non-refundable advance payment of 10% of the total value is required to confirm the order. The balance payment must be settled prior to delivery, unless otherwise agreed in writing. The vehicle will not be released until full payment is received.
+                <b>1. Payment Terms & Delivery:</b> A non-refundable advance of 10% is required to confirm the order. The remaining balance must be paid before delivery, or as agreed. Customizations will incur additional costs. Estimated delivery is 45-120 days, subject to stock and color availability. Delivery may be delayed due to factors beyond the seller's control. The Vehicle will not be released until full payment is made.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>2. Delivery Timeline:</b> Estimated delivery is subject to stock availability, production schedules, and regulatory approvals. Delivery delays beyond the seller's control shall not be the seller's liability.
+                <b>2. USD Rate Fluctuations:</b> The quoted price is based on the current USD exchange rate and may change if fluctuations occur. The buyer must agree to any price adjustments. If not accepted, the order will be void, and the advance will be forfeited.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>3. Price Validity:</b> This quotation is valid for 14 days from the date of issue. Prices are subject to change without prior notice after the validity period.
+                <b>3. Import Regulations & Government Policies:</b> Any changes in Sri Lanka's import laws or trade restrictions may affect the delivery process. The buyer is responsible for any additional costs arising from these changes. If a ban on imports occurs, the advance is non-refundable.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>4. Currency Fluctuation:</b> Prices are based on the prevailing exchange rate at the time of quotation. Any exchange rate fluctuation may result in a price adjustment.
+                <b>4. Vehicle Registration:</b> Registration occurs after full payment or a valid Purchase Order. The buyer is responsible for additional charges like taxes and special plates. Once registered, the vehicle cannot be returned, and no refunds will be issued.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>5. Vehicle Registration & Statutory Costs:</b> Vehicle registration will commence only after full payment. All related costs including taxes, number plates, revenue licence, and insurance are the buyer's responsibility.
+                <b>5. Inspection & Acceptance:</b> The buyer must inspect the vehicle upon delivery. Any defects or discrepancies must be noted at the time of delivery. After acceptance, no claims for damages or missing items will be accepted.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>6. Inspection & Acceptance:</b> The buyer must inspect the vehicle at delivery. Any defects or discrepancies must be reported immediately. Once accepted, no claims for damages or missing items will be entertained.
+                <b>6. Warranty & Maintenance:</b> This vehicle is covered under a 3-year or 100,000 km warranty (whichever occurs first), subject to strict compliance with the prescribed service schedule. To maintain warranty validity, all scheduled minor and major services, inspections, and spare part replacements must be carried out exclusively at NCG Automotive Services – PEP (NAS PEP). Servicing, repairs, or replacement of parts performed at any external or third-party service facility will automatically and irrevocably void the warranty. Warranty benefits remain applicable only while the vehicle is continuously serviced at NAS PEP in accordance with manufacturer and company service intervals.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>7. Warranty Terms:</b> {quotation.warranty_terms || "The vehicle is covered under the manufacturer's warranty, subject to their terms and conditions. Warranty claims must be made through authorized service centers."}
+                <b>7. Risk of Loss:</b> The risk of loss or damage passes to the buyer upon delivery and acceptance of the vehicle.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>8. Risk Transfer:</b> Risk in the vehicle passes to the buyer upon delivery. The seller is not liable for any loss or damage after delivery.
+                <b>8. Indemnity:</b> The buyer agrees to indemnify the seller against any liability arising from the use or resale of the vehicle after delivery.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>9. Cancellation Policy:</b> If the buyer cancels the order after confirmation, the advance payment shall be forfeited. The seller reserves the right to cancel the order if terms are not met.
+                <b>9. Additional Clauses:</b> The seller may use photos of the vehicle for promotional purposes unless otherwise agreed. The buyer may not transfer their rights or obligations under this agreement without the seller's written consent.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>10. Dispute Resolution:</b> Any disputes arising from this quotation shall be governed by the laws of Sri Lanka and subject to the jurisdiction of Sri Lankan courts.
+                <b>10. Indemnity:</b> The buyer agrees to indemnify and hold the seller harmless against any loss, damage, or legal liability arising out of the buyer's use, ownership, or resale of the vehicle after delivery.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>11. Documentation:</b> The buyer is responsible for providing all necessary documentation required for vehicle registration and financing (if applicable).
-              </p>
-
-              <p style={{ marginBottom: "6px" }}>
-                <b>12. After-Sales Service:</b> Prime Auto provides after-sales support through our authorized service network. Regular servicing as per manufacturer guidelines is recommended to maintain warranty coverage.
+                <b>11. Additional Clauses:</b> The seller retains the right to use photographs or descriptions of the vehicle for advertising or promotional purposes unless otherwise agreed in writing by both parties. The buyer may not assign, transfer, or sub-contract their rights or obligations under this agreement without the prior written consent of the seller.
               </p>
             </div>
 
             {/* Acceptance Section */}
-            <div style={{ marginTop: "20px", padding: "15px", border: "2px solid #8B0000", borderRadius: "8px", background: "#f8f9fa" }}>
+            <div style={{ marginTop: "20px", padding: "15px", border: "2px solid #3b82f6", borderRadius: "8px", background: "#f8f9fa" }}>
               <p style={{ fontSize: "12px", marginBottom: "10px" }}>
                 <b>CUSTOMER ACCEPTANCE:</b> By signing below, I confirm that I have read, understood, and agree to the terms and conditions stated above.
               </p>
@@ -835,7 +831,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             <div className="footer-contact">
               <div style={{ display: "flex", alignItems: "center" }}>📞 +94 77 123 4567</div>
               <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
-              <div style={{ display: "flex", alignItems: "center" }}>✉️ info@primeauto.lk</div>
+              <div style={{ display: "flex", alignItems: "center" }}>✉️ info@ncgholdings.lk</div>
             </div>
           </div>
         </div>

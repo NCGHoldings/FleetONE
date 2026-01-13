@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { LightVehicleQuotationViewModal } from './LightVehicleQuotationViewModal';
+import { LightVehicleEditQuotationModal } from './LightVehicleEditQuotationModal';
 
 interface LightVehicleQuotation {
   id: string;
@@ -42,6 +43,9 @@ interface LightVehicleQuotation {
   payment_terms?: string;
   warranty_terms?: string;
   delivery_timeline?: string;
+  model_id?: string;
+  finance_company?: string;
+  contact_person?: string;
 }
 
 interface LightVehicleQuotationsListProps {
@@ -53,6 +57,8 @@ export function LightVehicleQuotationsList({ onRefresh }: LightVehicleQuotations
   const [loading, setLoading] = useState(true);
   const [selectedQuotation, setSelectedQuotation] = useState<LightVehicleQuotation | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editQuotation, setEditQuotation] = useState<LightVehicleQuotation | null>(null);
   const { toast } = useToast();
 
   const loadQuotations = async () => {
@@ -173,6 +179,16 @@ export function LightVehicleQuotationsList({ onRefresh }: LightVehicleQuotations
     setIsViewModalOpen(true);
   };
 
+  const handleEditQuotation = (quotation: LightVehicleQuotation) => {
+    setEditQuotation(quotation);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    loadQuotations();
+    onRefresh();
+  };
+
   const columns: ColumnDef<LightVehicleQuotation>[] = [
     {
       accessorKey: "quotation_number",
@@ -257,7 +273,12 @@ export function LightVehicleQuotationsList({ onRefresh }: LightVehicleQuotations
             >
               <Eye className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" title="Edit">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              title="Edit"
+              onClick={() => handleEditQuotation(quotation)}
+            >
               <Edit className="h-4 w-4" />
             </Button>
             <Button 
@@ -312,6 +333,16 @@ export function LightVehicleQuotationsList({ onRefresh }: LightVehicleQuotations
           setIsViewModalOpen(false);
           setSelectedQuotation(null);
         }}
+      />
+
+      <LightVehicleEditQuotationModal
+        quotation={editQuotation}
+        open={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditQuotation(null);
+        }}
+        onSuccess={handleEditSuccess}
       />
     </>
   );
