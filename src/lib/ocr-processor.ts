@@ -42,6 +42,8 @@ export interface DailyExpenses extends Record<string, number> {
 export interface OCRResult {
   busNumber: string | null;
   date: string | null;
+  driverName?: string | null;
+  conductorName?: string | null;
   trips: SingleTrip[];
   daily_expenses: DailyExpenses;
   confidence: number;
