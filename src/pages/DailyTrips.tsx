@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
+import { useCrewGroupedTrips } from "@/hooks/useCrewGroupedTrips";
 import { BusDailySummaryTable } from "@/components/trips/BusDailySummaryTable";
 import { BusDailyCard } from "@/components/trips/BusDailyCard";
+import { CrewConsolidatedView } from "@/components/trips/CrewConsolidatedView";
 import { FleetDailySummary } from "@/components/trips/FleetDailySummary";
 import { DailyBreakdownView } from "@/components/trips/DailyBreakdownView";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -26,7 +28,7 @@ export default function DailyTrips() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
-  const [viewMode, setViewMode] = useState<"table" | "cards">(isMobile ? "cards" : "table");
+  const [viewMode, setViewMode] = useState<"table" | "cards" | "crew">(isMobile ? "cards" : "table");
   const [showImportModal, setShowImportModal] = useState(false);
   const [showGLExportModal, setShowGLExportModal] = useState(false);
   const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
@@ -54,6 +56,21 @@ export default function DailyTrips() {
     dateMode === "single" ? selectedDate : null,
     validDateRange
   );
+
+  // Crew grouped data for crew view mode
+  const { crewGroups, loading: crewLoading, refetch: refetchCrew } = useCrewGroupedTrips(
+    dateMode === "single" ? selectedDate : null,
+    validDateRange
+  );
+
+  // Combined loading state
+  const isLoading = viewMode === "crew" ? crewLoading : loading;
+
+  // Combined refetch
+  const handleRefetch = () => {
+    refetch();
+    refetchCrew();
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -188,9 +205,9 @@ export default function DailyTrips() {
           </div>
 
           {/* View Mode Toggle */}
-          {!isMobile && busSummaries.length > 0 && (
+          {!isMobile && (busSummaries.length > 0 || crewGroups.length > 0) && (
             <div className="flex items-center justify-between">
-              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "table" | "cards")}>
+              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "table" | "cards" | "crew")}>
                 <TabsList>
                   <TabsTrigger value="table" className="gap-2">
                     <LayoutList className="h-4 w-4" />
@@ -199,6 +216,10 @@ export default function DailyTrips() {
                   <TabsTrigger value="cards" className="gap-2">
                     <LayoutGrid className="h-4 w-4" />
                     Card View
+                  </TabsTrigger>
+                  <TabsTrigger value="crew" className="gap-2">
+                    <Users className="h-4 w-4" />
+                    Crew View
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -217,14 +238,14 @@ export default function DailyTrips() {
 
       {/* Main Content */}
       <div className="container mx-auto p-4 space-y-6">
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-muted-foreground">Loading daily trips...</p>
             </div>
           </div>
-        ) : busSummaries.length === 0 ? (
+        ) : busSummaries.length === 0 && crewGroups.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-lg text-muted-foreground mb-4">
               {dateMode === "single" ? (
@@ -261,17 +282,21 @@ export default function DailyTrips() {
               />
             )}
 
-            {/* Bus Summaries */}
+            {/* Bus Summaries / Crew View */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Bus Operations</h3>
+              <h3 className="text-lg font-semibold mb-4">
+                {viewMode === "crew" ? "Crew Consolidated View" : "Bus Operations"}
+              </h3>
               
-              {viewMode === "table" ? (
-                <BusDailySummaryTable summaries={busSummaries} onRefresh={refetch} />
+              {viewMode === "crew" ? (
+                <CrewConsolidatedView crewGroups={crewGroups} onRefresh={handleRefetch} />
+              ) : viewMode === "table" ? (
+                <BusDailySummaryTable summaries={busSummaries} onRefresh={handleRefetch} />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {busSummaries.map((summary) => (
-              <BusDailyCard key={summary.bus_id} summary={summary} onRefresh={refetch} />
-            ))}
+                  {busSummaries.map((summary) => (
+                    <BusDailyCard key={summary.bus_id} summary={summary} onRefresh={handleRefetch} />
+                  ))}
                 </div>
               )}
             </div>
@@ -284,7 +309,7 @@ export default function DailyTrips() {
         onClose={() => setShowImportModal(false)}
         onSuccess={() => {
           console.log('✅ Import completed. Refetching daily trips data...');
-          refetch();
+          handleRefetch();
           toast.success('Daily trips data refreshed!', { duration: 2000 });
         }}
       />

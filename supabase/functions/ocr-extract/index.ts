@@ -35,7 +35,13 @@ Extract:
 2. DATE: Format DD/MM/YYYY or දිනය
    - Look for the date field at the top of the sheet
 
-3. TRIP TABLE (rows labeled 1, 2, 3, 4):
+3. CREW INFORMATION (IMPORTANT - extract if visible):
+   - DRIVER NAME (රියදුරු / ඩ්‍රයිවර් / Driver): Look for driver name near the top of the sheet
+   - CONDUCTOR NAME (කොන්දොස්තර / Conductor / Helper): Look for conductor/helper name
+   - These are usually written near the bus number or at the top of the sheet
+   - If you see a signature or name field, extract the readable name
+
+4. TRIP TABLE (rows labeled 1, 2, 3, 4):
    For EACH ROW that has data, extract:
    - Trip number (1, 2, 3, or 4)
    - Revenue fields for that specific trip:
@@ -118,6 +124,8 @@ Return JSON in this exact format:
 {
   "busNumber": "0746",
   "date": "01/10/2025",
+  "driverName": "Kamal Perera",
+  "conductorName": "Sunil Fernando",
   "trips": [
     {
       "trip_no": 1,
@@ -166,7 +174,9 @@ Return JSON in this exact format:
     "other": 0
   },
   "confidence": 0.92
-}`;
+}
+
+NOTE: If driver or conductor name is not visible, return null for those fields.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
