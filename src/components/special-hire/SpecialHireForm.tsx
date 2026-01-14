@@ -1075,7 +1075,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         throw new Error(`No rate cards found for ${data.hireType} hire type. Please configure rate cards first.`);
       }
 
-      const tripDistance = distanceData.kmTrip || 0;
+      // Round trip distance to 1 decimal place to avoid floating-point precision errors
+      const tripDistance = Math.round((distanceData.kmTrip || 0) * 10) / 10;
       let rateCard = null;
       let fixedRate = 0;
       let exceedingDistanceCharge = 0;
@@ -1109,7 +1110,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           );
           if (exceedingRateCard) {
             baseCoverageKm = exceedingRateCard.exceeding_km_threshold || 100;
-            exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+            // Round exceeding km to 1 decimal place
+            exceedingKm = Math.round(Math.max(0, tripDistance - baseCoverageKm) * 10) / 10;
             exceedingDistanceCharge = exceedingKm * (exceedingRateCard.exceeding_km_rate_lkr || 0);
           }
         }
@@ -1122,7 +1124,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
         fixedRate = rateCard.flat_fee_lkr || 0;
         baseCoverageKm = rateCard.exceeding_km_threshold || 100;
-        exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
+        // Round exceeding km to 1 decimal place
+        exceedingKm = Math.round(Math.max(0, tripDistance - baseCoverageKm) * 10) / 10;
         exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
       }
       
@@ -1329,6 +1332,57 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     }
   };
 
+  // Helper function to check if route-affecting fields have changed
+  const hasRouteChanged = (currentData: FormData, originalData: any): boolean => {
+    if (!originalData) return true;
+
+    // Check location changes
+    if (currentData.pickupLocation !== originalData.pickup_location) return true;
+    if (currentData.dropLocation !== originalData.drop_location) return true;
+    if (currentData.parkingLocationId !== originalData.parking_location_id) return true;
+
+    // Check bus configuration changes
+    if (currentData.busTypeId !== originalData.bus_type_id) return true;
+    if (currentData.numberOfBuses !== originalData.number_of_buses) return true;
+    if (currentData.hireType !== originalData.hire_type) return true;
+
+    // Check date/time changes (affects extra time calculations)
+    const currentPickup = new Date(currentData.pickupDateTime).getTime();
+    const originalPickup = new Date(originalData.pickup_datetime).getTime();
+    if (Math.abs(currentPickup - originalPickup) > 60000) return true; // 1 minute tolerance
+
+    const currentDrop = new Date(currentData.dropDateTime).getTime();
+    const originalDrop = new Date(originalData.drop_datetime).getTime();
+    if (Math.abs(currentDrop - originalDrop) > 60000) return true;
+
+    // Check intermediate stops changes
+    const currentStops = intermediateStops.filter(s => s.location && s.location.trim());
+    const originalStops = JSON.parse(originalData.intermediate_stops || '[]');
+    if (currentStops.length !== originalStops.length) return true;
+    for (let i = 0; i < currentStops.length; i++) {
+      if (currentStops[i].location !== originalStops[i]?.location) return true;
+    }
+
+    // Check additional distance charges
+    const currentDistanceCharges = additionalCharges.filter(c => c.type === 'additional_distance');
+    const originalCharges = JSON.parse(originalData.additional_charges || '[]');
+    const originalDistanceCharges = originalCharges.filter((c: any) => c.type === 'additional_distance');
+    if (currentDistanceCharges.length !== originalDistanceCharges.length) return true;
+    const currentDistanceTotal = currentDistanceCharges.reduce((sum, c) => sum + (c.distance || 0), 0);
+    const originalDistanceTotal = originalDistanceCharges.reduce((sum: number, c: any) => sum + (c.distance || 0), 0);
+    if (currentDistanceTotal !== originalDistanceTotal) return true;
+
+    // Check commission changes (affects cost calculations)
+    if (currentData.commissionPct !== (originalData.commission_pct || 0)) return true;
+    if (currentData.commissionPassThroughPct !== (originalData.commission_pass_through_pct || 0)) return true;
+
+    // Check discount changes
+    if (currentData.discountPct !== (originalData.discount_percentage || 0)) return true;
+    if (currentData.discountAmount !== (originalData.discount_amount_lkr || 0)) return true;
+
+    return false;
+  };
+
   const handleSubmit = async (data: FormData) => {
     setLoading(true);
     try {
@@ -1354,8 +1408,55 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         }
       }
 
-      // Calculate costs first
-      const { costs, distanceData } = await calculateCosts(data);
+      // Check if route-affecting fields have changed (only for edits)
+      const routeChanged = isEditing && initialData ? hasRouteChanged(data, initialData) : true;
+
+      let costs: any;
+      let distanceData: any;
+
+      if (routeChanged) {
+        // Recalculate everything - route or cost-affecting fields changed
+        const result = await calculateCosts(data);
+        costs = result.costs;
+        distanceData = result.distanceData;
+      } else {
+        // PRESERVE original calculations for non-route/cost edits (e.g., company name, customer phone)
+        console.log('Preserving original calculations - no route-affecting changes detected');
+        
+        costs = {
+          km_parking_to_pickup: initialData.km_parking_to_pickup,
+          km_trip: initialData.km_trip,
+          km_drop_to_parking: initialData.km_drop_to_parking,
+          fuel_cost_fuel_only: initialData.fuel_cost_fuel_only,
+          hire_charge: initialData.hire_charge,
+          extra_charges: initialData.extra_charges,
+          gross_revenue: initialData.gross_revenue,
+          driver_charge: initialData.driver_charge || 1500,
+          other_expenses: JSON.parse(initialData.other_expenses || '[]'),
+          commission_pct: initialData.commission_pct,
+          commission_pass_through_pct: initialData.commission_pass_through_pct,
+          commission_pass_through_amount: initialData.commission_pass_through_amount,
+          commission_amount: initialData.commission_amount,
+          discount_percentage: initialData.discount_percentage,
+          discount_amount: initialData.discount_amount_lkr,
+          additional_charges: JSON.parse(initialData.additional_charges || '[]'),
+          total_additional_charges: initialData.total_additional_charges,
+          total_expenses: initialData.total_expenses,
+          net_profit: initialData.net_profit,
+          customerTotalWithFuel: initialData.customer_total_with_fuel,
+          bus_fleet_details: initialData.bus_fleet_details ? JSON.parse(initialData.bus_fleet_details) : null
+        };
+
+        distanceData = {
+          pickupCoords: [initialData.pickup_lng, initialData.pickup_lat],
+          dropCoords: [initialData.drop_lng, initialData.drop_lat],
+        };
+
+        toast({
+          title: "Calculations Preserved",
+          description: "Original cost calculations maintained (no route changes detected)"
+        });
+      }
 
       // Filter out empty intermediate stops before creating quotation
       const validIntermediateStops = intermediateStops.filter(stop => stop.location && stop.location.trim());
