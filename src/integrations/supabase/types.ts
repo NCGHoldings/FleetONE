@@ -1555,37 +1555,61 @@ export type Database = {
       chart_of_accounts: {
         Row: {
           account_code: string
+          account_level: number | null
           account_name: string
           account_type: Database["public"]["Enums"]["account_type"]
           created_at: string
           current_balance: number
           description: string | null
+          gl_code: string | null
           id: string
           is_active: boolean
+          is_header: boolean | null
+          level1: string | null
+          level2: string | null
+          level3: string | null
+          level4: string | null
+          level5: string | null
           parent_account_id: string | null
           updated_at: string
         }
         Insert: {
           account_code: string
+          account_level?: number | null
           account_name: string
           account_type: Database["public"]["Enums"]["account_type"]
           created_at?: string
           current_balance?: number
           description?: string | null
+          gl_code?: string | null
           id?: string
           is_active?: boolean
+          is_header?: boolean | null
+          level1?: string | null
+          level2?: string | null
+          level3?: string | null
+          level4?: string | null
+          level5?: string | null
           parent_account_id?: string | null
           updated_at?: string
         }
         Update: {
           account_code?: string
+          account_level?: number | null
           account_name?: string
           account_type?: Database["public"]["Enums"]["account_type"]
           created_at?: string
           current_balance?: number
           description?: string | null
+          gl_code?: string | null
           id?: string
           is_active?: boolean
+          is_header?: boolean | null
+          level1?: string | null
+          level2?: string | null
+          level3?: string | null
+          level4?: string | null
+          level5?: string | null
           parent_account_id?: string | null
           updated_at?: string
         }
@@ -1598,6 +1622,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      coa_upload_history: {
+        Row: {
+          created_at: string | null
+          file_name: string | null
+          id: string
+          notes: string | null
+          status: string
+          total_records: number
+          uploaded_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          total_records: number
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          total_records?: number
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
       }
       companies: {
         Row: {
