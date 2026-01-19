@@ -175,13 +175,21 @@ export const ManualInquiryForm = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yutong">Yutong Bus</SelectItem>
-                  <SelectItem value="sinotruk">Sinotruck</SelectItem>
-                  <SelectItem value="honda">Honda</SelectItem>
-                  <SelectItem value="toyota">Toyota</SelectItem>
-                  <SelectItem value="mitsubishi">Mitsubishi</SelectItem>
-                  <SelectItem value="suzuki">Suzuki</SelectItem>
-                  <SelectItem value="general">General Inquiry</SelectItem>
+                    <SelectItem value="yutong">Yutong Bus</SelectItem>
+                    <SelectItem value="sinotruk">Sinotruck</SelectItem>
+                    <SelectItem value="daihatsu">Daihatsu</SelectItem>
+                    <SelectItem value="honda">Honda</SelectItem>
+                    <SelectItem value="hyundai">Hyundai</SelectItem>
+                    <SelectItem value="isuzu">Isuzu</SelectItem>
+                    <SelectItem value="kia">KIA</SelectItem>
+                    <SelectItem value="mazda">Mazda</SelectItem>
+                    <SelectItem value="mitsubishi">Mitsubishi</SelectItem>
+                    <SelectItem value="nissan">Nissan</SelectItem>
+                    <SelectItem value="perodua">Perodua</SelectItem>
+                    <SelectItem value="subaru">Subaru</SelectItem>
+                    <SelectItem value="suzuki">Suzuki</SelectItem>
+                    <SelectItem value="toyota">Toyota</SelectItem>
+                    <SelectItem value="general">General Inquiry</SelectItem>
                 </SelectContent>
               </Select>
             </div>
