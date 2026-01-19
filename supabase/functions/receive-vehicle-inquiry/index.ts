@@ -71,7 +71,7 @@ serve(async (req) => {
       .single();
 
     // Define light vehicle brands for matching
-    const lightVehicleBrands = ['honda', 'toyota', 'mitsubishi', 'suzuki', 'lightvehicle'];
+    const lightVehicleBrands = ['daihatsu', 'honda', 'hyundai', 'isuzu', 'kia', 'mazda', 'mitsubishi', 'nissan', 'perodua', 'subaru', 'suzuki', 'toyota', 'lightvehicle'];
     const productType = sanitizedData.product_type.toLowerCase();
 
     let assignedTo = null;
