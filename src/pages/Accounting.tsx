@@ -9,6 +9,8 @@ import { AccountsPayableView } from "@/components/accounting/AccountsPayableView
 import { AccountsReceivableView } from "@/components/accounting/AccountsReceivableView";
 import { FinancialStatementsView } from "@/components/accounting/FinancialStatementsView";
 import { TaxManagementView } from "@/components/accounting/TaxManagementView";
+import { CustomerMasterView } from "@/components/accounting/CustomerMasterView";
+import { VendorMasterView } from "@/components/accounting/VendorMasterView";
 
 const Accounting = () => {
   return (
@@ -23,10 +25,12 @@ const Accounting = () => {
           </div>
 
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList>
+            <TabsList className="flex-wrap">
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="coa">Chart of Accounts</TabsTrigger>
               <TabsTrigger value="journal">Journal Entries</TabsTrigger>
+              <TabsTrigger value="customers">Customers</TabsTrigger>
+              <TabsTrigger value="vendors">Vendors</TabsTrigger>
               <TabsTrigger value="ap">Accounts Payable</TabsTrigger>
               <TabsTrigger value="ar">Accounts Receivable</TabsTrigger>
               <TabsTrigger value="tax">Tax Management</TabsTrigger>
@@ -95,6 +99,14 @@ const Accounting = () => {
 
             <TabsContent value="journal">
               <JournalEntriesView />
+            </TabsContent>
+
+            <TabsContent value="customers">
+              <CustomerMasterView />
+            </TabsContent>
+
+            <TabsContent value="vendors">
+              <VendorMasterView />
             </TabsContent>
 
             <TabsContent value="ap">
