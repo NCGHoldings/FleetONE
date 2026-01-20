@@ -8,6 +8,7 @@ import { JournalEntriesView } from "@/components/accounting/JournalEntriesView";
 import { AccountsPayableView } from "@/components/accounting/AccountsPayableView";
 import { AccountsReceivableView } from "@/components/accounting/AccountsReceivableView";
 import { FinancialStatementsView } from "@/components/accounting/FinancialStatementsView";
+import { TaxManagementView } from "@/components/accounting/TaxManagementView";
 
 const Accounting = () => {
   return (
@@ -28,6 +29,7 @@ const Accounting = () => {
               <TabsTrigger value="journal">Journal Entries</TabsTrigger>
               <TabsTrigger value="ap">Accounts Payable</TabsTrigger>
               <TabsTrigger value="ar">Accounts Receivable</TabsTrigger>
+              <TabsTrigger value="tax">Tax Management</TabsTrigger>
               <TabsTrigger value="statements">Financial Statements</TabsTrigger>
             </TabsList>
 
@@ -101,6 +103,10 @@ const Accounting = () => {
 
             <TabsContent value="ar">
               <AccountsReceivableView />
+            </TabsContent>
+
+            <TabsContent value="tax">
+              <TaxManagementView />
             </TabsContent>
 
             <TabsContent value="statements">

@@ -1,0 +1,27 @@
+#!/usr/bin/expect
+
+set timeout 600
+set ip [lindex $argv 0]
+set user [lindex $argv 1]
+set password [lindex $argv 2]
+set script "deploy_app.sh"
+
+# Copy deploy script
+spawn scp -o StrictHostKeyChecking=no $script $user@$ip:/root/$script
+expect {
+  "password:" {
+    send "$password\r"
+    exp_continue
+  }
+  eof
+}
+
+# Run deploy script
+spawn ssh -o StrictHostKeyChecking=no $user@$ip "chmod +x /root/$script && /root/$script"
+expect {
+  "password:" {
+    send "$password\r"
+    exp_continue
+  }
+  eof
+}
