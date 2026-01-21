@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, CheckCircle, Eye, FileText } from "lucide-react";
+import { ARInvoiceForm } from "./ARInvoiceForm";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -11,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const AccountsReceivableView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [invoiceFormOpen, setInvoiceFormOpen] = useState(false);
   const { data: invoices, isLoading } = useARInvoices(statusFilter);
 
   const getStatusBadge = (status: string) => {
@@ -159,7 +161,7 @@ export const AccountsReceivableView = () => {
               <FileText className="h-4 w-4 mr-2" />
               AR Ageing Report
             </Button>
-            <Button>
+            <Button onClick={() => setInvoiceFormOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New Invoice
             </Button>
@@ -200,6 +202,9 @@ export const AccountsReceivableView = () => {
           </TabsContent>
         </Tabs>
       </Card>
+
+      {/* AR Invoice Form Dialog */}
+      <ARInvoiceForm open={invoiceFormOpen} onOpenChange={setInvoiceFormOpen} />
     </div>
   );
 };

@@ -68,6 +68,9 @@ import { DataImportWizard } from "@/components/accounting/DataImportWizard";
 import { AdvanceAllocationForm } from "@/components/accounting/AdvanceAllocationForm";
 // Multi-company
 import { CompanySwitcher } from "@/components/accounting/CompanySwitcher";
+// Settings Components
+import { CompanySettingsView } from "@/components/accounting/settings/CompanySettingsView";
+import { DocumentTemplateManager } from "@/components/accounting/settings/DocumentTemplateManager";
 
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
@@ -682,9 +685,11 @@ const Accounting = () => {
 
           {/* Settings Module */}
           {activeModule === "settings" && (
-            <Tabs defaultValue="costing" className="space-y-6">
+            <Tabs defaultValue="companies" className="space-y-6">
               <ScrollArea className="w-full whitespace-nowrap">
                 <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="companies">Companies</TabsTrigger>
+                  <TabsTrigger value="templates">Document Templates</TabsTrigger>
                   <TabsTrigger value="costing">Costing & Budget</TabsTrigger>
                   <TabsTrigger value="approval-config">Approval Workflow</TabsTrigger>
                   <TabsTrigger value="user-activity">User Activity</TabsTrigger>
@@ -693,6 +698,14 @@ const Accounting = () => {
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
+
+              <TabsContent value="companies">
+                <CompanySettingsView />
+              </TabsContent>
+
+              <TabsContent value="templates">
+                <DocumentTemplateManager />
+              </TabsContent>
 
               <TabsContent value="costing">
                 <CostingBudgetView />
