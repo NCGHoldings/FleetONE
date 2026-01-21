@@ -28,7 +28,7 @@ export const AssetRevaluationForm = () => {
   });
 
   const selectedAsset = assets?.find(a => a.id === selectedAssetId);
-  const currentValue = selectedAsset?.current_value || selectedAsset?.acquisition_cost || 0;
+  const currentValue = selectedAsset?.current_value || selectedAsset?.purchase_cost || 0;
   const newValue = parseFloat(formData.new_value) || 0;
   const revaluationSurplus = newValue - currentValue;
 
@@ -43,7 +43,7 @@ export const AssetRevaluationForm = () => {
     if (asset) {
       setFormData(prev => ({
         ...prev,
-        new_value: (asset.current_value || asset.acquisition_cost || 0).toString(),
+        new_value: (asset.current_value || asset.purchase_cost || 0).toString(),
       }));
     }
   };
@@ -132,8 +132,8 @@ export const AssetRevaluationForm = () => {
                       <p className="font-semibold"><CurrencyDisplay amount={currentValue} /></p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Acquisition Cost</p>
-                      <p className="font-semibold"><CurrencyDisplay amount={selectedAsset.acquisition_cost || 0} /></p>
+                      <p className="text-muted-foreground">Purchase Cost</p>
+                      <p className="font-semibold"><CurrencyDisplay amount={selectedAsset.purchase_cost || 0} /></p>
                     </div>
                   </div>
                 </Card>

@@ -20,20 +20,19 @@ export const SSCLTransactionsView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
   const [formData, setFormData] = useState({
-    transaction_type: "sscl_payable",
+    reference_type: "sscl_payable",
     transaction_date: format(new Date(), "yyyy-MM-dd"),
-    taxable_amount: "",
+    gross_amount: "",
     sscl_rate: "2.5",
-    reference: "",
-    description: "",
+    reference_id: "",
   });
 
   const filteredTransactions = useMemo(() => {
     if (!transactions) return [];
     
     return transactions.filter(t => {
-      const matchesSearch = t.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = t.reference_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.reference_type?.toLowerCase().includes(searchTerm.toLowerCase());
       const transactionMonth = format(new Date(t.transaction_date), "yyyy-MM");
       const matchesMonth = selectedMonth === "all" || transactionMonth === selectedMonth;
       return matchesSearch && matchesMonth;
@@ -50,11 +49,11 @@ export const SSCLTransactionsView = () => {
     }) || [];
 
     const payable = monthTransactions
-      .filter(t => t.transaction_type === "sscl_payable")
+      .filter(t => t.reference_type === "sscl_payable" || t.reference_type === "invoice")
       .reduce((sum, t) => sum + (t.sscl_amount || 0), 0);
     
     const paid = monthTransactions
-      .filter(t => t.transaction_type === "sscl_payment")
+      .filter(t => t.reference_type === "sscl_payment" || t.reference_type === "payment")
       .reduce((sum, t) => sum + (t.sscl_amount || 0), 0);
 
     return { payable, paid, balance: payable - paid };
@@ -63,18 +62,17 @@ export const SSCLTransactionsView = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const taxableAmount = parseFloat(formData.taxable_amount);
+      const grossAmount = parseFloat(formData.gross_amount);
       const sscl_rate = parseFloat(formData.sscl_rate);
-      const sscl_amount = (taxableAmount * sscl_rate) / 100;
+      const sscl_amount = (grossAmount * sscl_rate) / 100;
 
       const { error } = await supabase.from("sscl_transactions").insert({
-        transaction_type: formData.transaction_type,
+        reference_type: formData.reference_type,
         transaction_date: formData.transaction_date,
-        taxable_amount: taxableAmount,
+        gross_amount: grossAmount,
         sscl_rate,
         sscl_amount,
-        reference: formData.reference,
-        description: formData.description,
+        reference_id: formData.reference_id || null,
         status: "pending",
       });
 
@@ -82,12 +80,11 @@ export const SSCLTransactionsView = () => {
       toast.success("SSCL transaction recorded successfully");
       setIsDialogOpen(false);
       setFormData({
-        transaction_type: "sscl_payable",
+        reference_type: "sscl_payable",
         transaction_date: format(new Date(), "yyyy-MM-dd"),
-        taxable_amount: "",
+        gross_amount: "",
         sscl_rate: "2.5",
-        reference: "",
-        description: "",
+        reference_id: "",
       });
       refetch();
     } catch (error: any) {
@@ -96,9 +93,9 @@ export const SSCLTransactionsView = () => {
   };
 
   const calculateSSCL = () => {
-    const taxable = parseFloat(formData.taxable_amount) || 0;
+    const gross = parseFloat(formData.gross_amount) || 0;
     const rate = parseFloat(formData.sscl_rate) || 2.5;
-    return (taxable * rate) / 100;
+    return (gross * rate) / 100;
   };
 
   // Generate month options for the last 12 months
@@ -114,6 +111,18 @@ export const SSCLTransactionsView = () => {
     }
     return options;
   }, []);
+
+  const getTransactionTypeLabel = (refType: string) => {
+    switch (refType) {
+      case "sscl_payment":
+      case "payment":
+        return { label: "Payment", isPayment: true };
+      case "sscl_payable":
+      case "invoice":
+      default:
+        return { label: "Payable", isPayment: false };
+    }
+  };
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-32"><p className="text-muted-foreground">Loading SSCL transactions...</p></div>;
@@ -143,7 +152,7 @@ export const SSCLTransactionsView = () => {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Transaction Type *</Label>
-                  <Select value={formData.transaction_type} onValueChange={v => setFormData(prev => ({ ...prev, transaction_type: v }))}>
+                  <Select value={formData.reference_type} onValueChange={v => setFormData(prev => ({ ...prev, reference_type: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="sscl_payable">SSCL Payable</SelectItem>
@@ -162,8 +171,8 @@ export const SSCLTransactionsView = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Taxable Amount *</Label>
-                  <Input type="number" step="0.01" placeholder="0.00" value={formData.taxable_amount} onChange={e => setFormData(prev => ({ ...prev, taxable_amount: e.target.value }))} required />
+                  <Label>Gross Amount *</Label>
+                  <Input type="number" step="0.01" placeholder="0.00" value={formData.gross_amount} onChange={e => setFormData(prev => ({ ...prev, gross_amount: e.target.value }))} required />
                 </div>
                 <Card className="p-4 bg-primary/5">
                   <div className="flex items-center justify-between">
@@ -177,12 +186,8 @@ export const SSCLTransactionsView = () => {
                   </div>
                 </Card>
                 <div className="space-y-2">
-                  <Label>Reference</Label>
-                  <Input placeholder="Invoice/Receipt reference" value={formData.reference} onChange={e => setFormData(prev => ({ ...prev, reference: e.target.value }))} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Input placeholder="Transaction description" value={formData.description} onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))} />
+                  <Label>Reference ID</Label>
+                  <Input placeholder="Invoice/Receipt reference ID" value={formData.reference_id} onChange={e => setFormData(prev => ({ ...prev, reference_id: e.target.value }))} />
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
@@ -235,7 +240,7 @@ export const SSCLTransactionsView = () => {
                 <th className="text-left py-3 px-2 font-semibold">Date</th>
                 <th className="text-left py-3 px-2 font-semibold">Type</th>
                 <th className="text-left py-3 px-2 font-semibold">Reference</th>
-                <th className="text-right py-3 px-2 font-semibold">Taxable Amount</th>
+                <th className="text-right py-3 px-2 font-semibold">Gross Amount</th>
                 <th className="text-right py-3 px-2 font-semibold">Rate</th>
                 <th className="text-right py-3 px-2 font-semibold">SSCL Amount</th>
                 <th className="text-left py-3 px-2 font-semibold">Status</th>
@@ -245,23 +250,26 @@ export const SSCLTransactionsView = () => {
               {filteredTransactions.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No SSCL transactions found</td></tr>
               ) : (
-                filteredTransactions.map(t => (
-                  <tr key={t.id} className="border-b hover:bg-muted/50">
-                    <td className="py-3 px-2"><DateDisplay date={t.transaction_date} /></td>
-                    <td className="py-3 px-2">
-                      <span className={t.transaction_type === "sscl_payment" ? "text-green-600" : "text-destructive"}>
-                        {t.transaction_type === "sscl_payment" ? "Payment" : "Payable"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-2"><FileText className="inline h-4 w-4 mr-1 text-muted-foreground" />{t.reference || "—"}</td>
-                    <td className="py-3 px-2 text-right"><CurrencyDisplay amount={t.taxable_amount || 0} /></td>
-                    <td className="py-3 px-2 text-right">{t.sscl_rate}%</td>
-                    <td className={`py-3 px-2 text-right font-semibold ${t.transaction_type === "sscl_payment" ? "text-green-600" : "text-destructive"}`}>
-                      <CurrencyDisplay amount={t.sscl_amount || 0} />
-                    </td>
-                    <td className="py-3 px-2"><StatusBadge status={t.status || "pending"} /></td>
-                  </tr>
-                ))
+                filteredTransactions.map(t => {
+                  const typeInfo = getTransactionTypeLabel(t.reference_type);
+                  return (
+                    <tr key={t.id} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-2"><DateDisplay date={t.transaction_date} /></td>
+                      <td className="py-3 px-2">
+                        <span className={typeInfo.isPayment ? "text-green-600" : "text-destructive"}>
+                          {typeInfo.label}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2"><FileText className="inline h-4 w-4 mr-1 text-muted-foreground" />{t.reference_id || "—"}</td>
+                      <td className="py-3 px-2 text-right"><CurrencyDisplay amount={t.gross_amount || 0} /></td>
+                      <td className="py-3 px-2 text-right">{t.sscl_rate}%</td>
+                      <td className={`py-3 px-2 text-right font-semibold ${typeInfo.isPayment ? "text-green-600" : "text-destructive"}`}>
+                        <CurrencyDisplay amount={t.sscl_amount || 0} />
+                      </td>
+                      <td className="py-3 px-2"><StatusBadge status={t.status || "pending"} /></td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
