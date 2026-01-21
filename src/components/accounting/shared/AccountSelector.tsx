@@ -36,14 +36,16 @@ export const AccountSelector = ({
         <SelectValue placeholder={isLoading ? "Loading..." : placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {filteredAccounts?.map((account) => (
-          <SelectItem key={account.id} value={account.id}>
-            <span className="font-mono text-xs text-muted-foreground mr-2">
-              {account.account_code}
-            </span>
-            {account.account_name}
-          </SelectItem>
-        ))}
+        {filteredAccounts
+          ?.filter((account) => account.id && account.id.trim() !== "")
+          ?.map((account) => (
+            <SelectItem key={account.id} value={account.id}>
+              <span className="font-mono text-xs text-muted-foreground mr-2">
+                {account.account_code}
+              </span>
+              {account.account_name}
+            </SelectItem>
+          ))}
       </SelectContent>
     </Select>
   );
