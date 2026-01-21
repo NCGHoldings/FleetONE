@@ -39,6 +39,35 @@ import { PeriodClosingChecklistView } from "@/components/accounting/PeriodClosin
 import { BatchSerialTrackingView } from "@/components/accounting/BatchSerialTrackingView";
 import { WHTCertificateView } from "@/components/accounting/WHTCertificateView";
 import { VendorPerformanceView } from "@/components/accounting/VendorPerformanceView";
+// Gap Analysis - AR/AP Components
+import { ARCreditNotesView } from "@/components/accounting/ARCreditNotesView";
+import { ARAgeingReport } from "@/components/accounting/ARAgeingReport";
+import { ARReconciliationView } from "@/components/accounting/ARReconciliationView";
+import { APDebitNotesView } from "@/components/accounting/APDebitNotesView";
+import { APAgeingReport } from "@/components/accounting/APAgeingReport";
+import { APReconciliationView } from "@/components/accounting/APReconciliationView";
+// Gap Analysis - Inventory Components
+import { InventoryAgeingView } from "@/components/accounting/InventoryAgeingView";
+import { StockReconciliationView } from "@/components/accounting/StockReconciliationView";
+// Gap Analysis - Banking Components
+import { CashbookView } from "@/components/accounting/CashbookView";
+import { PaymentBatchView } from "@/components/accounting/PaymentBatchView";
+// Gap Analysis - Fixed Assets Components
+import { AssetRevaluationForm } from "@/components/accounting/AssetRevaluationForm";
+import { AssetTransferForm } from "@/components/accounting/AssetTransferForm";
+// Gap Analysis - Reports & Compliance
+import { SSCLTransactionsView } from "@/components/accounting/SSCLTransactionsView";
+import { SegmentReportView } from "@/components/accounting/SegmentReportView";
+import { TaxReturnGeneratorView } from "@/components/accounting/TaxReturnGeneratorView";
+// Gap Analysis - Settings & Admin
+import { ApprovalConfigView } from "@/components/accounting/ApprovalConfigView";
+import { UserActivityView } from "@/components/accounting/UserActivityView";
+import { NotificationsView } from "@/components/accounting/NotificationsView";
+import { DataImportWizard } from "@/components/accounting/DataImportWizard";
+// Gap Analysis - Advance Allocations
+import { AdvanceAllocationForm } from "@/components/accounting/AdvanceAllocationForm";
+// Multi-company
+import { CompanySwitcher } from "@/components/accounting/CompanySwitcher";
 
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
@@ -87,11 +116,14 @@ const Accounting = () => {
     <PageAccessGuard pageId="accounting">
       <AppLayout>
         <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">Finance & Accounting ERP</h1>
-            <p className="text-muted-foreground mt-2">
-              Complete accounting management with GL, AR/AP, Inventory, Procurement, Banking, Fixed Assets & Reporting
-            </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold">Finance & Accounting ERP</h1>
+              <p className="text-muted-foreground mt-2">
+                Complete accounting management with GL, AR/AP, Inventory, Procurement, Banking, Fixed Assets & Reporting
+              </p>
+            </div>
+            <CompanySwitcher />
           </div>
 
           {/* Module Navigation */}
@@ -349,7 +381,11 @@ const Accounting = () => {
                   <TabsTrigger value="customers">Customers</TabsTrigger>
                   <TabsTrigger value="invoices">Invoices</TabsTrigger>
                   <TabsTrigger value="receipts">Receipts</TabsTrigger>
+                  <TabsTrigger value="credit-notes">Credit Notes</TabsTrigger>
+                  <TabsTrigger value="advances">Advance Allocations</TabsTrigger>
+                  <TabsTrigger value="ageing">Ageing Report</TabsTrigger>
                   <TabsTrigger value="bad-debts">Bad Debt Provisions</TabsTrigger>
+                  <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -366,8 +402,24 @@ const Accounting = () => {
                 <AccountsReceivableView />
               </TabsContent>
 
+              <TabsContent value="credit-notes">
+                <ARCreditNotesView />
+              </TabsContent>
+
+              <TabsContent value="advances">
+                <AdvanceAllocationForm type="ar" />
+              </TabsContent>
+
+              <TabsContent value="ageing">
+                <ARAgeingReport />
+              </TabsContent>
+
               <TabsContent value="bad-debts">
                 <BadDebtProvisionView />
+              </TabsContent>
+
+              <TabsContent value="reconciliation">
+                <ARReconciliationView />
               </TabsContent>
             </Tabs>
           )}
@@ -380,7 +432,11 @@ const Accounting = () => {
                   <TabsTrigger value="vendors">Vendors</TabsTrigger>
                   <TabsTrigger value="invoices">Invoices</TabsTrigger>
                   <TabsTrigger value="payments">Payments</TabsTrigger>
+                  <TabsTrigger value="debit-notes">Debit Notes</TabsTrigger>
+                  <TabsTrigger value="advances">Advance Allocations</TabsTrigger>
+                  <TabsTrigger value="ageing">Ageing Report</TabsTrigger>
                   <TabsTrigger value="wht">WHT Certificates</TabsTrigger>
+                  <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
                   <TabsTrigger value="vendor-performance">Vendor Performance</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
@@ -398,8 +454,24 @@ const Accounting = () => {
                 <AccountsPayableView />
               </TabsContent>
 
+              <TabsContent value="debit-notes">
+                <APDebitNotesView />
+              </TabsContent>
+
+              <TabsContent value="advances">
+                <AdvanceAllocationForm type="ap" />
+              </TabsContent>
+
+              <TabsContent value="ageing">
+                <APAgeingReport />
+              </TabsContent>
+
               <TabsContent value="wht">
                 <WHTCertificateView />
+              </TabsContent>
+
+              <TabsContent value="reconciliation">
+                <APReconciliationView />
               </TabsContent>
 
               <TabsContent value="vendor-performance">
@@ -416,6 +488,8 @@ const Accounting = () => {
                   <TabsTrigger value="items">Items</TabsTrigger>
                   <TabsTrigger value="stock">Stock Levels</TabsTrigger>
                   <TabsTrigger value="batch-serial">Batch/Serial Tracking</TabsTrigger>
+                  <TabsTrigger value="ageing">Inventory Ageing</TabsTrigger>
+                  <TabsTrigger value="reconciliation">Stock Reconciliation</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -430,6 +504,14 @@ const Accounting = () => {
 
               <TabsContent value="batch-serial">
                 <BatchSerialTrackingView />
+              </TabsContent>
+
+              <TabsContent value="ageing">
+                <InventoryAgeingView />
+              </TabsContent>
+
+              <TabsContent value="reconciliation">
+                <StockReconciliationView />
               </TabsContent>
             </Tabs>
           )}
@@ -472,9 +554,11 @@ const Accounting = () => {
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="accounts">Bank Accounts</TabsTrigger>
                   <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                  <TabsTrigger value="cashbook">Cashbook</TabsTrigger>
                   <TabsTrigger value="cheques">Cheque Register</TabsTrigger>
                   <TabsTrigger value="reconciliation">Bank Reconciliation</TabsTrigger>
                   <TabsTrigger value="transfers">Fund Transfers</TabsTrigger>
+                  <TabsTrigger value="payment-batches">Payment Batches</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -485,6 +569,10 @@ const Accounting = () => {
 
               <TabsContent value="transactions">
                 <BankingView />
+              </TabsContent>
+
+              <TabsContent value="cashbook">
+                <CashbookView />
               </TabsContent>
 
               <TabsContent value="cheques">
@@ -498,6 +586,10 @@ const Accounting = () => {
               <TabsContent value="transfers">
                 <FundTransferForm />
               </TabsContent>
+
+              <TabsContent value="payment-batches">
+                <PaymentBatchView />
+              </TabsContent>
             </Tabs>
           )}
 
@@ -508,6 +600,8 @@ const Accounting = () => {
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="register">Asset Register</TabsTrigger>
                   <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
+                  <TabsTrigger value="revaluations">Revaluations</TabsTrigger>
+                  <TabsTrigger value="transfers">Transfers</TabsTrigger>
                   <TabsTrigger value="disposals">Disposals</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
@@ -519,6 +613,14 @@ const Accounting = () => {
 
               <TabsContent value="depreciation">
                 <DepreciationRunView />
+              </TabsContent>
+
+              <TabsContent value="revaluations">
+                <AssetRevaluationForm />
+              </TabsContent>
+
+              <TabsContent value="transfers">
+                <AssetTransferForm />
               </TabsContent>
 
               <TabsContent value="disposals">
@@ -535,7 +637,10 @@ const Accounting = () => {
                   <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
                   <TabsTrigger value="statements">Financial Statements</TabsTrigger>
                   <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
+                  <TabsTrigger value="segments">Segment Reports</TabsTrigger>
                   <TabsTrigger value="tax">Tax Reports</TabsTrigger>
+                  <TabsTrigger value="sscl">SSCL</TabsTrigger>
+                  <TabsTrigger value="tax-returns">Tax Returns</TabsTrigger>
                   <TabsTrigger value="audit">Audit & Logs</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
@@ -553,8 +658,20 @@ const Accounting = () => {
                 <CashFlowView />
               </TabsContent>
 
+              <TabsContent value="segments">
+                <SegmentReportView />
+              </TabsContent>
+
               <TabsContent value="tax">
                 <TaxManagementView />
+              </TabsContent>
+
+              <TabsContent value="sscl">
+                <SSCLTransactionsView />
+              </TabsContent>
+
+              <TabsContent value="tax-returns">
+                <TaxReturnGeneratorView />
               </TabsContent>
 
               <TabsContent value="audit">
@@ -569,12 +686,32 @@ const Accounting = () => {
               <ScrollArea className="w-full whitespace-nowrap">
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="costing">Costing & Budget</TabsTrigger>
+                  <TabsTrigger value="approval-config">Approval Workflow</TabsTrigger>
+                  <TabsTrigger value="user-activity">User Activity</TabsTrigger>
+                  <TabsTrigger value="notifications">Notifications</TabsTrigger>
+                  <TabsTrigger value="data-import">Data Import</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
 
               <TabsContent value="costing">
                 <CostingBudgetView />
+              </TabsContent>
+
+              <TabsContent value="approval-config">
+                <ApprovalConfigView />
+              </TabsContent>
+
+              <TabsContent value="user-activity">
+                <UserActivityView />
+              </TabsContent>
+
+              <TabsContent value="notifications">
+                <NotificationsView />
+              </TabsContent>
+
+              <TabsContent value="data-import">
+                <DataImportWizard />
               </TabsContent>
             </Tabs>
           )}
