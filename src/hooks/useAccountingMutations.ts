@@ -144,15 +144,15 @@ export const useApproveJournalEntry = () => {
   
   return useMutation({
     mutationFn: async ({ entryId, level }: { entryId: string; level: number }) => {
-      const statusMap: Record<number, string> = {
-        1: "approved_level_1",
-        2: "approved",
+      const statusMap: Record<number, "draft" | "posted" | "void"> = {
+        1: "draft",
+        2: "posted",
       };
       
       const { error } = await supabase
         .from("journal_entries")
         .update({ 
-          status: statusMap[level] || "approved",
+          status: statusMap[level] || ("posted" as const),
           approved_at: new Date().toISOString(),
         })
         .eq("id", entryId);
@@ -623,6 +623,121 @@ export const useClosePeriod = () => {
     },
     onError: (error) => {
       toast.error(`Failed to close period: ${error.message}`);
+    },
+  });
+};
+
+// ============ Customer Mutations ============
+export const useCreateCustomer = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (customer: {
+      customer_code: string;
+      customer_name: string;
+      contact_email?: string;
+      contact_phone?: string;
+      billing_address?: string;
+      credit_limit?: number;
+      payment_terms?: number;
+      tax_id?: string;
+      is_active?: boolean;
+    }) => {
+      const { data, error } = await supabase
+        .from("customers")
+        .insert([customer])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      toast.success("Customer created successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to create customer: ${error.message}`);
+    },
+  });
+};
+
+export const useUpdateCustomer = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
+      const { error } = await supabase
+        .from("customers")
+        .update(updates)
+        .eq("id", id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      toast.success("Customer updated successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to update customer: ${error.message}`);
+    },
+  });
+};
+
+// ============ Vendor Mutations ============
+export const useCreateVendor = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (vendor: {
+      vendor_code: string;
+      vendor_name: string;
+      contact_email?: string;
+      contact_phone?: string;
+      address?: string;
+      payment_terms?: number;
+      tax_id?: string;
+      wht_applicable?: boolean;
+      wht_rate?: number;
+      is_active?: boolean;
+    }) => {
+      const { data, error } = await supabase
+        .from("vendors")
+        .insert([vendor])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      toast.success("Vendor created successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to create vendor: ${error.message}`);
+    },
+  });
+};
+
+export const useUpdateVendor = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
+      const { error } = await supabase
+        .from("vendors")
+        .update(updates)
+        .eq("id", id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      toast.success("Vendor updated successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to update vendor: ${error.message}`);
     },
   });
 };
