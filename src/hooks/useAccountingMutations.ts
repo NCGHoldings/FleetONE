@@ -741,3 +741,174 @@ export const useUpdateVendor = () => {
     },
   });
 };
+
+// ============ AR Credit Notes ============
+export const useCreateARCreditNote = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const { data: result, error } = await supabase.from("ar_credit_notes").insert([data]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      toast.success("Credit note created");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ AP Debit Notes ============
+export const useCreateAPDebitNote = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const { data: result, error } = await supabase.from("ap_debit_notes").insert([data]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      toast.success("Debit note created");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ AP Approvals ============
+export const useApproveAPInvoice = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ap_invoices").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      toast.success("Invoice approved");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useApproveAPPayment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ap_payments").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      toast.success("Payment approved");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Items & Inventory ============
+export const useCreateItem = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const { data: result, error } = await supabase.from("items").insert([data]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      toast.success("Item created");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useCreateStockAdjustment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const { data: result, error } = await supabase.from("stock_adjustments").insert([data]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["item-stock"] });
+      toast.success("Stock adjusted");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Purchase Orders & GRN ============
+export const useCreatePurchaseOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const { lines, ...poData } = data;
+      const { data: result, error } = await supabase.from("purchase_orders").insert([{ ...poData, status: "draft" }]).select().single();
+      if (error) throw error;
+      if (lines?.length) {
+        await supabase.from("purchase_order_lines").insert(lines.map((l: any) => ({ ...l, purchase_order_id: result.id })));
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      toast.success("Purchase order created");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useCreateGoodsReceipt = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const { lines, ...grnData } = data;
+      const { data: result, error } = await supabase.from("goods_receipt_notes").insert([{ ...grnData, status: "received" }]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["goods-receipt-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      toast.success("GRN recorded");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Recurring Entries ============
+export const useCreateRecurringEntry = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const { data: result, error } = await supabase.from("recurring_journal_entries").insert([data]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-entries"] });
+      toast.success("Recurring entry created");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useRunRecurringEntry = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("recurring_journal_entries").update({ last_run_date: new Date().toISOString() }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      toast.success("Entry executed");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
