@@ -26,10 +26,13 @@ type Notification = {
   message: string | null;
   reference_type: string | null;
   reference_id: string | null;
-  priority: string | null;
+  severity: string | null;
   is_read: boolean;
   read_at: string | null;
   created_at: string;
+  module: string | null;
+  expires_at: string | null;
+  user_id: string | null;
 };
 
 export const NotificationsView = () => {
@@ -99,8 +102,8 @@ export const NotificationsView = () => {
     },
   });
 
-  const getNotificationIcon = (type: string, priority: string | null) => {
-    if (priority === "high") {
+  const getNotificationIcon = (type: string, severity: string | null) => {
+    if (severity === "error") {
       return <AlertTriangle className="w-5 h-5 text-destructive" />;
     }
     switch (type) {
@@ -117,13 +120,13 @@ export const NotificationsView = () => {
     }
   };
 
-  const getPriorityBadge = (priority: string | null) => {
-    switch (priority) {
-      case "high":
+  const getSeverityBadge = (severity: string | null) => {
+    switch (severity) {
+      case "error":
         return <Badge variant="destructive">High</Badge>;
-      case "normal":
-        return <Badge variant="secondary">Normal</Badge>;
-      case "low":
+      case "warning":
+        return <Badge variant="secondary">Medium</Badge>;
+      case "info":
         return <Badge variant="outline">Low</Badge>;
       default:
         return null;
@@ -164,7 +167,7 @@ export const NotificationsView = () => {
           <CardHeader className="pb-2">
             <CardDescription>High Priority</CardDescription>
             <CardTitle className="text-2xl text-destructive">
-              {notifications?.filter(n => n.priority === "high" && !n.is_read).length || 0}
+              {notifications?.filter(n => n.severity === "error" && !n.is_read).length || 0}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -232,14 +235,14 @@ export const NotificationsView = () => {
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5">
-                        {getNotificationIcon(notification.notification_type, notification.priority)}
+                        {getNotificationIcon(notification.notification_type, notification.severity)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`font-medium ${!notification.is_read ? "text-foreground" : "text-muted-foreground"}`}>
                             {notification.title}
                           </span>
-                          {getPriorityBadge(notification.priority)}
+                          {getSeverityBadge(notification.severity)}
                           {!notification.is_read && (
                             <Badge variant="outline" className="text-xs">New</Badge>
                           )}

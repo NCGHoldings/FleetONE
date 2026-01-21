@@ -341,12 +341,17 @@ export const UserActivityView = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={activityColumns}
-            data={activityLogs || []}
-            searchKey="description"
-            isLoading={isLoading}
-          />
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <p className="text-muted-foreground">Loading...</p>
+            </div>
+          ) : (
+            <DataTable
+              columns={activityColumns}
+              data={activityLogs || []}
+              searchKey="description"
+            />
+          )}
         </CardContent>
       </Card>
     </div>
