@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, CheckCircle, Eye, FileText } from "lucide-react";
+import { Plus, CheckCircle, Eye, FileText, Printer } from "lucide-react";
 import { ARInvoiceForm } from "./ARInvoiceForm";
 import { ARReceiptForm } from "./ARReceiptForm";
 import { ARAgeingReport } from "./ARAgeingReport";
@@ -19,6 +19,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 
 export const AccountsReceivableView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
@@ -27,6 +28,9 @@ export const AccountsReceivableView = () => {
   const [selectedInvoiceForReceipt, setSelectedInvoiceForReceipt] = useState<any>(null);
   const [ageingReportOpen, setAgeingReportOpen] = useState(false);
   const [viewInvoice, setViewInvoice] = useState<any>(null);
+  const [printDocumentOpen, setPrintDocumentOpen] = useState(false);
+  const [printDocumentData, setPrintDocumentData] = useState<any>(null);
+  const [printDocumentType, setPrintDocumentType] = useState<string>("ar_invoice");
   const { data: invoices, isLoading } = useARInvoices(statusFilter);
 
   const getStatusBadge = (status: string) => {
@@ -322,10 +326,22 @@ export const AccountsReceivableView = () => {
                 </>
               )}
 
-              {viewInvoice.balance > 0 && (
-                <div className="pt-4">
+              <div className="pt-4 flex gap-2">
+                <Button 
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setPrintDocumentData(viewInvoice);
+                    setPrintDocumentType("ar_invoice");
+                    setPrintDocumentOpen(true);
+                  }}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Invoice
+                </Button>
+                {viewInvoice.balance > 0 && (
                   <Button 
-                    className="w-full"
+                    className="flex-1"
                     onClick={() => {
                       setViewInvoice(null);
                       handleReceiveClick(viewInvoice);
@@ -334,12 +350,20 @@ export const AccountsReceivableView = () => {
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Record Receipt
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Document Print Preview Modal */}
+      <FinanceDocumentPreviewModal
+        open={printDocumentOpen}
+        onOpenChange={setPrintDocumentOpen}
+        documentType={printDocumentType}
+        documentData={printDocumentData}
+      />
     </div>
   );
 };
