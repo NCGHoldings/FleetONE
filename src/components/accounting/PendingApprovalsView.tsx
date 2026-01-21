@@ -4,8 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, XCircle, Eye, Clock, AlertTriangle } from "lucide-react";
-import { useJournalEntries, useAPInvoices, useAPPayments } from "@/hooks/useAccountingData";
-import { useApproveJournalEntry, useApproveAPInvoice, useApproveAPPayment } from "@/hooks/useAccountingMutations";
+import { useJournalEntries, useAPInvoices, useAPPayments, usePurchaseOrders } from "@/hooks/useAccountingData";
+import { 
+  useApproveJournalEntry, 
+  useApproveAPInvoice, 
+  useApproveAPPayment,
+  useRejectJournalEntry,
+  useRejectAPInvoice,
+  useRejectAPPayment,
+  useApprovePurchaseOrder,
+  useRejectPurchaseOrder,
+} from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -16,10 +25,17 @@ export const PendingApprovalsView = () => {
   const { data: journalEntries } = useJournalEntries("draft");
   const { data: apInvoices } = useAPInvoices();
   const { data: apPayments } = useAPPayments();
+  const { data: purchaseOrders } = usePurchaseOrders("pending_approval");
 
   const approveJE = useApproveJournalEntry();
   const approveAPInv = useApproveAPInvoice();
   const approveAPPay = useApproveAPPayment();
+  const approvePO = useApprovePurchaseOrder();
+  
+  const rejectJE = useRejectJournalEntry();
+  const rejectAPInv = useRejectAPInvoice();
+  const rejectAPPay = useRejectAPPayment();
+  const rejectPO = useRejectPurchaseOrder();
 
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; type: string; id: string }>({
     open: false,
@@ -31,8 +47,9 @@ export const PendingApprovalsView = () => {
   const pendingJournals = journalEntries?.filter(je => je.status === "draft") || [];
   const pendingAPInvoices = apInvoices?.filter(inv => inv.approval_status === "pending") || [];
   const pendingAPPayments = apPayments?.filter(pay => pay.approval_status === "pending") || [];
+  const pendingPOs = purchaseOrders?.filter(po => po.status === "pending_approval") || [];
 
-  const totalPending = pendingJournals.length + pendingAPInvoices.length + pendingAPPayments.length;
+  const totalPending = pendingJournals.length + pendingAPInvoices.length + pendingAPPayments.length + pendingPOs.length;
 
   const handleApprove = async (type: string, id: string) => {
     try {
@@ -42,6 +59,8 @@ export const PendingApprovalsView = () => {
         await approveAPInv.mutateAsync(id);
       } else if (type === "ap_payment") {
         await approveAPPay.mutateAsync(id);
+      } else if (type === "purchase_order") {
+        await approvePO.mutateAsync(id);
       }
       toast.success("Approved successfully");
     } catch (error) {
@@ -50,8 +69,22 @@ export const PendingApprovalsView = () => {
   };
 
   const handleReject = async () => {
+    if (!rejectReason.trim()) {
+      toast.error("Please provide a reason for rejection");
+      return;
+    }
+    
     try {
-      // In a real implementation, this would call a reject mutation
+      const { type, id } = rejectDialog;
+      if (type === "journal") {
+        await rejectJE.mutateAsync({ id, reason: rejectReason });
+      } else if (type === "ap_invoice") {
+        await rejectAPInv.mutateAsync({ id, reason: rejectReason });
+      } else if (type === "ap_payment") {
+        await rejectAPPay.mutateAsync({ id, reason: rejectReason });
+      } else if (type === "purchase_order") {
+        await rejectPO.mutateAsync({ id, reason: rejectReason });
+      }
       toast.success("Rejected successfully");
       setRejectDialog({ open: false, type: "", id: "" });
       setRejectReason("");
