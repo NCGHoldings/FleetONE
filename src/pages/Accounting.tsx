@@ -15,10 +15,18 @@ import { BankingView } from "@/components/accounting/BankingView";
 import { FixedAssetsView } from "@/components/accounting/FixedAssetsView";
 import { CostingBudgetView } from "@/components/accounting/CostingBudgetView";
 import { AuditReportsView } from "@/components/accounting/AuditReportsView";
+import { InventoryView } from "@/components/accounting/InventoryView";
+import { PurchaseOrderView } from "@/components/accounting/PurchaseOrderView";
+import { PendingApprovalsView } from "@/components/accounting/PendingApprovalsView";
+import { ChequeRegisterView } from "@/components/accounting/ChequeRegisterView";
+import { RecurringEntriesView } from "@/components/accounting/RecurringEntriesView";
+import { CashFlowView } from "@/components/accounting/CashFlowView";
+import { DepreciationRunView } from "@/components/accounting/DepreciationRunView";
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const Accounting = () => {
   const { data: summary, isLoading: summaryLoading } = useAccountingSummary();
@@ -53,21 +61,31 @@ const Accounting = () => {
           </div>
 
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="flex-wrap">
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-              <TabsTrigger value="coa">Chart of Accounts</TabsTrigger>
-              <TabsTrigger value="journal">Journal Entries</TabsTrigger>
-              <TabsTrigger value="customers">Customers</TabsTrigger>
-              <TabsTrigger value="vendors">Vendors</TabsTrigger>
-              <TabsTrigger value="ar">Accounts Receivable</TabsTrigger>
-              <TabsTrigger value="ap">Accounts Payable</TabsTrigger>
-              <TabsTrigger value="banking">Banking</TabsTrigger>
-              <TabsTrigger value="assets">Fixed Assets</TabsTrigger>
-              <TabsTrigger value="costing">Costing & Budget</TabsTrigger>
-              <TabsTrigger value="tax">Tax Management</TabsTrigger>
-              <TabsTrigger value="statements">Statements</TabsTrigger>
-              <TabsTrigger value="audit">Audit & Reports</TabsTrigger>
-            </TabsList>
+            <ScrollArea className="w-full whitespace-nowrap">
+              <TabsList className="inline-flex w-max">
+                <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+                <TabsTrigger value="coa">Chart of Accounts</TabsTrigger>
+                <TabsTrigger value="journal">Journal Entries</TabsTrigger>
+                <TabsTrigger value="recurring">Recurring Entries</TabsTrigger>
+                <TabsTrigger value="customers">Customers</TabsTrigger>
+                <TabsTrigger value="vendors">Vendors</TabsTrigger>
+                <TabsTrigger value="ar">Accounts Receivable</TabsTrigger>
+                <TabsTrigger value="ap">Accounts Payable</TabsTrigger>
+                <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                <TabsTrigger value="procurement">Procurement</TabsTrigger>
+                <TabsTrigger value="banking">Banking</TabsTrigger>
+                <TabsTrigger value="cheques">Cheques</TabsTrigger>
+                <TabsTrigger value="assets">Fixed Assets</TabsTrigger>
+                <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
+                <TabsTrigger value="costing">Costing & Budget</TabsTrigger>
+                <TabsTrigger value="tax">Tax Management</TabsTrigger>
+                <TabsTrigger value="statements">Statements</TabsTrigger>
+                <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
+                <TabsTrigger value="approvals">Approvals</TabsTrigger>
+                <TabsTrigger value="audit">Audit & Reports</TabsTrigger>
+              </TabsList>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
 
             <TabsContent value="dashboard" className="space-y-6">
               {/* Financial Summary KPIs */}
@@ -259,6 +277,10 @@ const Accounting = () => {
               <JournalEntriesView />
             </TabsContent>
 
+            <TabsContent value="recurring">
+              <RecurringEntriesView />
+            </TabsContent>
+
             <TabsContent value="customers">
               <CustomerMasterView />
             </TabsContent>
@@ -275,12 +297,28 @@ const Accounting = () => {
               <AccountsPayableView />
             </TabsContent>
 
+            <TabsContent value="inventory">
+              <InventoryView />
+            </TabsContent>
+
+            <TabsContent value="procurement">
+              <PurchaseOrderView />
+            </TabsContent>
+
             <TabsContent value="banking">
               <BankingView />
             </TabsContent>
 
+            <TabsContent value="cheques">
+              <ChequeRegisterView />
+            </TabsContent>
+
             <TabsContent value="assets">
               <FixedAssetsView />
+            </TabsContent>
+
+            <TabsContent value="depreciation">
+              <DepreciationRunView />
             </TabsContent>
 
             <TabsContent value="costing">
@@ -293,6 +331,14 @@ const Accounting = () => {
 
             <TabsContent value="statements">
               <FinancialStatementsView />
+            </TabsContent>
+
+            <TabsContent value="cashflow">
+              <CashFlowView />
+            </TabsContent>
+
+            <TabsContent value="approvals">
+              <PendingApprovalsView />
             </TabsContent>
 
             <TabsContent value="audit">

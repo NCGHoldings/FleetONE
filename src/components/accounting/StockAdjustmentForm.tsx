@@ -87,8 +87,8 @@ export const StockAdjustmentForm = ({ open, onOpenChange }: StockAdjustmentFormP
 
             {selectedItem && (
               <div className="p-3 bg-muted rounded-lg text-sm">
-                <p>Current Stock: <span className="font-semibold">{selectedItem.quantity_on_hand || 0}</span></p>
-                <p>Unit Cost: <span className="font-semibold">LKR {selectedItem.unit_cost?.toLocaleString()}</span></p>
+                <p>Item: <span className="font-semibold">{selectedItem.item_name}</span></p>
+                <p>Last Purchase Price: <span className="font-semibold">LKR {selectedItem.last_purchase_price?.toLocaleString()}</span></p>
               </div>
             )}
 

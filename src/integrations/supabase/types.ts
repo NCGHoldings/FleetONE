@@ -5193,6 +5193,67 @@ export type Database = {
           },
         ]
       }
+      goods_receipt_lines: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          grn_id: string
+          id: string
+          item_id: string | null
+          line_total: number | null
+          ordered_quantity: number | null
+          po_line_id: string | null
+          received_quantity: number
+          unit_price: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          grn_id: string
+          id?: string
+          item_id?: string | null
+          line_total?: number | null
+          ordered_quantity?: number | null
+          po_line_id?: string | null
+          received_quantity: number
+          unit_price?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          grn_id?: string
+          id?: string
+          item_id?: string | null
+          line_total?: number | null
+          ordered_quantity?: number | null
+          po_line_id?: string | null
+          received_quantity?: number
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goods_receipt_lines_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_lines_po_line_id_fkey"
+            columns: ["po_line_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goods_receipt_notes: {
         Row: {
           created_at: string | null
@@ -5968,6 +6029,7 @@ export type Database = {
           is_active: boolean | null
           parent_category_id: string | null
           sales_account_id: string | null
+          valuation_method: string | null
         }
         Insert: {
           category_code?: string | null
@@ -5979,6 +6041,7 @@ export type Database = {
           is_active?: boolean | null
           parent_category_id?: string | null
           sales_account_id?: string | null
+          valuation_method?: string | null
         }
         Update: {
           category_code?: string | null
@@ -5990,6 +6053,7 @@ export type Database = {
           is_active?: boolean | null
           parent_category_id?: string | null
           sales_account_id?: string | null
+          valuation_method?: string | null
         }
         Relationships: [
           {
@@ -9246,6 +9310,63 @@ export type Database = {
           },
         ]
       }
+      purchase_order_lines: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          item_id: string | null
+          line_total: number
+          purchase_order_id: string
+          quantity: number
+          received_quantity: number | null
+          tax_amount: number | null
+          tax_rate: number | null
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          item_id?: string | null
+          line_total?: number
+          purchase_order_id: string
+          quantity?: number
+          received_quantity?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          item_id?: string | null
+          line_total?: number
+          purchase_order_id?: string
+          quantity?: number
+          received_quantity?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_orders: {
         Row: {
           approval_status: string | null
@@ -9573,6 +9694,72 @@ export type Database = {
             columns: ["route_id"]
             isOneToOne: false
             referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_journal_entries: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          credit_account_id: string | null
+          debit_account_id: string | null
+          description: string | null
+          frequency: string
+          id: string
+          is_active: boolean | null
+          last_run_date: string | null
+          next_run_date: string
+          template_data: Json | null
+          template_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          credit_account_id?: string | null
+          debit_account_id?: string | null
+          description?: string | null
+          frequency?: string
+          id?: string
+          is_active?: boolean | null
+          last_run_date?: string | null
+          next_run_date: string
+          template_data?: Json | null
+          template_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          credit_account_id?: string | null
+          debit_account_id?: string | null
+          description?: string | null
+          frequency?: string
+          id?: string
+          is_active?: boolean | null
+          last_run_date?: string | null
+          next_run_date?: string
+          template_data?: Json | null
+          template_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_journal_entries_credit_account_id_fkey"
+            columns: ["credit_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_journal_entries_debit_account_id_fkey"
+            columns: ["debit_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -17575,6 +17762,7 @@ export type Database = {
       }
       generate_sinotruck_customer_code: { Args: never; Returns: string }
       generate_sinotruck_quotation_no: { Args: never; Returns: string }
+      generate_stock_adjustment_number: { Args: never; Returns: string }
       generate_submission_code: { Args: never; Returns: string }
       generate_temp_account_code: { Args: never; Returns: string }
       generate_yutong_invoice_no: { Args: never; Returns: string }

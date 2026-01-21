@@ -664,11 +664,11 @@ export const useRecurringEntries = () => {
     queryKey: ["recurring-entries"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("recurring_journal_entries")
+        .from("recurring_journal_entries" as any)
         .select("*")
         .order("template_name");
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 };
