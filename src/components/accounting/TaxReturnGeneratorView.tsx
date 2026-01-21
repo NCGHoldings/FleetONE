@@ -122,7 +122,7 @@ export const TaxReturnGeneratorView = () => {
       
       if (error) throw error;
 
-      const totalWht = data?.reduce((sum, c) => sum + (c.wht_amount || 0), 0) || 0;
+      const totalWht = data?.reduce((sum, c) => sum + (c.total_wht_amount || 0), 0) || 0;
 
       return {
         certificates: data || [],
@@ -328,17 +328,17 @@ export const TaxReturnGeneratorView = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {whtData.certificates.map((cert) => (
+                {whtData.certificates.map((cert) => (
                     <TableRow key={cert.id}>
                       <TableCell className="font-medium">{cert.certificate_number}</TableCell>
                       <TableCell>{format(new Date(cert.certificate_date), "dd MMM yyyy")}</TableCell>
                       <TableCell>{(cert as any).vendors?.vendor_name || "-"}</TableCell>
                       <TableCell className="text-right">
-                        <CurrencyDisplay amount={cert.gross_amount} />
+                        <CurrencyDisplay amount={cert.total_gross_amount} />
                       </TableCell>
                       <TableCell className="text-right">{cert.wht_rate}%</TableCell>
                       <TableCell className="text-right">
-                        <CurrencyDisplay amount={cert.wht_amount} />
+                        <CurrencyDisplay amount={cert.total_wht_amount} />
                       </TableCell>
                     </TableRow>
                   ))}
