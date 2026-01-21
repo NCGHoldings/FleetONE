@@ -2180,7 +2180,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                     field.onChange(newDateTime);
                                   }
                                 }}
-                                disabled={(date) => date < new Date()}
+                                disabled={(date) => {
+                                  const today = new Date();
+                                  today.setHours(0, 0, 0, 0);
+                                  return date < today;
+                                }}
                                 initialFocus
                                 className="pointer-events-auto"
                               />
@@ -2251,7 +2255,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                     field.onChange(newDateTime);
                                   }
                                 }}
-                                disabled={(date) => date < new Date()}
+                                disabled={(date) => {
+                                  const today = new Date();
+                                  today.setHours(0, 0, 0, 0);
+                                  return date < today;
+                                }}
                                 initialFocus
                                 className="pointer-events-auto"
                               />

@@ -530,7 +530,11 @@ export default function PublicSpecialHireForm() {
                               setFormData(prev => ({ ...prev, pickupDateTime: newDate }));
                             }
                           }}
-                          disabled={(date) => date < new Date()}
+                          disabled={(date) => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            return date < today;
+                          }}
                           initialFocus
                         />
                         {formData.pickupDateTime && (
@@ -582,7 +586,11 @@ export default function PublicSpecialHireForm() {
                               setFormData(prev => ({ ...prev, dropDateTime: newDate }));
                             }
                           }}
-                          disabled={(date) => date < new Date()}
+                          disabled={(date) => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            return date < today;
+                          }}
                           initialFocus
                         />
                         {formData.dropDateTime && (
