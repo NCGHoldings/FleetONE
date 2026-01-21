@@ -11,6 +11,10 @@ import { FinancialStatementsView } from "@/components/accounting/FinancialStatem
 import { TaxManagementView } from "@/components/accounting/TaxManagementView";
 import { CustomerMasterView } from "@/components/accounting/CustomerMasterView";
 import { VendorMasterView } from "@/components/accounting/VendorMasterView";
+import { BankingView } from "@/components/accounting/BankingView";
+import { FixedAssetsView } from "@/components/accounting/FixedAssetsView";
+import { CostingBudgetView } from "@/components/accounting/CostingBudgetView";
+import { AuditReportsView } from "@/components/accounting/AuditReportsView";
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
 import { format } from "date-fns";
@@ -55,10 +59,14 @@ const Accounting = () => {
               <TabsTrigger value="journal">Journal Entries</TabsTrigger>
               <TabsTrigger value="customers">Customers</TabsTrigger>
               <TabsTrigger value="vendors">Vendors</TabsTrigger>
-              <TabsTrigger value="ap">Accounts Payable</TabsTrigger>
               <TabsTrigger value="ar">Accounts Receivable</TabsTrigger>
+              <TabsTrigger value="ap">Accounts Payable</TabsTrigger>
+              <TabsTrigger value="banking">Banking</TabsTrigger>
+              <TabsTrigger value="assets">Fixed Assets</TabsTrigger>
+              <TabsTrigger value="costing">Costing & Budget</TabsTrigger>
               <TabsTrigger value="tax">Tax Management</TabsTrigger>
-              <TabsTrigger value="statements">Financial Statements</TabsTrigger>
+              <TabsTrigger value="statements">Statements</TabsTrigger>
+              <TabsTrigger value="audit">Audit & Reports</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6">
@@ -259,12 +267,24 @@ const Accounting = () => {
               <VendorMasterView />
             </TabsContent>
 
+            <TabsContent value="ar">
+              <AccountsReceivableView />
+            </TabsContent>
+
             <TabsContent value="ap">
               <AccountsPayableView />
             </TabsContent>
 
-            <TabsContent value="ar">
-              <AccountsReceivableView />
+            <TabsContent value="banking">
+              <BankingView />
+            </TabsContent>
+
+            <TabsContent value="assets">
+              <FixedAssetsView />
+            </TabsContent>
+
+            <TabsContent value="costing">
+              <CostingBudgetView />
             </TabsContent>
 
             <TabsContent value="tax">
@@ -273,6 +293,10 @@ const Accounting = () => {
 
             <TabsContent value="statements">
               <FinancialStatementsView />
+            </TabsContent>
+
+            <TabsContent value="audit">
+              <AuditReportsView />
             </TabsContent>
           </Tabs>
         </div>
