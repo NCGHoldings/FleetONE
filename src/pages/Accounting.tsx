@@ -14,6 +14,7 @@ import { VendorMasterView } from "@/components/accounting/VendorMasterView";
 import { BankingView } from "@/components/accounting/BankingView";
 import { FixedAssetsView } from "@/components/accounting/FixedAssetsView";
 import { CostingBudgetView } from "@/components/accounting/CostingBudgetView";
+import { VehicleOperatingCostView } from "@/components/accounting/VehicleOperatingCostView";
 import { AuditReportsView } from "@/components/accounting/AuditReportsView";
 import { InventoryView } from "@/components/accounting/InventoryView";
 import { PurchaseOrderView } from "@/components/accounting/PurchaseOrderView";
@@ -637,6 +638,7 @@ const Accounting = () => {
             <Tabs defaultValue="trial-balance" className="space-y-6">
               <ScrollArea className="w-full whitespace-nowrap">
                 <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="fleet-costs">Fleet Operating Costs</TabsTrigger>
                   <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
                   <TabsTrigger value="statements">Financial Statements</TabsTrigger>
                   <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
@@ -648,6 +650,10 @@ const Accounting = () => {
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
+
+              <TabsContent value="fleet-costs">
+                <VehicleOperatingCostView />
+              </TabsContent>
 
               <TabsContent value="trial-balance">
                 <TrialBalanceView />
