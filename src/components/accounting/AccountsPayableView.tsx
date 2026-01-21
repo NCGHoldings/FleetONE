@@ -9,10 +9,24 @@ import { useAPInvoices } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { APInvoiceForm } from "./APInvoiceForm";
+import { APPaymentForm } from "./APPaymentForm";
+import { APAgeingReport } from "./APAgeingReport";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 
 export const AccountsPayableView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [invoiceFormOpen, setInvoiceFormOpen] = useState(false);
+  const [paymentFormOpen, setPaymentFormOpen] = useState(false);
+  const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<any>(null);
+  const [ageingReportOpen, setAgeingReportOpen] = useState(false);
+  const [viewInvoice, setViewInvoice] = useState<any>(null);
   const { data: invoices, isLoading } = useAPInvoices(statusFilter);
 
   const getStatusBadge = (status: string) => {
@@ -41,6 +55,11 @@ export const AccountsPayableView = () => {
   const isOverdue = (dueDate: string, status: string) => {
     if (status === "paid" || status === "cancelled") return false;
     return new Date(dueDate) < new Date();
+  };
+
+  const handlePayClick = (invoice: any) => {
+    setSelectedInvoiceForPayment(invoice);
+    setPaymentFormOpen(true);
   };
 
   const columns = [
@@ -117,11 +136,20 @@ export const AccountsPayableView = () => {
       header: "Actions",
       cell: ({ row }: any) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="ghost" title="View Details">
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            title="View Details"
+            onClick={() => setViewInvoice(row.original)}
+          >
             <Eye className="h-4 w-4" />
           </Button>
           {row.original.balance > 0 && row.original.approval_status === "approved" && (
-            <Button size="sm" variant="outline">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => handlePayClick(row.original)}
+            >
               <DollarSign className="h-4 w-4 mr-1" />
               Pay
             </Button>
@@ -181,7 +209,7 @@ export const AccountsPayableView = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setAgeingReportOpen(true)}>
               <FileText className="h-4 w-4 mr-2" />
               AP Ageing Report
             </Button>
@@ -229,6 +257,122 @@ export const AccountsPayableView = () => {
 
       {/* AP Invoice Form Dialog */}
       <APInvoiceForm open={invoiceFormOpen} onOpenChange={setInvoiceFormOpen} />
+
+      {/* AP Payment Form Dialog */}
+      <APPaymentForm 
+        open={paymentFormOpen} 
+        onOpenChange={(open) => {
+          setPaymentFormOpen(open);
+          if (!open) setSelectedInvoiceForPayment(null);
+        }}
+        preselectedVendorId={selectedInvoiceForPayment?.vendor_id}
+      />
+
+      {/* AP Ageing Report Dialog */}
+      <Dialog open={ageingReportOpen} onOpenChange={setAgeingReportOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>AP Ageing Report</DialogTitle>
+            <DialogDescription>
+              View outstanding payables by ageing buckets
+            </DialogDescription>
+          </DialogHeader>
+          <APAgeingReport />
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Detail View Dialog */}
+      <Dialog open={!!viewInvoice} onOpenChange={() => setViewInvoice(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Invoice Details</DialogTitle>
+            <DialogDescription>
+              {viewInvoice?.invoice_number}
+            </DialogDescription>
+          </DialogHeader>
+          {viewInvoice && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Vendor</p>
+                  <p className="font-medium">{viewInvoice.vendors?.vendor_name || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <div className="flex gap-2">
+                    {getStatusBadge(viewInvoice.status)}
+                    {getApprovalBadge(viewInvoice.approval_status)}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Invoice Date</p>
+                  <p className="font-medium">{format(new Date(viewInvoice.invoice_date), "MMM dd, yyyy")}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Due Date</p>
+                  <p className={`font-medium ${isOverdue(viewInvoice.due_date, viewInvoice.status) ? "text-destructive" : ""}`}>
+                    {format(new Date(viewInvoice.due_date), "MMM dd, yyyy")}
+                  </p>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Amount</p>
+                  <p className="font-bold text-lg">
+                    <CurrencyDisplay amount={viewInvoice.total_amount || 0} />
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">WHT Amount</p>
+                  <p className="font-bold text-lg text-orange-600">
+                    <CurrencyDisplay amount={viewInvoice.wht_amount || 0} />
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Paid Amount</p>
+                  <p className="font-bold text-lg text-green-600">
+                    <CurrencyDisplay amount={viewInvoice.paid_amount || 0} />
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Balance</p>
+                  <p className={`font-bold text-lg ${viewInvoice.balance > 0 ? "text-destructive" : "text-green-600"}`}>
+                    <CurrencyDisplay amount={viewInvoice.balance || 0} />
+                  </p>
+                </div>
+              </div>
+
+              {viewInvoice.notes && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Notes</p>
+                    <p className="text-sm">{viewInvoice.notes}</p>
+                  </div>
+                </>
+              )}
+
+              {viewInvoice.balance > 0 && viewInvoice.approval_status === "approved" && (
+                <div className="pt-4">
+                  <Button 
+                    className="w-full"
+                    onClick={() => {
+                      setViewInvoice(null);
+                      handlePayClick(viewInvoice);
+                    }}
+                  >
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Process Payment
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

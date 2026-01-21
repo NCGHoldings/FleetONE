@@ -3,16 +3,30 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, CheckCircle, Eye, FileText } from "lucide-react";
 import { ARInvoiceForm } from "./ARInvoiceForm";
+import { ARReceiptForm } from "./ARReceiptForm";
+import { ARAgeingReport } from "./ARAgeingReport";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useARInvoices } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 
 export const AccountsReceivableView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [invoiceFormOpen, setInvoiceFormOpen] = useState(false);
+  const [receiptFormOpen, setReceiptFormOpen] = useState(false);
+  const [selectedInvoiceForReceipt, setSelectedInvoiceForReceipt] = useState<any>(null);
+  const [ageingReportOpen, setAgeingReportOpen] = useState(false);
+  const [viewInvoice, setViewInvoice] = useState<any>(null);
   const { data: invoices, isLoading } = useARInvoices(statusFilter);
 
   const getStatusBadge = (status: string) => {
@@ -30,6 +44,11 @@ export const AccountsReceivableView = () => {
   const isOverdue = (dueDate: string, status: string) => {
     if (status === "paid" || status === "cancelled") return false;
     return new Date(dueDate) < new Date();
+  };
+
+  const handleReceiveClick = (invoice: any) => {
+    setSelectedInvoiceForReceipt(invoice);
+    setReceiptFormOpen(true);
   };
 
   const columns = [
@@ -101,11 +120,20 @@ export const AccountsReceivableView = () => {
       header: "Actions",
       cell: ({ row }: any) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="ghost" title="View Details">
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            title="View Details"
+            onClick={() => setViewInvoice(row.original)}
+          >
             <Eye className="h-4 w-4" />
           </Button>
           {row.original.balance > 0 && (
-            <Button size="sm" variant="outline">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => handleReceiveClick(row.original)}
+            >
               <CheckCircle className="h-4 w-4 mr-1" />
               Receive
             </Button>
@@ -157,7 +185,7 @@ export const AccountsReceivableView = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setAgeingReportOpen(true)}>
               <FileText className="h-4 w-4 mr-2" />
               AR Ageing Report
             </Button>
@@ -205,6 +233,113 @@ export const AccountsReceivableView = () => {
 
       {/* AR Invoice Form Dialog */}
       <ARInvoiceForm open={invoiceFormOpen} onOpenChange={setInvoiceFormOpen} />
+
+      {/* AR Receipt Form Dialog */}
+      <ARReceiptForm 
+        open={receiptFormOpen} 
+        onOpenChange={(open) => {
+          setReceiptFormOpen(open);
+          if (!open) setSelectedInvoiceForReceipt(null);
+        }}
+        preselectedCustomerId={selectedInvoiceForReceipt?.customer_id}
+      />
+
+      {/* AR Ageing Report Dialog */}
+      <Dialog open={ageingReportOpen} onOpenChange={setAgeingReportOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>AR Ageing Report</DialogTitle>
+            <DialogDescription>
+              View outstanding balances by ageing buckets
+            </DialogDescription>
+          </DialogHeader>
+          <ARAgeingReport />
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Detail View Dialog */}
+      <Dialog open={!!viewInvoice} onOpenChange={() => setViewInvoice(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Invoice Details</DialogTitle>
+            <DialogDescription>
+              {viewInvoice?.invoice_number}
+            </DialogDescription>
+          </DialogHeader>
+          {viewInvoice && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Customer</p>
+                  <p className="font-medium">{viewInvoice.customers?.customer_name || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  {getStatusBadge(viewInvoice.status)}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Invoice Date</p>
+                  <p className="font-medium">{format(new Date(viewInvoice.invoice_date), "MMM dd, yyyy")}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Due Date</p>
+                  <p className={`font-medium ${isOverdue(viewInvoice.due_date, viewInvoice.status) ? "text-destructive" : ""}`}>
+                    {format(new Date(viewInvoice.due_date), "MMM dd, yyyy")}
+                  </p>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Amount</p>
+                  <p className="font-bold text-lg">
+                    <CurrencyDisplay amount={viewInvoice.total_amount || 0} />
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Paid Amount</p>
+                  <p className="font-bold text-lg text-green-600">
+                    <CurrencyDisplay amount={viewInvoice.paid_amount || 0} />
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Balance</p>
+                  <p className={`font-bold text-lg ${viewInvoice.balance > 0 ? "text-destructive" : "text-green-600"}`}>
+                    <CurrencyDisplay amount={viewInvoice.balance || 0} />
+                  </p>
+                </div>
+              </div>
+
+              {viewInvoice.notes && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Notes</p>
+                    <p className="text-sm">{viewInvoice.notes}</p>
+                  </div>
+                </>
+              )}
+
+              {viewInvoice.balance > 0 && (
+                <div className="pt-4">
+                  <Button 
+                    className="w-full"
+                    onClick={() => {
+                      setViewInvoice(null);
+                      handleReceiveClick(viewInvoice);
+                    }}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Record Receipt
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

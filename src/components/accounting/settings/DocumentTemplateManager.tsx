@@ -12,7 +12,7 @@ import {
   useDeleteDocumentTemplate 
 } from "@/hooks/useDocumentTemplates";
 import { DocumentTemplateEditor } from "./DocumentTemplateEditor";
-import { Plus, FileText, Pencil, Trash2, Eye, Copy } from "lucide-react";
+import { Plus, FileText, Pencil, Trash2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import {
   AlertDialog,
@@ -80,6 +80,87 @@ export const DocumentTemplateManager = () => {
       tax: "bg-red-100 text-red-800",
     };
     return colors[module] || "bg-gray-100 text-gray-800";
+  };
+
+  // Render preview with placeholder replacement
+  const renderPreview = (template: any): string => {
+    let html = template.html_content || "<p>No content</p>";
+    
+    // Get company info for placeholders
+    const company = companies?.find((c) => c.id === template.company_id);
+    
+    // Sample data for preview - replace placeholders with realistic data
+    const sampleData: Record<string, string> = {
+      "{{invoice_number}}": "INV-2024-0001",
+      "{{invoice_date}}": "January 15, 2024",
+      "{{due_date}}": "February 14, 2024",
+      "{{customer_name}}": "Sample Customer Ltd.",
+      "{{customer_address}}": "123 Customer Street, Colombo 01",
+      "{{customer_phone}}": "+94 11 234 5678",
+      "{{customer_email}}": "customer@example.com",
+      "{{vendor_name}}": "Sample Vendor Ltd.",
+      "{{vendor_address}}": "456 Vendor Road, Colombo 02",
+      "{{vendor_phone}}": "+94 11 987 6543",
+      "{{vendor_email}}": "vendor@example.com",
+      "{{company_name}}": company?.name || "Your Company Name",
+      "{{company_address}}": company?.address || "Company Address",
+      "{{company_phone}}": company?.phone || "+94 11 234 5678",
+      "{{company_email}}": company?.email || "info@company.com",
+      "{{company_logo}}": template.header_image_url 
+        ? `<img src="${template.header_image_url}" style="max-height: 80px;" alt="Company Logo" />` 
+        : "",
+      "{{receipt_number}}": "RCV-2024-0001",
+      "{{receipt_date}}": "January 20, 2024",
+      "{{payment_number}}": "PAY-2024-0001",
+      "{{payment_date}}": "January 20, 2024",
+      "{{payment_method}}": "Bank Transfer",
+      "{{reference}}": "REF-123456",
+      "{{subtotal}}": "LKR 100,000.00",
+      "{{tax_amount}}": "LKR 8,000.00",
+      "{{discount_amount}}": "LKR 5,000.00",
+      "{{wht_amount}}": "LKR 2,000.00",
+      "{{total_amount}}": "LKR 101,000.00",
+      "{{amount_in_words}}": "One Hundred and One Thousand Rupees Only",
+      "{{balance}}": "LKR 0.00",
+      "{{paid_amount}}": "LKR 101,000.00",
+      "{{notes}}": "Thank you for your business!",
+      "{{terms}}": "Payment is due within 30 days of invoice date.",
+      "{{current_date}}": format(new Date(), "MMMM dd, yyyy"),
+      "{{line_items}}": `
+        <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+          <thead>
+            <tr style="background-color: #f3f4f6;">
+              <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: left;">Description</th>
+              <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: center;">Qty</th>
+              <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">Unit Price</th>
+              <th style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="border: 1px solid #e5e7eb; padding: 8px;">Professional Services - Consulting</td>
+              <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: center;">10</td>
+              <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">LKR 5,000.00</td>
+              <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">LKR 50,000.00</td>
+            </tr>
+            <tr>
+              <td style="border: 1px solid #e5e7eb; padding: 8px;">Software License - Annual</td>
+              <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: center;">1</td>
+              <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">LKR 50,000.00</td>
+              <td style="border: 1px solid #e5e7eb; padding: 8px; text-align: right;">LKR 50,000.00</td>
+            </tr>
+          </tbody>
+        </table>
+      `,
+    };
+
+    // Replace all placeholders with sample data
+    Object.entries(sampleData).forEach(([key, value]) => {
+      const escapedKey = key.replace(/[{}]/g, "\\$&");
+      html = html.replace(new RegExp(escapedKey, "g"), value);
+    });
+
+    return html;
   };
 
   return (
@@ -238,34 +319,23 @@ export const DocumentTemplateManager = () => {
         templateTypes={templateTypes || []}
       />
 
-      {/* Preview Dialog */}
+      {/* Preview Dialog - Using iframe for proper HTML rendering */}
       {previewTemplate && (
         <AlertDialog open={!!previewTemplate} onOpenChange={() => setPreviewTemplate(null)}>
-          <AlertDialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <AlertDialogContent className="max-w-4xl max-h-[90vh]">
             <AlertDialogHeader>
               <AlertDialogTitle>Template Preview: {previewTemplate.template_name}</AlertDialogTitle>
+              <AlertDialogDescription>
+                Preview with sample data - placeholders are replaced with example values
+              </AlertDialogDescription>
             </AlertDialogHeader>
-            <div className="border rounded-lg p-4 bg-white min-h-[400px]">
-              {previewTemplate.header_image_url && (
-                <div className="mb-4">
-                  <img 
-                    src={previewTemplate.header_image_url} 
-                    alt="Header" 
-                    className="max-h-24 object-contain"
-                  />
-                </div>
-              )}
-              <div 
-                className="prose max-w-none"
-                dangerouslySetInnerHTML={{ 
-                  __html: previewTemplate.html_content || "<p>No content</p>" 
-                }}
+            <div className="border rounded-lg bg-white overflow-hidden">
+              <iframe
+                srcDoc={renderPreview(previewTemplate)}
+                className="w-full min-h-[500px] border-0"
+                title="Template Preview"
+                sandbox="allow-same-origin"
               />
-              {previewTemplate.footer_text && (
-                <div className="mt-4 pt-4 border-t text-sm text-muted-foreground">
-                  {previewTemplate.footer_text}
-                </div>
-              )}
             </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Close</AlertDialogCancel>
