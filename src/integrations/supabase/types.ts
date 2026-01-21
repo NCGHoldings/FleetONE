@@ -3795,31 +3795,64 @@ export type Database = {
       }
       companies: {
         Row: {
+          address: string | null
           created_at: string
+          default_currency: string | null
+          display_order: number | null
+          email: string | null
+          fiscal_year_start: number | null
           id: string
           is_active: boolean | null
+          logo_url: string | null
           name: string
           parent_company_id: string | null
+          phone: string | null
+          registration_number: string | null
           sector: string | null
+          short_code: string | null
+          tax_registration_number: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
+          address?: string | null
           created_at?: string
+          default_currency?: string | null
+          display_order?: number | null
+          email?: string | null
+          fiscal_year_start?: number | null
           id?: string
           is_active?: boolean | null
+          logo_url?: string | null
           name: string
           parent_company_id?: string | null
+          phone?: string | null
+          registration_number?: string | null
           sector?: string | null
+          short_code?: string | null
+          tax_registration_number?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
+          address?: string | null
           created_at?: string
+          default_currency?: string | null
+          display_order?: number | null
+          email?: string | null
+          fiscal_year_start?: number | null
           id?: string
           is_active?: boolean | null
+          logo_url?: string | null
           name?: string
           parent_company_id?: string | null
+          phone?: string | null
+          registration_number?: string | null
           sector?: string | null
+          short_code?: string | null
+          tax_registration_number?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: [
           {
@@ -4552,6 +4585,123 @@ export type Database = {
             columns: ["payment_id"]
             isOneToOne: false
             referencedRelation: "special_hire_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_template_types: {
+        Row: {
+          available_placeholders: Json | null
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          module: string
+          type_code: string
+          type_name: string
+        }
+        Insert: {
+          available_placeholders?: Json | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          module?: string
+          type_code: string
+          type_name: string
+        }
+        Update: {
+          available_placeholders?: Json | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          module?: string
+          type_code?: string
+          type_name?: string
+        }
+        Relationships: []
+      }
+      document_templates: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          css_styles: string | null
+          footer_text: string | null
+          header_image_url: string | null
+          html_content: string
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          margins: Json | null
+          orientation: string | null
+          paper_size: string | null
+          template_code: string | null
+          template_name: string
+          template_type_id: string | null
+          updated_at: string | null
+          updated_by: string | null
+          version: number | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          css_styles?: string | null
+          footer_text?: string | null
+          header_image_url?: string | null
+          html_content?: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          margins?: Json | null
+          orientation?: string | null
+          paper_size?: string | null
+          template_code?: string | null
+          template_name: string
+          template_type_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          version?: number | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          css_styles?: string | null
+          footer_text?: string | null
+          header_image_url?: string | null
+          html_content?: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          margins?: Json | null
+          orientation?: string | null
+          paper_size?: string | null
+          template_code?: string | null
+          template_name?: string
+          template_type_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_templates_template_type_id_fkey"
+            columns: ["template_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_template_types"
             referencedColumns: ["id"]
           },
         ]

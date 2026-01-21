@@ -8,9 +8,11 @@ import { format } from "date-fns";
 import { useAPInvoices } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { APInvoiceForm } from "./APInvoiceForm";
 
 export const AccountsPayableView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [invoiceFormOpen, setInvoiceFormOpen] = useState(false);
   const { data: invoices, isLoading } = useAPInvoices(statusFilter);
 
   const getStatusBadge = (status: string) => {
@@ -183,7 +185,7 @@ export const AccountsPayableView = () => {
               <FileText className="h-4 w-4 mr-2" />
               AP Ageing Report
             </Button>
-            <Button>
+            <Button onClick={() => setInvoiceFormOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               New Invoice
             </Button>
@@ -224,6 +226,9 @@ export const AccountsPayableView = () => {
           </TabsContent>
         </Tabs>
       </Card>
+
+      {/* AP Invoice Form Dialog */}
+      <APInvoiceForm open={invoiceFormOpen} onOpenChange={setInvoiceFormOpen} />
     </div>
   );
 };
