@@ -566,3 +566,109 @@ export const useAPSummary = () => {
     },
   });
 };
+
+// ============ Items & Inventory ============
+export const useItems = () => {
+  return useQuery({
+    queryKey: ["items"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("items")
+        .select(`*, item_categories (category_name, category_code, valuation_method)`)
+        .order("item_code");
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+export const useItemStock = () => {
+  return useQuery({
+    queryKey: ["item-stock"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("item_stock")
+        .select(`*, items (item_code, item_name)`)
+        .order("location");
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+export const useItemCategories = () => {
+  return useQuery({
+    queryKey: ["item-categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("item_categories")
+        .select("*")
+        .order("category_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// ============ Purchase Orders & GRN ============
+export const usePurchaseOrders = (status?: string) => {
+  return useQuery({
+    queryKey: ["purchase-orders", status],
+    queryFn: async () => {
+      let query = supabase
+        .from("purchase_orders")
+        .select(`*, vendors (vendor_code, vendor_name)`)
+        .order("po_date", { ascending: false });
+      if (status) query = query.eq("status", status);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+export const useGoodsReceiptNotes = () => {
+  return useQuery({
+    queryKey: ["goods-receipt-notes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("goods_receipt_notes")
+        .select(`*, vendors (vendor_name), purchase_orders (po_number)`)
+        .order("receipt_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// ============ Cheque Register ============
+export const useChequeRegister = (status?: string) => {
+  return useQuery({
+    queryKey: ["cheque-register", status],
+    queryFn: async () => {
+      let query = supabase
+        .from("cheque_register")
+        .select("*")
+        .order("cheque_date", { ascending: false });
+      if (status) query = query.eq("status", status);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// ============ Recurring Entries ============
+export const useRecurringEntries = () => {
+  return useQuery({
+    queryKey: ["recurring-entries"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("recurring_journal_entries")
+        .select("*")
+        .order("template_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+};
