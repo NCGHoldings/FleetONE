@@ -260,14 +260,14 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
                         </td>
                         <td className="px-3 py-2">
                           <Select
-                            value={line.tax_code || ""}
-                            onValueChange={(val) => handleTaxCodeChange(line.id, val)}
+                            value={line.tax_code || "_none"}
+                            onValueChange={(val) => handleTaxCodeChange(line.id, val === "_none" ? "" : val)}
                           >
                             <SelectTrigger className="h-8">
                               <SelectValue placeholder="None" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">None</SelectItem>
+                              <SelectItem value="_none">None</SelectItem>
                               {taxCodes?.map((tax) => (
                                 <SelectItem key={tax.tax_code} value={tax.tax_code}>
                                   {tax.tax_code} ({tax.rate}%)

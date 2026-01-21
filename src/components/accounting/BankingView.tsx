@@ -228,12 +228,12 @@ export const BankingView = () => {
                 </p>
               </div>
               <div className="flex gap-3">
-                <Select value={selectedBankId || ""} onValueChange={setSelectedBankId}>
+                <Select value={selectedBankId || "_all"} onValueChange={(val) => setSelectedBankId(val === "_all" ? null : val)}>
                   <SelectTrigger className="w-64">
                     <SelectValue placeholder="Select bank account" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Accounts</SelectItem>
+                    <SelectItem value="_all">All Accounts</SelectItem>
                     {bankAccounts?.map((bank) => (
                       <SelectItem key={bank.id} value={bank.id}>
                         {bank.account_name}
