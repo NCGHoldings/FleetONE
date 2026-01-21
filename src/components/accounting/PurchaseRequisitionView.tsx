@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,7 +81,7 @@ export const PurchaseRequisitionView = () => {
 
   const handleApprove = async (id: string) => {
     try {
-      await approvePR.mutateAsync({ requisitionId: id, action: "approve" });
+      await approvePR.mutateAsync(id);
       toast.success("Purchase requisition approved");
     } catch (error) {
       toast.error("Failed to approve requisition");
@@ -89,7 +90,7 @@ export const PurchaseRequisitionView = () => {
 
   const handleReject = async (id: string) => {
     try {
-      await approvePR.mutateAsync({ requisitionId: id, action: "reject" });
+      await (supabase.from("purchase_requisitions" as any).update({ status: "rejected" }).eq("id", id));
       toast.success("Purchase requisition rejected");
     } catch (error) {
       toast.error("Failed to reject requisition");

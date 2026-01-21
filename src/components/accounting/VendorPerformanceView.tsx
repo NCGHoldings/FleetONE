@@ -66,7 +66,7 @@ export const VendorPerformanceView = () => {
     vendorGRNs.forEach((grn: any) => {
       const po = vendorPOs.find((p: any) => p.id === grn.po_id);
       if (po && grn.receipt_date && po.expected_date) {
-        const deliveryDays = differenceInDays(new Date(grn.receipt_date), new Date(po.po_date));
+        const deliveryDays = differenceInDays(new Date(grn.receipt_date), new Date(po.order_date));
         totalDeliveryDays += deliveryDays;
         if (new Date(grn.receipt_date) <= new Date(po.expected_date)) {
           onTimeCount++;
