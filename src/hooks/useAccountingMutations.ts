@@ -191,10 +191,13 @@ export const useCreateARInvoice = () => {
         tax_code?: string;
       }>;
     }) => {
+      // Destructure to separate lines from header data
+      const { lines, ...headerData } = invoice;
+      
       const { data, error } = await supabase
         .from("ar_invoices")
         .insert([{
-          ...invoice,
+          ...headerData,
           balance: invoice.total_amount,
           status: "unpaid",
         }])
@@ -204,13 +207,13 @@ export const useCreateARInvoice = () => {
       if (error) throw error;
       
       // Create invoice lines if provided
-      if (invoice.lines?.length) {
-        const lines = invoice.lines.map(line => ({
+      if (lines?.length) {
+        const lineData = lines.map(line => ({
           invoice_id: data.id,
           ...line,
         }));
         
-        await supabase.from("ar_invoice_lines").insert(lines);
+        await supabase.from("ar_invoice_lines").insert(lineData);
       }
       
       return data;
