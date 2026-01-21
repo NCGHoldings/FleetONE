@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, FileText, Search } from "lucide-react";
+import { Plus, FileText, Search, Printer } from "lucide-react";
 import { useAPDebitNotes, useVendors, useAPInvoices } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
@@ -14,6 +14,7 @@ import { StatusBadge } from "./shared/StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 
 export const APDebitNotesView = () => {
   const { data: debitNotes, isLoading, refetch } = useAPDebitNotes();
@@ -21,6 +22,8 @@ export const APDebitNotesView = () => {
   const { data: invoices } = useAPInvoices();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [printDocumentOpen, setPrintDocumentOpen] = useState(false);
+  const [printDocumentData, setPrintDocumentData] = useState<any>(null);
   const [formData, setFormData] = useState({
     vendor_id: "",
     original_invoice_id: "",
@@ -155,11 +158,12 @@ export const APDebitNotesView = () => {
                 <th className="text-left py-3 px-2 font-semibold">Date</th>
                 <th className="text-right py-3 px-2 font-semibold">Amount</th>
                 <th className="text-left py-3 px-2 font-semibold">Status</th>
+                <th className="text-left py-3 px-2 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredDebitNotes?.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No debit notes found</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No debit notes found</td></tr>
               ) : (
                 filteredDebitNotes?.map(dn => (
                   <tr key={dn.id} className="border-b hover:bg-muted/50">
@@ -169,6 +173,18 @@ export const APDebitNotesView = () => {
                     <td className="py-3 px-2"><DateDisplay date={dn.debit_date} /></td>
                     <td className="py-3 px-2 text-right font-semibold text-green-600"><CurrencyDisplay amount={dn.amount} /></td>
                     <td className="py-3 px-2"><StatusBadge status={dn.status || "draft"} /></td>
+                    <td className="py-3 px-2">
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => {
+                          setPrintDocumentData(dn);
+                          setPrintDocumentOpen(true);
+                        }}
+                      >
+                        <Printer className="h-4 w-4" />
+                      </Button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -176,6 +192,14 @@ export const APDebitNotesView = () => {
           </table>
         </div>
       </Card>
+
+      {/* Document Print Preview Modal */}
+      <FinanceDocumentPreviewModal
+        open={printDocumentOpen}
+        onOpenChange={setPrintDocumentOpen}
+        documentType="ap_debit_note"
+        documentData={printDocumentData}
+      />
     </div>
   );
 };

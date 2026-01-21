@@ -963,3 +963,18 @@ export const useSSCLTransactions = () => {
     },
   });
 };
+
+// ============ Companies ============
+export const useCompanies = () => {
+  return useQuery({
+    queryKey: ["companies"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("*")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+};

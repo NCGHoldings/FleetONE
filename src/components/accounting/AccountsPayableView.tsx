@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, DollarSign, Eye, FileText } from "lucide-react";
+import { Plus, DollarSign, Eye, FileText, Printer } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -19,6 +19,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
 
 export const AccountsPayableView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
@@ -27,6 +28,9 @@ export const AccountsPayableView = () => {
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<any>(null);
   const [ageingReportOpen, setAgeingReportOpen] = useState(false);
   const [viewInvoice, setViewInvoice] = useState<any>(null);
+  const [printDocumentOpen, setPrintDocumentOpen] = useState(false);
+  const [printDocumentData, setPrintDocumentData] = useState<any>(null);
+  const [printDocumentType, setPrintDocumentType] = useState<string>("ap_invoice");
   const { data: invoices, isLoading } = useAPInvoices(statusFilter);
 
   const getStatusBadge = (status: string) => {
@@ -355,10 +359,22 @@ export const AccountsPayableView = () => {
                 </>
               )}
 
-              {viewInvoice.balance > 0 && viewInvoice.approval_status === "approved" && (
-                <div className="pt-4">
+              <div className="pt-4 flex gap-2">
+                <Button 
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setPrintDocumentData(viewInvoice);
+                    setPrintDocumentType("ap_invoice");
+                    setPrintDocumentOpen(true);
+                  }}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Invoice
+                </Button>
+                {viewInvoice.balance > 0 && viewInvoice.approval_status === "approved" && (
                   <Button 
-                    className="w-full"
+                    className="flex-1"
                     onClick={() => {
                       setViewInvoice(null);
                       handlePayClick(viewInvoice);
@@ -367,12 +383,20 @@ export const AccountsPayableView = () => {
                     <DollarSign className="h-4 w-4 mr-2" />
                     Process Payment
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Document Print Preview Modal */}
+      <FinanceDocumentPreviewModal
+        open={printDocumentOpen}
+        onOpenChange={setPrintDocumentOpen}
+        documentType={printDocumentType}
+        documentData={printDocumentData}
+      />
     </div>
   );
 };
