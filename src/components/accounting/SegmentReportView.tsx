@@ -44,7 +44,7 @@ export const SegmentReportView = () => {
         .from("cost_centers")
         .select("*")
         .eq("is_active", true)
-        .order("cost_center_name");
+        .order("center_name");
       if (error) throw error;
       return data;
     },
@@ -100,8 +100,8 @@ export const SegmentReportView = () => {
       case "cost-center":
         return (costCenters || []).map(s => ({
           id: s.id,
-          name: s.cost_center_name,
-          code: s.cost_center_code,
+          name: s.center_name,
+          code: s.center_code,
           revenue: 0,
           expenses: 0,
           netIncome: 0,
