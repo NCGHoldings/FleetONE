@@ -50,7 +50,7 @@ export const InventoryAgeingView = () => {
             itemId,
             itemCode: item?.item_code || "",
             itemName: item?.item_name || "Unknown",
-            category: item?.category || "General",
+            category: item?.item_categories?.category_name || "General",
             buckets: { days0to30: 0, days31to60: 0, days61to90: 0, days91to180: 0, over180: 0, total: 0 },
             classification: "fast",
             totalQty: 0,

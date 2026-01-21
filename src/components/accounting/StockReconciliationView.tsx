@@ -41,7 +41,7 @@ export const StockReconciliationView = () => {
       const systemQty = stock?.quantity_on_hand || 0;
       const physicalQty = physicalCounts[item.id] ?? systemQty;
       const variance = physicalQty - systemQty;
-      const unitCost = stock?.unit_cost || item.standard_cost || 0;
+      const unitCost = stock?.average_cost || item.standard_cost || 0;
       const varianceValue = variance * unitCost;
 
       return {

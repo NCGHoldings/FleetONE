@@ -874,3 +874,92 @@ export const usePeriodClosingChecklist = (periodId?: string) => {
     enabled: !!periodId,
   });
 };
+
+// ============ AR Credit Notes ============
+export const useARCreditNotes = () => {
+  return useQuery({
+    queryKey: ["ar-credit-notes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ar_credit_notes")
+        .select(`
+          *,
+          customers (customer_code, customer_name),
+          ar_invoices (invoice_number)
+        `)
+        .order("credit_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// ============ AP Debit Notes ============
+export const useAPDebitNotes = () => {
+  return useQuery({
+    queryKey: ["ap-debit-notes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ap_debit_notes")
+        .select(`
+          *,
+          vendors (vendor_code, vendor_name),
+          ap_invoices (invoice_number)
+        `)
+        .order("debit_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// ============ Asset Revaluations ============
+export const useAssetRevaluations = () => {
+  return useQuery({
+    queryKey: ["asset-revaluations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("asset_revaluations")
+        .select(`
+          *,
+          fixed_assets (asset_code, asset_name)
+        `)
+        .order("revaluation_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// ============ Asset Transfers ============
+export const useAssetTransfers = () => {
+  return useQuery({
+    queryKey: ["asset-transfers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("asset_transfers")
+        .select(`
+          *,
+          fixed_assets (asset_code, asset_name)
+        `)
+        .order("transfer_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// ============ SSCL Transactions ============
+export const useSSCLTransactions = () => {
+  return useQuery({
+    queryKey: ["sscl-transactions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sscl_transactions")
+        .select("*")
+        .order("transaction_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+};
