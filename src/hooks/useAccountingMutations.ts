@@ -912,3 +912,313 @@ export const useRunRecurringEntry = () => {
     onError: (error) => toast.error(`Failed: ${error.message}`),
   });
 };
+
+// ============ Currency Management ============
+export const useCreateCurrency = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { currency_code: string; currency_name: string; symbol?: string; is_base_currency?: boolean }) => {
+      const { data: result, error } = await supabase.from("currencies" as any).insert([data]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["currencies"] });
+      toast.success("Currency added");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useCreateExchangeRate = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { from_currency: string; to_currency: string; rate: number; effective_date: string }) => {
+      const { data: result, error } = await supabase.from("exchange_rates" as any).insert([data]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exchange-rates"] });
+      toast.success("Exchange rate added");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useUpdateExchangeRate = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; rate?: number; effective_date?: string }) => {
+      const { error } = await supabase.from("exchange_rates" as any).update(updates).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exchange-rates"] });
+      toast.success("Exchange rate updated");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Purchase Requisitions ============
+export const useCreatePurchaseRequisition = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const { data: result, error } = await supabase.from("purchase_requisitions" as any).insert([{ ...data, status: "draft" }]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] });
+      toast.success("Purchase requisition created");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useApprovePurchaseRequisition = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("purchase_requisitions" as any).update({ status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] });
+      toast.success("Requisition approved");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useConvertPRtoPO = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (prId: string) => {
+      // Get PR details
+      const { data: pr, error: prError } = await supabase.from("purchase_requisitions" as any).select("*").eq("id", prId).single();
+      if (prError) throw prError;
+      
+      // Create PO from PR
+      const { data: po, error: poError } = await supabase.from("purchase_orders").insert([{
+        po_number: `PO-${Date.now()}`,
+        vendor_id: pr.vendor_id,
+        po_date: new Date().toISOString().split('T')[0],
+        expected_date: pr.required_date,
+        total_amount: pr.estimated_amount || 0,
+        status: "draft",
+        notes: `Converted from PR: ${pr.requisition_number}`,
+      }]).select().single();
+      if (poError) throw poError;
+      
+      // Update PR status
+      await supabase.from("purchase_requisitions" as any).update({ status: "converted", converted_to_po_id: po.id }).eq("id", prId);
+      
+      return po;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      toast.success("Converted to Purchase Order");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Bank Reconciliation ============
+export const useCreateBankReconciliation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { bank_account_id: string; statement_date: string; statement_balance: number; book_balance: number }) => {
+      const { data: result, error } = await supabase.from("bank_reconciliations").insert([{
+        ...data,
+        reconciliation_date: new Date().toISOString().split('T')[0],
+        status: "in_progress",
+      }]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bank-reconciliations"] });
+      toast.success("Reconciliation started");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useMatchReconciliationItem = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId, transactionId }: { itemId: string; transactionId: string }) => {
+      const { error } = await supabase.from("bank_reconciliation_items" as any).update({ 
+        bank_transaction_id: transactionId, 
+        match_status: "matched",
+        matched_at: new Date().toISOString(),
+      }).eq("id", itemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bank-reconciliation-items"] });
+      toast.success("Item matched");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Fund Transfers ============
+export const useCreateFundTransfer = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { from_account_id: string; to_account_id: string; amount: number; transfer_date: string; reference?: string }) => {
+      const { data: result, error } = await supabase.from("fund_transfers" as any).insert([{
+        ...data,
+        status: "completed",
+      }]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fund-transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      toast.success("Fund transfer completed");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Asset Disposals ============
+export const useCreateAssetDisposal = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { asset_id: string; disposal_date: string; disposal_type: string; disposal_value?: number; reason?: string }) => {
+      // Get asset details
+      const { data: asset, error: assetError } = await supabase.from("fixed_assets").select("*").eq("id", data.asset_id).single();
+      if (assetError) throw assetError;
+      
+      const nbv = asset.current_value || 0;
+      const gainLoss = (data.disposal_value || 0) - nbv;
+      
+      const { data: result, error } = await supabase.from("asset_disposals").insert([{
+        ...data,
+        net_book_value: nbv,
+        accumulated_depreciation: asset.accumulated_depreciation || 0,
+        gain_loss: gainLoss,
+        approval_status: "pending",
+      }]).select().single();
+      if (error) throw error;
+      
+      // Update asset status
+      await supabase.from("fixed_assets").update({ status: "disposed" }).eq("id", data.asset_id);
+      
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["asset-disposals"] });
+      queryClient.invalidateQueries({ queryKey: ["fixed-assets"] });
+      toast.success("Asset disposal recorded");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Bad Debt Provisions ============
+export const useCreateBadDebtProvision = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { customer_id?: string; invoice_id?: string; provision_amount: number; provision_date: string; reason?: string }) => {
+      const { data: result, error } = await supabase.from("ar_bad_debt_provisions").insert([{
+        ...data,
+        status: "pending",
+      }]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bad-debt-provisions"] });
+      toast.success("Bad debt provision created");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useWriteOffBadDebt = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (provisionId: string) => {
+      const { error } = await supabase.from("ar_bad_debt_provisions").update({ 
+        status: "written_off",
+        write_off_date: new Date().toISOString().split('T')[0],
+      }).eq("id", provisionId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bad-debt-provisions"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      toast.success("Bad debt written off");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ Batch & Serial Numbers ============
+export const useCreateBatchNumber = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { item_id: string; batch_number: string; quantity_received: number; expiry_date?: string; manufacture_date?: string }) => {
+      const { data: result, error } = await supabase.from("batch_numbers").insert([{
+        ...data,
+        quantity_available: data.quantity_received,
+        status: "active",
+      }]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["batch-numbers"] });
+      toast.success("Batch number created");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+export const useCreateSerialNumber = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { item_id: string; serial_number: string; status?: string }) => {
+      const { data: result, error } = await supabase.from("serial_numbers" as any).insert([{
+        ...data,
+        status: data.status || "available",
+      }]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["serial-numbers"] });
+      toast.success("Serial number created");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// ============ WHT Certificates ============
+export const useCreateWHTCertificate = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { vendor_id: string; certificate_number: string; certificate_date: string; wht_amount: number; tax_period?: string }) => {
+      const { data: result, error } = await supabase.from("wht_certificates" as any).insert([{
+        ...data,
+        status: "issued",
+      }]).select().single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wht-certificates"] });
+      toast.success("WHT certificate issued");
+    },
+    onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
