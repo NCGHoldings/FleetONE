@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CurrencyDisplay } from "./CurrencyDisplay";
+import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Plus, CheckCircle, AlertTriangle, FileText, RefreshCw } from "lucide-react";
@@ -438,12 +438,17 @@ export const APReconciliationView = () => {
           <CardDescription>Past reconciliation records</CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={reconciliationColumns}
-            data={reconciliations || []}
-            searchKey="vendors.vendor_name"
-            isLoading={isLoading}
-          />
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <p className="text-muted-foreground">Loading...</p>
+            </div>
+          ) : (
+            <DataTable
+              columns={reconciliationColumns}
+              data={reconciliations || []}
+              searchKey="vendors.vendor_name"
+            />
+          )}
         </CardContent>
       </Card>
     </div>

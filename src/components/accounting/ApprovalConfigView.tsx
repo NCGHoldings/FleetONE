@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { DataTable } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { CurrencyDisplay } from "./CurrencyDisplay";
+import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { toast } from "sonner";
 import { Plus, Settings, Shield, Users, Edit, Trash2 } from "lucide-react";
 
@@ -448,12 +448,17 @@ export const ApprovalConfigView = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={configColumns}
-            data={configs || []}
-            searchKey="module"
-            isLoading={isLoading}
-          />
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <p className="text-muted-foreground">Loading...</p>
+            </div>
+          ) : (
+            <DataTable
+              columns={configColumns}
+              data={configs || []}
+              searchKey="module"
+            />
+          )}
         </CardContent>
       </Card>
     </div>

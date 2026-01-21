@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { CurrencyDisplay } from "./CurrencyDisplay";
+import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Plus, CheckCircle, Clock, XCircle, Download, Send, FileSpreadsheet } from "lucide-react";
@@ -430,12 +430,17 @@ export const PaymentBatchView = () => {
           <CardDescription>View and manage payment batches</CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={batchColumns}
-            data={batches || []}
-            searchKey="batch_number"
-            isLoading={isLoading}
-          />
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <p className="text-muted-foreground">Loading...</p>
+            </div>
+          ) : (
+            <DataTable
+              columns={batchColumns}
+              data={batches || []}
+              searchKey="batch_number"
+            />
+          )}
         </CardContent>
       </Card>
     </div>
