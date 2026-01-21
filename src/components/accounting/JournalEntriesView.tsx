@@ -3,12 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye } from "lucide-react";
+import { Plus, Eye, CheckCircle, XCircle } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { StatusBadge } from "./shared/StatusBadge";
+import { CurrencyDisplay } from "./shared/CurrencyDisplay";
+import { DateDisplay } from "./shared/DateDisplay";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { JournalEntryForm } from "./JournalEntryForm";
 
 export const JournalEntriesView = () => {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
   const { data: entries, isLoading } = useQuery({
     queryKey: ["journal-entries"],
     queryFn: async () => {
@@ -22,59 +27,60 @@ export const JournalEntriesView = () => {
     },
   });
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive"> = {
-      draft: "secondary",
-      posted: "default",
-      void: "destructive",
-    };
-    return <Badge variant={variants[status] || "default"}>{status.toUpperCase()}</Badge>;
-  };
-
   const columns = [
     {
       accessorKey: "entry_number",
       header: "Entry #",
+      cell: ({ row }: any) => (
+        <span className="font-mono text-sm">{row.original.entry_number}</span>
+      ),
     },
     {
       accessorKey: "entry_date",
       header: "Date",
-      cell: ({ row }: any) => format(new Date(row.original.entry_date), "MMM dd, yyyy"),
+      cell: ({ row }: any) => <DateDisplay date={row.original.entry_date} />,
     },
     {
       accessorKey: "description",
       header: "Description",
+      cell: ({ row }: any) => (
+        <span className="max-w-[300px] truncate block">{row.original.description}</span>
+      ),
     },
     {
       accessorKey: "total_debit",
       header: "Debit",
-      cell: ({ row }: any) => (
-        <span>
-          LKR {(row.original.total_debit || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
-      ),
+      cell: ({ row }: any) => <CurrencyDisplay amount={row.original.total_debit} />,
     },
     {
       accessorKey: "total_credit",
       header: "Credit",
-      cell: ({ row }: any) => (
-        <span>
-          LKR {(row.original.total_credit || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
-      ),
+      cell: ({ row }: any) => <CurrencyDisplay amount={row.original.total_credit} />,
     },
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }: any) => getStatusBadge(row.original.status),
+      cell: ({ row }: any) => <StatusBadge status={row.original.status} />,
     },
     {
       id: "actions",
       header: "Actions",
       cell: ({ row }: any) => (
-        <Button size="sm" variant="outline">
-          <Eye className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline">
+            <Eye className="h-4 w-4" />
+          </Button>
+          {row.original.status === "draft" && (
+            <>
+              <Button size="sm" variant="outline" className="text-green-600">
+                <CheckCircle className="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="outline" className="text-destructive">
+                <XCircle className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
       ),
     },
   ];
@@ -88,10 +94,20 @@ export const JournalEntriesView = () => {
             Record and manage journal entries for financial transactions
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          New Entry
-        </Button>
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Entry
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create Journal Entry</DialogTitle>
+            </DialogHeader>
+            <JournalEntryForm onSuccess={() => setIsFormOpen(false)} />
+          </DialogContent>
+        </Dialog>
       </div>
 
       <DataTable
