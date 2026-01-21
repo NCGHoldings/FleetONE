@@ -672,3 +672,205 @@ export const useRecurringEntries = () => {
     },
   });
 };
+
+// ============ Currencies & Exchange Rates ============
+export const useCurrencies = () => {
+  return useQuery({
+    queryKey: ["currencies"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("currencies" as any)
+        .select("*")
+        .order("currency_code");
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+};
+
+export const useExchangeRates = (baseCurrency?: string) => {
+  return useQuery({
+    queryKey: ["exchange-rates", baseCurrency],
+    queryFn: async () => {
+      let query = supabase
+        .from("exchange_rates" as any)
+        .select("*")
+        .order("effective_date", { ascending: false });
+      if (baseCurrency) {
+        query = query.eq("from_currency", baseCurrency);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+};
+
+// ============ Purchase Requisitions ============
+export const usePurchaseRequisitions = (status?: string) => {
+  return useQuery({
+    queryKey: ["purchase-requisitions", status],
+    queryFn: async () => {
+      let query = supabase
+        .from("purchase_requisitions" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (status) query = query.eq("status", status);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+};
+
+// ============ Fund Transfers ============
+export const useFundTransfers = () => {
+  return useQuery({
+    queryKey: ["fund-transfers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fund_transfers" as any)
+        .select("*")
+        .order("transfer_date", { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+};
+
+// ============ Asset Disposals ============
+export const useAssetDisposals = () => {
+  return useQuery({
+    queryKey: ["asset-disposals"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("asset_disposals")
+        .select(`*, fixed_assets (asset_code, asset_name)`)
+        .order("disposal_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// ============ Bad Debt Provisions ============
+export const useBadDebtProvisions = () => {
+  return useQuery({
+    queryKey: ["bad-debt-provisions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ar_bad_debt_provisions")
+        .select(`*, customers (customer_code, customer_name), ar_invoices (invoice_number)`)
+        .order("provision_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+// ============ Batch & Serial Numbers ============
+export const useBatchNumbers = (itemId?: string) => {
+  return useQuery({
+    queryKey: ["batch-numbers", itemId],
+    queryFn: async () => {
+      let query = supabase
+        .from("batch_numbers")
+        .select(`*, items (item_code, item_name)`)
+        .order("batch_number");
+      if (itemId) query = query.eq("item_id", itemId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+export const useSerialNumbers = (itemId?: string) => {
+  return useQuery({
+    queryKey: ["serial-numbers", itemId],
+    queryFn: async () => {
+      let query = supabase
+        .from("serial_numbers" as any)
+        .select(`*, items (item_code, item_name)`)
+        .order("serial_number");
+      if (itemId) query = query.eq("item_id", itemId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+};
+
+// ============ WHT Certificates ============
+export const useWHTCertificates = () => {
+  return useQuery({
+    queryKey: ["wht-certificates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("wht_certificates" as any)
+        .select(`*, vendors (vendor_code, vendor_name)`)
+        .order("certificate_date", { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+};
+
+// ============ Vendor Performance ============
+export const useVendorPerformance = () => {
+  return useQuery({
+    queryKey: ["vendor-performance"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendor_performance" as any)
+        .select(`*, vendors (vendor_code, vendor_name)`)
+        .order("period_end", { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+};
+
+// ============ Bank Reconciliation Items ============
+export const useBankReconciliationItems = (reconciliationId?: string) => {
+  return useQuery({
+    queryKey: ["bank-reconciliation-items", reconciliationId],
+    queryFn: async () => {
+      let query = supabase
+        .from("bank_reconciliation_items" as any)
+        .select(`*, bank_transactions (*)`)
+        .order("statement_date", { ascending: false });
+      if (reconciliationId) query = query.eq("reconciliation_id", reconciliationId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!reconciliationId,
+  });
+};
+
+// ============ Period Closing Checklist ============
+export const usePeriodClosingChecklist = (periodId?: string) => {
+  return useQuery({
+    queryKey: ["period-closing-checklist", periodId],
+    queryFn: async () => {
+      // Check various conditions for period closing
+      if (!periodId) return null;
+      
+      const [journals, arInvoices, apInvoices, reconciliations] = await Promise.all([
+        supabase.from("journal_entries").select("id, status").eq("period_id", periodId).neq("status", "posted"),
+        supabase.from("ar_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid"),
+        supabase.from("ap_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid"),
+        supabase.from("bank_reconciliations").select("id, status").neq("status", "completed"),
+      ]);
+      
+      return {
+        unpostedJournals: journals.data?.length || 0,
+        unpaidARInvoices: arInvoices.data?.length || 0,
+        unpaidAPInvoices: apInvoices.data?.length || 0,
+        pendingReconciliations: reconciliations.data?.length || 0,
+      };
+    },
+    enabled: !!periodId,
+  });
+};

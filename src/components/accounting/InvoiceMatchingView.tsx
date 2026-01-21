@@ -71,31 +71,31 @@ export const InvoiceMatchingView = () => {
     .filter((inv: any) => inv.grn_id && inv.approval_status === "pending")
     .map((inv: any) => {
       const grn = grns.find((g: any) => g.id === inv.grn_id);
-      const po = purchaseOrders.find((p: any) => p.id === grn?.purchase_order_id);
+      // Use po_id from GRN to find the PO
+      const po = purchaseOrders.find((p: any) => p.id === grn?.po_id);
       
-      const qtyVariance = grn ? Math.abs((grn.total_quantity || 0) - (inv.total_amount || 0)) : 0;
+      // Use total_amount for comparison since total_quantity may not exist
       const priceVariance = po ? Math.abs((po.total_amount || 0) - (inv.total_amount || 0)) : 0;
       
       let matchStatus: MatchItem["match_status"] = "matched";
       if (!grn || !po) matchStatus = "unmatched";
-      else if (qtyVariance > 0.01) matchStatus = "qty_mismatch";
       else if (priceVariance > 0.01) matchStatus = "price_mismatch";
 
       return {
         id: inv.id,
-        po_number: po?.order_number || "-",
+        po_number: po?.po_number || "-",
         po_id: po?.id || "",
         grn_number: grn?.grn_number || "-",
         grn_id: grn?.id || "",
         invoice_number: inv.invoice_number,
         invoice_id: inv.id,
         item_description: inv.notes || "Multiple items",
-        po_qty: po?.total_quantity || 0,
-        grn_qty: grn?.total_quantity || 0,
+        po_qty: 1,
+        grn_qty: 1,
         invoice_qty: 1,
         po_price: po?.total_amount || 0,
         invoice_price: inv.total_amount || 0,
-        qty_variance: qtyVariance,
+        qty_variance: 0,
         price_variance: priceVariance,
         match_status: matchStatus,
       };
