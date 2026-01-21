@@ -998,18 +998,21 @@ export const useConvertPRtoPO = () => {
   return useMutation({
     mutationFn: async (prId: string) => {
       // Get PR details
-      const { data: pr, error: prError } = await supabase.from("purchase_requisitions" as any).select("*").eq("id", prId).single();
+      const { data: prData, error: prError } = await supabase.from("purchase_requisitions" as any).select("*").eq("id", prId).single();
       if (prError) throw prError;
+      
+      const pr = prData as any;
       
       // Create PO from PR
       const { data: po, error: poError } = await supabase.from("purchase_orders").insert([{
         po_number: `PO-${Date.now()}`,
-        vendor_id: pr.vendor_id,
-        po_date: new Date().toISOString().split('T')[0],
-        expected_date: pr.required_date,
-        total_amount: pr.estimated_amount || 0,
+        vendor_id: pr.vendor_id || null,
+        order_date: new Date().toISOString().split('T')[0],
+        expected_date: pr.required_date || null,
+        total_amount: pr.estimated_total || 0,
         status: "draft",
-        notes: `Converted from PR: ${pr.requisition_number}`,
+        notes: `Converted from PR: ${pr.requisition_number || prId}`,
+        pr_id: prId,
       }]).select().single();
       if (poError) throw poError;
       
