@@ -759,6 +759,68 @@ export type Database = {
           },
         ]
       }
+      ap_reconciliations: {
+        Row: {
+          closing_balance: number | null
+          created_at: string | null
+          discrepancy_amount: number | null
+          id: string
+          notes: string | null
+          opening_balance: number | null
+          period_end: string | null
+          period_start: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciliation_date: string
+          status: string | null
+          updated_at: string | null
+          vendor_id: string | null
+          vendor_statement_balance: number | null
+        }
+        Insert: {
+          closing_balance?: number | null
+          created_at?: string | null
+          discrepancy_amount?: number | null
+          id?: string
+          notes?: string | null
+          opening_balance?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date: string
+          status?: string | null
+          updated_at?: string | null
+          vendor_id?: string | null
+          vendor_statement_balance?: number | null
+        }
+        Update: {
+          closing_balance?: number | null
+          created_at?: string | null
+          discrepancy_amount?: number | null
+          id?: string
+          notes?: string | null
+          opening_balance?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date?: string
+          status?: string | null
+          updated_at?: string | null
+          vendor_id?: string | null
+          vendor_statement_balance?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_reconciliations_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_usage_logs: {
         Row: {
           api_name: string
@@ -792,6 +854,48 @@ export type Database = {
           metadata?: Json | null
           query_text?: string | null
           response_status?: string | null
+        }
+        Relationships: []
+      }
+      approval_configurations: {
+        Row: {
+          approver_roles: string[] | null
+          created_at: string | null
+          document_type: string
+          id: string
+          is_active: boolean | null
+          max_amount: number | null
+          min_amount: number | null
+          module: string
+          required_approvers: number | null
+          sequential_approval: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          approver_roles?: string[] | null
+          created_at?: string | null
+          document_type: string
+          id?: string
+          is_active?: boolean | null
+          max_amount?: number | null
+          min_amount?: number | null
+          module: string
+          required_approvers?: number | null
+          sequential_approval?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          approver_roles?: string[] | null
+          created_at?: string | null
+          document_type?: string
+          id?: string
+          is_active?: boolean | null
+          max_amount?: number | null
+          min_amount?: number | null
+          module?: string
+          required_approvers?: number | null
+          sequential_approval?: boolean | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1299,6 +1403,68 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ar_reconciliations: {
+        Row: {
+          closing_balance: number | null
+          created_at: string | null
+          customer_id: string | null
+          customer_statement_balance: number | null
+          discrepancy_amount: number | null
+          id: string
+          notes: string | null
+          opening_balance: number | null
+          period_end: string | null
+          period_start: string | null
+          reconciled_at: string | null
+          reconciled_by: string | null
+          reconciliation_date: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          closing_balance?: number | null
+          created_at?: string | null
+          customer_id?: string | null
+          customer_statement_balance?: number | null
+          discrepancy_amount?: number | null
+          id?: string
+          notes?: string | null
+          opening_balance?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          closing_balance?: number | null
+          created_at?: string | null
+          customer_id?: string | null
+          customer_statement_balance?: number | null
+          discrepancy_amount?: number | null
+          id?: string
+          notes?: string | null
+          opening_balance?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          reconciled_at?: string | null
+          reconciled_by?: string | null
+          reconciliation_date?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_reconciliations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -14644,6 +14810,51 @@ export type Database = {
           ip_address?: string
           submission_count?: number | null
           window_start?: string | null
+        }
+        Relationships: []
+      }
+      user_activity_log: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          description: string | null
+          id: string
+          ip_address: string | null
+          module: string | null
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string | null
+          record_type: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          ip_address?: string | null
+          module?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          record_type?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          ip_address?: string | null
+          module?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          record_type?: string | null
+          user_agent?: string | null
+          user_id?: string
         }
         Relationships: []
       }
