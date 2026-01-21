@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PageAccessGuard } from "@/components/auth/PageAccessGuard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, FileText, DollarSign, TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
+import { BookOpen, FileText, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building2, Users, Package, Truck, Landmark, HardDrive, Calculator, FileCheck, ClipboardCheck, BarChart3, Settings } from "lucide-react";
 import { ChartOfAccountsView } from "@/components/accounting/ChartOfAccountsView";
 import { JournalEntriesView } from "@/components/accounting/JournalEntriesView";
 import { AccountsPayableView } from "@/components/accounting/AccountsPayableView";
@@ -22,13 +22,35 @@ import { ChequeRegisterView } from "@/components/accounting/ChequeRegisterView";
 import { RecurringEntriesView } from "@/components/accounting/RecurringEntriesView";
 import { CashFlowView } from "@/components/accounting/CashFlowView";
 import { DepreciationRunView } from "@/components/accounting/DepreciationRunView";
+// Phase 1 New Components
+import { CurrencyManagementView } from "@/components/accounting/CurrencyManagementView";
+import { FinancialPeriodsView } from "@/components/accounting/FinancialPeriodsView";
+import { PurchaseRequisitionView } from "@/components/accounting/PurchaseRequisitionView";
+import { GoodsReceiptNoteView } from "@/components/accounting/GoodsReceiptNoteView";
+import { InvoiceMatchingView } from "@/components/accounting/InvoiceMatchingView";
+import { BankReconciliationWorksheet } from "@/components/accounting/BankReconciliationWorksheet";
+import { TrialBalanceView } from "@/components/accounting/TrialBalanceView";
+// Phase 2 Components
+import { FundTransferForm } from "@/components/accounting/FundTransferForm";
+import { AssetDisposalForm } from "@/components/accounting/AssetDisposalForm";
+import { BadDebtProvisionView } from "@/components/accounting/BadDebtProvisionView";
+import { PeriodClosingChecklistView } from "@/components/accounting/PeriodClosingChecklistView";
+// Phase 3 Components
+import { BatchSerialTrackingView } from "@/components/accounting/BatchSerialTrackingView";
+import { WHTCertificateView } from "@/components/accounting/WHTCertificateView";
+import { VendorPerformanceView } from "@/components/accounting/VendorPerformanceView";
+
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useState } from "react";
+
+type ModuleTab = "gl" | "ar" | "ap" | "inventory" | "procurement" | "banking" | "assets" | "reports" | "settings";
 
 const Accounting = () => {
+  const [activeModule, setActiveModule] = useState<ModuleTab>("gl");
   const { data: summary, isLoading: summaryLoading } = useAccountingSummary();
   const { data: arInvoices } = useARInvoices();
   const { data: apInvoices } = useAPInvoices();
@@ -49,302 +71,513 @@ const Accounting = () => {
   // Recent journal entries (last 5)
   const recentJournals = journalEntries?.slice(0, 5) || [];
 
+  const moduleButtons = [
+    { id: "gl" as ModuleTab, label: "General Ledger", icon: BookOpen },
+    { id: "ar" as ModuleTab, label: "AR", icon: TrendingUp },
+    { id: "ap" as ModuleTab, label: "AP", icon: TrendingDown },
+    { id: "inventory" as ModuleTab, label: "Inventory", icon: Package },
+    { id: "procurement" as ModuleTab, label: "Procurement", icon: Truck },
+    { id: "banking" as ModuleTab, label: "Banking", icon: Landmark },
+    { id: "assets" as ModuleTab, label: "Fixed Assets", icon: HardDrive },
+    { id: "reports" as ModuleTab, label: "Reports", icon: BarChart3 },
+    { id: "settings" as ModuleTab, label: "Settings", icon: Settings },
+  ];
+
   return (
     <PageAccessGuard pageId="accounting">
       <AppLayout>
         <div className="space-y-6">
           <div>
-            <h1 className="text-3xl font-bold">Accounting & General Ledger</h1>
+            <h1 className="text-3xl font-bold">Finance & Accounting ERP</h1>
             <p className="text-muted-foreground mt-2">
-              Complete accounting management system with chart of accounts, journal entries, AP/AR, and financial statements
+              Complete accounting management with GL, AR/AP, Inventory, Procurement, Banking, Fixed Assets & Reporting
             </p>
           </div>
 
-          <Tabs defaultValue="dashboard" className="space-y-6">
-            <ScrollArea className="w-full whitespace-nowrap">
-              <TabsList className="inline-flex w-max">
-                <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-                <TabsTrigger value="coa">Chart of Accounts</TabsTrigger>
-                <TabsTrigger value="journal">Journal Entries</TabsTrigger>
-                <TabsTrigger value="recurring">Recurring Entries</TabsTrigger>
-                <TabsTrigger value="customers">Customers</TabsTrigger>
-                <TabsTrigger value="vendors">Vendors</TabsTrigger>
-                <TabsTrigger value="ar">Accounts Receivable</TabsTrigger>
-                <TabsTrigger value="ap">Accounts Payable</TabsTrigger>
-                <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                <TabsTrigger value="procurement">Procurement</TabsTrigger>
-                <TabsTrigger value="banking">Banking</TabsTrigger>
-                <TabsTrigger value="cheques">Cheques</TabsTrigger>
-                <TabsTrigger value="assets">Fixed Assets</TabsTrigger>
-                <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
-                <TabsTrigger value="costing">Costing & Budget</TabsTrigger>
-                <TabsTrigger value="tax">Tax Management</TabsTrigger>
-                <TabsTrigger value="statements">Statements</TabsTrigger>
-                <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
-                <TabsTrigger value="approvals">Approvals</TabsTrigger>
-                <TabsTrigger value="audit">Audit & Reports</TabsTrigger>
-              </TabsList>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
+          {/* Module Navigation */}
+          <div className="flex flex-wrap gap-2 pb-2 border-b">
+            {moduleButtons.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveModule(id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  activeModule === id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
 
-            <TabsContent value="dashboard" className="space-y-6">
-              {/* Financial Summary KPIs */}
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Assets</p>
-                      <h3 className="text-2xl font-bold mt-2">
-                        <CurrencyDisplay amount={summary?.totalAssets || 0} />
-                      </h3>
+          {/* General Ledger Module */}
+          {activeModule === "gl" && (
+            <Tabs defaultValue="dashboard" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+                  <TabsTrigger value="coa">Chart of Accounts</TabsTrigger>
+                  <TabsTrigger value="journal">Journal Entries</TabsTrigger>
+                  <TabsTrigger value="recurring">Recurring Entries</TabsTrigger>
+                  <TabsTrigger value="periods">Financial Periods</TabsTrigger>
+                  <TabsTrigger value="currencies">Currencies</TabsTrigger>
+                  <TabsTrigger value="period-closing">Period Closing</TabsTrigger>
+                  <TabsTrigger value="approvals">Approvals</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="dashboard" className="space-y-6">
+                {/* Financial Summary KPIs */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  <Card className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Assets</p>
+                        <h3 className="text-2xl font-bold mt-2">
+                          <CurrencyDisplay amount={summary?.totalAssets || 0} />
+                        </h3>
+                      </div>
+                      <DollarSign className="h-10 w-10 text-primary" />
                     </div>
-                    <DollarSign className="h-10 w-10 text-primary" />
-                  </div>
-                </Card>
+                  </Card>
 
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Liabilities</p>
-                      <h3 className="text-2xl font-bold mt-2">
-                        <CurrencyDisplay amount={summary?.totalLiabilities || 0} />
-                      </h3>
+                  <Card className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Liabilities</p>
+                        <h3 className="text-2xl font-bold mt-2">
+                          <CurrencyDisplay amount={summary?.totalLiabilities || 0} />
+                        </h3>
+                      </div>
+                      <FileText className="h-10 w-10 text-destructive" />
                     </div>
-                    <FileText className="h-10 w-10 text-destructive" />
-                  </div>
-                </Card>
+                  </Card>
 
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Revenue</p>
-                      <h3 className="text-2xl font-bold mt-2 text-green-600">
-                        <CurrencyDisplay amount={summary?.totalRevenue || 0} />
-                      </h3>
+                  <Card className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Revenue</p>
+                        <h3 className="text-2xl font-bold mt-2 text-green-600">
+                          <CurrencyDisplay amount={summary?.totalRevenue || 0} />
+                        </h3>
+                      </div>
+                      <TrendingUp className="h-10 w-10 text-green-600" />
                     </div>
-                    <TrendingUp className="h-10 w-10 text-green-600" />
-                  </div>
-                </Card>
+                  </Card>
 
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Expenses</p>
-                      <h3 className="text-2xl font-bold mt-2 text-orange-600">
-                        <CurrencyDisplay amount={summary?.totalExpenses || 0} />
-                      </h3>
+                  <Card className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Expenses</p>
+                        <h3 className="text-2xl font-bold mt-2 text-orange-600">
+                          <CurrencyDisplay amount={summary?.totalExpenses || 0} />
+                        </h3>
+                      </div>
+                      <TrendingDown className="h-10 w-10 text-orange-600" />
                     </div>
-                    <TrendingDown className="h-10 w-10 text-orange-600" />
-                  </div>
-                </Card>
-              </div>
-
-              {/* Net Income Card */}
-              <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Net Income (Revenue - Expenses)</p>
-                    <h3 className={`text-3xl font-bold mt-2 ${(summary?.netIncome || 0) >= 0 ? "text-green-600" : "text-destructive"}`}>
-                      <CurrencyDisplay amount={summary?.netIncome || 0} />
-                    </h3>
-                  </div>
-                  <BookOpen className="h-12 w-12 text-primary opacity-50" />
+                  </Card>
                 </div>
-              </Card>
 
-              {/* AR/AP Overview */}
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-green-600" />
-                    Accounts Receivable Overview
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Total Outstanding</span>
-                      <span className="font-semibold">
-                        <CurrencyDisplay amount={arInvoices?.reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0} />
-                      </span>
+                {/* Net Income Card */}
+                <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Net Income (Revenue - Expenses)</p>
+                      <h3 className={`text-3xl font-bold mt-2 ${(summary?.netIncome || 0) >= 0 ? "text-green-600" : "text-destructive"}`}>
+                        <CurrencyDisplay amount={summary?.netIncome || 0} />
+                      </h3>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Overdue Invoices</span>
-                      <Badge variant="destructive">{arOverdue.length}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Overdue Amount</span>
-                      <span className="font-semibold text-destructive">
-                        <CurrencyDisplay amount={arOverdueAmount} />
-                      </span>
-                    </div>
+                    <BookOpen className="h-12 w-12 text-primary opacity-50" />
                   </div>
                 </Card>
 
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <TrendingDown className="h-5 w-5 text-orange-600" />
-                    Accounts Payable Overview
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Total Outstanding</span>
-                      <span className="font-semibold">
-                        <CurrencyDisplay amount={apInvoices?.reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0} />
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Overdue Invoices</span>
-                      <Badge variant="destructive">{apOverdue.length}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Overdue Amount</span>
-                      <span className="font-semibold text-destructive">
-                        <CurrencyDisplay amount={apOverdueAmount} />
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Recent Activity */}
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Recent Journal Entries</h3>
-                  {recentJournals.length > 0 ? (
+                {/* AR/AP Overview */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card className="p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                      Accounts Receivable Overview
+                    </h3>
                     <div className="space-y-3">
-                      {recentJournals.map((entry) => (
-                        <div key={entry.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                          <div>
-                            <p className="font-medium">{entry.entry_number}</p>
-                            <p className="text-sm text-muted-foreground">{entry.description}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold">
-                              <CurrencyDisplay amount={entry.total_debit || 0} />
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(new Date(entry.entry_date), "MMM dd, yyyy")}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Total Outstanding</span>
+                        <span className="font-semibold">
+                          <CurrencyDisplay amount={arInvoices?.reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0} />
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Overdue Invoices</span>
+                        <Badge variant="destructive">{arOverdue.length}</Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Overdue Amount</span>
+                        <span className="font-semibold text-destructive">
+                          <CurrencyDisplay amount={arOverdueAmount} />
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No recent entries</p>
-                  )}
-                </Card>
+                  </Card>
 
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-yellow-600" />
-                    Alerts & Notifications
-                  </h3>
-                  <div className="space-y-3">
-                    {arOverdue.length > 0 && (
-                      <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg">
-                        <AlertCircle className="h-5 w-5 text-destructive" />
-                        <div>
-                          <p className="font-medium text-destructive">{arOverdue.length} AR invoices overdue</p>
-                          <p className="text-sm text-muted-foreground">
-                            Total: <CurrencyDisplay amount={arOverdueAmount} />
-                          </p>
-                        </div>
+                  <Card className="p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <TrendingDown className="h-5 w-5 text-orange-600" />
+                      Accounts Payable Overview
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Total Outstanding</span>
+                        <span className="font-semibold">
+                          <CurrencyDisplay amount={apInvoices?.reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0} />
+                        </span>
                       </div>
-                    )}
-                    {apOverdue.length > 0 && (
-                      <div className="flex items-center gap-3 p-3 bg-orange-500/10 rounded-lg">
-                        <AlertCircle className="h-5 w-5 text-orange-600" />
-                        <div>
-                          <p className="font-medium text-orange-600">{apOverdue.length} AP invoices overdue</p>
-                          <p className="text-sm text-muted-foreground">
-                            Total: <CurrencyDisplay amount={apOverdueAmount} />
-                          </p>
-                        </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Overdue Invoices</span>
+                        <Badge variant="destructive">{apOverdue.length}</Badge>
                       </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Overdue Amount</span>
+                        <span className="font-semibold text-destructive">
+                          <CurrencyDisplay amount={apOverdueAmount} />
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Recent Activity */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card className="p-6">
+                    <h3 className="text-lg font-semibold mb-4">Recent Journal Entries</h3>
+                    {recentJournals.length > 0 ? (
+                      <div className="space-y-3">
+                        {recentJournals.map((entry) => (
+                          <div key={entry.id} className="flex justify-between items-center py-2 border-b last:border-0">
+                            <div>
+                              <p className="font-medium">{entry.entry_number}</p>
+                              <p className="text-sm text-muted-foreground">{entry.description}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold">
+                                <CurrencyDisplay amount={entry.total_debit || 0} />
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(entry.entry_date), "MMM dd, yyyy")}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No recent entries</p>
                     )}
-                    {arOverdue.length === 0 && apOverdue.length === 0 && (
-                      <p className="text-sm text-muted-foreground">No overdue accounts</p>
-                    )}
-                  </div>
-                </Card>
-              </div>
-            </TabsContent>
+                  </Card>
 
-            <TabsContent value="coa">
-              <ChartOfAccountsView />
-            </TabsContent>
+                  <Card className="p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-yellow-600" />
+                      Alerts & Notifications
+                    </h3>
+                    <div className="space-y-3">
+                      {arOverdue.length > 0 && (
+                        <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg">
+                          <AlertCircle className="h-5 w-5 text-destructive" />
+                          <div>
+                            <p className="font-medium text-destructive">{arOverdue.length} AR invoices overdue</p>
+                            <p className="text-sm text-muted-foreground">
+                              Total: <CurrencyDisplay amount={arOverdueAmount} />
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {apOverdue.length > 0 && (
+                        <div className="flex items-center gap-3 p-3 bg-orange-500/10 rounded-lg">
+                          <AlertCircle className="h-5 w-5 text-orange-600" />
+                          <div>
+                            <p className="font-medium text-orange-600">{apOverdue.length} AP invoices overdue</p>
+                            <p className="text-sm text-muted-foreground">
+                              Total: <CurrencyDisplay amount={apOverdueAmount} />
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {arOverdue.length === 0 && apOverdue.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No overdue accounts</p>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+              </TabsContent>
 
-            <TabsContent value="journal">
-              <JournalEntriesView />
-            </TabsContent>
+              <TabsContent value="coa">
+                <ChartOfAccountsView />
+              </TabsContent>
 
-            <TabsContent value="recurring">
-              <RecurringEntriesView />
-            </TabsContent>
+              <TabsContent value="journal">
+                <JournalEntriesView />
+              </TabsContent>
 
-            <TabsContent value="customers">
-              <CustomerMasterView />
-            </TabsContent>
+              <TabsContent value="recurring">
+                <RecurringEntriesView />
+              </TabsContent>
 
-            <TabsContent value="vendors">
-              <VendorMasterView />
-            </TabsContent>
+              <TabsContent value="periods">
+                <FinancialPeriodsView />
+              </TabsContent>
 
-            <TabsContent value="ar">
-              <AccountsReceivableView />
-            </TabsContent>
+              <TabsContent value="currencies">
+                <CurrencyManagementView />
+              </TabsContent>
 
-            <TabsContent value="ap">
-              <AccountsPayableView />
-            </TabsContent>
+              <TabsContent value="period-closing">
+                <PeriodClosingChecklistView />
+              </TabsContent>
 
-            <TabsContent value="inventory">
-              <InventoryView />
-            </TabsContent>
+              <TabsContent value="approvals">
+                <PendingApprovalsView />
+              </TabsContent>
+            </Tabs>
+          )}
 
-            <TabsContent value="procurement">
-              <PurchaseOrderView />
-            </TabsContent>
+          {/* Accounts Receivable Module */}
+          {activeModule === "ar" && (
+            <Tabs defaultValue="customers" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="customers">Customers</TabsTrigger>
+                  <TabsTrigger value="invoices">Invoices</TabsTrigger>
+                  <TabsTrigger value="receipts">Receipts</TabsTrigger>
+                  <TabsTrigger value="bad-debts">Bad Debt Provisions</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
 
-            <TabsContent value="banking">
-              <BankingView />
-            </TabsContent>
+              <TabsContent value="customers">
+                <CustomerMasterView />
+              </TabsContent>
 
-            <TabsContent value="cheques">
-              <ChequeRegisterView />
-            </TabsContent>
+              <TabsContent value="invoices">
+                <AccountsReceivableView />
+              </TabsContent>
 
-            <TabsContent value="assets">
-              <FixedAssetsView />
-            </TabsContent>
+              <TabsContent value="receipts">
+                <AccountsReceivableView />
+              </TabsContent>
 
-            <TabsContent value="depreciation">
-              <DepreciationRunView />
-            </TabsContent>
+              <TabsContent value="bad-debts">
+                <BadDebtProvisionView />
+              </TabsContent>
+            </Tabs>
+          )}
 
-            <TabsContent value="costing">
-              <CostingBudgetView />
-            </TabsContent>
+          {/* Accounts Payable Module */}
+          {activeModule === "ap" && (
+            <Tabs defaultValue="vendors" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="vendors">Vendors</TabsTrigger>
+                  <TabsTrigger value="invoices">Invoices</TabsTrigger>
+                  <TabsTrigger value="payments">Payments</TabsTrigger>
+                  <TabsTrigger value="wht">WHT Certificates</TabsTrigger>
+                  <TabsTrigger value="vendor-performance">Vendor Performance</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
 
-            <TabsContent value="tax">
-              <TaxManagementView />
-            </TabsContent>
+              <TabsContent value="vendors">
+                <VendorMasterView />
+              </TabsContent>
 
-            <TabsContent value="statements">
-              <FinancialStatementsView />
-            </TabsContent>
+              <TabsContent value="invoices">
+                <AccountsPayableView />
+              </TabsContent>
 
-            <TabsContent value="cashflow">
-              <CashFlowView />
-            </TabsContent>
+              <TabsContent value="payments">
+                <AccountsPayableView />
+              </TabsContent>
 
-            <TabsContent value="approvals">
-              <PendingApprovalsView />
-            </TabsContent>
+              <TabsContent value="wht">
+                <WHTCertificateView />
+              </TabsContent>
 
-            <TabsContent value="audit">
-              <AuditReportsView />
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="vendor-performance">
+                <VendorPerformanceView />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* Inventory Module */}
+          {activeModule === "inventory" && (
+            <Tabs defaultValue="items" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="items">Items</TabsTrigger>
+                  <TabsTrigger value="stock">Stock Levels</TabsTrigger>
+                  <TabsTrigger value="batch-serial">Batch/Serial Tracking</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="items">
+                <InventoryView />
+              </TabsContent>
+
+              <TabsContent value="stock">
+                <InventoryView />
+              </TabsContent>
+
+              <TabsContent value="batch-serial">
+                <BatchSerialTrackingView />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* Procurement Module */}
+          {activeModule === "procurement" && (
+            <Tabs defaultValue="requisitions" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="requisitions">Purchase Requisitions</TabsTrigger>
+                  <TabsTrigger value="orders">Purchase Orders</TabsTrigger>
+                  <TabsTrigger value="grn">Goods Receipt Notes</TabsTrigger>
+                  <TabsTrigger value="matching">Invoice Matching</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="requisitions">
+                <PurchaseRequisitionView />
+              </TabsContent>
+
+              <TabsContent value="orders">
+                <PurchaseOrderView />
+              </TabsContent>
+
+              <TabsContent value="grn">
+                <GoodsReceiptNoteView />
+              </TabsContent>
+
+              <TabsContent value="matching">
+                <InvoiceMatchingView />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* Banking Module */}
+          {activeModule === "banking" && (
+            <Tabs defaultValue="accounts" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="accounts">Bank Accounts</TabsTrigger>
+                  <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                  <TabsTrigger value="cheques">Cheque Register</TabsTrigger>
+                  <TabsTrigger value="reconciliation">Bank Reconciliation</TabsTrigger>
+                  <TabsTrigger value="transfers">Fund Transfers</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="accounts">
+                <BankingView />
+              </TabsContent>
+
+              <TabsContent value="transactions">
+                <BankingView />
+              </TabsContent>
+
+              <TabsContent value="cheques">
+                <ChequeRegisterView />
+              </TabsContent>
+
+              <TabsContent value="reconciliation">
+                <BankReconciliationWorksheet />
+              </TabsContent>
+
+              <TabsContent value="transfers">
+                <FundTransferForm />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* Fixed Assets Module */}
+          {activeModule === "assets" && (
+            <Tabs defaultValue="register" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="register">Asset Register</TabsTrigger>
+                  <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
+                  <TabsTrigger value="disposals">Disposals</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="register">
+                <FixedAssetsView />
+              </TabsContent>
+
+              <TabsContent value="depreciation">
+                <DepreciationRunView />
+              </TabsContent>
+
+              <TabsContent value="disposals">
+                <AssetDisposalForm />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* Reports Module */}
+          {activeModule === "reports" && (
+            <Tabs defaultValue="trial-balance" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
+                  <TabsTrigger value="statements">Financial Statements</TabsTrigger>
+                  <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
+                  <TabsTrigger value="tax">Tax Reports</TabsTrigger>
+                  <TabsTrigger value="audit">Audit & Logs</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="trial-balance">
+                <TrialBalanceView />
+              </TabsContent>
+
+              <TabsContent value="statements">
+                <FinancialStatementsView />
+              </TabsContent>
+
+              <TabsContent value="cashflow">
+                <CashFlowView />
+              </TabsContent>
+
+              <TabsContent value="tax">
+                <TaxManagementView />
+              </TabsContent>
+
+              <TabsContent value="audit">
+                <AuditReportsView />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* Settings Module */}
+          {activeModule === "settings" && (
+            <Tabs defaultValue="costing" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="costing">Costing & Budget</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="costing">
+                <CostingBudgetView />
+              </TabsContent>
+            </Tabs>
+          )}
         </div>
       </AppLayout>
     </PageAccessGuard>
