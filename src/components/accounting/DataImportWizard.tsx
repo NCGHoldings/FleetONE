@@ -298,14 +298,14 @@ export const DataImportWizard = () => {
                   <div className="w-1/3 font-medium">{mapping.sourceColumn}</div>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   <Select 
-                    value={mapping.targetField} 
-                    onValueChange={(v) => handleMappingChange(mapping.sourceColumn, v)}
+                    value={mapping.targetField || "_ignore"} 
+                    onValueChange={(v) => handleMappingChange(mapping.sourceColumn, v === "_ignore" ? "" : v)}
                   >
                     <SelectTrigger className="w-1/3">
                       <SelectValue placeholder="Select field" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">— Ignore —</SelectItem>
+                      <SelectItem value="_ignore">— Ignore —</SelectItem>
                       {selectedType?.fields.map(field => (
                         <SelectItem key={field} value={field}>{field}</SelectItem>
                       ))}
