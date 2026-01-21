@@ -85,8 +85,8 @@ export const PurchaseOrderForm = ({ open, onOpenChange }: PurchaseOrderFormProps
           ...line,
           item_id: itemId,
           description: item.item_name,
-          unit_price: item.unit_cost || 0,
-          line_total: line.quantity * (item.unit_cost || 0),
+          unit_price: item.last_purchase_price || 0,
+          line_total: line.quantity * (item.last_purchase_price || 0),
         };
       }));
     }

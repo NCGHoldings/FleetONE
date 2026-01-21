@@ -52,9 +52,9 @@ export const InventoryView = () => {
       cell: ({ row }: any) => row.original.unit_of_measure || "EA",
     },
     {
-      accessorKey: "unit_cost",
+      accessorKey: "last_purchase_price",
       header: "Unit Cost",
-      cell: ({ row }: any) => <CurrencyDisplay amount={row.original.unit_cost || 0} />,
+      cell: ({ row }: any) => <CurrencyDisplay amount={row.original.last_purchase_price || 0} />,
     },
     {
       accessorKey: "selling_price",
@@ -62,27 +62,17 @@ export const InventoryView = () => {
       cell: ({ row }: any) => <CurrencyDisplay amount={row.original.selling_price || 0} />,
     },
     {
-      accessorKey: "quantity_on_hand",
-      header: "Qty on Hand",
-      cell: ({ row }: any) => {
-        const qty = row.original.quantity_on_hand || 0;
-        const reorder = row.original.reorder_level || 0;
-        const status = getStockStatus(qty, reorder);
-        return (
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">{qty}</span>
-            <Badge variant={status.variant}>{status.label}</Badge>
-          </div>
-        );
-      },
+      accessorKey: "reorder_level",
+      header: "Reorder Level",
+      cell: ({ row }: any) => row.original.reorder_level || 0,
     },
     {
-      accessorKey: "total_value",
-      header: "Stock Value",
+      accessorKey: "is_active",
+      header: "Status",
       cell: ({ row }: any) => (
-        <CurrencyDisplay 
-          amount={(row.original.quantity_on_hand || 0) * (row.original.unit_cost || 0)} 
-        />
+        <Badge variant={row.original.is_active ? "default" : "secondary"}>
+          {row.original.is_active ? "Active" : "Inactive"}
+        </Badge>
       ),
     },
     {
@@ -109,48 +99,49 @@ export const InventoryView = () => {
       ),
     },
     {
-      accessorKey: "location",
+      accessorKey: "warehouse_id",
       header: "Location/Warehouse",
-      cell: ({ row }: any) => row.original.location || "Main Warehouse",
+      cell: ({ row }: any) => row.original.warehouse_id || "Main Warehouse",
     },
     {
-      accessorKey: "quantity",
+      accessorKey: "quantity_on_hand",
       header: "Quantity",
       cell: ({ row }: any) => (
-        <span className="font-semibold">{row.original.quantity || 0}</span>
+        <span className="font-semibold">{row.original.quantity_on_hand || 0}</span>
       ),
     },
     {
-      accessorKey: "reserved_quantity",
+      accessorKey: "quantity_reserved",
       header: "Reserved",
-      cell: ({ row }: any) => row.original.reserved_quantity || 0,
+      cell: ({ row }: any) => row.original.quantity_reserved || 0,
     },
     {
-      accessorKey: "available_quantity",
+      accessorKey: "quantity_available",
       header: "Available",
       cell: ({ row }: any) => {
-        const available = (row.original.quantity || 0) - (row.original.reserved_quantity || 0);
+        const available = row.original.quantity_available || 0;
         return <span className="font-semibold text-green-600">{available}</span>;
       },
     },
     {
-      accessorKey: "last_movement_date",
-      header: "Last Movement",
-      cell: ({ row }: any) => 
-        row.original.last_movement_date 
-          ? new Date(row.original.last_movement_date).toLocaleDateString()
-          : "-",
+      accessorKey: "average_cost",
+      header: "Avg Cost",
+      cell: ({ row }: any) => <CurrencyDisplay amount={row.original.average_cost || 0} />,
+    },
+    {
+      accessorKey: "total_value",
+      header: "Total Value",
+      cell: ({ row }: any) => <CurrencyDisplay amount={row.original.total_value || 0} />,
     },
   ];
 
   const totalItems = items?.length || 0;
-  const lowStockItems = items?.filter(item => 
-    (item.quantity_on_hand || 0) <= (item.reorder_level || 0) && (item.quantity_on_hand || 0) > 0
+  const totalStockQuantity = stock?.reduce((sum, s) => sum + (s.quantity_on_hand || 0), 0) || 0;
+  const lowStockItems = stock?.filter(s => 
+    (s.quantity_on_hand || 0) <= 10 && (s.quantity_on_hand || 0) > 0
   ).length || 0;
-  const outOfStockItems = items?.filter(item => (item.quantity_on_hand || 0) <= 0).length || 0;
-  const totalStockValue = items?.reduce((sum, item) => 
-    sum + ((item.quantity_on_hand || 0) * (item.unit_cost || 0)), 0
-  ) || 0;
+  const outOfStockItems = stock?.filter(s => (s.quantity_on_hand || 0) <= 0).length || 0;
+  const totalStockValue = stock?.reduce((sum, s) => sum + (s.total_value || 0), 0) || 0;
 
   return (
     <div className="space-y-6">
@@ -255,7 +246,7 @@ export const InventoryView = () => {
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Valuation: {cat.valuation_method || "Weighted Average"}
+                    Valuation: Weighted Average
                   </p>
                 </Card>
               ))}

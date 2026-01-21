@@ -850,7 +850,7 @@ export const useCreatePurchaseOrder = () => {
       const { data: result, error } = await supabase.from("purchase_orders").insert([{ ...poData, status: "draft" }]).select().single();
       if (error) throw error;
       if (lines?.length) {
-        await supabase.from("purchase_order_lines").insert(lines.map((l: any) => ({ ...l, purchase_order_id: result.id })));
+        await supabase.from("purchase_order_lines" as any).insert(lines.map((l: any) => ({ ...l, purchase_order_id: result.id })));
       }
       return result;
     },
@@ -885,7 +885,7 @@ export const useCreateRecurringEntry = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: any) => {
-      const { data: result, error } = await supabase.from("recurring_journal_entries").insert([data]).select().single();
+      const { data: result, error } = await supabase.from("recurring_journal_entries" as any).insert([data]).select().single();
       if (error) throw error;
       return result;
     },
@@ -901,7 +901,7 @@ export const useRunRecurringEntry = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("recurring_journal_entries").update({ last_run_date: new Date().toISOString() }).eq("id", id);
+      const { error } = await supabase.from("recurring_journal_entries" as any).update({ last_run_date: new Date().toISOString().split('T')[0] }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
