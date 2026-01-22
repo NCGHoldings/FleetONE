@@ -72,6 +72,7 @@ import { CompanySwitcher } from "@/components/accounting/CompanySwitcher";
 // Settings Components
 import { CompanySettingsView } from "@/components/accounting/settings/CompanySettingsView";
 import { DocumentTemplateManager } from "@/components/accounting/settings/DocumentTemplateManager";
+import { ModuleIntegrationView } from "@/components/accounting/settings/ModuleIntegrationView";
 
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
@@ -695,6 +696,7 @@ const Accounting = () => {
               <ScrollArea className="w-full whitespace-nowrap">
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="companies">Companies</TabsTrigger>
+                  <TabsTrigger value="module-integration">Module Integration</TabsTrigger>
                   <TabsTrigger value="templates">Document Templates</TabsTrigger>
                   <TabsTrigger value="costing">Costing & Budget</TabsTrigger>
                   <TabsTrigger value="approval-config">Approval Workflow</TabsTrigger>
@@ -707,6 +709,10 @@ const Accounting = () => {
 
               <TabsContent value="companies">
                 <CompanySettingsView />
+              </TabsContent>
+
+              <TabsContent value="module-integration">
+                <ModuleIntegrationView />
               </TabsContent>
 
               <TabsContent value="templates">
