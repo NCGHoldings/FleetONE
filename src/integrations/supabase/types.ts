@@ -12275,6 +12275,8 @@ export type Database = {
           id: string
           invoice_month: string
           invoice_number: string
+          paid_amount: number | null
+          payment_id: string | null
           status: string | null
           student_id: string
         }
@@ -12286,6 +12288,8 @@ export type Database = {
           id?: string
           invoice_month: string
           invoice_number: string
+          paid_amount?: number | null
+          payment_id?: string | null
           status?: string | null
           student_id: string
         }
@@ -12297,6 +12301,8 @@ export type Database = {
           id?: string
           invoice_month?: string
           invoice_number?: string
+          paid_amount?: number | null
+          payment_id?: string | null
           status?: string | null
           student_id?: string
         }
@@ -12313,6 +12319,13 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "school_ar_invoice_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_ar_invoices_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "school_payment_transactions"
             referencedColumns: ["id"]
           },
           {
@@ -20360,6 +20373,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_payment_to_invoices: {
+        Args: {
+          p_payment_amount: number
+          p_payment_id: string
+          p_student_id: string
+        }
+        Returns: number
+      }
       calculate_expenses_from_details: {
         Args: { details: Json }
         Returns: number

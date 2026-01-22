@@ -113,6 +113,12 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
         }
       }
 
+      // Note: The database trigger 'update_student_balance_on_payment_trigger' 
+      // automatically updates:
+      // 1. Student's current_amount_due (decreases by amount_paid)
+      // 2. Student's payment_balance (set to payment_balance_after)
+      // 3. School AR invoices status (marks as 'paid' or 'partial' using FIFO)
+
       toast.success("Payment recorded successfully");
       onSuccess();
       onClose();

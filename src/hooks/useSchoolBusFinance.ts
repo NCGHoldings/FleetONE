@@ -283,7 +283,17 @@ export function useGenerateBulkARInvoices() {
 
       if (batchError) throw batchError;
 
-      // Create individual invoices
+      // Get branch info for customer naming
+      const { data: branchData } = await supabase
+        .from("school_branches")
+        .select("branch_name, branch_code")
+        .eq("id", branchId)
+        .single();
+
+      const branchCode = branchData?.branch_code || "SBS";
+      const branchName = branchData?.branch_name || "School Bus";
+
+      // Create individual school invoices
       const invoicePromises = students.map(async (student, index) => {
         const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(index + 1).padStart(5, "0")}`;
         const amount = student.current_amount_due || student.fixed_monthly_amount || 0;
@@ -297,6 +307,7 @@ export function useGenerateBulkARInvoices() {
             invoice_month: format(invoiceMonth, "yyyy-MM-dd"),
             amount: amount,
             status: "pending",
+            paid_amount: 0,
           })
           .select()
           .single();
@@ -307,8 +318,61 @@ export function useGenerateBulkARInvoices() {
 
       await Promise.all(invoicePromises);
 
-      // If auto-post enabled, create journal entry
+      // If auto-post enabled, create journal entry AND link to Finance ERP AR
       if (settings.auto_post_invoices && settings.trade_receivable_account_id && settings.sbs_collection_account_id) {
+        // Get or create a customer for this branch in Finance ERP
+        let customerId: string | null = null;
+        const { data: existingCustomer } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("company_id", selectedCompanyId)
+          .eq("customer_code", `SBS-${branchCode}`)
+          .maybeSingle();
+
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
+        } else {
+          const { data: newCustomer, error: customerError } = await supabase
+            .from("customers")
+            .insert({
+              company_id: selectedCompanyId,
+              customer_code: `SBS-${branchCode}`,
+              customer_name: `School Bus Students - ${branchName}`,
+              is_active: true,
+            })
+            .select()
+            .single();
+
+          if (!customerError && newCustomer) {
+            customerId = newCustomer.id;
+          }
+        }
+
+        // Create Finance ERP AR Invoice (aggregated for the batch)
+        let arInvoiceId: string | null = null;
+        if (customerId) {
+          const { data: arInvoice, error: arError } = await supabase
+            .from("ar_invoices")
+            .insert({
+              company_id: selectedCompanyId,
+              customer_id: customerId,
+              invoice_number: batchNumber,
+              invoice_date: format(new Date(), "yyyy-MM-dd"),
+              due_date: format(new Date(new Date().setDate(new Date().getDate() + 30)), "yyyy-MM-dd"),
+              total_amount: totalAmount,
+              balance: totalAmount,
+              status: "unpaid",
+              reference: `School Bus Batch: ${batchNumber}`,
+              notes: `Auto-generated from School Bus module for ${students.length} students`,
+            })
+            .select()
+            .single();
+
+          if (!arError && arInvoice) {
+            arInvoiceId = arInvoice.id;
+          }
+        }
+
         const entryNumber = `SBS-JE-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
         // Create journal entry
@@ -329,6 +393,14 @@ export function useGenerateBulkARInvoices() {
           .single();
 
         if (jeError) throw jeError;
+
+        // Link AR Invoice to Journal Entry
+        if (arInvoiceId) {
+          await supabase
+            .from("ar_invoices")
+            .update({ journal_entry_id: journalEntry.id })
+            .eq("id", arInvoiceId);
+        }
 
         // Create journal entry lines
         const { error: linesError } = await supabase
@@ -367,10 +439,13 @@ export function useGenerateBulkARInvoices() {
           })
           .eq("id", batch.id);
 
-        // Update individual invoices status
+        // Update individual school invoices status and link to AR invoice
         await supabase
           .from("school_ar_invoices")
-          .update({ status: "posted" })
+          .update({ 
+            status: "posted",
+            ar_invoice_id: arInvoiceId,
+          })
           .eq("batch_id", batch.id);
       }
 
@@ -382,6 +457,8 @@ export function useGenerateBulkARInvoices() {
       queryClient.invalidateQueries({ queryKey: ["students-bulk-ar"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
       toast.success("AR invoices generated successfully");
     },
     onError: (error) => {
@@ -510,6 +587,9 @@ export function usePostPaymentToGL() {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["school-students"] });
+      queryClient.invalidateQueries({ queryKey: ["school-ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
       toast.success("Payment posted to GL successfully");
     },
     onError: (error) => {
