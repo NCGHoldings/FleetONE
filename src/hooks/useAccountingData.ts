@@ -824,7 +824,7 @@ export const useItemCategories = () => {
   return useQuery({
     queryKey: ["item-categories", selectedCompanyId],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from("item_categories")
         .select("*")
         .order("category_name");
