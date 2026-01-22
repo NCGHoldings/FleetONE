@@ -6524,6 +6524,73 @@ export type Database = {
           },
         ]
       }
+      gl_posting_log: {
+        Row: {
+          company_id: string
+          error_message: string | null
+          id: string
+          journal_entry_id: string | null
+          mapping_id: string | null
+          notes: string | null
+          posted_amount: number
+          posted_at: string | null
+          posted_by: string | null
+          source_record_id: string
+          source_table: string
+          status: string | null
+        }
+        Insert: {
+          company_id: string
+          error_message?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          mapping_id?: string | null
+          notes?: string | null
+          posted_amount: number
+          posted_at?: string | null
+          posted_by?: string | null
+          source_record_id: string
+          source_table: string
+          status?: string | null
+        }
+        Update: {
+          company_id?: string
+          error_message?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          mapping_id?: string | null
+          notes?: string | null
+          posted_amount?: number
+          posted_at?: string | null
+          posted_by?: string | null
+          source_record_id?: string
+          source_table?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gl_posting_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_posting_log_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gl_posting_log_mapping_id_fkey"
+            columns: ["mapping_id"]
+            isOneToOne: false
+            referencedRelation: "module_gl_mappings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goods_receipt_lines: {
         Row: {
           company_id: string | null
@@ -9994,6 +10061,91 @@ export type Database = {
           },
         ]
       }
+      module_gl_mappings: {
+        Row: {
+          amount_field: string
+          auto_post: boolean | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          credit_account_id: string | null
+          date_field: string | null
+          debit_account_id: string | null
+          description_template: string | null
+          event_name: string
+          id: string
+          is_active: boolean | null
+          module_name: string
+          reference_field: string | null
+          requires_approval: boolean | null
+          source_table: string
+          transaction_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount_field?: string
+          auto_post?: boolean | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          credit_account_id?: string | null
+          date_field?: string | null
+          debit_account_id?: string | null
+          description_template?: string | null
+          event_name: string
+          id?: string
+          is_active?: boolean | null
+          module_name: string
+          reference_field?: string | null
+          requires_approval?: boolean | null
+          source_table: string
+          transaction_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount_field?: string
+          auto_post?: boolean | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          credit_account_id?: string | null
+          date_field?: string | null
+          debit_account_id?: string | null
+          description_template?: string | null
+          event_name?: string
+          id?: string
+          is_active?: boolean | null
+          module_name?: string
+          reference_field?: string | null
+          requires_approval?: boolean | null
+          source_table?: string
+          transaction_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_gl_mappings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_gl_mappings_credit_account_id_fkey"
+            columns: ["credit_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_gl_mappings_debit_account_id_fkey"
+            columns: ["debit_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       multi_day_route_config: {
         Row: {
           created_at: string | null
@@ -10411,6 +10563,89 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      pending_gl_postings: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string
+          created_at: string | null
+          credit_account_id: string | null
+          debit_account_id: string | null
+          description: string | null
+          id: string
+          mapping_id: string | null
+          rejection_reason: string | null
+          source_record_id: string
+          source_table: string
+          status: string | null
+          transaction_date: string
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id: string
+          created_at?: string | null
+          credit_account_id?: string | null
+          debit_account_id?: string | null
+          description?: string | null
+          id?: string
+          mapping_id?: string | null
+          rejection_reason?: string | null
+          source_record_id: string
+          source_table: string
+          status?: string | null
+          transaction_date: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string
+          created_at?: string | null
+          credit_account_id?: string | null
+          debit_account_id?: string | null
+          description?: string | null
+          id?: string
+          mapping_id?: string | null
+          rejection_reason?: string | null
+          source_record_id?: string
+          source_table?: string
+          status?: string | null
+          transaction_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_gl_postings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_gl_postings_credit_account_id_fkey"
+            columns: ["credit_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_gl_postings_debit_account_id_fkey"
+            columns: ["debit_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_gl_postings_mapping_id_fkey"
+            columns: ["mapping_id"]
+            isOneToOne: false
+            referencedRelation: "module_gl_mappings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pending_invites: {
         Row: {
@@ -19860,6 +20095,18 @@ export type Database = {
       increment_name_suggestion: {
         Args: { p_name: string }
         Returns: undefined
+      }
+      post_pending_gl_entry: { Args: { p_pending_id: string }; Returns: string }
+      process_gl_posting: {
+        Args: {
+          p_amount: number
+          p_company_id: string
+          p_description?: string
+          p_source_record_id: string
+          p_source_table: string
+          p_transaction_date: string
+        }
+        Returns: string
       }
       storage_apply_conservative_policies: { Args: never; Returns: undefined }
       sync_all_tyre_conditions: { Args: never; Returns: undefined }
