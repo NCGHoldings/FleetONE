@@ -1007,6 +1007,39 @@ export const useCreateItem = () => {
   });
 };
 
+export const useCreateItemCategory = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (category: {
+      category_code: string;
+      category_name: string;
+      parent_category_id?: string;
+      inventory_account_id?: string;
+      cogs_account_id?: string;
+      sales_account_id?: string;
+      valuation_method?: string;
+      is_active?: boolean;
+    }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data, error } = await (supabase as any)
+        .from("item_categories")
+        .insert([{ ...category, company_id: selectedCompanyId }])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["item-categories", selectedCompanyId] });
+      toast.success("Category created");
+    },
+    onError: (error: any) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
 export const useCreateStockAdjustment = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();

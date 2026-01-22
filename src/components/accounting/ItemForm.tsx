@@ -17,12 +17,12 @@ const itemSchema = z.object({
   description: z.string().optional(),
   category_id: z.string().optional(),
   unit_of_measure: z.string().min(1, "Unit of measure is required"),
-  unit_cost: z.coerce.number().min(0, "Unit cost must be positive"),
+  standard_cost: z.coerce.number().min(0, "Unit cost must be positive"),
   selling_price: z.coerce.number().min(0, "Selling price must be positive"),
   reorder_level: z.coerce.number().min(0, "Reorder level must be positive"),
   reorder_quantity: z.coerce.number().min(0, "Reorder quantity must be positive"),
   is_active: z.boolean().default(true),
-  is_stockable: z.boolean().default(true),
+  is_batch_tracked: z.boolean().default(false),
 });
 
 type ItemFormData = z.infer<typeof itemSchema>;
@@ -43,12 +43,12 @@ export const ItemForm = ({ open, onOpenChange }: ItemFormProps) => {
       item_name: "",
       description: "",
       unit_of_measure: "EA",
-      unit_cost: 0,
+      standard_cost: 0,
       selling_price: 0,
       reorder_level: 10,
       reorder_quantity: 50,
       is_active: true,
-      is_stockable: true,
+      is_batch_tracked: false,
     },
   });
 
@@ -165,7 +165,7 @@ export const ItemForm = ({ open, onOpenChange }: ItemFormProps) => {
 
               <FormField
                 control={form.control}
-                name="unit_cost"
+                name="standard_cost"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Unit Cost (LKR)</FormLabel>
@@ -241,7 +241,7 @@ export const ItemForm = ({ open, onOpenChange }: ItemFormProps) => {
 
               <FormField
                 control={form.control}
-                name="is_stockable"
+                name="is_batch_tracked"
                 render={({ field }) => (
                   <FormItem className="flex items-center gap-2">
                     <FormControl>
@@ -250,7 +250,7 @@ export const ItemForm = ({ open, onOpenChange }: ItemFormProps) => {
                         onCheckedChange={field.onChange}
                       />
                     </FormControl>
-                    <FormLabel className="!mt-0">Track Stock</FormLabel>
+                    <FormLabel className="!mt-0">Track Batches</FormLabel>
                   </FormItem>
                 )}
               />
