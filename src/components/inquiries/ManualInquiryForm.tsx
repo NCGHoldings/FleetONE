@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ManualInquiryFormProps {
   open: boolean;
@@ -32,6 +33,7 @@ export const ManualInquiryForm = ({
   onSuccess,
 }: ManualInquiryFormProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     source: "phone",
     product_type: "yutong",
@@ -49,13 +51,32 @@ export const ManualInquiryForm = ({
 
   // Fetch available models based on product type
   const { data: models } = useQuery({
-    queryKey: ["vehicle-models", formData.product_type],
+    queryKey: ["vehicle-models", formData.product_type, user?.id],
     queryFn: async () => {
       if (formData.product_type === "yutong") {
-        const { data } = await supabase
+        // Check if user is super_admin
+        let isSuperAdmin = false;
+        if (user?.id) {
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .eq("role", "super_admin")
+            .maybeSingle();
+          isSuperAdmin = !!roleData;
+        }
+
+        let query = supabase
           .from("yutong_bus_models")
           .select("id, model_name")
           .eq("is_active", true);
+
+        // Filter restricted models for non-super_admin
+        if (!isSuperAdmin) {
+          query = query.or("visibility.is.null,visibility.eq.all");
+        }
+
+        const { data } = await query.order("model_name");
         return data || [];
       } else if (formData.product_type === "sinotruk") {
         const { data } = await supabase

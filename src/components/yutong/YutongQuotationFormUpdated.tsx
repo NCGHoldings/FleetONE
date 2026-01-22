@@ -158,11 +158,35 @@ export function YutongQuotationForm({ onSubmit, onCancel, initialData }: YutongQ
 
   const loadBusModels = async () => {
     try {
-      const { data, error } = await supabase
+      const { hasRole } = await import('@/hooks/useAuth').then(m => ({ hasRole: (role: string) => {
+        // Check if user has super_admin role from the auth context
+        return user?.id ? true : false; // This will be replaced with actual check below
+      }}));
+      
+      // Check super_admin role via database
+      let isSuperAdmin = false;
+      if (user?.id) {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'super_admin')
+          .maybeSingle();
+        isSuperAdmin = !!roleData;
+      }
+
+      let query = supabase
         .from('yutong_bus_models')
         .select('*')
         .eq('is_active', true)
         .order('bus_name');
+
+      // If not super_admin, filter out restricted models
+      if (!isSuperAdmin) {
+        query = query.or('visibility.is.null,visibility.eq.all');
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error loading bus models:', error);

@@ -16575,6 +16575,7 @@ export type Database = {
           transmission: string | null
           unit_price: number | null
           updated_at: string
+          visibility: string | null
           wheel_base_mm: string | null
         }
         Insert: {
@@ -16616,6 +16617,7 @@ export type Database = {
           transmission?: string | null
           unit_price?: number | null
           updated_at?: string
+          visibility?: string | null
           wheel_base_mm?: string | null
         }
         Update: {
@@ -16657,6 +16659,7 @@ export type Database = {
           transmission?: string | null
           unit_price?: number | null
           updated_at?: string
+          visibility?: string | null
           wheel_base_mm?: string | null
         }
         Relationships: []

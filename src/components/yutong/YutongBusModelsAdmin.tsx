@@ -10,11 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Edit, Trash2, Upload, Image, Eye, Copy, Images } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Image, Eye, Copy, Images, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { YutongBusModelProfile } from './YutongBusModelProfile';
 import { YutongImageManager } from './YutongImageManager';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formSchema = z.object({
   bus_name: z.string().min(1, 'Bus name is required'),
@@ -25,6 +26,7 @@ const formSchema = z.object({
   condition: z.string().min(1, 'Condition is required'),
   unit_price: z.number().min(1, 'Unit price is required'),
   is_active: z.boolean().default(true),
+  visibility: z.enum(['all', 'super_admin_only']).default('all'),
   // New detailed specification fields
   overall_dimension_mm: z.string().optional(),
   wheel_base_mm: z.string().optional(),
@@ -60,6 +62,7 @@ interface BusModel {
   condition: string;
   base_price: number; // This maps to 'unit_price' in our form
   is_active: boolean;
+  visibility?: string;
   created_at: string;
   image_url?: string;
   // New detailed specification fields
@@ -101,7 +104,8 @@ export function YutongBusModelsAdmin() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      is_active: true
+      is_active: true,
+      visibility: 'all'
     }
   });
 
@@ -215,6 +219,7 @@ export function YutongBusModelsAdmin() {
         condition: data.condition,
         base_price: data.unit_price,
         is_active: data.is_active,
+        visibility: data.visibility || 'all',
         // New detailed specification fields
         overall_dimension_mm: data.overall_dimension_mm || null,
         wheel_base_mm: data.wheel_base_mm || null,
@@ -280,6 +285,7 @@ export function YutongBusModelsAdmin() {
       condition: model.condition,
       unit_price: model.base_price,
       is_active: model.is_active,
+      visibility: (model.visibility as 'all' | 'super_admin_only') || 'all',
       // New detailed specification fields
       overall_dimension_mm: model.overall_dimension_mm || '',
       wheel_base_mm: model.wheel_base_mm || '',
@@ -321,6 +327,7 @@ export function YutongBusModelsAdmin() {
         condition: model.condition,
         base_price: model.base_price,
         is_active: model.is_active,
+        visibility: model.visibility || 'all',
         overall_dimension_mm: model.overall_dimension_mm || null,
         wheel_base_mm: model.wheel_base_mm || null,
         minimum_turning_diameter_m: model.minimum_turning_diameter_m || null,
@@ -824,21 +831,45 @@ export function YutongBusModelsAdmin() {
                     </div>
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="is_active"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-2">
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <FormLabel>Active</FormLabel>
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="is_active"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel>Active</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="visibility"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Visibility</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || 'all'}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select visibility" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="all">All Users</SelectItem>
+                              <SelectItem value="super_admin_only">Super Admin Only</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <div className="flex justify-end space-x-2">
                     <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
@@ -881,7 +912,15 @@ export function YutongBusModelsAdmin() {
               <CardContent className="p-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-lg">{model.bus_name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-lg">{model.bus_name}</h3>
+                      {model.visibility === 'super_admin_only' && (
+                        <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700">
+                          <Shield className="h-3 w-3 mr-1" />
+                          Restricted
+                        </Badge>
+                      )}
+                    </div>
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       model.is_active 
                         ? 'bg-green-100 text-green-800' 
