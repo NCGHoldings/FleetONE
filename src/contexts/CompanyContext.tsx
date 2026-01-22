@@ -45,19 +45,34 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
 
   // Fetch all companies with hierarchy support
-  const { data: companies = [], isLoading } = useQuery({
+  const { data: companies = [], isLoading, error } = useQuery({
     queryKey: ["companies-hierarchy"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      console.log("Fetching companies...");
+      const { data, error } = await supabase
         .from("companies")
-        .select("id, name, short_code, is_active, parent_company_id, business_unit_type, company_code, logo_url, tax_registration, fiscal_year_start, default_currency, created_at, updated_at")
+        .select("*")
         .eq("is_active", true)
         .order("name");
       
-      if (error) throw error;
+      if (error) {
+        console.error("Failed to load companies:", error);
+        throw error;
+      }
+      
+      console.log("Companies loaded:", data?.length || 0, "companies");
       return (data || []) as Company[];
     },
+    retry: 3,
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
+
+  // Log any query errors
+  useEffect(() => {
+    if (error) {
+      console.error("Company query error:", error);
+    }
+  }, [error]);
 
   // Derive parent and sub companies
   const parentCompanies = companies.filter(c => !c.parent_company_id);
