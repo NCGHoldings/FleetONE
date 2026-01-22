@@ -171,6 +171,134 @@ export const useApproveJournalEntry = () => {
   });
 };
 
+export const useRejectJournalEntry = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (entryId: string) => {
+      const { error } = await supabase
+        .from("journal_entries")
+        .update({ 
+          status: "void" as const,
+          rejected_at: new Date().toISOString(),
+        })
+        .eq("id", entryId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
+      toast.success("Journal entry rejected");
+    },
+    onError: (error) => {
+      toast.error(`Failed to reject: ${error.message}`);
+    },
+  });
+};
+
+export const useReverseJournalEntry = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (entryId: string) => {
+      // Fetch the original entry with lines
+      const { data: entry, error: fetchError } = await supabase
+        .from("journal_entries")
+        .select(`
+          *,
+          journal_entry_lines (
+            account_id,
+            description,
+            debit,
+            credit,
+            cost_center_id
+          )
+        `)
+        .eq("id", entryId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Reverse the account balances
+      for (const line of entry.journal_entry_lines) {
+        const netAmount = (line.debit || 0) - (line.credit || 0);
+        
+        const { data: account } = await supabase
+          .from("chart_of_accounts")
+          .select("current_balance, account_type")
+          .eq("id", line.account_id)
+          .single();
+        
+        if (account) {
+          const isDebitNormal = ["asset", "expense"].includes(account.account_type);
+          const adjustment = isDebitNormal ? -netAmount : netAmount; // Reverse the adjustment
+          
+          await supabase
+            .from("chart_of_accounts")
+            .update({ current_balance: (account.current_balance || 0) + adjustment })
+            .eq("id", line.account_id);
+        }
+      }
+      
+      // Mark original entry as reversed
+      const { error: statusError } = await supabase
+        .from("journal_entries")
+        .update({ 
+          status: "reversed" as const,
+          reversed_at: new Date().toISOString(),
+        })
+        .eq("id", entryId);
+      
+      if (statusError) throw statusError;
+      
+      // Create reversing entry
+      const { data: reversalEntry, error: reversalError } = await supabase
+        .from("journal_entries")
+        .insert([{
+          entry_date: new Date().toISOString().split("T")[0],
+          description: `Reversal of ${entry.entry_number}: ${entry.description}`,
+          reference: `REV-${entry.entry_number}`,
+          total_debit: entry.total_credit, // Swap debit/credit
+          total_credit: entry.total_debit,
+          status: "posted",
+          posted_at: new Date().toISOString(),
+          reversed_entry_id: entryId,
+          company_id: selectedCompanyId,
+        }])
+        .select()
+        .single();
+      
+      if (reversalError) throw reversalError;
+      
+      // Create reversed lines (swap debit/credit)
+      const reversedLines = entry.journal_entry_lines.map((line: any) => ({
+        journal_entry_id: reversalEntry.id,
+        account_id: line.account_id,
+        description: `Reversal: ${line.description || ""}`,
+        debit: line.credit, // Swap
+        credit: line.debit, // Swap
+        cost_center_id: line.cost_center_id,
+        company_id: selectedCompanyId,
+      }));
+      
+      await supabase.from("journal_entry_lines").insert(reversedLines);
+      
+      return reversalEntry;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary", selectedCompanyId] });
+      toast.success("Journal entry reversed successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to reverse: ${error.message}`);
+    },
+  });
+};
+
 // ============ AR Invoices ============
 export const useCreateARInvoice = () => {
   const queryClient = useQueryClient();
@@ -2180,5 +2308,143 @@ export const useUpdateChequeStatus = () => {
       toast.success("Cheque status updated");
     },
     onError: (error) => toast.error(`Failed to update cheque: ${error.message}`),
+  });
+};
+
+// ============ Recurring Entries ============
+export const useToggleRecurringEntry = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async ({ entryId, isActive }: { entryId: string; isActive: boolean }) => {
+      const { error } = await supabase
+        .from("recurring_entries")
+        .update({ is_active: isActive })
+        .eq("id", entryId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
+    },
+    onError: (error) => toast.error(`Failed to update: ${error.message}`),
+  });
+};
+
+export const useProcessRecurringEntry = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (entryId: string) => {
+      // Fetch the recurring entry with its template
+      const { data: recurringEntry, error: fetchError } = await supabase
+        .from("recurring_entries")
+        .select("*")
+        .eq("id", entryId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Create a new journal entry from the template
+      const { data: journalEntry, error: journalError } = await supabase
+        .from("journal_entries")
+        .insert([{
+          entry_date: new Date().toISOString().split("T")[0],
+          description: recurringEntry.description,
+          reference: `REC-${recurringEntry.entry_name}`,
+          total_debit: recurringEntry.amount,
+          total_credit: recurringEntry.amount,
+          status: "posted",
+          posted_at: new Date().toISOString(),
+          company_id: selectedCompanyId,
+        }])
+        .select()
+        .single();
+      
+      if (journalError) throw journalError;
+      
+      // Update last run date and calculate next run date
+      const nextRunDate = new Date();
+      switch (recurringEntry.frequency) {
+        case "daily":
+          nextRunDate.setDate(nextRunDate.getDate() + 1);
+          break;
+        case "weekly":
+          nextRunDate.setDate(nextRunDate.getDate() + 7);
+          break;
+        case "monthly":
+          nextRunDate.setMonth(nextRunDate.getMonth() + 1);
+          break;
+        case "quarterly":
+          nextRunDate.setMonth(nextRunDate.getMonth() + 3);
+          break;
+        case "yearly":
+          nextRunDate.setFullYear(nextRunDate.getFullYear() + 1);
+          break;
+      }
+      
+      await supabase
+        .from("recurring_entries")
+        .update({
+          last_run_date: new Date().toISOString().split("T")[0],
+          next_run_date: nextRunDate.toISOString().split("T")[0],
+        })
+        .eq("id", entryId);
+      
+      return journalEntry;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
+    },
+    onError: (error) => toast.error(`Failed to process: ${error.message}`),
+  });
+};
+
+export const useCreateRecurringEntry = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (entry: {
+      entry_name: string;
+      description: string;
+      frequency: string;
+      amount: number;
+      start_date: string;
+      end_date?: string;
+      debit_account_id: string;
+      credit_account_id: string;
+    }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data, error } = await supabase
+        .from("recurring_entries")
+        .insert([{
+          entry_name: entry.entry_name,
+          description: entry.description,
+          frequency: entry.frequency,
+          amount: entry.amount,
+          start_date: entry.start_date,
+          end_date: entry.end_date,
+          next_run_date: entry.start_date,
+          debit_account_id: entry.debit_account_id,
+          credit_account_id: entry.credit_account_id,
+          is_active: true,
+          company_id: selectedCompanyId,
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
+      toast.success("Recurring entry created successfully");
+    },
+    onError: (error) => toast.error(`Failed to create: ${error.message}`),
   });
 };

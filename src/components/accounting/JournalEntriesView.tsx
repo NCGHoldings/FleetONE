@@ -1,31 +1,53 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Eye, CheckCircle, XCircle, RotateCcw } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "./shared/StatusBadge";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { JournalEntryForm } from "./JournalEntryForm";
+import { JournalEntryDetailDialog } from "./JournalEntryDetailDialog";
+import { useJournalEntries } from "@/hooks/useAccountingData";
+import { usePostJournalEntry, useRejectJournalEntry, useReverseJournalEntry } from "@/hooks/useAccountingMutations";
+import { toast } from "sonner";
 
 export const JournalEntriesView = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<any>(null);
+  const [showDetail, setShowDetail] = useState(false);
 
-  const { data: entries, isLoading } = useQuery({
-    queryKey: ["journal-entries"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("journal_entries")
-        .select("*")
-        .order("entry_date", { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: entries, isLoading } = useJournalEntries();
+  const postEntry = usePostJournalEntry();
+  const rejectEntry = useRejectJournalEntry();
+  const reverseEntry = useReverseJournalEntry();
+
+  const handleApprove = (entryId: string) => {
+    postEntry.mutate(entryId, {
+      onSuccess: () => toast.success("Journal entry approved and posted"),
+      onError: (error) => toast.error(`Failed to approve: ${error.message}`),
+    });
+  };
+
+  const handleReject = (entryId: string) => {
+    rejectEntry.mutate(entryId, {
+      onSuccess: () => toast.success("Journal entry rejected"),
+      onError: (error) => toast.error(`Failed to reject: ${error.message}`),
+    });
+  };
+
+  const handleReverse = (entryId: string) => {
+    reverseEntry.mutate(entryId, {
+      onSuccess: () => toast.success("Journal entry reversed"),
+      onError: (error) => toast.error(`Failed to reverse: ${error.message}`),
+    });
+  };
+
+  const handleView = (entry: any) => {
+    setSelectedEntry(entry);
+    setShowDetail(true);
+  };
 
   const columns = [
     {
@@ -67,23 +89,50 @@ export const JournalEntriesView = () => {
       header: "Actions",
       cell: ({ row }: any) => (
         <div className="flex gap-1">
-          <Button size="sm" variant="outline">
+          <Button size="sm" variant="outline" onClick={() => handleView(row.original)}>
             <Eye className="h-4 w-4" />
           </Button>
           {row.original.status === "draft" && (
             <>
-              <Button size="sm" variant="outline" className="text-green-600">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-emerald-600 hover:text-emerald-700"
+                onClick={() => handleApprove(row.original.id)}
+                disabled={postEntry.isPending}
+              >
                 <CheckCircle className="h-4 w-4" />
               </Button>
-              <Button size="sm" variant="outline" className="text-destructive">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="text-destructive hover:text-destructive"
+                onClick={() => handleReject(row.original.id)}
+                disabled={rejectEntry.isPending}
+              >
                 <XCircle className="h-4 w-4" />
               </Button>
             </>
+          )}
+          {row.original.status === "posted" && (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-amber-600 hover:text-amber-700"
+              onClick={() => handleReverse(row.original.id)}
+              disabled={reverseEntry.isPending}
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
           )}
         </div>
       ),
     },
   ];
+
+  if (isLoading) {
+    return <Card className="p-6"><p>Loading journal entries...</p></Card>;
+  }
 
   return (
     <Card className="p-6">
@@ -114,6 +163,13 @@ export const JournalEntriesView = () => {
         columns={columns}
         data={entries || []}
         searchKey="description"
+      />
+
+      {/* Entry Detail Dialog */}
+      <JournalEntryDetailDialog
+        entry={selectedEntry}
+        open={showDetail}
+        onOpenChange={setShowDetail}
       />
     </Card>
   );
