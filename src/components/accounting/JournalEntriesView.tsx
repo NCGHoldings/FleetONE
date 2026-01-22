@@ -31,7 +31,7 @@ export const JournalEntriesView = () => {
   };
 
   const handleReject = (entryId: string) => {
-    rejectEntry.mutate(entryId, {
+    rejectEntry.mutate({ id: entryId, reason: "Rejected by user" }, {
       onSuccess: () => toast.success("Journal entry rejected"),
       onError: (error) => toast.error(`Failed to reject: ${error.message}`),
     });

@@ -171,31 +171,7 @@ export const useApproveJournalEntry = () => {
   });
 };
 
-export const useRejectJournalEntry = () => {
-  const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
-  
-  return useMutation({
-    mutationFn: async (entryId: string) => {
-      const { error } = await supabase
-        .from("journal_entries")
-        .update({ 
-          status: "void" as const,
-          rejected_at: new Date().toISOString(),
-        })
-        .eq("id", entryId);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
-      toast.success("Journal entry rejected");
-    },
-    onError: (error) => {
-      toast.error(`Failed to reject: ${error.message}`);
-    },
-  });
-};
+// Note: useRejectJournalEntry is defined in the "Reject Mutations" section below
 
 export const useReverseJournalEntry = () => {
   const queryClient = useQueryClient();
@@ -242,21 +218,25 @@ export const useReverseJournalEntry = () => {
         }
       }
       
-      // Mark original entry as reversed
+      // Mark original entry as reversed (use 'void' since 'reversed' is not in the enum)
       const { error: statusError } = await supabase
         .from("journal_entries")
         .update({ 
-          status: "reversed" as const,
-          reversed_at: new Date().toISOString(),
+          status: "void" as const,
+          notes: "Reversed",
         })
         .eq("id", entryId);
       
       if (statusError) throw statusError;
       
+      // Generate reversal entry number
+      const reversalEntryNumber = `REV-${entry.entry_number}`;
+      
       // Create reversing entry
       const { data: reversalEntry, error: reversalError } = await supabase
         .from("journal_entries")
         .insert([{
+          entry_number: reversalEntryNumber,
           entry_date: new Date().toISOString().split("T")[0],
           description: `Reversal of ${entry.entry_number}: ${entry.description}`,
           reference: `REV-${entry.entry_number}`,
@@ -264,7 +244,6 @@ export const useReverseJournalEntry = () => {
           total_credit: entry.total_debit,
           status: "posted",
           posted_at: new Date().toISOString(),
-          reversed_entry_id: entryId,
           company_id: selectedCompanyId,
         }])
         .select()
@@ -1108,18 +1087,39 @@ export const useCreateGoodsReceipt = () => {
   });
 };
 
-// ============ Recurring Entries ============
+// ============ Recurring Entries (Create) ============
 export const useCreateRecurringEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
   
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (entry: {
+      entry_name: string;
+      description: string;
+      frequency: string;
+      amount: number;
+      start_date: string;
+      end_date?: string;
+      debit_account_id: string;
+      credit_account_id: string;
+    }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
-      const { data: result, error } = await supabase
-        .from("recurring_journal_entries" as any)
-        .insert([{ ...data, company_id: selectedCompanyId }])
+      const { data: result, error } = await (supabase as any)
+        .from("recurring_journal_entries")
+        .insert([{ 
+          entry_name: entry.entry_name,
+          description: entry.description,
+          frequency: entry.frequency,
+          amount: entry.amount,
+          start_date: entry.start_date,
+          end_date: entry.end_date,
+          next_run_date: entry.start_date,
+          debit_account_id: entry.debit_account_id,
+          credit_account_id: entry.credit_account_id,
+          is_active: true,
+          company_id: selectedCompanyId,
+        }])
         .select()
         .single();
       if (error) throw error;
@@ -1129,7 +1129,7 @@ export const useCreateRecurringEntry = () => {
       queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
       toast.success("Recurring entry created");
     },
-    onError: (error) => toast.error(`Failed: ${error.message}`),
+    onError: (error: any) => toast.error(`Failed: ${error.message}`),
   });
 };
 
@@ -2311,15 +2311,15 @@ export const useUpdateChequeStatus = () => {
   });
 };
 
-// ============ Recurring Entries ============
+// ============ Recurring Entries (Toggle/Process) ============
 export const useToggleRecurringEntry = () => {
   const queryClient = useQueryClient();
   const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async ({ entryId, isActive }: { entryId: string; isActive: boolean }) => {
-      const { error } = await supabase
-        .from("recurring_entries")
+      const { error } = await (supabase as any)
+        .from("recurring_journal_entries")
         .update({ is_active: isActive })
         .eq("id", entryId);
       
@@ -2328,7 +2328,7 @@ export const useToggleRecurringEntry = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
     },
-    onError: (error) => toast.error(`Failed to update: ${error.message}`),
+    onError: (error: any) => toast.error(`Failed to update: ${error.message}`),
   });
 };
 
@@ -2339,23 +2339,27 @@ export const useProcessRecurringEntry = () => {
   return useMutation({
     mutationFn: async (entryId: string) => {
       // Fetch the recurring entry with its template
-      const { data: recurringEntry, error: fetchError } = await supabase
-        .from("recurring_entries")
+      const { data: recurringEntry, error: fetchError } = await (supabase as any)
+        .from("recurring_journal_entries")
         .select("*")
         .eq("id", entryId)
         .single();
       
       if (fetchError) throw fetchError;
       
+      // Generate unique entry number
+      const entryNumber = `REC-${Date.now()}`;
+      
       // Create a new journal entry from the template
       const { data: journalEntry, error: journalError } = await supabase
         .from("journal_entries")
         .insert([{
+          entry_number: entryNumber,
           entry_date: new Date().toISOString().split("T")[0],
-          description: recurringEntry.description,
-          reference: `REC-${recurringEntry.entry_name}`,
-          total_debit: recurringEntry.amount,
-          total_credit: recurringEntry.amount,
+          description: recurringEntry.description || recurringEntry.entry_name,
+          reference: `REC-${recurringEntry.entry_name || entryId}`,
+          total_debit: recurringEntry.amount || 0,
+          total_credit: recurringEntry.amount || 0,
           status: "posted",
           posted_at: new Date().toISOString(),
           company_id: selectedCompanyId,
@@ -2367,7 +2371,8 @@ export const useProcessRecurringEntry = () => {
       
       // Update last run date and calculate next run date
       const nextRunDate = new Date();
-      switch (recurringEntry.frequency) {
+      const frequency = recurringEntry.frequency || "monthly";
+      switch (frequency) {
         case "daily":
           nextRunDate.setDate(nextRunDate.getDate() + 1);
           break;
@@ -2385,8 +2390,8 @@ export const useProcessRecurringEntry = () => {
           break;
       }
       
-      await supabase
-        .from("recurring_entries")
+      await (supabase as any)
+        .from("recurring_journal_entries")
         .update({
           last_run_date: new Date().toISOString().split("T")[0],
           next_run_date: nextRunDate.toISOString().split("T")[0],
@@ -2398,53 +2403,8 @@ export const useProcessRecurringEntry = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
+      toast.success("Recurring entry processed");
     },
-    onError: (error) => toast.error(`Failed to process: ${error.message}`),
-  });
-};
-
-export const useCreateRecurringEntry = () => {
-  const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
-  
-  return useMutation({
-    mutationFn: async (entry: {
-      entry_name: string;
-      description: string;
-      frequency: string;
-      amount: number;
-      start_date: string;
-      end_date?: string;
-      debit_account_id: string;
-      credit_account_id: string;
-    }) => {
-      if (!selectedCompanyId) throw new Error("No company selected");
-      
-      const { data, error } = await supabase
-        .from("recurring_entries")
-        .insert([{
-          entry_name: entry.entry_name,
-          description: entry.description,
-          frequency: entry.frequency,
-          amount: entry.amount,
-          start_date: entry.start_date,
-          end_date: entry.end_date,
-          next_run_date: entry.start_date,
-          debit_account_id: entry.debit_account_id,
-          credit_account_id: entry.credit_account_id,
-          is_active: true,
-          company_id: selectedCompanyId,
-        }])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
-      toast.success("Recurring entry created successfully");
-    },
-    onError: (error) => toast.error(`Failed to create: ${error.message}`),
+    onError: (error: any) => toast.error(`Failed to process: ${error.message}`),
   });
 };

@@ -47,8 +47,14 @@ export const RecurringEntryForm = ({ onSuccess }: RecurringEntryFormProps) => {
   const onSubmit = async (data: FormValues) => {
     try {
       await createEntry.mutateAsync({
-        ...data,
+        entry_name: data.entry_name,
+        description: data.description,
+        frequency: data.frequency,
+        amount: data.amount,
+        start_date: data.start_date,
         end_date: data.end_date || undefined,
+        debit_account_id: data.debit_account_id,
+        credit_account_id: data.credit_account_id,
       });
       form.reset();
       onSuccess?.();
@@ -175,7 +181,7 @@ export const RecurringEntryForm = ({ onSuccess }: RecurringEntryFormProps) => {
                 <FormControl>
                   <AccountSelector
                     value={field.value}
-                    onChange={field.onChange}
+                    onValueChange={field.onChange}
                     placeholder="Select debit account"
                   />
                 </FormControl>
@@ -193,7 +199,7 @@ export const RecurringEntryForm = ({ onSuccess }: RecurringEntryFormProps) => {
                 <FormControl>
                   <AccountSelector
                     value={field.value}
-                    onChange={field.onChange}
+                    onValueChange={field.onChange}
                     placeholder="Select credit account"
                   />
                 </FormControl>

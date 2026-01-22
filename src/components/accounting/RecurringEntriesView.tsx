@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 
 const recurringSchema = z.object({
-  template_name: z.string().min(1, "Template name is required"),
+  entry_name: z.string().min(1, "Entry name is required"),
   description: z.string().min(1, "Description is required"),
   frequency: z.enum(["daily", "weekly", "monthly", "quarterly", "yearly"]),
   start_date: z.string().min(1, "Start date is required"),
@@ -27,7 +27,6 @@ const recurringSchema = z.object({
   debit_account_id: z.string().min(1, "Debit account is required"),
   credit_account_id: z.string().min(1, "Credit account is required"),
   amount: z.coerce.number().positive("Amount must be positive"),
-  is_active: z.boolean().default(true),
 });
 
 type RecurringFormData = z.infer<typeof recurringSchema>;
@@ -42,10 +41,13 @@ export const RecurringEntriesView = () => {
   const form = useForm<RecurringFormData>({
     resolver: zodResolver(recurringSchema),
     defaultValues: {
+      entry_name: "",
+      description: "",
       frequency: "monthly",
       start_date: new Date().toISOString().split("T")[0],
-      is_active: true,
       amount: 0,
+      debit_account_id: "",
+      credit_account_id: "",
     },
   });
 
@@ -160,7 +162,16 @@ export const RecurringEntriesView = () => {
     .reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
 
   const onSubmit = async (data: RecurringFormData) => {
-    await createEntry.mutateAsync(data);
+    await createEntry.mutateAsync({
+      entry_name: data.entry_name,
+      description: data.description,
+      frequency: data.frequency,
+      amount: data.amount,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      debit_account_id: data.debit_account_id,
+      credit_account_id: data.credit_account_id,
+    });
     setShowForm(false);
     form.reset();
   };
@@ -227,10 +238,10 @@ export const RecurringEntriesView = () => {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="template_name"
+                name="entry_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Template Name</FormLabel>
+                    <FormLabel>Entry Name</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., Monthly Rent Payment" {...field} />
                     </FormControl>
@@ -374,21 +385,7 @@ export const RecurringEntriesView = () => {
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="is_active"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-2">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <FormLabel className="!mt-0">Active (will auto-run on schedule)</FormLabel>
-                  </FormItem>
-                )}
-              />
+              {/* Active checkbox removed - entries are active by default */}
 
               <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
