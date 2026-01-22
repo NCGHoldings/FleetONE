@@ -139,7 +139,7 @@ export function useUpdateSchoolBusFinanceSettings() {
   });
 }
 
-// Get students with outstanding balances for bulk AR
+// Get ALL active students for bulk AR invoicing
 export function useStudentsForBulkAR(branchId: string | null) {
   return useQuery({
     queryKey: ["students-bulk-ar", branchId],
@@ -149,7 +149,8 @@ export function useStudentsForBulkAR(branchId: string | null) {
         .select("*")
         .eq("branch_id", branchId)
         .eq("is_active", true)
-        .lt("payment_balance", 0); // Only students with negative balance (owed)
+        .gt("current_amount_due", 0) // All students with amount due > 0
+        .order("student_name");
 
       if (error) throw error;
       return data || [];
@@ -177,6 +178,7 @@ export function useGenerateBulkARInvoices() {
         student_name: string;
         payment_balance: number;
         current_amount_due: number;
+        fixed_monthly_amount?: number;
       }>;
       settings: SchoolBusFinanceSettings;
     }) => {
@@ -186,8 +188,8 @@ export function useGenerateBulkARInvoices() {
       const { data: batchData } = await supabase.rpc("generate_sbs_batch_number");
       const batchNumber = batchData || `SBS-BATCH-${format(new Date(), "yyyyMMdd")}-0001`;
 
-      // Calculate totals
-      const totalAmount = students.reduce((sum, s) => sum + Math.abs(s.payment_balance), 0);
+      // Calculate totals using current_amount_due
+      const totalAmount = students.reduce((sum, s) => sum + (s.current_amount_due || s.fixed_monthly_amount || 0), 0);
 
       // Create batch record
       const { data: batch, error: batchError } = await supabase
@@ -211,7 +213,7 @@ export function useGenerateBulkARInvoices() {
       // Create individual invoices
       const invoicePromises = students.map(async (student, index) => {
         const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(index + 1).padStart(5, "0")}`;
-        const amount = Math.abs(student.payment_balance);
+        const amount = student.current_amount_due || student.fixed_monthly_amount || 0;
 
         const { data, error } = await supabase
           .from("school_ar_invoices")

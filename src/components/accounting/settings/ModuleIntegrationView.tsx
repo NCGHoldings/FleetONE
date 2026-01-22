@@ -296,6 +296,34 @@ export const ModuleIntegrationView = () => {
 
         {MODULE_DEFINITIONS.map((module) => (
           <TabsContent key={module.id} value={module.id} className="space-y-4">
+            {/* School Bus Special Settings Link */}
+            {module.id === "school_bus" && (
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-xl">🚌</span>
+                      </div>
+                      <div>
+                        <h4 className="font-medium">School Bus Finance Integration</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Configure AR invoicing and GL posting for student payments
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => window.location.href = '/settings?tab=school-bus-finance'}
+                    >
+                      <Link2 className="h-4 w-4 mr-2" />
+                      Open Settings
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Available Events */}
             <Card>
               <CardHeader>
