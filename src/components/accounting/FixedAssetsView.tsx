@@ -6,13 +6,11 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useFixedAssets, useAssetCategories, useDepreciationSchedule } from "@/hooks/useAccountingData";
-import { useRunDepreciationWithGL } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { FixedAssetForm } from "./FixedAssetForm";
 import { AssetCategoryForm } from "./AssetCategoryForm";
-import { useToast } from "@/hooks/use-toast";
 
 export const FixedAssetsView = () => {
   const [activeTab, setActiveTab] = useState("register");
@@ -22,30 +20,13 @@ export const FixedAssetsView = () => {
   const { data: assets, isLoading } = useFixedAssets();
   const { data: categories } = useAssetCategories();
   const { data: depreciation } = useDepreciationSchedule();
-  const runDepreciation = useRunDepreciationWithGL();
-  const { toast } = useToast();
 
-  const handleRunDepreciation = async () => {
-    try {
-      await runDepreciation.mutateAsync({});
-      toast({
-        title: "Depreciation Posted",
-        description: "Monthly depreciation has been calculated and posted to the GL.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to run depreciation. Please try again.",
-        variant: "destructive",
-      });
-    }
+  const handleRunDepreciation = () => {
+    // Switch to depreciation tab where period selection is available
+    setActiveTab("depreciation");
   };
 
   const handleAssetReport = () => {
-    toast({
-      title: "Report Generated",
-      description: "Fixed Asset Register report has been generated.",
-    });
     window.print();
   };
 
@@ -280,9 +261,9 @@ export const FixedAssetsView = () => {
                   View and run monthly depreciation
                 </p>
               </div>
-              <Button onClick={handleRunDepreciation} disabled={runDepreciation.isPending}>
+              <Button onClick={handleRunDepreciation}>
                 <Play className="h-4 w-4 mr-2" />
-                {runDepreciation.isPending ? "Running..." : "Run Depreciation"}
+                Run Depreciation
               </Button>
             </div>
 
