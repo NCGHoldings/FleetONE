@@ -1,7 +1,4 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Building2, ChevronDown, Check } from "lucide-react";
+import { Building2, ChevronDown, Check, Bus, Car, Truck, Briefcase, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,31 +8,37 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCompany } from "@/contexts/CompanyContext";
+
+// Get icon based on business unit type
+const getBusinessUnitIcon = (type: string | null | undefined) => {
+  switch (type) {
+    case "school_bus":
+      return <Bus className="h-4 w-4 text-amber-500" />;
+    case "special_hire":
+      return <Car className="h-4 w-4 text-blue-500" />;
+    case "yutong":
+    case "sinotruck":
+      return <Truck className="h-4 w-4 text-green-500" />;
+    case "light_vehicle":
+      return <Car className="h-4 w-4 text-purple-500" />;
+    case "holding":
+      return <Building className="h-4 w-4 text-gray-500" />;
+    default:
+      return <Briefcase className="h-4 w-4 text-muted-foreground" />;
+  }
+};
 
 export const CompanySwitcher = () => {
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
-
-  const { data: companies, isLoading } = useQuery({
-    queryKey: ["companies"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("companies")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const selectedCompany = companies?.find(c => c.id === selectedCompanyId) || companies?.[0];
-
-  const handleCompanyChange = (companyId: string) => {
-    setSelectedCompanyId(companyId);
-    localStorage.setItem("selectedCompanyId", companyId);
-    window.dispatchEvent(new CustomEvent("companyChanged", { detail: { companyId } }));
-  };
+  const { 
+    selectedCompanyId, 
+    selectedCompany, 
+    companies, 
+    parentCompanies,
+    getSubCompaniesFor,
+    setSelectedCompanyId, 
+    isLoading 
+  } = useCompany();
 
   if (isLoading) {
     return (
@@ -55,32 +58,84 @@ export const CompanySwitcher = () => {
     );
   }
 
+  // Build hierarchical structure
+  const renderHierarchy = () => {
+    const items: React.ReactNode[] = [];
+    
+    // First render parent companies and their children
+    parentCompanies.forEach((parent, index) => {
+      if (index > 0) {
+        items.push(<DropdownMenuSeparator key={`sep-${parent.id}`} />);
+      }
+      
+      // Parent company as header or selectable item
+      const subCompanies = getSubCompaniesFor(parent.id);
+      
+      if (subCompanies.length > 0) {
+        // Parent with children - show as header
+        items.push(
+          <DropdownMenuLabel key={`label-${parent.id}`} className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
+            {getBusinessUnitIcon(parent.business_unit_type)}
+            {parent.name}
+          </DropdownMenuLabel>
+        );
+        
+        // Render sub-companies
+        subCompanies.forEach((sub) => {
+          items.push(
+            <DropdownMenuItem
+              key={sub.id}
+              onClick={() => setSelectedCompanyId(sub.id)}
+              className="flex items-center justify-between cursor-pointer pl-6"
+            >
+              <div className="flex items-center gap-2">
+                {getBusinessUnitIcon(sub.business_unit_type)}
+                <span className="font-medium">{sub.name}</span>
+              </div>
+              {selectedCompanyId === sub.id && (
+                <Check className="h-4 w-4 text-primary" />
+              )}
+            </DropdownMenuItem>
+          );
+        });
+      } else {
+        // Standalone company (no children)
+        items.push(
+          <DropdownMenuItem
+            key={parent.id}
+            onClick={() => setSelectedCompanyId(parent.id)}
+            className="flex items-center justify-between cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              {getBusinessUnitIcon(parent.business_unit_type)}
+              <span className="font-medium">{parent.name}</span>
+            </div>
+            {selectedCompanyId === parent.id && (
+              <Check className="h-4 w-4 text-primary" />
+            )}
+          </DropdownMenuItem>
+        );
+      }
+    });
+    
+    return items;
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="w-[220px] justify-between">
+        <Button variant="outline" className="w-[240px] justify-between">
           <div className="flex items-center gap-2 truncate">
-            <Building2 className="h-4 w-4 shrink-0" />
+            {getBusinessUnitIcon(selectedCompany?.business_unit_type)}
             <span className="truncate">{selectedCompany?.name || "Select Company"}</span>
           </div>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[260px]">
-        <DropdownMenuLabel>Switch Company</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-[280px]">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Switch Company</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {companies.map((company) => (
-          <DropdownMenuItem
-            key={company.id}
-            onClick={() => handleCompanyChange(company.id)}
-            className="flex items-center justify-between cursor-pointer"
-          >
-            <span className="font-medium">{company.name}</span>
-            {selectedCompany?.id === company.id && (
-              <Check className="h-4 w-4 text-primary" />
-            )}
-          </DropdownMenuItem>
-        ))}
+        {renderHierarchy()}
       </DropdownMenuContent>
     </DropdownMenu>
   );
