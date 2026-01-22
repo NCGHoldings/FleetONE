@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 // Company type matching database structure
@@ -35,6 +35,7 @@ const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 const STORAGE_KEY = "selectedCompanyId";
 
 export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(() => {
     // Initialize from localStorage
     if (typeof window !== "undefined") {
@@ -72,12 +73,29 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Set company and persist to localStorage
   const setSelectedCompanyId = (id: string | null) => {
+    const previousCompanyId = selectedCompanyId;
     setSelectedCompanyIdState(id);
     if (id) {
       localStorage.setItem(STORAGE_KEY, id);
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
+    
+    // Invalidate all company-specific queries when company changes
+    if (previousCompanyId !== id) {
+      // Invalidate queries that include company filtering
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["fixed-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+    }
+    
     // Dispatch event for other components
     window.dispatchEvent(new CustomEvent("companyChanged", { detail: { companyId: id } }));
   };

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Edit, Trash2, Users } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Users, Building2 } from "lucide-react";
 import { toast } from "sonner";
 
 const formatLKR = (amount: number) => {
@@ -51,6 +52,7 @@ export function CustomerMasterView() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const queryClient = useQueryClient();
+  const { selectedCompanyId, selectedCompany } = useCompany();
 
   const [formData, setFormData] = useState({
     customer_code: "",
@@ -64,19 +66,27 @@ export function CustomerMasterView() {
   });
 
   const { data: customers, isLoading } = useQuery({
-    queryKey: ["customers"],
+    queryKey: ["customers", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("customers")
         .select("*")
         .order("customer_name");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as Customer[];
     },
+    enabled: !!selectedCompanyId,
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      if (!selectedCompanyId) throw new Error("Please select a company first");
       const { error } = await supabase.from("customers").insert([{
         customer_code: data.customer_code,
         customer_name: data.customer_name,
@@ -87,11 +97,12 @@ export function CustomerMasterView() {
         credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : null,
         payment_terms: parseInt(data.payment_terms) || 30,
         is_active: true,
+        company_id: selectedCompanyId,
       }]);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["customers", selectedCompanyId] });
       toast.success("Customer created successfully");
       resetForm();
       setIsDialogOpen(false);
@@ -119,7 +130,7 @@ export function CustomerMasterView() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["customers", selectedCompanyId] });
       toast.success("Customer updated successfully");
       resetForm();
       setIsDialogOpen(false);
@@ -136,7 +147,7 @@ export function CustomerMasterView() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["customers", selectedCompanyId] });
       toast.success("Customer deleted successfully");
     },
     onError: (error) => {
@@ -195,6 +206,12 @@ export function CustomerMasterView() {
             <Users className="h-5 w-5 text-primary" />
             <CardTitle>Customer Master</CardTitle>
             <Badge variant="secondary">{customers?.length || 0} customers</Badge>
+            {selectedCompany && (
+              <Badge variant="outline" className="ml-2">
+                <Building2 className="h-3 w-3 mr-1" />
+                {selectedCompany.name}
+              </Badge>
+            )}
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
@@ -317,10 +334,19 @@ export function CustomerMasterView() {
           </div>
         </div>
 
-        {isLoading ? (
+        {!selectedCompanyId ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Building2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p>Please select a company from the dropdown above</p>
+          </div>
+        ) : isLoading ? (
           <div className="text-center py-8 text-muted-foreground">Loading customers...</div>
         ) : filteredCustomers?.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">No customers found</div>
+          <div className="text-center py-8 text-muted-foreground">
+            <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p>No customers found for {selectedCompany?.name}</p>
+            <p className="text-sm mt-1">Add a customer to get started</p>
+          </div>
         ) : (
           <div className="rounded-md border">
             <Table>

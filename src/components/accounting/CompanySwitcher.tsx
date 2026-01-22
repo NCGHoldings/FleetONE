@@ -68,25 +68,34 @@ export const CompanySwitcher = () => {
         items.push(<DropdownMenuSeparator key={`sep-${parent.id}`} />);
       }
       
-      // Parent company as header or selectable item
+      // Parent company as SELECTABLE item (not just header)
       const subCompanies = getSubCompaniesFor(parent.id);
       
-      if (subCompanies.length > 0) {
-        // Parent with children - show as header
-        items.push(
-          <DropdownMenuLabel key={`label-${parent.id}`} className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
+      // Always make parent company selectable
+      items.push(
+        <DropdownMenuItem
+          key={parent.id}
+          onClick={() => setSelectedCompanyId(parent.id)}
+          className={`flex items-center justify-between cursor-pointer ${subCompanies.length > 0 ? 'font-semibold' : ''}`}
+        >
+          <div className="flex items-center gap-2">
             {getBusinessUnitIcon(parent.business_unit_type)}
-            {parent.name}
-          </DropdownMenuLabel>
-        );
-        
-        // Render sub-companies
+            <span>{parent.name}</span>
+          </div>
+          {selectedCompanyId === parent.id && (
+            <Check className="h-4 w-4 text-primary" />
+          )}
+        </DropdownMenuItem>
+      );
+      
+      // Render sub-companies with indentation
+      if (subCompanies.length > 0) {
         subCompanies.forEach((sub) => {
           items.push(
             <DropdownMenuItem
               key={sub.id}
               onClick={() => setSelectedCompanyId(sub.id)}
-              className="flex items-center justify-between cursor-pointer pl-6"
+              className="flex items-center justify-between cursor-pointer pl-8"
             >
               <div className="flex items-center gap-2">
                 {getBusinessUnitIcon(sub.business_unit_type)}
@@ -98,23 +107,6 @@ export const CompanySwitcher = () => {
             </DropdownMenuItem>
           );
         });
-      } else {
-        // Standalone company (no children)
-        items.push(
-          <DropdownMenuItem
-            key={parent.id}
-            onClick={() => setSelectedCompanyId(parent.id)}
-            className="flex items-center justify-between cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              {getBusinessUnitIcon(parent.business_unit_type)}
-              <span className="font-medium">{parent.name}</span>
-            </div>
-            {selectedCompanyId === parent.id && (
-              <Check className="h-4 w-4 text-primary" />
-            )}
-          </DropdownMenuItem>
-        );
       }
     });
     
