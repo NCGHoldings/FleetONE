@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -6,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useItemCategories } from "@/hooks/useAccountingData";
 import { useCreateItem } from "@/hooks/useAccountingMutations";
+import { useGenerateNumber } from "@/hooks/useNumbering";
+import { Loader2 } from "lucide-react";
 
 const itemSchema = z.object({
   item_code: z.string().min(1, "Item code is required"),
@@ -35,6 +38,8 @@ interface ItemFormProps {
 export const ItemForm = ({ open, onOpenChange }: ItemFormProps) => {
   const { data: categories } = useItemCategories();
   const createItem = useCreateItem();
+  const generateNumber = useGenerateNumber();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const form = useForm<ItemFormData>({
     resolver: zodResolver(itemSchema),
@@ -51,6 +56,17 @@ export const ItemForm = ({ open, onOpenChange }: ItemFormProps) => {
       is_batch_tracked: false,
     },
   });
+
+  // Auto-generate item code when dialog opens
+  useEffect(() => {
+    if (open && !form.getValues("item_code")) {
+      setIsGenerating(true);
+      generateNumber("item").then((code) => {
+        form.setValue("item_code", code);
+        setIsGenerating(false);
+      });
+    }
+  }, [open, generateNumber, form]);
 
   const onSubmit = async (data: ItemFormData) => {
     await createItem.mutateAsync(data);
@@ -75,8 +91,19 @@ export const ItemForm = ({ open, onOpenChange }: ItemFormProps) => {
                   <FormItem>
                     <FormLabel>Item Code</FormLabel>
                     <FormControl>
-                      <Input placeholder="ITM-001" {...field} />
+                      <div className="relative">
+                        <Input 
+                          placeholder="Auto-generated" 
+                          {...field} 
+                          readOnly 
+                          className="bg-muted"
+                        />
+                        {isGenerating && (
+                          <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
                     </FormControl>
+                    <FormDescription>Auto-generated from Settings</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

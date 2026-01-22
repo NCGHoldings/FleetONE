@@ -10254,6 +10254,59 @@ export type Database = {
         }
         Relationships: []
       }
+      numbering_sequences: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          entity_type: string
+          id: string
+          include_month: boolean | null
+          include_year: boolean | null
+          is_active: boolean | null
+          next_number: number | null
+          padding_length: number | null
+          prefix: string
+          separator: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          entity_type: string
+          id?: string
+          include_month?: boolean | null
+          include_year?: boolean | null
+          is_active?: boolean | null
+          next_number?: number | null
+          padding_length?: number | null
+          prefix: string
+          separator?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          entity_type?: string
+          id?: string
+          include_month?: boolean | null
+          include_year?: boolean | null
+          is_active?: boolean | null
+          next_number?: number | null
+          padding_length?: number | null
+          prefix?: string
+          separator?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "numbering_sequences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_batch_items: {
         Row: {
           amount: number
@@ -20038,6 +20091,10 @@ export type Database = {
       generate_budget_code: { Args: { p_fiscal_year: number }; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_employee_id: { Args: never; Returns: string }
+      generate_entity_number: {
+        Args: { p_company_id?: string; p_entity_type: string }
+        Returns: string
+      }
       generate_inquiry_number: { Args: never; Returns: string }
       generate_journal_entry_number: { Args: never; Returns: string }
       generate_lightvehicle_order_number: { Args: never; Returns: string }
