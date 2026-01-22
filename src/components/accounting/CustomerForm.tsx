@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateCustomer, useUpdateCustomer } from "@/hooks/useAccountingMutations";
+import { useGenerateNumber } from "@/hooks/useNumbering";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   customer_code: z.string().min(1, "Customer code is required"),
@@ -31,7 +34,9 @@ interface CustomerFormProps {
 export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
+  const generateNumber = useGenerateNumber();
   const isEditing = !!customer;
+  const [isGenerating, setIsGenerating] = useState(!isEditing);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -47,6 +52,16 @@ export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
       is_active: customer?.is_active ?? true,
     },
   });
+
+  // Auto-generate customer code for new customers
+  useEffect(() => {
+    if (!isEditing && isGenerating) {
+      generateNumber("customer").then((code) => {
+        form.setValue("customer_code", code);
+        setIsGenerating(false);
+      });
+    }
+  }, [isEditing, generateNumber, form, isGenerating]);
 
   const onSubmit = async (data: FormValues) => {
     const payload = {
@@ -89,8 +104,20 @@ export const CustomerForm = ({ customer, onSuccess }: CustomerFormProps) => {
               <FormItem>
                 <FormLabel>Customer Code</FormLabel>
                 <FormControl>
-                  <Input placeholder="CUST-001" {...field} disabled={isEditing} />
+                  <div className="relative">
+                    <Input 
+                      placeholder="Auto-generated" 
+                      {...field} 
+                      disabled={isEditing || isGenerating}
+                      readOnly={!isEditing}
+                      className={!isEditing ? "bg-muted" : ""}
+                    />
+                    {isGenerating && (
+                      <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
                 </FormControl>
+                {!isEditing && <FormDescription>Auto-generated from Settings</FormDescription>}
                 <FormMessage />
               </FormItem>
             )}

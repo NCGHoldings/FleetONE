@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target, Users, Wallet } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target, Users, Wallet, Hash } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
@@ -22,6 +22,7 @@ import { ExecutiveKPISettings } from "@/components/settings/ExecutiveKPISettings
 import { StaffRegistrySettings } from "@/components/settings/StaffRegistrySettings";
 import { RouteTargetSettings } from "@/components/settings/RouteTargetSettings";
 import { PayrollSettingsComponent } from "@/components/settings/PayrollSettingsComponent";
+import { NumberingSettings } from "@/components/settings/NumberingSettings";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -121,6 +122,10 @@ export default function Settings() {
           <TabsTrigger value="staff-payroll" className="flex items-center gap-1">
             <Users className="h-3 w-3" />
             Staff & Payroll
+          </TabsTrigger>
+          <TabsTrigger value="numbering" className="flex items-center gap-1">
+            <Hash className="h-3 w-3" />
+            Numbering
           </TabsTrigger>
         </TabsList>
 
@@ -555,6 +560,12 @@ export default function Settings() {
                 <PayrollSettingsComponent />
               </CardContent>
             </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="numbering" className="space-y-6 mt-6">
+          <div className="max-w-4xl">
+            <NumberingSettings />
           </div>
         </TabsContent>
       </Tabs>
