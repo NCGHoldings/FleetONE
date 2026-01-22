@@ -9,6 +9,7 @@ import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { PageAccessGuard } from "./components/auth/PageAccessGuard";
 import { SeasonalThemeProvider } from "./components/seasonal/SeasonalThemeProvider";
+import { CompanyProvider } from "./contexts/CompanyContext";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -83,12 +84,13 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider delayDuration={300} skipDelayDuration={100}>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <SeasonalThemeProvider>
-          <BrowserRouter>
+    <CompanyProvider>
+      <TooltipProvider delayDuration={300} skipDelayDuration={100}>
+        <Toaster />
+        <Sonner />
+        <AuthProvider>
+          <SeasonalThemeProvider>
+            <BrowserRouter>
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
@@ -787,10 +789,11 @@ const App = () => (
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </BrowserRouter>
-      </SeasonalThemeProvider>
-      </AuthProvider>
-    </TooltipProvider>
+          </BrowserRouter>
+        </SeasonalThemeProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </CompanyProvider>
   </QueryClientProvider>
 );
 

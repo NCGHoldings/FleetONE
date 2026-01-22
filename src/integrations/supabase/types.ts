@@ -288,6 +288,7 @@ export type Database = {
           account_id: string | null
           amount: number
           balance: number
+          company_id: string | null
           created_at: string
           due_date: string
           id: string
@@ -303,6 +304,7 @@ export type Database = {
           account_id?: string | null
           amount: number
           balance: number
+          company_id?: string | null
           created_at?: string
           due_date: string
           id?: string
@@ -318,6 +320,7 @@ export type Database = {
           account_id?: string | null
           amount?: number
           balance?: number
+          company_id?: string | null
           created_at?: string
           due_date?: string
           id?: string
@@ -337,6 +340,13 @@ export type Database = {
             referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "accounts_payable_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
         ]
       }
       accounts_receivable: {
@@ -344,6 +354,7 @@ export type Database = {
           account_id: string | null
           amount: number
           balance: number
+          company_id: string | null
           created_at: string
           customer_name: string
           due_date: string
@@ -359,6 +370,7 @@ export type Database = {
           account_id?: string | null
           amount: number
           balance: number
+          company_id?: string | null
           created_at?: string
           customer_name: string
           due_date: string
@@ -374,6 +386,7 @@ export type Database = {
           account_id?: string | null
           amount?: number
           balance?: number
+          company_id?: string | null
           created_at?: string
           customer_name?: string
           due_date?: string
@@ -391,6 +404,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_receivable_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -425,6 +445,7 @@ export type Database = {
       ap_debit_notes: {
         Row: {
           amount: number
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           debit_date: string
@@ -439,6 +460,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           debit_date: string
@@ -453,6 +475,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           debit_date?: string
@@ -466,6 +489,13 @@ export type Database = {
           vendor_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ap_debit_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ap_debit_notes_journal_entry_id_fkey"
             columns: ["journal_entry_id"]
@@ -492,6 +522,7 @@ export type Database = {
       ap_invoice_lines: {
         Row: {
           account_id: string | null
+          company_id: string | null
           created_at: string | null
           description: string
           id: string
@@ -507,6 +538,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           description: string
           id?: string
@@ -522,6 +554,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           description?: string
           id?: string
@@ -544,6 +577,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ap_invoice_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ap_invoice_lines_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
@@ -558,6 +598,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           balance: number
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           discount_amount: number | null
@@ -584,6 +625,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           balance: number
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           discount_amount?: number | null
@@ -610,6 +652,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           balance?: number
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           discount_amount?: number | null
@@ -632,6 +675,13 @@ export type Database = {
           wht_amount?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ap_invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ap_invoices_journal_entry_id_fkey"
             columns: ["journal_entry_id"]
@@ -658,6 +708,7 @@ export type Database = {
       ap_payment_allocations: {
         Row: {
           allocated_amount: number
+          company_id: string | null
           created_at: string | null
           id: string
           invoice_id: string | null
@@ -666,6 +717,7 @@ export type Database = {
         }
         Insert: {
           allocated_amount: number
+          company_id?: string | null
           created_at?: string | null
           id?: string
           invoice_id?: string | null
@@ -674,6 +726,7 @@ export type Database = {
         }
         Update: {
           allocated_amount?: number
+          company_id?: string | null
           created_at?: string | null
           id?: string
           invoice_id?: string | null
@@ -681,6 +734,13 @@ export type Database = {
           wht_deducted?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ap_payment_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ap_payment_allocations_invoice_id_fkey"
             columns: ["invoice_id"]
@@ -706,6 +766,7 @@ export type Database = {
           bank_account_id: string | null
           cheque_date: string | null
           cheque_number: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -728,6 +789,7 @@ export type Database = {
           bank_account_id?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -750,6 +812,7 @@ export type Database = {
           bank_account_id?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -765,6 +828,13 @@ export type Database = {
           vendor_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ap_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ap_payments_journal_entry_id_fkey"
             columns: ["journal_entry_id"]
@@ -784,6 +854,7 @@ export type Database = {
       ap_reconciliations: {
         Row: {
           closing_balance: number | null
+          company_id: string | null
           created_at: string | null
           discrepancy_amount: number | null
           id: string
@@ -801,6 +872,7 @@ export type Database = {
         }
         Insert: {
           closing_balance?: number | null
+          company_id?: string | null
           created_at?: string | null
           discrepancy_amount?: number | null
           id?: string
@@ -818,6 +890,7 @@ export type Database = {
         }
         Update: {
           closing_balance?: number | null
+          company_id?: string | null
           created_at?: string | null
           discrepancy_amount?: number | null
           id?: string
@@ -834,6 +907,13 @@ export type Database = {
           vendor_statement_balance?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ap_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ap_reconciliations_vendor_id_fkey"
             columns: ["vendor_id"]
@@ -882,6 +962,7 @@ export type Database = {
       approval_configurations: {
         Row: {
           approver_roles: string[] | null
+          company_id: string | null
           created_at: string | null
           document_type: string
           id: string
@@ -895,6 +976,7 @@ export type Database = {
         }
         Insert: {
           approver_roles?: string[] | null
+          company_id?: string | null
           created_at?: string | null
           document_type: string
           id?: string
@@ -908,6 +990,7 @@ export type Database = {
         }
         Update: {
           approver_roles?: string[] | null
+          company_id?: string | null
           created_at?: string | null
           document_type?: string
           id?: string
@@ -919,7 +1002,15 @@ export type Database = {
           sequential_approval?: boolean | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "approval_configurations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       approval_name_suggestions: {
         Row: {
@@ -1030,6 +1121,7 @@ export type Database = {
       }
       ar_bad_debt_provisions: {
         Row: {
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           customer_id: string | null
@@ -1046,6 +1138,7 @@ export type Database = {
           write_off_journal_id: string | null
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
@@ -1062,6 +1155,7 @@ export type Database = {
           write_off_journal_id?: string | null
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
@@ -1078,6 +1172,13 @@ export type Database = {
           write_off_journal_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_bad_debt_provisions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_bad_debt_provisions_customer_id_fkey"
             columns: ["customer_id"]
@@ -1111,6 +1212,7 @@ export type Database = {
       ar_credit_notes: {
         Row: {
           amount: number
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           credit_date: string
@@ -1125,6 +1227,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           credit_date: string
@@ -1139,6 +1242,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           credit_date?: string
@@ -1152,6 +1256,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_credit_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_credit_notes_customer_id_fkey"
             columns: ["customer_id"]
@@ -1178,6 +1289,7 @@ export type Database = {
       ar_invoice_lines: {
         Row: {
           account_id: string | null
+          company_id: string | null
           created_at: string | null
           description: string
           discount_amount: number | null
@@ -1193,6 +1305,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           description: string
           discount_amount?: number | null
@@ -1208,6 +1321,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           description?: string
           discount_amount?: number | null
@@ -1230,6 +1344,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ar_invoice_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ar_invoice_lines_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
@@ -1241,6 +1362,7 @@ export type Database = {
       ar_invoices: {
         Row: {
           balance: number
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           customer_id: string | null
@@ -1262,6 +1384,7 @@ export type Database = {
         }
         Insert: {
           balance: number
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
@@ -1283,6 +1406,7 @@ export type Database = {
         }
         Update: {
           balance?: number
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
@@ -1303,6 +1427,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_invoices_customer_id_fkey"
             columns: ["customer_id"]
@@ -1329,6 +1460,7 @@ export type Database = {
       ar_receipt_allocations: {
         Row: {
           allocated_amount: number
+          company_id: string | null
           created_at: string | null
           id: string
           invoice_id: string | null
@@ -1336,6 +1468,7 @@ export type Database = {
         }
         Insert: {
           allocated_amount: number
+          company_id?: string | null
           created_at?: string | null
           id?: string
           invoice_id?: string | null
@@ -1343,12 +1476,20 @@ export type Database = {
         }
         Update: {
           allocated_amount?: number
+          company_id?: string | null
           created_at?: string | null
           id?: string
           invoice_id?: string | null
           receipt_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_receipt_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_receipt_allocations_invoice_id_fkey"
             columns: ["invoice_id"]
@@ -1371,6 +1512,7 @@ export type Database = {
           bank_account_id: string | null
           cheque_date: string | null
           cheque_number: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           customer_id: string | null
@@ -1390,6 +1532,7 @@ export type Database = {
           bank_account_id?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
@@ -1409,6 +1552,7 @@ export type Database = {
           bank_account_id?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
@@ -1424,6 +1568,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_receipts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_receipts_customer_id_fkey"
             columns: ["customer_id"]
@@ -1443,6 +1594,7 @@ export type Database = {
       ar_reconciliations: {
         Row: {
           closing_balance: number | null
+          company_id: string | null
           created_at: string | null
           customer_id: string | null
           customer_statement_balance: number | null
@@ -1460,6 +1612,7 @@ export type Database = {
         }
         Insert: {
           closing_balance?: number | null
+          company_id?: string | null
           created_at?: string | null
           customer_id?: string | null
           customer_statement_balance?: number | null
@@ -1477,6 +1630,7 @@ export type Database = {
         }
         Update: {
           closing_balance?: number | null
+          company_id?: string | null
           created_at?: string | null
           customer_id?: string | null
           customer_statement_balance?: number | null
@@ -1494,6 +1648,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ar_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ar_reconciliations_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -1508,6 +1669,7 @@ export type Database = {
           asset_account_id: string | null
           category_code: string
           category_name: string
+          company_id: string | null
           created_at: string | null
           depreciation_expense_account_id: string | null
           depreciation_method: string | null
@@ -1522,6 +1684,7 @@ export type Database = {
           asset_account_id?: string | null
           category_code: string
           category_name: string
+          company_id?: string | null
           created_at?: string | null
           depreciation_expense_account_id?: string | null
           depreciation_method?: string | null
@@ -1536,6 +1699,7 @@ export type Database = {
           asset_account_id?: string | null
           category_code?: string
           category_name?: string
+          company_id?: string | null
           created_at?: string | null
           depreciation_expense_account_id?: string | null
           depreciation_method?: string | null
@@ -1561,6 +1725,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "asset_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "asset_categories_depreciation_expense_account_id_fkey"
             columns: ["depreciation_expense_account_id"]
             isOneToOne: false
@@ -1573,6 +1744,7 @@ export type Database = {
         Row: {
           accumulated_depreciation: number
           asset_id: string | null
+          company_id: string | null
           created_at: string | null
           depreciation_amount: number
           depreciation_date: string
@@ -1585,6 +1757,7 @@ export type Database = {
         Insert: {
           accumulated_depreciation: number
           asset_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           depreciation_amount: number
           depreciation_date: string
@@ -1597,6 +1770,7 @@ export type Database = {
         Update: {
           accumulated_depreciation?: number
           asset_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           depreciation_amount?: number
           depreciation_date?: string
@@ -1612,6 +1786,13 @@ export type Database = {
             columns: ["asset_id"]
             isOneToOne: false
             referencedRelation: "fixed_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_depreciation_schedule_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -1639,6 +1820,7 @@ export type Database = {
           asset_id: string
           buyer_name: string | null
           buyer_reference: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           disposal_date: string
@@ -1659,6 +1841,7 @@ export type Database = {
           asset_id: string
           buyer_name?: string | null
           buyer_reference?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           disposal_date: string
@@ -1679,6 +1862,7 @@ export type Database = {
           asset_id?: string
           buyer_name?: string | null
           buyer_reference?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           disposal_date?: string
@@ -1700,6 +1884,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "asset_disposals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "asset_disposals_journal_entry_id_fkey"
             columns: ["journal_entry_id"]
             isOneToOne: false
@@ -1711,6 +1902,7 @@ export type Database = {
       asset_revaluations: {
         Row: {
           asset_id: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -1723,6 +1915,7 @@ export type Database = {
         }
         Insert: {
           asset_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -1735,6 +1928,7 @@ export type Database = {
         }
         Update: {
           asset_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -1754,6 +1948,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "asset_revaluations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "asset_revaluations_journal_entry_id_fkey"
             columns: ["journal_entry_id"]
             isOneToOne: false
@@ -1767,6 +1968,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           asset_id: string | null
+          company_id: string | null
           created_at: string | null
           from_custodian: string | null
           from_department: string | null
@@ -1783,6 +1985,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           asset_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           from_custodian?: string | null
           from_department?: string | null
@@ -1799,6 +2002,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           asset_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           from_custodian?: string | null
           from_department?: string | null
@@ -1817,6 +2021,13 @@ export type Database = {
             columns: ["asset_id"]
             isOneToOne: false
             referencedRelation: "fixed_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_transfers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1905,6 +2116,7 @@ export type Database = {
           account_type: string | null
           bank_name: string
           branch: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
@@ -1924,6 +2136,7 @@ export type Database = {
           account_type?: string | null
           bank_name: string
           branch?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -1943,6 +2156,7 @@ export type Database = {
           account_type?: string | null
           bank_name?: string
           branch?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -1957,6 +2171,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "bank_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bank_accounts_gl_account_id_fkey"
             columns: ["gl_account_id"]
             isOneToOne: false
@@ -1968,6 +2189,7 @@ export type Database = {
       bank_reconciliation_items: {
         Row: {
           bank_transaction_id: string | null
+          company_id: string | null
           created_at: string | null
           id: string
           match_status: string | null
@@ -1982,6 +2204,7 @@ export type Database = {
         }
         Insert: {
           bank_transaction_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string
           match_status?: string | null
@@ -1996,6 +2219,7 @@ export type Database = {
         }
         Update: {
           bank_transaction_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string
           match_status?: string | null
@@ -2017,6 +2241,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bank_reconciliation_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bank_reconciliation_items_reconciliation_id_fkey"
             columns: ["reconciliation_id"]
             isOneToOne: false
@@ -2030,6 +2261,7 @@ export type Database = {
           adjusted_book_balance: number | null
           bank_account_id: string | null
           book_balance: number
+          company_id: string | null
           created_at: string | null
           difference: number | null
           id: string
@@ -2046,6 +2278,7 @@ export type Database = {
           adjusted_book_balance?: number | null
           bank_account_id?: string | null
           book_balance: number
+          company_id?: string | null
           created_at?: string | null
           difference?: number | null
           id?: string
@@ -2062,6 +2295,7 @@ export type Database = {
           adjusted_book_balance?: number | null
           bank_account_id?: string | null
           book_balance?: number
+          company_id?: string | null
           created_at?: string | null
           difference?: number | null
           id?: string
@@ -2082,12 +2316,20 @@ export type Database = {
             referencedRelation: "bank_accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bank_reconciliations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
         ]
       }
       bank_statement_imports: {
         Row: {
           bank_account_id: string | null
           closing_balance: number | null
+          company_id: string | null
           created_at: string | null
           error_message: string | null
           file_name: string
@@ -2106,6 +2348,7 @@ export type Database = {
         Insert: {
           bank_account_id?: string | null
           closing_balance?: number | null
+          company_id?: string | null
           created_at?: string | null
           error_message?: string | null
           file_name: string
@@ -2124,6 +2367,7 @@ export type Database = {
         Update: {
           bank_account_id?: string | null
           closing_balance?: number | null
+          company_id?: string | null
           created_at?: string | null
           error_message?: string | null
           file_name?: string
@@ -2147,12 +2391,20 @@ export type Database = {
             referencedRelation: "bank_accounts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bank_statement_imports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
         ]
       }
       bank_transactions: {
         Row: {
           bank_account_id: string | null
           cheque_number: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           credit_amount: number | null
@@ -2175,6 +2427,7 @@ export type Database = {
         Insert: {
           bank_account_id?: string | null
           cheque_number?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           credit_amount?: number | null
@@ -2197,6 +2450,7 @@ export type Database = {
         Update: {
           bank_account_id?: string | null
           cheque_number?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           credit_amount?: number | null
@@ -2225,6 +2479,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bank_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bank_transactions_journal_entry_id_fkey"
             columns: ["journal_entry_id"]
             isOneToOne: false
@@ -2236,6 +2497,7 @@ export type Database = {
       batch_numbers: {
         Row: {
           batch_number: string
+          company_id: string | null
           created_at: string | null
           expiry_date: string | null
           grn_id: string | null
@@ -2255,6 +2517,7 @@ export type Database = {
         }
         Insert: {
           batch_number: string
+          company_id?: string | null
           created_at?: string | null
           expiry_date?: string | null
           grn_id?: string | null
@@ -2274,6 +2537,7 @@ export type Database = {
         }
         Update: {
           batch_number?: string
+          company_id?: string | null
           created_at?: string | null
           expiry_date?: string | null
           grn_id?: string | null
@@ -2292,6 +2556,13 @@ export type Database = {
           warehouse_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "batch_numbers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "batch_numbers_grn_id_fkey"
             columns: ["grn_id"]
@@ -2397,6 +2668,7 @@ export type Database = {
         Row: {
           allocated_amount: number | null
           budget_id: string
+          company_id: string | null
           created_at: string | null
           department_code: string | null
           department_name: string
@@ -2412,6 +2684,7 @@ export type Database = {
         Insert: {
           allocated_amount?: number | null
           budget_id: string
+          company_id?: string | null
           created_at?: string | null
           department_code?: string | null
           department_name: string
@@ -2427,6 +2700,7 @@ export type Database = {
         Update: {
           allocated_amount?: number | null
           budget_id?: string
+          company_id?: string | null
           created_at?: string | null
           department_code?: string | null
           department_name?: string
@@ -2445,6 +2719,13 @@ export type Database = {
             columns: ["budget_id"]
             isOneToOne: false
             referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_departments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -2470,6 +2751,7 @@ export type Database = {
           budget_amount: number | null
           budget_id: string
           category: string
+          company_id: string | null
           created_at: string | null
           department_id: string | null
           description: string | null
@@ -2491,6 +2773,7 @@ export type Database = {
           budget_amount?: number | null
           budget_id: string
           category: string
+          company_id?: string | null
           created_at?: string | null
           department_id?: string | null
           description?: string | null
@@ -2512,6 +2795,7 @@ export type Database = {
           budget_amount?: number | null
           budget_id?: string
           category?: string
+          company_id?: string | null
           created_at?: string | null
           department_id?: string | null
           description?: string | null
@@ -2540,6 +2824,13 @@ export type Database = {
             columns: ["budget_id"]
             isOneToOne: false
             referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_line_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -2642,6 +2933,7 @@ export type Database = {
           budget_code: string
           budget_name: string
           budget_period: string
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
@@ -2665,6 +2957,7 @@ export type Database = {
           budget_code: string
           budget_name: string
           budget_period: string
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -2688,6 +2981,7 @@ export type Database = {
           budget_code?: string
           budget_name?: string
           budget_period?: string
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -2705,6 +2999,13 @@ export type Database = {
           version_number?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "budgets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "budgets_parent_budget_id_fkey"
             columns: ["parent_budget_id"]
@@ -3507,6 +3808,7 @@ export type Database = {
           account_id: string | null
           amount: number
           cash_account_id: string | null
+          company_id: string | null
           cost_center_id: string | null
           created_at: string | null
           created_by: string | null
@@ -3527,6 +3829,7 @@ export type Database = {
           account_id?: string | null
           amount: number
           cash_account_id?: string | null
+          company_id?: string | null
           cost_center_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -3547,6 +3850,7 @@ export type Database = {
           account_id?: string | null
           amount?: number
           cash_account_id?: string | null
+          company_id?: string | null
           cost_center_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -3579,6 +3883,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cashbook_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cashbook_entries_cost_center_id_fkey"
             columns: ["cost_center_id"]
             isOneToOne: false
@@ -3600,6 +3911,7 @@ export type Database = {
           account_level: number | null
           account_name: string
           account_type: Database["public"]["Enums"]["account_type"]
+          company_id: string | null
           created_at: string
           current_balance: number
           description: string | null
@@ -3620,6 +3932,7 @@ export type Database = {
           account_level?: number | null
           account_name: string
           account_type: Database["public"]["Enums"]["account_type"]
+          company_id?: string | null
           created_at?: string
           current_balance?: number
           description?: string | null
@@ -3640,6 +3953,7 @@ export type Database = {
           account_level?: number | null
           account_name?: string
           account_type?: Database["public"]["Enums"]["account_type"]
+          company_id?: string | null
           created_at?: string
           current_balance?: number
           description?: string | null
@@ -3656,6 +3970,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "chart_of_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "chart_of_accounts_parent_account_id_fkey"
             columns: ["parent_account_id"]
@@ -3676,6 +3997,7 @@ export type Database = {
           cheque_date: string
           cheque_number: string
           cleared_date: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -3695,6 +4017,7 @@ export type Database = {
           cheque_date: string
           cheque_number: string
           cleared_date?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -3714,6 +4037,7 @@ export type Database = {
           cheque_date?: string
           cheque_number?: string
           cleared_date?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -3732,6 +4056,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cheque_register_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cheque_register_payment_id_fkey"
             columns: ["payment_id"]
             isOneToOne: false
@@ -3742,6 +4073,7 @@ export type Database = {
       }
       coa_upload_history: {
         Row: {
+          company_id: string | null
           created_at: string | null
           file_name: string | null
           id: string
@@ -3752,6 +4084,7 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           file_name?: string | null
           id?: string
@@ -3762,6 +4095,7 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           file_name?: string | null
           id?: string
@@ -3771,10 +4105,19 @@ export type Database = {
           uploaded_at?: string | null
           uploaded_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "coa_upload_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cogs_transactions: {
         Row: {
+          company_id: string | null
           created_at: string | null
           id: string
           item_id: string
@@ -3790,6 +4133,7 @@ export type Database = {
           warehouse_id: string | null
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           id?: string
           item_id: string
@@ -3805,6 +4149,7 @@ export type Database = {
           warehouse_id?: string | null
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           id?: string
           item_id?: string
@@ -3820,6 +4165,13 @@ export type Database = {
           warehouse_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cogs_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cogs_transactions_item_id_fkey"
             columns: ["item_id"]
@@ -4112,6 +4464,7 @@ export type Database = {
       }
       currencies: {
         Row: {
+          company_id: string | null
           created_at: string | null
           currency_code: string
           currency_name: string
@@ -4123,6 +4476,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           currency_code: string
           currency_name: string
@@ -4134,6 +4488,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           currency_code?: string
           currency_name?: string
@@ -4144,12 +4499,21 @@ export type Database = {
           symbol?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "currencies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customers: {
         Row: {
           ar_account_id: string | null
           billing_address: string | null
+          company_id: string | null
           contact_person: string | null
           created_at: string | null
           created_by: string | null
@@ -4172,6 +4536,7 @@ export type Database = {
         Insert: {
           ar_account_id?: string | null
           billing_address?: string | null
+          company_id?: string | null
           contact_person?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -4194,6 +4559,7 @@ export type Database = {
         Update: {
           ar_account_id?: string | null
           billing_address?: string | null
+          company_id?: string | null
           contact_person?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -4219,6 +4585,13 @@ export type Database = {
             columns: ["ar_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -4525,6 +4898,7 @@ export type Database = {
           approval_date: string
           approval_type: string
           approver_name: string
+          company_id: string | null
           created_at: string
           document_id: string | null
           id: string
@@ -4536,6 +4910,7 @@ export type Database = {
           approval_date?: string
           approval_type: string
           approver_name: string
+          company_id?: string | null
           created_at?: string
           document_id?: string | null
           id?: string
@@ -4547,6 +4922,7 @@ export type Database = {
           approval_date?: string
           approval_type?: string
           approver_name?: string
+          company_id?: string | null
           created_at?: string
           document_id?: string | null
           id?: string
@@ -4555,6 +4931,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "document_approvals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "document_approvals_document_id_fkey"
             columns: ["document_id"]
@@ -5117,6 +5500,7 @@ export type Database = {
       }
       exchange_rates: {
         Row: {
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           effective_date: string
@@ -5127,6 +5511,7 @@ export type Database = {
           to_currency: string
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           effective_date: string
@@ -5137,6 +5522,7 @@ export type Database = {
           to_currency: string
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           effective_date?: string
@@ -5146,7 +5532,15 @@ export type Database = {
           source?: string | null
           to_currency?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "exchange_rates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       executive_kpi_targets: {
         Row: {
@@ -5630,6 +6024,7 @@ export type Database = {
           closed_at: string | null
           closed_by: string | null
           closing_status: string | null
+          company_id: string | null
           created_at: string
           end_date: string
           fiscal_year: number | null
@@ -5646,6 +6041,7 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           closing_status?: string | null
+          company_id?: string | null
           created_at?: string
           end_date: string
           fiscal_year?: number | null
@@ -5662,6 +6058,7 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           closing_status?: string | null
+          company_id?: string | null
           created_at?: string
           end_date?: string
           fiscal_year?: number | null
@@ -5674,7 +6071,15 @@ export type Database = {
           period_number?: number | null
           start_date?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "financial_periods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fixed_assets: {
         Row: {
@@ -5683,6 +6088,7 @@ export type Database = {
           asset_name: string
           capitalization_date: string | null
           category_id: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           current_value: number | null
@@ -5715,6 +6121,7 @@ export type Database = {
           asset_name: string
           capitalization_date?: string | null
           category_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           current_value?: number | null
@@ -5747,6 +6154,7 @@ export type Database = {
           asset_name?: string
           capitalization_date?: string | null
           category_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           current_value?: number | null
@@ -5779,6 +6187,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fixed_assets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -6030,6 +6445,7 @@ export type Database = {
         Row: {
           amount: number
           bank_charges: number | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           from_bank_account_id: string | null
@@ -6046,6 +6462,7 @@ export type Database = {
         Insert: {
           amount: number
           bank_charges?: number | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           from_bank_account_id?: string | null
@@ -6062,6 +6479,7 @@ export type Database = {
         Update: {
           amount?: number
           bank_charges?: number | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           from_bank_account_id?: string | null
@@ -6076,6 +6494,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fund_transfers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fund_transfers_from_bank_account_id_fkey"
             columns: ["from_bank_account_id"]
@@ -6101,6 +6526,7 @@ export type Database = {
       }
       goods_receipt_lines: {
         Row: {
+          company_id: string | null
           created_at: string | null
           description: string | null
           grn_id: string
@@ -6113,6 +6539,7 @@ export type Database = {
           unit_price: number | null
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           description?: string | null
           grn_id: string
@@ -6125,6 +6552,7 @@ export type Database = {
           unit_price?: number | null
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           description?: string | null
           grn_id?: string
@@ -6137,6 +6565,13 @@ export type Database = {
           unit_price?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "goods_receipt_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "goods_receipt_lines_grn_id_fkey"
             columns: ["grn_id"]
@@ -6162,6 +6597,7 @@ export type Database = {
       }
       goods_receipt_notes: {
         Row: {
+          company_id: string | null
           created_at: string | null
           grn_number: string
           id: string
@@ -6177,6 +6613,7 @@ export type Database = {
           warehouse_id: string | null
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           grn_number: string
           id?: string
@@ -6192,6 +6629,7 @@ export type Database = {
           warehouse_id?: string | null
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           grn_number?: string
           id?: string
@@ -6207,6 +6645,13 @@ export type Database = {
           warehouse_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "goods_receipt_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "goods_receipt_notes_po_id_fkey"
             columns: ["po_id"]
@@ -6524,6 +6969,7 @@ export type Database = {
         Row: {
           accepted_quantity: number | null
           batch_number: string | null
+          company_id: string | null
           expiry_date: string | null
           grn_id: string | null
           id: string
@@ -6540,6 +6986,7 @@ export type Database = {
         Insert: {
           accepted_quantity?: number | null
           batch_number?: string | null
+          company_id?: string | null
           expiry_date?: string | null
           grn_id?: string | null
           id?: string
@@ -6556,6 +7003,7 @@ export type Database = {
         Update: {
           accepted_quantity?: number | null
           batch_number?: string | null
+          company_id?: string | null
           expiry_date?: string | null
           grn_id?: string | null
           id?: string
@@ -6570,6 +7018,13 @@ export type Database = {
           unit_cost?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "grn_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "grn_lines_grn_id_fkey"
             columns: ["grn_id"]
@@ -7025,6 +7480,7 @@ export type Database = {
       item_stock: {
         Row: {
           average_cost: number | null
+          company_id: string | null
           id: string
           item_id: string | null
           last_issue_date: string | null
@@ -7037,6 +7493,7 @@ export type Database = {
         }
         Insert: {
           average_cost?: number | null
+          company_id?: string | null
           id?: string
           item_id?: string | null
           last_issue_date?: string | null
@@ -7049,6 +7506,7 @@ export type Database = {
         }
         Update: {
           average_cost?: number | null
+          company_id?: string | null
           id?: string
           item_id?: string | null
           last_issue_date?: string | null
@@ -7060,6 +7518,13 @@ export type Database = {
           warehouse_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "item_stock_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "item_stock_item_id_fkey"
             columns: ["item_id"]
@@ -7079,6 +7544,7 @@ export type Database = {
       items: {
         Row: {
           category_id: string | null
+          company_id: string | null
           created_at: string | null
           id: string
           is_active: boolean | null
@@ -7101,6 +7567,7 @@ export type Database = {
         }
         Insert: {
           category_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
@@ -7123,6 +7590,7 @@ export type Database = {
         }
         Update: {
           category_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
@@ -7151,6 +7619,13 @@ export type Database = {
             referencedRelation: "item_categories"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
         ]
       }
       journal_entries: {
@@ -7158,6 +7633,7 @@ export type Database = {
           approval_status: string | null
           approved_at: string | null
           approved_by: string | null
+          company_id: string | null
           created_at: string
           created_by: string | null
           description: string
@@ -7182,6 +7658,7 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string
           created_by?: string | null
           description: string
@@ -7206,6 +7683,7 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string
@@ -7228,6 +7706,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "journal_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "journal_entries_period_id_fkey"
             columns: ["period_id"]
             isOneToOne: false
@@ -7249,6 +7734,7 @@ export type Database = {
           approver_id: string | null
           approver_name: string | null
           comments: string | null
+          company_id: string | null
           created_at: string | null
           entry_id: string | null
           id: string
@@ -7259,6 +7745,7 @@ export type Database = {
           approver_id?: string | null
           approver_name?: string | null
           comments?: string | null
+          company_id?: string | null
           created_at?: string | null
           entry_id?: string | null
           id?: string
@@ -7269,12 +7756,20 @@ export type Database = {
           approver_id?: string | null
           approver_name?: string | null
           comments?: string | null
+          company_id?: string | null
           created_at?: string | null
           entry_id?: string | null
           id?: string
           status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "journal_entry_approvals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "journal_entry_approvals_entry_id_fkey"
             columns: ["entry_id"]
@@ -7287,6 +7782,7 @@ export type Database = {
       journal_entry_lines: {
         Row: {
           account_id: string
+          company_id: string | null
           cost_center_id: string | null
           created_at: string
           credit: number
@@ -7300,6 +7796,7 @@ export type Database = {
         }
         Insert: {
           account_id: string
+          company_id?: string | null
           cost_center_id?: string | null
           created_at?: string
           credit?: number
@@ -7313,6 +7810,7 @@ export type Database = {
         }
         Update: {
           account_id?: string
+          company_id?: string | null
           cost_center_id?: string | null
           created_at?: string
           credit?: number
@@ -7330,6 +7828,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entry_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -10381,6 +10886,7 @@ export type Database = {
       }
       purchase_order_lines: {
         Row: {
+          company_id: string | null
           created_at: string | null
           description: string
           id: string
@@ -10394,6 +10900,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           description: string
           id?: string
@@ -10407,6 +10914,7 @@ export type Database = {
           unit_price?: number
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           description?: string
           id?: string
@@ -10420,6 +10928,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "purchase_order_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchase_order_lines_item_id_fkey"
             columns: ["item_id"]
@@ -10441,6 +10956,7 @@ export type Database = {
           approval_status: string | null
           approved_at: string | null
           approved_by: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           delivery_address: string | null
@@ -10464,6 +10980,7 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           delivery_address?: string | null
@@ -10487,6 +11004,7 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           delivery_address?: string | null
@@ -10508,6 +11026,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "purchase_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "purchase_orders_pr_id_fkey"
             columns: ["pr_id"]
             isOneToOne: false
@@ -10527,6 +11052,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          company_id: string | null
           created_at: string | null
           department: string | null
           id: string
@@ -10542,6 +11068,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string | null
           department?: string | null
           id?: string
@@ -10557,6 +11084,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string | null
           department?: string | null
           id?: string
@@ -10569,7 +11097,15 @@ export type Database = {
           status?: string | null
           total_amount?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "purchase_requisitions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quotation_bus_details: {
         Row: {
@@ -13666,6 +14202,7 @@ export type Database = {
       }
       sscl_transactions: {
         Row: {
+          company_id: string | null
           created_at: string | null
           gross_amount: number
           id: string
@@ -13678,6 +14215,7 @@ export type Database = {
           transaction_date: string
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           gross_amount: number
           id?: string
@@ -13690,6 +14228,7 @@ export type Database = {
           transaction_date: string
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           gross_amount?: number
           id?: string
@@ -13701,7 +14240,15 @@ export type Database = {
           status?: string | null
           transaction_date?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sscl_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_attendance: {
         Row: {
@@ -14018,6 +14565,7 @@ export type Database = {
           adjustment_type: string | null
           approved_at: string | null
           approved_by: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -14033,6 +14581,7 @@ export type Database = {
           adjustment_type?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -14048,6 +14597,7 @@ export type Database = {
           adjustment_type?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -14058,6 +14608,13 @@ export type Database = {
           warehouse_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "stock_adjustments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stock_adjustments_journal_entry_id_fkey"
             columns: ["journal_entry_id"]
@@ -15369,6 +15926,7 @@ export type Database = {
           bank_account: string | null
           bank_branch: string | null
           bank_name: string | null
+          company_id: string | null
           contact_person: string | null
           created_at: string | null
           created_by: string | null
@@ -15393,6 +15951,7 @@ export type Database = {
           bank_account?: string | null
           bank_branch?: string | null
           bank_name?: string | null
+          company_id?: string | null
           contact_person?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -15417,6 +15976,7 @@ export type Database = {
           bank_account?: string | null
           bank_branch?: string | null
           bank_name?: string | null
+          company_id?: string | null
           contact_person?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -15441,6 +16001,13 @@ export type Database = {
             columns: ["ap_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendors_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -15543,6 +16110,7 @@ export type Database = {
         Row: {
           certificate_date: string
           certificate_number: string
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           financial_year: string
@@ -15561,6 +16129,7 @@ export type Database = {
         Insert: {
           certificate_date: string
           certificate_number: string
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           financial_year: string
@@ -15579,6 +16148,7 @@ export type Database = {
         Update: {
           certificate_date?: string
           certificate_number?: string
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           financial_year?: string
@@ -15595,6 +16165,13 @@ export type Database = {
           wht_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "wht_certificates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "wht_certificates_vendor_id_fkey"
             columns: ["vendor_id"]
