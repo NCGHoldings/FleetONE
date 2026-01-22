@@ -12196,6 +12196,134 @@ export type Database = {
           },
         ]
       }
+      school_ar_invoice_batches: {
+        Row: {
+          batch_number: string
+          branch_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          invoice_month: string
+          journal_entry_id: string | null
+          posted_at: string | null
+          status: string | null
+          total_amount: number | null
+          total_invoices: number | null
+          total_students: number | null
+        }
+        Insert: {
+          batch_number: string
+          branch_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          invoice_month: string
+          journal_entry_id?: string | null
+          posted_at?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_invoices?: number | null
+          total_students?: number | null
+        }
+        Update: {
+          batch_number?: string
+          branch_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          invoice_month?: string
+          journal_entry_id?: string | null
+          posted_at?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_invoices?: number | null
+          total_students?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_ar_invoice_batches_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_ar_invoice_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_ar_invoice_batches_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_ar_invoices: {
+        Row: {
+          amount: number
+          ar_invoice_id: string | null
+          batch_id: string | null
+          created_at: string | null
+          id: string
+          invoice_month: string
+          invoice_number: string
+          status: string | null
+          student_id: string
+        }
+        Insert: {
+          amount: number
+          ar_invoice_id?: string | null
+          batch_id?: string | null
+          created_at?: string | null
+          id?: string
+          invoice_month: string
+          invoice_number: string
+          status?: string | null
+          student_id: string
+        }
+        Update: {
+          amount?: number
+          ar_invoice_id?: string | null
+          batch_id?: string | null
+          created_at?: string | null
+          id?: string
+          invoice_month?: string
+          invoice_number?: string
+          status?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_ar_invoices_ar_invoice_id_fkey"
+            columns: ["ar_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_ar_invoices_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "school_ar_invoice_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_ar_invoices_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "school_students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_branches: {
         Row: {
           address: string | null
@@ -12237,6 +12365,97 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      school_bus_finance_settings: {
+        Row: {
+          auto_post_invoices: boolean | null
+          auto_post_payments: boolean | null
+          bank_account_id: string | null
+          branch_id: string | null
+          cash_account_id: string | null
+          company_id: string | null
+          created_at: string | null
+          id: string
+          invoice_prefix: string | null
+          is_active: boolean | null
+          sbs_collection_account_id: string | null
+          trade_receivable_account_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_post_invoices?: boolean | null
+          auto_post_payments?: boolean | null
+          bank_account_id?: string | null
+          branch_id?: string | null
+          cash_account_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          sbs_collection_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_post_invoices?: boolean | null
+          auto_post_payments?: boolean | null
+          bank_account_id?: string | null
+          branch_id?: string | null
+          cash_account_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          sbs_collection_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_bus_finance_settings_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_bus_finance_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_bus_finance_settings_cash_account_id_fkey"
+            columns: ["cash_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_bus_finance_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_bus_finance_settings_sbs_collection_account_id_fkey"
+            columns: ["sbs_collection_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_bus_finance_settings_trade_receivable_account_id_fkey"
+            columns: ["trade_receivable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       school_payment_import_items: {
         Row: {
@@ -12480,11 +12699,14 @@ export type Database = {
       school_payment_transactions: {
         Row: {
           amount_paid: number
+          ar_receipt_id: string | null
           created_at: string | null
           created_by: string | null
           difference: number
           fixed_amount: number
+          gl_posted: boolean | null
           id: string
+          journal_entry_id: string | null
           notes: string | null
           payment_balance_after: number
           payment_balance_before: number
@@ -12497,11 +12719,14 @@ export type Database = {
         }
         Insert: {
           amount_paid: number
+          ar_receipt_id?: string | null
           created_at?: string | null
           created_by?: string | null
           difference: number
           fixed_amount: number
+          gl_posted?: boolean | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           payment_balance_after: number
           payment_balance_before: number
@@ -12514,11 +12739,14 @@ export type Database = {
         }
         Update: {
           amount_paid?: number
+          ar_receipt_id?: string | null
           created_at?: string | null
           created_by?: string | null
           difference?: number
           fixed_amount?: number
+          gl_posted?: boolean | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           payment_balance_after?: number
           payment_balance_before?: number
@@ -12530,6 +12758,20 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "school_payment_transactions_ar_receipt_id_fkey"
+            columns: ["ar_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_payment_transactions_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "school_payment_transactions_student_id_fkey"
             columns: ["student_id"]
@@ -12776,6 +13018,42 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "school_branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_student_ar_link: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_student_ar_link_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_student_ar_link_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "school_students"
             referencedColumns: ["id"]
           },
         ]
@@ -20110,6 +20388,11 @@ export type Database = {
       }
       generate_next_yutong_version_number: {
         Args: { p_parent_id: string }
+        Returns: string
+      }
+      generate_sbs_batch_number: { Args: never; Returns: string }
+      generate_sbs_invoice_number: {
+        Args: { p_prefix?: string }
         Returns: string
       }
       generate_sinotruck_customer_code: { Args: never; Returns: string }
