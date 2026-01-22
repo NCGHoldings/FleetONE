@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit, Trash2, TreePine, List } from "lucide-react";
+import { Plus, Edit, Trash2, TreePine, List, AlertCircle, Building2 } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -11,22 +11,27 @@ import { ChartOfAccountsUpload } from "./ChartOfAccountsUpload";
 import { ChartOfAccountsTree } from "./ChartOfAccountsTree";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export const ChartOfAccountsView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"tree" | "table">("tree");
+  const { selectedCompanyId, selectedCompany } = useCompany();
 
   const { data: accounts, isLoading, refetch } = useQuery({
-    queryKey: ["chart-of-accounts"],
+    queryKey: ["chart-of-accounts", selectedCompanyId],
     queryFn: async () => {
+      if (!selectedCompanyId) return [];
       const { data, error } = await supabase
         .from("chart_of_accounts")
         .select("*")
+        .eq("company_id", selectedCompanyId)
         .order("account_code");
       
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 
   const getAccountTypeBadge = (type: string) => {
@@ -91,17 +96,60 @@ export const ChartOfAccountsView = () => {
     },
   ];
 
+  // No company selected state
+  if (!selectedCompanyId) {
+    return (
+      <Card className="p-8">
+        <div className="flex flex-col items-center justify-center text-center">
+          <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold">No Company Selected</h3>
+          <p className="text-muted-foreground mt-2">
+            Please select a company from the dropdown to view its Chart of Accounts
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
+  // Empty COA for selected company
+  if (!isLoading && (!accounts || accounts.length === 0)) {
+    return (
+      <Card className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold">Chart of Accounts</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {selectedCompany?.name} - No accounts configured
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <ChartOfAccountsUpload onUploadComplete={refetch} companyId={selectedCompanyId} />
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
+          <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold">No Chart of Accounts</h3>
+          <p className="text-muted-foreground mt-2 max-w-md">
+            {selectedCompany?.name} doesn't have a Chart of Accounts yet. 
+            Upload an Excel file to initialize the account structure.
+          </p>
+          <ChartOfAccountsUpload onUploadComplete={refetch} companyId={selectedCompanyId} />
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold">Chart of Accounts</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your organization's account structure ({accounts?.length || 0} accounts)
+            {selectedCompany?.name} - {accounts?.length || 0} accounts
           </p>
         </div>
         <div className="flex gap-2">
-          <ChartOfAccountsUpload onUploadComplete={refetch} />
+          <ChartOfAccountsUpload onUploadComplete={refetch} companyId={selectedCompanyId} />
           <Button>
             <Plus className="h-4 w-4 mr-2" />
             Add Account
