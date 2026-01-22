@@ -22,9 +22,10 @@ interface ParsedRow {
 
 interface ChartOfAccountsUploadProps {
   onUploadComplete: () => void;
+  companyId?: string;
 }
 
-export const ChartOfAccountsUpload = ({ onUploadComplete }: ChartOfAccountsUploadProps) => {
+export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAccountsUploadProps) => {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
@@ -132,6 +133,11 @@ export const ChartOfAccountsUpload = ({ onUploadComplete }: ChartOfAccountsUploa
       return;
     }
 
+    if (!companyId) {
+      toast.error("No company selected");
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
 
@@ -139,11 +145,11 @@ export const ChartOfAccountsUpload = ({ onUploadComplete }: ChartOfAccountsUploa
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Delete existing accounts (replace mode)
+      // Delete existing accounts for THIS COMPANY ONLY (replace mode)
       const { error: deleteError } = await supabase
         .from("chart_of_accounts")
         .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+        .eq("company_id", companyId);
 
       if (deleteError) {
         console.error("Delete error:", deleteError);
@@ -172,6 +178,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete }: ChartOfAccountsUploa
           else if (row.level1) accountLevel = 1;
 
           return {
+            company_id: companyId, // CRITICAL: Tag with company_id
             account_code: row.glCode,
             account_name: accountName,
             account_type: mapAccountType(row.level1),
