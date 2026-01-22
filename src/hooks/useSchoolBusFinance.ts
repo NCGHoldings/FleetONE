@@ -4,6 +4,68 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
+// Helper function to update COA balances after journal entry creation
+// This follows proper double-entry bookkeeping rules:
+// - Assets and Expenses are "debit normal" (debit increases balance)
+// - Liabilities, Equity, and Revenue are "credit normal" (credit increases balance)
+async function updateAccountBalancesFromJournalEntry(journalEntryId: string) {
+  // Fetch journal entry lines with account information
+  const { data: lines, error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .select(`
+      account_id,
+      debit,
+      credit
+    `)
+    .eq("journal_entry_id", journalEntryId);
+
+  if (linesError) {
+    console.error("Error fetching journal entry lines:", linesError);
+    throw linesError;
+  }
+
+  if (!lines || lines.length === 0) return;
+
+  // Update each account balance
+  for (const line of lines) {
+    if (!line.account_id) continue;
+
+    // Fetch account type and current balance
+    const { data: account, error: accountError } = await supabase
+      .from("chart_of_accounts")
+      .select("current_balance, account_type")
+      .eq("id", line.account_id)
+      .single();
+
+    if (accountError || !account) {
+      console.error("Error fetching account:", accountError);
+      continue;
+    }
+
+    // Calculate net amount (debit - credit)
+    const netAmount = (line.debit || 0) - (line.credit || 0);
+
+    // Determine balance adjustment based on account type
+    // Debit normal accounts: asset, expense
+    // Credit normal accounts: liability, equity, revenue
+    const isDebitNormal = ["asset", "expense"].includes(account.account_type || "");
+    const adjustment = isDebitNormal ? netAmount : -netAmount;
+
+    // Update account balance
+    const { error: updateError } = await supabase
+      .from("chart_of_accounts")
+      .update({
+        current_balance: (account.current_balance || 0) + adjustment,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", line.account_id);
+
+    if (updateError) {
+      console.error("Error updating account balance:", updateError);
+    }
+  }
+}
+
 export interface SchoolBusFinanceSettings {
   id: string;
   company_id: string;
@@ -292,6 +354,9 @@ export function useGenerateBulkARInvoices() {
 
         if (linesError) throw linesError;
 
+        // UPDATE COA BALANCES - Critical for proper accounting
+        await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
         // Update batch with journal entry ID
         await supabase
           .from("school_ar_invoice_batches")
@@ -315,6 +380,8 @@ export function useGenerateBulkARInvoices() {
       queryClient.invalidateQueries({ queryKey: ["school-ar-batches"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["students-bulk-ar"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("AR invoices generated successfully");
     },
     onError: (error) => {
@@ -425,6 +492,9 @@ export function usePostPaymentToGL() {
 
       if (linesError) throw linesError;
 
+      // UPDATE COA BALANCES - Critical for proper accounting
+      await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
       // Update payment record with GL info
       await supabase
         .from("school_payment_transactions")
@@ -439,6 +509,7 @@ export function usePostPaymentToGL() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("Payment posted to GL successfully");
     },
     onError: (error) => {
