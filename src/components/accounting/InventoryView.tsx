@@ -9,6 +9,7 @@ import { useItems, useItemStock, useItemCategories } from "@/hooks/useAccounting
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ItemForm } from "./ItemForm";
 import { StockAdjustmentForm } from "./StockAdjustmentForm";
+import { ItemCategoryForm } from "./ItemCategoryForm";
 
 export const InventoryView = () => {
   const { data: items, isLoading } = useItems();
@@ -16,6 +17,7 @@ export const InventoryView = () => {
   const { data: categories } = useItemCategories();
   const [showItemForm, setShowItemForm] = useState(false);
   const [showAdjustmentForm, setShowAdjustmentForm] = useState(false);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
 
   const getStockStatus = (quantity: number, reorderLevel: number) => {
     if (quantity <= 0) return { label: "Out of Stock", variant: "destructive" as const };
@@ -233,6 +235,12 @@ export const InventoryView = () => {
           </TabsContent>
 
           <TabsContent value="categories" className="mt-4">
+            <div className="flex justify-end mb-4">
+              <Button onClick={() => setShowCategoryForm(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Category
+              </Button>
+            </div>
             <div className="grid gap-4 md:grid-cols-3">
               {categories?.map((cat) => (
                 <Card key={cat.id} className="p-4">
@@ -246,13 +254,13 @@ export const InventoryView = () => {
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Valuation: Weighted Average
+                    Valuation: {cat.valuation_method || "Weighted Average"}
                   </p>
                 </Card>
               ))}
               {(!categories || categories.length === 0) && (
                 <p className="text-muted-foreground col-span-3 text-center py-8">
-                  No categories defined
+                  No categories defined. Click "Add Category" to create one.
                 </p>
               )}
             </div>
@@ -268,6 +276,7 @@ export const InventoryView = () => {
 
       <ItemForm open={showItemForm} onOpenChange={setShowItemForm} />
       <StockAdjustmentForm open={showAdjustmentForm} onOpenChange={setShowAdjustmentForm} />
+      <ItemCategoryForm open={showCategoryForm} onOpenChange={setShowCategoryForm} />
     </div>
   );
 };

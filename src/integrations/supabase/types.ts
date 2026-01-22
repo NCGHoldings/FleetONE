@@ -7481,6 +7481,7 @@ export type Database = {
           category_code: string | null
           category_name: string
           cogs_account_id: string | null
+          company_id: string | null
           created_at: string | null
           id: string
           inventory_account_id: string | null
@@ -7493,6 +7494,7 @@ export type Database = {
           category_code?: string | null
           category_name: string
           cogs_account_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string
           inventory_account_id?: string | null
@@ -7505,6 +7507,7 @@ export type Database = {
           category_code?: string | null
           category_name?: string
           cogs_account_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string
           inventory_account_id?: string | null
@@ -7519,6 +7522,13 @@ export type Database = {
             columns: ["cogs_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -7613,6 +7623,7 @@ export type Database = {
           category_id: string | null
           company_id: string | null
           created_at: string | null
+          description: string | null
           id: string
           is_active: boolean | null
           is_batch_tracked: boolean | null
@@ -7636,6 +7647,7 @@ export type Database = {
           category_id?: string | null
           company_id?: string | null
           created_at?: string | null
+          description?: string | null
           id?: string
           is_active?: boolean | null
           is_batch_tracked?: boolean | null
@@ -7659,6 +7671,7 @@ export type Database = {
           category_id?: string | null
           company_id?: string | null
           created_at?: string | null
+          description?: string | null
           id?: string
           is_active?: boolean | null
           is_batch_tracked?: boolean | null
