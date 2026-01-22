@@ -1,11 +1,14 @@
 // Centralized mutations for all accounting modules
+// All mutations inject company_id for multi-company data isolation
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useCompany } from "@/contexts/CompanyContext";
 
 // ============ Journal Entries ============
 export const useCreateJournalEntry = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (entry: {
@@ -24,7 +27,8 @@ export const useCreateJournalEntry = () => {
         cost_center_id?: string;
       }>;
     }) => {
-      // Create journal entry
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: journalEntry, error: entryError } = await supabase
         .from("journal_entries")
         .insert([{
@@ -36,13 +40,13 @@ export const useCreateJournalEntry = () => {
           total_debit: entry.total_debit,
           total_credit: entry.total_credit,
           status: "draft",
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
       
       if (entryError) throw entryError;
       
-      // Create journal entry lines
       const lines = entry.lines.map((line) => ({
         journal_entry_id: journalEntry.id,
         account_id: line.account_id,
@@ -50,6 +54,7 @@ export const useCreateJournalEntry = () => {
         debit: line.debit_amount || 0,
         credit: line.credit_amount || 0,
         cost_center_id: line.cost_center_id,
+        company_id: selectedCompanyId,
       }));
       
       const { error: linesError } = await supabase
@@ -61,7 +66,7 @@ export const useCreateJournalEntry = () => {
       return journalEntry;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
       toast.success("Journal entry created successfully");
     },
     onError: (error) => {
@@ -72,10 +77,10 @@ export const useCreateJournalEntry = () => {
 
 export const usePostJournalEntry = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (entryId: string) => {
-      // Get entry with lines
       const { data: entry, error: fetchError } = await supabase
         .from("journal_entries")
         .select(`
@@ -91,11 +96,9 @@ export const usePostJournalEntry = () => {
       
       if (fetchError) throw fetchError;
       
-      // Update account balances
       for (const line of entry.journal_entry_lines) {
         const netAmount = (line.debit || 0) - (line.credit || 0);
         
-        // Update directly
         const { data: account } = await supabase
           .from("chart_of_accounts")
           .select("current_balance, account_type")
@@ -103,7 +106,6 @@ export const usePostJournalEntry = () => {
           .single();
         
         if (account) {
-          // For assets/expenses, debits increase; for liabilities/equity/revenue, credits increase
           const isDebitNormal = ["asset", "expense"].includes(account.account_type);
           const adjustment = isDebitNormal ? netAmount : -netAmount;
           
@@ -114,7 +116,6 @@ export const usePostJournalEntry = () => {
         }
       }
       
-      // Update entry status
       const { error: statusError } = await supabase
         .from("journal_entries")
         .update({ 
@@ -128,9 +129,9 @@ export const usePostJournalEntry = () => {
       return entry;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary", selectedCompanyId] });
       toast.success("Journal entry posted successfully");
     },
     onError: (error) => {
@@ -141,6 +142,7 @@ export const usePostJournalEntry = () => {
 
 export const useApproveJournalEntry = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async ({ entryId, level }: { entryId: string; level: number }) => {
@@ -160,7 +162,7 @@ export const useApproveJournalEntry = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
       toast.success("Journal entry approved");
     },
     onError: (error) => {
@@ -172,6 +174,7 @@ export const useApproveJournalEntry = () => {
 // ============ AR Invoices ============
 export const useCreateARInvoice = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (invoice: {
@@ -191,7 +194,8 @@ export const useCreateARInvoice = () => {
         tax_code?: string;
       }>;
     }) => {
-      // Destructure to separate lines from header data
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { lines, ...headerData } = invoice;
       
       const { data, error } = await supabase
@@ -200,17 +204,18 @@ export const useCreateARInvoice = () => {
           ...headerData,
           balance: invoice.total_amount,
           status: "unpaid",
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
       
       if (error) throw error;
       
-      // Create invoice lines if provided
       if (lines?.length) {
         const lineData = lines.map(line => ({
           invoice_id: data.id,
           ...line,
+          company_id: selectedCompanyId,
         }));
         
         await supabase.from("ar_invoice_lines").insert(lineData);
@@ -219,8 +224,8 @@ export const useCreateARInvoice = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["ar-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ar-summary", selectedCompanyId] });
       toast.success("Invoice created successfully");
     },
     onError: (error) => {
@@ -232,6 +237,7 @@ export const useCreateARInvoice = () => {
 // ============ AR Receipts ============
 export const useCreateARReceipt = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (receipt: {
@@ -248,6 +254,8 @@ export const useCreateARReceipt = () => {
         allocated_amount: number;
       }>;
     }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data, error } = await supabase
         .from("ar_receipts")
         .insert([{
@@ -260,22 +268,22 @@ export const useCreateARReceipt = () => {
           reference: receipt.reference,
           notes: receipt.notes,
           status: "posted",
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
       
       if (error) throw error;
       
-      // Create allocations and update invoice balances
       if (receipt.allocations?.length) {
         for (const alloc of receipt.allocations) {
           await supabase.from("ar_receipt_allocations").insert([{
             receipt_id: data.id,
             invoice_id: alloc.invoice_id,
             allocated_amount: alloc.allocated_amount,
+            company_id: selectedCompanyId,
           }]);
           
-          // Update invoice balance
           const { data: invoice } = await supabase
             .from("ar_invoices")
             .select("balance, total_amount, paid_amount")
@@ -301,9 +309,9 @@ export const useCreateARReceipt = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ar-receipts"] });
-      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["ar-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-receipts", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ar-summary", selectedCompanyId] });
       toast.success("Receipt recorded successfully");
     },
     onError: (error) => {
@@ -315,6 +323,7 @@ export const useCreateARReceipt = () => {
 // ============ AP Invoices ============
 export const useCreateAPInvoice = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (invoice: {
@@ -327,12 +336,15 @@ export const useCreateAPInvoice = () => {
       wht_amount?: number;
       notes?: string;
     }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data, error } = await supabase
         .from("ap_invoices")
         .insert([{
           ...invoice,
           balance: invoice.total_amount - (invoice.wht_amount || 0),
           status: "unpaid",
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
@@ -341,8 +353,8 @@ export const useCreateAPInvoice = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["ap-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ap-summary", selectedCompanyId] });
       toast.success("Vendor invoice recorded successfully");
     },
     onError: (error) => {
@@ -354,6 +366,7 @@ export const useCreateAPInvoice = () => {
 // ============ AP Payments ============
 export const useCreateAPPayment = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (payment: {
@@ -372,6 +385,8 @@ export const useCreateAPPayment = () => {
         wht_deducted?: number;
       }>;
     }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data, error } = await supabase
         .from("ap_payments")
         .insert([{
@@ -385,13 +400,13 @@ export const useCreateAPPayment = () => {
           reference: payment.reference,
           notes: payment.notes,
           status: "posted",
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
       
       if (error) throw error;
       
-      // Create allocations and update invoice balances
       if (payment.allocations?.length) {
         for (const alloc of payment.allocations) {
           await supabase.from("ap_payment_allocations").insert([{
@@ -399,9 +414,9 @@ export const useCreateAPPayment = () => {
             invoice_id: alloc.invoice_id,
             allocated_amount: alloc.allocated_amount,
             wht_deducted: alloc.wht_deducted || 0,
+            company_id: selectedCompanyId,
           }]);
           
-          // Update invoice balance
           const { data: invoice } = await supabase
             .from("ap_invoices")
             .select("balance, total_amount, paid_amount")
@@ -428,9 +443,9 @@ export const useCreateAPPayment = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["ap-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-payments", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ap-summary", selectedCompanyId] });
       toast.success("Payment recorded successfully");
     },
     onError: (error) => {
@@ -442,6 +457,7 @@ export const useCreateAPPayment = () => {
 // ============ Bank Transactions ============
 export const useCreateBankTransaction = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (transaction: {
@@ -454,9 +470,14 @@ export const useCreateBankTransaction = () => {
       reference?: string;
       cheque_number?: string;
     }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data, error } = await supabase
         .from("bank_transactions")
-        .insert([transaction])
+        .insert([{
+          ...transaction,
+          company_id: selectedCompanyId,
+        }])
         .select()
         .single();
       
@@ -465,8 +486,8 @@ export const useCreateBankTransaction = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
       toast.success("Transaction recorded successfully");
     },
     onError: (error) => {
@@ -478,6 +499,7 @@ export const useCreateBankTransaction = () => {
 // ============ Fixed Assets ============
 export const useCreateFixedAsset = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (asset: {
@@ -490,6 +512,8 @@ export const useCreateFixedAsset = () => {
       location?: string;
       department?: string;
     }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data, error } = await supabase
         .from("fixed_assets")
         .insert([{
@@ -504,6 +528,7 @@ export const useCreateFixedAsset = () => {
           current_value: asset.purchase_cost,
           accumulated_depreciation: 0,
           status: "active",
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
@@ -512,7 +537,7 @@ export const useCreateFixedAsset = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fixed-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["fixed-assets", selectedCompanyId] });
       toast.success("Asset registered successfully");
     },
     onError: (error) => {
@@ -523,11 +548,11 @@ export const useCreateFixedAsset = () => {
 
 export const useRunDepreciation = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (periodId: string) => {
-      // Get all active assets
-      const { data: assets, error: fetchError } = await supabase
+      let query = supabase
         .from("fixed_assets")
         .select(`
           *,
@@ -540,6 +565,11 @@ export const useRunDepreciation = () => {
         `)
         .eq("status", "active");
       
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data: assets, error: fetchError } = await query;
       if (fetchError) throw fetchError;
       
       const schedules = [];
@@ -554,7 +584,6 @@ export const useRunDepreciation = () => {
         const newAccumulated = (asset.accumulated_depreciation || 0) + monthlyDepreciation;
         const newNetValue = asset.purchase_cost - newAccumulated;
         
-        // Create depreciation schedule entry
         schedules.push({
           asset_id: asset.id,
           period_id: periodId,
@@ -563,9 +592,9 @@ export const useRunDepreciation = () => {
           accumulated_depreciation: newAccumulated,
           net_book_value: newNetValue,
           is_posted: false,
+          company_id: selectedCompanyId,
         });
         
-        // Update asset values
         await supabase
           .from("fixed_assets")
           .update({
@@ -582,8 +611,8 @@ export const useRunDepreciation = () => {
       return { processedAssets: schedules.length };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["fixed-assets"] });
-      queryClient.invalidateQueries({ queryKey: ["depreciation-schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["fixed-assets", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["depreciation-schedule", selectedCompanyId] });
       toast.success(`Depreciation run complete: ${data.processedAssets} assets processed`);
     },
     onError: (error) => {
@@ -595,10 +624,10 @@ export const useRunDepreciation = () => {
 // ============ Financial Period ============
 export const useClosePeriod = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (periodId: string) => {
-      // Check for unposted journal entries
       const { data: unposted } = await supabase
         .from("journal_entries")
         .select("id")
@@ -621,7 +650,7 @@ export const useClosePeriod = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["financial-periods"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-periods", selectedCompanyId] });
       toast.success("Period closed successfully");
     },
     onError: (error) => {
@@ -633,6 +662,7 @@ export const useClosePeriod = () => {
 // ============ Customer Mutations ============
 export const useCreateCustomer = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (customer: {
@@ -646,9 +676,14 @@ export const useCreateCustomer = () => {
       tax_id?: string;
       is_active?: boolean;
     }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data, error } = await supabase
         .from("customers")
-        .insert([customer])
+        .insert([{
+          ...customer,
+          company_id: selectedCompanyId,
+        }])
         .select()
         .single();
       
@@ -656,7 +691,7 @@ export const useCreateCustomer = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["customers", selectedCompanyId] });
       toast.success("Customer created successfully");
     },
     onError: (error) => {
@@ -667,6 +702,7 @@ export const useCreateCustomer = () => {
 
 export const useUpdateCustomer = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
@@ -678,7 +714,7 @@ export const useUpdateCustomer = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["customers", selectedCompanyId] });
       toast.success("Customer updated successfully");
     },
     onError: (error) => {
@@ -690,6 +726,7 @@ export const useUpdateCustomer = () => {
 // ============ Vendor Mutations ============
 export const useCreateVendor = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async (vendor: {
@@ -704,9 +741,14 @@ export const useCreateVendor = () => {
       wht_rate?: number;
       is_active?: boolean;
     }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data, error } = await supabase
         .from("vendors")
-        .insert([vendor])
+        .insert([{
+          ...vendor,
+          company_id: selectedCompanyId,
+        }])
         .select()
         .single();
       
@@ -714,7 +756,7 @@ export const useCreateVendor = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["vendors", selectedCompanyId] });
       toast.success("Vendor created successfully");
     },
     onError: (error) => {
@@ -725,6 +767,7 @@ export const useCreateVendor = () => {
 
 export const useUpdateVendor = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
   
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
@@ -736,7 +779,7 @@ export const useUpdateVendor = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["vendors", selectedCompanyId] });
       toast.success("Vendor updated successfully");
     },
     onError: (error) => {
@@ -748,14 +791,23 @@ export const useUpdateVendor = () => {
 // ============ AR Credit Notes ============
 export const useCreateARCreditNote = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
-      const { data: result, error } = await supabase.from("ar_credit_notes").insert([data]).select().single();
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data: result, error } = await supabase
+        .from("ar_credit_notes")
+        .insert([{ ...data, company_id: selectedCompanyId }])
+        .select()
+        .single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ar-credit-notes", selectedCompanyId] });
       toast.success("Credit note created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -765,14 +817,23 @@ export const useCreateARCreditNote = () => {
 // ============ AP Debit Notes ============
 export const useCreateAPDebitNote = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
-      const { data: result, error } = await supabase.from("ap_debit_notes").insert([data]).select().single();
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data: result, error } = await supabase
+        .from("ap_debit_notes")
+        .insert([{ ...data, company_id: selectedCompanyId }])
+        .select()
+        .single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ap-debit-notes", selectedCompanyId] });
       toast.success("Debit note created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -782,13 +843,15 @@ export const useCreateAPDebitNote = () => {
 // ============ AP Approvals ============
 export const useApproveAPInvoice = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("ap_invoices").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
       toast.success("Invoice approved");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -797,13 +860,15 @@ export const useApproveAPInvoice = () => {
 
 export const useApproveAPPayment = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("ap_payments").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-payments", selectedCompanyId] });
       toast.success("Payment approved");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -813,14 +878,22 @@ export const useApproveAPPayment = () => {
 // ============ Items & Inventory ============
 export const useCreateItem = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
-      const { data: result, error } = await supabase.from("items").insert([data]).select().single();
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data: result, error } = await supabase
+        .from("items")
+        .insert([{ ...data, company_id: selectedCompanyId }])
+        .select()
+        .single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["items", selectedCompanyId] });
       toast.success("Item created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -829,15 +902,23 @@ export const useCreateItem = () => {
 
 export const useCreateStockAdjustment = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
-      const { data: result, error } = await supabase.from("stock_adjustments").insert([data]).select().single();
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data: result, error } = await supabase
+        .from("stock_adjustments")
+        .insert([{ ...data, company_id: selectedCompanyId }])
+        .select()
+        .single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["items"] });
-      queryClient.invalidateQueries({ queryKey: ["item-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["items", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["item-stock", selectedCompanyId] });
       toast.success("Stock adjusted");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -847,18 +928,26 @@ export const useCreateStockAdjustment = () => {
 // ============ Purchase Orders & GRN ============
 export const useCreatePurchaseOrder = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { lines, ...poData } = data;
-      const { data: result, error } = await supabase.from("purchase_orders").insert([{ ...poData, status: "draft" }]).select().single();
+      const { data: result, error } = await supabase
+        .from("purchase_orders")
+        .insert([{ ...poData, status: "draft", company_id: selectedCompanyId }])
+        .select()
+        .single();
       if (error) throw error;
       if (lines?.length) {
-        await supabase.from("purchase_order_lines" as any).insert(lines.map((l: any) => ({ ...l, purchase_order_id: result.id })));
+        await supabase.from("purchase_order_lines" as any).insert(lines.map((l: any) => ({ ...l, purchase_order_id: result.id, company_id: selectedCompanyId })));
       }
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders", selectedCompanyId] });
       toast.success("Purchase order created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -867,16 +956,24 @@ export const useCreatePurchaseOrder = () => {
 
 export const useCreateGoodsReceipt = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { lines, ...grnData } = data;
-      const { data: result, error } = await supabase.from("goods_receipt_notes").insert([{ ...grnData, status: "received" }]).select().single();
+      const { data: result, error } = await supabase
+        .from("goods_receipt_notes")
+        .insert([{ ...grnData, status: "received", company_id: selectedCompanyId }])
+        .select()
+        .single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["goods-receipt-notes"] });
-      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["goods-receipt-notes", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders", selectedCompanyId] });
       toast.success("GRN recorded");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -886,14 +983,22 @@ export const useCreateGoodsReceipt = () => {
 // ============ Recurring Entries ============
 export const useCreateRecurringEntry = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
-      const { data: result, error } = await supabase.from("recurring_journal_entries" as any).insert([data]).select().single();
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data: result, error } = await supabase
+        .from("recurring_journal_entries" as any)
+        .insert([{ ...data, company_id: selectedCompanyId }])
+        .select()
+        .single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["recurring-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
       toast.success("Recurring entry created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -902,14 +1007,16 @@ export const useCreateRecurringEntry = () => {
 
 export const useRunRecurringEntry = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("recurring_journal_entries" as any).update({ last_run_date: new Date().toISOString().split('T')[0] }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["recurring-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
       toast.success("Entry executed");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -967,14 +1074,22 @@ export const useUpdateExchangeRate = () => {
 // ============ Purchase Requisitions ============
 export const useCreatePurchaseRequisition = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: any) => {
-      const { data: result, error } = await supabase.from("purchase_requisitions" as any).insert([{ ...data, status: "draft" }]).select().single();
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data: result, error } = await supabase
+        .from("purchase_requisitions" as any)
+        .insert([{ ...data, status: "draft", company_id: selectedCompanyId }])
+        .select()
+        .single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-requisitions", selectedCompanyId] });
       toast.success("Purchase requisition created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -983,13 +1098,15 @@ export const useCreatePurchaseRequisition = () => {
 
 export const useApprovePurchaseRequisition = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("purchase_requisitions" as any).update({ status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-requisitions", selectedCompanyId] });
       toast.success("Requisition approved");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -998,15 +1115,17 @@ export const useApprovePurchaseRequisition = () => {
 
 export const useConvertPRtoPO = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (prId: string) => {
-      // Get PR details
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: prData, error: prError } = await supabase.from("purchase_requisitions" as any).select("*").eq("id", prId).single();
       if (prError) throw prError;
       
       const pr = prData as any;
       
-      // Create PO from PR
       const { data: po, error: poError } = await supabase.from("purchase_orders").insert([{
         po_number: `PO-${Date.now()}`,
         vendor_id: pr.vendor_id || null,
@@ -1016,17 +1135,17 @@ export const useConvertPRtoPO = () => {
         status: "draft",
         notes: `Converted from PR: ${pr.requisition_number || prId}`,
         pr_id: prId,
+        company_id: selectedCompanyId,
       }]).select().single();
       if (poError) throw poError;
       
-      // Update PR status
       await supabase.from("purchase_requisitions" as any).update({ status: "converted", converted_to_po_id: po.id }).eq("id", prId);
       
       return po;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] });
-      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-requisitions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders", selectedCompanyId] });
       toast.success("Converted to Purchase Order");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1036,18 +1155,23 @@ export const useConvertPRtoPO = () => {
 // ============ Bank Reconciliation ============
 export const useCreateBankReconciliation = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: { bank_account_id: string; statement_date: string; statement_balance: number; book_balance: number }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: result, error } = await supabase.from("bank_reconciliations").insert([{
         ...data,
         reconciliation_date: new Date().toISOString().split('T')[0],
         status: "in_progress",
+        company_id: selectedCompanyId,
       }]).select().single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-reconciliations"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-reconciliations", selectedCompanyId] });
       toast.success("Reconciliation started");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1056,6 +1180,8 @@ export const useCreateBankReconciliation = () => {
 
 export const useMatchReconciliationItem = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async ({ itemId, transactionId }: { itemId: string; transactionId: string }) => {
       const { error } = await supabase.from("bank_reconciliation_items" as any).update({ 
@@ -1066,7 +1192,7 @@ export const useMatchReconciliationItem = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-reconciliation-items"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-reconciliation-items", selectedCompanyId] });
       toast.success("Item matched");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1076,19 +1202,24 @@ export const useMatchReconciliationItem = () => {
 // ============ Fund Transfers ============
 export const useCreateFundTransfer = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: { from_account_id: string; to_account_id: string; amount: number; transfer_date: string; reference?: string }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: result, error } = await supabase.from("fund_transfers" as any).insert([{
         ...data,
         status: "completed",
+        company_id: selectedCompanyId,
       }]).select().single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fund-transfers"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["fund-transfers", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
       toast.success("Fund transfer completed");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1098,9 +1229,12 @@ export const useCreateFundTransfer = () => {
 // ============ Asset Disposals ============
 export const useCreateAssetDisposal = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: { asset_id: string; disposal_date: string; disposal_type: string; disposal_value?: number; reason?: string }) => {
-      // Get asset details
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: asset, error: assetError } = await supabase.from("fixed_assets").select("*").eq("id", data.asset_id).single();
       if (assetError) throw assetError;
       
@@ -1113,17 +1247,17 @@ export const useCreateAssetDisposal = () => {
         accumulated_depreciation: asset.accumulated_depreciation || 0,
         gain_loss: gainLoss,
         approval_status: "pending",
+        company_id: selectedCompanyId,
       }]).select().single();
       if (error) throw error;
       
-      // Update asset status
       await supabase.from("fixed_assets").update({ status: "disposed" }).eq("id", data.asset_id);
       
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["asset-disposals"] });
-      queryClient.invalidateQueries({ queryKey: ["fixed-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-disposals", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["fixed-assets", selectedCompanyId] });
       toast.success("Asset disposal recorded");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1133,17 +1267,22 @@ export const useCreateAssetDisposal = () => {
 // ============ Bad Debt Provisions ============
 export const useCreateBadDebtProvision = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: { customer_id?: string; invoice_id?: string; provision_amount: number; provision_date: string; reason?: string }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: result, error } = await supabase.from("ar_bad_debt_provisions").insert([{
         ...data,
         status: "pending",
+        company_id: selectedCompanyId,
       }]).select().single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bad-debt-provisions"] });
+      queryClient.invalidateQueries({ queryKey: ["bad-debt-provisions", selectedCompanyId] });
       toast.success("Bad debt provision created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1152,6 +1291,8 @@ export const useCreateBadDebtProvision = () => {
 
 export const useWriteOffBadDebt = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (provisionId: string) => {
       const { error } = await supabase.from("ar_bad_debt_provisions").update({ 
@@ -1161,8 +1302,8 @@ export const useWriteOffBadDebt = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bad-debt-provisions"] });
-      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["bad-debt-provisions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
       toast.success("Bad debt written off");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1172,18 +1313,23 @@ export const useWriteOffBadDebt = () => {
 // ============ Batch & Serial Numbers ============
 export const useCreateBatchNumber = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: { item_id: string; batch_number: string; quantity_received: number; expiry_date?: string; manufacture_date?: string }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: result, error } = await supabase.from("batch_numbers").insert([{
         ...data,
         quantity_available: data.quantity_received,
         status: "active",
+        company_id: selectedCompanyId,
       }]).select().single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["batch-numbers"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-numbers", selectedCompanyId] });
       toast.success("Batch number created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1192,17 +1338,22 @@ export const useCreateBatchNumber = () => {
 
 export const useCreateSerialNumber = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: { item_id: string; serial_number: string; status?: string }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: result, error } = await supabase.from("serial_numbers" as any).insert([{
         ...data,
         status: data.status || "available",
+        company_id: selectedCompanyId,
       }]).select().single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["serial-numbers"] });
+      queryClient.invalidateQueries({ queryKey: ["serial-numbers", selectedCompanyId] });
       toast.success("Serial number created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1212,17 +1363,22 @@ export const useCreateSerialNumber = () => {
 // ============ WHT Certificates ============
 export const useCreateWHTCertificate = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: { vendor_id: string; certificate_number: string; certificate_date: string; wht_amount: number; tax_period?: string }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: result, error } = await supabase.from("wht_certificates" as any).insert([{
         ...data,
         status: "issued",
+        company_id: selectedCompanyId,
       }]).select().single();
       if (error) throw error;
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["wht-certificates"] });
+      queryClient.invalidateQueries({ queryKey: ["wht-certificates", selectedCompanyId] });
       toast.success("WHT certificate issued");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1232,6 +1388,8 @@ export const useCreateWHTCertificate = () => {
 // ============ PO Approval ============
 export const useApprovePurchaseOrder = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -1244,7 +1402,7 @@ export const useApprovePurchaseOrder = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders", selectedCompanyId] });
       toast.success("Purchase order approved");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1253,6 +1411,8 @@ export const useApprovePurchaseOrder = () => {
 
 export const useRejectPurchaseOrder = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const { error } = await supabase
@@ -1265,7 +1425,7 @@ export const useRejectPurchaseOrder = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders", selectedCompanyId] });
       toast.success("Purchase order rejected");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1275,6 +1435,8 @@ export const useRejectPurchaseOrder = () => {
 // ============ Stock Adjustment Approval ============
 export const useApproveStockAdjustment = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -1287,8 +1449,8 @@ export const useApproveStockAdjustment = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["stock-adjustments"] });
-      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-adjustments", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["items", selectedCompanyId] });
       toast.success("Stock adjustment approved");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1298,6 +1460,8 @@ export const useApproveStockAdjustment = () => {
 // ============ Reject Mutations ============
 export const useRejectJournalEntry = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const { error } = await supabase
@@ -1310,7 +1474,7 @@ export const useRejectJournalEntry = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
       toast.success("Journal entry rejected");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1319,6 +1483,8 @@ export const useRejectJournalEntry = () => {
 
 export const useRejectAPInvoice = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const { error } = await supabase
@@ -1331,7 +1497,7 @@ export const useRejectAPInvoice = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
       toast.success("Invoice rejected");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1340,6 +1506,8 @@ export const useRejectAPInvoice = () => {
 
 export const useRejectAPPayment = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const { error } = await supabase
@@ -1352,7 +1520,7 @@ export const useRejectAPPayment = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-payments", selectedCompanyId] });
       toast.success("Payment rejected");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1362,9 +1530,12 @@ export const useRejectAPPayment = () => {
 // ============ Reversing Journal Entries ============
 export const useCreateReversingEntry = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async ({ originalEntryId, reverseDate }: { originalEntryId: string; reverseDate: string }) => {
-      // Get original entry with lines
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: original, error: fetchError } = await supabase
         .from("journal_entries")
         .select(`
@@ -1376,7 +1547,6 @@ export const useCreateReversingEntry = () => {
       
       if (fetchError) throw fetchError;
       
-      // Create reversing entry
       const reverseEntryNumber = `REV-${Date.now()}`;
       const { data: reversingEntry, error: entryError } = await supabase
         .from("journal_entries")
@@ -1389,13 +1559,13 @@ export const useCreateReversingEntry = () => {
           total_credit: original.total_debit,
           status: "draft",
           is_reversal: true,
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
       
       if (entryError) throw entryError;
       
-      // Create reversed lines (swap debit/credit)
       const reversedLines = original.journal_entry_lines.map((line: any) => ({
         journal_entry_id: reversingEntry.id,
         account_id: line.account_id,
@@ -1403,6 +1573,7 @@ export const useCreateReversingEntry = () => {
         debit: line.credit || 0,
         credit: line.debit || 0,
         cost_center_id: line.cost_center_id,
+        company_id: selectedCompanyId,
       }));
       
       const { error: linesError } = await supabase
@@ -1414,7 +1585,7 @@ export const useCreateReversingEntry = () => {
       return reversingEntry;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
       toast.success("Reversing entry created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1424,9 +1595,12 @@ export const useCreateReversingEntry = () => {
 // ============ Depreciation with GL Posting ============
 export const useRunDepreciationWithGL = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (periodId: string) => {
-      // Get period details
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: period, error: periodError } = await supabase
         .from("financial_periods")
         .select("*")
@@ -1435,8 +1609,7 @@ export const useRunDepreciationWithGL = () => {
       
       if (periodError) throw periodError;
       
-      // Get active assets with categories
-      const { data: assets, error: assetsError } = await supabase
+      let query = supabase
         .from("fixed_assets")
         .select(`
           *,
@@ -1448,6 +1621,11 @@ export const useRunDepreciationWithGL = () => {
         `)
         .eq("status", "active");
       
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data: assets, error: assetsError } = await query;
       if (assetsError) throw assetsError;
       
       const scheduleEntries: any[] = [];
@@ -1463,7 +1641,6 @@ export const useRunDepreciationWithGL = () => {
         const newAccumulated = (asset.accumulated_depreciation || 0) + monthlyDep;
         const newNBV = asset.purchase_cost - newAccumulated;
         
-        // Add to schedule
         scheduleEntries.push({
           asset_id: asset.id,
           depreciation_date: period.end_date,
@@ -1472,29 +1649,31 @@ export const useRunDepreciationWithGL = () => {
           net_book_value: newNBV,
           period_id: periodId,
           is_posted: true,
+          company_id: selectedCompanyId,
         });
         
-        // Add journal lines
         if (asset.asset_categories.depreciation_expense_account_id) {
           journalLines.push({
             account_id: asset.asset_categories.depreciation_expense_account_id,
-            description: `Depreciation - ${asset.asset_name}`,
+            description: `Depreciation - ${asset.asset_code} - ${asset.asset_name}`,
             debit: monthlyDep,
             credit: 0,
+            company_id: selectedCompanyId,
           });
         }
+        
         if (asset.asset_categories.accumulated_dep_account_id) {
           journalLines.push({
             account_id: asset.asset_categories.accumulated_dep_account_id,
-            description: `Accumulated Depreciation - ${asset.asset_name}`,
+            description: `Accumulated Dep - ${asset.asset_code} - ${asset.asset_name}`,
             debit: 0,
             credit: monthlyDep,
+            company_id: selectedCompanyId,
           });
         }
         
         totalDepreciation += monthlyDep;
         
-        // Update asset
         await supabase
           .from("fixed_assets")
           .update({
@@ -1505,7 +1684,6 @@ export const useRunDepreciationWithGL = () => {
           .eq("id", asset.id);
       }
       
-      // Create journal entry for depreciation
       if (journalLines.length > 0) {
         const { data: journalEntry, error: jeError } = await supabase
           .from("journal_entries")
@@ -1518,13 +1696,13 @@ export const useRunDepreciationWithGL = () => {
             total_credit: totalDepreciation,
             status: "posted",
             period_id: periodId,
+            company_id: selectedCompanyId,
           }])
           .select()
           .single();
         
         if (jeError) throw jeError;
         
-        // Add journal entry lines
         const linesWithJE = journalLines.map((line) => ({
           ...line,
           journal_entry_id: journalEntry.id,
@@ -1532,13 +1710,11 @@ export const useRunDepreciationWithGL = () => {
         
         await supabase.from("journal_entry_lines").insert(linesWithJE);
         
-        // Update schedule entries with journal_entry_id
         for (const entry of scheduleEntries) {
           entry.journal_entry_id = journalEntry.id;
         }
       }
       
-      // Insert schedule entries
       if (scheduleEntries.length > 0) {
         await supabase.from("asset_depreciation_schedule").insert(scheduleEntries);
       }
@@ -1546,10 +1722,10 @@ export const useRunDepreciationWithGL = () => {
       return { assetsProcessed: assets?.length || 0, totalDepreciation };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["fixed-assets"] });
-      queryClient.invalidateQueries({ queryKey: ["depreciation-schedule"] });
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["fixed-assets", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["depreciation-schedule", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", selectedCompanyId] });
       toast.success(`Depreciation run complete: ${data.assetsProcessed} assets processed`);
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1559,9 +1735,12 @@ export const useRunDepreciationWithGL = () => {
 // ============ Currency Revaluation ============
 export const useRunCurrencyRevaluation = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async ({ periodId, revaluationDate }: { periodId: string; revaluationDate: string }) => {
-      // Get exchange rates
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: rates, error: ratesError } = await supabase
         .from("exchange_rates")
         .select("*")
@@ -1569,14 +1748,10 @@ export const useRunCurrencyRevaluation = () => {
       
       if (ratesError) throw ratesError;
       
-      // For currency revaluation - simplified version
-      // Full implementation would require currency columns in chart_of_accounts
       const accountsProcessed = rates?.length || 0;
       const totalGainLoss = 0;
       
-      // Log the revaluation run
       if (rates && rates.length > 0) {
-        // Create a journal entry to record the revaluation was run
         const { error: jeError } = await supabase
           .from("journal_entries")
           .insert([{
@@ -1588,6 +1763,7 @@ export const useRunCurrencyRevaluation = () => {
             total_credit: 0,
             status: "posted",
             period_id: periodId,
+            company_id: selectedCompanyId,
           }]);
         
         if (jeError) throw jeError;
@@ -1596,8 +1772,8 @@ export const useRunCurrencyRevaluation = () => {
       return { accountsProcessed, totalGainLoss };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["exchange-rates"] });
       toast.success(`Revaluation complete: ${data.accountsProcessed} rates processed`);
     },
@@ -1608,6 +1784,8 @@ export const useRunCurrencyRevaluation = () => {
 // ============ Bank Statement Import ============
 export const useImportBankStatement = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async ({ 
       bankAccountId, 
@@ -1628,7 +1806,8 @@ export const useImportBankStatement = () => {
       openingBalance?: number;
       closingBalance?: number;
     }) => {
-      // Create statement import record
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: importRecord, error: importError } = await supabase
         .from("bank_statement_imports")
         .insert([{
@@ -1643,13 +1822,13 @@ export const useImportBankStatement = () => {
           total_debits: transactions.reduce((sum, t) => sum + (t.debit || 0), 0),
           total_credits: transactions.reduce((sum, t) => sum + (t.credit || 0), 0),
           status: "pending",
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
       
       if (importError) throw importError;
       
-      // Create bank transactions
       const bankTransactions = transactions.map((t) => ({
         bank_account_id: bankAccountId,
         transaction_date: t.date,
@@ -1661,6 +1840,7 @@ export const useImportBankStatement = () => {
         is_reconciled: false,
         source_type: "statement_import",
         source_id: importRecord.id,
+        company_id: selectedCompanyId,
       }));
       
       const { error: txnError } = await supabase
@@ -1669,7 +1849,6 @@ export const useImportBankStatement = () => {
       
       if (txnError) throw txnError;
       
-      // Update import record status
       await supabase
         .from("bank_statement_imports")
         .update({ status: "completed" })
@@ -1678,8 +1857,8 @@ export const useImportBankStatement = () => {
       return importRecord;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-statement-imports"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-statement-imports", selectedCompanyId] });
       toast.success("Bank statement imported successfully");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1689,6 +1868,8 @@ export const useImportBankStatement = () => {
 // ============ AP Credit Notes ============
 export const useCreateAPCreditNote = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: {
       credit_note_number: string;
@@ -1698,18 +1879,19 @@ export const useCreateAPCreditNote = () => {
       reason?: string;
       original_invoice_id?: string;
     }) => {
-      // Create credit note (using ap_debit_notes table with negative amount concept or separate table)
-      // For now, we'll use a negative debit note approach
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: result, error } = await supabase
         .from("ap_debit_notes")
         .insert([{
           debit_note_number: data.credit_note_number.replace("CN", "DN"),
           vendor_id: data.vendor_id,
           debit_date: data.credit_date,
-          amount: -data.amount, // Negative to represent credit
+          amount: -data.amount,
           reason: `[CREDIT NOTE] ${data.reason || ""}`,
           original_invoice_id: data.original_invoice_id,
           status: "draft",
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
@@ -1718,8 +1900,8 @@ export const useCreateAPCreditNote = () => {
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["ap-credit-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ap-credit-notes", selectedCompanyId] });
       toast.success("AP Credit note created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -1729,6 +1911,8 @@ export const useCreateAPCreditNote = () => {
 // ============ AR Debit Notes ============
 export const useCreateARDebitNote = () => {
   const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
   return useMutation({
     mutationFn: async (data: {
       debit_note_number: string;
@@ -1738,17 +1922,19 @@ export const useCreateARDebitNote = () => {
       reason?: string;
       original_invoice_id?: string;
     }) => {
-      // Create debit note (using ar_credit_notes table with negative amount concept or separate table)
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
       const { data: result, error } = await supabase
         .from("ar_credit_notes")
         .insert([{
           credit_note_number: data.debit_note_number.replace("DN", "CN"),
           customer_id: data.customer_id,
           credit_date: data.debit_date,
-          amount: -data.amount, // Negative to represent debit
+          amount: -data.amount,
           reason: `[DEBIT NOTE] ${data.reason || ""}`,
           original_invoice_id: data.original_invoice_id,
           status: "draft",
+          company_id: selectedCompanyId,
         }])
         .select()
         .single();
@@ -1757,8 +1943,8 @@ export const useCreateARDebitNote = () => {
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["ar-debit-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ar-debit-notes", selectedCompanyId] });
       toast.success("AR Debit note created");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),

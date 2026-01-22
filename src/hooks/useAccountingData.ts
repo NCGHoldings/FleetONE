@@ -1,47 +1,73 @@
 // Centralized data fetching hooks for all accounting modules
+// All hooks filter by selectedCompanyId for multi-company data isolation
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 
 // ============ Chart of Accounts ============
 export const useChartOfAccounts = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["chart-of-accounts"],
+    queryKey: ["chart-of-accounts", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("chart_of_accounts")
         .select("*")
         .order("account_code");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useAccountsByType = (accountType: "asset" | "liability" | "equity" | "revenue" | "expense") => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["accounts-by-type", accountType],
+    queryKey: ["accounts-by-type", accountType, selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("chart_of_accounts")
         .select("*")
         .eq("account_type", accountType)
         .eq("is_active", true)
         .order("account_code");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Journal Entries ============
 export const useJournalEntries = (status?: "draft" | "posted" | "void") => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["journal-entries", status],
+    queryKey: ["journal-entries", status, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("journal_entries")
         .select("*")
         .order("entry_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
       
       if (status) {
         query = query.eq("status", status);
@@ -51,6 +77,7 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void") => {
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
@@ -79,103 +106,156 @@ export const useJournalEntryLines = (entryId: string) => {
 
 // ============ Financial Periods ============
 export const useFinancialPeriods = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["financial-periods"],
+    queryKey: ["financial-periods", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("financial_periods")
         .select("*")
         .order("start_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useCurrentPeriod = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["current-period"],
+    queryKey: ["current-period", selectedCompanyId],
     queryFn: async () => {
       const today = new Date().toISOString().split("T")[0];
-      const { data, error } = await supabase
+      let query = supabase
         .from("financial_periods")
         .select("*")
         .lte("start_date", today)
         .gte("end_date", today)
-        .eq("is_closed", false)
-        .single();
+        .eq("is_closed", false);
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query.single();
       if (error && error.code !== "PGRST116") throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Customers (AR) ============
 export const useCustomers = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["customers"],
+    queryKey: ["customers", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("customers")
         .select("*")
         .order("customer_name");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useCustomerBalance = (customerId: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["customer-balance", customerId],
+    queryKey: ["customer-balance", customerId, selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ar_invoices")
         .select("balance")
         .eq("customer_id", customerId)
         .neq("status", "paid");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data.reduce((sum, inv) => sum + (inv.balance || 0), 0);
     },
-    enabled: !!customerId,
+    enabled: !!customerId && !!selectedCompanyId,
   });
 };
 
 // ============ Vendors (AP) ============
 export const useVendors = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["vendors"],
+    queryKey: ["vendors", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("vendors")
         .select("*")
         .order("vendor_name");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useVendorBalance = (vendorId: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["vendor-balance", vendorId],
+    queryKey: ["vendor-balance", vendorId, selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ap_invoices")
         .select("balance")
         .eq("vendor_id", vendorId)
         .neq("status", "paid");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data.reduce((sum, inv) => sum + (inv.balance || 0), 0);
     },
-    enabled: !!vendorId,
+    enabled: !!vendorId && !!selectedCompanyId,
   });
 };
 
 // ============ AR Invoices ============
 export const useARInvoices = (status?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["ar-invoices", status],
+    queryKey: ["ar-invoices", status, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("ar_invoices")
@@ -188,6 +268,10 @@ export const useARInvoices = (status?: string) => {
         `)
         .order("invoice_date", { ascending: false });
       
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (status) {
         query = query.eq("status", status);
       }
@@ -196,13 +280,16 @@ export const useARInvoices = (status?: string) => {
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ AP Invoices ============
 export const useAPInvoices = (status?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["ap-invoices", status],
+    queryKey: ["ap-invoices", status, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("ap_invoices")
@@ -215,6 +302,10 @@ export const useAPInvoices = (status?: string) => {
         `)
         .order("invoice_date", { ascending: false });
       
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (status) {
         query = query.eq("status", status);
       }
@@ -223,15 +314,18 @@ export const useAPInvoices = (status?: string) => {
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ AR Receipts ============
 export const useARReceipts = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["ar-receipts"],
+    queryKey: ["ar-receipts", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ar_receipts")
         .select(`
           *,
@@ -241,18 +335,27 @@ export const useARReceipts = () => {
           )
         `)
         .order("receipt_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ AP Payments ============
 export const useAPPayments = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["ap-payments"],
+    queryKey: ["ap-payments", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ap_payments")
         .select(`
           *,
@@ -262,30 +365,48 @@ export const useAPPayments = () => {
           )
         `)
         .order("payment_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Bank Accounts ============
 export const useBankAccounts = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["bank-accounts"],
+    queryKey: ["bank-accounts", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("bank_accounts")
         .select("*")
         .order("account_name");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useBankTransactions = (bankAccountId?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["bank-transactions", bankAccountId],
+    queryKey: ["bank-transactions", bankAccountId, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("bank_transactions")
@@ -293,6 +414,10 @@ export const useBankTransactions = (bankAccountId?: string) => {
         .order("transaction_date", { ascending: false })
         .limit(100);
       
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (bankAccountId) {
         query = query.eq("bank_account_id", bankAccountId);
       }
@@ -301,18 +426,25 @@ export const useBankTransactions = (bankAccountId?: string) => {
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useBankReconciliations = (bankAccountId?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["bank-reconciliations", bankAccountId],
+    queryKey: ["bank-reconciliations", bankAccountId, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("bank_reconciliations")
         .select("*")
         .order("reconciliation_date", { ascending: false });
       
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (bankAccountId) {
         query = query.eq("bank_account_id", bankAccountId);
       }
@@ -321,15 +453,18 @@ export const useBankReconciliations = (bankAccountId?: string) => {
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Fixed Assets ============
 export const useFixedAssets = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["fixed-assets"],
+    queryKey: ["fixed-assets", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("fixed_assets")
         .select(`
           *,
@@ -341,34 +476,56 @@ export const useFixedAssets = () => {
           )
         `)
         .order("asset_code");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useAssetCategories = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["asset-categories"],
+    queryKey: ["asset-categories", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("asset_categories")
         .select("*")
         .order("category_code");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useDepreciationSchedule = (assetId?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["depreciation-schedule", assetId],
+    queryKey: ["depreciation-schedule", assetId, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("asset_depreciation_schedule")
         .select("*")
         .order("depreciation_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
       
       if (assetId) {
         query = query.eq("asset_id", assetId);
@@ -378,6 +535,7 @@ export const useDepreciationSchedule = (assetId?: string) => {
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
@@ -399,29 +557,44 @@ export const useTaxCodes = () => {
 
 // ============ Cost Centers ============
 export const useCostCenters = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["cost-centers"],
+    queryKey: ["cost-centers", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("cost_centers")
         .select("*")
         .eq("is_active", true)
         .order("cost_center_code");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Budgets ============
 export const useBudgets = (fiscalYear?: number) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["budgets", fiscalYear],
+    queryKey: ["budgets", fiscalYear, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("budgets")
         .select("*")
         .order("budget_name");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
       
       if (fiscalYear) {
         query = query.eq("fiscal_year", fiscalYear);
@@ -431,19 +604,26 @@ export const useBudgets = (fiscalYear?: number) => {
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Audit Logs ============
 export const useAuditLogs = (tableName?: string, recordId?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["audit-logs", tableName, recordId],
+    queryKey: ["audit-logs", tableName, recordId, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("accounting_audit_log")
         .select("*")
         .order("changed_at", { ascending: false })
         .limit(100);
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
       
       if (tableName) {
         query = query.eq("table_name", tableName);
@@ -456,20 +636,27 @@ export const useAuditLogs = (tableName?: string, recordId?: string) => {
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Dashboard Summaries ============
 export const useAccountingSummary = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["accounting-summary"],
+    queryKey: ["accounting-summary", selectedCompanyId],
     queryFn: async () => {
-      // Fetch totals by account type
-      const { data: accounts, error } = await supabase
+      let query = supabase
         .from("chart_of_accounts")
         .select("account_type, current_balance")
         .eq("is_active", true);
       
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data: accounts, error } = await query;
       if (error) throw error;
       
       const summary = {
@@ -506,18 +693,26 @@ export const useAccountingSummary = () => {
       
       return summary;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useARSummary = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["ar-summary"],
+    queryKey: ["ar-summary", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ar_invoices")
         .select("balance, due_date, status")
         .neq("status", "paid");
       
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       
       const today = new Date();
@@ -535,18 +730,26 @@ export const useARSummary = () => {
       
       return { totalOutstanding, totalOverdue, countOverdue, totalInvoices: data?.length || 0 };
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useAPSummary = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["ap-summary"],
+    queryKey: ["ap-summary", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ap_invoices")
         .select("balance, due_date, status")
         .neq("status", "paid");
       
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       
       const today = new Date();
@@ -564,112 +767,174 @@ export const useAPSummary = () => {
       
       return { totalOutstanding, totalOverdue, countOverdue, totalInvoices: data?.length || 0 };
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Items & Inventory ============
 export const useItems = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["items"],
+    queryKey: ["items", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("items")
         .select(`*, item_categories (category_name, category_code, valuation_method)`)
         .order("item_code");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useItemStock = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["item-stock"],
+    queryKey: ["item-stock", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("item_stock")
         .select(`*, items (item_code, item_name)`)
         .order("location");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useItemCategories = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["item-categories"],
+    queryKey: ["item-categories", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("item_categories")
         .select("*")
         .order("category_name");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Purchase Orders & GRN ============
 export const usePurchaseOrders = (status?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["purchase-orders", status],
+    queryKey: ["purchase-orders", status, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("purchase_orders")
         .select(`*, vendors (vendor_code, vendor_name)`)
         .order("po_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (status) query = query.eq("status", status);
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useGoodsReceiptNotes = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["goods-receipt-notes"],
+    queryKey: ["goods-receipt-notes", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("goods_receipt_notes")
         .select(`*, vendors (vendor_name), purchase_orders (po_number)`)
         .order("receipt_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Cheque Register ============
 export const useChequeRegister = (status?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["cheque-register", status],
+    queryKey: ["cheque-register", status, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("cheque_register")
         .select("*")
         .order("cheque_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (status) query = query.eq("status", status);
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Recurring Entries ============
 export const useRecurringEntries = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["recurring-entries"],
+    queryKey: ["recurring-entries", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("recurring_journal_entries" as any)
         .select("*")
         .order("template_name");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
@@ -708,153 +973,230 @@ export const useExchangeRates = (baseCurrency?: string) => {
 
 // ============ Purchase Requisitions ============
 export const usePurchaseRequisitions = (status?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["purchase-requisitions", status],
+    queryKey: ["purchase-requisitions", status, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("purchase_requisitions" as any)
         .select("*")
         .order("created_at", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (status) query = query.eq("status", status);
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Fund Transfers ============
 export const useFundTransfers = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["fund-transfers"],
+    queryKey: ["fund-transfers", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("fund_transfers" as any)
         .select("*")
         .order("transfer_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Asset Disposals ============
 export const useAssetDisposals = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["asset-disposals"],
+    queryKey: ["asset-disposals", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("asset_disposals")
         .select(`*, fixed_assets (asset_code, asset_name)`)
         .order("disposal_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Bad Debt Provisions ============
 export const useBadDebtProvisions = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["bad-debt-provisions"],
+    queryKey: ["bad-debt-provisions", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ar_bad_debt_provisions")
         .select(`*, customers (customer_code, customer_name), ar_invoices (invoice_number)`)
         .order("provision_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Batch & Serial Numbers ============
 export const useBatchNumbers = (itemId?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["batch-numbers", itemId],
+    queryKey: ["batch-numbers", itemId, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("batch_numbers")
         .select(`*, items (item_code, item_name)`)
         .order("batch_number");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (itemId) query = query.eq("item_id", itemId);
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 export const useSerialNumbers = (itemId?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["serial-numbers", itemId],
+    queryKey: ["serial-numbers", itemId, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("serial_numbers" as any)
         .select(`*, items (item_code, item_name)`)
         .order("serial_number");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (itemId) query = query.eq("item_id", itemId);
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ WHT Certificates ============
 export const useWHTCertificates = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["wht-certificates"],
+    queryKey: ["wht-certificates", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("wht_certificates" as any)
         .select(`*, vendors (vendor_code, vendor_name)`)
         .order("certificate_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Vendor Performance ============
 export const useVendorPerformance = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["vendor-performance"],
+    queryKey: ["vendor-performance", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("vendor_performance" as any)
         .select(`*, vendors (vendor_code, vendor_name)`)
         .order("period_end", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as any[];
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Bank Reconciliation Items ============
 export const useBankReconciliationItems = (reconciliationId?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["bank-reconciliation-items", reconciliationId],
+    queryKey: ["bank-reconciliation-items", reconciliationId, selectedCompanyId],
     queryFn: async () => {
       let query = supabase
-        .from("bank_reconciliation_items" as any)
-        .select(`*, bank_transactions (*)`)
+        .from("bank_reconciliation_items")
+        .select("*")
         .order("statement_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
       if (reconciliationId) query = query.eq("reconciliation_id", reconciliationId);
       const { data, error } = await query;
       if (error) throw error;
-      return data as any[];
+      return data;
     },
-    enabled: !!reconciliationId,
+    enabled: !!reconciliationId && !!selectedCompanyId,
   });
 };
 
 // ============ Period Closing Checklist ============
 export const usePeriodClosingChecklist = (periodId?: string) => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["period-closing-checklist", periodId],
+    queryKey: ["period-closing-checklist", periodId, selectedCompanyId],
     queryFn: async () => {
-      // Check various conditions for period closing
       if (!periodId) return null;
       
       const [journals, arInvoices, apInvoices, reconciliations] = await Promise.all([
@@ -871,16 +1213,18 @@ export const usePeriodClosingChecklist = (periodId?: string) => {
         pendingReconciliations: reconciliations.data?.length || 0,
       };
     },
-    enabled: !!periodId,
+    enabled: !!periodId && !!selectedCompanyId,
   });
 };
 
 // ============ AR Credit Notes ============
 export const useARCreditNotes = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["ar-credit-notes"],
+    queryKey: ["ar-credit-notes", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ar_credit_notes")
         .select(`
           *,
@@ -888,18 +1232,27 @@ export const useARCreditNotes = () => {
           ar_invoices (invoice_number)
         `)
         .order("credit_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ AP Debit Notes ============
 export const useAPDebitNotes = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["ap-debit-notes"],
+    queryKey: ["ap-debit-notes", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ap_debit_notes")
         .select(`
           *,
@@ -907,60 +1260,94 @@ export const useAPDebitNotes = () => {
           ap_invoices (invoice_number)
         `)
         .order("debit_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Asset Revaluations ============
 export const useAssetRevaluations = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["asset-revaluations"],
+    queryKey: ["asset-revaluations", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("asset_revaluations")
         .select(`
           *,
           fixed_assets (asset_code, asset_name)
         `)
         .order("revaluation_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ Asset Transfers ============
 export const useAssetTransfers = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["asset-transfers"],
+    queryKey: ["asset-transfers", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("asset_transfers")
         .select(`
           *,
           fixed_assets (asset_code, asset_name)
         `)
         .order("transfer_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
 // ============ SSCL Transactions ============
 export const useSSCLTransactions = () => {
+  const { selectedCompanyId } = useCompany();
+  
   return useQuery({
-    queryKey: ["sscl-transactions"],
+    queryKey: ["sscl-transactions", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("sscl_transactions")
         .select("*")
         .order("transaction_date", { ascending: false });
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!selectedCompanyId,
   });
 };
 
