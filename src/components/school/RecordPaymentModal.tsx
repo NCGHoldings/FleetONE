@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { usePostPaymentToGL, useBranchFinanceSettings } from "@/hooks/useSchoolBusFinance";
 
 interface Student {
   id: string;
@@ -20,6 +21,7 @@ interface Student {
   fixed_monthly_amount: number;
   payment_balance: number;
   current_amount_due: number;
+  branch_id?: string;
 }
 
 interface RecordPaymentModalProps {
@@ -37,6 +39,9 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
   const [paymentMonth, setPaymentMonth] = useState<Date>(new Date());
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const postPaymentToGL = usePostPaymentToGL();
+  const { data: financeSettings } = useBranchFinanceSettings(student?.branch_id || null);
 
   useEffect(() => {
     if (isOpen && student) {
@@ -70,7 +75,7 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      const { error } = await supabase
+      const { data: paymentRecord, error } = await supabase
         .from("school_payment_transactions")
         .insert({
           student_id: student.id,
@@ -85,9 +90,28 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
           payment_date: format(paymentDate, 'yyyy-MM-dd'),
           notes: notes || null,
           created_by: user?.id,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Auto-post to GL if settings enabled
+      if (financeSettings?.auto_post_payments && student.branch_id) {
+        try {
+          await postPaymentToGL.mutateAsync({
+            paymentId: paymentRecord.id,
+            amount: receivedAmount,
+            branchId: student.branch_id,
+            studentName: student.student_name,
+            paymentMethod: paymentMethod,
+            referenceNo: referenceNo,
+          });
+        } catch (glError) {
+          console.error("GL posting failed:", glError);
+          // Payment still recorded, just GL posting failed
+        }
+      }
 
       toast.success("Payment recorded successfully");
       onSuccess();

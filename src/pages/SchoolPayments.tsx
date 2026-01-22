@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History } from "lucide-react";
+import { ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, Download, Receipt, History, FileSpreadsheet, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { RecordPaymentModal } from "@/components/school/RecordPaymentModal";
 import { PaymentHistoryModal } from "@/components/school/PaymentHistoryModal";
 import { OutstandingStudentsView } from "@/components/school/OutstandingStudentsView";
+import { BulkARInvoiceDialog } from "@/components/school/BulkARInvoiceDialog";
 
 interface Student {
   id: string;
@@ -45,6 +46,7 @@ export default function SchoolPayments() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showBulkARDialog, setShowBulkARDialog] = useState(false);
   const [stats, setStats] = useState({
     totalStudents: 0,
     paidStudents: 0,
@@ -282,13 +284,20 @@ export default function SchoolPayments() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => navigate(`/school-bus/branch/${branchId}/payment-import`)}>
+          <Button onClick={() => setShowBulkARDialog(true)} variant="default">
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            Generate AR Invoices
+          </Button>
+          <Button onClick={() => navigate(`/school-bus/branch/${branchId}/payment-import`)} variant="outline">
             Import Bank Statement
           </Button>
           <Button onClick={() => navigate(`/school-bus/branch/${branchId}/payment-settings`)} variant="outline">
             Import Settings
           </Button>
-          <Button onClick={handleExport}>
+          <Button onClick={() => navigate("/settings?tab=school-bus-finance")} variant="ghost" size="icon">
+            <Settings className="w-4 h-4" />
+          </Button>
+          <Button onClick={handleExport} variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Export Report
           </Button>
@@ -418,6 +427,15 @@ export default function SchoolPayments() {
         studentId={selectedStudent?.id || null}
         studentName={selectedStudent?.student_name || ""}
       />
+
+      {branchId && branch && (
+        <BulkARInvoiceDialog
+          open={showBulkARDialog}
+          onOpenChange={setShowBulkARDialog}
+          branchId={branchId}
+          branchName={branch.branch_name}
+        />
+      )}
     </div>
   );
 }
