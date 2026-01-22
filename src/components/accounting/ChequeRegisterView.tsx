@@ -2,16 +2,43 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Plus, FileText, CheckCircle, XCircle, Clock, Check, X, Send } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useChequeRegister } from "@/hooks/useAccountingData";
+import { useUpdateChequeStatus } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
+import { ChequeIssueForm } from "./ChequeIssueForm";
+import { useToast } from "@/hooks/use-toast";
 
 export const ChequeRegisterView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [showChequeForm, setShowChequeForm] = useState(false);
+  
   const { data: cheques, isLoading } = useChequeRegister(statusFilter);
+  const updateChequeStatus = useUpdateChequeStatus();
+  const { toast } = useToast();
+
+  const handleStatusUpdate = async (chequeId: string, newStatus: string, clearedDate?: string) => {
+    try {
+      await updateChequeStatus.mutateAsync({
+        chequeId,
+        status: newStatus,
+        clearedDate,
+      });
+      toast({
+        title: "Status Updated",
+        description: `Cheque status changed to ${newStatus.replace('_', ' ')}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update cheque status.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; icon: any }> = {
@@ -49,7 +76,7 @@ export const ChequeRegisterView = () => {
       header: "Payee",
       cell: ({ row }: any) => (
         <div>
-          <p className="font-medium">{row.original.payee_name}</p>
+          <p className="font-medium">{row.original.payee_name || row.original.payee}</p>
           <p className="text-xs text-muted-foreground">{row.original.reference}</p>
         </div>
       ),
@@ -84,25 +111,71 @@ export const ChequeRegisterView = () => {
     {
       id: "actions",
       header: "Actions",
-      cell: ({ row }: any) => (
-        <div className="flex gap-2">
-          {row.original.status === "issued" && (
-            <>
-              <Button size="sm" variant="outline">
-                Mark Cleared
+      cell: ({ row }: any) => {
+        const status = row.original.status;
+        const chequeId = row.original.id;
+        
+        if (status === "issued" || status === "post_dated") {
+          return (
+            <div className="flex gap-1">
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => handleStatusUpdate(chequeId, "presented")}
+                disabled={updateChequeStatus.isPending}
+                title="Present"
+              >
+                <Send className="h-3 w-3" />
               </Button>
-              <Button size="sm" variant="destructive">
-                Bounce
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => handleStatusUpdate(chequeId, "cleared", new Date().toISOString().split("T")[0])}
+                disabled={updateChequeStatus.isPending}
+                title="Mark Cleared"
+              >
+                <Check className="h-3 w-3" />
               </Button>
-            </>
-          )}
-          {row.original.status === "post_dated" && (
-            <Button size="sm" variant="outline">
-              Present
-            </Button>
-          )}
-        </div>
-      ),
+              <Button 
+                size="sm" 
+                variant="destructive"
+                onClick={() => handleStatusUpdate(chequeId, "bounced")}
+                disabled={updateChequeStatus.isPending}
+                title="Bounce"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          );
+        }
+        
+        if (status === "presented") {
+          return (
+            <div className="flex gap-1">
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => handleStatusUpdate(chequeId, "cleared", new Date().toISOString().split("T")[0])}
+                disabled={updateChequeStatus.isPending}
+                title="Mark Cleared"
+              >
+                <Check className="h-3 w-3" />
+              </Button>
+              <Button 
+                size="sm" 
+                variant="destructive"
+                onClick={() => handleStatusUpdate(chequeId, "bounced")}
+                disabled={updateChequeStatus.isPending}
+                title="Bounce"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          );
+        }
+        
+        return null;
+      },
     },
   ];
 
@@ -127,7 +200,7 @@ export const ChequeRegisterView = () => {
             Track issued, post-dated, and cleared cheques
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setShowChequeForm(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Issue Cheque
         </Button>
@@ -221,6 +294,9 @@ export const ChequeRegisterView = () => {
           </TabsContent>
         </Tabs>
       </Card>
+
+      {/* Form */}
+      <ChequeIssueForm open={showChequeForm} onOpenChange={setShowChequeForm} />
     </div>
   );
 };

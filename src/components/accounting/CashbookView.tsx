@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { useBankTransactions, useBankAccounts } from "@/hooks/useAccountingData"
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export const CashbookView = () => {
   const { data: transactions, isLoading } = useBankTransactions();
@@ -15,6 +17,7 @@ export const CashbookView = () => {
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
@@ -69,6 +72,52 @@ export const CashbookView = () => {
     return options;
   }, []);
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExport = () => {
+    if (!transactionsWithBalance.length) {
+      toast({
+        title: "No Data",
+        description: "No transactions to export for the selected period.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const exportData = transactionsWithBalance.map(t => ({
+      "Date": format(new Date(t.transaction_date), "dd/MM/yyyy"),
+      "Reference": t.reference || "",
+      "Description": t.description || "",
+      "Receipts": t.credit_amount || 0,
+      "Payments": t.debit_amount || 0,
+      "Balance": t.runningBalance,
+    }));
+
+    // Add totals row
+    exportData.push({
+      "Date": "",
+      "Reference": "",
+      "Description": "TOTALS",
+      "Receipts": summary.totalReceipts,
+      "Payments": summary.totalPayments,
+      "Balance": summary.netMovement,
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cashbook");
+    
+    const accountName = bankAccounts?.find(b => b.id === selectedAccount)?.account_name || "All_Accounts";
+    XLSX.writeFile(wb, `Cashbook_${accountName}_${selectedMonth}.xlsx`);
+
+    toast({
+      title: "Exported",
+      description: "Cashbook has been exported to Excel.",
+    });
+  };
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-32"><p className="text-muted-foreground">Loading cashbook...</p></div>;
   }
@@ -83,8 +132,12 @@ export const CashbookView = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm"><Printer className="h-4 w-4 mr-2" />Print</Button>
-          <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-2" />Export</Button>
+          <Button variant="outline" size="sm" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-2" />Print
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" />Export
+          </Button>
         </div>
       </div>
 

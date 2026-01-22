@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Play, Pause, Calendar, RotateCcw } from "lucide-react";
+import { Plus, Play, Pause, Calendar, RotateCcw, RefreshCw } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { useRecurringEntries, useChartOfAccounts } from "@/hooks/useAccountingData";
-import { useCreateRecurringEntry, useRunRecurringEntry } from "@/hooks/useAccountingMutations";
+import { useCreateRecurringEntry, useRunRecurringEntry, useToggleRecurringEntry } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format, addDays, addMonths, addQuarters, addYears } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
 
 const recurringSchema = z.object({
   entry_name: z.string().min(1, "Entry name is required"),
@@ -36,7 +36,9 @@ export const RecurringEntriesView = () => {
   const { data: accounts } = useChartOfAccounts();
   const createEntry = useCreateRecurringEntry();
   const runEntry = useRunRecurringEntry();
+  const toggleEntry = useToggleRecurringEntry();
   const [showForm, setShowForm] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<RecurringFormData>({
     resolver: zodResolver(recurringSchema),
@@ -50,6 +52,41 @@ export const RecurringEntriesView = () => {
       credit_account_id: "",
     },
   });
+
+  const handleToggle = async (entryId: string, currentStatus: boolean) => {
+    try {
+      await toggleEntry.mutateAsync({
+        entryId,
+        isActive: !currentStatus,
+      });
+      toast({
+        title: currentStatus ? "Entry Paused" : "Entry Activated",
+        description: `Recurring entry has been ${currentStatus ? 'paused' : 'activated'}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to toggle entry status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRunNow = async (entryId: string) => {
+    try {
+      await runEntry.mutateAsync(entryId);
+      toast({
+        title: "Entry Processed",
+        description: "Recurring journal entry has been posted to the GL.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to process recurring entry.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getFrequencyBadge = (frequency: string) => {
     const colors: Record<string, string> = {
@@ -80,11 +117,11 @@ export const RecurringEntriesView = () => {
 
   const columns = [
     {
-      accessorKey: "template_name",
+      accessorKey: "entry_name",
       header: "Template Name",
       cell: ({ row }: any) => (
         <div>
-          <p className="font-medium">{row.original.template_name}</p>
+          <p className="font-medium">{row.original.entry_name || row.original.template_name}</p>
           <p className="text-xs text-muted-foreground">{row.original.description}</p>
         </div>
       ),
@@ -138,13 +175,20 @@ export const RecurringEntriesView = () => {
           <Button 
             size="sm" 
             variant="outline"
-            onClick={() => runEntry.mutate(row.original.id)}
-            disabled={!row.original.is_active}
+            onClick={() => handleRunNow(row.original.id)}
+            disabled={!row.original.is_active || runEntry.isPending}
+            title="Run Now"
           >
-            <Play className="h-4 w-4 mr-1" />
+            <RefreshCw className={`h-4 w-4 mr-1 ${runEntry.isPending ? 'animate-spin' : ''}`} />
             Run Now
           </Button>
-          <Button size="sm" variant="ghost">
+          <Button 
+            size="sm" 
+            variant="ghost"
+            onClick={() => handleToggle(row.original.id, row.original.is_active)}
+            disabled={toggleEntry.isPending}
+            title={row.original.is_active ? "Pause" : "Activate"}
+          >
             {row.original.is_active ? (
               <Pause className="h-4 w-4" />
             ) : (
@@ -223,7 +267,7 @@ export const RecurringEntriesView = () => {
         <DataTable
           columns={columns}
           data={entries || []}
-          searchKey="template_name"
+          searchKey="entry_name"
         />
       </Card>
 
@@ -384,8 +428,6 @@ export const RecurringEntriesView = () => {
                   )}
                 />
               </div>
-
-              {/* Active checkbox removed - entries are active by default */}
 
               <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
