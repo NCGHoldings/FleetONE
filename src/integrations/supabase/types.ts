@@ -189,6 +189,7 @@ export type Database = {
       accounting_activity_log: {
         Row: {
           activity_type: string
+          company_id: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -200,6 +201,7 @@ export type Database = {
         }
         Insert: {
           activity_type: string
+          company_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -211,6 +213,7 @@ export type Database = {
         }
         Update: {
           activity_type?: string
+          company_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -220,13 +223,22 @@ export type Database = {
           record_type?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "accounting_activity_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       accounting_audit_log: {
         Row: {
           action: string
           changed_at: string | null
           changed_by: string | null
+          company_id: string | null
           id: string
           ip_address: string | null
           new_values: Json | null
@@ -239,6 +251,7 @@ export type Database = {
           action: string
           changed_at?: string | null
           changed_by?: string | null
+          company_id?: string | null
           id?: string
           ip_address?: string | null
           new_values?: Json | null
@@ -251,6 +264,7 @@ export type Database = {
           action?: string
           changed_at?: string | null
           changed_by?: string | null
+          company_id?: string | null
           id?: string
           ip_address?: string | null
           new_values?: Json | null
@@ -259,7 +273,15 @@ export type Database = {
           table_name?: string
           user_agent?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "accounting_audit_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       accounts_payable: {
         Row: {
@@ -928,6 +950,7 @@ export type Database = {
           approval_order: number | null
           approver_role: string | null
           approver_user_id: string | null
+          company_id: string | null
           created_at: string | null
           id: string
           is_active: boolean | null
@@ -942,6 +965,7 @@ export type Database = {
           approval_order?: number | null
           approver_role?: string | null
           approver_user_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
@@ -956,6 +980,7 @@ export type Database = {
           approval_order?: number | null
           approver_role?: string | null
           approver_user_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
@@ -966,7 +991,15 @@ export type Database = {
           workflow_code?: string | null
           workflow_name?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "approval_workflows_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ar_ageing_buckets: {
         Row: {
@@ -1791,6 +1824,7 @@ export type Database = {
       auto_posting_rules: {
         Row: {
           amount_field: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           credit_account_id: string | null
@@ -1807,6 +1841,7 @@ export type Database = {
         }
         Insert: {
           amount_field?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           credit_account_id?: string | null
@@ -1823,6 +1858,7 @@ export type Database = {
         }
         Update: {
           amount_field?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           credit_account_id?: string | null
@@ -1838,6 +1874,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "auto_posting_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "auto_posting_rules_credit_account_id_fkey"
             columns: ["credit_account_id"]
@@ -3796,6 +3839,8 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          business_unit_type: string | null
+          company_code: string | null
           created_at: string
           default_currency: string | null
           display_order: number | null
@@ -3810,12 +3855,15 @@ export type Database = {
           registration_number: string | null
           sector: string | null
           short_code: string | null
+          tax_registration: string | null
           tax_registration_number: string | null
           updated_at: string
           website: string | null
         }
         Insert: {
           address?: string | null
+          business_unit_type?: string | null
+          company_code?: string | null
           created_at?: string
           default_currency?: string | null
           display_order?: number | null
@@ -3830,12 +3878,15 @@ export type Database = {
           registration_number?: string | null
           sector?: string | null
           short_code?: string | null
+          tax_registration?: string | null
           tax_registration_number?: string | null
           updated_at?: string
           website?: string | null
         }
         Update: {
           address?: string | null
+          business_unit_type?: string | null
+          company_code?: string | null
           created_at?: string
           default_currency?: string | null
           display_order?: number | null
@@ -3850,6 +3901,7 @@ export type Database = {
           registration_number?: string | null
           sector?: string | null
           short_code?: string | null
+          tax_registration?: string | null
           tax_registration_number?: string | null
           updated_at?: string
           website?: string | null
