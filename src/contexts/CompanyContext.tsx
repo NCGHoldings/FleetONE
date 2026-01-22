@@ -6,8 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 export interface Company {
   id: string;
   name: string;
-  code?: string;
-  status?: string;
+  short_code?: string | null;
+  is_active?: boolean | null;
   parent_company_id?: string | null;
   business_unit_type?: string | null;
   company_code?: string | null;
@@ -44,13 +44,13 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
 
   // Fetch all companies with hierarchy support
-  const { data: companies = [], isLoading } = useQuery<Company[]>({
+  const { data: companies = [], isLoading } = useQuery({
     queryKey: ["companies-hierarchy"],
-    queryFn: async (): Promise<Company[]> => {
-      const { data, error } = await supabase
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
         .from("companies")
-        .select("id, name, code, status, parent_company_id, business_unit_type, company_code, logo_url, tax_registration, fiscal_year_start, default_currency, created_at, updated_at")
-        .eq("status", "active")
+        .select("id, name, short_code, is_active, parent_company_id, business_unit_type, company_code, logo_url, tax_registration, fiscal_year_start, default_currency, created_at, updated_at")
+        .eq("is_active", true)
         .order("name");
       
       if (error) throw error;
