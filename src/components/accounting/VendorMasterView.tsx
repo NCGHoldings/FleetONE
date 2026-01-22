@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Building2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Building2, Store } from "lucide-react";
 import { toast } from "sonner";
 
 interface Vendor {
@@ -52,6 +53,7 @@ export function VendorMasterView() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const queryClient = useQueryClient();
+  const { selectedCompanyId, selectedCompany } = useCompany();
 
   const [formData, setFormData] = useState({
     vendor_code: "",
@@ -67,19 +69,27 @@ export function VendorMasterView() {
   });
 
   const { data: vendors, isLoading } = useQuery({
-    queryKey: ["vendors"],
+    queryKey: ["vendors", selectedCompanyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("vendors")
         .select("*")
         .order("vendor_name");
+      
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as Vendor[];
     },
+    enabled: !!selectedCompanyId,
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      if (!selectedCompanyId) throw new Error("Please select a company first");
       const { error } = await supabase.from("vendors").insert([{
         vendor_code: data.vendor_code,
         vendor_name: data.vendor_name,
@@ -92,11 +102,12 @@ export function VendorMasterView() {
         wht_applicable: data.wht_applicable === "true",
         wht_rate: data.wht_rate ? parseFloat(data.wht_rate) : null,
         is_active: true,
+        company_id: selectedCompanyId,
       }]);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["vendors", selectedCompanyId] });
       toast.success("Vendor created successfully");
       resetForm();
       setIsDialogOpen(false);
@@ -126,7 +137,7 @@ export function VendorMasterView() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["vendors", selectedCompanyId] });
       toast.success("Vendor updated successfully");
       resetForm();
       setIsDialogOpen(false);
@@ -143,7 +154,7 @@ export function VendorMasterView() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["vendors", selectedCompanyId] });
       toast.success("Vendor deleted successfully");
     },
     onError: (error) => {
@@ -203,9 +214,15 @@ export function VendorMasterView() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-primary" />
+            <Store className="h-5 w-5 text-primary" />
             <CardTitle>Vendor Master</CardTitle>
             <Badge variant="secondary">{vendors?.length || 0} vendors</Badge>
+            {selectedCompany && (
+              <Badge variant="outline" className="ml-2">
+                <Building2 className="h-3 w-3 mr-1" />
+                {selectedCompany.name}
+              </Badge>
+            )}
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
@@ -357,10 +374,19 @@ export function VendorMasterView() {
           </div>
         </div>
 
-        {isLoading ? (
+        {!selectedCompanyId ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Building2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p>Please select a company from the dropdown above</p>
+          </div>
+        ) : isLoading ? (
           <div className="text-center py-8 text-muted-foreground">Loading vendors...</div>
         ) : filteredVendors?.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">No vendors found</div>
+          <div className="text-center py-8 text-muted-foreground">
+            <Store className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p>No vendors found for {selectedCompany?.name}</p>
+            <p className="text-sm mt-1">Add a vendor to get started</p>
+          </div>
         ) : (
           <div className="rounded-md border">
             <Table>
