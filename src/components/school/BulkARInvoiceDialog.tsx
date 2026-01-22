@@ -73,7 +73,7 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
   };
 
   const selectedStudentsList = students?.filter((s) => selectedStudents.has(s.id)) || [];
-  const totalAmount = selectedStudentsList.reduce((sum, s) => sum + Math.abs(s.payment_balance), 0);
+  const totalAmount = selectedStudentsList.reduce((sum, s) => sum + (s.current_amount_due || s.fixed_monthly_amount || 0), 0);
 
   const handleGenerateInvoices = async () => {
     if (!effectiveSettings) {
@@ -91,6 +91,7 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
           student_name: s.student_name,
           payment_balance: s.payment_balance,
           current_amount_due: s.current_amount_due,
+          fixed_monthly_amount: s.fixed_monthly_amount,
         })),
         settings: effectiveSettings,
       });
@@ -117,7 +118,7 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
             Generate AR Invoices - {branchName}
           </DialogTitle>
           <DialogDescription>
-            Create AR invoices for students with outstanding balances
+            Create AR invoices for all active students with amount due
           </DialogDescription>
         </DialogHeader>
 
@@ -215,7 +216,7 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
                   </div>
                 ) : students?.length === 0 ? (
                   <div className="flex items-center justify-center h-32 text-muted-foreground">
-                    No students with outstanding balances
+                    No active students with amount due
                   </div>
                 ) : (
                   <div className="divide-y">
@@ -241,10 +242,15 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-destructive">
-                            LKR {Math.abs(student.payment_balance).toLocaleString()}
+                          <p className="font-semibold text-primary">
+                            LKR {(student.current_amount_due || student.fixed_monthly_amount || 0).toLocaleString()}
                           </p>
-                          <p className="text-xs text-muted-foreground">Outstanding</p>
+                          <p className="text-xs text-muted-foreground">Amount Due</p>
+                          {student.payment_balance < 0 && (
+                            <p className="text-xs text-destructive">
+                              Balance: LKR {Math.abs(student.payment_balance).toLocaleString()}
+                            </p>
+                          )}
                         </div>
                       </div>
                     ))}
