@@ -11,6 +11,7 @@ export interface SchoolBusFinanceSettings {
   trade_receivable_account_id: string | null;
   sbs_collection_account_id: string | null;
   bank_account_id: string | null;
+  branch_gl_account_id: string | null; // Direct COA account mapping for branch payments
   cash_account_id: string | null;
   auto_post_invoices: boolean;
   auto_post_payments: boolean;
@@ -50,7 +51,7 @@ export function useSchoolBusFinanceSettings() {
           branch:school_branches(id, branch_name, branch_code),
           trade_receivable_account:chart_of_accounts!school_bus_finance_settings_trade_receivable_account_id_fkey(id, account_code, account_name),
           sbs_collection_account:chart_of_accounts!school_bus_finance_settings_sbs_collection_account_id_fkey(id, account_code, account_name),
-          bank_account:bank_accounts(id, account_name, account_number, bank_name),
+          branch_gl_account:chart_of_accounts!school_bus_finance_settings_branch_gl_account_id_fkey(id, account_code, account_name),
           cash_account:chart_of_accounts!school_bus_finance_settings_cash_account_id_fkey(id, account_code, account_name)
         `)
         .eq("company_id", selectedCompanyId);
@@ -62,27 +63,37 @@ export function useSchoolBusFinanceSettings() {
   });
 }
 
-// Get settings for a specific branch
+// Get settings for a specific branch, falling back to default settings if not found
 export function useBranchFinanceSettings(branchId: string | null) {
   const { selectedCompanyId } = useCompany();
 
   return useQuery({
     queryKey: ["school-bus-finance-settings", selectedCompanyId, branchId],
     queryFn: async () => {
-      let query = supabase
-        .from("school_bus_finance_settings")
-        .select("*")
-        .eq("company_id", selectedCompanyId);
-      
+      // First try to get branch-specific settings
       if (branchId) {
-        query = query.eq("branch_id", branchId);
-      } else {
-        query = query.is("branch_id", null);
+        const { data: branchSettings } = await supabase
+          .from("school_bus_finance_settings")
+          .select("*")
+          .eq("company_id", selectedCompanyId)
+          .eq("branch_id", branchId)
+          .maybeSingle();
+
+        if (branchSettings) {
+          return branchSettings;
+        }
       }
 
-      const { data, error } = await query.maybeSingle();
+      // Fallback to default settings (branch_id is null)
+      const { data: defaultSettings, error } = await supabase
+        .from("school_bus_finance_settings")
+        .select("*")
+        .eq("company_id", selectedCompanyId)
+        .is("branch_id", null)
+        .maybeSingle();
+
       if (error) throw error;
-      return data;
+      return defaultSettings;
     },
     enabled: !!selectedCompanyId,
   });
@@ -361,23 +372,12 @@ export function usePostPaymentToGL() {
         throw new Error("Trade Receivables account not configured");
       }
 
-      // Determine which account to debit (bank or cash)
-      const debitAccountId = effectiveSettings.bank_account_id 
-        ? null // We'll get the GL account from bank_account
-        : effectiveSettings.cash_account_id;
-
-      let bankGLAccountId = debitAccountId;
-      if (effectiveSettings.bank_account_id) {
-        const { data: bankAccount } = await supabase
-          .from("bank_accounts")
-          .select("gl_account_id")
-          .eq("id", effectiveSettings.bank_account_id)
-          .single();
-        bankGLAccountId = bankAccount?.gl_account_id;
-      }
+      // Use branch_gl_account_id directly (from COA) instead of looking up from bank_accounts
+      // Priority: branch_gl_account_id > cash_account_id
+      const bankGLAccountId = effectiveSettings.branch_gl_account_id || effectiveSettings.cash_account_id;
 
       if (!bankGLAccountId) {
-        throw new Error("Bank/Cash account not configured");
+        throw new Error("Bank/Cash GL account not configured for this branch. Please configure in School Bus Finance Settings.");
       }
 
       // Create journal entry

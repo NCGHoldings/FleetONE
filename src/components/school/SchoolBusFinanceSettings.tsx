@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Settings2, Building2, CreditCard, FileText, CheckCircle, AlertCircle, Save } from "lucide-react";
 import { useSchoolBusFinanceSettings, useUpdateSchoolBusFinanceSettings } from "@/hooks/useSchoolBusFinance";
-import { useChartOfAccounts, useBankAccounts } from "@/hooks/useAccountingData";
+import { useChartOfAccounts } from "@/hooks/useAccountingData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,7 +20,7 @@ interface BranchSetting {
   branch_name: string;
   trade_receivable_account_id: string | null;
   sbs_collection_account_id: string | null;
-  bank_account_id: string | null;
+  branch_gl_account_id: string | null;
   cash_account_id: string | null;
   auto_post_invoices: boolean;
   auto_post_payments: boolean;
@@ -31,7 +31,6 @@ interface BranchSetting {
 export function SchoolBusFinanceSettings() {
   const { data: existingSettings, isLoading: settingsLoading } = useSchoolBusFinanceSettings();
   const { data: chartOfAccounts } = useChartOfAccounts();
-  const { data: bankAccounts } = useBankAccounts();
   const updateSettings = useUpdateSchoolBusFinanceSettings();
 
   // Fetch school branches
@@ -58,8 +57,8 @@ export function SchoolBusFinanceSettings() {
     invoice_prefix: "SBS-INV",
   });
 
-  // Branch settings state
-  const [branchSettings, setBranchSettings] = useState<Record<string, { bank_account_id: string }>>({});
+  // Branch settings state - use branch_gl_account_id for direct COA mapping
+  const [branchSettings, setBranchSettings] = useState<Record<string, { branch_gl_account_id: string }>>({});
 
   // Load existing settings
   useEffect(() => {
@@ -76,10 +75,10 @@ export function SchoolBusFinanceSettings() {
         });
       }
 
-      const branchMap: Record<string, { bank_account_id: string }> = {};
+      const branchMap: Record<string, { branch_gl_account_id: string }> = {};
       existingSettings.forEach((s: any) => {
         if (s.branch_id) {
-          branchMap[s.branch_id] = { bank_account_id: s.bank_account_id || "" };
+          branchMap[s.branch_id] = { branch_gl_account_id: s.branch_gl_account_id || "" };
         }
       });
       setBranchSettings(branchMap);
@@ -101,7 +100,7 @@ export function SchoolBusFinanceSettings() {
     try {
       await updateSettings.mutateAsync({
         branch_id: branchId,
-        bank_account_id: branchSettings[branchId]?.bank_account_id || null,
+        branch_gl_account_id: branchSettings[branchId]?.branch_gl_account_id || null,
         ...defaultSettings, // Inherit default settings
       });
     } catch (error) {
@@ -293,14 +292,14 @@ export function SchoolBusFinanceSettings() {
               <thead className="bg-muted">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium">Branch</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Bank Account (for payments)</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Cash/Bank GL Account (for payments)</th>
                   <th className="px-4 py-3 text-center text-sm font-medium">Status</th>
                   <th className="px-4 py-3 text-right text-sm font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {branches?.map((branch) => {
-                  const isConfigured = !!branchSettings[branch.id]?.bank_account_id;
+                  const isConfigured = !!branchSettings[branch.id]?.branch_gl_account_id;
                   return (
                     <tr key={branch.id} className="border-t">
                       <td className="px-4 py-3">
@@ -312,21 +311,21 @@ export function SchoolBusFinanceSettings() {
                       </td>
                       <td className="px-4 py-3">
                         <Select
-                          value={branchSettings[branch.id]?.bank_account_id || ""}
+                          value={branchSettings[branch.id]?.branch_gl_account_id || ""}
                           onValueChange={(value) =>
                             setBranchSettings({
                               ...branchSettings,
-                              [branch.id]: { bank_account_id: value },
+                              [branch.id]: { branch_gl_account_id: value },
                             })
                           }
                         >
-                          <SelectTrigger className="w-[300px]">
-                            <SelectValue placeholder="Select bank account..." />
+                          <SelectTrigger className="w-[350px]">
+                            <SelectValue placeholder="Select cash/bank GL account..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {bankAccounts?.map((bank) => (
-                              <SelectItem key={bank.id} value={bank.id}>
-                                {bank.account_code} - {bank.bank_name} ({bank.account_number})
+                            {cashAccounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.account_code} - {account.account_name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -334,12 +333,12 @@ export function SchoolBusFinanceSettings() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         {isConfigured ? (
-                          <Badge variant="default" className="bg-green-500">
+                          <Badge variant="default" className="bg-primary">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Configured
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="text-yellow-600 bg-yellow-100">
+                          <Badge variant="secondary">
                             <AlertCircle className="h-3 w-3 mr-1" />
                             Not configured
                           </Badge>
