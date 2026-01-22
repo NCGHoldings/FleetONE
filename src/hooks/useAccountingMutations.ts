@@ -1950,3 +1950,235 @@ export const useCreateARDebitNote = () => {
     onError: (error) => toast.error(`Failed: ${error.message}`),
   });
 };
+
+// ============ Bank Accounts ============
+export const useCreateBankAccount = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (account: {
+      account_code: string;
+      account_name: string;
+      bank_name: string;
+      account_number: string;
+      branch?: string;
+      account_type?: string;
+      currency?: string;
+      opening_balance?: number;
+      current_balance?: number;
+      gl_account_id?: string;
+      is_active?: boolean;
+      is_default?: boolean;
+      notes?: string;
+    }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data, error } = await supabase
+        .from("bank_accounts")
+        .insert([{
+          ...account,
+          company_id: selectedCompanyId,
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
+      toast.success("Bank account created successfully");
+    },
+    onError: (error) => toast.error(`Failed to create bank account: ${error.message}`),
+  });
+};
+
+// ============ Asset Categories ============
+export const useCreateAssetCategory = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (category: {
+      category_code: string;
+      category_name: string;
+      depreciation_method?: string;
+      depreciation_rate?: number;
+      useful_life_years?: number;
+      asset_account_id?: string;
+      accumulated_dep_account_id?: string;
+      depreciation_expense_account_id?: string;
+      is_active?: boolean;
+    }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data, error } = await supabase
+        .from("asset_categories")
+        .insert([{
+          ...category,
+          company_id: selectedCompanyId,
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["asset-categories", selectedCompanyId] });
+      toast.success("Asset category created successfully");
+    },
+    onError: (error) => toast.error(`Failed to create category: ${error.message}`),
+  });
+};
+
+// ============ Cost Centers ============
+export const useCreateCostCenter = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (costCenter: {
+      cost_center_code: string;
+      cost_center_name: string;
+      cost_center_type?: string;
+      parent_id?: string;
+      description?: string;
+      is_active?: boolean;
+    }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data, error } = await supabase
+        .from("cost_centers")
+        .insert([{
+          center_code: costCenter.cost_center_code,
+          center_name: costCenter.cost_center_name,
+          is_active: costCenter.is_active ?? true,
+          company_id: selectedCompanyId,
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cost-centers", selectedCompanyId] });
+      toast.success("Cost center created successfully");
+    },
+    onError: (error) => toast.error(`Failed to create cost center: ${error.message}`),
+  });
+};
+
+// ============ Budgets ============
+export const useCreateBudget = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (budget: {
+      budget_code: string;
+      budget_name: string;
+      fiscal_year: string;
+      budget_period?: string;
+      total_budget_amount: number;
+      status?: string;
+    }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const startDate = `${budget.fiscal_year}-01-01`;
+      const endDate = `${budget.fiscal_year}-12-31`;
+      
+      const { data, error } = await supabase
+        .from("budgets")
+        .insert([{
+          budget_code: budget.budget_code,
+          budget_name: budget.budget_name,
+          fiscal_year: parseInt(budget.fiscal_year),
+          budget_period: budget.budget_period || "annual",
+          total_budget_amount: budget.total_budget_amount,
+          status: budget.status || "draft",
+          start_date: startDate,
+          end_date: endDate,
+          company_id: selectedCompanyId,
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets", selectedCompanyId] });
+      toast.success("Budget created successfully");
+    },
+    onError: (error) => toast.error(`Failed to create budget: ${error.message}`),
+  });
+};
+
+// ============ Cheque Register ============
+export const useCreateCheque = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (cheque: {
+      cheque_number: string;
+      bank_account_id: string;
+      cheque_date: string;
+      payee_name: string;
+      amount: number;
+      status: string;
+      reference?: string;
+    }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      const { data, error } = await supabase
+        .from("cheque_register")
+        .insert([{
+          cheque_number: cheque.cheque_number,
+          bank_account_id: cheque.bank_account_id,
+          cheque_date: cheque.cheque_date,
+          amount: cheque.amount,
+          status: cheque.status,
+          description: cheque.payee_name,
+          company_id: selectedCompanyId,
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cheque-register", selectedCompanyId] });
+      toast.success("Cheque issued successfully");
+    },
+    onError: (error) => toast.error(`Failed to issue cheque: ${error.message}`),
+  });
+};
+
+export const useUpdateChequeStatus = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async ({ chequeId, status, clearedDate }: { chequeId: string; status: string; clearedDate?: string }) => {
+      const updateData: any = { status };
+      if (clearedDate) updateData.cleared_date = clearedDate;
+      
+      const { error } = await supabase
+        .from("cheque_register")
+        .update(updateData)
+        .eq("id", chequeId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cheque-register", selectedCompanyId] });
+      toast.success("Cheque status updated");
+    },
+    onError: (error) => toast.error(`Failed to update cheque: ${error.message}`),
+  });
+};
