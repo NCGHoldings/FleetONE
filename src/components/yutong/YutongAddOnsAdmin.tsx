@@ -123,10 +123,35 @@ export function YutongAddOnsAdmin() {
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      // Convert empty addon_code to null to avoid unique constraint violation
+      const submitData = {
+        ...values,
+        addon_code: values.addon_code?.trim() || null,
+      };
+
+      // Check for duplicate code if a code is provided
+      if (submitData.addon_code) {
+        const { data: existing } = await (supabase as any)
+          .from('yutong_addons')
+          .select('id')
+          .eq('addon_code', submitData.addon_code)
+          .neq('id', editingAddOn?.id || '00000000-0000-0000-0000-000000000000')
+          .maybeSingle();
+
+        if (existing) {
+          toast({
+            title: "Error",
+            description: "An add-on with this code already exists",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       if (editingAddOn) {
         const { error } = await (supabase as any)
           .from('yutong_addons')
-          .update(values)
+          .update(submitData)
           .eq('id', editingAddOn.id);
 
         if (error) throw error;
@@ -137,7 +162,7 @@ export function YutongAddOnsAdmin() {
       } else {
         const { error } = await (supabase as any)
           .from('yutong_addons')
-          .insert([values]);
+          .insert([submitData]);
 
         if (error) throw error;
         toast({
