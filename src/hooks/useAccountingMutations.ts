@@ -2142,7 +2142,7 @@ export const useCreateCheque = () => {
           cheque_date: cheque.cheque_date,
           amount: cheque.amount,
           status: cheque.status,
-          description: cheque.payee_name,
+          payee: cheque.payee_name,
           company_id: selectedCompanyId,
         }])
         .select()
