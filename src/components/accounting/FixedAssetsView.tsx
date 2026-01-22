@@ -1,19 +1,53 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Building, Calculator, FileText } from "lucide-react";
+import { Plus, Building, Calculator, FileText, Play } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useFixedAssets, useAssetCategories, useDepreciationSchedule } from "@/hooks/useAccountingData";
+import { useRunDepreciationWithGL } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { FixedAssetForm } from "./FixedAssetForm";
+import { AssetCategoryForm } from "./AssetCategoryForm";
+import { useToast } from "@/hooks/use-toast";
 
 export const FixedAssetsView = () => {
+  const [activeTab, setActiveTab] = useState("register");
+  const [showAssetForm, setShowAssetForm] = useState(false);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  
   const { data: assets, isLoading } = useFixedAssets();
   const { data: categories } = useAssetCategories();
   const { data: depreciation } = useDepreciationSchedule();
+  const runDepreciation = useRunDepreciationWithGL();
+  const { toast } = useToast();
+
+  const handleRunDepreciation = async () => {
+    try {
+      await runDepreciation.mutateAsync({});
+      toast({
+        title: "Depreciation Posted",
+        description: "Monthly depreciation has been calculated and posted to the GL.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to run depreciation. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAssetReport = () => {
+    toast({
+      title: "Report Generated",
+      description: "Fixed Asset Register report has been generated.",
+    });
+    window.print();
+  };
 
   const assetColumns = [
     {
@@ -186,7 +220,7 @@ export const FixedAssetsView = () => {
         </Card>
       </div>
 
-      <Tabs defaultValue="register" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="register">Asset Register</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
@@ -203,11 +237,11 @@ export const FixedAssetsView = () => {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline">
+                <Button variant="outline" onClick={handleAssetReport}>
                   <FileText className="h-4 w-4 mr-2" />
                   Asset Report
                 </Button>
-                <Button>
+                <Button onClick={() => setShowAssetForm(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Asset
                 </Button>
@@ -227,7 +261,7 @@ export const FixedAssetsView = () => {
                   Configure depreciation methods and rates by category
                 </p>
               </div>
-              <Button>
+              <Button onClick={() => setShowCategoryForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Category
               </Button>
@@ -246,9 +280,9 @@ export const FixedAssetsView = () => {
                   View and run monthly depreciation
                 </p>
               </div>
-              <Button>
-                <Calculator className="h-4 w-4 mr-2" />
-                Run Depreciation
+              <Button onClick={handleRunDepreciation} disabled={runDepreciation.isPending}>
+                <Play className="h-4 w-4 mr-2" />
+                {runDepreciation.isPending ? "Running..." : "Run Depreciation"}
               </Button>
             </div>
 
@@ -256,6 +290,10 @@ export const FixedAssetsView = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Forms */}
+      <FixedAssetForm open={showAssetForm} onOpenChange={setShowAssetForm} />
+      <AssetCategoryForm open={showCategoryForm} onOpenChange={setShowCategoryForm} />
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Building2, ArrowUpDown, CheckCircle2 } from "lucide-react";
+import { Plus, Building2, ArrowUpDown, CheckCircle2, RefreshCw } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -9,9 +9,16 @@ import { useBankAccounts, useBankTransactions, useBankReconciliations } from "@/
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BankAccountForm } from "./BankAccountForm";
+import { BankTransactionForm } from "./BankTransactionForm";
+import { BankReconciliationWorksheet } from "./BankReconciliationWorksheet";
 
 export const BankingView = () => {
   const [selectedBankId, setSelectedBankId] = useState<string | undefined>();
+  const [showBankForm, setShowBankForm] = useState(false);
+  const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [showReconciliation, setShowReconciliation] = useState(false);
+  
   const { data: bankAccounts, isLoading: accountsLoading } = useBankAccounts();
   const { data: transactions } = useBankTransactions(selectedBankId);
   const { data: reconciliations } = useBankReconciliations(selectedBankId);
@@ -208,7 +215,7 @@ export const BankingView = () => {
                   Manage bank and cash accounts
                 </p>
               </div>
-              <Button>
+              <Button onClick={() => setShowBankForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Bank Account
               </Button>
@@ -228,7 +235,7 @@ export const BankingView = () => {
                 </p>
               </div>
               <div className="flex gap-3">
-                <Select value={selectedBankId || "_all"} onValueChange={(val) => setSelectedBankId(val === "_all" ? null : val)}>
+                <Select value={selectedBankId || "_all"} onValueChange={(val) => setSelectedBankId(val === "_all" ? undefined : val)}>
                   <SelectTrigger className="w-64">
                     <SelectValue placeholder="Select bank account" />
                   </SelectTrigger>
@@ -241,7 +248,7 @@ export const BankingView = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button>
+                <Button onClick={() => setShowTransactionForm(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Transaction
                 </Button>
@@ -262,11 +269,12 @@ export const BankingView = () => {
                 </p>
               </div>
               <div className="flex gap-3">
-                <Select value={selectedBankId || ""} onValueChange={setSelectedBankId}>
+                <Select value={selectedBankId || "_none"} onValueChange={(val) => setSelectedBankId(val === "_none" ? undefined : val)}>
                   <SelectTrigger className="w-64">
                     <SelectValue placeholder="Select bank account" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="_none">Select an account</SelectItem>
                     {bankAccounts?.map((bank) => (
                       <SelectItem key={bank.id} value={bank.id}>
                         {bank.account_name}
@@ -274,8 +282,8 @@ export const BankingView = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button>
-                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                <Button onClick={() => setShowReconciliation(true)} disabled={!selectedBankId}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
                   Start Reconciliation
                 </Button>
               </div>
@@ -285,6 +293,13 @@ export const BankingView = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Forms */}
+      <BankAccountForm open={showBankForm} onOpenChange={setShowBankForm} />
+      <BankTransactionForm 
+        open={showTransactionForm} 
+        onOpenChange={setShowTransactionForm}
+      />
     </div>
   );
 };

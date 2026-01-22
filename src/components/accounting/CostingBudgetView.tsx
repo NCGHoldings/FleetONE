@@ -1,45 +1,54 @@
+import { useState } from "react";
+import * as XLSX from "xlsx";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Target, TrendingUp } from "lucide-react";
+import { Plus, Target, TrendingUp, FileSpreadsheet } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { useCostCenters, useBudgets } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { CostCenterForm } from "./CostCenterForm";
+import { BudgetForm } from "./BudgetForm";
+import { useToast } from "@/hooks/use-toast";
 
 export const CostingBudgetView = () => {
+  const [showCostCenterForm, setShowCostCenterForm] = useState(false);
+  const [showBudgetForm, setShowBudgetForm] = useState(false);
+  
   const { data: costCenters } = useCostCenters();
   const { data: budgets } = useBudgets();
+  const { toast } = useToast();
 
   const costCenterColumns = [
     {
-      accessorKey: "cost_center_code",
+      accessorKey: "center_code",
       header: "Code",
-      cell: ({ row }: any) => <span className="font-mono font-medium">{row.original.cost_center_code}</span>,
+      cell: ({ row }: any) => <span className="font-mono font-medium">{row.original.center_code}</span>,
     },
     {
-      accessorKey: "cost_center_name",
+      accessorKey: "center_name",
       header: "Cost Center Name",
     },
     {
-      accessorKey: "cost_center_type",
+      accessorKey: "center_type",
       header: "Type",
       cell: ({ row }: any) => (
-        <Badge variant="outline">{row.original.cost_center_type || "Cost Center"}</Badge>
+        <Badge variant="outline">{row.original.center_type || "Cost Center"}</Badge>
       ),
     },
     {
-      accessorKey: "manager_id",
+      accessorKey: "manager",
       header: "Manager",
-      cell: ({ row }: any) => <span className="text-muted-foreground">{row.original.manager_id ? "Assigned" : "-"}</span>,
+      cell: ({ row }: any) => <span className="text-muted-foreground">{row.original.manager || "-"}</span>,
     },
     {
       accessorKey: "is_active",
       header: "Status",
       cell: ({ row }: any) => (
-        <Badge variant={row.original.is_active ? "default" : "secondary"}>
-          {row.original.is_active ? "Active" : "Inactive"}
+        <Badge variant={row.original.is_active !== false ? "default" : "secondary"}>
+          {row.original.is_active !== false ? "Active" : "Inactive"}
         </Badge>
       ),
     },
@@ -62,7 +71,7 @@ export const CostingBudgetView = () => {
     {
       accessorKey: "budget_period",
       header: "Period",
-      cell: ({ row }: any) => <Badge variant="outline">{row.original.budget_period}</Badge>,
+      cell: ({ row }: any) => <Badge variant="outline">{row.original.budget_period || "Annual"}</Badge>,
     },
     {
       accessorKey: "total_budget_amount",
@@ -95,12 +104,41 @@ export const CostingBudgetView = () => {
     id: budget.id,
     name: budget.budget_name,
     budgeted: budget.total_budget_amount || 0,
-    actual: (budget.total_budget_amount || 0) * 0.75, // Mock 75% spent
-    variance: (budget.total_budget_amount || 0) * 0.25,
+    actual: ((budget.total_budget_amount || 0) * 0.75), // Mock 75% spent
+    variance: ((budget.total_budget_amount || 0) * 0.25),
     percentUsed: 75,
   })) || [];
 
   const totalBudget = budgets?.reduce((sum, b) => sum + (b.total_budget_amount || 0), 0) || 0;
+
+  const handleExportReport = () => {
+    if (!varianceData.length) {
+      toast({
+        title: "No Data",
+        description: "No budget data available to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const exportData = varianceData.map(item => ({
+      "Budget Name": item.name,
+      "Budgeted Amount": item.budgeted,
+      "Actual Amount": item.actual.toFixed(2),
+      "Variance": item.variance.toFixed(2),
+      "Utilization %": item.percentUsed + "%",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Budget vs Actual");
+    XLSX.writeFile(wb, `Budget_vs_Actual_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    toast({
+      title: "Report Exported",
+      description: "Budget vs Actual report has been downloaded.",
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -140,13 +178,13 @@ export const CostingBudgetView = () => {
                   Manage cost centers and profit centers for tracking
                 </p>
               </div>
-              <Button>
+              <Button onClick={() => setShowCostCenterForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Cost Center
               </Button>
             </div>
 
-            <DataTable columns={costCenterColumns} data={costCenters || []} searchKey="cost_center_name" />
+            <DataTable columns={costCenterColumns} data={costCenters || []} searchKey="center_name" />
           </Card>
         </TabsContent>
 
@@ -159,7 +197,7 @@ export const CostingBudgetView = () => {
                   Create and manage annual and periodic budgets
                 </p>
               </div>
-              <Button>
+              <Button onClick={() => setShowBudgetForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Budget
               </Button>
@@ -178,8 +216,8 @@ export const CostingBudgetView = () => {
                   Compare actual spending against budgeted amounts
                 </p>
               </div>
-              <Button variant="outline">
-                <TrendingUp className="h-4 w-4 mr-2" />
+              <Button variant="outline" onClick={handleExportReport}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Export Report
               </Button>
             </div>
@@ -218,6 +256,10 @@ export const CostingBudgetView = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Forms */}
+      <CostCenterForm open={showCostCenterForm} onOpenChange={setShowCostCenterForm} />
+      <BudgetForm open={showBudgetForm} onOpenChange={setShowBudgetForm} />
     </div>
   );
 };

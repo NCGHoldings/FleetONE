@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, FileText, CheckCircle, Package } from "lucide-react";
+import { Plus, Eye, FileText, CheckCircle, Package, ArrowRight } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePurchaseOrders, useGoodsReceiptNotes } from "@/hooks/useAccountingData";
@@ -10,9 +10,11 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { PurchaseOrderForm } from "./PurchaseOrderForm";
 import { GoodsReceiptForm } from "./GoodsReceiptForm";
+import { InvoiceMatchingView } from "./InvoiceMatchingView";
 
 export const PurchaseOrderView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [activeMainTab, setActiveMainTab] = useState("po");
   const { data: purchaseOrders, isLoading } = usePurchaseOrders(statusFilter);
   const { data: grns } = useGoodsReceiptNotes();
   const [showPOForm, setShowPOForm] = useState(false);
@@ -195,7 +197,7 @@ export const PurchaseOrderView = () => {
 
       {/* Main Content */}
       <Card className="p-6">
-        <Tabs defaultValue="po" className="space-y-4">
+        <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="po">Purchase Orders</TabsTrigger>
             <TabsTrigger value="grn">Goods Receipt Notes</TabsTrigger>
@@ -239,16 +241,7 @@ export const PurchaseOrderView = () => {
           </TabsContent>
 
           <TabsContent value="matching" className="mt-4">
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold">3-Way Matching</h3>
-              <p className="text-sm text-muted-foreground mt-2">
-                Match Purchase Orders, GRNs, and Vendor Invoices
-              </p>
-              <Button className="mt-4" variant="outline">
-                Start Matching
-              </Button>
-            </div>
+            <InvoiceMatchingView />
           </TabsContent>
         </Tabs>
       </Card>
