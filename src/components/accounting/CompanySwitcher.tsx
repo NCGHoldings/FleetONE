@@ -40,20 +40,24 @@ export const CompanySwitcher = () => {
     isLoading 
   } = useCompany();
 
+  // Debug logging
+  console.log("CompanySwitcher - isLoading:", isLoading, "companies:", companies?.length);
+
   if (isLoading) {
     return (
-      <Button variant="outline" disabled className="w-[200px]">
-        <Building2 className="h-4 w-4 mr-2" />
-        Loading...
+      <Button variant="outline" disabled className="w-[220px]">
+        <Building2 className="h-4 w-4 mr-2 animate-pulse" />
+        Loading companies...
       </Button>
     );
   }
 
-  if (!companies?.length) {
+  if (!companies || companies.length === 0) {
+    console.warn("CompanySwitcher - No companies available");
     return (
-      <Button variant="outline" disabled className="w-[200px]">
+      <Button variant="outline" disabled className="w-[220px]">
         <Building2 className="h-4 w-4 mr-2" />
-        No companies
+        No companies available
       </Button>
     );
   }
