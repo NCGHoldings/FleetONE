@@ -126,12 +126,13 @@ export function BulkARInvoiceDialog({ open, onOpenChange, branchId, branchName }
           <>
             {/* Settings Warning */}
             {!isSettingsConfigured && (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+              <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
                 <div>
-                  <p className="font-medium text-yellow-800">Finance Settings Not Configured</p>
-                  <p className="text-sm text-yellow-700">
-                    Please configure Trade Receivables and SBS Collection accounts in Settings before generating invoices.
+                  <p className="font-medium text-destructive">Finance Settings Not Configured</p>
+                  <p className="text-sm text-muted-foreground">
+                    Please configure Trade Receivables and SBS Collection accounts in <strong>School Bus → Settings → Finance</strong> tab before generating invoices.
+                    Without these settings, invoices cannot be posted to the General Ledger.
                   </p>
                 </div>
               </div>

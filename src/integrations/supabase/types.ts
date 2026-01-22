@@ -12371,6 +12371,7 @@ export type Database = {
           auto_post_invoices: boolean | null
           auto_post_payments: boolean | null
           bank_account_id: string | null
+          branch_gl_account_id: string | null
           branch_id: string | null
           cash_account_id: string | null
           company_id: string | null
@@ -12386,6 +12387,7 @@ export type Database = {
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null
           bank_account_id?: string | null
+          branch_gl_account_id?: string | null
           branch_id?: string | null
           cash_account_id?: string | null
           company_id?: string | null
@@ -12401,6 +12403,7 @@ export type Database = {
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null
           bank_account_id?: string | null
+          branch_gl_account_id?: string | null
           branch_id?: string | null
           cash_account_id?: string | null
           company_id?: string | null
@@ -12418,6 +12421,13 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_bus_finance_settings_branch_gl_account_id_fkey"
+            columns: ["branch_gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
           {
