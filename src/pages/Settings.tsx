@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target, Users, Wallet, Hash, Bus } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target, Users, Wallet, Hash, Bus, Car } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
@@ -24,6 +24,7 @@ import { RouteTargetSettings } from "@/components/settings/RouteTargetSettings";
 import { PayrollSettingsComponent } from "@/components/settings/PayrollSettingsComponent";
 import { NumberingSettings } from "@/components/settings/NumberingSettings";
 import { SchoolBusFinanceSettings } from "@/components/school/SchoolBusFinanceSettings";
+import { SpecialHireFinanceSettings } from "@/components/special-hire/SpecialHireFinanceSettings";
 
 export default function Settings() {
   const { user } = useAuth();

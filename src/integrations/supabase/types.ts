@@ -14260,6 +14260,153 @@ export type Database = {
           },
         ]
       }
+      special_hire_finance_settings: {
+        Row: {
+          advance_receipt_prefix: string | null
+          auto_post_advance_payments: boolean | null
+          auto_post_balance_payments: boolean | null
+          auto_post_invoices: boolean | null
+          commission_expense_account_id: string | null
+          company_id: string
+          created_at: string | null
+          customer_advance_account_id: string | null
+          default_bank_account_id: string | null
+          discount_expense_account_id: string | null
+          id: string
+          invoice_prefix: string | null
+          is_active: boolean | null
+          refund_expense_account_id: string | null
+          revenue_external_account_id: string | null
+          revenue_internal_account_id: string | null
+          trade_receivable_account_id: string | null
+          updated_at: string | null
+          vat_output_account_id: string | null
+          wht_payable_account_id: string | null
+        }
+        Insert: {
+          advance_receipt_prefix?: string | null
+          auto_post_advance_payments?: boolean | null
+          auto_post_balance_payments?: boolean | null
+          auto_post_invoices?: boolean | null
+          commission_expense_account_id?: string | null
+          company_id: string
+          created_at?: string | null
+          customer_advance_account_id?: string | null
+          default_bank_account_id?: string | null
+          discount_expense_account_id?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          refund_expense_account_id?: string | null
+          revenue_external_account_id?: string | null
+          revenue_internal_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+          vat_output_account_id?: string | null
+          wht_payable_account_id?: string | null
+        }
+        Update: {
+          advance_receipt_prefix?: string | null
+          auto_post_advance_payments?: boolean | null
+          auto_post_balance_payments?: boolean | null
+          auto_post_invoices?: boolean | null
+          commission_expense_account_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          customer_advance_account_id?: string | null
+          default_bank_account_id?: string | null
+          discount_expense_account_id?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          refund_expense_account_id?: string | null
+          revenue_external_account_id?: string | null
+          revenue_internal_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+          vat_output_account_id?: string | null
+          wht_payable_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "special_hire_finance_settings_commission_expense_account_i_fkey"
+            columns: ["commission_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_customer_advance_account_id_fkey"
+            columns: ["customer_advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_default_bank_account_id_fkey"
+            columns: ["default_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_discount_expense_account_id_fkey"
+            columns: ["discount_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_refund_expense_account_id_fkey"
+            columns: ["refund_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_revenue_external_account_id_fkey"
+            columns: ["revenue_external_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_revenue_internal_account_id_fkey"
+            columns: ["revenue_internal_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_trade_receivable_account_id_fkey"
+            columns: ["trade_receivable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_vat_output_account_id_fkey"
+            columns: ["vat_output_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_finance_settings_wht_payable_account_id_fkey"
+            columns: ["wht_payable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       special_hire_invoices: {
         Row: {
           adjustment_id: string | null
