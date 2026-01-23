@@ -598,6 +598,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           balance: number
+          business_unit_code: string | null
           company_id: string | null
           created_at: string | null
           created_by: string | null
@@ -625,6 +626,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           balance: number
+          business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -652,6 +654,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           balance?: number
+          business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -764,6 +767,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           bank_account_id: string | null
+          business_unit_code: string | null
           cheque_date: string | null
           cheque_number: string | null
           company_id: string | null
@@ -787,6 +791,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
+          business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
           company_id?: string | null
@@ -810,6 +815,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           bank_account_id?: string | null
+          business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
           company_id?: string | null
@@ -1362,6 +1368,7 @@ export type Database = {
       ar_invoices: {
         Row: {
           balance: number
+          business_unit_code: string | null
           company_id: string | null
           created_at: string | null
           created_by: string | null
@@ -1384,6 +1391,7 @@ export type Database = {
         }
         Insert: {
           balance: number
+          business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -1406,6 +1414,7 @@ export type Database = {
         }
         Update: {
           balance?: number
+          business_unit_code?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -1510,6 +1519,7 @@ export type Database = {
         Row: {
           amount: number
           bank_account_id: string | null
+          business_unit_code: string | null
           cheque_date: string | null
           cheque_number: string | null
           company_id: string | null
@@ -1530,6 +1540,7 @@ export type Database = {
         Insert: {
           amount: number
           bank_account_id?: string | null
+          business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
           company_id?: string | null
@@ -1550,6 +1561,7 @@ export type Database = {
         Update: {
           amount?: number
           bank_account_id?: string | null
+          business_unit_code?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
           company_id?: string | null
@@ -4513,6 +4525,7 @@ export type Database = {
         Row: {
           ar_account_id: string | null
           billing_address: string | null
+          business_unit_code: string | null
           company_id: string | null
           contact_person: string | null
           created_at: string | null
@@ -4536,6 +4549,7 @@ export type Database = {
         Insert: {
           ar_account_id?: string | null
           billing_address?: string | null
+          business_unit_code?: string | null
           company_id?: string | null
           contact_person?: string | null
           created_at?: string | null
@@ -4559,6 +4573,7 @@ export type Database = {
         Update: {
           ar_account_id?: string | null
           billing_address?: string | null
+          business_unit_code?: string | null
           company_id?: string | null
           contact_person?: string | null
           created_at?: string | null
@@ -16682,6 +16697,7 @@ export type Database = {
           bank_account: string | null
           bank_branch: string | null
           bank_name: string | null
+          business_unit_code: string | null
           company_id: string | null
           contact_person: string | null
           created_at: string | null
@@ -16707,6 +16723,7 @@ export type Database = {
           bank_account?: string | null
           bank_branch?: string | null
           bank_name?: string | null
+          business_unit_code?: string | null
           company_id?: string | null
           contact_person?: string | null
           created_at?: string | null
@@ -16732,6 +16749,7 @@ export type Database = {
           bank_account?: string | null
           bank_branch?: string | null
           bank_name?: string | null
+          business_unit_code?: string | null
           company_id?: string | null
           contact_person?: string | null
           created_at?: string | null

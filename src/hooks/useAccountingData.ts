@@ -1,9 +1,21 @@
 // Centralized data fetching hooks for all accounting modules
 // All hooks filter by selectedCompanyId for multi-company data isolation
+// Sub-companies automatically filter by business_unit_code for their specific entries
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 
+// Helper hook to get auto business unit filtering for sub-companies
+const useAutoBusinessUnitFilter = () => {
+  const { selectedCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  
+  // Auto-filter by business unit when a sub-company is selected
+  const autoBusinessUnitCode = selectedCompanyId && isSubCompanyOfNCGHolding(selectedCompanyId)
+    ? getBusinessUnitCode()
+    : null;
+  
+  return autoBusinessUnitCode;
+};
 // ============ Chart of Accounts ============
 // For sub-companies, fetch parent company's COA (consolidated GL)
 export const useChartOfAccounts = () => {
@@ -58,10 +70,17 @@ export const useAccountsByType = (accountType: "asset" | "liability" | "equity" 
 
 // ============ Journal Entries ============
 // For consolidated GL, show all entries for parent company
-// With optional business unit filter
-export const useJournalEntries = (status?: "draft" | "posted" | "void", businessUnitCode?: string) => {
+// Auto-filters by business_unit_code when a sub-company is selected
+// businessUnitCodeOverride: pass "all" to see all entries (consolidated view), or specific code
+export const useJournalEntries = (status?: "draft" | "posted" | "void", businessUnitCodeOverride?: string) => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
+  
+  // Use override if provided, otherwise use auto-detected from selected company
+  const businessUnitCode = businessUnitCodeOverride !== undefined 
+    ? businessUnitCodeOverride 
+    : autoBusinessUnitCode;
   
   return useQuery({
     queryKey: ["journal-entries", status, effectiveCompanyId, businessUnitCode],
@@ -79,7 +98,7 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
         query = query.eq("status", status);
       }
       
-      // Filter by specific business unit if provided
+      // Filter by specific business unit if provided (auto or override)
       if (businessUnitCode && businessUnitCode !== "all") {
         query = query.eq("business_unit_code", businessUnitCode);
       }
@@ -166,19 +185,27 @@ export const useCurrentPeriod = () => {
 };
 
 // ============ Customers (AR) ============
+// Filters by business_unit_code when a sub-company is selected
 export const useCustomers = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
   
   return useQuery({
-    queryKey: ["customers", selectedCompanyId],
+    queryKey: ["customers", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("customers")
         .select("*")
         .order("customer_name");
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      // Filter by business unit for sub-company views
+      if (autoBusinessUnitCode) {
+        (query as any) = query.eq("business_unit_code", autoBusinessUnitCode);
       }
       
       const { data, error } = await query;
@@ -214,19 +241,27 @@ export const useCustomerBalance = (customerId: string) => {
 };
 
 // ============ Vendors (AP) ============
+// Filters by business_unit_code when a sub-company is selected
 export const useVendors = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
   
   return useQuery({
-    queryKey: ["vendors", selectedCompanyId],
+    queryKey: ["vendors", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("vendors")
         .select("*")
         .order("vendor_name");
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      // Filter by business unit for sub-company views
+      if (autoBusinessUnitCode) {
+        (query as any) = query.eq("business_unit_code", autoBusinessUnitCode);
       }
       
       const { data, error } = await query;
@@ -262,13 +297,16 @@ export const useVendorBalance = (vendorId: string) => {
 };
 
 // ============ AR Invoices ============
+// Filters by business_unit_code when a sub-company is selected
 export const useARInvoices = (status?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
   
   return useQuery({
-    queryKey: ["ar-invoices", status, selectedCompanyId],
+    queryKey: ["ar-invoices", status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
-      let query = supabase
+      let query: any = supabase
         .from("ar_invoices")
         .select(`
           *,
@@ -279,8 +317,13 @@ export const useARInvoices = (status?: string) => {
         `)
         .order("invoice_date", { ascending: false });
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      // Filter by business unit for sub-company views
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
       
       if (status) {
@@ -296,13 +339,16 @@ export const useARInvoices = (status?: string) => {
 };
 
 // ============ AP Invoices ============
+// Filters by business_unit_code when a sub-company is selected
 export const useAPInvoices = (status?: string) => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
   
   return useQuery({
-    queryKey: ["ap-invoices", status, selectedCompanyId],
+    queryKey: ["ap-invoices", status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
-      let query = supabase
+      let query: any = supabase
         .from("ap_invoices")
         .select(`
           *,
@@ -313,8 +359,13 @@ export const useAPInvoices = (status?: string) => {
         `)
         .order("invoice_date", { ascending: false });
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      // Filter by business unit for sub-company views
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
       
       if (status) {
