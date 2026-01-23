@@ -355,10 +355,11 @@ export function useGenerateBulkARInvoices() {
       if (settings.auto_post_invoices && settings.trade_receivable_account_id && settings.sbs_collection_account_id) {
         // Get or create a customer for this branch in Finance ERP
         let customerId: string | null = null;
+        // Use effective company for consolidated GL (NCG Holding hierarchy)
         const { data: existingCustomer } = await supabase
           .from("customers")
           .select("id")
-          .eq("company_id", selectedCompanyId)
+          .eq("company_id", effectiveCompanyId)
           .eq("customer_code", `SBS-${branchCode}`)
           .maybeSingle();
 
@@ -368,7 +369,7 @@ export function useGenerateBulkARInvoices() {
           const { data: newCustomer, error: customerError } = await supabase
             .from("customers")
             .insert({
-              company_id: selectedCompanyId,
+              company_id: effectiveCompanyId,
               customer_code: `SBS-${branchCode}`,
               customer_name: `School Bus Students - ${branchName}`,
               is_active: true,
@@ -381,19 +382,20 @@ export function useGenerateBulkARInvoices() {
           }
         }
 
-        // Create Finance ERP AR Invoice (aggregated for the batch)
+        // Create Finance ERP AR Invoice (aggregated for the batch) - use consolidated company
         let arInvoiceId: string | null = null;
         if (customerId) {
           const { data: arInvoice, error: arError } = await supabase
             .from("ar_invoices")
             .insert({
-              company_id: selectedCompanyId,
+              company_id: effectiveCompanyId,
               customer_id: customerId,
               invoice_number: batchNumber,
               invoice_date: format(new Date(), "yyyy-MM-dd"),
               due_date: format(new Date(new Date().setDate(new Date().getDate() + 30)), "yyyy-MM-dd"),
               total_amount: totalAmount,
               balance: totalAmount,
+              paid_amount: 0,
               status: "unpaid",
               reference: `School Bus Batch: ${batchNumber}`,
               notes: `Auto-generated from School Bus module for ${students.length} students`,
