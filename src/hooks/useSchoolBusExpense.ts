@@ -154,7 +154,11 @@ export function useFleetBuses() {
 // Post expense to GL
 export function usePostExpenseToGL() {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  
+  // Use consolidated GL for NCG Holding hierarchy
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
 
   return useMutation({
     mutationFn: async ({
@@ -243,7 +247,7 @@ export function usePostExpenseToGL() {
         throw new Error("Cash/Bank account not configured for expenses");
       }
 
-      // Create journal entry
+      // Create journal entry - use CONSOLIDATED GL for NCG Holding hierarchy
       const entryNumber = `SBS-EXP-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
       const { data: journalEntry, error: jeError } = await supabase
@@ -256,8 +260,9 @@ export function usePostExpenseToGL() {
           total_debit: amount,
           total_credit: amount,
           status: "posted",
-          company_id: selectedCompanyId,
-          business_unit_code: "SBO",
+          company_id: effectiveCompanyId, // Use NCG Holding for consolidated GL
+          business_unit_code: businessUnitCode || "SBO", // Tag with business unit
+          business_unit_id: selectedCompanyId, // Original company for reference
           posted_at: new Date().toISOString(),
         })
         .select()
@@ -265,7 +270,7 @@ export function usePostExpenseToGL() {
 
       if (jeError) throw jeError;
 
-      // Create journal entry lines
+      // Create journal entry lines - use consolidated company ID
       // DR: Expense Account (increases expense)
       // CR: Cash/Bank Account (decreases asset)
       const { error: linesError } = await supabase
@@ -277,7 +282,7 @@ export function usePostExpenseToGL() {
             description: `${expenseType} - ${description}`,
             debit: amount,
             credit: 0,
-            company_id: selectedCompanyId,
+            company_id: effectiveCompanyId, // Use consolidated GL company
           },
           {
             journal_entry_id: journalEntry.id,
@@ -285,7 +290,7 @@ export function usePostExpenseToGL() {
             description: `Payment for ${expenseType}`,
             debit: 0,
             credit: amount,
-            company_id: selectedCompanyId,
+            company_id: effectiveCompanyId, // Use consolidated GL company
           },
         ]);
 
