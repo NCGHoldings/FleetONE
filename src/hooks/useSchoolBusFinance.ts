@@ -261,7 +261,16 @@ export function useStudentsForBulkAR(branchId: string | null) {
   });
 }
 
-// Generate bulk AR invoices
+// Helper to process students in chunks for performance
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
+}
+
+// Generate bulk AR invoices - creates INDIVIDUAL entries per student
 export function useGenerateBulkARInvoices() {
   const queryClient = useQueryClient();
   const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isNCGHoldingOrSubCompany } = useCompany();
@@ -276,6 +285,7 @@ export function useGenerateBulkARInvoices() {
       invoiceMonth,
       students,
       settings,
+      onProgress,
     }: {
       branchId: string;
       invoiceMonth: Date;
@@ -287,17 +297,18 @@ export function useGenerateBulkARInvoices() {
         fixed_monthly_amount?: number;
       }>;
       settings: SchoolBusFinanceSettings;
+      onProgress?: (processed: number, total: number) => void;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Get batch number
+      // Get batch number for tracking
       const { data: batchData } = await supabase.rpc("generate_sbs_batch_number");
       const batchNumber = batchData || `SBS-BATCH-${format(new Date(), "yyyyMMdd")}-0001`;
 
       // Calculate totals using current_amount_due
       const totalAmount = students.reduce((sum, s) => sum + (s.current_amount_due || s.fixed_monthly_amount || 0), 0);
 
-      // Create batch record
+      // Create batch record for tracking
       const { data: batch, error: batchError } = await supabase
         .from("school_ar_invoice_batches")
         .insert({
@@ -326,167 +337,196 @@ export function useGenerateBulkARInvoices() {
       const branchCode = branchData?.branch_code || "SBS";
       const branchName = branchData?.branch_name || "School Bus";
 
-      // Create individual school invoices
-      const invoicePromises = students.map(async (student, index) => {
-        const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(index + 1).padStart(5, "0")}`;
-        const amount = student.current_amount_due || student.fixed_monthly_amount || 0;
+      // Only proceed with finance integration if auto-post is enabled and accounts are configured
+      if (!settings.auto_post_invoices || !settings.trade_receivable_account_id || !settings.sbs_collection_account_id) {
+        // Create basic school invoices without finance integration
+        const invoicePromises = students.map(async (student, index) => {
+          const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(index + 1).padStart(5, "0")}`;
+          const amount = student.current_amount_due || student.fixed_monthly_amount || 0;
 
-        const { data, error } = await supabase
-          .from("school_ar_invoices")
-          .insert({
-            batch_id: batch.id,
-            student_id: student.id,
-            invoice_number: invoiceNumber,
-            invoice_month: format(invoiceMonth, "yyyy-MM-dd"),
-            amount: amount,
-            status: "pending",
-            paid_amount: 0,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        return data;
-      });
-
-      await Promise.all(invoicePromises);
-
-      // If auto-post enabled, create journal entry AND link to Finance ERP AR
-      if (settings.auto_post_invoices && settings.trade_receivable_account_id && settings.sbs_collection_account_id) {
-        // Get or create a customer for this branch in Finance ERP
-        let customerId: string | null = null;
-        // Use effective company for consolidated GL (NCG Holding hierarchy)
-        const { data: existingCustomer } = await supabase
-          .from("customers")
-          .select("id")
-          .eq("company_id", effectiveCompanyId)
-          .eq("customer_code", `SBS-${branchCode}`)
-          .maybeSingle();
-
-        if (existingCustomer) {
-          customerId = existingCustomer.id;
-        } else {
-          const { data: newCustomer, error: customerError } = await supabase
-            .from("customers")
+          const { data, error } = await supabase
+            .from("school_ar_invoices")
             .insert({
-              company_id: effectiveCompanyId,
-              business_unit_code: businessUnitCode || 'SBO',
-              customer_code: `SBS-${branchCode}`,
-              customer_name: `School Bus Students - ${branchName}`,
-              is_active: true,
-            } as any)
-            .select()
-            .single();
-
-          if (!customerError && newCustomer) {
-            customerId = newCustomer.id;
-          }
-        }
-
-        // Create Finance ERP AR Invoice (aggregated for the batch) - use consolidated company
-        let arInvoiceId: string | null = null;
-        if (customerId) {
-          const { data: arInvoice, error: arError } = await supabase
-            .from("ar_invoices")
-            .insert({
-              company_id: effectiveCompanyId,
-              business_unit_code: businessUnitCode || 'SBO',
-              customer_id: customerId,
-              invoice_number: batchNumber,
-              invoice_date: format(new Date(), "yyyy-MM-dd"),
-              due_date: format(new Date(new Date().setDate(new Date().getDate() + 30)), "yyyy-MM-dd"),
-              total_amount: totalAmount,
-              balance: totalAmount,
+              batch_id: batch.id,
+              student_id: student.id,
+              invoice_number: invoiceNumber,
+              invoice_month: format(invoiceMonth, "yyyy-MM-dd"),
+              amount: amount,
+              status: "pending",
               paid_amount: 0,
-              status: "unpaid",
-              reference: `School Bus Batch: ${batchNumber}`,
-              notes: `Auto-generated from School Bus module for ${students.length} students`,
-            } as any)
+            })
             .select()
             .single();
 
-          if (!arError && arInvoice) {
-            arInvoiceId = arInvoice.id;
-          }
-        }
+          if (error) throw error;
+          return data;
+        });
 
-        const entryNumber = `SBS-JE-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        await Promise.all(invoicePromises);
+        return batch;
+      }
 
-        // Create journal entry - use CONSOLIDATED GL for NCG Holding hierarchy
-        const { data: journalEntry, error: jeError } = await supabase
-          .from("journal_entries")
+      // Get or create a customer for this branch in Finance ERP
+      let customerId: string | null = null;
+      const { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("company_id", effectiveCompanyId)
+        .eq("customer_code", `SBS-${branchCode}`)
+        .maybeSingle();
+
+      if (existingCustomer) {
+        customerId = existingCustomer.id;
+      } else {
+        const { data: newCustomer, error: customerError } = await supabase
+          .from("customers")
           .insert({
-            entry_number: entryNumber,
-            entry_date: format(new Date(), "yyyy-MM-dd"),
-            description: `School Bus AR - Batch ${batchNumber} - ${format(invoiceMonth, "MMM yyyy")}`,
-            reference: batchNumber,
-            total_debit: totalAmount,
-            total_credit: totalAmount,
-            status: "posted",
-            company_id: effectiveCompanyId, // Use NCG Holding for consolidated GL
-            business_unit_code: businessUnitCode || 'SBO', // Tag with business unit
-            business_unit_id: selectedCompanyId, // Original company for reference
-            posted_at: new Date().toISOString(),
-          })
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode || 'SBO',
+            customer_code: `SBS-${branchCode}`,
+            customer_name: `School Bus Students - ${branchName}`,
+            is_active: true,
+          } as any)
           .select()
           .single();
 
-        if (jeError) throw jeError;
-
-        // Link AR Invoice to Journal Entry
-        if (arInvoiceId) {
-          await supabase
-            .from("ar_invoices")
-            .update({ journal_entry_id: journalEntry.id })
-            .eq("id", arInvoiceId);
+        if (!customerError && newCustomer) {
+          customerId = newCustomer.id;
         }
-
-        // Create journal entry lines - use consolidated company ID
-        const { error: linesError } = await supabase
-          .from("journal_entry_lines")
-          .insert([
-            {
-              journal_entry_id: journalEntry.id,
-              account_id: settings.trade_receivable_account_id,
-              description: `School Bus AR - ${students.length} students`,
-              debit: totalAmount,
-              credit: 0,
-              company_id: effectiveCompanyId, // Use consolidated GL company
-            },
-            {
-              journal_entry_id: journalEntry.id,
-              account_id: settings.sbs_collection_account_id,
-              description: `School Bus Collection - ${format(invoiceMonth, "MMM yyyy")}`,
-              debit: 0,
-              credit: totalAmount,
-              company_id: effectiveCompanyId, // Use consolidated GL company
-            },
-          ]);
-
-        if (linesError) throw linesError;
-
-        // UPDATE COA BALANCES - Critical for proper accounting
-        await updateAccountBalancesFromJournalEntry(journalEntry.id);
-
-        // Update batch with journal entry ID
-        await supabase
-          .from("school_ar_invoice_batches")
-          .update({
-            status: "posted",
-            posted_at: new Date().toISOString(),
-            journal_entry_id: journalEntry.id,
-          })
-          .eq("id", batch.id);
-
-        // Update individual school invoices status and link to AR invoice
-        await supabase
-          .from("school_ar_invoices")
-          .update({ 
-            status: "posted",
-            ar_invoice_id: arInvoiceId,
-          })
-          .eq("batch_id", batch.id);
       }
+
+      // Process students in chunks for performance (50 at a time)
+      const CHUNK_SIZE = 50;
+      const chunks = chunkArray(students, CHUNK_SIZE);
+      let processedCount = 0;
+
+      for (const chunk of chunks) {
+        // Process each chunk in parallel
+        await Promise.all(chunk.map(async (student, indexInChunk) => {
+          const globalIndex = processedCount + indexInChunk + 1;
+          const amount = student.current_amount_due || student.fixed_monthly_amount || 0;
+          
+          // Generate unique identifiers for this student
+          const studentShortId = student.id.substring(0, 4).toUpperCase();
+          const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(globalIndex).padStart(5, "0")}`;
+          const entryNumber = `SBS-JE-${format(new Date(), "yyyyMMdd")}-${studentShortId}`;
+          
+          // 1. Create individual Journal Entry for this student
+          const { data: journalEntry, error: jeError } = await supabase
+            .from("journal_entries")
+            .insert({
+              entry_number: entryNumber,
+              entry_date: format(new Date(), "yyyy-MM-dd"),
+              description: `School Bus AR - ${student.student_name}`,
+              reference: invoiceNumber,
+              total_debit: amount,
+              total_credit: amount,
+              status: "posted",
+              company_id: effectiveCompanyId,
+              business_unit_code: businessUnitCode || 'SBO',
+              business_unit_id: selectedCompanyId,
+              posted_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (jeError) {
+            console.error(`JE error for ${student.student_name}:`, jeError);
+            throw jeError;
+          }
+
+          // 2. Create journal entry lines for this student
+          const { error: linesError } = await supabase
+            .from("journal_entry_lines")
+            .insert([
+              {
+                journal_entry_id: journalEntry.id,
+                account_id: settings.trade_receivable_account_id,
+                description: `AR - ${student.student_name} (${invoiceNumber})`,
+                debit: amount,
+                credit: 0,
+                company_id: effectiveCompanyId,
+              },
+              {
+                journal_entry_id: journalEntry.id,
+                account_id: settings.sbs_collection_account_id,
+                description: `Collection - ${student.student_name}`,
+                debit: 0,
+                credit: amount,
+                company_id: effectiveCompanyId,
+              },
+            ]);
+
+          if (linesError) {
+            console.error(`JE lines error for ${student.student_name}:`, linesError);
+            throw linesError;
+          }
+
+          // 3. Update COA balances for this entry
+          await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+          // 4. Create individual Finance ERP AR Invoice for this student
+          let arInvoiceId: string | null = null;
+          if (customerId) {
+            const { data: arInvoice, error: arError } = await supabase
+              .from("ar_invoices")
+              .insert({
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode || 'SBO',
+                customer_id: customerId,
+                invoice_number: invoiceNumber,
+                invoice_date: format(new Date(), "yyyy-MM-dd"),
+                due_date: format(new Date(new Date().setDate(new Date().getDate() + 30)), "yyyy-MM-dd"),
+                total_amount: amount,
+                balance: amount,
+                paid_amount: 0,
+                status: "unpaid",
+                reference: `${student.student_name} - ${format(invoiceMonth, "MMM yyyy")}`,
+                notes: `School Bus AR for ${student.student_name}`,
+                journal_entry_id: journalEntry.id,
+              } as any)
+              .select()
+              .single();
+
+            if (!arError && arInvoice) {
+              arInvoiceId = arInvoice.id;
+            }
+          }
+
+          // 5. Create school invoice linked to Finance AR invoice and Journal Entry
+          const { error: schoolInvError } = await supabase
+            .from("school_ar_invoices")
+            .insert({
+              batch_id: batch.id,
+              student_id: student.id,
+              invoice_number: invoiceNumber,
+              invoice_month: format(invoiceMonth, "yyyy-MM-dd"),
+              amount: amount,
+              status: "posted",
+              paid_amount: 0,
+              ar_invoice_id: arInvoiceId,
+              journal_entry_id: journalEntry.id,
+            });
+
+          if (schoolInvError) {
+            console.error(`School invoice error for ${student.student_name}:`, schoolInvError);
+            throw schoolInvError;
+          }
+        }));
+
+        // Update progress
+        processedCount += chunk.length;
+        onProgress?.(processedCount, students.length);
+      }
+
+      // Update batch status to posted
+      await supabase
+        .from("school_ar_invoice_batches")
+        .update({
+          status: "posted",
+          posted_at: new Date().toISOString(),
+        })
+        .eq("id", batch.id);
 
       return batch;
     },
@@ -498,7 +538,7 @@ export function useGenerateBulkARInvoices() {
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
-      toast.success("AR invoices generated successfully");
+      toast.success("Individual AR invoices generated successfully");
     },
     onError: (error) => {
       toast.error(`Failed to generate AR invoices: ${error.message}`);

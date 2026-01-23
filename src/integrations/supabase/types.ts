@@ -12333,6 +12333,7 @@ export type Database = {
           id: string
           invoice_month: string
           invoice_number: string
+          journal_entry_id: string | null
           paid_amount: number | null
           payment_id: string | null
           status: string | null
@@ -12346,6 +12347,7 @@ export type Database = {
           id?: string
           invoice_month: string
           invoice_number: string
+          journal_entry_id?: string | null
           paid_amount?: number | null
           payment_id?: string | null
           status?: string | null
@@ -12359,6 +12361,7 @@ export type Database = {
           id?: string
           invoice_month?: string
           invoice_number?: string
+          journal_entry_id?: string | null
           paid_amount?: number | null
           payment_id?: string | null
           status?: string | null
@@ -12377,6 +12380,13 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "school_ar_invoice_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_ar_invoices_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
           {
