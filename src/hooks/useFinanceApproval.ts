@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
+import { 
+  fetchSpecialHireFinanceSettings, 
+  postAdvancePaymentToGLStandalone,
+  postBalancePaymentToGLStandalone 
+} from '@/hooks/useSpecialHireFinance';
+import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 
 export const useFinanceApproval = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -55,6 +61,60 @@ export const useFinanceApproval = () => {
         .single();
 
       if (paymentError) throw paymentError;
+
+      // ========================
+      // GL POSTING INTEGRATION
+      // ========================
+      // Post to General Ledger when finance approves payment
+      try {
+        const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+        
+        if (settings) {
+          const paymentType = paymentData.payment_type || 'advance';
+          const isAdvance = paymentType === 'advance' || 
+                           (!paymentData.quotation.advance_paid || 
+                            paymentData.amount === paymentData.quotation.advance_paid);
+
+          if (isAdvance && settings.auto_post_advance_payments) {
+            // Post advance payment: DR Bank | CR Customer Advance (Liability)
+            const glResult = await postAdvancePaymentToGLStandalone({
+              quotationNo: paymentData.quotation.quotation_no,
+              customerName: paymentData.quotation.customer_name,
+              amount: paymentData.amount,
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
+            
+            if (glResult) {
+              console.log('Advance payment posted to GL:', glResult.entry_number);
+              toast.success('Advance payment posted to General Ledger');
+            }
+          } else if (!isAdvance && settings.auto_post_balance_payments) {
+            // Post balance payment: DR Bank | CR Trade Receivable
+            const glResult = await postBalancePaymentToGLStandalone({
+              quotationNo: paymentData.quotation.quotation_no,
+              customerName: paymentData.quotation.customer_name,
+              balanceAmount: paymentData.amount,
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
+            
+            if (glResult) {
+              console.log('Balance payment posted to GL:', glResult.entry_number);
+              toast.success('Balance payment posted to General Ledger');
+            }
+          }
+        } else {
+          console.log('Special Hire Finance settings not configured - skipping GL posting');
+        }
+      } catch (glError) {
+        console.error('GL posting failed (non-blocking):', glError);
+        // Don't fail the approval if GL posting fails - just log it
+        toast.warning('Payment approved but GL posting failed. Check Finance Settings.');
+      }
+      // ========================
+      // END GL POSTING
+      // ========================
 
       // Auto-add checked_by signature FIRST, before regenerating PDFs
       try {
