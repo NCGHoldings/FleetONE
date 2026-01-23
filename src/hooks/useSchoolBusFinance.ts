@@ -264,7 +264,11 @@ export function useStudentsForBulkAR(branchId: string | null) {
 // Generate bulk AR invoices
 export function useGenerateBulkARInvoices() {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isNCGHoldingOrSubCompany } = useCompany();
+  
+  // Use consolidated GL for NCG Holding hierarchy
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
 
   return useMutation({
     mutationFn: async ({
@@ -404,7 +408,7 @@ export function useGenerateBulkARInvoices() {
 
         const entryNumber = `SBS-JE-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-        // Create journal entry
+        // Create journal entry - use CONSOLIDATED GL for NCG Holding hierarchy
         const { data: journalEntry, error: jeError } = await supabase
           .from("journal_entries")
           .insert({
@@ -415,7 +419,9 @@ export function useGenerateBulkARInvoices() {
             total_debit: totalAmount,
             total_credit: totalAmount,
             status: "posted",
-            company_id: selectedCompanyId,
+            company_id: effectiveCompanyId, // Use NCG Holding for consolidated GL
+            business_unit_code: businessUnitCode || 'SBO', // Tag with business unit
+            business_unit_id: selectedCompanyId, // Original company for reference
             posted_at: new Date().toISOString(),
           })
           .select()
@@ -431,7 +437,7 @@ export function useGenerateBulkARInvoices() {
             .eq("id", arInvoiceId);
         }
 
-        // Create journal entry lines
+        // Create journal entry lines - use consolidated company ID
         const { error: linesError } = await supabase
           .from("journal_entry_lines")
           .insert([
@@ -441,7 +447,7 @@ export function useGenerateBulkARInvoices() {
               description: `School Bus AR - ${students.length} students`,
               debit: totalAmount,
               credit: 0,
-              company_id: selectedCompanyId,
+              company_id: effectiveCompanyId, // Use consolidated GL company
             },
             {
               journal_entry_id: journalEntry.id,
@@ -449,7 +455,7 @@ export function useGenerateBulkARInvoices() {
               description: `School Bus Collection - ${format(invoiceMonth, "MMM yyyy")}`,
               debit: 0,
               credit: totalAmount,
-              company_id: selectedCompanyId,
+              company_id: effectiveCompanyId, // Use consolidated GL company
             },
           ]);
 
@@ -499,7 +505,11 @@ export function useGenerateBulkARInvoices() {
 // Post payment to GL
 export function usePostPaymentToGL() {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  
+  // Use consolidated GL for NCG Holding hierarchy
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
 
   return useMutation({
     mutationFn: async ({
@@ -553,7 +563,7 @@ export function usePostPaymentToGL() {
         throw new Error("Bank/Cash GL account not configured for this branch. Please configure in School Bus Finance Settings.");
       }
 
-      // Create journal entry
+      // Create journal entry - use CONSOLIDATED GL for NCG Holding hierarchy
       const entryNumber = `SBS-PAY-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
       const { data: journalEntry, error: jeError } = await supabase
@@ -566,7 +576,9 @@ export function usePostPaymentToGL() {
           total_debit: amount,
           total_credit: amount,
           status: "posted",
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId, // Use NCG Holding for consolidated GL
+          business_unit_code: businessUnitCode || 'SBO', // Tag with business unit
+          business_unit_id: selectedCompanyId, // Original company for reference
           posted_at: new Date().toISOString(),
         })
         .select()
@@ -574,7 +586,7 @@ export function usePostPaymentToGL() {
 
       if (jeError) throw jeError;
 
-      // Create journal entry lines
+      // Create journal entry lines - use consolidated company ID
       const { error: linesError } = await supabase
         .from("journal_entry_lines")
         .insert([
@@ -584,7 +596,7 @@ export function usePostPaymentToGL() {
             description: `Payment received - ${paymentMethod}`,
             debit: amount,
             credit: 0,
-            company_id: selectedCompanyId,
+            company_id: effectiveCompanyId, // Use consolidated GL company
           },
           {
             journal_entry_id: journalEntry.id,
@@ -592,7 +604,7 @@ export function usePostPaymentToGL() {
             description: `School Bus Payment - ${studentName}`,
             debit: 0,
             credit: amount,
-            company_id: selectedCompanyId,
+            company_id: effectiveCompanyId, // Use consolidated GL company
           },
         ]);
 
