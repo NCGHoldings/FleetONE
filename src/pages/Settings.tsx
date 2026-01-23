@@ -133,6 +133,10 @@ export default function Settings() {
             <Bus className="h-3 w-3" />
             School Bus Finance
           </TabsTrigger>
+          <TabsTrigger value="special-hire-finance" className="flex items-center gap-1">
+            <Car className="h-3 w-3" />
+            Special Hire Finance
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="space-y-6 mt-6">
@@ -577,6 +581,10 @@ export default function Settings() {
 
         <TabsContent value="school-bus-finance" className="space-y-6 mt-6">
           <SchoolBusFinanceSettings />
+        </TabsContent>
+
+        <TabsContent value="special-hire-finance" className="space-y-6 mt-6">
+          <SpecialHireFinanceSettings />
         </TabsContent>
       </Tabs>
     </div>
