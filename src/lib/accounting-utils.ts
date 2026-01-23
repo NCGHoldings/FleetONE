@@ -117,10 +117,11 @@ export const getAgeingBucket = (dueDate: string): string => {
 
 // Validate journal entry balance
 export const validateJournalBalance = (
-  lines: Array<{ debit_amount?: number; credit_amount?: number }>
+  lines: Array<{ debit?: number; credit?: number; debit_amount?: number; credit_amount?: number }>
 ): { isValid: boolean; totalDebit: number; totalCredit: number; difference: number } => {
-  const totalDebit = lines.reduce((sum, line) => sum + (line.debit_amount || 0), 0);
-  const totalCredit = lines.reduce((sum, line) => sum + (line.credit_amount || 0), 0);
+  // Support both column name conventions for backward compatibility
+  const totalDebit = lines.reduce((sum, line) => sum + (line.debit ?? line.debit_amount ?? 0), 0);
+  const totalCredit = lines.reduce((sum, line) => sum + (line.credit ?? line.credit_amount ?? 0), 0);
   const difference = Math.abs(totalDebit - totalCredit);
   
   return {
