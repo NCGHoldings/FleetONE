@@ -161,6 +161,32 @@ export function useBranchFinanceSettings(branchId: string | null) {
   });
 }
 
+// Helper to convert empty strings to null for UUID fields
+function sanitizeSettingsForDB(settings: Record<string, any>): Record<string, any> {
+  const uuidFields = [
+    'trade_receivable_account_id',
+    'sbs_collection_account_id',
+    'bank_account_id',
+    'branch_gl_account_id',
+    'cash_account_id',
+    'expense_account_id',
+    'fuel_expense_account_id',
+    'maintenance_expense_account_id',
+    'salary_expense_account_id',
+    'expense_cash_account_id',
+    'branch_id',
+  ];
+  
+  const sanitized = { ...settings };
+  uuidFields.forEach(field => {
+    if (sanitized[field] === '' || sanitized[field] === undefined) {
+      sanitized[field] = null;
+    }
+  });
+  
+  return sanitized;
+}
+
 // Update or create finance settings
 export function useUpdateSchoolBusFinanceSettings() {
   const queryClient = useQueryClient();
@@ -168,18 +194,21 @@ export function useUpdateSchoolBusFinanceSettings() {
 
   return useMutation({
     mutationFn: async (settings: Partial<SchoolBusFinanceSettings> & { branch_id?: string | null }) => {
+      // Sanitize empty strings to null for UUID fields
+      const sanitizedSettings = sanitizeSettingsForDB(settings);
+      
       const { data: existing } = await supabase
         .from("school_bus_finance_settings")
         .select("id")
         .eq("company_id", selectedCompanyId)
-        .eq("branch_id", settings.branch_id ?? null)
+        .is("branch_id", sanitizedSettings.branch_id ?? null)
         .maybeSingle();
 
       if (existing) {
         const { data, error } = await supabase
           .from("school_bus_finance_settings")
           .update({
-            ...settings,
+            ...sanitizedSettings,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existing.id)
@@ -192,7 +221,7 @@ export function useUpdateSchoolBusFinanceSettings() {
         const { data, error } = await supabase
           .from("school_bus_finance_settings")
           .insert({
-            ...settings,
+            ...sanitizedSettings,
             company_id: selectedCompanyId,
           })
           .select()

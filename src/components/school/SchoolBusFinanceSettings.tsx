@@ -101,9 +101,17 @@ export function SchoolBusFinanceSettings() {
 
   const handleSaveDefaultSettings = async () => {
     try {
+      // Convert empty strings to null for UUID fields before saving
+      const sanitizedSettings = Object.fromEntries(
+        Object.entries(defaultSettings).map(([key, value]) => [
+          key,
+          value === '' ? null : value
+        ])
+      );
+      
       await updateSettings.mutateAsync({
         branch_id: null,
-        ...defaultSettings,
+        ...sanitizedSettings,
       });
     } catch (error) {
       // Error handled by mutation
@@ -112,10 +120,20 @@ export function SchoolBusFinanceSettings() {
 
   const handleSaveBranchSettings = async (branchId: string) => {
     try {
+      const branchGlAccountId = branchSettings[branchId]?.branch_gl_account_id;
+      
+      // Convert empty strings to null for UUID fields
+      const sanitizedDefaults = Object.fromEntries(
+        Object.entries(defaultSettings).map(([key, value]) => [
+          key,
+          value === '' ? null : value
+        ])
+      );
+      
       await updateSettings.mutateAsync({
         branch_id: branchId,
-        branch_gl_account_id: branchSettings[branchId]?.branch_gl_account_id || null,
-        ...defaultSettings, // Inherit default settings
+        branch_gl_account_id: branchGlAccountId === '' ? null : branchGlAccountId,
+        ...sanitizedDefaults, // Inherit sanitized default settings
       });
     } catch (error) {
       // Error handled by mutation
