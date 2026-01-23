@@ -67,7 +67,15 @@ export const useFinanceApproval = () => {
       // ========================
       // Post to General Ledger when finance approves payment
       try {
+        console.log('[SPH GL] Fetching finance settings for company:', NCG_HOLDING_ID);
         const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+        console.log('[SPH GL] Settings loaded:', settings ? {
+          auto_post_advance: settings.auto_post_advance_payments,
+          auto_post_balance: settings.auto_post_balance_payments,
+          bank_account: settings.default_bank_account_id,
+          advance_account: settings.customer_advance_account_id,
+          receivable_account: settings.trade_receivable_account_id,
+        } : 'Not found');
         
         if (settings) {
           const paymentType = paymentData.payment_type || 'advance';
@@ -75,7 +83,15 @@ export const useFinanceApproval = () => {
                            (!paymentData.quotation.advance_paid || 
                             paymentData.amount === paymentData.quotation.advance_paid);
 
+          console.log('[SPH GL] Payment analysis:', {
+            paymentType,
+            isAdvance,
+            amount: paymentData.amount,
+            advancePaid: paymentData.quotation.advance_paid,
+          });
+
           if (isAdvance && settings.auto_post_advance_payments) {
+            console.log('[SPH GL] Posting advance payment to GL...');
             // Post advance payment: DR Bank | CR Customer Advance (Liability)
             const glResult = await postAdvancePaymentToGLStandalone({
               quotationNo: paymentData.quotation.quotation_no,
@@ -86,10 +102,14 @@ export const useFinanceApproval = () => {
             });
             
             if (glResult) {
-              console.log('Advance payment posted to GL:', glResult.entry_number);
-              toast.success('Advance payment posted to General Ledger');
+              console.log('[SPH GL] ✅ Advance payment posted:', glResult.entry_number);
+              toast.success(`GL Entry created: ${glResult.entry_number}`);
+            } else {
+              console.warn('[SPH GL] ⚠️ GL posting returned null - check account configuration');
+              toast.warning('GL accounts may not be fully configured');
             }
           } else if (!isAdvance && settings.auto_post_balance_payments) {
+            console.log('[SPH GL] Posting balance payment to GL...');
             // Post balance payment: DR Bank | CR Trade Receivable
             const glResult = await postBalancePaymentToGLStandalone({
               quotationNo: paymentData.quotation.quotation_no,
@@ -100,17 +120,23 @@ export const useFinanceApproval = () => {
             });
             
             if (glResult) {
-              console.log('Balance payment posted to GL:', glResult.entry_number);
-              toast.success('Balance payment posted to General Ledger');
+              console.log('[SPH GL] ✅ Balance payment posted:', glResult.entry_number);
+              toast.success(`GL Entry created: ${glResult.entry_number}`);
+            } else {
+              console.warn('[SPH GL] ⚠️ GL posting returned null - check account configuration');
+              toast.warning('GL accounts may not be fully configured');
             }
+          } else {
+            console.log('[SPH GL] Skipping GL posting - auto-post disabled or conditions not met');
           }
         } else {
-          console.log('Special Hire Finance settings not configured - skipping GL posting');
+          console.warn('[SPH GL] ⚠️ Special Hire Finance settings not configured for company:', NCG_HOLDING_ID);
+          toast.warning('Special Hire Finance settings not configured. Go to Settings > Special Hire Finance.');
         }
-      } catch (glError) {
-        console.error('GL posting failed (non-blocking):', glError);
+      } catch (glError: any) {
+        console.error('[SPH GL] ❌ GL posting failed:', glError?.message || glError);
         // Don't fail the approval if GL posting fails - just log it
-        toast.warning('Payment approved but GL posting failed. Check Finance Settings.');
+        toast.warning(`Payment approved but GL posting failed: ${glError?.message || 'Unknown error'}`);
       }
       // ========================
       // END GL POSTING
