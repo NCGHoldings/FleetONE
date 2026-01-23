@@ -370,10 +370,11 @@ export function useGenerateBulkARInvoices() {
             .from("customers")
             .insert({
               company_id: effectiveCompanyId,
+              business_unit_code: businessUnitCode || 'SBO',
               customer_code: `SBS-${branchCode}`,
               customer_name: `School Bus Students - ${branchName}`,
               is_active: true,
-            })
+            } as any)
             .select()
             .single();
 
@@ -389,6 +390,7 @@ export function useGenerateBulkARInvoices() {
             .from("ar_invoices")
             .insert({
               company_id: effectiveCompanyId,
+              business_unit_code: businessUnitCode || 'SBO',
               customer_id: customerId,
               invoice_number: batchNumber,
               invoice_date: format(new Date(), "yyyy-MM-dd"),
@@ -399,7 +401,7 @@ export function useGenerateBulkARInvoices() {
               status: "unpaid",
               reference: `School Bus Batch: ${batchNumber}`,
               notes: `Auto-generated from School Bus module for ${students.length} students`,
-            })
+            } as any)
             .select()
             .single();
 
