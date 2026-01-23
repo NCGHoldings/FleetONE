@@ -73,8 +73,7 @@ export const DrillDownModal = ({
             description,
             status,
             business_unit_code,
-            reference,
-            source_type
+            reference
           )
         `
         )
@@ -161,14 +160,14 @@ export const DrillDownModal = ({
       ? transactionsWithBalance.filter((t) => selectedRows.has(t.id))
       : transactionsWithBalance;
 
-    const headers = ["Date", "Entry #", "Business Unit", "Source", "Description", "Debit", "Credit", "Balance"];
+    const headers = ["Date", "Entry #", "Business Unit", "Reference", "Description", "Debit", "Credit", "Balance"];
     const rows = dataToExport.map((t) => {
       const entry = t.journal_entries as any;
       return [
         format(new Date(entry?.entry_date || t.created_at), "yyyy-MM-dd"),
         entry?.entry_number || "",
         entry?.business_unit_code || "",
-        entry?.source_type || "",
+        entry?.reference || "",
         (t.description || entry?.description || "").replace(/,/g, ";"),
         t.debit || 0,
         t.credit || 0,
@@ -286,7 +285,7 @@ export const DrillDownModal = ({
                   <TableHead>Date</TableHead>
                   <TableHead>Entry #</TableHead>
                   <TableHead>BU</TableHead>
-                  <TableHead>Source</TableHead>
+                  <TableHead>Reference</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Debit</TableHead>
                   <TableHead className="text-right">Credit</TableHead>
@@ -321,7 +320,7 @@ export const DrillDownModal = ({
                         )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {entry?.source_type || "-"}
+                        {entry?.reference || "-"}
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate">
                         {t.description || entry?.description}
