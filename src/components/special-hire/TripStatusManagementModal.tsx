@@ -6,7 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, DollarSign } from 'lucide-react';
+import { AlertTriangle, DollarSign, BookOpen } from 'lucide-react';
+import { toast } from 'sonner';
+import { 
+  fetchSpecialHireFinanceSettings, 
+  postRefundToGLStandalone 
+} from '@/hooks/useSpecialHireFinance';
+import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 
 export interface TripStatusData {
   status: string;
@@ -57,6 +63,7 @@ export function TripStatusManagementModal({
   const [reason, setReason] = useState<string>('');
   const [refundAmount, setRefundAmount] = useState<number>(0);
   const [refundStatus, setRefundStatus] = useState<string>('pending');
+  const [isPostingGL, setIsPostingGL] = useState(false);
 
   const requiresReason = selectedStatus === 'cancelled' || selectedStatus === 'on_hold' || 
                         selectedStatus === 'no_bus_allocated' || selectedStatus === 'other';
@@ -68,6 +75,7 @@ export function TripStatusManagementModal({
   const handleSubmit = async () => {
     if (!selectedStatus) return;
     if (requiresReason && !reason.trim()) return;
+    if (!trip) return;
     
     const statusData: TripStatusData = {
       status: selectedStatus,
@@ -78,6 +86,43 @@ export function TripStatusManagementModal({
       statusData.refundAmount = refundAmount;
       statusData.refundStatus = refundStatus;
     }
+
+    // ========================
+    // GL POSTING FOR REFUNDS
+    // ========================
+    // If refund is being processed, post to GL
+    if (isCancellation && refundAmount > 0 && (refundStatus === 'processed' || refundStatus === 'completed')) {
+      try {
+        setIsPostingGL(true);
+        const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+        
+        if (settings) {
+          const glResult = await postRefundToGLStandalone({
+            quotationNo: trip.quotation.quotation_no,
+            customerName: trip.quotation.customer_name,
+            refundAmount: refundAmount,
+            reason: reason.trim(),
+            settings,
+            effectiveCompanyId: NCG_HOLDING_ID,
+          });
+          
+          if (glResult) {
+            console.log('Refund posted to GL:', glResult.entry_number);
+            toast.success('Refund posted to General Ledger');
+          }
+        } else {
+          console.log('Special Hire Finance settings not configured - skipping GL posting');
+        }
+      } catch (glError) {
+        console.error('GL posting for refund failed (non-blocking):', glError);
+        toast.warning('Refund processed but GL posting failed. Check Finance Settings.');
+      } finally {
+        setIsPostingGL(false);
+      }
+    }
+    // ========================
+    // END GL POSTING
+    // ========================
 
     await onStatusChange(statusData);
     
@@ -205,6 +250,18 @@ export function TripStatusManagementModal({
                     </div>
                   </div>
                 )}
+
+                {refundAmount > 0 && (refundStatus === 'processed' || refundStatus === 'completed') && (
+                  <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                    <BookOpen className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-medium text-blue-800">GL Posting</div>
+                      <div className="text-blue-700">
+                        Refund will be posted to General Ledger (DR Customer Advance / CR Bank)
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -213,7 +270,7 @@ export function TripStatusManagementModal({
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={loading}
+              disabled={loading || isPostingGL}
             >
               Cancel
             </Button>
@@ -221,12 +278,13 @@ export function TripStatusManagementModal({
               onClick={handleSubmit}
               disabled={
                 loading || 
+                isPostingGL ||
                 !selectedStatus || 
                 (requiresReason && !reason.trim()) ||
                 (isCancellation && hasAdvancePayment && refundAmount > maxRefundAmount)
               }
             >
-              {loading ? 'Updating...' : 'Update Status'}
+              {loading || isPostingGL ? 'Updating...' : 'Update Status'}
             </Button>
           </div>
         </div>

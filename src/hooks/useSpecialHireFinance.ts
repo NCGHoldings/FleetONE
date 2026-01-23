@@ -1,8 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCompany } from "@/contexts/CompanyContext";
+import { useCompany, NCG_HOLDING_ID } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import { format } from "date-fns";
+
+// Standalone function to fetch Special Hire finance settings (for use outside React hooks)
+export async function fetchSpecialHireFinanceSettings(companyId?: string): Promise<any> {
+  // Default to NCG Holding if no company ID provided
+  const effectiveCompanyId = companyId || NCG_HOLDING_ID;
+  
+  const { data, error } = await supabase
+    .from("special_hire_finance_settings")
+    .select("*")
+    .eq("company_id", effectiveCompanyId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching Special Hire finance settings:", error);
+    return null;
+  }
+  return data;
+}
 
 // Helper function to update COA balances after journal entry creation
 // This follows proper double-entry bookkeeping rules:
@@ -55,6 +73,385 @@ async function updateAccountBalancesFromJournalEntry(journalEntryId: string) {
       console.error("Error updating account balance:", updateError);
     }
   }
+}
+
+// Standalone function to post advance payment to GL (for use outside React hooks)
+export async function postAdvancePaymentToGLStandalone({
+  quotationNo,
+  customerName,
+  amount,
+  settings,
+  effectiveCompanyId,
+}: {
+  quotationNo: string;
+  customerName: string;
+  amount: number;
+  settings: any;
+  effectiveCompanyId: string;
+}) {
+  if (!settings?.default_bank_account_id || !settings?.customer_advance_account_id) {
+    console.warn("GL accounts not configured for Special Hire advance payments");
+    return null;
+  }
+
+  const entryNumber = `SPH-ADV-${quotationNo}-${Date.now().toString(36).toUpperCase()}`;
+
+  // Create journal entry
+  const { data: journalEntry, error: jeError } = await supabase
+    .from("journal_entries")
+    .insert({
+      entry_number: entryNumber,
+      entry_date: format(new Date(), "yyyy-MM-dd"),
+      description: `Advance payment received - ${customerName} - ${quotationNo}`,
+      reference: quotationNo,
+      total_debit: amount,
+      total_credit: amount,
+      status: "posted",
+      company_id: effectiveCompanyId,
+      business_unit_code: "SPH",
+      posted_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (jeError) throw jeError;
+
+  // Create journal entry lines
+  // DR Bank/Cash (Asset increases with Debit)
+  // CR Customer Advance Receipt (Liability increases with Credit)
+  const { error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .insert([
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.default_bank_account_id,
+        description: `Advance received - ${customerName} (${quotationNo})`,
+        debit: amount,
+        credit: 0,
+        company_id: effectiveCompanyId,
+      },
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.customer_advance_account_id,
+        description: `Customer advance - ${customerName}`,
+        debit: 0,
+        credit: amount,
+        company_id: effectiveCompanyId,
+      },
+    ]);
+
+  if (linesError) throw linesError;
+
+  // Update COA balances
+  await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+  return journalEntry;
+}
+
+// Standalone function to post balance payment to GL (for use outside React hooks)
+export async function postBalancePaymentToGLStandalone({
+  quotationNo,
+  invoiceNo,
+  customerName,
+  balanceAmount,
+  settings,
+  effectiveCompanyId,
+}: {
+  quotationNo: string;
+  invoiceNo?: string;
+  customerName: string;
+  balanceAmount: number;
+  settings: any;
+  effectiveCompanyId: string;
+}) {
+  if (!settings?.default_bank_account_id || !settings?.trade_receivable_account_id) {
+    console.warn("GL accounts not configured for Special Hire balance payments");
+    return null;
+  }
+
+  const entryNumber = `SPH-BAL-${quotationNo}-${Date.now().toString(36).toUpperCase()}`;
+
+  // Create journal entry
+  const { data: journalEntry, error: jeError } = await supabase
+    .from("journal_entries")
+    .insert({
+      entry_number: entryNumber,
+      entry_date: format(new Date(), "yyyy-MM-dd"),
+      description: `Balance payment received - ${customerName} - ${quotationNo}`,
+      reference: invoiceNo || quotationNo,
+      total_debit: balanceAmount,
+      total_credit: balanceAmount,
+      status: "posted",
+      company_id: effectiveCompanyId,
+      business_unit_code: "SPH",
+      posted_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (jeError) throw jeError;
+
+  // Create journal entry lines
+  // DR Bank/Cash (Asset increases with Debit)
+  // CR Trade Receivable (Asset decreases with Credit)
+  const { error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .insert([
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.default_bank_account_id,
+        description: `Balance payment - ${customerName} (${quotationNo})`,
+        debit: balanceAmount,
+        credit: 0,
+        company_id: effectiveCompanyId,
+      },
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.trade_receivable_account_id,
+        description: `Clear receivable - ${customerName}`,
+        debit: 0,
+        credit: balanceAmount,
+        company_id: effectiveCompanyId,
+      },
+    ]);
+
+  if (linesError) throw linesError;
+
+  // Update COA balances
+  await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+  return journalEntry;
+}
+
+// Standalone function to post refund to GL
+export async function postRefundToGLStandalone({
+  quotationNo,
+  customerName,
+  refundAmount,
+  reason,
+  settings,
+  effectiveCompanyId,
+}: {
+  quotationNo: string;
+  customerName: string;
+  refundAmount: number;
+  reason?: string;
+  settings: any;
+  effectiveCompanyId: string;
+}) {
+  if (!settings?.customer_advance_account_id || !settings?.default_bank_account_id) {
+    console.warn("GL accounts not configured for Special Hire refunds");
+    return null;
+  }
+
+  const entryNumber = `SPH-REF-${quotationNo}-${Date.now().toString(36).toUpperCase()}`;
+
+  // Create journal entry
+  const { data: journalEntry, error: jeError } = await supabase
+    .from("journal_entries")
+    .insert({
+      entry_number: entryNumber,
+      entry_date: format(new Date(), "yyyy-MM-dd"),
+      description: `Refund issued - ${customerName} - ${quotationNo}${reason ? ` (${reason})` : ''}`,
+      reference: quotationNo,
+      total_debit: refundAmount,
+      total_credit: refundAmount,
+      status: "posted",
+      company_id: effectiveCompanyId,
+      business_unit_code: "SPH",
+      posted_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (jeError) throw jeError;
+
+  // Create journal entry lines
+  // DR Customer Advance (Liability decreases with Debit)
+  // CR Bank/Cash (Asset decreases with Credit)
+  const { error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .insert([
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.customer_advance_account_id,
+        description: `Refund advance - ${customerName} (${quotationNo})`,
+        debit: refundAmount,
+        credit: 0,
+        company_id: effectiveCompanyId,
+      },
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.default_bank_account_id,
+        description: `Refund payment - ${customerName}`,
+        debit: 0,
+        credit: refundAmount,
+        company_id: effectiveCompanyId,
+      },
+    ]);
+
+  if (linesError) throw linesError;
+
+  // Update COA balances
+  await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+  return journalEntry;
+}
+
+// Standalone function to post invoice to GL (Revenue recognition)
+export async function postInvoiceToGLStandalone({
+  invoiceNo,
+  quotationNo,
+  customerName,
+  totalAmount,
+  isInternal,
+  settings,
+  effectiveCompanyId,
+}: {
+  invoiceNo: string;
+  quotationNo: string;
+  customerName: string;
+  totalAmount: number;
+  isInternal?: boolean;
+  settings: any;
+  effectiveCompanyId: string;
+}) {
+  const revenueAccountId = isInternal 
+    ? settings?.revenue_internal_account_id 
+    : settings?.revenue_external_account_id;
+
+  if (!settings?.trade_receivable_account_id || !revenueAccountId) {
+    console.warn("GL accounts not configured for Special Hire invoices");
+    return null;
+  }
+
+  const entryNumber = `SPH-INV-${invoiceNo}-${Date.now().toString(36).toUpperCase()}`;
+
+  // Create journal entry
+  const { data: journalEntry, error: jeError } = await supabase
+    .from("journal_entries")
+    .insert({
+      entry_number: entryNumber,
+      entry_date: format(new Date(), "yyyy-MM-dd"),
+      description: `Special hire invoice - ${customerName} - ${invoiceNo}`,
+      reference: quotationNo,
+      total_debit: totalAmount,
+      total_credit: totalAmount,
+      status: "posted",
+      company_id: effectiveCompanyId,
+      business_unit_code: "SPH",
+      posted_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (jeError) throw jeError;
+
+  // Create journal entry lines
+  // DR Trade Receivable (Asset increases with Debit)
+  // CR Special Hire Revenue (Revenue increases with Credit)
+  const { error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .insert([
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.trade_receivable_account_id,
+        description: `Receivable - ${customerName} (${invoiceNo})`,
+        debit: totalAmount,
+        credit: 0,
+        company_id: effectiveCompanyId,
+      },
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: revenueAccountId,
+        description: `Revenue - Special Hire ${invoiceNo}`,
+        debit: 0,
+        credit: totalAmount,
+        company_id: effectiveCompanyId,
+      },
+    ]);
+
+  if (linesError) throw linesError;
+
+  // Update COA balances
+  await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+  return journalEntry;
+}
+
+// Standalone function to apply advance to invoice
+export async function applyAdvanceToInvoiceStandalone({
+  invoiceNo,
+  quotationNo,
+  customerName,
+  advanceAmount,
+  settings,
+  effectiveCompanyId,
+}: {
+  invoiceNo: string;
+  quotationNo: string;
+  customerName: string;
+  advanceAmount: number;
+  settings: any;
+  effectiveCompanyId: string;
+}) {
+  if (!settings?.customer_advance_account_id || !settings?.trade_receivable_account_id) {
+    console.warn("GL accounts not configured for Special Hire advance application");
+    return null;
+  }
+
+  const entryNumber = `SPH-ADV-APPLY-${invoiceNo}-${Date.now().toString(36).toUpperCase()}`;
+
+  // Create journal entry
+  const { data: journalEntry, error: jeError } = await supabase
+    .from("journal_entries")
+    .insert({
+      entry_number: entryNumber,
+      entry_date: format(new Date(), "yyyy-MM-dd"),
+      description: `Apply advance to invoice - ${customerName} - ${invoiceNo}`,
+      reference: quotationNo,
+      total_debit: advanceAmount,
+      total_credit: advanceAmount,
+      status: "posted",
+      company_id: effectiveCompanyId,
+      business_unit_code: "SPH",
+      posted_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (jeError) throw jeError;
+
+  // Create journal entry lines
+  // DR Customer Advance (Liability decreases with Debit)
+  // CR Trade Receivable (Asset decreases with Credit)
+  const { error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .insert([
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.customer_advance_account_id,
+        description: `Apply advance - ${customerName} (${invoiceNo})`,
+        debit: advanceAmount,
+        credit: 0,
+        company_id: effectiveCompanyId,
+      },
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.trade_receivable_account_id,
+        description: `Reduce receivable - ${customerName}`,
+        debit: 0,
+        credit: advanceAmount,
+        company_id: effectiveCompanyId,
+      },
+    ]);
+
+  if (linesError) throw linesError;
+
+  // Update COA balances
+  await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+  return journalEntry;
 }
 
 export interface SpecialHireFinanceSettings {
