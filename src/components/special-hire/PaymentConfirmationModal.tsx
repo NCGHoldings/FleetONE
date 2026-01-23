@@ -196,22 +196,37 @@ export const PaymentConfirmationModal = ({
   };
 
   const handleConfirm = () => {
+    // Validate amount
+    if (amount <= 0) {
+      toast.error('Please enter a valid payment amount');
+      return;
+    }
+
+    // Validate required fields for all payments (to ensure document quality)
+    if (!method) {
+      toast.error('Please select a payment method');
+      return;
+    }
+
     // Validate required fields for balance payment with specific messages
     if (paymentType === 'balance') {
       if (!paymentProofUrl) {
-        toast.error('Please upload payment proof for balance payment');
+        toast.error('Payment proof is required for balance payment');
         return;
       }
       if (!driverName) {
-        toast.error('Please enter driver name for trip assignment');
+        toast.error('Driver name is required for trip assignment');
         return;
       }
       if (!busNo) {
-        toast.error('Please enter bus number for trip assignment');
+        toast.error('Bus number is required for trip assignment');
         return;
       }
     }
 
+    // All validations passed - document will be auto-generated
+    console.log('[SPH Payment] Confirming payment - document will be auto-generated');
+    
     onConfirm({
       amount,
       paymentType,
@@ -530,12 +545,17 @@ export const PaymentConfirmationModal = ({
             </div>
           </div>
 
-          {/* Receipt Preview Alert */}
+          {/* Finance Workflow Alert */}
           <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
-            <Eye className="h-4 w-4 text-blue-600" />
+            <FileCheck className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800 dark:text-blue-300">
-              <strong>Preview:</strong> A receipt will be generated with the above details. 
-              You can edit and preview the document after confirming payment in the Document Flow.
+              <strong>What happens next:</strong>
+              <ul className="list-disc list-inside mt-1 space-y-1 text-sm">
+                <li>A Sales Receipt will be auto-generated as a draft document</li>
+                <li>Payment will be sent to Finance team for approval</li>
+                <li>Upon approval: Customer & AR Invoice created in Finance module</li>
+                <li>GL entries will be posted automatically (DR Bank / CR Advance)</li>
+              </ul>
             </AlertDescription>
           </Alert>
 

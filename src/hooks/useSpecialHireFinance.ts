@@ -1135,3 +1135,368 @@ export function usePostDiscountToGL() {
     },
   });
 }
+
+// =============================================
+// AR INVOICE & CUSTOMER INTEGRATION FUNCTIONS
+// =============================================
+
+// Standalone function to create or get SPH customer
+export async function createOrGetSPHCustomer({
+  customerName,
+  customerPhone,
+  customerEmail,
+  companyId,
+}: {
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  companyId: string;
+}): Promise<string | null> {
+  try {
+    console.log('[SPH AR] Creating/getting customer:', customerName);
+    
+    const { data, error } = await supabase.rpc('create_or_get_sph_customer', {
+      p_customer_name: customerName,
+      p_customer_phone: customerPhone || null,
+      p_customer_email: customerEmail || null,
+      p_company_id: companyId,
+    });
+
+    if (error) {
+      console.error('[SPH AR] Error creating/getting customer:', error);
+      throw error;
+    }
+
+    console.log('[SPH AR] ✅ Customer ID:', data);
+    return data;
+  } catch (error) {
+    console.error('[SPH AR] Failed to create/get customer:', error);
+    return null;
+  }
+}
+
+// Standalone function to create AR Invoice for SPH
+export async function createSPHARInvoice({
+  quotationId,
+  quotationNo,
+  customerId,
+  customerName,
+  totalAmount,
+  advanceAmount,
+  dueDate,
+  companyId,
+  journalEntryId,
+}: {
+  quotationId: string;
+  quotationNo: string;
+  customerId: string;
+  customerName: string;
+  totalAmount: number;
+  advanceAmount: number;
+  dueDate: string;
+  companyId: string;
+  journalEntryId?: string;
+}): Promise<{ invoiceId: string; invoiceNumber: string } | null> {
+  try {
+    console.log('[SPH AR] Creating AR Invoice for quotation:', quotationNo);
+    
+    // Generate invoice number using the database function
+    const { data: invoiceNumber, error: numError } = await supabase.rpc(
+      'generate_sph_ar_invoice_number',
+      { p_company_id: companyId }
+    );
+
+    if (numError) {
+      console.error('[SPH AR] Error generating invoice number:', numError);
+      throw numError;
+    }
+
+    const balance = totalAmount - advanceAmount;
+    const status = balance <= 0 ? 'paid' : (advanceAmount > 0 ? 'partial' : 'unpaid');
+
+    // Create AR Invoice
+    const { data: invoice, error: invoiceError } = await supabase
+      .from('ar_invoices')
+      .insert({
+        invoice_number: invoiceNumber,
+        invoice_date: format(new Date(), 'yyyy-MM-dd'),
+        due_date: dueDate,
+        customer_id: customerId,
+        total_amount: totalAmount,
+        paid_amount: advanceAmount,
+        balance: balance,
+        status: status,
+        company_id: companyId,
+        business_unit_code: 'SPH',
+        reference: quotationNo,
+        notes: `Special Hire - ${customerName}`,
+        journal_entry_id: journalEntryId || null,
+      })
+      .select()
+      .single();
+
+    if (invoiceError) {
+      console.error('[SPH AR] Error creating AR Invoice:', invoiceError);
+      throw invoiceError;
+    }
+
+    // Link AR Invoice to quotation
+    const { error: linkError } = await supabase
+      .from('special_hire_quotations')
+      .update({ 
+        ar_invoice_id: invoice.id,
+        finance_customer_id: customerId 
+      })
+      .eq('id', quotationId);
+
+    if (linkError) {
+      console.error('[SPH AR] Error linking AR Invoice to quotation:', linkError);
+    }
+
+    console.log('[SPH AR] ✅ AR Invoice created:', invoiceNumber);
+    return { invoiceId: invoice.id, invoiceNumber };
+  } catch (error) {
+    console.error('[SPH AR] Failed to create AR Invoice:', error);
+    return null;
+  }
+}
+
+// Standalone function to update AR Invoice on payment
+export async function updateSPHARInvoiceOnPayment({
+  arInvoiceId,
+  paymentAmount,
+  paymentId,
+  journalEntryId,
+}: {
+  arInvoiceId: string;
+  paymentAmount: number;
+  paymentId: string;
+  journalEntryId?: string;
+}): Promise<boolean> {
+  try {
+    console.log('[SPH AR] Updating AR Invoice on payment:', arInvoiceId);
+    
+    // Get current invoice
+    const { data: invoice, error: fetchError } = await supabase
+      .from('ar_invoices')
+      .select('*')
+      .eq('id', arInvoiceId)
+      .single();
+
+    if (fetchError || !invoice) {
+      console.error('[SPH AR] Error fetching AR Invoice:', fetchError);
+      return false;
+    }
+
+    const newPaidAmount = (invoice.paid_amount || 0) + paymentAmount;
+    const newBalance = invoice.total_amount - newPaidAmount;
+    const newStatus = newBalance <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partial' : 'unpaid');
+
+    // Update AR Invoice
+    const { error: updateError } = await supabase
+      .from('ar_invoices')
+      .update({
+        paid_amount: newPaidAmount,
+        balance: newBalance,
+        status: newStatus,
+        journal_entry_id: journalEntryId || invoice.journal_entry_id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', arInvoiceId);
+
+    if (updateError) {
+      console.error('[SPH AR] Error updating AR Invoice:', updateError);
+      return false;
+    }
+
+    // Link payment to AR Invoice
+    const { error: linkError } = await supabase
+      .from('special_hire_payments')
+      .update({ 
+        ar_invoice_id: arInvoiceId,
+        journal_entry_id: journalEntryId || null,
+      })
+      .eq('id', paymentId);
+
+    if (linkError) {
+      console.error('[SPH AR] Error linking payment to AR Invoice:', linkError);
+    }
+
+    console.log('[SPH AR] ✅ AR Invoice updated. New balance:', newBalance);
+    return true;
+  } catch (error) {
+    console.error('[SPH AR] Failed to update AR Invoice:', error);
+    return false;
+  }
+}
+
+// Standalone function to create AR Receipt for SPH
+export async function createSPHARReceipt({
+  customerId,
+  arInvoiceId,
+  paymentAmount,
+  paymentMethod,
+  reference,
+  paymentId,
+  companyId,
+  journalEntryId,
+}: {
+  customerId: string;
+  arInvoiceId: string;
+  paymentAmount: number;
+  paymentMethod: string;
+  reference?: string;
+  paymentId: string;
+  companyId: string;
+  journalEntryId?: string;
+}): Promise<{ receiptId: string; receiptNumber: string } | null> {
+  try {
+    console.log('[SPH AR] Creating AR Receipt for payment:', paymentId);
+    
+    // Generate receipt number using the database function
+    const { data: receiptNumber, error: numError } = await supabase.rpc(
+      'generate_sph_ar_receipt_number',
+      { p_company_id: companyId }
+    );
+
+    if (numError) {
+      console.error('[SPH AR] Error generating receipt number:', numError);
+      throw numError;
+    }
+
+    // Create AR Receipt
+    const { data: receipt, error: receiptError } = await supabase
+      .from('ar_receipts')
+      .insert({
+        receipt_number: receiptNumber,
+        receipt_date: format(new Date(), 'yyyy-MM-dd'),
+        customer_id: customerId,
+        amount: paymentAmount,
+        payment_method: paymentMethod,
+        reference: reference || null,
+        status: 'posted',
+        company_id: companyId,
+        business_unit_code: 'SPH',
+        journal_entry_id: journalEntryId || null,
+      })
+      .select()
+      .single();
+
+    if (receiptError) {
+      console.error('[SPH AR] Error creating AR Receipt:', receiptError);
+      throw receiptError;
+    }
+
+    // Create receipt allocation
+    const { error: allocError } = await supabase
+      .from('ar_receipt_allocations')
+      .insert({
+        receipt_id: receipt.id,
+        invoice_id: arInvoiceId,
+        allocated_amount: paymentAmount,
+        company_id: companyId,
+      });
+
+    if (allocError) {
+      console.error('[SPH AR] Error creating receipt allocation:', allocError);
+    }
+
+    // Link receipt to payment
+    const { error: linkError } = await supabase
+      .from('special_hire_payments')
+      .update({ ar_receipt_id: receipt.id })
+      .eq('id', paymentId);
+
+    if (linkError) {
+      console.error('[SPH AR] Error linking receipt to payment:', linkError);
+    }
+
+    console.log('[SPH AR] ✅ AR Receipt created:', receiptNumber);
+    return { receiptId: receipt.id, receiptNumber };
+  } catch (error) {
+    console.error('[SPH AR] Failed to create AR Receipt:', error);
+    return null;
+  }
+}
+
+// Standalone function to update AR Invoice with full invoice amount (when invoice is sent)
+export async function updateSPHARInvoiceOnInvoiceSent({
+  arInvoiceId,
+  quotationId,
+  totalAmount,
+  journalEntryId,
+}: {
+  arInvoiceId?: string;
+  quotationId: string;
+  totalAmount: number;
+  journalEntryId?: string;
+}): Promise<boolean> {
+  try {
+    // If no AR Invoice exists, we need to create one first
+    if (!arInvoiceId) {
+      console.log('[SPH AR] No AR Invoice found - will be created during payment approval');
+      return true; // Not an error, just not ready yet
+    }
+
+    console.log('[SPH AR] Updating AR Invoice on invoice sent:', arInvoiceId);
+    
+    // Get current invoice
+    const { data: invoice, error: fetchError } = await supabase
+      .from('ar_invoices')
+      .select('*')
+      .eq('id', arInvoiceId)
+      .single();
+
+    if (fetchError || !invoice) {
+      console.error('[SPH AR] Error fetching AR Invoice:', fetchError);
+      return false;
+    }
+
+    const newBalance = totalAmount - (invoice.paid_amount || 0);
+    const newStatus = newBalance <= 0 ? 'paid' : ((invoice.paid_amount || 0) > 0 ? 'partial' : 'unpaid');
+
+    // Update AR Invoice with new total
+    const { error: updateError } = await supabase
+      .from('ar_invoices')
+      .update({
+        total_amount: totalAmount,
+        balance: newBalance,
+        status: newStatus,
+        journal_entry_id: journalEntryId || invoice.journal_entry_id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', arInvoiceId);
+
+    if (updateError) {
+      console.error('[SPH AR] Error updating AR Invoice:', updateError);
+      return false;
+    }
+
+    console.log('[SPH AR] ✅ AR Invoice updated with invoice amount:', totalAmount);
+    return true;
+  } catch (error) {
+    console.error('[SPH AR] Failed to update AR Invoice:', error);
+    return false;
+  }
+}
+
+// Standalone function to check if document exists for payment
+export async function checkPaymentDocument(paymentId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('document_storage')
+      .select('id')
+      .eq('payment_id', paymentId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[SPH AR] Error checking payment document:', error);
+      return false;
+    }
+
+    return !!data;
+  } catch (error) {
+    console.error('[SPH AR] Failed to check payment document:', error);
+    return false;
+  }
+}

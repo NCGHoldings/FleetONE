@@ -14476,11 +14476,14 @@ export type Database = {
       special_hire_payments: {
         Row: {
           amount: number
+          ar_invoice_id: string | null
+          ar_receipt_id: string | null
           created_at: string
           created_by: string | null
           finance_approved_at: string | null
           finance_approved_by: string | null
           id: string
+          journal_entry_id: string | null
           notes: string | null
           paid_at: string
           payment_method: string
@@ -14493,11 +14496,14 @@ export type Database = {
         }
         Insert: {
           amount: number
+          ar_invoice_id?: string | null
+          ar_receipt_id?: string | null
           created_at?: string
           created_by?: string | null
           finance_approved_at?: string | null
           finance_approved_by?: string | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           paid_at?: string
           payment_method: string
@@ -14510,11 +14516,14 @@ export type Database = {
         }
         Update: {
           amount?: number
+          ar_invoice_id?: string | null
+          ar_receipt_id?: string | null
           created_at?: string
           created_by?: string | null
           finance_approved_at?: string | null
           finance_approved_by?: string | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           paid_at?: string
           payment_method?: string
@@ -14526,6 +14535,27 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "special_hire_payments_ar_invoice_id_fkey"
+            columns: ["ar_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_payments_ar_receipt_id_fkey"
+            columns: ["ar_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_payments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "special_hire_payments_quotation_id_fkey"
             columns: ["quotation_id"]
@@ -14640,6 +14670,7 @@ export type Database = {
           approval_date: string | null
           approval_status: Database["public"]["Enums"]["approval_status"] | null
           approved_by: string | null
+          ar_invoice_id: string | null
           assigned_bus_no: string | null
           assigned_conductor_name: string | null
           assigned_driver_name: string | null
@@ -14670,6 +14701,7 @@ export type Database = {
           edit_reason: string | null
           edit_type: string | null
           extra_charges: number | null
+          finance_customer_id: string | null
           fuel_cost_fuel_only: number | null
           gross_revenue: number | null
           hire_charge: number | null
@@ -14727,6 +14759,7 @@ export type Database = {
             | Database["public"]["Enums"]["approval_status"]
             | null
           approved_by?: string | null
+          ar_invoice_id?: string | null
           assigned_bus_no?: string | null
           assigned_conductor_name?: string | null
           assigned_driver_name?: string | null
@@ -14757,6 +14790,7 @@ export type Database = {
           edit_reason?: string | null
           edit_type?: string | null
           extra_charges?: number | null
+          finance_customer_id?: string | null
           fuel_cost_fuel_only?: number | null
           gross_revenue?: number | null
           hire_charge?: number | null
@@ -14814,6 +14848,7 @@ export type Database = {
             | Database["public"]["Enums"]["approval_status"]
             | null
           approved_by?: string | null
+          ar_invoice_id?: string | null
           assigned_bus_no?: string | null
           assigned_conductor_name?: string | null
           assigned_driver_name?: string | null
@@ -14844,6 +14879,7 @@ export type Database = {
           edit_reason?: string | null
           edit_type?: string | null
           extra_charges?: number | null
+          finance_customer_id?: string | null
           fuel_cost_fuel_only?: number | null
           gross_revenue?: number | null
           hire_charge?: number | null
@@ -14901,10 +14937,24 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
+            foreignKeyName: "special_hire_quotations_ar_invoice_id_fkey"
+            columns: ["ar_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "special_hire_quotations_bus_type_id_fkey"
             columns: ["bus_type_id"]
             isOneToOne: false
             referencedRelation: "bus_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "special_hire_quotations_finance_customer_id_fkey"
+            columns: ["finance_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
@@ -20725,6 +20775,15 @@ export type Database = {
       calculate_tyre_condition: { Args: { p_tyre_id: string }; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       create_admin_user: { Args: never; Returns: undefined }
+      create_or_get_sph_customer: {
+        Args: {
+          p_company_id: string
+          p_customer_email: string
+          p_customer_name: string
+          p_customer_phone: string
+        }
+        Returns: string
+      }
       expire_temporary_accounts: { Args: never; Returns: number }
       generate_budget_code: { Args: { p_fiscal_year: number }; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
@@ -20757,6 +20816,14 @@ export type Database = {
       }
       generate_sinotruck_customer_code: { Args: never; Returns: string }
       generate_sinotruck_quotation_no: { Args: never; Returns: string }
+      generate_sph_ar_invoice_number: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
+      generate_sph_ar_receipt_number: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
       generate_stock_adjustment_number: { Args: never; Returns: string }
       generate_submission_code: { Args: never; Returns: string }
       generate_temp_account_code: { Args: never; Returns: string }
