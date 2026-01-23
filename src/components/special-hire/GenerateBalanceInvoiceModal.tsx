@@ -12,6 +12,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { sanitizeHTML } from '@/lib/sanitize';
+import { 
+  fetchSpecialHireFinanceSettings,
+  postInvoiceToGLStandalone,
+  applyAdvanceToInvoiceStandalone 
+} from '@/hooks/useSpecialHireFinance';
+import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 
 interface GenerateBalanceInvoiceModalProps {
   open: boolean;
@@ -338,6 +344,75 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
         setInvoiceStatus('sent_to_customer');
       }
+
+      // ========================
+      // GL POSTING INTEGRATION - Post invoice to General Ledger
+      // ========================
+      try {
+        console.log('[SPH GL] Invoice sent - attempting GL posting...');
+        const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+        
+        if (settings?.auto_post_invoices) {
+          const fullInvoiceAmount = quotationData.original_quotation_amount + 
+            (adjustmentData.extra_km_total_charge || 0) + 
+            (adjustmentData.total_additional_expenses || 0) -
+            (quotationData.discount_amount_lkr || 0);
+          
+          const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
+          const isInternal = quotationData.company_name?.toLowerCase().includes('internal') || false;
+          
+          console.log('[SPH GL] Posting invoice to GL:', {
+            invoiceNo,
+            amount: fullInvoiceAmount,
+            isInternal,
+          });
+
+          // 1. Post invoice (Revenue recognition)
+          // DR Trade Receivable | CR Special Hire Revenue
+          const invoiceGLResult = await postInvoiceToGLStandalone({
+            invoiceNo,
+            quotationNo: quotationData.quotation_no,
+            customerName: quotationData.customer_name,
+            totalAmount: fullInvoiceAmount,
+            isInternal,
+            settings,
+            effectiveCompanyId: NCG_HOLDING_ID,
+          });
+          
+          if (invoiceGLResult) {
+            console.log('[SPH GL] ✅ Invoice posted:', invoiceGLResult.entry_number);
+            toast.success(`Invoice GL Entry: ${invoiceGLResult.entry_number}`);
+          }
+          
+          // 2. Apply advance if customer paid advance
+          // DR Customer Advance (Liability) | CR Trade Receivable
+          if (quotationData.advance_paid > 0) {
+            console.log('[SPH GL] Applying advance to invoice:', quotationData.advance_paid);
+            
+            const advanceGLResult = await applyAdvanceToInvoiceStandalone({
+              invoiceNo,
+              quotationNo: quotationData.quotation_no,
+              customerName: quotationData.customer_name,
+              advanceAmount: quotationData.advance_paid,
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
+            
+            if (advanceGLResult) {
+              console.log('[SPH GL] ✅ Advance applied:', advanceGLResult.entry_number);
+              toast.success(`Advance Applied: ${advanceGLResult.entry_number}`);
+            }
+          }
+        } else {
+          console.log('[SPH GL] Auto-post invoices disabled or settings not found');
+        }
+      } catch (glError: any) {
+        console.error('[SPH GL] ❌ Invoice GL posting failed:', glError?.message || glError);
+        toast.warning(`Invoice sent but GL posting failed: ${glError?.message || 'Unknown error'}`);
+      }
+      // ========================
+      // END GL POSTING
+      // ========================
 
       toast.success(`Invoice emailed successfully to ${quotationData.customer_email}`);
       
