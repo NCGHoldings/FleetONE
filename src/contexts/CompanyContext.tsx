@@ -2,6 +2,12 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+// Company IDs for consolidated GL architecture
+// NCG Holding: Parent with consolidated GL for all sub-companies
+// NCG Express: Standalone company with its own GL
+export const NCG_HOLDING_ID = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020';
+export const NCG_EXPRESS_ID = '7ece7595-8b7b-46de-8bfc-c1e8e0da7513';
+
 // Company type matching database structure
 export interface Company {
   id: string;
@@ -31,6 +37,8 @@ interface CompanyContextType {
   // Consolidated GL helpers
   getParentCompanyId: (companyId: string) => string;
   isSubCompany: (companyId: string) => boolean;
+  isSubCompanyOfNCGHolding: (companyId: string) => boolean; // Specifically checks NCG Holding
+  isNCGHoldingOrSubCompany: (companyId: string) => boolean; // NCG Holding or any of its sub-companies
   getEffectiveCompanyId: () => string | null; // Returns parent for sub-companies, otherwise selected
   getBusinessUnitCode: () => string | null; // Returns short_code for sub-companies, null for parent
 }
@@ -102,21 +110,44 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     return !!company?.parent_company_id;
   };
 
-  // Returns parent company ID for sub-companies, otherwise selected company ID
-  // This is used for COA and GL queries to show consolidated data
-  const getEffectiveCompanyId = (): string | null => {
-    if (!selectedCompanyId) return null;
-    return getParentCompanyId(selectedCompanyId);
+  // Specifically checks if company is a sub-company of NCG Holding
+  const isSubCompanyOfNCGHolding = (companyId: string): boolean => {
+    const company = companies.find(c => c.id === companyId);
+    return company?.parent_company_id === NCG_HOLDING_ID;
   };
 
-  // Returns the business unit code (short_code) for sub-companies
-  // Used for tagging journal entries
+  // Checks if company is NCG Holding or one of its sub-companies
+  // Used to validate School Bus operations should only run under NCG Holding hierarchy
+  const isNCGHoldingOrSubCompany = (companyId: string): boolean => {
+    return companyId === NCG_HOLDING_ID || isSubCompanyOfNCGHolding(companyId);
+  };
+
+  // Returns parent company ID for sub-companies of NCG Holding, otherwise returns selected company ID
+  // This ensures NCG Express remains completely isolated with its own COA/GL
+  // While NCG Holding sub-companies share the consolidated NCG Holding COA/GL
+  const getEffectiveCompanyId = (): string | null => {
+    if (!selectedCompanyId) return null;
+    
+    // Only consolidate for NCG Holding sub-companies
+    if (isSubCompanyOfNCGHolding(selectedCompanyId)) {
+      return NCG_HOLDING_ID;
+    }
+    
+    // NCG Express and other standalone companies use their own ID
+    return selectedCompanyId;
+  };
+
+  // Returns the business unit code (short_code) for NCG Holding sub-companies
+  // Used for tagging journal entries with business unit identifier (SBO, YUT, etc.)
   const getBusinessUnitCode = (): string | null => {
     if (!selectedCompanyId || !selectedCompany) return null;
-    if (selectedCompany.parent_company_id) {
+    
+    // Only NCG Holding sub-companies have business unit codes
+    if (isSubCompanyOfNCGHolding(selectedCompanyId)) {
       return selectedCompany.short_code || null;
     }
-    return null; // Parent companies don't have a business unit code
+    
+    return null; // NCG Express and parent companies don't have business unit codes
   };
 
   // Set company and persist to localStorage
@@ -183,6 +214,8 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
         getSubCompaniesFor,
         getParentCompanyId,
         isSubCompany,
+        isSubCompanyOfNCGHolding,
+        isNCGHoldingOrSubCompany,
         getEffectiveCompanyId,
         getBusinessUnitCode,
       }}
