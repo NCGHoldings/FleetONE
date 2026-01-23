@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { ChevronRight, ChevronDown, Folder, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { DrillDownModal } from "./DrillDownModal";
 
 interface Account {
   id: string;
@@ -33,6 +34,8 @@ interface TreeNode {
 
 export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccountsTreeProps) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["Assets", "Liabilities", "Equity", "Revenue", "Expenses"]));
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [drillDownOpen, setDrillDownOpen] = useState(false);
 
   const filteredAccounts = useMemo(() => {
     if (!searchTerm) return accounts;
@@ -119,6 +122,12 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
     });
   };
 
+  const handleAccountClick = (account: Account, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedAccount(account);
+    setDrillDownOpen(true);
+  };
+
   const getAccountTypeBadge = (type: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       asset: "default",
@@ -172,21 +181,23 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
             {node.accounts.map((account) => (
               <div
                 key={account.id}
-                className="flex items-center gap-2 py-1 px-2 hover:bg-muted rounded"
+                className="flex items-center gap-2 py-1 px-2 hover:bg-accent rounded cursor-pointer group transition-colors"
                 style={{ paddingLeft: `${(level + 1) * 20 + 8}px` }}
+                onClick={(e) => handleAccountClick(account, e)}
               >
                 <span className="w-4" />
-                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                <FileText className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
                 <span className="font-mono text-xs text-muted-foreground w-20 shrink-0">
                   {account.account_code}
                 </span>
-                <span className="flex-1 truncate text-sm">
+                <span className="flex-1 truncate text-sm group-hover:text-foreground">
                   {account.level5 || account.account_name}
                 </span>
                 {getAccountTypeBadge(account.account_type)}
                 <span className={cn(
-                  "text-sm",
-                  account.current_balance < 0 && "text-destructive"
+                  "text-sm font-mono",
+                  account.current_balance < 0 && "text-destructive",
+                  account.current_balance >= 0 && "text-green-600 dark:text-green-400"
                 )}>
                   {formatBalance(account.current_balance)}
                 </span>
@@ -210,8 +221,17 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
   }
 
   return (
-    <div className="border rounded-lg p-2">
-      {Array.from(tree.entries()).map(([name, node]) => renderTreeNode(node, name, 0))}
-    </div>
+    <>
+      <div className="border rounded-lg p-2">
+        {Array.from(tree.entries()).map(([name, node]) => renderTreeNode(node, name, 0))}
+      </div>
+
+      <DrillDownModal
+        open={drillDownOpen}
+        onOpenChange={setDrillDownOpen}
+        accountId={selectedAccount?.id || null}
+        accountName={selectedAccount ? `${selectedAccount.account_code} - ${selectedAccount.account_name}` : undefined}
+      />
+    </>
   );
 };
