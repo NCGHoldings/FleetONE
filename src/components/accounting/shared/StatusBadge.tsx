@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 type StatusType = 
-  | "draft" | "posted" | "void" | "approved" | "rejected" | "pending"
+  | "draft" | "posted" | "void" | "approved" | "rejected" | "pending" | "unpaid"
   | "open" | "closed" | "paid" | "partial" | "overdue" | "cancelled"
   | "active" | "inactive" | "reconciled" | "unreconciled";
 
@@ -18,6 +18,7 @@ const statusConfig: Record<StatusType, { variant: "default" | "secondary" | "des
   approved: { variant: "default", label: "Approved" },
   rejected: { variant: "destructive", label: "Rejected" },
   pending: { variant: "outline", label: "Pending" },
+  unpaid: { variant: "secondary", label: "Unpaid" },
   open: { variant: "outline", label: "Open" },
   closed: { variant: "secondary", label: "Closed" },
   paid: { variant: "default", label: "Paid" },
