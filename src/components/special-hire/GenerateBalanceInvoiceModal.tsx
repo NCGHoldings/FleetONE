@@ -15,7 +15,8 @@ import { sanitizeHTML } from '@/lib/sanitize';
 import { 
   fetchSpecialHireFinanceSettings,
   postInvoiceToGLStandalone,
-  applyAdvanceToInvoiceStandalone 
+  applyAdvanceToInvoiceStandalone,
+  updateSPHARInvoiceOnInvoiceSent,
 } from '@/hooks/useSpecialHireFinance';
 import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 
@@ -346,10 +347,10 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       }
 
       // ========================
-      // GL POSTING INTEGRATION - Post invoice to General Ledger
+      // GL & AR POSTING INTEGRATION - Post invoice to General Ledger and update AR
       // ========================
       try {
-        console.log('[SPH GL] Invoice sent - attempting GL posting...');
+        console.log('[SPH GL] Invoice sent - attempting GL & AR update...');
         const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
         
         if (settings?.auto_post_invoices) {
@@ -382,6 +383,24 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           if (invoiceGLResult) {
             console.log('[SPH GL] ✅ Invoice posted:', invoiceGLResult.entry_number);
             toast.success(`Invoice GL Entry: ${invoiceGLResult.entry_number}`);
+
+            // Update AR Invoice with full invoice amount (if AR Invoice exists)
+            // This handles adjustments that change the total
+            const { data: quotationRecord } = await supabase
+              .from('special_hire_quotations')
+              .select('ar_invoice_id')
+              .eq('id', quotationData.id)
+              .single();
+
+            if (quotationRecord?.ar_invoice_id) {
+              await updateSPHARInvoiceOnInvoiceSent({
+                arInvoiceId: quotationRecord.ar_invoice_id,
+                quotationId: quotationData.id,
+                totalAmount: fullInvoiceAmount,
+                journalEntryId: invoiceGLResult.id,
+              });
+              console.log('[SPH AR] ✅ AR Invoice updated with invoice amount');
+            }
           }
           
           // 2. Apply advance if customer paid advance
@@ -407,11 +426,11 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
           console.log('[SPH GL] Auto-post invoices disabled or settings not found');
         }
       } catch (glError: any) {
-        console.error('[SPH GL] ❌ Invoice GL posting failed:', glError?.message || glError);
-        toast.warning(`Invoice sent but GL posting failed: ${glError?.message || 'Unknown error'}`);
+        console.error('[SPH GL] ❌ Invoice GL/AR update failed:', glError?.message || glError);
+        toast.warning(`Invoice sent but GL/AR update failed: ${glError?.message || 'Unknown error'}`);
       }
       // ========================
-      // END GL POSTING
+      // END GL & AR POSTING
       // ========================
 
       toast.success(`Invoice emailed successfully to ${quotationData.customer_email}`);

@@ -2,11 +2,17 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 import { generateInvoicePDF, type InvoiceData } from '@/lib/invoice-generator';
 import { 
   fetchSpecialHireFinanceSettings, 
   postAdvancePaymentToGLStandalone,
-  postBalancePaymentToGLStandalone 
+  postBalancePaymentToGLStandalone,
+  createOrGetSPHCustomer,
+  createSPHARInvoice,
+  updateSPHARInvoiceOnPayment,
+  createSPHARReceipt,
+  checkPaymentDocument,
 } from '@/hooks/useSpecialHireFinance';
 import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
 
@@ -44,6 +50,15 @@ export const useFinanceApproval = () => {
     try {
       setIsLoading(true);
 
+      // ========================
+      // VALIDATION GATE: Check if document exists
+      // ========================
+      const hasDocument = await checkPaymentDocument(paymentId);
+      if (!hasDocument) {
+        console.warn('[SPH Finance] ⚠️ No document found for payment. Proceeding anyway...');
+        // Note: We log but don't block - document may have been generated after payment
+      }
+
       // Update payment status to approved
       const { data: paymentData, error: paymentError } = await supabase
         .from('special_hire_payments')
@@ -63,13 +78,16 @@ export const useFinanceApproval = () => {
       if (paymentError) throw paymentError;
 
       // ========================
-      // GL POSTING INTEGRATION
+      // AR & GL INTEGRATION
       // ========================
-      // Post to General Ledger when finance approves payment
+      let journalEntry: any = null;
+      let arInvoiceId: string | null = paymentData.quotation.ar_invoice_id;
+      let customerId: string | null = paymentData.quotation.finance_customer_id;
+
       try {
-        console.log('[SPH GL] Fetching finance settings for company:', NCG_HOLDING_ID);
+        console.log('[SPH Finance] Starting AR & GL integration...');
         const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
-        console.log('[SPH GL] Settings loaded:', settings ? {
+        console.log('[SPH Finance] Settings loaded:', settings ? {
           auto_post_advance: settings.auto_post_advance_payments,
           auto_post_balance: settings.auto_post_balance_payments,
           bank_account: settings.default_bank_account_id,
@@ -83,17 +101,68 @@ export const useFinanceApproval = () => {
                            (!paymentData.quotation.advance_paid || 
                             paymentData.amount === paymentData.quotation.advance_paid);
 
-          console.log('[SPH GL] Payment analysis:', {
+          console.log('[SPH Finance] Payment analysis:', {
             paymentType,
             isAdvance,
             amount: paymentData.amount,
             advancePaid: paymentData.quotation.advance_paid,
           });
 
+          // Step 1: Create/Get Finance Customer
+          if (!customerId) {
+            console.log('[SPH Finance] Creating/getting customer...');
+            customerId = await createOrGetSPHCustomer({
+              customerName: paymentData.quotation.customer_name,
+              customerPhone: paymentData.quotation.customer_phone,
+              customerEmail: paymentData.quotation.customer_email,
+              companyId: NCG_HOLDING_ID,
+            });
+
+            if (customerId) {
+              // Update quotation with customer ID
+              await supabase
+                .from('special_hire_quotations')
+                .update({ finance_customer_id: customerId })
+                .eq('id', paymentData.quotation.id);
+            }
+          }
+
+          // Step 2: Create AR Invoice if not exists (for advance payment)
+          if (isAdvance && !arInvoiceId && customerId) {
+            console.log('[SPH Finance] Creating AR Invoice...');
+            // Calculate total amount
+            const totalAmount = (paymentData.quotation.gross_revenue || 0) +
+              (paymentData.quotation.fuel_cost_fuel_only || 0) +
+              (paymentData.quotation.commission_pass_through_amount || 0) +
+              (paymentData.quotation.total_additional_charges || 0) -
+              (paymentData.quotation.discount_amount_lkr || 0);
+
+            const dueDate = format(
+              new Date(paymentData.quotation.pickup_datetime || new Date()),
+              'yyyy-MM-dd'
+            );
+
+            const arResult = await createSPHARInvoice({
+              quotationId: paymentData.quotation.id,
+              quotationNo: paymentData.quotation.quotation_no,
+              customerId,
+              customerName: paymentData.quotation.customer_name,
+              totalAmount,
+              advanceAmount: paymentData.amount,
+              dueDate,
+              companyId: NCG_HOLDING_ID,
+            });
+
+            if (arResult) {
+              arInvoiceId = arResult.invoiceId;
+              toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
+            }
+          }
+
+          // Step 3: Post GL Entry
           if (isAdvance && settings.auto_post_advance_payments) {
-            console.log('[SPH GL] Posting advance payment to GL...');
-            // Post advance payment: DR Bank | CR Customer Advance (Liability)
-            const glResult = await postAdvancePaymentToGLStandalone({
+            console.log('[SPH Finance] Posting advance payment to GL...');
+            journalEntry = await postAdvancePaymentToGLStandalone({
               quotationNo: paymentData.quotation.quotation_no,
               customerName: paymentData.quotation.customer_name,
               amount: paymentData.amount,
@@ -101,17 +170,13 @@ export const useFinanceApproval = () => {
               effectiveCompanyId: NCG_HOLDING_ID,
             });
             
-            if (glResult) {
-              console.log('[SPH GL] ✅ Advance payment posted:', glResult.entry_number);
-              toast.success(`GL Entry created: ${glResult.entry_number}`);
-            } else {
-              console.warn('[SPH GL] ⚠️ GL posting returned null - check account configuration');
-              toast.warning('GL accounts may not be fully configured');
+            if (journalEntry) {
+              console.log('[SPH Finance] ✅ Advance payment posted:', journalEntry.entry_number);
+              toast.success(`GL Entry created: ${journalEntry.entry_number}`);
             }
           } else if (!isAdvance && settings.auto_post_balance_payments) {
-            console.log('[SPH GL] Posting balance payment to GL...');
-            // Post balance payment: DR Bank | CR Trade Receivable
-            const glResult = await postBalancePaymentToGLStandalone({
+            console.log('[SPH Finance] Posting balance payment to GL...');
+            journalEntry = await postBalancePaymentToGLStandalone({
               quotationNo: paymentData.quotation.quotation_no,
               customerName: paymentData.quotation.customer_name,
               balanceAmount: paymentData.amount,
@@ -119,27 +184,50 @@ export const useFinanceApproval = () => {
               effectiveCompanyId: NCG_HOLDING_ID,
             });
             
-            if (glResult) {
-              console.log('[SPH GL] ✅ Balance payment posted:', glResult.entry_number);
-              toast.success(`GL Entry created: ${glResult.entry_number}`);
-            } else {
-              console.warn('[SPH GL] ⚠️ GL posting returned null - check account configuration');
-              toast.warning('GL accounts may not be fully configured');
+            if (journalEntry) {
+              console.log('[SPH Finance] ✅ Balance payment posted:', journalEntry.entry_number);
+              toast.success(`GL Entry created: ${journalEntry.entry_number}`);
             }
-          } else {
-            console.log('[SPH GL] Skipping GL posting - auto-post disabled or conditions not met');
+
+            // Step 4: Update AR Invoice and create Receipt for balance payment
+            if (arInvoiceId && customerId) {
+              await updateSPHARInvoiceOnPayment({
+                arInvoiceId,
+                paymentAmount: paymentData.amount,
+                paymentId,
+                journalEntryId: journalEntry?.id,
+              });
+
+              await createSPHARReceipt({
+                customerId,
+                arInvoiceId,
+                paymentAmount: paymentData.amount,
+                paymentMethod: paymentData.payment_method || 'cash',
+                reference: paymentData.reference_no,
+                paymentId,
+                companyId: NCG_HOLDING_ID,
+                journalEntryId: journalEntry?.id,
+              });
+            }
+          }
+
+          // Step 5: Link journal entry to payment
+          if (journalEntry) {
+            await supabase
+              .from('special_hire_payments')
+              .update({ journal_entry_id: journalEntry.id })
+              .eq('id', paymentId);
           }
         } else {
-          console.warn('[SPH GL] ⚠️ Special Hire Finance settings not configured for company:', NCG_HOLDING_ID);
+          console.warn('[SPH Finance] ⚠️ Special Hire Finance settings not configured');
           toast.warning('Special Hire Finance settings not configured. Go to Settings > Special Hire Finance.');
         }
       } catch (glError: any) {
-        console.error('[SPH GL] ❌ GL posting failed:', glError?.message || glError);
-        // Don't fail the approval if GL posting fails - just log it
-        toast.warning(`Payment approved but GL posting failed: ${glError?.message || 'Unknown error'}`);
+        console.error('[SPH Finance] ❌ AR/GL integration failed:', glError?.message || glError);
+        toast.warning(`Payment approved but AR/GL integration failed: ${glError?.message || 'Unknown error'}`);
       }
       // ========================
-      // END GL POSTING
+      // END AR & GL INTEGRATION
       // ========================
 
       // Auto-add checked_by signature FIRST, before regenerating PDFs
