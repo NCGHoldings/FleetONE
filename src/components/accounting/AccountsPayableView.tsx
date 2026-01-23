@@ -36,7 +36,7 @@ export const AccountsPayableView = () => {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       draft: "outline",
-      pending: "secondary",
+      unpaid: "secondary",
       approved: "default",
       partial: "outline",
       paid: "default",
@@ -229,8 +229,8 @@ export const AccountsPayableView = () => {
             <TabsTrigger value="all" onClick={() => setStatusFilter(undefined)}>
               All Invoices
             </TabsTrigger>
-            <TabsTrigger value="pending" onClick={() => setStatusFilter("pending")}>
-              Pending
+            <TabsTrigger value="unpaid" onClick={() => setStatusFilter("unpaid")}>
+              Unpaid
             </TabsTrigger>
             <TabsTrigger value="partial" onClick={() => setStatusFilter("partial")}>
               Partial
@@ -247,7 +247,7 @@ export const AccountsPayableView = () => {
               searchKey="invoice_number"
             />
           </TabsContent>
-          <TabsContent value="pending">
+          <TabsContent value="unpaid">
             <DataTable columns={columns} data={invoices || []} searchKey="invoice_number" />
           </TabsContent>
           <TabsContent value="partial">

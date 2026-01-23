@@ -36,7 +36,7 @@ export const AccountsReceivableView = () => {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       draft: "outline",
-      pending: "secondary",
+      unpaid: "secondary",
       partial: "outline",
       paid: "default",
       overdue: "destructive",
@@ -205,8 +205,8 @@ export const AccountsReceivableView = () => {
             <TabsTrigger value="all" onClick={() => setStatusFilter(undefined)}>
               All Invoices
             </TabsTrigger>
-            <TabsTrigger value="pending" onClick={() => setStatusFilter("pending")}>
-              Pending
+            <TabsTrigger value="unpaid" onClick={() => setStatusFilter("unpaid")}>
+              Unpaid
             </TabsTrigger>
             <TabsTrigger value="partial" onClick={() => setStatusFilter("partial")}>
               Partial
@@ -223,7 +223,7 @@ export const AccountsReceivableView = () => {
               searchKey="invoice_number"
             />
           </TabsContent>
-          <TabsContent value="pending">
+          <TabsContent value="unpaid">
             <DataTable columns={columns} data={invoices || []} searchKey="invoice_number" />
           </TabsContent>
           <TabsContent value="partial">
