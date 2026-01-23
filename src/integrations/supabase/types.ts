@@ -7713,6 +7713,8 @@ export type Database = {
           approval_status: string | null
           approved_at: string | null
           approved_by: string | null
+          business_unit_code: string | null
+          business_unit_id: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
@@ -7738,6 +7740,8 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          business_unit_code?: string | null
+          business_unit_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7763,6 +7767,8 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          business_unit_code?: string | null
+          business_unit_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7785,6 +7791,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "journal_entries_business_unit_id_fkey"
+            columns: ["business_unit_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "journal_entries_company_id_fkey"
             columns: ["company_id"]
@@ -7862,6 +7875,7 @@ export type Database = {
       journal_entry_lines: {
         Row: {
           account_id: string
+          business_unit_code: string | null
           company_id: string | null
           cost_center_id: string | null
           created_at: string
@@ -7876,6 +7890,7 @@ export type Database = {
         }
         Insert: {
           account_id: string
+          business_unit_code?: string | null
           company_id?: string | null
           cost_center_id?: string | null
           created_at?: string
@@ -7890,6 +7905,7 @@ export type Database = {
         }
         Update: {
           account_id?: string
+          business_unit_code?: string | null
           company_id?: string | null
           cost_center_id?: string | null
           created_at?: string

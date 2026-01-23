@@ -28,6 +28,11 @@ interface CompanyContextType {
   isLoading: boolean;
   setSelectedCompanyId: (id: string | null) => void;
   getSubCompaniesFor: (parentId: string) => Company[];
+  // Consolidated GL helpers
+  getParentCompanyId: (companyId: string) => string;
+  isSubCompany: (companyId: string) => boolean;
+  getEffectiveCompanyId: () => string | null; // Returns parent for sub-companies, otherwise selected
+  getBusinessUnitCode: () => string | null; // Returns short_code for sub-companies, null for parent
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -85,6 +90,34 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Get selected company details
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || null;
+
+  // Consolidated GL helpers
+  const getParentCompanyId = (companyId: string): string => {
+    const company = companies.find(c => c.id === companyId);
+    return company?.parent_company_id || companyId;
+  };
+
+  const isSubCompany = (companyId: string): boolean => {
+    const company = companies.find(c => c.id === companyId);
+    return !!company?.parent_company_id;
+  };
+
+  // Returns parent company ID for sub-companies, otherwise selected company ID
+  // This is used for COA and GL queries to show consolidated data
+  const getEffectiveCompanyId = (): string | null => {
+    if (!selectedCompanyId) return null;
+    return getParentCompanyId(selectedCompanyId);
+  };
+
+  // Returns the business unit code (short_code) for sub-companies
+  // Used for tagging journal entries
+  const getBusinessUnitCode = (): string | null => {
+    if (!selectedCompanyId || !selectedCompany) return null;
+    if (selectedCompany.parent_company_id) {
+      return selectedCompany.short_code || null;
+    }
+    return null; // Parent companies don't have a business unit code
+  };
 
   // Set company and persist to localStorage
   const setSelectedCompanyId = (id: string | null) => {
@@ -148,6 +181,10 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
         isLoading,
         setSelectedCompanyId,
         getSubCompaniesFor,
+        getParentCompanyId,
+        isSubCompany,
+        getEffectiveCompanyId,
+        getBusinessUnitCode,
       }}
     >
       {children}

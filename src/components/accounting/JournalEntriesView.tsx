@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, CheckCircle, XCircle, RotateCcw } from "lucide-react";
@@ -6,19 +6,39 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "./shared/StatusBadge";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateDisplay } from "./shared/DateDisplay";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { JournalEntryForm } from "./JournalEntryForm";
 import { JournalEntryDetailDialog } from "./JournalEntryDetailDialog";
 import { useJournalEntries } from "@/hooks/useAccountingData";
 import { usePostJournalEntry, useRejectJournalEntry, useReverseJournalEntry } from "@/hooks/useAccountingMutations";
+import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
+
+// Business unit display mapping
+const BUSINESS_UNIT_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
+  SBO: { label: "School Bus", variant: "default" },
+  YUT: { label: "Yutong", variant: "secondary" },
+  SPH: { label: "Special Hire", variant: "outline" },
+  LTV: { label: "Light Vehicle", variant: "secondary" },
+  SNT: { label: "Sinotruck", variant: "outline" },
+};
 
 export const JournalEntriesView = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [filterBusinessUnit, setFilterBusinessUnit] = useState<string>("all");
 
-  const { data: entries, isLoading } = useJournalEntries();
+  const { selectedCompany, getSubCompaniesFor, isSubCompany, selectedCompanyId } = useCompany();
+  
+  // Get available business units for filter (only for parent companies)
+  const subCompanies = selectedCompany?.id && !isSubCompany(selectedCompany.id) 
+    ? getSubCompaniesFor(selectedCompany.id) 
+    : [];
+
+  const { data: entries, isLoading } = useJournalEntries(undefined, filterBusinessUnit);
   const postEntry = usePostJournalEntry();
   const rejectEntry = useRejectJournalEntry();
   const reverseEntry = useReverseJournalEntry();
@@ -63,10 +83,20 @@ export const JournalEntriesView = () => {
       cell: ({ row }: any) => <DateDisplay date={row.original.entry_date} />,
     },
     {
+      accessorKey: "business_unit_code",
+      header: "Business Unit",
+      cell: ({ row }: any) => {
+        const code = row.original.business_unit_code;
+        if (!code) return <Badge variant="outline">HQ</Badge>;
+        const config = BUSINESS_UNIT_LABELS[code] || { label: code, variant: "outline" as const };
+        return <Badge variant={config.variant}>{config.label}</Badge>;
+      },
+    },
+    {
       accessorKey: "description",
       header: "Description",
       cell: ({ row }: any) => (
-        <span className="max-w-[300px] truncate block">{row.original.description}</span>
+        <span className="max-w-[250px] truncate block">{row.original.description}</span>
       ),
     },
     {
@@ -134,29 +164,53 @@ export const JournalEntriesView = () => {
     return <Card className="p-6"><p>Loading journal entries...</p></Card>;
   }
 
+  // Check if viewing as parent company with sub-companies
+  const showBusinessUnitFilter = selectedCompanyId && !isSubCompany(selectedCompanyId) && subCompanies.length > 0;
+
   return (
     <Card className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold">Journal Entries</h2>
+          <h2 className="text-2xl font-bold">General Ledger</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Record and manage journal entries for financial transactions
+            {showBusinessUnitFilter 
+              ? "Consolidated journal entries across all business units"
+              : "Record and manage journal entries for financial transactions"}
           </p>
         </div>
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              New Entry
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create Journal Entry</DialogTitle>
-            </DialogHeader>
-            <JournalEntryForm onSuccess={() => setIsFormOpen(false)} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-3">
+          {/* Business Unit Filter - only show for parent companies */}
+          {showBusinessUnitFilter && (
+            <Select value={filterBusinessUnit} onValueChange={setFilterBusinessUnit}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Business Units" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Business Units</SelectItem>
+                {subCompanies.map((sub) => (
+                  <SelectItem key={sub.id} value={sub.short_code || sub.id}>
+                    {sub.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          
+          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Entry
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create Journal Entry</DialogTitle>
+              </DialogHeader>
+              <JournalEntryForm onSuccess={() => setIsFormOpen(false)} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <DataTable

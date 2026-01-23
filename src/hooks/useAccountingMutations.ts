@@ -8,7 +8,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 // ============ Journal Entries ============
 export const useCreateJournalEntry = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompany } = useCompany();
   
   return useMutation({
     mutationFn: async (entry: {
@@ -29,6 +29,11 @@ export const useCreateJournalEntry = () => {
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
+      // For consolidated GL: post to parent company, tag with business unit
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = getBusinessUnitCode();
+      const businessUnitId = isSubCompany(selectedCompanyId) ? selectedCompanyId : null;
+      
       const { data: journalEntry, error: entryError } = await supabase
         .from("journal_entries")
         .insert([{
@@ -40,7 +45,9 @@ export const useCreateJournalEntry = () => {
           total_debit: entry.total_debit,
           total_credit: entry.total_credit,
           status: "draft",
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId, // Posts to parent company for consolidated GL
+          business_unit_id: businessUnitId, // Tags with originating sub-company
+          business_unit_code: businessUnitCode, // Short code for filtering (SBO, YUT, etc.)
         }])
         .select()
         .single();
@@ -54,7 +61,8 @@ export const useCreateJournalEntry = () => {
         debit: line.debit_amount || 0,
         credit: line.credit_amount || 0,
         cost_center_id: line.cost_center_id,
-        company_id: selectedCompanyId,
+        company_id: effectiveCompanyId,
+        business_unit_code: businessUnitCode, // Tag lines too for efficient filtering
       }));
       
       const { error: linesError } = await supabase
@@ -66,7 +74,9 @@ export const useCreateJournalEntry = () => {
       return journalEntry;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
+      const effectiveCompanyId = getEffectiveCompanyId();
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", effectiveCompanyId] });
       toast.success("Journal entry created successfully");
     },
     onError: (error) => {

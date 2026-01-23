@@ -5,19 +5,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 
 // ============ Chart of Accounts ============
+// For sub-companies, fetch parent company's COA (consolidated GL)
 export const useChartOfAccounts = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   
   return useQuery({
-    queryKey: ["chart-of-accounts", selectedCompanyId],
+    queryKey: ["chart-of-accounts", effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("chart_of_accounts")
         .select("*")
         .order("account_code");
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
       
       const { data, error } = await query;
@@ -29,10 +31,11 @@ export const useChartOfAccounts = () => {
 };
 
 export const useAccountsByType = (accountType: "asset" | "liability" | "equity" | "revenue" | "expense") => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   
   return useQuery({
-    queryKey: ["accounts-by-type", accountType, selectedCompanyId],
+    queryKey: ["accounts-by-type", accountType, effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("chart_of_accounts")
@@ -41,8 +44,8 @@ export const useAccountsByType = (accountType: "asset" | "liability" | "equity" 
         .eq("is_active", true)
         .order("account_code");
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
       
       const { data, error } = await query;
@@ -54,23 +57,31 @@ export const useAccountsByType = (accountType: "asset" | "liability" | "equity" 
 };
 
 // ============ Journal Entries ============
-export const useJournalEntries = (status?: "draft" | "posted" | "void") => {
-  const { selectedCompanyId } = useCompany();
+// For consolidated GL, show all entries for parent company
+// With optional business unit filter
+export const useJournalEntries = (status?: "draft" | "posted" | "void", businessUnitCode?: string) => {
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   
   return useQuery({
-    queryKey: ["journal-entries", status, selectedCompanyId],
+    queryKey: ["journal-entries", status, effectiveCompanyId, businessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("journal_entries")
-        .select("*")
+        .select("*, business_unit_code")
         .order("entry_date", { ascending: false });
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
       
       if (status) {
         query = query.eq("status", status);
+      }
+      
+      // Filter by specific business unit if provided
+      if (businessUnitCode && businessUnitCode !== "all") {
+        query = query.eq("business_unit_code", businessUnitCode);
       }
       
       const { data, error } = await query;
