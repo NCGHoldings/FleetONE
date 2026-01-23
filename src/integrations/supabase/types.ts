@@ -11822,8 +11822,6 @@ export type Database = {
         Row: {
           amount: number
           branch_id: string
-          bus_id: string | null
-          bus_no: string | null
           created_at: string
           created_by: string | null
           description: string
@@ -11831,8 +11829,6 @@ export type Database = {
           expense_date: string
           expense_type: string
           id: string
-          journal_entry_id: string | null
-          posted_to_gl: boolean | null
           receipt_url: string | null
           route_id: string
           updated_at: string
@@ -11840,8 +11836,6 @@ export type Database = {
         Insert: {
           amount?: number
           branch_id: string
-          bus_id?: string | null
-          bus_no?: string | null
           created_at?: string
           created_by?: string | null
           description: string
@@ -11849,8 +11843,6 @@ export type Database = {
           expense_date?: string
           expense_type: string
           id?: string
-          journal_entry_id?: string | null
-          posted_to_gl?: boolean | null
           receipt_url?: string | null
           route_id: string
           updated_at?: string
@@ -11858,8 +11850,6 @@ export type Database = {
         Update: {
           amount?: number
           branch_id?: string
-          bus_id?: string | null
-          bus_no?: string | null
           created_at?: string
           created_by?: string | null
           description?: string
@@ -11867,28 +11857,11 @@ export type Database = {
           expense_date?: string
           expense_type?: string
           id?: string
-          journal_entry_id?: string | null
-          posted_to_gl?: boolean | null
           receipt_url?: string | null
           route_id?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "route_expenses_bus_id_fkey"
-            columns: ["bus_id"]
-            isOneToOne: false
-            referencedRelation: "buses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "route_expenses_journal_entry_id_fkey"
-            columns: ["journal_entry_id"]
-            isOneToOne: false
-            referencedRelation: "journal_entries"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       route_permits: {
         Row: {
@@ -12422,67 +12395,8 @@ export type Database = {
         }
         Relationships: []
       }
-      school_bus_expense_gl_mappings: {
-        Row: {
-          branch_id: string | null
-          company_id: string | null
-          created_at: string | null
-          expense_category: string | null
-          expense_type: string
-          gl_account_id: string
-          id: string
-          is_active: boolean | null
-          updated_at: string | null
-        }
-        Insert: {
-          branch_id?: string | null
-          company_id?: string | null
-          created_at?: string | null
-          expense_category?: string | null
-          expense_type: string
-          gl_account_id: string
-          id?: string
-          is_active?: boolean | null
-          updated_at?: string | null
-        }
-        Update: {
-          branch_id?: string | null
-          company_id?: string | null
-          created_at?: string | null
-          expense_category?: string | null
-          expense_type?: string
-          gl_account_id?: string
-          id?: string
-          is_active?: boolean | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "school_bus_expense_gl_mappings_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "school_branches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "school_bus_expense_gl_mappings_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "school_bus_expense_gl_mappings_gl_account_id_fkey"
-            columns: ["gl_account_id"]
-            isOneToOne: false
-            referencedRelation: "chart_of_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       school_bus_finance_settings: {
         Row: {
-          auto_post_expenses: boolean | null
           auto_post_invoices: boolean | null
           auto_post_payments: boolean | null
           bank_account_id: string | null
@@ -12491,20 +12405,14 @@ export type Database = {
           cash_account_id: string | null
           company_id: string | null
           created_at: string | null
-          expense_account_id: string | null
-          expense_cash_account_id: string | null
-          fuel_expense_account_id: string | null
           id: string
           invoice_prefix: string | null
           is_active: boolean | null
-          maintenance_expense_account_id: string | null
-          salary_expense_account_id: string | null
           sbs_collection_account_id: string | null
           trade_receivable_account_id: string | null
           updated_at: string | null
         }
         Insert: {
-          auto_post_expenses?: boolean | null
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null
           bank_account_id?: string | null
@@ -12513,20 +12421,14 @@ export type Database = {
           cash_account_id?: string | null
           company_id?: string | null
           created_at?: string | null
-          expense_account_id?: string | null
-          expense_cash_account_id?: string | null
-          fuel_expense_account_id?: string | null
           id?: string
           invoice_prefix?: string | null
           is_active?: boolean | null
-          maintenance_expense_account_id?: string | null
-          salary_expense_account_id?: string | null
           sbs_collection_account_id?: string | null
           trade_receivable_account_id?: string | null
           updated_at?: string | null
         }
         Update: {
-          auto_post_expenses?: boolean | null
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null
           bank_account_id?: string | null
@@ -12535,14 +12437,9 @@ export type Database = {
           cash_account_id?: string | null
           company_id?: string | null
           created_at?: string | null
-          expense_account_id?: string | null
-          expense_cash_account_id?: string | null
-          fuel_expense_account_id?: string | null
           id?: string
           invoice_prefix?: string | null
           is_active?: boolean | null
-          maintenance_expense_account_id?: string | null
-          salary_expense_account_id?: string | null
           sbs_collection_account_id?: string | null
           trade_receivable_account_id?: string | null
           updated_at?: string | null
@@ -12581,41 +12478,6 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "school_bus_finance_settings_expense_account_id_fkey"
-            columns: ["expense_account_id"]
-            isOneToOne: false
-            referencedRelation: "chart_of_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "school_bus_finance_settings_expense_cash_account_id_fkey"
-            columns: ["expense_cash_account_id"]
-            isOneToOne: false
-            referencedRelation: "chart_of_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "school_bus_finance_settings_fuel_expense_account_id_fkey"
-            columns: ["fuel_expense_account_id"]
-            isOneToOne: false
-            referencedRelation: "chart_of_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "school_bus_finance_settings_maintenance_expense_account_id_fkey"
-            columns: ["maintenance_expense_account_id"]
-            isOneToOne: false
-            referencedRelation: "chart_of_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "school_bus_finance_settings_salary_expense_account_id_fkey"
-            columns: ["salary_expense_account_id"]
-            isOneToOne: false
-            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
           {

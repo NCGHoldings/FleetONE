@@ -109,8 +109,8 @@ export const TrialBalanceView = () => {
             ) {
               return;
             }
-            balances[line.account_id].periodDebit += line.debit || 0;
-            balances[line.account_id].periodCredit += line.credit || 0;
+            balances[line.account_id].periodDebit += line.debit_amount || 0;
+            balances[line.account_id].periodCredit += line.credit_amount || 0;
           }
         });
       }

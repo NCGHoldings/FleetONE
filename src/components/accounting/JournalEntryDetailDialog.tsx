@@ -101,10 +101,10 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
                       </TableCell>
                       <TableCell>{line.description || "-"}</TableCell>
                       <TableCell className="text-right">
-                        {line.debit > 0 ? <CurrencyDisplay amount={line.debit} /> : "-"}
+                        {line.debit_amount > 0 ? <CurrencyDisplay amount={line.debit_amount} /> : "-"}
                       </TableCell>
                       <TableCell className="text-right">
-                        {line.credit > 0 ? <CurrencyDisplay amount={line.credit} /> : "-"}
+                        {line.credit_amount > 0 ? <CurrencyDisplay amount={line.credit_amount} /> : "-"}
                       </TableCell>
                     </TableRow>
                   ))}

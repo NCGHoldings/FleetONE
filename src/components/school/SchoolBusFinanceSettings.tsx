@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Settings2, Building2, CreditCard, FileText, CheckCircle, AlertCircle, Save, Receipt } from "lucide-react";
+import { Settings2, Building2, CreditCard, FileText, CheckCircle, AlertCircle, Save } from "lucide-react";
 import { useSchoolBusFinanceSettings, useUpdateSchoolBusFinanceSettings } from "@/hooks/useSchoolBusFinance";
 import { useChartOfAccounts } from "@/hooks/useAccountingData";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,21 +47,14 @@ export function SchoolBusFinanceSettings() {
     },
   });
 
-  // Default settings state (now includes expense accounts)
+  // Default settings state
   const [defaultSettings, setDefaultSettings] = useState({
     trade_receivable_account_id: "",
     sbs_collection_account_id: "",
     cash_account_id: "",
     auto_post_invoices: false,
     auto_post_payments: false,
-    auto_post_expenses: false,
     invoice_prefix: "SBS-INV",
-    // Expense accounts
-    expense_account_id: "",
-    fuel_expense_account_id: "",
-    maintenance_expense_account_id: "",
-    salary_expense_account_id: "",
-    expense_cash_account_id: "",
   });
 
   // Branch settings state - use branch_gl_account_id for direct COA mapping
@@ -78,14 +71,7 @@ export function SchoolBusFinanceSettings() {
           cash_account_id: defaultSetting.cash_account_id || "",
           auto_post_invoices: defaultSetting.auto_post_invoices || false,
           auto_post_payments: defaultSetting.auto_post_payments || false,
-          auto_post_expenses: defaultSetting.auto_post_expenses || false,
           invoice_prefix: defaultSetting.invoice_prefix || "SBS-INV",
-          // Expense accounts
-          expense_account_id: defaultSetting.expense_account_id || "",
-          fuel_expense_account_id: defaultSetting.fuel_expense_account_id || "",
-          maintenance_expense_account_id: defaultSetting.maintenance_expense_account_id || "",
-          salary_expense_account_id: defaultSetting.salary_expense_account_id || "",
-          expense_cash_account_id: defaultSetting.expense_cash_account_id || "",
         });
       }
 
@@ -131,9 +117,6 @@ export function SchoolBusFinanceSettings() {
   ) || [];
   const cashAccounts = chartOfAccounts?.filter(
     (a) => a.account_type === "asset" && (a.account_name.toLowerCase().includes("cash") || a.account_name.toLowerCase().includes("bank"))
-  ) || [];
-  const expenseAccounts = chartOfAccounts?.filter(
-    (a) => a.account_type === "expense"
   ) || [];
 
   if (settingsLoading) {
@@ -281,175 +264,12 @@ export function SchoolBusFinanceSettings() {
                 }
               />
             </div>
-
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="space-y-0.5">
-                <Label className="text-base">Auto-Post Expenses to GL</Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatically post journal entries when route expenses are added
-                </p>
-              </div>
-              <Switch
-                checked={defaultSettings.auto_post_expenses}
-                onCheckedChange={(checked) =>
-                  setDefaultSettings({ ...defaultSettings, auto_post_expenses: checked })
-                }
-              />
-            </div>
           </div>
 
           <div className="flex justify-end">
             <Button onClick={handleSaveDefaultSettings} disabled={updateSettings.isPending}>
               <Save className="h-4 w-4 mr-2" />
               Save Default Settings
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Expense GL Account Mappings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            Expense GL Account Mappings
-          </CardTitle>
-          <CardDescription>
-            Configure which expense accounts to use for route expenses (fuel, maintenance, salaries, etc.)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* General Expense Account */}
-            <div className="space-y-2">
-              <Label>General Expense Account (Debit)</Label>
-              <Select
-                value={defaultSettings.expense_account_id}
-                onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, expense_account_id: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select expense account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Default account for "Other" expense types
-              </p>
-            </div>
-
-            {/* Fuel Expense Account */}
-            <div className="space-y-2">
-              <Label>Fuel Expense Account (Debit)</Label>
-              <Select
-                value={defaultSettings.fuel_expense_account_id}
-                onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, fuel_expense_account_id: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select fuel expense account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Specific account for fuel expenses
-              </p>
-            </div>
-
-            {/* Maintenance Expense Account */}
-            <div className="space-y-2">
-              <Label>Maintenance Expense Account (Debit)</Label>
-              <Select
-                value={defaultSettings.maintenance_expense_account_id}
-                onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, maintenance_expense_account_id: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select maintenance expense account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Specific account for maintenance/repairs
-              </p>
-            </div>
-
-            {/* Salary Expense Account */}
-            <div className="space-y-2">
-              <Label>Salary/Staff Expense Account (Debit)</Label>
-              <Select
-                value={defaultSettings.salary_expense_account_id}
-                onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, salary_expense_account_id: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select salary expense account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Specific account for driver/staff salaries
-              </p>
-            </div>
-
-            {/* Expense Cash/Bank Account */}
-            <div className="space-y-2 md:col-span-2">
-              <Label>Cash/Bank Account for Expenses (Credit)</Label>
-              <Select
-                value={defaultSettings.expense_cash_account_id}
-                onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, expense_cash_account_id: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select cash/bank account for expense payments" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cashAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                This account will be credited when expenses are recorded (cash paid out)
-              </p>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={handleSaveDefaultSettings} disabled={updateSettings.isPending}>
-              <Save className="h-4 w-4 mr-2" />
-              Save Expense Settings
             </Button>
           </div>
         </CardContent>
