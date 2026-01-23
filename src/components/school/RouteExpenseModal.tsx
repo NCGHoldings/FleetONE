@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,21 +7,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { CalendarIcon, Bus, Link2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useFleetBuses } from "@/hooks/useSchoolBusExpense";
+import { findMatchingBus, getRouteBuses, normalizeBusNo } from "@/lib/bus-utils";
 
 interface RouteExpenseModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   routeId: string;
   routeName: string;
+  routeBusRegNos?: string[]; // Bus registration numbers from the route
   onAddExpense: (expense: {
     expense_type: string;
     description: string;
     amount: number;
     expense_date?: string;
     expense_category?: string;
+    bus_id?: string;
+    bus_no?: string;
   }) => Promise<void>;
 }
 
@@ -49,17 +55,39 @@ export function RouteExpenseModal({
   open, 
   onOpenChange, 
   routeId, 
-  routeName, 
+  routeName,
+  routeBusRegNos = [],
   onAddExpense 
 }: RouteExpenseModalProps) {
+  const { data: fleetBuses = [] } = useFleetBuses();
+  
   const [formData, setFormData] = useState({
     expense_type: "",
     expense_category: "",
     description: "",
     amount: "",
-    expense_date: new Date()
+    expense_date: new Date(),
+    bus_id: "",
+    bus_no: ""
   });
   const [loading, setLoading] = useState(false);
+
+  // Get buses that match this route
+  const suggestedBuses = useMemo(() => {
+    return getRouteBuses(routeBusRegNos, fleetBuses);
+  }, [routeBusRegNos, fleetBuses]);
+
+  // Auto-select first suggested bus when modal opens
+  useEffect(() => {
+    if (open && suggestedBuses.length > 0 && !formData.bus_id) {
+      const firstBus = suggestedBuses[0];
+      setFormData(prev => ({
+        ...prev,
+        bus_id: firstBus.id,
+        bus_no: firstBus.bus_no
+      }));
+    }
+  }, [open, suggestedBuses]);
 
   const getCategoriesForType = (type: string) => {
     switch (type) {
@@ -67,6 +95,22 @@ export function RouteExpenseModal({
       case "fuel": return FUEL_CATEGORIES;
       case "other": return OTHER_CATEGORIES;
       default: return [];
+    }
+  };
+
+  const handleBusChange = (busId: string) => {
+    if (busId === "none") {
+      setFormData({ ...formData, bus_id: "", bus_no: "" });
+    } else if (busId === "other") {
+      // Allow manual entry - clear for now
+      setFormData({ ...formData, bus_id: "", bus_no: "" });
+    } else {
+      const bus = fleetBuses.find(b => b.id === busId);
+      setFormData({
+        ...formData,
+        bus_id: busId,
+        bus_no: bus?.bus_no || ""
+      });
     }
   };
 
@@ -85,7 +129,9 @@ export function RouteExpenseModal({
         description: formData.description,
         amount: parseFloat(formData.amount),
         expense_date: formData.expense_date.toISOString().split('T')[0],
-        expense_category: formData.expense_category || undefined
+        expense_category: formData.expense_category || undefined,
+        bus_id: formData.bus_id || undefined,
+        bus_no: formData.bus_no || undefined
       });
       
       // Reset form
@@ -94,7 +140,9 @@ export function RouteExpenseModal({
         expense_category: "",
         description: "",
         amount: "",
-        expense_date: new Date()
+        expense_date: new Date(),
+        bus_id: "",
+        bus_no: ""
       });
       
       onOpenChange(false);
@@ -116,6 +164,67 @@ export function RouteExpenseModal({
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Bus Selection */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Bus className="h-4 w-4" />
+              Bus (Optional)
+            </Label>
+            <Select 
+              value={formData.bus_id || "none"} 
+              onValueChange={handleBusChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select bus (auto-suggested from route)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No specific bus</SelectItem>
+                
+                {/* Suggested buses from route */}
+                {suggestedBuses.length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted">
+                      Suggested (from route)
+                    </div>
+                    {suggestedBuses.map(bus => (
+                      <SelectItem key={bus.id} value={bus.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{bus.bus_no}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            <Link2 className="h-3 w-3 mr-1" />
+                            Route
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+                
+                {/* All other buses */}
+                {fleetBuses.filter(b => !suggestedBuses.find(s => s.id === b.id)).length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted">
+                      All Buses
+                    </div>
+                    {fleetBuses
+                      .filter(b => !suggestedBuses.find(s => s.id === b.id))
+                      .map(bus => (
+                        <SelectItem key={bus.id} value={bus.id}>
+                          {bus.bus_no} {bus.model && `- ${bus.model}`}
+                        </SelectItem>
+                      ))}
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+            {formData.bus_no && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Link2 className="h-3 w-3" />
+                Linked to Fleet: {formData.bus_no}
+              </p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="expense_type">Expense Type</Label>
             <Select 
