@@ -1212,24 +1212,26 @@ export function ConfirmedTripsTable() {
                                 {/* Re-generate receipts/invoices for approved payments */}
                                 {approvedPayments.length > 0 && (
                                   <>
-                                    {approvedPayments.some(p => p.payment_type === 'advance') && (
+                                    {approvedPayments.filter(p => p.payment_type === 'advance').map(p => (
                                       <DropdownMenuItem
-                                        onClick={() => generateApprovedInvoice(trip, 'advance')}
+                                        key={`receipt-${p.id}`}
+                                        onClick={() => generateApprovedInvoice(p.id)}
                                         disabled={financeLoading}
                                       >
                                         <RotateCcw className="w-4 h-4 mr-2" />
                                         Re-generate Sales Receipt
                                       </DropdownMenuItem>
-                                    )}
-                                    {approvedPayments.some(p => p.payment_type === 'balance' || p.payment_type === 'full') && (
+                                    ))}
+                                    {approvedPayments.filter(p => p.payment_type === 'balance' || p.payment_type === 'full').map(p => (
                                       <DropdownMenuItem
-                                        onClick={() => generateApprovedInvoice(trip, 'balance')}
+                                        key={`invoice-${p.id}`}
+                                        onClick={() => generateApprovedInvoice(p.id)}
                                         disabled={financeLoading}
                                       >
                                         <RotateCcw className="w-4 h-4 mr-2" />
                                         Re-generate Final Invoice
                                       </DropdownMenuItem>
-                                    )}
+                                    ))}
                                     <DropdownMenuSeparator />
                                   </>
                                 )}

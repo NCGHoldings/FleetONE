@@ -10,9 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Eye, Edit, FileCheck, AlertCircle } from 'lucide-react';
+import { Eye, Edit, FileCheck, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 
 interface PaymentConfirmationModalProps {
   isOpen: boolean;
@@ -60,6 +61,8 @@ export interface PaymentConfirmationData {
   notes?: string;
 }
 
+type ProcessingStep = 'idle' | 'payment' | 'assignment' | 'notification' | 'document' | 'complete';
+
 export const PaymentConfirmationModal = ({ 
   isOpen, 
   onClose, 
@@ -72,10 +75,15 @@ export const PaymentConfirmationModal = ({
 }: PaymentConfirmationModalProps) => {
   const { user } = useAuth();
   const [workflowMode, setWorkflowMode] = useState<'generate_invoice' | 'confirm_payment'>('confirm_payment');
+  
+  // Progress tracking state
+  const [processingStep, setProcessingStep] = useState<ProcessingStep>('idle');
+  const [progressPercent, setProgressPercent] = useState(0);
+  
   // Calculate final total to match quotation preview
   const calculateFinalTotal = () => {
     const hireAll = quotationData.gross_revenue || 0;
-    const fuelAll = quotationData.fuel_cost_fuel_only || 0; // already total across buses
+    const fuelAll = quotationData.fuel_cost_fuel_only || 0;
     const commission = quotationData.commission_pass_through_amount || 0;
     const additional = quotationData.total_additional_charges || 0;
     const discount = quotationData.discount_amount_lkr || 0;
@@ -133,28 +141,50 @@ export const PaymentConfirmationModal = ({
       return;
     }
 
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File is too large. Please upload a file smaller than 5MB.');
+      setUploadStatus('error');
+      return;
+    }
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Invalid file type. Please upload an image or PDF.');
+      setUploadStatus('error');
+      return;
+    }
+
     try {
       setIsUploadingProof(true);
       setUploadStatus('uploading');
       
       const key = `${user.id}/${quotationData.quotation_no || 'quotation'}/${Date.now()}-${file.name}`;
       
-      const { error: uploadError } = await supabase.storage
+      // Set a timeout for the upload (30 seconds)
+      const uploadPromise = supabase.storage
         .from('payment-proofs')
         .upload(key, file, { upsert: true, contentType: file.type });
       
-      if (uploadError) {
-        console.error('Upload error details:', uploadError);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Upload timed out')), 30000)
+      );
+      
+      const result = await Promise.race([uploadPromise, timeoutPromise]) as any;
+      
+      if (result?.error) {
+        console.error('Upload error details:', result.error);
         
         // Provide user-friendly error messages
-        if (uploadError.message?.includes('policy') || uploadError.message?.includes('permission')) {
+        if (result.error.message?.includes('policy') || result.error.message?.includes('permission')) {
           toast.error('Permission denied. Please contact administrator to fix storage permissions.');
-        } else if (uploadError.message?.includes('size')) {
+        } else if (result.error.message?.includes('size')) {
           toast.error('File is too large. Please upload a smaller file (max 5MB).');
-        } else if (uploadError.message?.includes('type') || uploadError.message?.includes('format')) {
+        } else if (result.error.message?.includes('type') || result.error.message?.includes('format')) {
           toast.error('Invalid file type. Please upload an image or PDF.');
         } else {
-          toast.error(`Upload failed: ${uploadError.message}`);
+          toast.error(`Upload failed: ${result.error.message}`);
         }
         setUploadStatus('error');
         return;
@@ -172,7 +202,9 @@ export const PaymentConfirmationModal = ({
       setUploadStatus('error');
       
       // Handle unexpected errors
-      if (e?.message?.includes('policy') || e?.message?.includes('denied')) {
+      if (e?.message?.includes('timed out')) {
+        toast.error('Upload timed out. Please check your internet connection and try again.');
+      } else if (e?.message?.includes('policy') || e?.message?.includes('denied')) {
         toast.error('Storage permission error. Please contact administrator.');
       } else {
         toast.error('Failed to upload payment proof. Please try again.');
@@ -192,6 +224,18 @@ export const PaymentConfirmationModal = ({
     } finally {
       setPaymentProofUrl('');
       setProofPreviewUrl('');
+      setUploadStatus('idle');
+    }
+  };
+
+  const getProgressStepLabel = (step: ProcessingStep): string => {
+    switch (step) {
+      case 'payment': return 'Creating payment record...';
+      case 'assignment': return 'Updating trip assignment...';
+      case 'notification': return 'Sending notifications...';
+      case 'document': return 'Generating sales receipt...';
+      case 'complete': return 'Complete!';
+      default: return '';
     }
   };
 
@@ -249,6 +293,9 @@ export const PaymentConfirmationModal = ({
 
   const [activeTab, setActiveTab] = useState<'details' | 'preview'>('details');
 
+  // Determine if we should show the loading overlay
+  const isProcessing = loading || processingStep !== 'idle';
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -261,6 +308,33 @@ export const PaymentConfirmationModal = ({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Processing Progress Indicator */}
+          {isProcessing && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  <span className="font-medium text-primary">
+                    {getProgressStepLabel(processingStep) || 'Processing...'}
+                  </span>
+                </div>
+                <Progress value={progressPercent} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Please wait while we process your request. This may take a few seconds.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Finance Integration Info Alert */}
+          <Alert className="bg-blue-50 border-blue-200">
+            <FileCheck className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 text-sm">
+              <strong>Automated Finance Integration:</strong> When you confirm this payment, a draft Sales Receipt will be automatically generated. 
+              Finance team will then approve and post to GL (General Ledger) and AR (Accounts Receivable).
+            </AlertDescription>
+          </Alert>
+
           {/* Workflow Selection - Only show if adjustments exist and invoice not sent yet */}
           {adjustmentData && !balanceInvoiceSent && (
             <Card className="border-primary/20 bg-primary/5">
@@ -419,109 +493,106 @@ export const PaymentConfirmationModal = ({
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
                   min="0"
-                  max={finalTotal}
+                  disabled={isProcessing}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="method">Payment Method</Label>
-                <Select value={method} onValueChange={setMethod}>
+                <Select value={method} onValueChange={setMethod} disabled={isProcessing}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select method" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                    <SelectItem value="card">Card Payment</SelectItem>
                     <SelectItem value="cheque">Cheque</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reference">Reference/Notes (Optional)</Label>
-              <Textarea
+              <Label htmlFor="reference">Reference Number (Optional)</Label>
+              <Input
                 id="reference"
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
-                placeholder="Payment reference number, cheque number, or additional notes..."
-                rows={2}
+                placeholder="e.g., Bank transaction ID, Cheque number"
+                disabled={isProcessing}
               />
             </div>
 
+            {/* Payment Proof Upload */}
             <div className="space-y-2">
-              <Label htmlFor="paymentProof">
-                Payment Proof (image/PDF){paymentType === 'balance' ? ' *' : ' (optional)'}
-              </Label>
-              <Input
-                id="paymentProof"
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileUpload(file);
-                }}
-                disabled={isUploadingProof}
-              />
-              {/* Upload Status Indicator */}
-              <div className="flex items-center gap-2 min-h-[32px]">
-                {uploadStatus === 'uploading' && (
-                  <span className="text-sm text-muted-foreground flex items-center gap-2">
-                    <span className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
-                    Uploading...
-                  </span>
-                )}
-                {uploadStatus === 'success' && paymentProofUrl && (
-                  <span className="text-sm text-green-600 flex items-center gap-2">
-                    ✓ Uploaded
-                  </span>
-                )}
-                {uploadStatus === 'error' && (
-                  <span className="text-sm text-red-600 flex items-center gap-2">
-                    ✗ Upload failed - please try again
-                  </span>
-                )}
-                {paymentProofUrl && (
-                  <div className="flex items-center gap-2 ml-auto">
+              <Label>Payment Proof {paymentType === 'balance' && <span className="text-red-500">*</span>}</Label>
+              {!paymentProofUrl ? (
+                <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                  <Input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    id="payment-proof"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file);
+                    }}
+                    disabled={isUploadingProof || isProcessing}
+                  />
+                  <Label htmlFor="payment-proof" className="cursor-pointer">
+                    <div className="flex flex-col items-center gap-2">
+                      {isUploadingProof ? (
+                        <>
+                          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                          <span className="text-sm text-muted-foreground">Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-8 h-8 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">
+                            Click to upload payment proof (image or PDF, max 5MB)
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </Label>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <span className="text-sm text-green-800">Payment proof uploaded</span>
+                  </div>
+                  <div className="flex gap-2">
                     {proofPreviewUrl && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={proofPreviewUrl} target="_blank" rel="noopener noreferrer">Preview</a>
+                      <Button variant="outline" size="sm" onClick={() => window.open(proofPreviewUrl, '_blank')}>
+                        <Eye className="w-4 h-4 mr-1" /> View
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      handleRemoveProof();
-                      setUploadStatus('idle');
-                    }}>Remove</Button>
+                    <Button variant="outline" size="sm" onClick={handleRemoveProof} disabled={isProcessing}>
+                      Remove
+                    </Button>
                   </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Additional Notes (Optional)</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any additional notes about the payment..."
-                rows={2}
-              />
+                </div>
+              )}
+              {uploadStatus === 'error' && (
+                <p className="text-xs text-red-500 mt-1">Upload failed. Please try again.</p>
+              )}
             </div>
           </div>
 
           {/* Trip Assignment */}
           <div className="space-y-4">
-            <Label className="text-base font-medium">Trip Assignment (Optional)</Label>
-            
+            <Label className="text-base font-medium">Trip Assignment</Label>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="driverName">Driver Name</Label>
+                <Label htmlFor="driverName">Driver Name {paymentType === 'balance' && <span className="text-red-500">*</span>}</Label>
                 <Input
                   id="driverName"
                   value={driverName}
                   onChange={(e) => setDriverName(e.target.value)}
                   placeholder="Enter driver name"
+                  disabled={isProcessing}
                 />
               </div>
               <div className="space-y-2">
@@ -531,42 +602,52 @@ export const PaymentConfirmationModal = ({
                   value={conductorName}
                   onChange={(e) => setConductorName(e.target.value)}
                   placeholder="Enter conductor name"
+                  disabled={isProcessing}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="busNo">Bus Number</Label>
+                <Label htmlFor="busNo">Bus Number {paymentType === 'balance' && <span className="text-red-500">*</span>}</Label>
                 <Input
                   id="busNo"
                   value={busNo}
                   onChange={(e) => setBusNo(e.target.value)}
-                  placeholder="Enter bus number"
+                  placeholder="e.g., NC-1234"
+                  disabled={isProcessing}
                 />
               </div>
             </div>
           </div>
 
-          {/* Finance Workflow Alert */}
-          <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
-            <FileCheck className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800 dark:text-blue-300">
-              <strong>What happens next:</strong>
-              <ul className="list-disc list-inside mt-1 space-y-1 text-sm">
-                <li>A Sales Receipt will be auto-generated as a draft document</li>
-                <li>Payment will be sent to Finance team for approval</li>
-                <li>Upon approval: Customer & AR Invoice created in Finance module</li>
-                <li>GL entries will be posted automatically (DR Bank / CR Advance)</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any additional notes..."
+              rows={2}
+              disabled={isProcessing}
+            />
+          </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={onClose} disabled={loading}>
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button variant="outline" onClick={onClose} disabled={isProcessing}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm} disabled={loading || amount <= 0} className="gap-2">
-              <FileCheck className="h-4 w-4" />
-              {loading ? 'Processing...' : 'Confirm Payment'}
+            <Button onClick={handleConfirm} disabled={isProcessing}>
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <FileCheck className="w-4 h-4 mr-2" />
+                  Confirm Payment
+                </>
+              )}
             </Button>
           </div>
             </>

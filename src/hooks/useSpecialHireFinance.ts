@@ -148,6 +148,82 @@ export async function postAdvancePaymentToGLStandalone({
   return journalEntry;
 }
 
+// Standalone function to post FULL payment to GL (direct revenue recognition)
+// DR Bank/Cash (Asset) | CR Special Hire Revenue (Revenue)
+export async function postFullPaymentToGLStandalone({
+  quotationNo,
+  customerName,
+  amount,
+  settings,
+  effectiveCompanyId,
+}: {
+  quotationNo: string;
+  customerName: string;
+  amount: number;
+  settings: any;
+  effectiveCompanyId: string;
+}) {
+  const revenueAccountId = settings?.revenue_external_account_id;
+  
+  if (!settings?.default_bank_account_id || !revenueAccountId) {
+    console.warn("GL accounts not configured for Special Hire full payments");
+    return null;
+  }
+
+  const entryNumber = `SPH-FULL-${quotationNo}-${Date.now().toString(36).toUpperCase()}`;
+
+  // Create journal entry
+  const { data: journalEntry, error: jeError } = await supabase
+    .from("journal_entries")
+    .insert({
+      entry_number: entryNumber,
+      entry_date: format(new Date(), "yyyy-MM-dd"),
+      description: `Full payment received - ${customerName} - ${quotationNo}`,
+      reference: quotationNo,
+      total_debit: amount,
+      total_credit: amount,
+      status: "posted",
+      company_id: effectiveCompanyId,
+      business_unit_code: "SPH",
+      posted_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (jeError) throw jeError;
+
+  // Create journal entry lines
+  // DR Bank/Cash (Asset increases with Debit)
+  // CR Special Hire Revenue (Revenue increases with Credit)
+  const { error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .insert([
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.default_bank_account_id,
+        description: `Full payment received - ${customerName} (${quotationNo})`,
+        debit: amount,
+        credit: 0,
+        company_id: effectiveCompanyId,
+      },
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: revenueAccountId,
+        description: `Revenue - Special Hire ${quotationNo}`,
+        debit: 0,
+        credit: amount,
+        company_id: effectiveCompanyId,
+      },
+    ]);
+
+  if (linesError) throw linesError;
+
+  // Update COA balances
+  await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+  return journalEntry;
+}
+
 // Standalone function to post balance payment to GL (for use outside React hooks)
 export async function postBalancePaymentToGLStandalone({
   quotationNo,
