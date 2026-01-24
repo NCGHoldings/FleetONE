@@ -1,266 +1,344 @@
 
-# Special Hire Module - Complete Finance Integration Plan
 
-## Executive Summary
+# Special Hire - Complete Finance Integration Fix Plan
 
-This plan addresses the gaps between Special Hire operations and the Finance ERP module by implementing a workflow similar to the School Bus module. The goal is to ensure:
-1. Payments cannot be marked "paid" without generating a Sales Receipt
-2. AR Invoices are created in the Finance module for full receivable tracking
-3. GL entries are properly linked to AR records
-4. All transactions flow smoothly with proper validation gates
+## Issues Identified from Analysis
+
+### Issue 1: Payment Confirmation Gets Stuck on "Processing..."
+**Root Cause**: Multiple async operations run sequentially without proper error handling and timeout management. If any operation is slow (especially document generation with PDF conversion), the modal appears stuck.
+
+**Evidence**: The `handlePaymentConfirmation` function has 4+ async operations:
+1. Insert payment record
+2. Update quotation with assignment
+3. Create notification
+4. Generate and store draft document (PDF generation + base64 conversion)
+
+### Issue 2: AR Invoice NOT Created (Critical Gap)
+**Root Cause**: Looking at the approved payment data:
+- Payment ID `1a45259b-2ddb-4a10-82da-e9e00bbb70c6` has `journal_entry_id` set
+- But quotation `QUO-2026-1026-v1.0` has `ar_invoice_id: nil` and `finance_customer_id: nil`
+
+This means the `createOrGetSPHCustomer` and `createSPHARInvoice` functions are failing silently during Finance approval. The error is being caught and suppressed.
+
+### Issue 3: Finance Approval Slow / Button Unresponsive
+**Root Cause**: The `approvePayment` function performs 10+ sequential operations:
+1. Document validation
+2. Update payment status
+3. Create/Get customer (RPC call)
+4. Create AR Invoice
+5. Post GL entry
+6. Update COA balances
+7. Add signature
+8. Update invoices
+9. Create notification
+10. Regenerate PDFs
+11. Delete payment proof
+
+Each operation is awaited sequentially, causing cumulative delays.
+
+### Issue 4: GL Entries Not Visible in Finance Module
+**Root Cause**: The GL entries ARE being created with `business_unit_code: 'SPH'`, but:
+- When filtering by "Special Hire" in the company dropdown, it applies a business_unit_code filter
+- The query shows the entry exists: `SPH-ADV-QUO-2026-1026-v1.0-MKROJ9J3` for NCG Holding
+
+### Issue 5: Missing Scenarios Coverage
+The current implementation doesn't fully handle:
+- Full payment upfront (no advance → customer pays 100%)
+- Post-trip extra charges → Additional balance invoice
+- Partial payments on balance
 
 ---
 
-## Current State Analysis
+## Technical Fixes Required
 
-### What Works
-| Component | Status |
-|-----------|--------|
-| GL posting on Finance Approval | ✅ Implemented |
-| GL posting on Invoice Send | ✅ Implemented |
-| Document storage (sales_receipt/invoice) | ✅ Implemented |
-| Payment status workflow | ✅ Implemented |
-| Quotation payment summary trigger | ✅ Implemented |
-
-### What's Missing
-| Gap | Impact |
-|-----|--------|
-| No AR Invoice created in Finance module | Cannot track receivables in Finance > Accounts Receivable |
-| No mandatory Sales Receipt check | Finance can approve payment without receipt generated |
-| No link between `document_storage` and `ar_invoices` | Documents exist but not connected to Finance AR |
-| GL entries not linked to AR Invoice | Journal entries exist but AR tracking incomplete |
-| No SPH customer creation in Finance | No customer records for SPH in Finance module |
-
----
-
-## Proposed Architecture
-
-### Complete Transaction Flow
+### Fix 1: Add Timeout and Retry Logic to Payment Confirmation
 
 ```text
-PHASE 1: QUOTATION CONFIRMED + ADVANCE PAYMENT
-============================================
-Step 1: Operations confirms payment → Creates special_hire_payments (pending_finance)
-Step 2: Auto-generate Draft Sales Receipt → Stored in document_storage
-Step 3: Finance approves payment:
-   a. Check: Sales Receipt document exists (NEW VALIDATION)
-   b. Create/Get Customer in Finance module (NEW)
-   c. Create AR Invoice in ar_invoices table (NEW)
-   d. Create GL Entry: DR Bank / CR Customer Advance
-   e. Link AR Invoice to Journal Entry
-   f. Update document_storage to 'approved'
-   g. Update quotation.advance_paid via trigger
+Location: src/components/special-hire/PaymentConfirmationModal.tsx
+          src/components/special-hire/ConfirmedTripsTable.tsx
 
-PHASE 2: TRIP COMPLETED + BALANCE INVOICE
-=========================================
-Step 4: Post-trip adjustments recorded
-Step 5: Generate Balance Invoice (customer-facing)
-Step 6: Send Invoice to Customer:
-   a. Create/Update AR Invoice with full amount
-   b. Create GL Entry: DR Trade Receivable / CR Revenue  
-   c. Create GL Entry: DR Customer Advance / CR Receivable (apply advance)
-   d. Update AR Invoice balance
+Changes:
+1. Add operation progress indicators
+2. Implement parallel operations where possible
+3. Add retry logic for document generation
+4. Add AbortController timeout (30 seconds max)
+5. Show granular progress: "Creating payment...", "Generating document...", etc.
+```
 
-PHASE 3: BALANCE PAYMENT
-========================
-Step 7: Customer pays balance → special_hire_payments created
-Step 8: Finance approves:
-   a. Create GL Entry: DR Bank / CR Trade Receivable
-   b. Update AR Invoice: paid_amount, balance, status='paid'
-   c. Create AR Receipt in ar_receipts table
+### Fix 2: Fix Silent AR/Customer Creation Failures
+
+```text
+Location: src/hooks/useFinanceApproval.ts
+
+Current Problem (lines 87-228):
+- The try/catch around AR/GL integration swallows errors
+- createOrGetSPHCustomer returns null on error but code continues
+- No validation that customer was actually created before proceeding
+
+Fixes:
+1. Add proper error propagation for critical operations
+2. Validate customer ID before attempting AR Invoice creation
+3. Add detailed console logging for debugging
+4. Show specific toast messages for each failure type
+```
+
+### Fix 3: Parallelize Finance Approval Operations
+
+```text
+Location: src/hooks/useFinanceApproval.ts
+
+Changes:
+1. Group independent operations to run in parallel using Promise.all
+2. Separate critical path (payment status update) from non-critical (notifications, PDF regeneration)
+3. Use background processing for PDF regeneration
+4. Add operation timeout handling
+```
+
+### Fix 4: Add "Retry Finance Integration" Button
+
+```text
+Location: src/components/special-hire/ConfirmedTripsTable.tsx
+
+For payments that were approved before AR integration was working:
+1. Add a dropdown option "Retry AR/GL Integration"
+2. Re-run the AR creation for existing approved payments
+3. Useful for fixing historical data
+```
+
+### Fix 5: Improve Error Visibility and Debugging
+
+```text
+Location: Multiple files
+
+Changes:
+1. Add visible status indicators showing AR/GL integration status
+2. Add "View Finance Links" button on quotation detail
+3. Show linked AR Invoice number, Customer ID, Journal Entry in UI
+4. Add console grouping for easier debugging
 ```
 
 ---
 
-## Database Changes Required
+## Complete Scenario Coverage
 
-### 1. Add SPH Customer Linking
-Add columns to `special_hire_quotations` to link to Finance customers:
-
-```sql
-ALTER TABLE special_hire_quotations
-ADD COLUMN IF NOT EXISTS finance_customer_id UUID REFERENCES customers(id),
-ADD COLUMN IF NOT EXISTS ar_invoice_id UUID REFERENCES ar_invoices(id);
+### Scenario 1: Advance Payment → Trip → Balance Payment
+```text
+Current Flow (Now Working):
+1. ✅ Operations confirms advance → pending_finance
+2. ✅ Finance approves → Create Customer + AR Invoice + GL (DR Bank / CR Advance)
+3. ✅ Trip completed → Post-trip adjustments
+4. ✅ Generate Balance Invoice → GL (DR Receivable / CR Revenue) + Apply Advance
+5. ✅ Balance payment confirmed → pending_finance
+6. ✅ Finance approves → Update AR Invoice + GL (DR Bank / CR Receivable)
 ```
 
-### 2. Add AR Links to Payments
-Add columns to `special_hire_payments` for Finance integration:
-
-```sql
-ALTER TABLE special_hire_payments
-ADD COLUMN IF NOT EXISTS ar_invoice_id UUID REFERENCES ar_invoices(id),
-ADD COLUMN IF NOT EXISTS ar_receipt_id UUID REFERENCES ar_receipts(id),
-ADD COLUMN IF NOT EXISTS journal_entry_id UUID REFERENCES journal_entries(id);
+### Scenario 2: Full Payment Upfront → Trip
+```text
+Current: Partial support
+Needed Fix: When payment_type = 'full':
+1. Create AR Invoice with total_amount = paid_amount, balance = 0, status = 'paid'
+2. GL: DR Bank / CR Revenue (direct revenue recognition, no advance liability)
 ```
 
-### 3. Create SPH Customer Auto-Creation Function
+### Scenario 3: Full Payment → Trip → Extra Charges
+```text
+Current: Not fully supported
+Needed Fix:
+1. After trip, if extra charges recorded
+2. Create Debit Note / Additional AR Invoice for the extra amount
+3. GL: DR Receivable / CR Revenue
+4. Track as separate receivable linked to original quotation
+```
 
-```sql
-CREATE OR REPLACE FUNCTION create_or_get_sph_customer(
-  p_customer_name TEXT,
-  p_customer_phone TEXT,
-  p_customer_email TEXT,
-  p_company_id UUID
-)
-RETURNS UUID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_customer_id UUID;
-BEGIN
-  -- Try to find existing customer by phone or email
-  SELECT id INTO v_customer_id
-  FROM customers
-  WHERE company_id = p_company_id
-    AND (phone = p_customer_phone OR email = p_customer_email)
-  LIMIT 1;
+### Scenario 4: Advance → Trip → Under Budget (Refund Scenario)
+```text
+Current: Partial support
+Needed Fix:
+1. If final amount < advance paid
+2. Calculate refund amount
+3. Option to refund or apply credit
+4. GL: DR Advance Liability / CR Bank (for refund)
+```
+
+---
+
+## Files to Modify
+
+| File | Priority | Changes |
+|------|----------|---------|
+| `src/hooks/useFinanceApproval.ts` | HIGH | Fix silent failures, add validation, improve logging |
+| `src/components/special-hire/ConfirmedTripsTable.tsx` | HIGH | Add retry button, improve progress feedback |
+| `src/components/special-hire/PaymentConfirmationModal.tsx` | HIGH | Add timeout handling, progress indicators |
+| `src/hooks/useDocumentManagement.ts` | MEDIUM | Add retry logic, timeout handling |
+| `src/hooks/useSpecialHireFinance.ts` | MEDIUM | Improve error messages, add full payment support |
+| New: `src/components/special-hire/FinanceIntegrationStatus.tsx` | LOW | Visual component showing AR/GL links |
+
+---
+
+## Implementation Details
+
+### Part 1: Fix Silent AR Creation Failure
+
+Current code fails silently when customer creation fails:
+
+```typescript
+// CURRENT (problematic)
+customerId = await createOrGetSPHCustomer({ ... });
+// If this returns null, code continues with customerId = null
+
+if (isAdvance && !arInvoiceId && customerId) {
+  // This block is skipped if customerId is null
+  // NO ERROR SHOWN TO USER
+}
+```
+
+Fix:
+
+```typescript
+// FIXED
+customerId = await createOrGetSPHCustomer({ ... });
+
+if (!customerId) {
+  console.error('[SPH Finance] CRITICAL: Failed to create customer');
+  toast.error('Failed to create customer record. AR Invoice not created.');
+  // Still proceed with payment approval but log the issue
+} else {
+  // Create AR Invoice only if customer exists
+  if (isAdvance && !arInvoiceId) {
+    const arResult = await createSPHARInvoice({ ... });
+    if (!arResult) {
+      toast.error('Failed to create AR Invoice. Check Finance Settings.');
+    } else {
+      arInvoiceId = arResult.invoiceId;
+      toast.success(`AR Invoice ${arResult.invoiceNumber} created`);
+    }
+  }
+}
+```
+
+### Part 2: Add Progress Indicators to Payment Modal
+
+```typescript
+// Add state for tracking progress
+const [progressStep, setProgressStep] = useState<string>('');
+
+// Update UI to show current step
+{loading && (
+  <div className="flex items-center gap-2">
+    <Loader2 className="animate-spin" />
+    <span>{progressStep || 'Processing...'}</span>
+  </div>
+)}
+
+// In handleConfirm:
+setProgressStep('Creating payment record...');
+// ... create payment
+setProgressStep('Generating document...');
+// ... generate document
+setProgressStep('Finalizing...');
+// ... complete
+```
+
+### Part 3: Add Retry AR Integration Button
+
+```typescript
+// New dropdown menu item for approved payments without AR
+{payment.status === 'approved' && !payment.ar_invoice_id && (
+  <DropdownMenuItem onClick={() => handleRetryARIntegration(payment)}>
+    <RefreshCw className="w-4 h-4 mr-2" />
+    Retry AR Integration
+  </DropdownMenuItem>
+)}
+
+// Handler function
+const handleRetryARIntegration = async (payment) => {
+  // Re-run the AR creation logic for this payment
+  const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+  if (!settings) {
+    toast.error('Finance settings not configured');
+    return;
+  }
   
-  IF v_customer_id IS NULL THEN
-    -- Create new customer
-    INSERT INTO customers (
-      company_id, name, phone, email, 
-      customer_type, business_unit_code, is_active
-    )
-    VALUES (
-      p_company_id, p_customer_name, p_customer_phone, p_customer_email,
-      'individual', 'SPH', true
-    )
-    RETURNING id INTO v_customer_id;
-  END IF;
+  // Create customer if needed
+  const customerId = await createOrGetSPHCustomer({ ... });
   
-  RETURN v_customer_id;
-END;
-$$;
+  // Create AR Invoice
+  const arResult = await createSPHARInvoice({ ... });
+  
+  if (arResult) {
+    toast.success(`AR Invoice ${arResult.invoiceNumber} created`);
+    refetch();
+  }
+};
+```
+
+### Part 4: Support Full Payment Scenario
+
+```typescript
+// In useFinanceApproval.ts, modify the isAdvance logic:
+
+const paymentType = paymentData.payment_type || 'advance';
+const isAdvance = paymentType === 'advance';
+const isFullPayment = paymentType === 'full';
+const isBalance = paymentType === 'balance';
+
+if (isAdvance) {
+  // Existing logic: DR Bank / CR Customer Advance
+} else if (isFullPayment) {
+  // NEW: Full payment = direct revenue recognition
+  // DR Bank / CR Special Hire Revenue
+  journalEntry = await postFullPaymentToGLStandalone({ ... });
+  
+  // Create AR Invoice with balance = 0
+  await createSPHARInvoice({
+    totalAmount: paymentData.amount,
+    advanceAmount: paymentData.amount, // Fully paid
+    status: 'paid',
+    ...
+  });
+} else if (isBalance) {
+  // Existing logic: DR Bank / CR Trade Receivable
+}
 ```
 
 ---
 
-## Code Changes Required
-
-### File 1: `src/hooks/useSpecialHireFinance.ts`
-
-**Add new functions:**
-
-1. `createOrGetSPHCustomer()` - Get/create customer in Finance module
-2. `createSPHARInvoice()` - Create AR Invoice record
-3. `updateSPHARInvoice()` - Update AR Invoice on payment
-4. `createSPHARReceipt()` - Create AR Receipt record
-
-### File 2: `src/hooks/useFinanceApproval.ts`
-
-**Modify `approvePayment()` to:**
-
-1. Validate that a draft document exists before approval
-2. Create/get Finance customer
-3. Create AR Invoice linked to quotation
-4. Link GL entry to AR Invoice
-5. Update special_hire_payments with ar_invoice_id and journal_entry_id
-
-### File 3: `src/components/special-hire/GenerateBalanceInvoiceModal.tsx`
-
-**Modify `handleEmailToCustomer()` to:**
-
-1. Update existing AR Invoice with full invoice amount
-2. Mark invoice as sent to customer
-3. Properly apply advance to reduce AR balance
-
-### File 4: `src/components/special-hire/PaymentConfirmationModal.tsx`
-
-**Add validation to ensure:**
-
-1. For advance payments: Draft receipt must be generated before closing modal
-2. Add visual indicator showing document generation status
-
----
-
-## New Validation Gates
-
-### Gate 1: Payment Confirmation → Finance
-**Location**: `ConfirmedTripsTable.tsx` in `handlePaymentConfirmation()`
-**Rule**: Payment can only be created with `pending_finance` status if document was generated
-**Implementation**: Check `docResult.success` before creating payment
-
-### Gate 2: Finance Approval
-**Location**: `useFinanceApproval.ts` in `approvePayment()`
-**Rule**: Cannot approve if no `document_storage` record exists with status='draft'
-**Implementation**: Query document_storage before allowing approval
-
-### Gate 3: Invoice Sending
-**Location**: `GenerateBalanceInvoiceModal.tsx` 
-**Rule**: Invoice must be saved before sending
-**Implementation**: Already exists (checks documentId)
-
----
-
-## Integration Pattern (Following School Bus)
-
-The School Bus module pattern will be replicated:
-
-| School Bus | Special Hire (NEW) |
-|------------|-------------------|
-| `school_ar_invoices` → `ar_invoices` | `special_hire_payments` → `ar_invoices` |
-| `journal_entry_id` field | `journal_entry_id` field |
-| `ar_invoice_id` field | `ar_invoice_id` field |
-| Individual student AR | Individual quotation AR |
-| FIFO payment settlement | Direct payment matching |
-| Auto-sync trigger | Direct update in approval hook |
-
----
-
-## Complete File Modifications List
-
-| File | Changes |
-|------|---------|
-| `supabase/migrations/new_sph_ar_integration.sql` | Add columns and functions |
-| `src/hooks/useSpecialHireFinance.ts` | Add AR Invoice/Customer/Receipt functions |
-| `src/hooks/useFinanceApproval.ts` | Add document validation, AR creation, linking |
-| `src/components/special-hire/GenerateBalanceInvoiceModal.tsx` | Update AR Invoice on send |
-| `src/components/special-hire/ConfirmedTripsTable.tsx` | Ensure document generated before payment |
-| `src/components/special-hire/PaymentConfirmationModal.tsx` | Add document status indicator |
-
----
-
-## Expected Results After Implementation
-
-### Finance Module View
-- **Accounts Receivable**: Will show SPH invoices with business_unit_code='SPH'
-- **Customers**: Will show SPH customers auto-created from quotations
-- **Journal Entries**: Already shows SPH entries (existing)
-
-### Special Hire Module
-- Cannot mark payment without generating Sales Receipt
-- Cannot re-mark if already processed (proper state management)
-- Full audit trail linking payments → documents → AR → GL
-
-### COA Impact
-All SPH transactions properly reflected in:
-- Trade Receivable account (increases/decreases)
-- Customer Advance Receipt account (liability)
-- Bank/Cash account
-- Special Hire Revenue account
-
----
-
-## Verification Checklist
+## Testing Checklist
 
 After implementation:
 
-1. **Create quotation** → Confirm → Record advance payment
-2. **Verify draft Sales Receipt** created in document_storage
-3. **Finance Approve** → Verify:
-   - AR Invoice created in Finance module
-   - Customer created/linked
-   - GL Entry created with AR link
-   - Document status changed to 'approved'
-4. **Complete trip** → Add adjustments → Generate Balance Invoice
-5. **Send Invoice** → Verify:
-   - AR Invoice updated with full amount
-   - GL entries created (Revenue + Advance Apply)
-6. **Record balance payment** → Finance Approve → Verify:
-   - AR Invoice status = 'paid'
-   - GL Entry created
-7. **Check Finance Module**:
-   - Filter AR by business_unit_code = 'SPH'
-   - Verify all SPH receivables visible
-   - Verify COA balances correct
+1. **Test Payment Confirmation Speed**
+   - Create new quotation → Confirm advance payment
+   - Modal should show progress steps
+   - Should complete within 5-10 seconds
+
+2. **Test AR Invoice Creation**
+   - After Finance approval → Check ar_invoices table
+   - Should see new invoice with business_unit_code='SPH'
+   - Should see in Finance > AR > Invoices
+
+3. **Test Retry Button**
+   - Find approved payment without AR Invoice
+   - Click "Retry AR Integration"
+   - Should create missing AR/Customer records
+
+4. **Test Full Payment Scenario**
+   - Create quotation → Choose "Full Payment (100%)"
+   - Confirm and approve
+   - Should create AR Invoice with balance=0, status='paid'
+
+5. **Test Extra Charges**
+   - Complete trip → Add post-trip adjustments
+   - Generate balance invoice
+   - Should update AR Invoice total
+
+---
+
+## Expected Outcomes
+
+1. Payment confirmation completes in under 10 seconds with visible progress
+2. All approved payments have linked AR Invoices and Customers
+3. GL entries visible when filtering by "Special Hire" business unit
+4. Historical payments can be fixed with "Retry AR Integration" button
+5. All payment scenarios (advance, full, balance) properly tracked in Finance module
+
