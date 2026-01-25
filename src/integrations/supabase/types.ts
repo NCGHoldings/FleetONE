@@ -14387,6 +14387,7 @@ export type Database = {
           quantity: number
           quotation_date: string
           quotation_no: string
+          referral_agent_id: string | null
           status: string | null
           terms_and_conditions: Json | null
           total_price: number
@@ -14417,6 +14418,7 @@ export type Database = {
           quantity?: number
           quotation_date?: string
           quotation_no: string
+          referral_agent_id?: string | null
           status?: string | null
           terms_and_conditions?: Json | null
           total_price: number
@@ -14447,6 +14449,7 @@ export type Database = {
           quantity?: number
           quotation_date?: string
           quotation_no?: string
+          referral_agent_id?: string | null
           status?: string | null
           terms_and_conditions?: Json | null
           total_price?: number
@@ -14481,10 +14484,80 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sinotruck_quotations_referral_agent_id_fkey"
+            columns: ["referral_agent_id"]
+            isOneToOne: false
+            referencedRelation: "referral_agents"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "sinotruck_quotations_truck_model_id_fkey"
             columns: ["truck_model_id"]
             isOneToOne: false
             referencedRelation: "sinotruck_truck_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sinotruck_referral_commission_payments: {
+        Row: {
+          commission_amount: number | null
+          commission_pct: number | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          paid_at: string | null
+          paid_by: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_status: string | null
+          quotation_id: string | null
+          referral_agent_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          commission_amount?: number | null
+          commission_pct?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: string | null
+          quotation_id?: string | null
+          referral_agent_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          commission_amount?: number | null
+          commission_pct?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: string | null
+          quotation_id?: string | null
+          referral_agent_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_referral_commission_payments_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: true
+            referencedRelation: "sinotruck_quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_referral_commission_payments_referral_agent_id_fkey"
+            columns: ["referral_agent_id"]
+            isOneToOne: false
+            referencedRelation: "referral_agents"
             referencedColumns: ["id"]
           },
         ]

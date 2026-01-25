@@ -91,22 +91,55 @@ export function ReferralAgentsManagement() {
 
       if (agentsError) throw agentsError;
 
-      // Fetch commission payments for each agent
-      const { data: payments, error: paymentsError } = await supabase
-        .from('referral_commission_payments')
-        .select('referral_agent_id, commission_amount, payment_status');
+      // Fetch commission payments from ALL 4 module tables in parallel
+      const [specialHireRes, yutongRes, lightVehicleRes, sinotruckRes] = await Promise.all([
+        supabase.from('referral_commission_payments')
+          .select('referral_agent_id, commission_amount, payment_status'),
+        supabase.from('yutong_referral_commission_payments')
+          .select('referral_agent_id, commission_amount, payment_status'),
+        supabase.from('lightvehicle_referral_commission_payments')
+          .select('agent_id, commission_amount, status'),
+        supabase.from('sinotruck_referral_commission_payments')
+          .select('referral_agent_id, commission_amount, payment_status')
+      ]);
 
-      if (paymentsError) throw paymentsError;
+      // Normalize and combine all payments
+      const allPayments = [
+        ...(specialHireRes.data || []).map(p => ({
+          referral_agent_id: p.referral_agent_id,
+          commission_amount: p.commission_amount,
+          payment_status: p.payment_status,
+          source: 'special_hire'
+        })),
+        ...(yutongRes.data || []).map(p => ({
+          referral_agent_id: p.referral_agent_id,
+          commission_amount: p.commission_amount,
+          payment_status: p.payment_status,
+          source: 'yutong'
+        })),
+        ...(lightVehicleRes.data || []).map(p => ({
+          referral_agent_id: p.agent_id,
+          commission_amount: p.commission_amount,
+          payment_status: p.status,
+          source: 'light_vehicle'
+        })),
+        ...(sinotruckRes.data || []).map(p => ({
+          referral_agent_id: p.referral_agent_id,
+          commission_amount: p.commission_amount,
+          payment_status: p.payment_status,
+          source: 'sinotruck'
+        }))
+      ];
 
-      // Calculate pending and paid amounts for each agent
+      // Calculate pending and paid amounts for each agent from ALL modules
       const agentsWithAmounts = (agentsData || []).map(agent => {
-        const agentPayments = payments?.filter(p => p.referral_agent_id === agent.id) || [];
+        const agentPayments = allPayments.filter(p => p.referral_agent_id === agent.id);
         const pending = agentPayments
           .filter(p => p.payment_status === 'pending')
-          .reduce((sum, p) => sum + Number(p.commission_amount), 0);
+          .reduce((sum, p) => sum + Number(p.commission_amount || 0), 0);
         const paid = agentPayments
           .filter(p => p.payment_status === 'paid')
-          .reduce((sum, p) => sum + Number(p.commission_amount), 0);
+          .reduce((sum, p) => sum + Number(p.commission_amount || 0), 0);
         
         return {
           ...agent,
@@ -117,9 +150,13 @@ export function ReferralAgentsManagement() {
 
       setAgents(agentsWithAmounts);
 
-      // Calculate stats
-      const totalPending = payments?.filter(p => p.payment_status === 'pending').reduce((sum, p) => sum + Number(p.commission_amount), 0) || 0;
-      const totalPaid = payments?.filter(p => p.payment_status === 'paid').reduce((sum, p) => sum + Number(p.commission_amount), 0) || 0;
+      // Calculate stats from ALL modules
+      const totalPending = allPayments
+        .filter(p => p.payment_status === 'pending')
+        .reduce((sum, p) => sum + Number(p.commission_amount || 0), 0);
+      const totalPaid = allPayments
+        .filter(p => p.payment_status === 'paid')
+        .reduce((sum, p) => sum + Number(p.commission_amount || 0), 0);
 
       setStats({
         totalAgents: agentsData?.length || 0,
