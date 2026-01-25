@@ -15754,7 +15754,12 @@ export type Database = {
       }
       special_hire_trip_adjustments: {
         Row: {
+          actual_drop_datetime: string | null
+          actual_hours: number | null
           actual_km_traveled: number | null
+          actual_overnight_charge: number | null
+          actual_overtime_charge: number | null
+          actual_pickup_datetime: string | null
           additional_expenses: Json | null
           adjusted_at: string | null
           adjusted_by: string | null
@@ -15764,20 +15769,34 @@ export type Database = {
           balance_due: number | null
           balance_invoice_document_id: string | null
           created_at: string | null
+          extra_hours: number | null
           extra_km: number | null
           extra_km_charge_per_km: number | null
           extra_km_total_charge: number | null
           final_trip_amount: number | null
           id: string
           notes: string | null
+          original_drop_datetime: string | null
+          original_hours: number | null
+          original_overnight_charge: number | null
+          original_overtime_charge: number | null
+          original_pickup_datetime: string | null
           original_quotation_amount: number | null
           original_quoted_km: number | null
+          overnight_charge_adjustment: number | null
+          overtime_charge_adjustment: number | null
           quotation_id: string
           total_additional_expenses: number | null
+          total_time_adjustment: number | null
           updated_at: string | null
         }
         Insert: {
+          actual_drop_datetime?: string | null
+          actual_hours?: number | null
           actual_km_traveled?: number | null
+          actual_overnight_charge?: number | null
+          actual_overtime_charge?: number | null
+          actual_pickup_datetime?: string | null
           additional_expenses?: Json | null
           adjusted_at?: string | null
           adjusted_by?: string | null
@@ -15787,20 +15806,34 @@ export type Database = {
           balance_due?: number | null
           balance_invoice_document_id?: string | null
           created_at?: string | null
+          extra_hours?: number | null
           extra_km?: number | null
           extra_km_charge_per_km?: number | null
           extra_km_total_charge?: number | null
           final_trip_amount?: number | null
           id?: string
           notes?: string | null
+          original_drop_datetime?: string | null
+          original_hours?: number | null
+          original_overnight_charge?: number | null
+          original_overtime_charge?: number | null
+          original_pickup_datetime?: string | null
           original_quotation_amount?: number | null
           original_quoted_km?: number | null
+          overnight_charge_adjustment?: number | null
+          overtime_charge_adjustment?: number | null
           quotation_id: string
           total_additional_expenses?: number | null
+          total_time_adjustment?: number | null
           updated_at?: string | null
         }
         Update: {
+          actual_drop_datetime?: string | null
+          actual_hours?: number | null
           actual_km_traveled?: number | null
+          actual_overnight_charge?: number | null
+          actual_overtime_charge?: number | null
+          actual_pickup_datetime?: string | null
           additional_expenses?: Json | null
           adjusted_at?: string | null
           adjusted_by?: string | null
@@ -15810,16 +15843,25 @@ export type Database = {
           balance_due?: number | null
           balance_invoice_document_id?: string | null
           created_at?: string | null
+          extra_hours?: number | null
           extra_km?: number | null
           extra_km_charge_per_km?: number | null
           extra_km_total_charge?: number | null
           final_trip_amount?: number | null
           id?: string
           notes?: string | null
+          original_drop_datetime?: string | null
+          original_hours?: number | null
+          original_overnight_charge?: number | null
+          original_overtime_charge?: number | null
+          original_pickup_datetime?: string | null
           original_quotation_amount?: number | null
           original_quoted_km?: number | null
+          overnight_charge_adjustment?: number | null
+          overtime_charge_adjustment?: number | null
           quotation_id?: string
           total_additional_expenses?: number | null
+          total_time_adjustment?: number | null
           updated_at?: string | null
         }
         Relationships: [

@@ -29,16 +29,18 @@ import {
   CheckCircle,
   AlertCircle,
   FileText,
-  Eye,
-  GitBranch
+  GitBranch,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   usePostTripAdjustment,
   type AdditionalExpense,
   type TripAdjustment,
+  type TimeAdjustmentResult,
 } from "@/hooks/usePostTripAdjustment";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { format } from "date-fns";
 
 interface PostTripAdjustmentModalProps {
   open: boolean;
@@ -52,6 +54,13 @@ interface PostTripAdjustmentModalProps {
   defaultKmRate?: number;
   onAdjustmentSaved?: () => void;
   onRequestInvoiceGeneration?: () => void;
+  // New time-related props
+  originalPickupDatetime?: string;
+  originalDropDatetime?: string;
+  originalOvertimeCharge?: number;
+  originalOvernightCharge?: number;
+  hourlyRate?: number;
+  nightBlockFee?: number;
 }
 
 export const PostTripAdjustmentModal = ({
@@ -66,10 +75,17 @@ export const PostTripAdjustmentModal = ({
   defaultKmRate = 300,
   onAdjustmentSaved,
   onRequestInvoiceGeneration,
+  originalPickupDatetime,
+  originalDropDatetime,
+  originalOvertimeCharge = 0,
+  originalOvernightCharge = 0,
+  hourlyRate = 500,
+  nightBlockFee = 3000,
 }: PostTripAdjustmentModalProps) => {
   const {
     loading,
     calculateTotals,
+    calculateTimeAdjustment,
     saveAdjustmentDraft,
     finalizeAdjustment,
     getAdjustment,
@@ -83,11 +99,17 @@ export const PostTripAdjustmentModal = ({
     AdditionalExpense[]
   >([]);
 
+  // Time adjustment state
+  const [actualPickupDatetime, setActualPickupDatetime] = useState<string>("");
+  const [actualDropDatetime, setActualDropDatetime] = useState<string>("");
+  const [timeAdjustmentResult, setTimeAdjustmentResult] = useState<TimeAdjustmentResult | null>(null);
+
   // Calculated values
   const [extraKm, setExtraKm] = useState(0);
   const [totals, setTotals] = useState({
     extra_km_total_charge: 0,
     total_additional_expenses: 0,
+    total_time_adjustment: 0,
     adjustment_amount: 0,
     final_trip_amount: originalAmount,
     balance_due: originalAmount - advancePaid,
@@ -98,8 +120,25 @@ export const PostTripAdjustmentModal = ({
   useEffect(() => {
     if (open && quotationId) {
       loadExistingAdjustment();
+      // Initialize actual times with original times if available
+      if (originalPickupDatetime) {
+        setActualPickupDatetime(formatDatetimeForInput(originalPickupDatetime));
+      }
+      if (originalDropDatetime) {
+        setActualDropDatetime(formatDatetimeForInput(originalDropDatetime));
+      }
     }
-  }, [open, quotationId]);
+  }, [open, quotationId, originalPickupDatetime, originalDropDatetime]);
+
+  const formatDatetimeForInput = (datetime: string): string => {
+    if (!datetime) return "";
+    try {
+      const date = new Date(datetime);
+      return format(date, "yyyy-MM-dd'T'HH:mm");
+    } catch {
+      return "";
+    }
+  };
 
   const loadExistingAdjustment = async () => {
     const { data } = await getAdjustment(quotationId);
@@ -110,20 +149,50 @@ export const PostTripAdjustmentModal = ({
       setAdditionalExpenses(
         (data.additional_expenses as AdditionalExpense[]) || []
       );
+      // Load time adjustment data if exists
+      if (data.actual_pickup_datetime) {
+        setActualPickupDatetime(formatDatetimeForInput(data.actual_pickup_datetime));
+      }
+      if (data.actual_drop_datetime) {
+        setActualDropDatetime(formatDatetimeForInput(data.actual_drop_datetime));
+      }
+      if (data.adjustment_status === 'finalized') {
+        setAdjustmentFinalized(true);
+      }
     }
   };
 
+  // Calculate time adjustment when times change
+  useEffect(() => {
+    if (originalPickupDatetime && originalDropDatetime && actualPickupDatetime && actualDropDatetime) {
+      const result = calculateTimeAdjustment(
+        originalKm,
+        actualKm,
+        originalPickupDatetime,
+        originalDropDatetime,
+        actualPickupDatetime,
+        actualDropDatetime,
+        { hourlyRate, nightBlockFee }
+      );
+      setTimeAdjustmentResult(result);
+    } else {
+      setTimeAdjustmentResult(null);
+    }
+  }, [originalPickupDatetime, originalDropDatetime, actualPickupDatetime, actualDropDatetime, originalKm, actualKm, hourlyRate, nightBlockFee]);
+
   // Recalculate whenever inputs change
   useEffect(() => {
+    const timeAdjustment = timeAdjustmentResult?.totalTimeAdjustment || 0;
     const calculated = calculateTotals(
       originalAmount,
       extraKm,
       kmRate,
       additionalExpenses,
-      advancePaid
+      advancePaid,
+      timeAdjustment
     );
     setTotals(calculated);
-  }, [extraKm, kmRate, additionalExpenses, originalAmount, advancePaid]);
+  }, [extraKm, kmRate, additionalExpenses, originalAmount, advancePaid, timeAdjustmentResult]);
 
   // Calculate extra KM whenever actual KM changes
   useEffect(() => {
@@ -171,6 +240,21 @@ export const PostTripAdjustmentModal = ({
     balance_due: totals.balance_due,
     notes,
     adjustment_status: status,
+    // Time adjustment fields
+    original_pickup_datetime: originalPickupDatetime,
+    original_drop_datetime: originalDropDatetime,
+    actual_pickup_datetime: actualPickupDatetime || undefined,
+    actual_drop_datetime: actualDropDatetime || undefined,
+    original_hours: timeAdjustmentResult?.originalHours || 0,
+    actual_hours: timeAdjustmentResult?.actualHours || 0,
+    extra_hours: timeAdjustmentResult?.extraHours || 0,
+    original_overtime_charge: timeAdjustmentResult?.originalOvertimeCharge || originalOvertimeCharge,
+    original_overnight_charge: timeAdjustmentResult?.originalOvernightCharge || originalOvernightCharge,
+    actual_overtime_charge: timeAdjustmentResult?.actualOvertimeCharge || 0,
+    actual_overnight_charge: timeAdjustmentResult?.actualOvernightCharge || 0,
+    overtime_charge_adjustment: timeAdjustmentResult?.overtimeAdjustment || 0,
+    overnight_charge_adjustment: timeAdjustmentResult?.overnightAdjustment || 0,
+    total_time_adjustment: timeAdjustmentResult?.totalTimeAdjustment || 0,
   });
 
   const handleSaveDraft = async () => {
@@ -198,7 +282,9 @@ export const PostTripAdjustmentModal = ({
   };
 
   const isExtraKmPositive = extraKm > 0;
-  const hasAdjustments = extraKm !== 0 || additionalExpenses.length > 0;
+  const hasTimeAdjustment = timeAdjustmentResult && timeAdjustmentResult.totalTimeAdjustment !== 0;
+  const hasAdjustments = extraKm !== 0 || additionalExpenses.length > 0 || hasTimeAdjustment;
+  const hasTimeData = originalPickupDatetime && originalDropDatetime;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -206,7 +292,7 @@ export const PostTripAdjustmentModal = ({
         <DialogHeader>
           <DialogTitle>Post-Trip Adjustments</DialogTitle>
           <DialogDescription>
-            Add extra kilometers and additional expenses for this trip
+            Add extra kilometers, time adjustments, and additional expenses for this trip
           </DialogDescription>
         </DialogHeader>
 
@@ -306,6 +392,148 @@ export const PostTripAdjustmentModal = ({
         </div>
 
         <Separator />
+
+        {/* Time Adjustment Section */}
+        {hasTimeData && (
+          <>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Time Adjustment</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Original Times (Read-only) */}
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Original Pickup Time</Label>
+                  <Input
+                    type="text"
+                    value={originalPickupDatetime ? format(new Date(originalPickupDatetime), "MMM dd, yyyy HH:mm") : "Not set"}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Actual Pickup Time</Label>
+                  <Input
+                    type="datetime-local"
+                    value={actualPickupDatetime}
+                    onChange={(e) => setActualPickupDatetime(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Original Drop Time</Label>
+                  <Input
+                    type="text"
+                    value={originalDropDatetime ? format(new Date(originalDropDatetime), "MMM dd, yyyy HH:mm") : "Not set"}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Actual Drop Time</Label>
+                  <Input
+                    type="datetime-local"
+                    value={actualDropDatetime}
+                    onChange={(e) => setActualDropDatetime(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Time Analysis */}
+              {timeAdjustmentResult && (
+                <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                  <CardContent className="pt-4">
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-blue-700 dark:text-blue-300">Time Analysis</h4>
+                      
+                      <div className="grid grid-cols-4 gap-4 text-sm">
+                        <div className="text-center">
+                          <div className="font-medium">{timeAdjustmentResult.availableHours.toFixed(1)} hrs</div>
+                          <div className="text-muted-foreground text-xs">Available Hours</div>
+                          <div className="text-muted-foreground text-xs">({actualKm} km ÷ 10 km/h)</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium">{timeAdjustmentResult.originalHours.toFixed(1)} hrs</div>
+                          <div className="text-muted-foreground text-xs">Original Duration</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium">{timeAdjustmentResult.actualHours.toFixed(1)} hrs</div>
+                          <div className="text-muted-foreground text-xs">Actual Duration</div>
+                        </div>
+                        <div className="text-center">
+                          <div className={`font-medium ${timeAdjustmentResult.extraHours > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                            {timeAdjustmentResult.extraHours.toFixed(1)} hrs
+                          </div>
+                          <div className="text-muted-foreground text-xs">Extra Hours</div>
+                        </div>
+                      </div>
+
+                      <Separator className="my-2" />
+
+                      {/* Time Charges Comparison */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-muted-foreground">
+                              <th className="text-left py-1">Charge Type</th>
+                              <th className="text-right py-1">Original</th>
+                              <th className="text-right py-1">Actual</th>
+                              <th className="text-right py-1">Adjustment</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td className="py-1">Overtime</td>
+                              <td className="text-right py-1">LKR {timeAdjustmentResult.originalOvertimeCharge.toLocaleString()}</td>
+                              <td className="text-right py-1">LKR {timeAdjustmentResult.actualOvertimeCharge.toLocaleString()}</td>
+                              <td className={`text-right py-1 font-medium ${timeAdjustmentResult.overtimeAdjustment > 0 ? 'text-destructive' : timeAdjustmentResult.overtimeAdjustment < 0 ? 'text-green-600' : ''}`}>
+                                {timeAdjustmentResult.overtimeAdjustment > 0 ? '+' : ''}LKR {timeAdjustmentResult.overtimeAdjustment.toLocaleString()}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="py-1">Overnight</td>
+                              <td className="text-right py-1">LKR {timeAdjustmentResult.originalOvernightCharge.toLocaleString()}</td>
+                              <td className="text-right py-1">LKR {timeAdjustmentResult.actualOvernightCharge.toLocaleString()}</td>
+                              <td className={`text-right py-1 font-medium ${timeAdjustmentResult.overnightAdjustment > 0 ? 'text-destructive' : timeAdjustmentResult.overnightAdjustment < 0 ? 'text-green-600' : ''}`}>
+                                {timeAdjustmentResult.overnightAdjustment > 0 ? '+' : ''}LKR {timeAdjustmentResult.overnightAdjustment.toLocaleString()}
+                              </td>
+                            </tr>
+                            <tr className="border-t font-semibold">
+                              <td className="py-1" colSpan={3}>Total Time Adjustment</td>
+                              <td className={`text-right py-1 ${timeAdjustmentResult.totalTimeAdjustment > 0 ? 'text-destructive' : timeAdjustmentResult.totalTimeAdjustment < 0 ? 'text-green-600' : ''}`}>
+                                {timeAdjustmentResult.totalTimeAdjustment > 0 ? '+' : ''}LKR {timeAdjustmentResult.totalTimeAdjustment.toLocaleString()}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {hasTimeAdjustment && (
+                <Alert
+                  variant={timeAdjustmentResult!.totalTimeAdjustment > 0 ? "destructive" : "default"}
+                  className={timeAdjustmentResult!.totalTimeAdjustment < 0 ? "border-green-500" : ""}
+                >
+                  <Clock className="h-4 w-4" />
+                  <AlertDescription>
+                    {timeAdjustmentResult!.totalTimeAdjustment > 0
+                      ? `Trip took ${(timeAdjustmentResult!.actualHours - timeAdjustmentResult!.originalHours).toFixed(1)} hours LONGER. Additional time charge: LKR ${timeAdjustmentResult!.totalTimeAdjustment.toLocaleString()}`
+                      : `Trip took ${Math.abs(timeAdjustmentResult!.actualHours - timeAdjustmentResult!.originalHours).toFixed(1)} hours LESS. Credit: LKR ${Math.abs(timeAdjustmentResult!.totalTimeAdjustment).toLocaleString()}`}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+
+            <Separator />
+          </>
+        )}
 
         {/* Additional Expenses Section */}
         <div className="space-y-4">
@@ -440,6 +668,20 @@ export const PostTripAdjustmentModal = ({
                   >
                     {isExtraKmPositive ? "+" : ""}
                     LKR {totals.extra_km_total_charge.toLocaleString()}
+                  </span>
+                </div>
+              )}
+
+              {hasTimeAdjustment && (
+                <div className="flex justify-between">
+                  <span>Time Adjustment (Overtime + Overnight):</span>
+                  <span
+                    className={`font-semibold ${
+                      timeAdjustmentResult!.totalTimeAdjustment > 0 ? "text-destructive" : "text-green-600"
+                    }`}
+                  >
+                    {timeAdjustmentResult!.totalTimeAdjustment > 0 ? "+" : ""}
+                    LKR {timeAdjustmentResult!.totalTimeAdjustment.toLocaleString()}
                   </span>
                 </div>
               )}

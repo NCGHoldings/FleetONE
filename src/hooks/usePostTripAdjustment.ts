@@ -1,11 +1,26 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { calculateExtraTimeCharge } from "@/lib/extra-time-calculator";
 
 export interface AdditionalExpense {
   description: string;
   amount: number;
   category: "toll" | "parking" | "waiting" | "driver_meals" | "other";
+}
+
+export interface TimeAdjustmentResult {
+  originalHours: number;
+  actualHours: number;
+  availableHours: number;
+  extraHours: number;
+  originalOvertimeCharge: number;
+  originalOvernightCharge: number;
+  actualOvertimeCharge: number;
+  actualOvernightCharge: number;
+  overtimeAdjustment: number;
+  overnightAdjustment: number;
+  totalTimeAdjustment: number;
 }
 
 export interface TripAdjustment {
@@ -25,30 +40,104 @@ export interface TripAdjustment {
   balance_due?: number;
   notes?: string;
   adjustment_status: "draft" | "finalized" | "invoiced";
+  // Time adjustment fields
+  original_pickup_datetime?: string;
+  original_drop_datetime?: string;
+  actual_pickup_datetime?: string;
+  actual_drop_datetime?: string;
+  original_hours?: number;
+  actual_hours?: number;
+  extra_hours?: number;
+  original_overtime_charge?: number;
+  original_overnight_charge?: number;
+  actual_overtime_charge?: number;
+  actual_overnight_charge?: number;
+  overtime_charge_adjustment?: number;
+  overnight_charge_adjustment?: number;
+  total_time_adjustment?: number;
+}
+
+export interface TimeAdjustmentConfig {
+  baselineSpeedKmph?: number;
+  hourlyRate?: number;
+  nightBlockFee?: number;
 }
 
 export const usePostTripAdjustment = () => {
   const [loading, setLoading] = useState(false);
+
+  const calculateTimeAdjustment = (
+    originalDistanceKm: number,
+    actualDistanceKm: number,
+    originalPickupDatetime: string | Date,
+    originalDropDatetime: string | Date,
+    actualPickupDatetime: string | Date,
+    actualDropDatetime: string | Date,
+    config: TimeAdjustmentConfig = {}
+  ): TimeAdjustmentResult => {
+    const {
+      baselineSpeedKmph = 10,
+      hourlyRate = 500,
+      nightBlockFee = 3000,
+    } = config;
+
+    // Calculate original time charges based on original quoted distance and times
+    const originalTimeResult = calculateExtraTimeCharge(
+      originalDistanceKm,
+      originalPickupDatetime,
+      originalDropDatetime,
+      { baselineSpeedKmph, hourlyRate, nightBlockFee }
+    );
+
+    // Calculate actual time charges based on actual distance and actual times
+    const actualTimeResult = calculateExtraTimeCharge(
+      actualDistanceKm,
+      actualPickupDatetime,
+      actualDropDatetime,
+      { baselineSpeedKmph, hourlyRate, nightBlockFee }
+    );
+
+    // Calculate adjustments (difference between actual and original)
+    const overtimeAdjustment = actualTimeResult.overtimeCharge - originalTimeResult.overtimeCharge;
+    const overnightAdjustment = actualTimeResult.overnightCharge - originalTimeResult.overnightCharge;
+    const totalTimeAdjustment = overtimeAdjustment + overnightAdjustment;
+
+    return {
+      originalHours: originalTimeResult.actualHours,
+      actualHours: actualTimeResult.actualHours,
+      availableHours: actualTimeResult.availableHours,
+      extraHours: actualTimeResult.extraHours,
+      originalOvertimeCharge: originalTimeResult.overtimeCharge,
+      originalOvernightCharge: originalTimeResult.overnightCharge,
+      actualOvertimeCharge: actualTimeResult.overtimeCharge,
+      actualOvernightCharge: actualTimeResult.overnightCharge,
+      overtimeAdjustment,
+      overnightAdjustment,
+      totalTimeAdjustment,
+    };
+  };
 
   const calculateTotals = (
     originalAmount: number,
     extraKm: number,
     extraKmRate: number,
     additionalExpenses: AdditionalExpense[],
-    advancePaid: number
+    advancePaid: number,
+    timeAdjustment: number = 0
   ) => {
     const extraKmCharge = extraKm * extraKmRate;
     const totalAdditionalExpenses = additionalExpenses.reduce(
       (sum, exp) => sum + exp.amount,
       0
     );
-    const adjustmentAmount = extraKmCharge + totalAdditionalExpenses;
+    const adjustmentAmount = extraKmCharge + totalAdditionalExpenses + timeAdjustment;
     const finalAmount = originalAmount + adjustmentAmount;
     const balanceDue = finalAmount - advancePaid;
 
     return {
       extra_km_total_charge: extraKmCharge,
       total_additional_expenses: totalAdditionalExpenses,
+      total_time_adjustment: timeAdjustment,
       adjustment_amount: adjustmentAmount,
       final_trip_amount: finalAmount,
       balance_due: balanceDue,
@@ -155,6 +244,7 @@ export const usePostTripAdjustment = () => {
 
   return {
     loading,
+    calculateTimeAdjustment,
     calculateTotals,
     saveAdjustmentDraft,
     finalizeAdjustment,

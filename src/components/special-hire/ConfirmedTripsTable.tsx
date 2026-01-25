@@ -1678,6 +1678,12 @@ export function ConfirmedTripsTable() {
             loadAdjustmentData(selectedTrip.id);
             refetch();
           }}
+          originalPickupDatetime={(selectedTrip as any).pickup_datetime}
+          originalDropDatetime={(selectedTrip as any).drop_datetime}
+          originalOvertimeCharge={(selectedTrip as any).overtime_charge || 0}
+          originalOvernightCharge={(selectedTrip as any).overnight_charge || 0}
+          hourlyRate={500}
+          nightBlockFee={3000}
         />
       )}
 
