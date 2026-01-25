@@ -7,7 +7,6 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -31,7 +30,10 @@ import {
   Filter,
   CheckCircle,
   Clock,
-  XCircle
+  XCircle,
+  Bus,
+  Truck,
+  Car
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -57,12 +59,11 @@ interface CommissionRecord {
   payment_reference: string | null;
   payment_method: string | null;
   created_at: string;
+  source: 'special_hire' | 'yutong' | 'light_vehicle' | 'sinotruck';
   quotation?: {
     quotation_no: string;
     customer_name: string;
     gross_revenue: number;
-    pickup_location: string;
-    drop_location: string;
   };
 }
 
@@ -92,23 +93,98 @@ export function ReferralAgentHistoryModal({
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
-        .from('referral_commission_payments')
-        .select(`
-          *,
-          quotation:special_hire_quotations (
-            quotation_no,
-            customer_name,
-            gross_revenue,
-            pickup_location,
-            drop_location
-          )
-        `)
-        .eq('referral_agent_id', agent.id)
-        .order('created_at', { ascending: false });
+      // Fetch from ALL 4 commission tables in parallel
+      const [specialHireRes, yutongRes, lightVehicleRes, sinotruckRes] = await Promise.all([
+        supabase
+          .from('referral_commission_payments')
+          .select(`*, quotation:special_hire_quotations (quotation_no, customer_name, gross_revenue)`)
+          .eq('referral_agent_id', agent.id),
+        supabase
+          .from('yutong_referral_commission_payments')
+          .select(`*, quotation:yutong_quotations (quotation_no, customer_name, total_price)`)
+          .eq('referral_agent_id', agent.id),
+        supabase
+          .from('lightvehicle_referral_commission_payments')
+          .select(`*, quotation:lightvehicle_quotations (quotation_number, customer_name, total_price)`)
+          .eq('agent_id', agent.id),
+        supabase
+          .from('sinotruck_referral_commission_payments')
+          .select(`*, quotation:sinotruck_quotations (quotation_no, customer_name, total_price)`)
+          .eq('referral_agent_id', agent.id)
+      ]);
 
-      if (error) throw error;
-      setRecords(data || []);
+      // Normalize and combine all records with source indicator
+      const allRecords: CommissionRecord[] = [
+        ...(specialHireRes.data || []).map(r => ({
+          id: r.id,
+          quotation_id: r.quotation_id,
+          commission_amount: r.commission_amount,
+          payment_status: r.payment_status,
+          paid_at: r.paid_at,
+          payment_reference: r.payment_reference,
+          payment_method: r.payment_method,
+          created_at: r.created_at,
+          source: 'special_hire' as const,
+          quotation: r.quotation ? {
+            quotation_no: r.quotation.quotation_no,
+            customer_name: r.quotation.customer_name,
+            gross_revenue: r.quotation.gross_revenue
+          } : undefined
+        })),
+        ...(yutongRes.data || []).map(r => ({
+          id: r.id,
+          quotation_id: r.yutong_quotation_id || r.id,
+          commission_amount: r.commission_amount,
+          payment_status: r.payment_status,
+          paid_at: r.paid_at,
+          payment_reference: r.payment_reference,
+          payment_method: r.payment_method,
+          created_at: r.created_at,
+          source: 'yutong' as const,
+          quotation: r.quotation ? {
+            quotation_no: r.quotation.quotation_no,
+            customer_name: r.quotation.customer_name,
+            gross_revenue: r.quotation.total_price || 0
+          } : undefined
+        })),
+        ...(lightVehicleRes.data || []).map(r => ({
+          id: r.id,
+          quotation_id: r.quotation_id || r.id,
+          commission_amount: r.commission_amount,
+          payment_status: r.status || 'pending',
+          paid_at: r.payment_date || null,
+          payment_reference: r.payment_reference,
+          payment_method: null,
+          created_at: r.created_at,
+          source: 'light_vehicle' as const,
+          quotation: r.quotation ? {
+            quotation_no: (r.quotation as any).quotation_number || '',
+            customer_name: (r.quotation as any).customer_name || '',
+            gross_revenue: (r.quotation as any).total_price || 0
+          } : undefined
+        })),
+        ...(sinotruckRes.data || []).map(r => ({
+          id: r.id,
+          quotation_id: r.quotation_id,
+          commission_amount: r.commission_amount,
+          payment_status: r.payment_status,
+          paid_at: r.paid_at,
+          payment_reference: r.payment_reference,
+          payment_method: r.payment_method,
+          created_at: r.created_at,
+          source: 'sinotruck' as const,
+          quotation: r.quotation ? {
+            quotation_no: r.quotation.quotation_no,
+            customer_name: r.quotation.customer_name,
+            gross_revenue: r.quotation.total_price || 0
+          } : undefined
+        }))
+      ];
+
+      // Sort by created_at descending
+      allRecords.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      setRecords(allRecords);
     } catch (error: any) {
       console.error('Error fetching history:', error);
       toast({
@@ -140,19 +216,34 @@ export function ReferralAgentHistoryModal({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
-        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Paid</Badge>;
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"><CheckCircle className="h-3 w-3 mr-1" />Paid</Badge>;
       case 'pending':
-        return <Badge className="bg-orange-100 text-orange-800"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+        return <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
       case 'cancelled':
-        return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" />Cancelled</Badge>;
+        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"><XCircle className="h-3 w-3 mr-1" />Cancelled</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
+  const getSourceBadge = (source: string) => {
+    switch (source) {
+      case 'special_hire':
+        return <Badge variant="outline" className="text-xs"><Bus className="h-3 w-3 mr-1" />Special Hire</Badge>;
+      case 'yutong':
+        return <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/20"><Bus className="h-3 w-3 mr-1" />Yutong</Badge>;
+      case 'light_vehicle':
+        return <Badge variant="outline" className="text-xs bg-green-50 dark:bg-green-900/20"><Car className="h-3 w-3 mr-1" />Light Vehicle</Badge>;
+      case 'sinotruck':
+        return <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-900/20"><Truck className="h-3 w-3 mr-1" />Sinotruck</Badge>;
+      default:
+        return <Badge variant="outline">{source}</Badge>;
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
@@ -245,9 +336,10 @@ export function ReferralAgentHistoryModal({
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
+                <TableHead>Source</TableHead>
                 <TableHead>Quotation #</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead className="text-right">Trip Amount</TableHead>
+                <TableHead className="text-right">Deal Value</TableHead>
                 <TableHead className="text-right">Commission</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Paid Date</TableHead>
@@ -255,10 +347,11 @@ export function ReferralAgentHistoryModal({
             </TableHeader>
             <TableBody>
               {filteredRecords.map((record) => (
-                <TableRow key={record.id}>
+                <TableRow key={`${record.source}-${record.id}`}>
                   <TableCell>
                     {format(new Date(record.created_at), 'MMM dd, yyyy')}
                   </TableCell>
+                  <TableCell>{getSourceBadge(record.source)}</TableCell>
                   <TableCell className="font-mono">
                     {record.quotation?.quotation_no || '-'}
                   </TableCell>

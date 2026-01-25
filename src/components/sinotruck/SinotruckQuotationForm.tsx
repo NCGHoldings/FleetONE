@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Link2 } from "lucide-react";
+import { FileText, Link2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -61,6 +61,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [truckModels, setTruckModels] = useState<any[]>([]);
+  const [referralAgents, setReferralAgents] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     customer_id: "",
@@ -71,12 +72,23 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
     quantity: initialData?.quantity || 1,
     payment_terms: DEFAULT_PAYMENT_TERMS,
     valid_until: "",
+    referral_agent_id: "",
   });
 
   useEffect(() => {
     loadCustomers();
     loadTruckModels();
+    loadReferralAgents();
   }, []);
+
+  const loadReferralAgents = async () => {
+    const { data } = await supabase
+      .from("referral_agents")
+      .select("*")
+      .eq("status", "active")
+      .order("agent_name");
+    if (data) setReferralAgents(data);
+  };
 
   const loadCustomers = async () => {
     const { data } = await supabase
@@ -144,6 +156,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
         valid_until: formData.valid_until || null,
         created_by: user?.id,
         inquiry_id: initialData?.inquiryId || null,
+        referral_agent_id: formData.referral_agent_id || null,
       }]);
 
       if (error) throw error;
@@ -277,6 +290,26 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
                 value={formData.valid_until}
                 onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Referral Agent (Optional)</Label>
+              <Select
+                value={formData.referral_agent_id}
+                onValueChange={(value) => setFormData({ ...formData, referral_agent_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select referral agent" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No Agent</SelectItem>
+                  {referralAgents.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      {agent.agent_name} ({agent.default_commission_pct}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2 col-span-2">
