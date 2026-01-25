@@ -1,134 +1,135 @@
 
-# Special Hire Trigger Fix - Implementation Plan
+# Special Hire Calculation & Display Issues - Complete Fix Plan
 
-## Problem Summary
+## Executive Summary
 
-The database trigger `update_quotation_payment_totals` is missing `total_additional_charges` in the `balance_due` calculation, causing:
-- Incorrect balance amounts displayed to users
-- Wrong AR Invoice totals sent to Finance
-- Incorrect GL postings
-
-**Evidence from Live Data:**
-
-| Quotation | Additional Charges | Current Balance | Correct Balance | Error |
-|-----------|-------------------|-----------------|-----------------|-------|
-| QUO-2026-0944 | 26,500 | 95,641 | 122,141 | -26,500 |
-| QUO-2026-0862 | 6,750 | -6,750 | 0 | -6,750 |
-| QUO-2026-0810 | 12,250 | 80,704 | 92,954 | -12,250 |
-| QUO-2025-0786 | 1,750 | -1,750 | 0 | -1,750 |
-| QUO-2025-0764 | 2,250 | -2,250 | 0 | -2,250 |
+After thorough cross-checking of the Special Hire calculation flow, I identified **4 critical issues** causing time calculations and overnight charges to not display correctly, plus inconsistencies in the quotation/invoice document flow.
 
 ---
 
-## Implementation Steps
+## Issues Identified
 
-### Step 1: Create Database Migration
+### Issue 1: Missing Database Columns for Time Charges
+**Problem**: The `special_hire_quotations` table lacks dedicated columns for `overtime_charge` and `overnight_charge`. These values are bundled into `extra_charges` during save, but lost when retrieving data for display.
 
-Create a new migration file that will:
+**Evidence**: Database query confirmed only `extra_charges` column exists - no individual overtime/overnight columns.
 
-1. **Fix the trigger function** - Add `COALESCE(total_additional_charges, 0)` to the balance calculation
-2. **Repair existing data** - Update all confirmed quotations with correct balance_due values
+### Issue 2: EnhancedCostCalculator References Non-Existent Columns
+**Problem**: Lines 335-336 in `EnhancedCostCalculator.tsx` reference `quotation.overtime_charge` and `quotation.overnight_charge` which return undefined/0.
 
-**Migration SQL:**
-
-```sql
--- Fix update_quotation_payment_totals to include total_additional_charges
-CREATE OR REPLACE FUNCTION public.update_quotation_payment_totals()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $function$
-BEGIN
-  UPDATE public.special_hire_quotations 
-  SET 
-    total_paid = (
-      SELECT COALESCE(SUM(amount), 0) 
-      FROM public.special_hire_payments 
-      WHERE quotation_id = COALESCE(NEW.quotation_id, OLD.quotation_id)
-      AND status = 'approved'
-    ),
-    advance_paid = (
-      SELECT COALESCE(SUM(amount), 0) 
-      FROM public.special_hire_payments 
-      WHERE quotation_id = COALESCE(NEW.quotation_id, OLD.quotation_id) 
-      AND payment_type = 'advance'
-      AND status = 'approved'
-    ),
-    balance_due = (
-      (gross_revenue + 
-       COALESCE(fuel_cost_fuel_only, 0) + 
-       COALESCE(commission_pass_through_amount, 0) + 
-       COALESCE(total_additional_charges, 0) -  -- THIS LINE ADDED
-       COALESCE(discount_amount_lkr, 0)) - (
-        SELECT COALESCE(SUM(amount), 0) 
-        FROM public.special_hire_payments 
-        WHERE quotation_id = COALESCE(NEW.quotation_id, OLD.quotation_id)
-        AND status = 'approved'
-      )
-    )
-  WHERE id = COALESCE(NEW.quotation_id, OLD.quotation_id);
-  
-  RETURN COALESCE(NEW, OLD);
-END;
-$function$;
-
--- Repair all existing confirmed quotation balances
-UPDATE special_hire_quotations
-SET balance_due = (
-  gross_revenue + 
-  COALESCE(fuel_cost_fuel_only, 0) + 
-  COALESCE(commission_pass_through_amount, 0) + 
-  COALESCE(total_additional_charges, 0) - 
-  COALESCE(discount_amount_lkr, 0)
-) - COALESCE(total_paid, 0)
-WHERE status = 'confirmed';
+```typescript
+// Current (BROKEN)
+overtimeCharge: quotation.overtime_charge || 0,  // Always 0
+overnightCharge: quotation.overnight_charge || 0, // Always 0
 ```
 
+### Issue 3: CostBreakdown Working Hours Display Fallback Logic
+**Problem**: When `rateCardDetails` is not fully populated (e.g., viewing saved quotations), the working hours analysis falls back to incomplete calculations that don't match the original business logic.
+
+### Issue 4: QuotationPreview Missing Time Breakdown
+**Problem**: Customer-facing quotation document shows only "Subtotal" and "Final Total" without listing the overtime/overnight components that contributed to those totals. The "Description" column shows static "Route Details" placeholder.
+
 ---
 
-## File to Create
+## Implementation Plan
 
-| File | Purpose |
+### Part 1: Add Database Columns for Time Charges
+
+Create a migration to add `overtime_charge`, `overnight_charge`, and `fixed_rate` columns to `special_hire_quotations`:
+
+```sql
+ALTER TABLE special_hire_quotations 
+ADD COLUMN IF NOT EXISTS overtime_charge NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS overnight_charge NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS fixed_rate NUMERIC DEFAULT 0,
+ADD COLUMN IF NOT EXISTS exceeding_distance_charge NUMERIC DEFAULT 0;
+```
+
+### Part 2: Update SpecialHireForm.tsx to Save Individual Charges
+
+Modify the quotation save logic (around line 1514) to include:
+- `overtime_charge`
+- `overnight_charge`
+- `fixed_rate`
+- `exceeding_distance_charge`
+
+### Part 3: Fix EnhancedCostCalculator.tsx Recalculation
+
+Update the cost data mapping (lines 328-337) to:
+1. First try to use stored values from database
+2. If not available, recalculate using `calculateExtraTimeCharge()` function with stored datetime and distance
+
+```typescript
+// Recalculate if not stored
+const extraTimeResult = calculateExtraTimeCharge(
+  quotation.km_trip || 0,
+  quotation.pickup_datetime,
+  quotation.drop_datetime,
+  { baselineSpeedKmph: 10, hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500, nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000 }
+);
+
+overtimeCharge: quotation.overtime_charge || extraTimeResult.overtimeCharge,
+overnightCharge: quotation.overnight_charge || extraTimeResult.overnightCharge,
+```
+
+### Part 4: Update QuotationPreview.tsx with Time Breakdown
+
+Add a new "Time Analysis" section to the customer document showing:
+- Trip Duration (pickup to drop)
+- Available Hours (distance / 10 km/h)
+- Overtime Hours (if applicable)
+- Overnight Days (if applicable)
+- Individual charge amounts
+
+### Part 5: Update QuotationData Interface
+
+Add the new fields to the interface in `QuotationPreview.tsx` and `useRealtimeSpecialHire.ts`:
+- `overtime_charge?: number`
+- `overnight_charge?: number`
+- `fixed_rate?: number`
+- `exceeding_distance_charge?: number`
+
+---
+
+## Files to Modify
+
+| File | Changes |
 |------|---------|
-| `supabase/migrations/[timestamp]_fix_balance_due_trigger.sql` | Fix trigger + repair data |
+| `supabase/migrations/[new]_add_time_charge_columns.sql` | Add 4 new columns |
+| `src/components/special-hire/SpecialHireForm.tsx` | Save individual charge values |
+| `src/components/special-hire/EnhancedCostCalculator.tsx` | Recalculate from stored or compute |
+| `src/components/special-hire/QuotationPreview.tsx` | Add time breakdown section |
+| `src/components/special-hire/CostBreakdown.tsx` | Improve fallback calculations |
+| `src/hooks/useRealtimeSpecialHire.ts` | Add new fields to interface |
+| `src/integrations/supabase/types.ts` | Update generated types |
 
 ---
 
-## Post-Deployment Verification
+## Verification Steps
 
-After migration runs, verify with this query (should return 0 rows):
+After implementation, verify with these checks:
 
-```sql
-SELECT quotation_no, balance_due, total_additional_charges
-FROM special_hire_quotations
-WHERE status = 'confirmed'
-  AND balance_due != (
-    gross_revenue + COALESCE(fuel_cost_fuel_only, 0) + 
-    COALESCE(commission_pass_through_amount, 0) + 
-    COALESCE(total_additional_charges, 0) - 
-    COALESCE(discount_amount_lkr, 0) - 
-    COALESCE(total_paid, 0)
-  );
-```
+1. **Create new Outside hire quotation** with multi-day trip - confirm overtime/overnight display in CostBreakdown
+2. **View saved quotation** - confirm time analysis displays correctly
+3. **Generate QuotationPreview PDF** - confirm customer document shows charge breakdown
+4. **Generate Balance Invoice** - confirm charges flow through correctly
+5. **Check database** - confirm new columns populated with correct values
 
 ---
 
 ## Technical Details
 
-### What This Fixes
+### Overtime/Overnight Calculation Rules (from extra-time-calculator.ts)
 
-1. **Balance Display** - Customers see correct balance amounts
-2. **AR Invoice Amounts** - Finance receives accurate invoice totals
-3. **GL Postings** - Accounting entries reflect true transaction values
-4. **Negative Balance Prevention** - No more incorrect negative balances
+- **Available Hours** = Trip Distance / 10 km/h
+- **Extra Hours** = Actual Hours - Available Hours
+- **If Extra Hours <= 10**: Charge hourly rate per hour
+- **If Extra Hours > 10**: Charge night block fee (3000 LKR) per 24h, remaining hours charged hourly
 
-### No Frontend Changes Required
+### Data Flow
 
-All frontend code already correctly includes `total_additional_charges`:
-- `useFinanceApproval.ts` (lines 169-173)
-- `PaymentConfirmationModal.tsx`
-- `QuotationPreview.tsx`
-- `GenerateBalanceInvoiceModal.tsx`
+```text
+Form Calculation -> Save to DB (with individual columns) -> Retrieve -> Display in CostBreakdown/Preview
+```
 
-The trigger fix ensures database consistency matches the frontend calculations.
+This ensures the calculated values are persisted and don't need recalculation on display, eliminating discrepancies.
