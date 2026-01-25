@@ -1,156 +1,182 @@
 
-# Special Hire Overtime/Overnight Calculation Complete Fix Plan
+# Referral Agent System - Complete Fix Plan
 
 ## Problem Summary
 
-Based on my investigation, I found **3 critical issues** causing overtime/overnight charges to not display correctly:
+Based on my investigation, I found **4 critical issues** preventing referral tracking across all modules:
 
-### Issue 1: EnhancedCostCalculator Missing Recalculation Logic
-**Problem**: When stored values are 0 (for existing quotations or newly migrated data), the calculator doesn't fall back to recalculating using `calculateExtraTimeCharge`.
+### Issue 1: Sinotruck Missing Referral Agent Support Entirely
+**Problem**: The `sinotruck_quotations` table does NOT have a `referral_agent_id` column.
+- **Evidence**: Database query confirmed column doesn't exist
+- **Impact**: No Sinotruck referrals can ever be tracked
 
-**Evidence from Code (lines 332-335)**:
-```typescript
-const storedOvertimeCharge = quotation.overtime_charge || 0;  // Falls back to 0, not recalculation
-const storedOvernightCharge = quotation.overnight_charge || 0; // Falls back to 0, not recalculation
-```
+### Issue 2: Stats Only Query `referral_commission_payments` (Special Hire Only)
+**Problem**: The ReferralAgentsManagement component (lines 95-99) only queries `referral_commission_payments` table for pending/paid calculations, ignoring Yutong and Light Vehicle commission tables.
+- **Evidence**: Code shows only one table queried
+- **Impact**: Stats show LKR 0 pending/paid even though there are 3 Yutong commission records worth LKR 4,399,500
 
-### Issue 2: Missing Import in EnhancedCostCalculator
-**Problem**: The `calculateExtraTimeCharge` function is not imported in `EnhancedCostCalculator.tsx`, so it cannot perform the fallback recalculation.
+### Issue 3: History Modal Only Shows Special Hire Records
+**Problem**: ReferralAgentHistoryModal (lines 95-108) only fetches from `referral_commission_payments` with a join to `special_hire_quotations`.
+- **Impact**: Agent history doesn't show Yutong, Light Vehicle, or Sinotruck referrals
 
-### Issue 3: Historical Data Has No Charges Stored
-**Problem**: All existing quotations in database have `overtime_charge = 0`, `overnight_charge = 0`, `fixed_rate = 0` because these columns were just added with default values.
+### Issue 4: Light Vehicle Commission Trigger May Not Be Working
+**Problem**: No records found in `lightvehicle_referral_commission_payments` even though the column and trigger exist.
+- **Evidence**: Table is empty
+- **Impact**: Light Vehicle referrals aren't being tracked
 
-**Database Evidence**:
-| Quotation | Trip KM | Pickup | Drop | Extra Charges | Overtime | Overnight | Fixed Rate |
-|-----------|---------|--------|------|---------------|----------|-----------|------------|
-| QUO-2026-0944 | 375.6 | Jan 23 00:00 | Jan 25 15:30 | 15000 | **0** | **0** | **0** |
-| QUO-2026-0862 | 231.6 | Jan 12 00:30 | Jan 13 16:30 | 10000 | **0** | **0** | **0** |
-| QUO-2026-0796 | 657.1 | Jan 08 00:30 | Jan 10 17:30 | 0 | **0** | **0** | **0** |
+---
+
+## Current State Summary
+
+| Module | Has referral_agent_id? | Has Commission Table? | Trigger Working? | Records Found |
+|--------|------------------------|----------------------|------------------|---------------|
+| **Special Hire** | Yes | referral_commission_payments | Manual linking | 0 records |
+| **Yutong** | Yes | yutong_referral_commission_payments | Yes | 3 records (LKR 4.4M) |
+| **Light Vehicle** | Yes | lightvehicle_referral_commission_payments | Unknown | 0 records |
+| **Sinotruck** | **NO** | **NONE** | N/A | N/A |
 
 ---
 
 ## Implementation Plan
 
-### Step 1: Update EnhancedCostCalculator.tsx - Add Import
+### Part 1: Add Sinotruck Referral Agent Support
 
-Add the `calculateExtraTimeCharge` import at the top of the file:
-
-```typescript
-import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
-```
-
-### Step 2: Update EnhancedCostCalculator.tsx - Add Recalculation Fallback
-
-Modify the `displayOriginalCostBreakdown` function (around line 330-335) to:
-1. Check if stored values are 0 AND the hire type is "Outside"
-2. If so, recalculate using `calculateExtraTimeCharge`
-3. Use rate card rates if available, otherwise use defaults
-
-**Updated Logic**:
-```typescript
-// Recalculate overtime/overnight for Outside hire if not stored
-let storedOvertimeCharge = quotation.overtime_charge || 0;
-let storedOvernightCharge = quotation.overnight_charge || 0;
-
-// If charges are 0 and this is an Outside hire, recalculate
-if (quotation.hire_type === 'Outside' && 
-    storedOvertimeCharge === 0 && 
-    storedOvernightCharge === 0 && 
-    quotation.pickup_datetime && 
-    quotation.drop_datetime) {
-  
-  const extraTimeResult = calculateExtraTimeCharge(
-    tripDistance,
-    quotation.pickup_datetime,
-    quotation.drop_datetime,
-    {
-      baselineSpeedKmph: 10,
-      hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
-      nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000
-    }
-  );
-  
-  storedOvertimeCharge = extraTimeResult.overtimeCharge;
-  storedOvernightCharge = extraTimeResult.overnightCharge;
-}
-```
-
-### Step 3: Update CostBreakdown.tsx - Add Overtime/Overnight Info to Working Hours
-
-Enhance the Working Hours Analysis section to show:
-- Extra hours (if > 0)
-- Whether overtime or overnight applies
-- The specific charge type breakdown
-
-**Add after the Available/Actual hours display**:
-```typescript
-{/* Extra Time Charges Info */}
-{(safeData.overtimeCharge > 0 || safeData.overnightCharge > 0) && (
-  <div className="mt-3 p-2 bg-orange-50 rounded-md border border-orange-200">
-    <div className="text-sm font-medium text-orange-700 mb-1">Extra Time Charges</div>
-    <div className="grid grid-cols-2 gap-2 text-xs">
-      {safeData.overtimeCharge > 0 && (
-        <div className="flex justify-between">
-          <span>Overtime</span>
-          <span className="font-medium">LKR {safeData.overtimeCharge.toLocaleString()}</span>
-        </div>
-      )}
-      {safeData.overnightCharge > 0 && (
-        <div className="flex justify-between">
-          <span>Overnight</span>
-          <span className="font-medium">LKR {safeData.overnightCharge.toLocaleString()}</span>
-        </div>
-      )}
-    </div>
-  </div>
-)}
-```
-
-### Step 4: Update QuotationPreview.tsx - Ensure Time Charges Display
-
-Verify the QuotationPreview component correctly displays overtime and overnight in the customer-facing quotation document.
-
-### Step 5: Database Migration - Backfill Historical Data
-
-Create a migration to update existing confirmed quotations with correct overtime/overnight values:
-
+**Database Migration**:
 ```sql
--- Note: This requires a server-side calculation since we can't call JS functions from SQL
--- The fix in EnhancedCostCalculator will handle display for existing data
--- New quotations will save values correctly going forward
+-- Add referral_agent_id to sinotruck_quotations
+ALTER TABLE sinotruck_quotations 
+ADD COLUMN IF NOT EXISTS referral_agent_id UUID REFERENCES referral_agents(id);
 
--- For now, just ensure columns exist and have correct defaults
--- The frontend recalculation handles historical data display
+-- Create sinotruck_referral_commission_payments table
+CREATE TABLE IF NOT EXISTS sinotruck_referral_commission_payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  quotation_id UUID REFERENCES sinotruck_quotations(id),
+  referral_agent_id UUID REFERENCES referral_agents(id),
+  commission_amount NUMERIC DEFAULT 0,
+  commission_pct NUMERIC DEFAULT 3,
+  payment_status TEXT DEFAULT 'pending',
+  paid_at TIMESTAMPTZ,
+  paid_by UUID REFERENCES auth.users(id),
+  payment_method TEXT,
+  payment_reference TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(quotation_id)
+);
+
+-- Create trigger for automatic tracking
+CREATE OR REPLACE FUNCTION track_sinotruck_referral_commission()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'confirmed' AND OLD.status != 'confirmed' AND NEW.referral_agent_id IS NOT NULL THEN
+    INSERT INTO sinotruck_referral_commission_payments (
+      quotation_id, referral_agent_id, commission_amount, commission_pct, payment_status
+    ) VALUES (
+      NEW.id, NEW.referral_agent_id, COALESCE(NEW.total_price, 0) * 0.03, 3.0, 'pending'
+    ) ON CONFLICT (quotation_id) DO NOTHING;
+    
+    UPDATE referral_agents 
+    SET total_referrals = total_referrals + 1,
+        total_commission_earned = total_commission_earned + (COALESCE(NEW.total_price, 0) * 0.03),
+        updated_at = NOW()
+    WHERE id = NEW.referral_agent_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER track_sinotruck_referral_commission_trigger
+AFTER UPDATE ON sinotruck_quotations
+FOR EACH ROW EXECUTE FUNCTION track_sinotruck_referral_commission();
 ```
+
+**Update SinotruckQuotationForm.tsx**:
+- Add `referral_agent_id` to form state
+- Add referral agents dropdown selector UI
+- Load referral agents on mount
+- Include `referral_agent_id` in database insert
+
+### Part 2: Fix Stats Aggregation in ReferralAgentsManagement
+
+**Update `fetchAgents()` function** to query ALL commission tables:
+
+```typescript
+// Fetch from all 4 commission tables
+const { data: specialHirePayments } = await supabase
+  .from('referral_commission_payments')
+  .select('referral_agent_id, commission_amount, payment_status');
+
+const { data: yutongPayments } = await supabase
+  .from('yutong_referral_commission_payments')
+  .select('referral_agent_id, commission_amount, payment_status');
+
+const { data: lightVehiclePayments } = await supabase
+  .from('lightvehicle_referral_commission_payments')
+  .select('agent_id, commission_amount, status');
+
+const { data: sinotruckPayments } = await supabase
+  .from('sinotruck_referral_commission_payments')
+  .select('referral_agent_id, commission_amount, payment_status');
+
+// Combine all payments
+const allPayments = [
+  ...(specialHirePayments || []).map(p => ({...p, source: 'special_hire'})),
+  ...(yutongPayments || []).map(p => ({...p, source: 'yutong'})),
+  ...(lightVehiclePayments || []).map(p => ({
+    referral_agent_id: p.agent_id, 
+    commission_amount: p.commission_amount, 
+    payment_status: p.status,
+    source: 'light_vehicle'
+  })),
+  ...(sinotruckPayments || []).map(p => ({...p, source: 'sinotruck'}))
+];
+```
+
+### Part 3: Fix History Modal to Show All Modules
+
+**Update ReferralAgentHistoryModal** to fetch and display records from all 4 commission tables, with a "Source" column showing which module each referral came from (Special Hire, Yutong, Light Vehicle, Sinotruck).
+
+### Part 4: Add Referral Agent Selector to Sinotruck Form UI
+
+Add referral agent selector similar to Yutong form:
+- Load agents from `referral_agents` table
+- Show Select dropdown with agent names
+- Include "Add Agent" button for inline creation
+- Store `referral_agent_id` when saving quotation
 
 ---
 
-## Files to Modify
+## Files to Create/Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/special-hire/EnhancedCostCalculator.tsx` | Add import + recalculation fallback logic |
-| `src/components/special-hire/CostBreakdown.tsx` | Add extra time charges info to Working Hours section |
-| `src/components/special-hire/QuotationPreview.tsx` | Verify time charges section displays correctly |
+| `supabase/migrations/[new]_add_sinotruck_referral_system.sql` | Add column, table, and trigger |
+| `src/components/sinotruck/SinotruckQuotationForm.tsx` | Add referral agent selector UI and state |
+| `src/components/special-hire/ReferralAgentsManagement.tsx` | Query all 4 commission tables for stats |
+| `src/components/special-hire/ReferralAgentHistoryModal.tsx` | Fetch records from all 4 modules with source indicator |
+| `src/integrations/supabase/types.ts` | Update generated types |
 
 ---
 
-## How This Fixes the Issues
+## Technical Details
 
-### Issue: "Quotation creation time shows but calculator page doesn't"
-**Fix**: EnhancedCostCalculator will now recalculate overtime/overnight charges from stored datetime/distance when the stored values are 0.
+### Why Only 2 Agents Have Records
 
-### Issue: "Overnight charges don't show"
-**Fix**: 
-1. Recalculation logic will compute correct overnight charges for multi-day trips
-2. CostBreakdown will display the charges in "Hire Charges Breakdown" section (already implemented at lines 420-425)
-3. New "Extra Time Charges" summary added to Working Hours section for clarity
+Based on database evidence:
+- **Mr. Suranga**: 2 Yutong referrals (confirmed quotations worth LKR 108M total, earning LKR 3.25M commission)
+- **Imesh Perera**: 1 Yutong referral (confirmed quotation worth LKR 38.25M, earning LKR 1.15M commission)
+- **Other 15 agents**: No confirmed quotations linked to them yet
 
-### Issue: "Should add overnight or not?"
-**Answer**: YES - overnight charges should absolutely be added when:
-- Extra hours exceed 10 hours (then a night block fee of LKR 3,000 per 24h is charged)
-- The existing business logic in `extra-time-calculator.ts` already handles this correctly
-- The issue was only that the calculator page wasn't recalculating for existing data
+The stats ARE accurate for Yutong - they show in `total_referrals` and `total_commission_earned`. But the "Pending" and "Paid Out" columns show LKR 0 because those only query Special Hire's `referral_commission_payments` table.
+
+### Commission Rate Consistency
+
+All modules use 3% default commission rate:
+- Special Hire: Manual linking, uses agent's `default_commission_pct`
+- Yutong: Trigger uses hardcoded 3%
+- Light Vehicle: Trigger uses `COALESCE(ra.commission_rate, 1.5)` - may need update
+- Sinotruck: Will use 3% default
 
 ---
 
@@ -158,27 +184,8 @@ Create a migration to update existing confirmed quotations with correct overtime
 
 After implementation:
 
-1. **View existing quotation in Calculator tab** - Should now show correct overtime/overnight charges
-2. **Create new Outside hire quotation** spanning multiple days - Verify charges display during creation AND in calculator
-3. **Check Working Hours Analysis** - Should show breakdown of extra time charges
-4. **Verify Hire Charges Breakdown** - Should list overtime/overnight as line items when applicable
-
----
-
-## Technical Details
-
-### Overtime/Overnight Business Rules (from extra-time-calculator.ts)
-
-| Extra Hours | Charge Type | Calculation |
-|-------------|-------------|-------------|
-| 0 | None | No charge |
-| 1-10 hrs | Overtime | hours × hourly rate (default LKR 500/hr) |
-| 10+ hrs | Overnight | First 24h block = night fee (LKR 3,000) + remaining calculated recursively |
-
-### Example Calculation
-For QUO-2026-0944:
-- Trip: 375.6 km → Available: 37.56 hrs
-- Duration: Jan 23 00:00 to Jan 25 15:30 = 63.5 hrs
-- Extra hours: 63.5 - 37.56 = 25.94 hrs
-- Since > 10 hrs: 1 night block (LKR 3,000) + (25.94 - 24) = 1.94 hrs × 500 = 970
-- Total: LKR 3,970 (currently showing as 0)
+1. **Create Sinotruck quotation with referral agent** - Confirm agent shows in dropdown
+2. **Confirm Sinotruck quotation** - Verify commission record created automatically
+3. **Check Referral Agents page stats** - Should show combined totals from all modules
+4. **View agent history** - Should show records from all 4 modules with source badges
+5. **Database validation** - Run query to verify all commission tables have correct data
