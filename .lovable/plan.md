@@ -1,43 +1,52 @@
 
-
-# Special Hire Finance Integration - Complete Cross-Check Report
+# Special Hire Finance Integration - Complete Fix Plan
 
 ## Executive Summary
 
-After thorough examination of the codebase and database, I found **ONE CRITICAL BUG** that must be fixed immediately, plus confirmation that the rest of the system is correctly implemented but requires configuration.
+After comprehensive cross-checking of the Special Hire finance integration, I found **ONE CRITICAL DATABASE BUG** that must be fixed, plus confirmed all other components are working correctly.
 
 ---
 
-## CRITICAL BUG FOUND: Missing `total_additional_charges` in Trigger
+## Critical Bug: Missing `total_additional_charges` in Database Trigger
 
-### The Problem
+### Evidence from Database
 
-The database trigger `update_quotation_payment_totals` is **missing `total_additional_charges`** in the `balance_due` calculation. This causes:
+| Quotation | Additional Charges | DB Balance | Correct Balance | Discrepancy |
+|-----------|-------------------|------------|-----------------|-------------|
+| QUO-2026-0944 | 26,500 | 95,641 | 122,141 | **-26,500** |
+| QUO-2026-0862 | 6,750 | **-6,750** | 0 | **-6,750** |
+| QUO-2026-0810 | 12,250 | 80,704 | 92,954 | **-12,250** |
+| QUO-2025-0786 | 1,750 | **-1,750** | 0 | **-1,750** |
+| QUO-2025-0764 | 2,250 | **-2,250** | 0 | **-2,250** |
 
-1. **Negative balance_due values** when customers pay including additional charges
-2. **Incorrect AR Invoice amounts** when invoice is generated
-3. **GL posting with wrong amounts**
+The discrepancy exactly equals `total_additional_charges` in every case - this confirms the trigger bug.
 
-### Current Broken Formula (in database trigger):
+### Root Cause
+
+The `update_quotation_payment_totals` trigger (line 275) calculates:
 
 ```sql
-balance_due = (gross_revenue + fuel_cost + commission - discount) - payments
--- MISSING: + total_additional_charges
+-- CURRENT (BROKEN)
+balance_due = (gross_revenue + fuel + commission - discount) - payments
+-- MISSING: + COALESCE(total_additional_charges, 0)
 ```
 
-### Evidence from Database:
+---
 
-| Quotation | Total Charges | Actual Paid | DB Balance | Correct Balance | Difference |
-|-----------|---------------|-------------|------------|-----------------|------------|
-| QUO-2026-0944 | 26,500 | 100,000 | 95,641 | 122,141 | -26,500 |
-| QUO-2026-0862 | 6,750 | 73,142 | -6,750 | 0 | -6,750 |
-| QUO-2026-0810 | 12,250 | 25,000 | 80,704 | 92,954 | -12,250 |
+## Implementation Steps
 
-### Required Fix (Database Migration):
+### Part 1: Database Migration - Fix Trigger Function
+
+Create a new migration file to fix the trigger:
 
 ```sql
-CREATE OR REPLACE FUNCTION update_quotation_payment_totals()
-RETURNS TRIGGER AS $$
+-- Fix update_quotation_payment_totals to include total_additional_charges
+CREATE OR REPLACE FUNCTION public.update_quotation_payment_totals()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $function$
 BEGIN
   UPDATE public.special_hire_quotations 
   SET 
@@ -55,10 +64,11 @@ BEGIN
       AND status = 'approved'
     ),
     balance_due = (
-      -- FIXED: Added total_additional_charges
-      (gross_revenue + COALESCE(fuel_cost_fuel_only, 0) + 
+      -- FIXED: Added COALESCE(total_additional_charges, 0)
+      (gross_revenue + 
+       COALESCE(fuel_cost_fuel_only, 0) + 
        COALESCE(commission_pass_through_amount, 0) + 
-       COALESCE(total_additional_charges, 0) -    -- <-- THIS WAS MISSING
+       COALESCE(total_additional_charges, 0) -  -- <-- THIS WAS MISSING
        COALESCE(discount_amount_lkr, 0)) - (
         SELECT COALESCE(SUM(amount), 0) 
         FROM public.special_hire_payments 
@@ -70,12 +80,9 @@ BEGIN
   
   RETURN COALESCE(NEW, OLD);
 END;
-$$ LANGUAGE plpgsql;
-```
+$function$;
 
-### Data Fix Query (to repair existing records):
-
-```sql
+-- Repair existing quotation balances
 UPDATE special_hire_quotations
 SET balance_due = (
   gross_revenue + 
@@ -89,121 +96,62 @@ WHERE status = 'confirmed';
 
 ---
 
-## Special Hire Finance Flow - Verification Status
+## Verification: All Other Components Working Correctly
 
-### 1. Advance Payment Flow
+### Finance Integration Flow (Verified)
 
-| Step | Function | Status | Notes |
-|------|----------|--------|-------|
-| Record Payment | UI Form | WORKING | Sets status = 'pending_operations' |
-| Generate Sales Receipt | AdvanceDetailsModal | WORKING | Creates draft document |
-| Operations Review | ConfirmedTripsTable | WORKING | Changes to 'pending_finance' |
-| Finance Approval | useFinanceApproval | WORKING | Triggers GL posting |
-| GL Posting (Advance) | postAdvancePaymentToGLStandalone | WORKING | DR Bank / CR Customer Advance |
-| Customer Creation | createOrGetSPHCustomer | WORKING | With fallback logic |
-| AR Invoice Creation | createSPHARInvoice | WORKING | Links to quotation |
-| COA Balance Update | updateAccountBalancesFromJournalEntry | WORKING | Proper debit/credit rules |
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    SPECIAL HIRE FINANCE FLOW - ALL VERIFIED                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-### 2. Balance Invoice Flow
+1. ADVANCE PAYMENT
+   ├─ Record Payment (UI) ..................... WORKING
+   ├─ Generate Sales Receipt .................. WORKING
+   ├─ Operations Review → pending_finance ..... WORKING
+   ├─ Finance Approval (useFinanceApproval) ... WORKING
+   │   ├─ Create Customer (createOrGetSPHCustomer) ... WORKING
+   │   ├─ Create AR Invoice (createSPHARInvoice) ..... WORKING
+   │   ├─ Post GL: DR Bank / CR Advance .............. WORKING
+   │   └─ Update COA Balances ........................ WORKING
+   └─ Total Calculation (lines 169-173) ....... INCLUDES total_additional_charges ✓
 
-| Step | Function | Status | Notes |
-|------|----------|--------|-------|
-| Trip Completion | TripAdjustmentModal | WORKING | Records extra KM, expenses |
-| Generate Balance Invoice | GenerateBalanceInvoiceModal | WORKING | Includes adjustments |
-| Email to Customer | handleEmailToCustomer | WORKING | Triggers GL posting |
-| GL Posting (Invoice) | postInvoiceToGLStandalone | WORKING | DR Trade Receivable / CR Revenue |
-| Advance Application | applyAdvanceToInvoiceStandalone | WORKING | DR Customer Advance / CR Trade Receivable |
-| AR Invoice Update | updateSPHARInvoiceOnInvoiceSent | WORKING | Updates total with adjustments |
+2. TRIP COMPLETION + BALANCE INVOICE
+   ├─ Post-Trip Adjustment (PostTripAdjustmentModal) ... WORKING
+   ├─ Generate Balance Invoice (GenerateBalanceInvoiceModal) ... WORKING
+   │   ├─ Calculate Final Balance ............. WORKING
+   │   ├─ Post GL: DR Receivable / CR Revenue ... WORKING (postInvoiceToGLStandalone)
+   │   ├─ Apply Advance: DR Advance / CR Receivable ... WORKING
+   │   └─ Update AR Invoice (updateSPHARInvoiceOnInvoiceSent) ... WORKING
+   └─ Email to Customer ....................... WORKING
 
-### 3. Balance Payment Flow
+3. BALANCE PAYMENT
+   ├─ Record Balance Payment .................. WORKING
+   ├─ Finance Approval ........................ WORKING
+   │   ├─ Post GL: DR Bank / CR Receivable .... WORKING (postBalancePaymentToGLStandalone)
+   │   ├─ Update AR Invoice ................... WORKING (updateSPHARInvoiceOnPayment)
+   │   └─ Create AR Receipt ................... WORKING (createSPHARReceipt)
+   └─ Payment linked to AR Invoice ............ WORKING
 
-| Step | Function | Status | Notes |
-|------|----------|--------|-------|
-| Record Balance | UI Form | WORKING | Records payment_type = 'balance' |
-| Finance Approval | useFinanceApproval | WORKING | Detects balance payment |
-| GL Posting (Balance) | postBalancePaymentToGLStandalone | WORKING | DR Bank / CR Trade Receivable |
-| AR Invoice Update | updateSPHARInvoiceOnPayment | WORKING | Updates paid_amount, status |
-| AR Receipt Creation | createSPHARReceipt | WORKING | Creates receipt allocation |
+4. REFUND FLOW
+   └─ Post GL: DR Advance / CR Bank ........... WORKING (postRefundToGLStandalone)
+```
 
-### 4. Refund Flow
+### GL Posting Rules (Verified in Code)
 
-| Step | Function | Status | Notes |
-|------|----------|--------|-------|
-| Process Refund | TripStatusManagementModal | WORKING | Calls postRefundToGLStandalone |
-| GL Posting (Refund) | postRefundToGLStandalone | WORKING | DR Customer Advance / CR Bank |
+| Transaction | Debit Account | Credit Account | Code Location | Status |
+|-------------|---------------|----------------|---------------|--------|
+| Advance Payment | Bank (Asset) | Customer Advance (Liability) | Lines 119-141 | CORRECT |
+| Full Payment | Bank (Asset) | Revenue | Lines 195-225 | CORRECT |
+| Invoice Sent | Trade Receivable | Revenue | Lines 426-448 | CORRECT |
+| Advance Applied | Customer Advance | Trade Receivable | Lines 501-523 | CORRECT |
+| Balance Payment | Bank (Asset) | Trade Receivable | Lines 270-294 | CORRECT |
+| Refund | Customer Advance | Bank (Asset) | Lines 345-368 | CORRECT |
 
----
-
-## Finance Settings Status
-
-| Module | Settings Table | Configured | GL Accounts Mapped |
-|--------|----------------|------------|-------------------|
-| **Special Hire** | special_hire_finance_settings | YES | Bank, Advance, Revenue, Receivable |
-| **Yutong** | yutong_finance_settings | NO | Not configured |
-| **Sinotruck** | sinotruck_finance_settings | NO | Not configured |
-| **Light Vehicle** | lightvehicle_finance_settings | NO | Not configured |
-
----
-
-## Vehicle Sales Finance - Code Verification
-
-### Yutong Payment Tracking (YutongPaymentTracking.tsx)
-
-| Feature | Status | Lines |
-|---------|--------|-------|
-| Finance hook imports | IMPLEMENTED | 20-28 |
-| handleVerifyPayment with GL | IMPLEMENTED | 204-350 |
-| Customer creation | IMPLEMENTED | 229-248 |
-| AR Invoice creation | IMPLEMENTED | 251-273 |
-| GL posting | IMPLEMENTED | 281-301 |
-| AR Receipt creation | IMPLEMENTED | 304-321 |
-| Order financials update | IMPLEMENTED | 352-381 |
-
-### Sinotruck Payment Tracking (SinotruckPaymentTracking.tsx)
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Component created | YES | Full implementation |
-| GL integration | YES | Uses useVehicleSalesFinance |
-| Verify with posting | YES | handleVerifyPayment function |
-
-### Light Vehicle Payment Tracking (LightVehiclePaymentTracking.tsx)
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Component created | YES | Full implementation |
-| GL integration | YES | Uses useVehicleSalesFinance |
-| Verify with posting | YES | handleVerifyPayment function |
-
----
-
-## GL Posting Rules - Verification
-
-### Special Hire (SPH)
-
-| Transaction | Debit Account | Credit Account | Status |
-|-------------|---------------|----------------|--------|
-| Advance Payment | Bank (Asset) | Customer Advance (Liability) | CORRECT |
-| Full Payment | Bank (Asset) | Revenue | CORRECT |
-| Invoice Sent | Trade Receivable (Asset) | Revenue | CORRECT |
-| Advance Applied | Customer Advance (Liability) | Trade Receivable (Asset) | CORRECT |
-| Balance Payment | Bank (Asset) | Trade Receivable (Asset) | CORRECT |
-| Refund | Customer Advance (Liability) | Bank (Asset) | CORRECT |
-
-### Vehicle Sales (YUT/SNT/LTV)
-
-| Transaction | Debit Account | Credit Account | Status |
-|-------------|---------------|----------------|--------|
-| Advance Payment | Bank | Customer Advance | CORRECT |
-| Balance Payment | Bank | Trade Receivable | CORRECT |
-| Full Payment | Bank | Sales Revenue | CORRECT |
-
----
-
-## COA Balance Update Logic
+### COA Balance Update Logic (Verified)
 
 ```typescript
-// From useSpecialHireFinance.ts lines 29-76
+// From useSpecialHireFinance.ts lines 60-62
 const netAmount = (line.debit || 0) - (line.credit || 0);
 const isDebitNormal = ["asset", "expense"].includes(account.account_type || "");
 const adjustment = isDebitNormal ? netAmount : -netAmount;
@@ -211,75 +159,70 @@ const adjustment = isDebitNormal ? netAmount : -netAmount;
 
 | Account Type | Normal Side | Debit Effect | Credit Effect | Status |
 |--------------|-------------|--------------|---------------|--------|
-| Asset | Debit | Increases | Decreases | CORRECT |
-| Expense | Debit | Increases | Decreases | CORRECT |
-| Liability | Credit | Decreases | Increases | CORRECT |
-| Equity | Credit | Decreases | Increases | CORRECT |
-| Revenue | Credit | Decreases | Increases | CORRECT |
+| Asset | Debit | +balance | -balance | CORRECT |
+| Expense | Debit | +balance | -balance | CORRECT |
+| Liability | Credit | -balance | +balance | CORRECT |
+| Revenue | Credit | -balance | +balance | CORRECT |
+
+### Total Calculation in useFinanceApproval (Verified)
+
+```typescript
+// Lines 169-173 - CORRECTLY includes total_additional_charges
+const totalAmount = (paymentData.quotation.gross_revenue || 0) +
+  (paymentData.quotation.fuel_cost_fuel_only || 0) +
+  (paymentData.quotation.commission_pass_through_amount || 0) +
+  (paymentData.quotation.total_additional_charges || 0) -  // ✅ INCLUDED
+  (paymentData.quotation.discount_amount_lkr || 0);
+```
 
 ---
 
-## Implementation Summary
+## Files to Create
 
-### Completed Tasks
-
-1. Database schema for all vehicle finance settings tables
-2. `useVehicleSalesFinance.ts` - Unified finance hook
-3. `VehicleFinanceSettingsBase.tsx` - Settings UI component
-4. Settings components for Yutong, Sinotruck, Light Vehicle
-5. Payment tracking components for all three modules
-6. Settings.tsx updated with 3 new finance tabs
-7. EnhancedSinotrukOrderDetailsModal updated with SinotruckPaymentTracking
-8. YutongPaymentTracking enhanced with GL posting
-9. useSinotrukOrderManagement updated with verify function
-
-### Pending Actions
-
-1. **Fix the database trigger** (CRITICAL) - Missing `total_additional_charges`
-2. **Configure Yutong finance settings** - Map GL accounts
-3. **Configure Sinotruck finance settings** - Map GL accounts
-4. **Configure Light Vehicle finance settings** - Map GL accounts
-5. **Repair existing quotation balances** - Run data fix query
+| File | Description |
+|------|-------------|
+| `supabase/migrations/[timestamp]_fix_balance_due_trigger.sql` | Fix trigger + repair data |
 
 ---
 
-## Testing Checklist After Bug Fix
+## Post-Deployment Verification
 
-1. **Special Hire Advance Payment**
-   - Record advance payment
-   - Approve via Finance
-   - Verify GL Entry: `SPH-ADV-xxx` with DR Bank / CR Advance
-   - Verify AR Invoice created
-   - Verify Customer created in Finance module
-   - Verify COA balances updated
+After migration runs, verify with this query:
 
-2. **Special Hire Balance Invoice**
-   - Complete trip with adjustments (extra KM, expenses)
-   - Generate balance invoice
-   - Email to customer
-   - Verify GL Entry: `SPH-INV-xxx` with DR Receivable / CR Revenue
-   - Verify GL Entry: `SPH-ADV-APPLY-xxx` with DR Advance / CR Receivable
-   - Verify balance_due calculation includes additional charges
-
-3. **Special Hire Balance Payment**
-   - Record balance payment
-   - Approve via Finance
-   - Verify GL Entry: `SPH-BAL-xxx` with DR Bank / CR Receivable
-   - Verify AR Invoice status updated to 'paid'
-   - Verify AR Receipt created
-
-4. **Vehicle Sales (after configuration)**
-   - Configure finance settings for Yutong
-   - Record and verify payment
-   - Check GL Entry with YUT tag
-   - Check AR Invoice creation
-   - Check COA balance updates
+```sql
+-- Should return 0 rows (no discrepancies)
+SELECT quotation_no, balance_due,
+  (gross_revenue + COALESCE(fuel_cost_fuel_only, 0) + 
+   COALESCE(commission_pass_through_amount, 0) + 
+   COALESCE(total_additional_charges, 0) - 
+   COALESCE(discount_amount_lkr, 0) - 
+   COALESCE(total_paid, 0)) as correct_balance
+FROM special_hire_quotations
+WHERE status = 'confirmed'
+  AND balance_due != (
+    gross_revenue + COALESCE(fuel_cost_fuel_only, 0) + 
+    COALESCE(commission_pass_through_amount, 0) + 
+    COALESCE(total_additional_charges, 0) - 
+    COALESCE(discount_amount_lkr, 0) - 
+    COALESCE(total_paid, 0)
+  );
+```
 
 ---
 
-## Files to Create/Modify
+## Summary
 
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/migrations/xxx_fix_balance_trigger.sql` | CREATE | Fix trigger to include total_additional_charges |
+| Component | Status | Action Required |
+|-----------|--------|-----------------|
+| `update_quotation_payment_totals` trigger | BUG | Fix to include `total_additional_charges` |
+| Existing quotation data | INCORRECT | Repair via UPDATE statement |
+| Frontend calculations | CORRECT | No changes needed |
+| GL posting functions | CORRECT | No changes needed |
+| AR Invoice functions | CORRECT | No changes needed |
+| COA balance updates | CORRECT | No changes needed |
+| Finance approval flow | CORRECT | No changes needed |
+| Customer creation | CORRECT | No changes needed |
 
+**Total Files to Modify: 1 (database migration)**
+
+This single database fix will resolve all the balance discrepancy issues and ensure correct AR Invoice amounts and GL postings going forward.
