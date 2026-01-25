@@ -602,6 +602,31 @@ export function CostBreakdown({ data }: Props) {
               }
             })()}
           </div>
+          
+          {/* Extra Time Charges Info - Display when overtime or overnight charges exist */}
+          {(safeData.overtimeCharge > 0 || safeData.overnightCharge > 0) && (
+            <div className="mt-3 p-3 bg-orange-50 rounded-md border border-orange-200">
+              <div className="text-sm font-medium text-orange-700 mb-2">Extra Time Charges</div>
+              <div className="space-y-1">
+                {safeData.overtimeCharge > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-orange-600">Overtime Charge ({safeData.rateCardDetails?.overtimeHours?.toFixed(1) || '0'} hrs)</span>
+                    <span className="font-medium text-orange-700">LKR {safeData.overtimeCharge.toLocaleString()}</span>
+                  </div>
+                )}
+                {safeData.overnightCharge > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-orange-600">Overnight Charge</span>
+                    <span className="font-medium text-orange-700">LKR {safeData.overnightCharge.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm pt-1 border-t border-orange-200">
+                  <span className="font-medium text-orange-700">Total Extra Time</span>
+                  <span className="font-bold text-orange-700">LKR {(safeData.overtimeCharge + safeData.overnightCharge).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <Separator />

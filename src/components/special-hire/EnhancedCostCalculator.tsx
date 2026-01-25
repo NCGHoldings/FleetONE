@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CostBreakdown } from './CostBreakdown';
 import { EnhancedSearch } from '@/components/ui/enhanced-search';
 import { format } from 'date-fns';
+import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
 
 interface QuotationData {
   id: string;
@@ -328,11 +329,33 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         .reduce((sum, charge) => sum + (charge.distance || 0), 0);
       
       // Prepare the cost breakdown data from the quotation to match CostBreakdown props
-      // Use stored values first, then recalculate as fallback
+      // Use stored values first, then recalculate as fallback for historical data
       const storedFixedRate = quotation.fixed_rate || fixedRate;
-      const storedOvertimeCharge = quotation.overtime_charge || 0;
-      const storedOvernightCharge = quotation.overnight_charge || 0;
+      let storedOvertimeCharge = quotation.overtime_charge || 0;
+      let storedOvernightCharge = quotation.overnight_charge || 0;
       const storedExceedingDistanceCharge = quotation.exceeding_distance_charge || exceedingDistanceCharge;
+      
+      // Recalculate overtime/overnight for Outside hire if stored values are 0 (historical data)
+      if (quotation.hire_type === 'Outside' && 
+          storedOvertimeCharge === 0 && 
+          storedOvernightCharge === 0 && 
+          quotation.pickup_datetime && 
+          quotation.drop_datetime) {
+        
+        const extraTimeResult = calculateExtraTimeCharge(
+          tripDistance, // Use quoted trip distance only
+          quotation.pickup_datetime,
+          quotation.drop_datetime,
+          {
+            baselineSpeedKmph: 10,
+            hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
+            nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000
+          }
+        );
+        
+        storedOvertimeCharge = extraTimeResult.overtimeCharge;
+        storedOvernightCharge = extraTimeResult.overnightCharge;
+      }
       
       const data: CostData = {
         kmParkingToPickup: quotation.km_parking_to_pickup || 0,
