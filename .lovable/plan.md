@@ -1,149 +1,171 @@
 
-# Referral Agent System - Complete Fix Plan
+# Post-Trip Adjustment Time Tracking - Complete Fix Plan
 
 ## Problem Summary
 
-Based on my investigation, I found **4 critical issues** preventing referral tracking across all modules:
+Based on my investigation, I found that the Post-Trip Adjustment feature is **missing critical time tracking functionality**:
 
-### Issue 1: Sinotruck Missing Referral Agent Support Entirely
-**Problem**: The `sinotruck_quotations` table does NOT have a `referral_agent_id` column.
-- **Evidence**: Database query confirmed column doesn't exist
-- **Impact**: No Sinotruck referrals can ever be tracked
+### Current Limitations:
+| Feature | Status | Impact |
+|---------|--------|--------|
+| Actual KM input | Working | Extra KM charges calculated correctly |
+| Additional expenses | Working | Toll, parking, etc. can be added |
+| Actual pickup/drop time | **MISSING** | No way to capture actual trip timing |
+| Overtime recalculation | **MISSING** | Cannot adjust overtime based on actual hours |
+| Overnight recalculation | **MISSING** | Cannot adjust overnight charges post-trip |
 
-### Issue 2: Stats Only Query `referral_commission_payments` (Special Hire Only)
-**Problem**: The ReferralAgentsManagement component (lines 95-99) only queries `referral_commission_payments` table for pending/paid calculations, ignoring Yutong and Light Vehicle commission tables.
-- **Evidence**: Code shows only one table queried
-- **Impact**: Stats show LKR 0 pending/paid even though there are 3 Yutong commission records worth LKR 4,399,500
-
-### Issue 3: History Modal Only Shows Special Hire Records
-**Problem**: ReferralAgentHistoryModal (lines 95-108) only fetches from `referral_commission_payments` with a join to `special_hire_quotations`.
-- **Impact**: Agent history doesn't show Yutong, Light Vehicle, or Sinotruck referrals
-
-### Issue 4: Light Vehicle Commission Trigger May Not Be Working
-**Problem**: No records found in `lightvehicle_referral_commission_payments` even though the column and trigger exist.
-- **Evidence**: Table is empty
-- **Impact**: Light Vehicle referrals aren't being tracked
+### Evidence from Screenshots:
+- "Working Hours Analysis" shows **0.0 hrs Actual** - this is incorrect
+- The quotation has pickup/drop times, but actual trip timing differs
+- No UI exists to input "Actual Pickup Time" or "Actual Drop Time" after the trip
 
 ---
 
-## Current State Summary
+## Root Cause Analysis
 
-| Module | Has referral_agent_id? | Has Commission Table? | Trigger Working? | Records Found |
-|--------|------------------------|----------------------|------------------|---------------|
-| **Special Hire** | Yes | referral_commission_payments | Manual linking | 0 records |
-| **Yutong** | Yes | yutong_referral_commission_payments | Yes | 3 records (LKR 4.4M) |
-| **Light Vehicle** | Yes | lightvehicle_referral_commission_payments | Unknown | 0 records |
-| **Sinotruck** | **NO** | **NONE** | N/A | N/A |
+### Issue 1: Database Schema Missing Time Fields
+The `special_hire_trip_adjustments` table only has distance-related columns:
+- `actual_km_traveled`, `extra_km`, `extra_km_total_charge`
+
+But lacks time-related columns:
+- `actual_pickup_datetime`, `actual_drop_datetime`
+- `actual_hours_traveled`, `extra_hours`
+- `overtime_charge_adjustment`, `overnight_charge_adjustment`
+
+### Issue 2: PostTripAdjustmentModal Missing Time UI
+The modal has sections for:
+- Kilometer Adjustment
+- Additional Expenses
+
+But no section for:
+- Time Adjustment (actual pickup/drop times)
+- Overtime/Overnight recalculation
+
+### Issue 3: Calculation Hook Missing Time Logic
+The `usePostTripAdjustment.calculateTotals()` only calculates:
+- Extra KM charge
+- Additional expenses
+
+But doesn't calculate:
+- Overtime adjustment based on actual hours
+- Overnight adjustment for extended trips
 
 ---
 
 ## Implementation Plan
 
-### Part 1: Add Sinotruck Referral Agent Support
+### Part 1: Database Migration - Add Time Fields
 
-**Database Migration**:
-```sql
--- Add referral_agent_id to sinotruck_quotations
-ALTER TABLE sinotruck_quotations 
-ADD COLUMN IF NOT EXISTS referral_agent_id UUID REFERENCES referral_agents(id);
+Add new columns to `special_hire_trip_adjustments` table:
 
--- Create sinotruck_referral_commission_payments table
-CREATE TABLE IF NOT EXISTS sinotruck_referral_commission_payments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quotation_id UUID REFERENCES sinotruck_quotations(id),
-  referral_agent_id UUID REFERENCES referral_agents(id),
-  commission_amount NUMERIC DEFAULT 0,
-  commission_pct NUMERIC DEFAULT 3,
-  payment_status TEXT DEFAULT 'pending',
-  paid_at TIMESTAMPTZ,
-  paid_by UUID REFERENCES auth.users(id),
-  payment_method TEXT,
-  payment_reference TEXT,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(quotation_id)
-);
+| Column | Type | Purpose |
+|--------|------|---------|
+| `original_pickup_datetime` | TIMESTAMPTZ | Store original quoted pickup time |
+| `original_drop_datetime` | TIMESTAMPTZ | Store original quoted drop time |
+| `actual_pickup_datetime` | TIMESTAMPTZ | User-input actual pickup time |
+| `actual_drop_datetime` | TIMESTAMPTZ | User-input actual drop time |
+| `original_hours` | NUMERIC | Calculated from quoted times |
+| `actual_hours` | NUMERIC | Calculated from actual times |
+| `extra_hours` | NUMERIC | actual_hours - available_hours |
+| `overtime_charge_adjustment` | NUMERIC | Recalculated overtime charge |
+| `overnight_charge_adjustment` | NUMERIC | Recalculated overnight charge |
+| `total_time_adjustment` | NUMERIC | Sum of overtime + overnight adjustments |
 
--- Create trigger for automatic tracking
-CREATE OR REPLACE FUNCTION track_sinotruck_referral_commission()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.status = 'confirmed' AND OLD.status != 'confirmed' AND NEW.referral_agent_id IS NOT NULL THEN
-    INSERT INTO sinotruck_referral_commission_payments (
-      quotation_id, referral_agent_id, commission_amount, commission_pct, payment_status
-    ) VALUES (
-      NEW.id, NEW.referral_agent_id, COALESCE(NEW.total_price, 0) * 0.03, 3.0, 'pending'
-    ) ON CONFLICT (quotation_id) DO NOTHING;
-    
-    UPDATE referral_agents 
-    SET total_referrals = total_referrals + 1,
-        total_commission_earned = total_commission_earned + (COALESCE(NEW.total_price, 0) * 0.03),
-        updated_at = NOW()
-    WHERE id = NEW.referral_agent_id;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+### Part 2: Update TripAdjustment Interface
 
-CREATE TRIGGER track_sinotruck_referral_commission_trigger
-AFTER UPDATE ON sinotruck_quotations
-FOR EACH ROW EXECUTE FUNCTION track_sinotruck_referral_commission();
-```
+Modify `usePostTripAdjustment.ts` to include:
+- New time-related fields in the `TripAdjustment` interface
+- New `calculateTimeAdjustment()` function using the existing `calculateExtraTimeCharge` utility
+- Updated `calculateTotals()` to include time charges in the adjustment amount
 
-**Update SinotruckQuotationForm.tsx**:
-- Add `referral_agent_id` to form state
-- Add referral agents dropdown selector UI
-- Load referral agents on mount
-- Include `referral_agent_id` in database insert
+### Part 3: Add Time Adjustment Section to Modal
 
-### Part 2: Fix Stats Aggregation in ReferralAgentsManagement
+Enhance `PostTripAdjustmentModal.tsx` with:
+- "Time Adjustment" section after "Kilometer Adjustment"
+- DateTime pickers for Actual Pickup Time and Actual Drop Time
+- Display calculated fields:
+  - Original Hours (from quoted times)
+  - Actual Hours (from actual times)
+  - Available Hours (distance / 10 km/h)
+  - Extra Hours (actual - available)
+- Automatic recalculation of overtime/overnight charges
+- Visual comparison showing original vs. adjusted time charges
 
-**Update `fetchAgents()` function** to query ALL commission tables:
+### Part 4: Update Final Calculation Summary
+
+Modify the "Final Calculation" section in the modal to:
+- Show original overtime/overnight from quotation
+- Show adjusted overtime/overnight from actual times
+- Show time adjustment amount (difference)
+- Include time adjustment in total adjustment amount
+
+### Part 5: Update CostBreakdown Display
+
+Enhance the "Post-Trip Adjustments" section in `CostBreakdown.tsx` to:
+- Display actual vs. quoted time comparison
+- Show time-based adjustment amounts separately
+- Update "Working Hours Analysis" to use actual times when adjustment exists
+
+### Part 6: Update Props Passed to Modal
+
+Modify the component that opens `PostTripAdjustmentModal` to pass:
+- `originalPickupDatetime` - from quotation
+- `originalDropDatetime` - from quotation
+- `originalOvertimeCharge` - from quotation
+- `originalOvernightCharge` - from quotation
+
+---
+
+## Technical Implementation Details
+
+### Time Adjustment Calculation Logic
+
+Using the existing `calculateExtraTimeCharge()` function:
 
 ```typescript
-// Fetch from all 4 commission tables
-const { data: specialHirePayments } = await supabase
-  .from('referral_commission_payments')
-  .select('referral_agent_id, commission_amount, payment_status');
+// Original quotation calculation
+const originalTimeResult = calculateExtraTimeCharge(
+  quotedDistanceKm,
+  originalPickupDatetime,
+  originalDropDatetime,
+  { hourlyRate: 500, nightBlockFee: 3000 }
+);
 
-const { data: yutongPayments } = await supabase
-  .from('yutong_referral_commission_payments')
-  .select('referral_agent_id, commission_amount, payment_status');
+// Post-trip actual calculation
+const actualTimeResult = calculateExtraTimeCharge(
+  actualKmTraveled,  // Use actual distance for available hours
+  actualPickupDatetime,
+  actualDropDatetime,
+  { hourlyRate: 500, nightBlockFee: 3000 }
+);
 
-const { data: lightVehiclePayments } = await supabase
-  .from('lightvehicle_referral_commission_payments')
-  .select('agent_id, commission_amount, status');
-
-const { data: sinotruckPayments } = await supabase
-  .from('sinotruck_referral_commission_payments')
-  .select('referral_agent_id, commission_amount, payment_status');
-
-// Combine all payments
-const allPayments = [
-  ...(specialHirePayments || []).map(p => ({...p, source: 'special_hire'})),
-  ...(yutongPayments || []).map(p => ({...p, source: 'yutong'})),
-  ...(lightVehiclePayments || []).map(p => ({
-    referral_agent_id: p.agent_id, 
-    commission_amount: p.commission_amount, 
-    payment_status: p.status,
-    source: 'light_vehicle'
-  })),
-  ...(sinotruckPayments || []).map(p => ({...p, source: 'sinotruck'}))
-];
+// Calculate adjustment
+const timeAdjustment = {
+  overtimeAdjustment: actualTimeResult.overtimeCharge - originalTimeResult.overtimeCharge,
+  overnightAdjustment: actualTimeResult.overnightCharge - originalTimeResult.overnightCharge,
+  totalTimeAdjustment: actualTimeResult.totalExtraCharge - originalTimeResult.totalExtraCharge
+};
 ```
 
-### Part 3: Fix History Modal to Show All Modules
+### UI Flow
 
-**Update ReferralAgentHistoryModal** to fetch and display records from all 4 commission tables, with a "Source" column showing which module each referral came from (Special Hire, Yutong, Light Vehicle, Sinotruck).
-
-### Part 4: Add Referral Agent Selector to Sinotruck Form UI
-
-Add referral agent selector similar to Yutong form:
-- Load agents from `referral_agents` table
-- Show Select dropdown with agent names
-- Include "Add Agent" button for inline creation
-- Store `referral_agent_id` when saving quotation
+```text
+User opens Post-Trip Adjustment
+    ↓
+Sees original pickup/drop times (read-only)
+    ↓
+Enters actual pickup/drop times
+    ↓
+System calculates:
+  - Actual hours vs. Available hours
+  - New overtime charge
+  - New overnight charge
+  - Difference from original
+    ↓
+Time adjustment added to total adjustment
+    ↓
+Final amount = Original + KM adjustment + Time adjustment + Expenses
+```
 
 ---
 
@@ -151,32 +173,47 @@ Add referral agent selector similar to Yutong form:
 
 | File | Changes |
 |------|---------|
-| `supabase/migrations/[new]_add_sinotruck_referral_system.sql` | Add column, table, and trigger |
-| `src/components/sinotruck/SinotruckQuotationForm.tsx` | Add referral agent selector UI and state |
-| `src/components/special-hire/ReferralAgentsManagement.tsx` | Query all 4 commission tables for stats |
-| `src/components/special-hire/ReferralAgentHistoryModal.tsx` | Fetch records from all 4 modules with source indicator |
+| `supabase/migrations/[new]_add_time_adjustment_fields.sql` | Add time-related columns |
+| `src/hooks/usePostTripAdjustment.ts` | Add time calculation functions, update interfaces |
+| `src/components/special-hire/PostTripAdjustmentModal.tsx` | Add time adjustment UI section |
+| `src/components/special-hire/CostBreakdown.tsx` | Display time adjustments in breakdown |
 | `src/integrations/supabase/types.ts` | Update generated types |
 
 ---
 
-## Technical Details
+## UI Mockup for Time Adjustment Section
 
-### Why Only 2 Agents Have Records
-
-Based on database evidence:
-- **Mr. Suranga**: 2 Yutong referrals (confirmed quotations worth LKR 108M total, earning LKR 3.25M commission)
-- **Imesh Perera**: 1 Yutong referral (confirmed quotation worth LKR 38.25M, earning LKR 1.15M commission)
-- **Other 15 agents**: No confirmed quotations linked to them yet
-
-The stats ARE accurate for Yutong - they show in `total_referrals` and `total_commission_earned`. But the "Pending" and "Paid Out" columns show LKR 0 because those only query Special Hire's `referral_commission_payments` table.
-
-### Commission Rate Consistency
-
-All modules use 3% default commission rate:
-- Special Hire: Manual linking, uses agent's `default_commission_pct`
-- Yutong: Trigger uses hardcoded 3%
-- Light Vehicle: Trigger uses `COALESCE(ra.commission_rate, 1.5)` - may need update
-- Sinotruck: Will use 3% default
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ 🕐 Time Adjustment                                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────┐          │
+│  │ Original Pickup     │  │ Actual Pickup       │          │
+│  │ Jan 23, 2026 09:00  │  │ [DateTimePicker]    │          │
+│  └─────────────────────┘  └─────────────────────┘          │
+│                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────┐          │
+│  │ Original Drop       │  │ Actual Drop         │          │
+│  │ Jan 23, 2026 17:00  │  │ [DateTimePicker]    │          │
+│  └─────────────────────┘  └─────────────────────┘          │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Time Analysis:                                             │
+│  • Available Hours: 19.9 hrs (199.4 km ÷ 10 km/h)          │
+│  • Original Hours:  8.0 hrs (09:00 - 17:00)                │
+│  • Actual Hours:   10.5 hrs (08:30 - 19:00)                │
+│  • Extra Hours:     0.0 hrs (no overtime - within limit)   │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Time Charges Comparison:                                   │
+│                         Original    Actual    Adjustment   │
+│  Overtime:              LKR 0       LKR 0     LKR 0        │
+│  Overnight:             LKR 0       LKR 0     LKR 0        │
+│  ─────────────────────────────────────────────────────     │
+│  Time Adjustment:                             LKR 0        │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -184,8 +221,10 @@ All modules use 3% default commission rate:
 
 After implementation:
 
-1. **Create Sinotruck quotation with referral agent** - Confirm agent shows in dropdown
-2. **Confirm Sinotruck quotation** - Verify commission record created automatically
-3. **Check Referral Agents page stats** - Should show combined totals from all modules
-4. **View agent history** - Should show records from all 4 modules with source badges
-5. **Database validation** - Run query to verify all commission tables have correct data
+1. **Create adjustment with time change** - Trip ran 2 hours longer than quoted
+2. **Verify overtime recalculation** - Should show additional overtime charge
+3. **Create multi-day adjustment** - Trip extended overnight
+4. **Verify overnight recalculation** - Should show overnight block fee
+5. **Check CostBreakdown** - Should show actual hours instead of 0.0 hrs
+6. **Check final calculation** - Time adjustment should be included in balance due
+7. **Generate balance invoice** - Time adjustments should appear on invoice
