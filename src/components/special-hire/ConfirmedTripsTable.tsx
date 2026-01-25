@@ -34,7 +34,7 @@ import { SignatureWorkflowIndicator } from './SignatureWorkflowIndicator';
 export function ConfirmedTripsTable() {
   const { quotations, loading: realtimeLoading, refetch } = useRealtimeSpecialHire();
   const { user, hasRole } = useAuth();
-  const { approvePayment, rejectPayment, generateApprovedInvoice, isLoading: financeLoading } = useFinanceApproval();
+  const { approvePayment, rejectPayment, generateApprovedInvoice, retryARIntegration, isLoading: financeLoading } = useFinanceApproval();
   const { generateAndStoreDraftDocument, getDocumentsByQuotation, regenerateDocument, approveDocument } = useDocumentManagement();
   
   // State for filtering and search
@@ -1228,10 +1228,27 @@ export function ConfirmedTripsTable() {
                                         onClick={() => generateApprovedInvoice(p.id)}
                                         disabled={financeLoading}
                                       >
-                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                      <RotateCcw className="w-4 h-4 mr-2" />
                                         Re-generate Final Invoice
                                       </DropdownMenuItem>
                                     ))}
+
+                                    {/* Retry AR Integration for approved payments missing AR link */}
+                                    {isFinanceUser && !trip.ar_invoice_id && approvedPayments.length > 0 && (
+                                      <DropdownMenuItem
+                                        onClick={async () => {
+                                          const firstPayment = approvedPayments[0];
+                                          const result = await retryARIntegration(firstPayment.id);
+                                          if (result.success) {
+                                            refetch();
+                                          }
+                                        }}
+                                        disabled={financeLoading}
+                                      >
+                                        <RefreshCw className="w-4 h-4 mr-2" />
+                                        Retry AR Integration
+                                      </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuSeparator />
                                   </>
                                 )}

@@ -138,10 +138,17 @@ export const useFinanceApproval = () => {
 
             if (!customerId) {
               console.error('[SPH Finance] ❌ CRITICAL: Failed to create customer');
-              toast.error('Failed to create customer record. AR Invoice not created.');
+              console.error('[SPH Finance] Customer creation params:', {
+                name: paymentData.quotation.customer_name,
+                phone: paymentData.quotation.customer_phone,
+                email: paymentData.quotation.customer_email,
+                companyId: NCG_HOLDING_ID,
+              });
+              toast.error('CRITICAL: Failed to create Finance Customer. Check console for details.');
               arIntegrationSuccess = false;
             } else {
               console.log('[SPH Finance] ✅ Customer ID:', customerId);
+              toast.success(`Finance Customer linked: ${paymentData.quotation.customer_name}`);
               // Update quotation with customer ID
               const { error: custLinkError } = await supabase
                 .from('special_hire_quotations')

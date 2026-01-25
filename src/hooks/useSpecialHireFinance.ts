@@ -1216,7 +1216,7 @@ export function usePostDiscountToGL() {
 // AR INVOICE & CUSTOMER INTEGRATION FUNCTIONS
 // =============================================
 
-// Standalone function to create or get SPH customer
+// Standalone function to create or get SPH customer with fallback
 export async function createOrGetSPHCustomer({
   customerName,
   customerPhone,
@@ -1231,6 +1231,7 @@ export async function createOrGetSPHCustomer({
   try {
     console.log('[SPH AR] Creating/getting customer:', customerName);
     
+    // Try RPC function first
     const { data, error } = await supabase.rpc('create_or_get_sph_customer', {
       p_customer_name: customerName,
       p_customer_phone: customerPhone || null,
@@ -1239,14 +1240,96 @@ export async function createOrGetSPHCustomer({
     });
 
     if (error) {
-      console.error('[SPH AR] Error creating/getting customer:', error);
-      throw error;
+      console.warn('[SPH AR] RPC function failed, attempting fallback:', error.message);
     }
 
-    console.log('[SPH AR] ✅ Customer ID:', data);
-    return data;
-  } catch (error) {
-    console.error('[SPH AR] Failed to create/get customer:', error);
+    if (data) {
+      console.log('[SPH AR] ✅ Customer ID from RPC:', data);
+      return data;
+    }
+
+    // Fallback: Direct database operations if RPC fails or returns null
+    console.log('[SPH AR] Fallback: Attempting direct database lookup/insert...');
+
+    // First, try to find existing customer by phone or email
+    if (customerPhone || customerEmail) {
+      let query = supabase
+        .from('customers')
+        .select('id')
+        .eq('company_id', companyId);
+      
+      // Build OR condition for phone/email match
+      const conditions: string[] = [];
+      if (customerPhone) conditions.push(`phone.eq.${customerPhone}`);
+      if (customerEmail) conditions.push(`email.eq.${customerEmail}`);
+      
+      if (conditions.length > 0) {
+        const { data: existingCustomer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('company_id', companyId)
+          .or(conditions.join(','))
+          .limit(1)
+          .maybeSingle();
+        
+        if (existingCustomer) {
+          console.log('[SPH AR] ✅ Found existing customer:', existingCustomer.id);
+          return existingCustomer.id;
+        }
+      }
+    }
+
+    // Also try matching by exact name
+    const { data: existingByName } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('customer_name', customerName)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingByName) {
+      console.log('[SPH AR] ✅ Found existing customer by name:', existingByName.id);
+      return existingByName.id;
+    }
+
+    // Create new customer
+    console.log('[SPH AR] Creating new customer...');
+    
+    // Generate a unique customer code
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const customerCode = `SPH-${timestamp}-${randomPart}`;
+    
+    const { data: newCustomer, error: insertError } = await supabase
+      .from('customers')
+      .insert({
+        company_id: companyId,
+        customer_code: customerCode,
+        customer_name: customerName,
+        phone: customerPhone || null,
+        email: customerEmail || null,
+        customer_type: 'individual',
+        business_unit_code: 'SPH',
+        is_active: true,
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      console.error('[SPH AR] ❌ Failed to create customer:', insertError.message);
+      console.error('[SPH AR] Insert error details:', {
+        code: insertError.code,
+        hint: insertError.hint,
+        details: insertError.details,
+      });
+      return null;
+    }
+
+    console.log('[SPH AR] ✅ New customer created:', newCustomer.id);
+    return newCustomer.id;
+  } catch (error: any) {
+    console.error('[SPH AR] ❌ Critical failure in createOrGetSPHCustomer:', error);
     return null;
   }
 }

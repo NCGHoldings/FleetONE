@@ -37,6 +37,9 @@ export interface QuotationWithPayments {
   assigned_conductor_name?: string;
   assigned_bus_no?: string;
   created_at: string;
+  // Finance integration fields
+  ar_invoice_id?: string;
+  finance_customer_id?: string;
   payments: Array<{
     id: string;
     payment_type: string;
@@ -52,6 +55,9 @@ export interface QuotationWithPayments {
     created_by?: string;
     created_at: string;
     quotation_id: string;
+    ar_invoice_id?: string;
+    ar_receipt_id?: string;
+    journal_entry_id?: string;
   }>;
   invoices: Array<{
     id: string;
