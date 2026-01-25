@@ -11,12 +11,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, Download, MoreHorizontal, Receipt } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, FileText, Plus, RefreshCw, Eye, Download, MoreHorizontal, Receipt, Landmark } from 'lucide-react';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
 import { useYutongCashReceipts, YutongCashReceipt } from '@/hooks/useYutongCashReceipts';
 import { YutongCashReceiptModal } from './YutongCashReceiptModal';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import {
+  fetchVehicleFinanceSettings,
+  createVehicleCustomer,
+  createVehicleARInvoice,
+  postVehiclePaymentToGL,
+  createVehicleARReceipt,
+  updateOrderFinanceLinks,
+  NCG_HOLDING_ID,
+} from '@/hooks/useVehicleSalesFinance';
 
 interface YutongPaymentTrackingProps {
   orderId?: string;
@@ -203,12 +212,123 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
 
   const handleVerifyPayment = async (paymentId: string) => {
     try {
+      const payment = payments.find(p => p.id === paymentId);
+      if (!payment) {
+        toast.error('Payment not found');
+        return;
+      }
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      // Fetch finance settings
+      const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+      if (!settings) {
+        toast.error('Finance settings not configured. Please configure Yutong Finance Settings first.');
+        return;
+      }
+
+      const customerName = orderDetails?.yutong_quotations?.customer_name || 'Unknown';
+      const orderNo = orderDetails?.order_no;
+
+      // 1. Create/Get Finance Customer
+      let customerId = orderDetails?.finance_customer_id;
+      if (!customerId && settings.auto_create_customer) {
+        customerId = await createVehicleCustomer({
+          module: 'yutong',
+          customerName,
+          companyId: NCG_HOLDING_ID,
+        });
+
+        if (customerId) {
+          await updateOrderFinanceLinks({
+            module: 'yutong',
+            orderId: selectedOrderId!,
+            financeCustomerId: customerId,
+          });
+        }
+      }
+
+      // 2. Create AR Invoice if not exists
+      let invoiceId = orderDetails?.ar_invoice_id;
+      if (!invoiceId && customerId) {
+        const arResult = await createVehicleARInvoice({
+          module: 'yutong',
+          orderId: selectedOrderId!,
+          orderNo,
+          customerId,
+          totalAmount: orderDetails?.total_amount || 0,
+          advanceAmount: payment.payment_amount,
+          companyId: NCG_HOLDING_ID,
+          settings,
+        });
+
+        if (arResult) {
+          invoiceId = arResult.invoiceId;
+          await updateOrderFinanceLinks({
+            module: 'yutong',
+            orderId: selectedOrderId!,
+            arInvoiceId: invoiceId,
+          });
+          toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
+        }
+      }
+
+      // 3. Post to GL
+      let journalEntryId: string | undefined;
+      if (settings.auto_post_on_verify) {
+        const paymentType = selectedSchedule?.milestone_name?.toLowerCase().includes('advance') ? 'advance' : 'balance';
+        
+        const glResult = await postVehiclePaymentToGL({
+          module: 'yutong',
+          orderNo,
+          customerName,
+          amount: payment.payment_amount,
+          paymentType,
+          paymentMethod: payment.payment_method,
+          settings,
+          effectiveCompanyId: NCG_HOLDING_ID,
+        });
+
+        if (glResult) {
+          journalEntryId = glResult.journalEntryId;
+          toast.success(`GL Entry posted: ${glResult.entryNumber}`);
+        }
+      }
+
+      // 4. Create AR Receipt
+      let receiptId: string | undefined;
+      if (customerId) {
+        const receiptResult = await createVehicleARReceipt({
+          module: 'yutong',
+          paymentId,
+          invoiceId,
+          customerId,
+          amount: payment.payment_amount,
+          paymentMethod: payment.payment_method,
+          paymentDate: payment.payment_date,
+          settings,
+          effectiveCompanyId: NCG_HOLDING_ID,
+        });
+
+        if (receiptResult) {
+          receiptId = receiptResult.receiptId;
+        }
+      }
+
+      // 5. Update payment status with GL links
       const { error } = await supabase
         .from('yutong_customer_payments')
         .update({
           status: 'verified',
           verified_at: new Date().toISOString(),
-          verified_by: (await supabase.auth.getUser()).data.user?.id
+          verified_by: user.id,
+          journal_entry_id: journalEntryId,
+          ar_receipt_id: receiptId,
         })
         .eq('id', paymentId);
 
@@ -220,7 +340,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
       // Regenerate all invoices for this order with updated payment data
       await regenerateOrderInvoices();
 
-      toast.success('Payment verified and invoices updated');
+      toast.success('Payment verified and GL posted successfully');
       loadPaymentData();
       onRefresh();
     } catch (error: any) {

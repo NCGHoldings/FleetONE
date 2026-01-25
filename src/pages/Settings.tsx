@@ -25,6 +25,10 @@ import { PayrollSettingsComponent } from "@/components/settings/PayrollSettingsC
 import { NumberingSettings } from "@/components/settings/NumberingSettings";
 import { SchoolBusFinanceSettings } from "@/components/school/SchoolBusFinanceSettings";
 import { SpecialHireFinanceSettings } from "@/components/special-hire/SpecialHireFinanceSettings";
+import { YutongFinanceSettings } from "@/components/settings/YutongFinanceSettings";
+import { SinotruckFinanceSettings } from "@/components/settings/SinotruckFinanceSettings";
+import { LightVehicleFinanceSettings } from "@/components/settings/LightVehicleFinanceSettings";
+import { Truck } from "lucide-react";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -136,6 +140,18 @@ export default function Settings() {
           <TabsTrigger value="special-hire-finance" className="flex items-center gap-1">
             <Car className="h-3 w-3" />
             Special Hire Finance
+          </TabsTrigger>
+          <TabsTrigger value="yutong-finance" className="flex items-center gap-1">
+            <Truck className="h-3 w-3" />
+            Yutong Finance
+          </TabsTrigger>
+          <TabsTrigger value="sinotruck-finance" className="flex items-center gap-1">
+            <Truck className="h-3 w-3" />
+            Sinotruck Finance
+          </TabsTrigger>
+          <TabsTrigger value="lightvehicle-finance" className="flex items-center gap-1">
+            <Car className="h-3 w-3" />
+            Light Vehicle Finance
           </TabsTrigger>
         </TabsList>
 
@@ -585,6 +601,18 @@ export default function Settings() {
 
         <TabsContent value="special-hire-finance" className="space-y-6 mt-6">
           <SpecialHireFinanceSettings />
+        </TabsContent>
+
+        <TabsContent value="yutong-finance" className="space-y-6 mt-6">
+          <YutongFinanceSettings />
+        </TabsContent>
+
+        <TabsContent value="sinotruck-finance" className="space-y-6 mt-6">
+          <SinotruckFinanceSettings />
+        </TabsContent>
+
+        <TabsContent value="lightvehicle-finance" className="space-y-6 mt-6">
+          <LightVehicleFinanceSettings />
         </TabsContent>
       </Tabs>
     </div>
