@@ -350,6 +350,12 @@ export function TripDetailsModal({
             defaultKmRate={300}
             onAdjustmentSaved={fetchAdjustmentData}
             onRequestInvoiceGeneration={() => setIsBalanceInvoiceModalOpen(true)}
+            originalPickupDatetime={(trip.quotation as any).pickup_datetime}
+            originalDropDatetime={(trip.quotation as any).drop_datetime}
+            originalOvertimeCharge={(trip.quotation as any).overtime_charge || 0}
+            originalOvernightCharge={(trip.quotation as any).overnight_charge || 0}
+            hourlyRate={(trip.quotation as any).overtime_rate_lkr_per_hour || 500}
+            nightBlockFee={(trip.quotation as any).overnight_charge_lkr_per_day || 3000}
           />
 
           <PaymentConfirmationModal
