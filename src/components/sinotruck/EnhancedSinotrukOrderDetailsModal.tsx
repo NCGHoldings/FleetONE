@@ -21,6 +21,7 @@ import {
     User
 } from 'lucide-react';
 import { SinotrukOrder } from '@/hooks/useSinotrukOrderManagement';
+import { SinotruckPaymentTracking } from './SinotruckPaymentTracking';
 
 interface EnhancedSinotrukOrderDetailsModalProps {
     order: SinotrukOrder | null;
@@ -174,11 +175,10 @@ export function EnhancedSinotrukOrderDetailsModal({
                     </TabsContent>
 
                     <TabsContent value="financial" className="space-y-6">
-                        <Card>
-                            <CardContent className="p-6">
-                                <p className="text-muted-foreground text-center">Financial tracking coming soon...</p>
-                            </CardContent>
-                        </Card>
+                        <SinotruckPaymentTracking 
+                            orderId={order.id} 
+                            onRefresh={onRefresh} 
+                        />
                     </TabsContent>
 
                     <TabsContent value="operations" className="space-y-6">

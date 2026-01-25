@@ -255,7 +255,7 @@ export const useSinotrukOrderManagement = () => {
                 .insert({
                     ...paymentData,
                     created_by: user?.id,
-                    status: 'received'
+                    status: 'pending'
                 });
 
             if (error) throw error;
@@ -283,6 +283,74 @@ export const useSinotrukOrderManagement = () => {
         }
     };
 
+    // Verify payment and trigger GL posting
+    const verifyPayment = async (paymentId: string) => {
+        try {
+            setIsLoading(true);
+
+            const { error } = await (supabase as any)
+                .from('sinotruck_customer_payments')
+                .update({
+                    status: 'verified',
+                    verified_at: new Date().toISOString(),
+                    verified_by: user?.id
+                })
+                .eq('id', paymentId);
+
+            if (error) throw error;
+
+            toast.success('Payment verified. GL posting triggered via payment tracking.');
+            return { success: true };
+        } catch (error) {
+            console.error('Error verifying payment:', error);
+            toast.error('Failed to verify payment');
+            return { success: false, error };
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Update order financials after payment verification
+    const updateOrderFinancials = async (orderId: string) => {
+        try {
+            // Get all verified payments for the order
+            const { data: verifiedPayments, error: paymentsError } = await (supabase as any)
+                .from('sinotruck_customer_payments')
+                .select('payment_amount')
+                .eq('order_id', orderId)
+                .eq('status', 'verified');
+
+            if (paymentsError) throw paymentsError;
+
+            const totalPaid = verifiedPayments?.reduce((sum: number, p: any) => sum + p.payment_amount, 0) || 0;
+
+            // Get order to calculate balance
+            const { data: order, error: orderError } = await (supabase as any)
+                .from('sinotruck_orders')
+                .select('total_amount')
+                .eq('id', orderId)
+                .single();
+
+            if (orderError) throw orderError;
+
+            const balanceDue = (order?.total_amount || 0) - totalPaid;
+
+            // Update order
+            await (supabase as any)
+                .from('sinotruck_orders')
+                .update({
+                    total_paid: totalPaid,
+                    balance_due: balanceDue
+                })
+                .eq('id', orderId);
+
+            return { success: true, totalPaid, balanceDue };
+        } catch (error) {
+            console.error('Error updating order financials:', error);
+            return { success: false, error };
+        }
+    };
+
     return {
         isLoading,
         createOrderFromQuotation,
@@ -290,5 +358,7 @@ export const useSinotrukOrderManagement = () => {
         updateOrderPhase,
         getPaymentSchedules,
         recordCustomerPayment,
+        verifyPayment,
+        updateOrderFinancials,
     };
 };
