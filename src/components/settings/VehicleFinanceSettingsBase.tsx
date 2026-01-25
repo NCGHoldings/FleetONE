@@ -121,19 +121,21 @@ export function VehicleFinanceSettingsBase({
     <div className="space-y-2">
       <Label>{label}</Label>
       <Select
-        value={settings[field] as string || ''}
-        onValueChange={(value) => setSettings({ ...settings, [field]: value || null })}
+        value={settings[field] as string || '_none'}
+        onValueChange={(value) => setSettings({ ...settings, [field]: value === '_none' ? null : value })}
       >
         <SelectTrigger>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">-- Not Configured --</SelectItem>
-          {getAccountsByType(accountTypes).map((account) => (
-            <SelectItem key={account.id} value={account.id}>
-              {account.account_code} - {account.account_name}
-            </SelectItem>
-          ))}
+          <SelectItem value="_none">-- Not Configured --</SelectItem>
+          {getAccountsByType(accountTypes)
+            .filter(account => account.id && account.id.trim() !== '')
+            .map((account) => (
+              <SelectItem key={account.id} value={account.id}>
+                {account.account_code} - {account.account_name}
+              </SelectItem>
+            ))}
         </SelectContent>
       </Select>
     </div>
