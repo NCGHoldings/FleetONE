@@ -1,93 +1,127 @@
 
-# Special Hire Calculation & Display Issues - Complete Fix Plan
+# Special Hire Overtime/Overnight Calculation Complete Fix Plan
 
-## Executive Summary
+## Problem Summary
 
-After thorough cross-checking of the Special Hire calculation flow, I identified **4 critical issues** causing time calculations and overnight charges to not display correctly, plus inconsistencies in the quotation/invoice document flow.
+Based on my investigation, I found **3 critical issues** causing overtime/overnight charges to not display correctly:
 
----
+### Issue 1: EnhancedCostCalculator Missing Recalculation Logic
+**Problem**: When stored values are 0 (for existing quotations or newly migrated data), the calculator doesn't fall back to recalculating using `calculateExtraTimeCharge`.
 
-## Issues Identified
-
-### Issue 1: Missing Database Columns for Time Charges
-**Problem**: The `special_hire_quotations` table lacks dedicated columns for `overtime_charge` and `overnight_charge`. These values are bundled into `extra_charges` during save, but lost when retrieving data for display.
-
-**Evidence**: Database query confirmed only `extra_charges` column exists - no individual overtime/overnight columns.
-
-### Issue 2: EnhancedCostCalculator References Non-Existent Columns
-**Problem**: Lines 335-336 in `EnhancedCostCalculator.tsx` reference `quotation.overtime_charge` and `quotation.overnight_charge` which return undefined/0.
-
+**Evidence from Code (lines 332-335)**:
 ```typescript
-// Current (BROKEN)
-overtimeCharge: quotation.overtime_charge || 0,  // Always 0
-overnightCharge: quotation.overnight_charge || 0, // Always 0
+const storedOvertimeCharge = quotation.overtime_charge || 0;  // Falls back to 0, not recalculation
+const storedOvernightCharge = quotation.overnight_charge || 0; // Falls back to 0, not recalculation
 ```
 
-### Issue 3: CostBreakdown Working Hours Display Fallback Logic
-**Problem**: When `rateCardDetails` is not fully populated (e.g., viewing saved quotations), the working hours analysis falls back to incomplete calculations that don't match the original business logic.
+### Issue 2: Missing Import in EnhancedCostCalculator
+**Problem**: The `calculateExtraTimeCharge` function is not imported in `EnhancedCostCalculator.tsx`, so it cannot perform the fallback recalculation.
 
-### Issue 4: QuotationPreview Missing Time Breakdown
-**Problem**: Customer-facing quotation document shows only "Subtotal" and "Final Total" without listing the overtime/overnight components that contributed to those totals. The "Description" column shows static "Route Details" placeholder.
+### Issue 3: Historical Data Has No Charges Stored
+**Problem**: All existing quotations in database have `overtime_charge = 0`, `overnight_charge = 0`, `fixed_rate = 0` because these columns were just added with default values.
+
+**Database Evidence**:
+| Quotation | Trip KM | Pickup | Drop | Extra Charges | Overtime | Overnight | Fixed Rate |
+|-----------|---------|--------|------|---------------|----------|-----------|------------|
+| QUO-2026-0944 | 375.6 | Jan 23 00:00 | Jan 25 15:30 | 15000 | **0** | **0** | **0** |
+| QUO-2026-0862 | 231.6 | Jan 12 00:30 | Jan 13 16:30 | 10000 | **0** | **0** | **0** |
+| QUO-2026-0796 | 657.1 | Jan 08 00:30 | Jan 10 17:30 | 0 | **0** | **0** | **0** |
 
 ---
 
 ## Implementation Plan
 
-### Part 1: Add Database Columns for Time Charges
+### Step 1: Update EnhancedCostCalculator.tsx - Add Import
 
-Create a migration to add `overtime_charge`, `overnight_charge`, and `fixed_rate` columns to `special_hire_quotations`:
-
-```sql
-ALTER TABLE special_hire_quotations 
-ADD COLUMN IF NOT EXISTS overtime_charge NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS overnight_charge NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS fixed_rate NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS exceeding_distance_charge NUMERIC DEFAULT 0;
-```
-
-### Part 2: Update SpecialHireForm.tsx to Save Individual Charges
-
-Modify the quotation save logic (around line 1514) to include:
-- `overtime_charge`
-- `overnight_charge`
-- `fixed_rate`
-- `exceeding_distance_charge`
-
-### Part 3: Fix EnhancedCostCalculator.tsx Recalculation
-
-Update the cost data mapping (lines 328-337) to:
-1. First try to use stored values from database
-2. If not available, recalculate using `calculateExtraTimeCharge()` function with stored datetime and distance
+Add the `calculateExtraTimeCharge` import at the top of the file:
 
 ```typescript
-// Recalculate if not stored
-const extraTimeResult = calculateExtraTimeCharge(
-  quotation.km_trip || 0,
-  quotation.pickup_datetime,
-  quotation.drop_datetime,
-  { baselineSpeedKmph: 10, hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500, nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000 }
-);
-
-overtimeCharge: quotation.overtime_charge || extraTimeResult.overtimeCharge,
-overnightCharge: quotation.overnight_charge || extraTimeResult.overnightCharge,
+import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
 ```
 
-### Part 4: Update QuotationPreview.tsx with Time Breakdown
+### Step 2: Update EnhancedCostCalculator.tsx - Add Recalculation Fallback
 
-Add a new "Time Analysis" section to the customer document showing:
-- Trip Duration (pickup to drop)
-- Available Hours (distance / 10 km/h)
-- Overtime Hours (if applicable)
-- Overnight Days (if applicable)
-- Individual charge amounts
+Modify the `displayOriginalCostBreakdown` function (around line 330-335) to:
+1. Check if stored values are 0 AND the hire type is "Outside"
+2. If so, recalculate using `calculateExtraTimeCharge`
+3. Use rate card rates if available, otherwise use defaults
 
-### Part 5: Update QuotationData Interface
+**Updated Logic**:
+```typescript
+// Recalculate overtime/overnight for Outside hire if not stored
+let storedOvertimeCharge = quotation.overtime_charge || 0;
+let storedOvernightCharge = quotation.overnight_charge || 0;
 
-Add the new fields to the interface in `QuotationPreview.tsx` and `useRealtimeSpecialHire.ts`:
-- `overtime_charge?: number`
-- `overnight_charge?: number`
-- `fixed_rate?: number`
-- `exceeding_distance_charge?: number`
+// If charges are 0 and this is an Outside hire, recalculate
+if (quotation.hire_type === 'Outside' && 
+    storedOvertimeCharge === 0 && 
+    storedOvernightCharge === 0 && 
+    quotation.pickup_datetime && 
+    quotation.drop_datetime) {
+  
+  const extraTimeResult = calculateExtraTimeCharge(
+    tripDistance,
+    quotation.pickup_datetime,
+    quotation.drop_datetime,
+    {
+      baselineSpeedKmph: 10,
+      hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
+      nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000
+    }
+  );
+  
+  storedOvertimeCharge = extraTimeResult.overtimeCharge;
+  storedOvernightCharge = extraTimeResult.overnightCharge;
+}
+```
+
+### Step 3: Update CostBreakdown.tsx - Add Overtime/Overnight Info to Working Hours
+
+Enhance the Working Hours Analysis section to show:
+- Extra hours (if > 0)
+- Whether overtime or overnight applies
+- The specific charge type breakdown
+
+**Add after the Available/Actual hours display**:
+```typescript
+{/* Extra Time Charges Info */}
+{(safeData.overtimeCharge > 0 || safeData.overnightCharge > 0) && (
+  <div className="mt-3 p-2 bg-orange-50 rounded-md border border-orange-200">
+    <div className="text-sm font-medium text-orange-700 mb-1">Extra Time Charges</div>
+    <div className="grid grid-cols-2 gap-2 text-xs">
+      {safeData.overtimeCharge > 0 && (
+        <div className="flex justify-between">
+          <span>Overtime</span>
+          <span className="font-medium">LKR {safeData.overtimeCharge.toLocaleString()}</span>
+        </div>
+      )}
+      {safeData.overnightCharge > 0 && (
+        <div className="flex justify-between">
+          <span>Overnight</span>
+          <span className="font-medium">LKR {safeData.overnightCharge.toLocaleString()}</span>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+```
+
+### Step 4: Update QuotationPreview.tsx - Ensure Time Charges Display
+
+Verify the QuotationPreview component correctly displays overtime and overnight in the customer-facing quotation document.
+
+### Step 5: Database Migration - Backfill Historical Data
+
+Create a migration to update existing confirmed quotations with correct overtime/overnight values:
+
+```sql
+-- Note: This requires a server-side calculation since we can't call JS functions from SQL
+-- The fix in EnhancedCostCalculator will handle display for existing data
+-- New quotations will save values correctly going forward
+
+-- For now, just ensure columns exist and have correct defaults
+-- The frontend recalculation handles historical data display
+```
 
 ---
 
@@ -95,41 +129,56 @@ Add the new fields to the interface in `QuotationPreview.tsx` and `useRealtimeSp
 
 | File | Changes |
 |------|---------|
-| `supabase/migrations/[new]_add_time_charge_columns.sql` | Add 4 new columns |
-| `src/components/special-hire/SpecialHireForm.tsx` | Save individual charge values |
-| `src/components/special-hire/EnhancedCostCalculator.tsx` | Recalculate from stored or compute |
-| `src/components/special-hire/QuotationPreview.tsx` | Add time breakdown section |
-| `src/components/special-hire/CostBreakdown.tsx` | Improve fallback calculations |
-| `src/hooks/useRealtimeSpecialHire.ts` | Add new fields to interface |
-| `src/integrations/supabase/types.ts` | Update generated types |
+| `src/components/special-hire/EnhancedCostCalculator.tsx` | Add import + recalculation fallback logic |
+| `src/components/special-hire/CostBreakdown.tsx` | Add extra time charges info to Working Hours section |
+| `src/components/special-hire/QuotationPreview.tsx` | Verify time charges section displays correctly |
+
+---
+
+## How This Fixes the Issues
+
+### Issue: "Quotation creation time shows but calculator page doesn't"
+**Fix**: EnhancedCostCalculator will now recalculate overtime/overnight charges from stored datetime/distance when the stored values are 0.
+
+### Issue: "Overnight charges don't show"
+**Fix**: 
+1. Recalculation logic will compute correct overnight charges for multi-day trips
+2. CostBreakdown will display the charges in "Hire Charges Breakdown" section (already implemented at lines 420-425)
+3. New "Extra Time Charges" summary added to Working Hours section for clarity
+
+### Issue: "Should add overnight or not?"
+**Answer**: YES - overnight charges should absolutely be added when:
+- Extra hours exceed 10 hours (then a night block fee of LKR 3,000 per 24h is charged)
+- The existing business logic in `extra-time-calculator.ts` already handles this correctly
+- The issue was only that the calculator page wasn't recalculating for existing data
 
 ---
 
 ## Verification Steps
 
-After implementation, verify with these checks:
+After implementation:
 
-1. **Create new Outside hire quotation** with multi-day trip - confirm overtime/overnight display in CostBreakdown
-2. **View saved quotation** - confirm time analysis displays correctly
-3. **Generate QuotationPreview PDF** - confirm customer document shows charge breakdown
-4. **Generate Balance Invoice** - confirm charges flow through correctly
-5. **Check database** - confirm new columns populated with correct values
+1. **View existing quotation in Calculator tab** - Should now show correct overtime/overnight charges
+2. **Create new Outside hire quotation** spanning multiple days - Verify charges display during creation AND in calculator
+3. **Check Working Hours Analysis** - Should show breakdown of extra time charges
+4. **Verify Hire Charges Breakdown** - Should list overtime/overnight as line items when applicable
 
 ---
 
 ## Technical Details
 
-### Overtime/Overnight Calculation Rules (from extra-time-calculator.ts)
+### Overtime/Overnight Business Rules (from extra-time-calculator.ts)
 
-- **Available Hours** = Trip Distance / 10 km/h
-- **Extra Hours** = Actual Hours - Available Hours
-- **If Extra Hours <= 10**: Charge hourly rate per hour
-- **If Extra Hours > 10**: Charge night block fee (3000 LKR) per 24h, remaining hours charged hourly
+| Extra Hours | Charge Type | Calculation |
+|-------------|-------------|-------------|
+| 0 | None | No charge |
+| 1-10 hrs | Overtime | hours × hourly rate (default LKR 500/hr) |
+| 10+ hrs | Overnight | First 24h block = night fee (LKR 3,000) + remaining calculated recursively |
 
-### Data Flow
-
-```text
-Form Calculation -> Save to DB (with individual columns) -> Retrieve -> Display in CostBreakdown/Preview
-```
-
-This ensures the calculated values are persisted and don't need recalculation on display, eliminating discrepancies.
+### Example Calculation
+For QUO-2026-0944:
+- Trip: 375.6 km → Available: 37.56 hrs
+- Duration: Jan 23 00:00 to Jan 25 15:30 = 63.5 hrs
+- Extra hours: 63.5 - 37.56 = 25.94 hrs
+- Since > 10 hrs: 1 night block (LKR 3,000) + (25.94 - 24) = 1.94 hrs × 500 = 970
+- Total: LKR 3,970 (currently showing as 0)
