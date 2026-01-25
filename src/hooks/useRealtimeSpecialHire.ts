@@ -20,6 +20,11 @@ export interface QuotationWithPayments {
   fuel_cost_fuel_only?: number;
   commission_pass_through_amount?: number;
   discount_amount_lkr?: number;
+  // Time-based charges
+  fixed_rate?: number;
+  overtime_charge?: number;
+  overnight_charge?: number;
+  exceeding_distance_charge?: number;
   additional_charges?: Array<{ type: string; amount: number; reason?: string }> | string;
   total_additional_charges?: number;
   status: string;

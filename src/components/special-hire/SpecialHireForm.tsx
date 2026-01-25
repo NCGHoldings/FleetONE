@@ -1228,6 +1228,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         fuel_cost_fuel_only: Math.round(totalFuelCost),
         hire_charge: Math.round(hireCharge),
         extra_charges: Math.round(totalExtraTimeCharge),
+        // Store individual time charge components for display
+        fixed_rate: Math.round(fixedRate),
+        overtime_charge: Math.round(overtimeCharge),
+        overnight_charge: Math.round(overnightCharge),
+        exceeding_distance_charge: Math.round(exceedingDistanceCharge),
         gross_revenue: Math.round(grossRevenue), // Base hire charges
         commission_pct: data.commissionPct,
         commission_pass_through_pct: data.commissionPassThroughPct,
@@ -1513,6 +1518,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         fuel_cost_fuel_only: costs.fuel_cost_fuel_only,
         hire_charge: costs.hire_charge,
         extra_charges: costs.extra_charges,
+        // Store individual time charge components for retrieval/display
+        fixed_rate: costs.fixed_rate || 0,
+        overtime_charge: costs.overtime_charge || 0,
+        overnight_charge: costs.overnight_charge || 0,
+        exceeding_distance_charge: costs.exceeding_distance_charge || 0,
         gross_revenue: costs.gross_revenue,
         driver_charge: costs.driver_charge,
         other_expenses: costs.other_expenses,

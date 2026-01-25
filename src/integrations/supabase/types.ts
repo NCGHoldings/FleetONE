@@ -15276,8 +15276,10 @@ export type Database = {
           drop_location: string
           edit_reason: string | null
           edit_type: string | null
+          exceeding_distance_charge: number | null
           extra_charges: number | null
           finance_customer_id: string | null
+          fixed_rate: number | null
           fuel_cost_fuel_only: number | null
           gross_revenue: number | null
           hire_charge: number | null
@@ -15292,6 +15294,8 @@ export type Database = {
           number_of_buses: number
           number_of_passengers: number
           other_expenses: Json | null
+          overnight_charge: number | null
+          overtime_charge: number | null
           parent_quotation_id: string | null
           parking_location_id: string | null
           percentage_adjustment: number | null
@@ -15365,8 +15369,10 @@ export type Database = {
           drop_location: string
           edit_reason?: string | null
           edit_type?: string | null
+          exceeding_distance_charge?: number | null
           extra_charges?: number | null
           finance_customer_id?: string | null
+          fixed_rate?: number | null
           fuel_cost_fuel_only?: number | null
           gross_revenue?: number | null
           hire_charge?: number | null
@@ -15381,6 +15387,8 @@ export type Database = {
           number_of_buses?: number
           number_of_passengers: number
           other_expenses?: Json | null
+          overnight_charge?: number | null
+          overtime_charge?: number | null
           parent_quotation_id?: string | null
           parking_location_id?: string | null
           percentage_adjustment?: number | null
@@ -15454,8 +15462,10 @@ export type Database = {
           drop_location?: string
           edit_reason?: string | null
           edit_type?: string | null
+          exceeding_distance_charge?: number | null
           extra_charges?: number | null
           finance_customer_id?: string | null
+          fixed_rate?: number | null
           fuel_cost_fuel_only?: number | null
           gross_revenue?: number | null
           hire_charge?: number | null
@@ -15470,6 +15480,8 @@ export type Database = {
           number_of_buses?: number
           number_of_passengers?: number
           other_expenses?: Json | null
+          overnight_charge?: number | null
+          overtime_charge?: number | null
           parent_quotation_id?: string | null
           parking_location_id?: string | null
           percentage_adjustment?: number | null

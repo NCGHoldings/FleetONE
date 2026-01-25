@@ -35,9 +35,12 @@ interface QuotationData {
   km_drop_to_parking?: number;
   km_additional?: number;
   hire_charge?: number;
+  // Time-based charges stored in database
+  fixed_rate?: number;
   overtime_charge?: number;
   overnight_charge?: number;
   exceeding_km_charge?: number;
+  exceeding_distance_charge?: number;
   fuel_cost_fuel_only?: number;
   fuel_cost_calculated?: number;
   maintenance_cost?: number;
@@ -325,16 +328,22 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         .reduce((sum, charge) => sum + (charge.distance || 0), 0);
       
       // Prepare the cost breakdown data from the quotation to match CostBreakdown props
+      // Use stored values first, then recalculate as fallback
+      const storedFixedRate = quotation.fixed_rate || fixedRate;
+      const storedOvertimeCharge = quotation.overtime_charge || 0;
+      const storedOvernightCharge = quotation.overnight_charge || 0;
+      const storedExceedingDistanceCharge = quotation.exceeding_distance_charge || exceedingDistanceCharge;
+      
       const data: CostData = {
         kmParkingToPickup: quotation.km_parking_to_pickup || 0,
         kmTrip: quotation.km_trip || 0,
         kmDropToParking: quotation.km_drop_to_parking || 0,
         fuelCostFuelOnly: quotation.fuel_cost_fuel_only || 0,
         hireCharge: quotation.gross_revenue || 0,
-        fixedRate: fixedRate,
-        overtimeCharge: quotation.overtime_charge || 0,
-        overnightCharge: quotation.overnight_charge || 0,
-        exceedingDistanceCharge: exceedingDistanceCharge,
+        fixedRate: storedFixedRate,
+        overtimeCharge: storedOvertimeCharge,
+        overnightCharge: storedOvernightCharge,
+        exceedingDistanceCharge: storedExceedingDistanceCharge,
         maintenanceCost: quotation.maintenance_cost || 0,
         // Use base trip distance for totalTripDistance (without additional km)
         totalTripDistance: baseTripDistance,

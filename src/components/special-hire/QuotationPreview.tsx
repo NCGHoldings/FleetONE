@@ -26,6 +26,11 @@ interface QuotationData {
   fuel_cost_fuel_only?: number;
   hire_charge?: number;
   extra_charges?: number;
+  // Time-based charges
+  fixed_rate?: number;
+  overtime_charge?: number;
+  overnight_charge?: number;
+  exceeding_distance_charge?: number;
   commission_amount?: number;
   commission_pass_through_amount?: number;
   discount_amount_lkr?: number;
@@ -935,6 +940,137 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                 <span className="text-gray-800">{parsedQuotation.drop_location}</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Time Analysis Section - Only show for Outside hires with time charges */}
+        {(parsedQuotation.overtime_charge || parsedQuotation.overnight_charge) && (
+          <div style={{ marginTop: "12px" }}>
+            <div className="text-sm font-semibold text-blue-600 mb-2">Trip Time Analysis</div>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: "11px",
+                fontFamily: '"Segoe UI", Arial, sans-serif',
+              }}
+            >
+              <tbody>
+                <tr>
+                  <th
+                    style={{
+                      border: "1px solid #d1d5db",
+                      padding: "6px 8px",
+                      backgroundColor: "#eff6ff",
+                      fontWeight: "600",
+                      color: "#2563eb",
+                      textAlign: "left",
+                      width: "25%",
+                    }}
+                  >
+                    Trip Duration
+                  </th>
+                  <td
+                    style={{
+                      border: "1px solid #d1d5db",
+                      padding: "6px 8px",
+                      color: "#374151",
+                      width: "25%",
+                    }}
+                  >
+                    {(() => {
+                      if (parsedQuotation.pickup_datetime && parsedQuotation.drop_datetime) {
+                        const pickup = new Date(parsedQuotation.pickup_datetime);
+                        const drop = new Date(parsedQuotation.drop_datetime);
+                        const hours = (drop.getTime() - pickup.getTime()) / (1000 * 60 * 60);
+                        return `${hours.toFixed(1)} hours`;
+                      }
+                      return "N/A";
+                    })()}
+                  </td>
+                  <th
+                    style={{
+                      border: "1px solid #d1d5db",
+                      padding: "6px 8px",
+                      backgroundColor: "#eff6ff",
+                      fontWeight: "600",
+                      color: "#2563eb",
+                      textAlign: "left",
+                      width: "25%",
+                    }}
+                  >
+                    Available Hours
+                  </th>
+                  <td
+                    style={{
+                      border: "1px solid #d1d5db",
+                      padding: "6px 8px",
+                      color: "#374151",
+                      width: "25%",
+                    }}
+                  >
+                    {((parsedQuotation.km_trip || 0) / 10).toFixed(1)} hours
+                    <div style={{ fontSize: "9px", color: "#6b7280" }}>
+                      ({parsedQuotation.km_trip || 0} km ÷ 10 km/h)
+                    </div>
+                  </td>
+                </tr>
+                {(parsedQuotation.overtime_charge || 0) > 0 && (
+                  <tr>
+                    <th
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "6px 8px",
+                        backgroundColor: "#fef3c7",
+                        fontWeight: "600",
+                        color: "#d97706",
+                        textAlign: "left",
+                      }}
+                    >
+                      Overtime Charge
+                    </th>
+                    <td
+                      colSpan={3}
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "6px 8px",
+                        color: "#d97706",
+                        fontWeight: "500",
+                      }}
+                    >
+                      LKR {parsedQuotation.overtime_charge?.toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+                {(parsedQuotation.overnight_charge || 0) > 0 && (
+                  <tr>
+                    <th
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "6px 8px",
+                        backgroundColor: "#dbeafe",
+                        fontWeight: "600",
+                        color: "#1d4ed8",
+                        textAlign: "left",
+                      }}
+                    >
+                      Overnight Charge
+                    </th>
+                    <td
+                      colSpan={3}
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "6px 8px",
+                        color: "#1d4ed8",
+                        fontWeight: "500",
+                      }}
+                    >
+                      LKR {parsedQuotation.overnight_charge?.toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
 
