@@ -8075,9 +8075,11 @@ export type Database = {
       lightvehicle_customer_payments: {
         Row: {
           amount: number
+          ar_receipt_id: string | null
           created_at: string | null
           created_by: string | null
           id: string
+          journal_entry_id: string | null
           notes: string | null
           order_id: string | null
           payment_date: string
@@ -8091,9 +8093,11 @@ export type Database = {
         }
         Insert: {
           amount: number
+          ar_receipt_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           order_id?: string | null
           payment_date: string
@@ -8107,9 +8111,11 @@ export type Database = {
         }
         Update: {
           amount?: number
+          ar_receipt_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           order_id?: string | null
           payment_date?: string
@@ -8122,6 +8128,20 @@ export type Database = {
           verified_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lightvehicle_customer_payments_ar_receipt_id_fkey"
+            columns: ["ar_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_customer_payments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lightvehicle_customer_payments_order_id_fkey"
             columns: ["order_id"]
@@ -8221,6 +8241,150 @@ export type Database = {
           option_value?: string
         }
         Relationships: []
+      }
+      lightvehicle_finance_settings: {
+        Row: {
+          auto_create_customer: boolean | null
+          auto_post_on_verify: boolean | null
+          commission_expense_account_id: string | null
+          company_id: string
+          created_at: string | null
+          customer_advance_account_id: string | null
+          default_bank_account_id: string | null
+          discount_expense_account_id: string | null
+          id: string
+          invoice_prefix: string | null
+          is_active: boolean | null
+          lc_bank_account_id: string | null
+          receipt_prefix: string | null
+          sales_revenue_account_id: string | null
+          spare_parts_revenue_account_id: string | null
+          trade_receivable_account_id: string | null
+          updated_at: string | null
+          vat_output_account_id: string | null
+          wht_payable_account_id: string | null
+        }
+        Insert: {
+          auto_create_customer?: boolean | null
+          auto_post_on_verify?: boolean | null
+          commission_expense_account_id?: string | null
+          company_id: string
+          created_at?: string | null
+          customer_advance_account_id?: string | null
+          default_bank_account_id?: string | null
+          discount_expense_account_id?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          lc_bank_account_id?: string | null
+          receipt_prefix?: string | null
+          sales_revenue_account_id?: string | null
+          spare_parts_revenue_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+          vat_output_account_id?: string | null
+          wht_payable_account_id?: string | null
+        }
+        Update: {
+          auto_create_customer?: boolean | null
+          auto_post_on_verify?: boolean | null
+          commission_expense_account_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          customer_advance_account_id?: string | null
+          default_bank_account_id?: string | null
+          discount_expense_account_id?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          lc_bank_account_id?: string | null
+          receipt_prefix?: string | null
+          sales_revenue_account_id?: string | null
+          spare_parts_revenue_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+          vat_output_account_id?: string | null
+          wht_payable_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_finance_settings_commission_expense_account_i_fkey"
+            columns: ["commission_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_customer_advance_account_id_fkey"
+            columns: ["customer_advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_default_bank_account_id_fkey"
+            columns: ["default_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_discount_expense_account_id_fkey"
+            columns: ["discount_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_lc_bank_account_id_fkey"
+            columns: ["lc_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_sales_revenue_account_id_fkey"
+            columns: ["sales_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_spare_parts_revenue_account__fkey"
+            columns: ["spare_parts_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_trade_receivable_account_id_fkey"
+            columns: ["trade_receivable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_vat_output_account_id_fkey"
+            columns: ["vat_output_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_finance_settings_wht_payable_account_id_fkey"
+            columns: ["wht_payable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lightvehicle_invoice_documents: {
         Row: {
@@ -8514,6 +8678,7 @@ export type Database = {
       lightvehicle_orders: {
         Row: {
           actual_delivery_date: string | null
+          ar_invoice_id: string | null
           balance_due: number | null
           brand: string | null
           category: string | null
@@ -8523,6 +8688,7 @@ export type Database = {
           current_phase: string | null
           customer_name: string
           expected_delivery_date: string | null
+          finance_customer_id: string | null
           id: string
           notes: string | null
           order_number: string
@@ -8540,6 +8706,7 @@ export type Database = {
         }
         Insert: {
           actual_delivery_date?: string | null
+          ar_invoice_id?: string | null
           balance_due?: number | null
           brand?: string | null
           category?: string | null
@@ -8549,6 +8716,7 @@ export type Database = {
           current_phase?: string | null
           customer_name: string
           expected_delivery_date?: string | null
+          finance_customer_id?: string | null
           id?: string
           notes?: string | null
           order_number: string
@@ -8566,6 +8734,7 @@ export type Database = {
         }
         Update: {
           actual_delivery_date?: string | null
+          ar_invoice_id?: string | null
           balance_due?: number | null
           brand?: string | null
           category?: string | null
@@ -8575,6 +8744,7 @@ export type Database = {
           current_phase?: string | null
           customer_name?: string
           expected_delivery_date?: string | null
+          finance_customer_id?: string | null
           id?: string
           notes?: string | null
           order_number?: string
@@ -8591,6 +8761,20 @@ export type Database = {
           vehicle_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lightvehicle_orders_ar_invoice_id_fkey"
+            columns: ["ar_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_orders_finance_customer_id_fkey"
+            columns: ["finance_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lightvehicle_orders_quotation_id_fkey"
             columns: ["quotation_id"]
@@ -13708,6 +13892,94 @@ export type Database = {
         }
         Relationships: []
       }
+      sinotruck_customer_payments: {
+        Row: {
+          ar_receipt_id: string | null
+          bank_name: string | null
+          bank_slip_no: string | null
+          cheque_no: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          journal_entry_id: string | null
+          notes: string | null
+          order_id: string | null
+          payment_amount: number
+          payment_date: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_schedule_id: string | null
+          status: string | null
+          updated_at: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          ar_receipt_id?: string | null
+          bank_name?: string | null
+          bank_slip_no?: string | null
+          cheque_no?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          order_id?: string | null
+          payment_amount: number
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_schedule_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          ar_receipt_id?: string | null
+          bank_name?: string | null
+          bank_slip_no?: string | null
+          cheque_no?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          order_id?: string | null
+          payment_amount?: number
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_schedule_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_customer_payments_ar_receipt_id_fkey"
+            columns: ["ar_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_customer_payments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_customer_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sinotruck_customers: {
         Row: {
           address: string | null
@@ -13749,6 +14021,310 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      sinotruck_finance_settings: {
+        Row: {
+          auto_create_customer: boolean | null
+          auto_post_on_verify: boolean | null
+          commission_expense_account_id: string | null
+          company_id: string
+          created_at: string | null
+          customer_advance_account_id: string | null
+          default_bank_account_id: string | null
+          discount_expense_account_id: string | null
+          id: string
+          invoice_prefix: string | null
+          is_active: boolean | null
+          lc_bank_account_id: string | null
+          receipt_prefix: string | null
+          sales_revenue_account_id: string | null
+          spare_parts_revenue_account_id: string | null
+          trade_receivable_account_id: string | null
+          updated_at: string | null
+          vat_output_account_id: string | null
+          wht_payable_account_id: string | null
+        }
+        Insert: {
+          auto_create_customer?: boolean | null
+          auto_post_on_verify?: boolean | null
+          commission_expense_account_id?: string | null
+          company_id: string
+          created_at?: string | null
+          customer_advance_account_id?: string | null
+          default_bank_account_id?: string | null
+          discount_expense_account_id?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          lc_bank_account_id?: string | null
+          receipt_prefix?: string | null
+          sales_revenue_account_id?: string | null
+          spare_parts_revenue_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+          vat_output_account_id?: string | null
+          wht_payable_account_id?: string | null
+        }
+        Update: {
+          auto_create_customer?: boolean | null
+          auto_post_on_verify?: boolean | null
+          commission_expense_account_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          customer_advance_account_id?: string | null
+          default_bank_account_id?: string | null
+          discount_expense_account_id?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          lc_bank_account_id?: string | null
+          receipt_prefix?: string | null
+          sales_revenue_account_id?: string | null
+          spare_parts_revenue_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+          vat_output_account_id?: string | null
+          wht_payable_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_finance_settings_commission_expense_account_id_fkey"
+            columns: ["commission_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_customer_advance_account_id_fkey"
+            columns: ["customer_advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_default_bank_account_id_fkey"
+            columns: ["default_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_discount_expense_account_id_fkey"
+            columns: ["discount_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_lc_bank_account_id_fkey"
+            columns: ["lc_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_sales_revenue_account_id_fkey"
+            columns: ["sales_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_spare_parts_revenue_account_id_fkey"
+            columns: ["spare_parts_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_trade_receivable_account_id_fkey"
+            columns: ["trade_receivable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_vat_output_account_id_fkey"
+            columns: ["vat_output_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_finance_settings_wht_payable_account_id_fkey"
+            columns: ["wht_payable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sinotruck_orders: {
+        Row: {
+          actual_delivery_date: string | null
+          ar_invoice_id: string | null
+          balance_due: number | null
+          created_at: string | null
+          created_by: string | null
+          current_phase: string | null
+          customer_id: string | null
+          expected_delivery_date: string | null
+          finance_customer_id: string | null
+          id: string
+          journal_entry_id: string | null
+          notes: string | null
+          order_date: string | null
+          order_no: string
+          payment_mode: string | null
+          payment_structure: Json | null
+          progress_percentage: number | null
+          quantity: number | null
+          quotation_id: string | null
+          status: string | null
+          total_amount: number | null
+          total_paid: number | null
+          truck_model: string
+          unit_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          ar_invoice_id?: string | null
+          balance_due?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          current_phase?: string | null
+          customer_id?: string | null
+          expected_delivery_date?: string | null
+          finance_customer_id?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          order_date?: string | null
+          order_no: string
+          payment_mode?: string | null
+          payment_structure?: Json | null
+          progress_percentage?: number | null
+          quantity?: number | null
+          quotation_id?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_paid?: number | null
+          truck_model: string
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          ar_invoice_id?: string | null
+          balance_due?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          current_phase?: string | null
+          customer_id?: string | null
+          expected_delivery_date?: string | null
+          finance_customer_id?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          order_date?: string | null
+          order_no?: string
+          payment_mode?: string | null
+          payment_structure?: Json | null
+          progress_percentage?: number | null
+          quantity?: number | null
+          quotation_id?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_paid?: number | null
+          truck_model?: string
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_orders_ar_invoice_id_fkey"
+            columns: ["ar_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_orders_finance_customer_id_fkey"
+            columns: ["finance_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_orders_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_orders_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sinotruck_payment_schedules: {
+        Row: {
+          amount: number
+          created_at: string | null
+          due_date: string | null
+          id: string
+          is_paid: boolean | null
+          milestone_name: string
+          notes: string | null
+          order_id: string | null
+          paid_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          is_paid?: boolean | null
+          milestone_name: string
+          notes?: string | null
+          order_id?: string | null
+          paid_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          is_paid?: boolean | null
+          milestone_name?: string
+          notes?: string | null
+          order_id?: string | null
+          paid_date?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_payment_schedules_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sinotruck_quotation_signatures: {
         Row: {
@@ -17756,12 +18332,14 @@ export type Database = {
       }
       yutong_customer_payments: {
         Row: {
+          ar_receipt_id: string | null
           bank_name: string | null
           bank_slip_no: string | null
           cheque_no: string | null
           created_at: string
           created_by: string | null
           id: string
+          journal_entry_id: string | null
           notes: string | null
           order_id: string
           payment_amount: number
@@ -17776,12 +18354,14 @@ export type Database = {
           verified_by: string | null
         }
         Insert: {
+          ar_receipt_id?: string | null
           bank_name?: string | null
           bank_slip_no?: string | null
           cheque_no?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           order_id: string
           payment_amount: number
@@ -17796,12 +18376,14 @@ export type Database = {
           verified_by?: string | null
         }
         Update: {
+          ar_receipt_id?: string | null
           bank_name?: string | null
           bank_slip_no?: string | null
           cheque_no?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          journal_entry_id?: string | null
           notes?: string | null
           order_id?: string
           payment_amount?: number
@@ -17816,6 +18398,20 @@ export type Database = {
           verified_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "yutong_customer_payments_ar_receipt_id_fkey"
+            columns: ["ar_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_customer_payments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "yutong_customer_payments_order_id_fkey"
             columns: ["order_id"]
@@ -18297,6 +18893,150 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "yutong_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      yutong_finance_settings: {
+        Row: {
+          auto_create_customer: boolean | null
+          auto_post_on_verify: boolean | null
+          commission_expense_account_id: string | null
+          company_id: string
+          created_at: string | null
+          customer_advance_account_id: string | null
+          default_bank_account_id: string | null
+          discount_expense_account_id: string | null
+          id: string
+          invoice_prefix: string | null
+          is_active: boolean | null
+          lc_bank_account_id: string | null
+          receipt_prefix: string | null
+          sales_revenue_account_id: string | null
+          spare_parts_revenue_account_id: string | null
+          trade_receivable_account_id: string | null
+          updated_at: string | null
+          vat_output_account_id: string | null
+          wht_payable_account_id: string | null
+        }
+        Insert: {
+          auto_create_customer?: boolean | null
+          auto_post_on_verify?: boolean | null
+          commission_expense_account_id?: string | null
+          company_id: string
+          created_at?: string | null
+          customer_advance_account_id?: string | null
+          default_bank_account_id?: string | null
+          discount_expense_account_id?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          lc_bank_account_id?: string | null
+          receipt_prefix?: string | null
+          sales_revenue_account_id?: string | null
+          spare_parts_revenue_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+          vat_output_account_id?: string | null
+          wht_payable_account_id?: string | null
+        }
+        Update: {
+          auto_create_customer?: boolean | null
+          auto_post_on_verify?: boolean | null
+          commission_expense_account_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          customer_advance_account_id?: string | null
+          default_bank_account_id?: string | null
+          discount_expense_account_id?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          is_active?: boolean | null
+          lc_bank_account_id?: string | null
+          receipt_prefix?: string | null
+          sales_revenue_account_id?: string | null
+          spare_parts_revenue_account_id?: string | null
+          trade_receivable_account_id?: string | null
+          updated_at?: string | null
+          vat_output_account_id?: string | null
+          wht_payable_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "yutong_finance_settings_commission_expense_account_id_fkey"
+            columns: ["commission_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_customer_advance_account_id_fkey"
+            columns: ["customer_advance_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_default_bank_account_id_fkey"
+            columns: ["default_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_discount_expense_account_id_fkey"
+            columns: ["discount_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_lc_bank_account_id_fkey"
+            columns: ["lc_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_sales_revenue_account_id_fkey"
+            columns: ["sales_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_spare_parts_revenue_account_id_fkey"
+            columns: ["spare_parts_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_trade_receivable_account_id_fkey"
+            columns: ["trade_receivable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_vat_output_account_id_fkey"
+            columns: ["vat_output_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_finance_settings_wht_payable_account_id_fkey"
+            columns: ["wht_payable_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -18815,6 +19555,7 @@ export type Database = {
       yutong_orders: {
         Row: {
           actual_delivery_date: string | null
+          ar_invoice_id: string | null
           balance_due: number | null
           bus_model: string
           chassis_number: string | null
@@ -18828,6 +19569,7 @@ export type Database = {
           engine_number: string | null
           engine_type: string | null
           expected_delivery_date: string | null
+          finance_customer_id: string | null
           fuel_type: string | null
           gearbox_type: string | null
           id: string
@@ -18851,6 +19593,7 @@ export type Database = {
         }
         Insert: {
           actual_delivery_date?: string | null
+          ar_invoice_id?: string | null
           balance_due?: number | null
           bus_model: string
           chassis_number?: string | null
@@ -18864,6 +19607,7 @@ export type Database = {
           engine_number?: string | null
           engine_type?: string | null
           expected_delivery_date?: string | null
+          finance_customer_id?: string | null
           fuel_type?: string | null
           gearbox_type?: string | null
           id?: string
@@ -18887,6 +19631,7 @@ export type Database = {
         }
         Update: {
           actual_delivery_date?: string | null
+          ar_invoice_id?: string | null
           balance_due?: number | null
           bus_model?: string
           chassis_number?: string | null
@@ -18900,6 +19645,7 @@ export type Database = {
           engine_number?: string | null
           engine_type?: string | null
           expected_delivery_date?: string | null
+          finance_customer_id?: string | null
           fuel_type?: string | null
           gearbox_type?: string | null
           id?: string
@@ -18923,10 +19669,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "yutong_orders_ar_invoice_id_fkey"
+            columns: ["ar_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "yutong_orders_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "yutong_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "yutong_orders_finance_customer_id_fkey"
+            columns: ["finance_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
@@ -20815,6 +21575,7 @@ export type Database = {
         Returns: string
       }
       generate_sinotruck_customer_code: { Args: never; Returns: string }
+      generate_sinotruck_order_no: { Args: never; Returns: string }
       generate_sinotruck_quotation_no: { Args: never; Returns: string }
       generate_sph_ar_invoice_number: {
         Args: { p_company_id: string }
