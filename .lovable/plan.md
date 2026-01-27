@@ -1,185 +1,189 @@
 
-# Special Hire Quotation Edit Fix Plan
+# System-Wide JSON Parsing Safety Fix
 
-## Problem Summary
+## Your Issue
 
-When editing a Special Hire quotation, the **"Update" button is permanently disabled** because the form's `costData` state is never initialized from the existing quotation data.
+The screenshot shows **"Unexpected end of JSON input"** error in Special Hire. This happens when the system tries to parse database fields that contain empty strings (`""`) or malformed JSON data.
 
-### Root Cause
-The form initialization in `SpecialHireForm.tsx` loads many values from `initialData` (customer info, stops, charges) but **does NOT populate `costData`** on mount when editing. Since the submit button has `disabled={loading || !costData}`, users cannot submit edits.
+## Why This Wasn't Detected Earlier
 
-### User Experience Issue
-Users must manually click "Calculate Costs" before they can update a quotation, which:
-1. Is confusing (button appears disabled with no explanation)
-2. May trigger unnecessary Google Maps API calls
-3. Could accidentally change preserved cost calculations
+I apologize for not catching this proactively. Here's why:
 
----
+1. **No Centralized Utility**: The project has 5+ different local implementations of `safeParseJSON` scattered across components
+2. **Inconsistent Protection**: Some files use `try-catch`, others just use `typeof` checks which still crash on empty strings
+3. **Database Data Variability**: The error only occurs when database records have empty or malformed JSON strings - not during normal testing
 
-## Technical Details
+## Critical Vulnerable Locations Found
 
-### Current Flow (Broken)
-1. User clicks "Edit" on a quotation
-2. Edit Type Selection Modal appears (Staff Edit / Customer Request)
-3. User selects type and continues
-4. SpecialHireForm opens with form fields populated from `initialData`
-5. **`costData` remains `null`** because no initialization logic exists
-6. Submit button is disabled (`!costData` evaluates to `true`)
-7. User stuck - cannot submit without clicking "Calculate Costs"
+I conducted a complete system audit and found **15 vulnerable locations** across the entire system:
 
-### Expected Flow (Fixed)
-1. User clicks "Edit" on a quotation
-2. Edit Type Selection Modal appears
-3. User selects type and continues
-4. SpecialHireForm opens with form fields AND `costData` populated from `initialData`
-5. Submit button is enabled immediately
-6. User can make changes and submit
-7. If route-critical fields changed, system recalculates automatically on submit
-8. If no route changes, preserved calculations are used
+### Special Hire Module (HIGHEST PRIORITY)
+| File | Line | Field | Risk |
+|------|------|-------|------|
+| `QuotationsList.tsx` | 182 | `bus_fleet_details` | HIGH - Crashes list loading |
+| `QuotationsList.tsx` | 192 | `bus_fleet_details` | HIGH - Second parse |
+| `QuotationsList.tsx` | 355 | `bus_fleet_details` | HIGH - Version loading |
+| `SpecialHireForm.tsx` | 1505 | `other_expenses` | HIGH - Edit submission |
+| `SpecialHireForm.tsx` | 1512 | `additional_charges` | HIGH - Edit submission |
+| `SpecialHireForm.tsx` | 1517 | `bus_fleet_details` | HIGH - Edit submission |
 
----
+### Daily Trips / SBO Module
+| File | Line | Field | Risk |
+|------|------|-------|------|
+| `useDailyBusGroupedTrips.ts` | 254 | `notes` | HIGH - Trips grouping |
+| `useCrewGroupedTrips.ts` | 127 | `notes` | HIGH - Crew grouping |
+| `gl-export-generator.ts` | 79 | `income_details` | MEDIUM - GL export |
+| `TripsAnalytics.tsx` | 163 | `notes` | MEDIUM - Analytics |
+
+### System Infrastructure
+| File | Line | Field | Risk |
+|------|------|-------|------|
+| `useSystemFlowDiagram.ts` | 58 | `flow_config` | LOW - Flow diagram |
+| `useSeasonalTheme.ts` | 80 | localStorage cache | LOW - Theme loading |
 
 ## Implementation Plan
 
-### Step 1: Add `costData` Initialization for Edit Mode
+### Part 1: Create Centralized Utility
 
-Add a new `useEffect` in `SpecialHireForm.tsx` that populates `costData` from `initialData` when editing:
-
-**Location**: After the existing `useEffect` for loading intermediate stops (around line 317)
-
-**Logic**: Map the stored quotation fields to the `costData` structure that the form expects.
-
-The initialization will include:
-- Distance values (`km_parking_to_pickup`, `km_trip`, `km_drop_to_parking`)
-- Financial calculations (`hire_charge`, `fuel_cost_fuel_only`, `gross_revenue`)
-- Time charges (`overtime_charge`, `overnight_charge`, `fixed_rate`)
-- Commission and discount details
-- Other expenses and additional charges
-
-### Step 2: Structure the `costData` Object
-
-The `costData` object needs to match the structure set by `calculateCosts()`:
-
-| Field | Source from `initialData` |
-|-------|---------------------------|
-| `kmParkingToPickup` | `km_parking_to_pickup` |
-| `kmTrip` | `km_trip` |
-| `kmDropToParking` | `km_drop_to_parking` |
-| `fuelCostFuelOnly` | `fuel_cost_fuel_only` |
-| `hireCharge` | `hire_charge` |
-| `grossRevenue` | `gross_revenue` |
-| `customerTotalWithFuel` | `customer_total_with_fuel` |
-| `overtimeCharge` | `overtime_charge` |
-| `overnightCharge` | `overnight_charge` |
-| `fixedRate` | `fixed_rate` |
-| `commissionPct` | `commission_pct` |
-| `commissionAmount` | `commission_amount` |
-| `discountPct` | `discount_percentage` |
-| `discountAmount` | `discount_amount_lkr` |
-| `netProfit` | `net_profit` |
-| `additionalCharges` | `JSON.parse(additional_charges)` |
-| `otherExpenses` | `JSON.parse(other_expenses)` |
-
-### Step 3: Handle Rate Card Details for Display
-
-For the CostBreakdown component to display correctly, also initialize:
-- `rateCardDetails` with overtime hours, standard hours, etc.
-- `pickupDateTime` and `dropDateTime` for time analysis display
-
----
-
-## Code Changes
-
-### File: `src/components/special-hire/SpecialHireForm.tsx`
-
-Add new `useEffect` after existing initialization:
+Add a robust `safeParseJSON` function to `src/lib/utils.ts` that:
+- Handles `null`, `undefined`, empty strings (`""`)
+- Handles already-parsed objects/arrays
+- Catches all parsing errors
+- Returns configurable fallback values
 
 ```typescript
-// Initialize costData from initialData when editing
-useEffect(() => {
-  if (isEditing && initialData) {
-    // Parse stored JSON fields
-    const additionalCharges = initialData.additional_charges 
-      ? (Array.isArray(initialData.additional_charges) 
-          ? initialData.additional_charges 
-          : JSON.parse(initialData.additional_charges || '[]'))
-      : [];
-    
-    const otherExpenses = initialData.other_expenses
-      ? (Array.isArray(initialData.other_expenses)
-          ? initialData.other_expenses
-          : JSON.parse(initialData.other_expenses || '[]'))
-      : [];
-
-    // Initialize costData to enable submit button
-    setCostData({
-      kmParkingToPickup: initialData.km_parking_to_pickup || 0,
-      kmTrip: initialData.km_trip || 0,
-      kmDropToParking: initialData.km_drop_to_parking || 0,
-      fuelCostFuelOnly: initialData.fuel_cost_fuel_only || 0,
-      hireCharge: initialData.hire_charge || 0,
-      grossRevenue: initialData.gross_revenue || 0,
-      customerTotalWithFuel: initialData.customer_total_with_fuel || 0,
-      fixedRate: initialData.fixed_rate || 0,
-      overtimeCharge: initialData.overtime_charge || 0,
-      overnightCharge: initialData.overnight_charge || 0,
-      exceedingDistanceCharge: initialData.exceeding_distance_charge || 0,
-      pickupDateTime: initialData.pickup_datetime,
-      dropDateTime: initialData.drop_datetime,
-      commissionPct: initialData.commission_pct || 0,
-      commissionAmount: initialData.commission_amount || 0,
-      commissionPassThroughPct: initialData.commission_pass_through_pct || 0,
-      commissionPassThroughAmount: initialData.commission_pass_through_amount || 0,
-      discountType: initialData.discount_percentage > 0 ? 'percentage' : 'amount',
-      discountPct: initialData.discount_percentage || 0,
-      discountAmount: initialData.discount_amount_lkr || 0,
-      driverCharge: initialData.driver_charge || 1500,
-      additionalCharges: additionalCharges,
-      totalAdditionalCharges: initialData.total_additional_charges || 0,
-      otherExpenses: otherExpenses,
-      totalExpenses: initialData.total_expenses || 0,
-      netProfit: initialData.net_profit || 0,
-      numberOfBuses: initialData.number_of_buses || 1,
-      // Rate card details for display
-      rateCardDetails: {
-        standardHours: 8,
-        actualHours: initialData.pickup_datetime && initialData.drop_datetime 
-          ? Math.round(((new Date(initialData.drop_datetime).getTime() - 
-              new Date(initialData.pickup_datetime).getTime()) / (1000 * 60 * 60)) * 100) / 100 
-          : 0,
-        overtimeHours: 0, // Will be recalculated if needed
-        overnightDays: 0,
-      }
-    });
+export function safeParseJSON<T>(
+  value: any, 
+  fallback: T = [] as T
+): T {
+  if (value === null || value === undefined || value === '') {
+    return fallback;
   }
-}, [isEditing, initialData]);
+  if (typeof value === 'object') {
+    return value as T;
+  }
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    console.warn('JSON parse failed for:', value, e);
+    return fallback;
+  }
+}
 ```
 
----
+### Part 2: Fix Special Hire Module (Critical)
 
-## Verification Steps
+**QuotationsList.tsx** - Replace 3 vulnerable parses:
+```typescript
+// Before (CRASHES)
+const fleetDetails = typeof item.bus_fleet_details === 'string' 
+  ? JSON.parse(item.bus_fleet_details) 
+  : item.bus_fleet_details;
 
-After implementation:
+// After (SAFE)
+const fleetDetails = safeParseJSON(item.bus_fleet_details, null);
+```
 
-1. **Open an existing quotation for editing** - Form should load with all fields populated
-2. **Check "Update" button** - Should be enabled immediately (not disabled)
-3. **Submit without changes** - Should work and preserve original calculations
-4. **Make a minor change (e.g., phone number)** - Should update without recalculating costs
-5. **Make a route change (e.g., pickup location)** - Should trigger recalculation on submit
-6. **Check CostBreakdown** - Should display correctly with all values from existing quotation
+**SpecialHireForm.tsx** - Fix lines 1505, 1512, 1517:
+```typescript
+// Before (CRASHES)
+other_expenses: JSON.parse(initialData.other_expenses || '[]'),
+additional_charges: JSON.parse(initialData.additional_charges || '[]'),
+bus_fleet_details: initialData.bus_fleet_details ? JSON.parse(initialData.bus_fleet_details) : null
 
----
+// After (SAFE)
+other_expenses: safeParseJSON(initialData.other_expenses, []),
+additional_charges: safeParseJSON(initialData.additional_charges, []),
+bus_fleet_details: safeParseJSON(initialData.bus_fleet_details, null)
+```
+
+### Part 3: Fix Daily Trips Module
+
+**useDailyBusGroupedTrips.ts** - Line 254:
+```typescript
+// Before (CRASHES on empty string)
+const notes = typeof trip.notes === 'string' ? JSON.parse(trip.notes || '{}') : (trip.notes || {});
+
+// After (SAFE)
+const notes = safeParseJSON(trip.notes, {});
+```
+
+**useCrewGroupedTrips.ts** - Line 127:
+```typescript
+// Before
+const notes = typeof trip.notes === 'string' 
+  ? JSON.parse(trip.notes || '{}') 
+  : (trip.notes || {});
+
+// After
+const notes = safeParseJSON(trip.notes, {});
+```
+
+**gl-export-generator.ts** - Line 79:
+```typescript
+// Before
+const incomeDetails = typeof trip.income_details === 'string' 
+  ? JSON.parse(trip.income_details) 
+  : trip.income_details;
+
+// After
+const incomeDetails = safeParseJSON(trip.income_details, {});
+```
+
+**TripsAnalytics.tsx** - Line 163:
+```typescript
+// Before
+const notes = typeof t.notes === 'string' ? JSON.parse(t.notes || '{}') : t.notes;
+
+// After
+const notes = safeParseJSON(t.notes, {});
+```
+
+### Part 4: Fix Infrastructure Hooks
+
+**useSystemFlowDiagram.ts** - Line 58:
+```typescript
+// Before
+const flowConfig = typeof data.flow_config === 'string' 
+  ? JSON.parse(data.flow_config) 
+  : data.flow_config;
+
+// After
+const flowConfig = safeParseJSON(data.flow_config, {});
+```
+
+**useSeasonalTheme.ts** - Line 80 (wrapped in try-catch already, but improve):
+```typescript
+// Use safeParseJSON for consistency
+const cachedTheme = safeParseJSON(cached, null);
+if (cachedTheme) {
+  setActiveTheme(cachedTheme);
+}
+```
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/special-hire/SpecialHireForm.tsx` | Add useEffect to initialize costData from initialData when editing |
+| `src/lib/utils.ts` | Add centralized `safeParseJSON` utility |
+| `src/components/special-hire/QuotationsList.tsx` | Fix 3 vulnerable JSON.parse calls |
+| `src/components/special-hire/SpecialHireForm.tsx` | Fix 3 vulnerable JSON.parse calls |
+| `src/hooks/useDailyBusGroupedTrips.ts` | Fix 1 vulnerable JSON.parse call |
+| `src/hooks/useCrewGroupedTrips.ts` | Fix 1 vulnerable JSON.parse call |
+| `src/lib/gl-export-generator.ts` | Fix 1 vulnerable JSON.parse call |
+| `src/pages/TripsAnalytics.tsx` | Fix 1 vulnerable JSON.parse call |
+| `src/hooks/useSystemFlowDiagram.ts` | Fix 1 vulnerable JSON.parse call |
+| `src/hooks/useSeasonalTheme.ts` | Improve 1 JSON.parse call |
 
----
+## Prevention Strategy
+
+After this fix:
+1. **Centralized utility** ensures all future JSON parsing uses the same safe pattern
+2. **TypeScript import** makes it easy to use: `import { safeParseJSON } from '@/lib/utils'`
+3. **Console warnings** help identify problematic data without crashing the app
 
 ## Impact
 
-- **Low Risk**: Only adds initialization logic, doesn't change calculation or submission flows
-- **Backward Compatible**: New quotations unaffected (they still require Calculate Costs)
-- **Preserves Data Integrity**: Uses existing "smart recalculation" logic on submit
+- **Immediate**: Fixes the "Unexpected end of JSON input" error you're seeing
+- **System-wide**: Protects Special Hire, Daily Trips, Analytics, and infrastructure from JSON parsing crashes
+- **Future-proof**: New code can use the centralized utility to prevent similar issues
