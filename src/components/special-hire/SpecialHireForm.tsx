@@ -316,6 +316,71 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     }
   }, [isEditing, initialData]);
 
+  // Initialize costData from initialData when editing to enable submit button
+  useEffect(() => {
+    if (isEditing && initialData) {
+      // Parse stored JSON fields safely
+      const parseJsonSafe = (value: any, fallback: any[] = []) => {
+        if (!value) return fallback;
+        if (Array.isArray(value)) return value;
+        try {
+          return JSON.parse(value);
+        } catch (e) {
+          return fallback;
+        }
+      };
+
+      const parsedAdditionalCharges = parseJsonSafe(initialData.additional_charges, []);
+      const parsedOtherExpenses = parseJsonSafe(initialData.other_expenses, []);
+
+      // Calculate actual hours from pickup/drop times
+      let actualHours = 0;
+      if (initialData.pickup_datetime && initialData.drop_datetime) {
+        const pickup = new Date(initialData.pickup_datetime);
+        const drop = new Date(initialData.drop_datetime);
+        actualHours = Math.round(((drop.getTime() - pickup.getTime()) / (1000 * 60 * 60)) * 100) / 100;
+      }
+
+      // Initialize costData to enable submit button
+      setCostData({
+        kmParkingToPickup: initialData.km_parking_to_pickup || 0,
+        kmTrip: initialData.km_trip || 0,
+        kmDropToParking: initialData.km_drop_to_parking || 0,
+        fuelCostFuelOnly: initialData.fuel_cost_fuel_only || 0,
+        hireCharge: initialData.hire_charge || 0,
+        grossRevenue: initialData.gross_revenue || 0,
+        customerTotalWithFuel: initialData.customer_total_with_fuel || 0,
+        fixedRate: initialData.fixed_rate || 0,
+        overtimeCharge: initialData.overtime_charge || 0,
+        overnightCharge: initialData.overnight_charge || 0,
+        exceedingDistanceCharge: initialData.exceeding_distance_charge || 0,
+        pickupDateTime: initialData.pickup_datetime,
+        dropDateTime: initialData.drop_datetime,
+        commissionPct: initialData.commission_pct || 0,
+        commissionAmount: initialData.commission_amount || 0,
+        commissionPassThroughPct: initialData.commission_pass_through_pct || 0,
+        commissionPassThroughAmount: initialData.commission_pass_through_amount || 0,
+        discountType: (initialData.discount_percentage && initialData.discount_percentage > 0) ? 'percentage' : 'amount',
+        discountPct: initialData.discount_percentage || 0,
+        discountAmount: initialData.discount_amount_lkr || 0,
+        driverCharge: initialData.driver_charge || 1500,
+        additionalCharges: parsedAdditionalCharges,
+        totalAdditionalCharges: initialData.total_additional_charges || 0,
+        otherExpenses: parsedOtherExpenses,
+        totalExpenses: initialData.total_expenses || 0,
+        netProfit: initialData.net_profit || 0,
+        numberOfBuses: initialData.number_of_buses || 1,
+        // Rate card details for display
+        rateCardDetails: {
+          standardHours: 8,
+          actualHours: actualHours,
+          overtimeHours: Math.max(0, actualHours - 8),
+          overnightDays: 0,
+        }
+      });
+    }
+  }, [isEditing, initialData]);
+
   // Auto-save functionality
   const saveToLocalStorage = useCallback(() => {
     const formValues = form.getValues();
