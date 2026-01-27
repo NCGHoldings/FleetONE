@@ -155,12 +155,20 @@ const handleFilterChange = useCallback((filters: any) => {
       }
     });
     
+    // Safe JSON parse helper to prevent crashes on empty strings
+    const safeParseJSON = <T,>(value: any, fallback: T): T => {
+      if (value === null || value === undefined || value === '') return fallback;
+      if (typeof value === 'object') return value as T;
+      try { return JSON.parse(value); } 
+      catch { return fallback; }
+    };
+
     // Extract driver names from notes JSON
     const driverNames = new Set<string>();
     analytics.rawTrips.forEach(t => {
       let driverName = '';
       if (t.notes) {
-        const notes = typeof t.notes === 'string' ? JSON.parse(t.notes || '{}') : t.notes;
+        const notes: Record<string, any> = safeParseJSON(t.notes, {});
         driverName = notes.driver || '';
       }
       if (!driverName && t.profiles) {

@@ -250,8 +250,14 @@ export function useDailyBusGroupedTrips(
           groupedByBus.set(busId, []);
         }
         
-        // Parse notes to get driver/conductor info
-        const notes = typeof trip.notes === 'string' ? JSON.parse(trip.notes || '{}') : (trip.notes || {});
+        // Parse notes to get driver/conductor info - use safe parsing to prevent crashes
+        const safeParseJSON = <T,>(value: any, fallback: T): T => {
+          if (value === null || value === undefined || value === '') return fallback;
+          if (typeof value === 'object') return value as T;
+          try { return JSON.parse(value); } 
+          catch { return fallback; }
+        };
+        const notes: Record<string, any> = safeParseJSON(trip.notes, {});
         
         groupedByBus.get(busId)!.push({
           id: trip.id,

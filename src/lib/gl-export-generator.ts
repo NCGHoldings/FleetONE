@@ -73,11 +73,17 @@ function aggregateIncomeByBus(busSummary: BusDailySummary): Record<string, numbe
     special_income: 0,
   };
 
+  // Safe JSON parse helper to prevent crashes on empty strings
+  const safeParseJSON = <T,>(value: any, fallback: T): T => {
+    if (value === null || value === undefined || value === '') return fallback;
+    if (typeof value === 'object') return value as T;
+    try { return JSON.parse(value); } 
+    catch { return fallback; }
+  };
+
   busSummary.trips.forEach(trip => {
     if (trip.income_details) {
-      const incomeDetails = typeof trip.income_details === 'string' 
-        ? JSON.parse(trip.income_details) 
-        : trip.income_details;
+      const incomeDetails = safeParseJSON(trip.income_details, {});
       
       Object.keys(aggregated).forEach(key => {
         aggregated[key] += Number(incomeDetails[key] || 0);

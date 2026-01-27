@@ -53,10 +53,14 @@ export function useSystemFlowDiagram(moduleName: string) {
       if (error) throw error;
 
       if (data) {
-        // Parse flow_config if it's a string
-        const flowConfig = typeof data.flow_config === 'string' 
-          ? JSON.parse(data.flow_config) 
-          : data.flow_config;
+        // Parse flow_config if it's a string - use safe parsing
+        const safeParseJSON = <T,>(value: any, fallback: T): T => {
+          if (value === null || value === undefined || value === '') return fallback;
+          if (typeof value === 'object') return value as T;
+          try { return JSON.parse(value); } 
+          catch { return fallback; }
+        };
+        const flowConfig = safeParseJSON(data.flow_config, { nodes: [], edges: [] });
         
         setDiagram({
           ...data,
