@@ -175,12 +175,18 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
       );
 
       // Transform data with creator names from the map
+      // Helper function for safe JSON parsing
+      const safeParseJSON = <T,>(value: any, fallback: T): T => {
+        if (value === null || value === undefined || value === '') return fallback;
+        if (typeof value === 'object') return value as T;
+        try { return JSON.parse(value); } 
+        catch { return fallback; }
+      };
+
       const transformedData = quotationsData.map((item: any) => ({
         ...item,
         bus_type: (() => {
-          const fleetDetails = typeof item.bus_fleet_details === 'string' 
-            ? JSON.parse(item.bus_fleet_details) 
-            : item.bus_fleet_details;
+          const fleetDetails = safeParseJSON(item.bus_fleet_details, null);
           return fleetDetails?.buses?.[0]?.bus_type_name || item.bus_types?.name || 'Unknown';
         })(),
         seating_capacity: item.bus_types?.capacity || 54,
@@ -189,7 +195,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
         intermediate_stops: typeof item.intermediate_stops === 'string' ? item.intermediate_stops : JSON.stringify(item.intermediate_stops || []),
         audit_log: Array.isArray(item.audit_log) ? item.audit_log : (item.audit_log ? [item.audit_log] : []),
         additional_charges: typeof item.additional_charges === 'string' ? item.additional_charges : JSON.stringify(item.additional_charges || []),
-        bus_fleet_details: typeof item.bus_fleet_details === 'string' ? JSON.parse(item.bus_fleet_details) : item.bus_fleet_details,
+        bus_fleet_details: safeParseJSON(item.bus_fleet_details, null),
         all_versions: [] // Load versions lazily when needed
       }));
 
@@ -344,6 +350,14 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
       if (error) throw error;
 
       // Transform the version data to match our interface
+      // Safe JSON parse helper
+      const safeParseJSON = <T,>(value: any, fallback: T): T => {
+        if (value === null || value === undefined || value === '') return fallback;
+        if (typeof value === 'object') return value as T;
+        try { return JSON.parse(value); } 
+        catch { return fallback; }
+      };
+
       const transformedVersion = {
         ...versionData,
         bus_type: versionData.bus_types?.name || 'Unknown',
@@ -352,7 +366,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
         intermediate_stops: typeof versionData.intermediate_stops === 'string' ? versionData.intermediate_stops : JSON.stringify(versionData.intermediate_stops || []),
         audit_log: Array.isArray(versionData.audit_log) ? versionData.audit_log : (versionData.audit_log ? [versionData.audit_log] : []),
         additional_charges: typeof versionData.additional_charges === 'string' ? versionData.additional_charges : JSON.stringify(versionData.additional_charges || []),
-        bus_fleet_details: typeof versionData.bus_fleet_details === 'string' ? JSON.parse(versionData.bus_fleet_details) : versionData.bus_fleet_details
+        bus_fleet_details: safeParseJSON(versionData.bus_fleet_details, null)
       };
 
       setSelectedQuotation(transformedVersion as Quotation);

@@ -121,11 +121,17 @@ export function useCrewGroupedTrips(
         trips: CrewTrip[];
       }>();
 
+      // Safe JSON parse helper to prevent crashes on empty strings
+      const safeParseJSON = <T,>(value: any, fallback: T): T => {
+        if (value === null || value === undefined || value === '') return fallback;
+        if (typeof value === 'object') return value as T;
+        try { return JSON.parse(value); } 
+        catch { return fallback; }
+      };
+
       (tripsData || []).forEach((trip: any) => {
-        // Parse notes to get driver/conductor
-        const notes = typeof trip.notes === 'string' 
-          ? JSON.parse(trip.notes || '{}') 
-          : (trip.notes || {});
+        // Parse notes to get driver/conductor - using safe parser
+        const notes: Record<string, any> = safeParseJSON(trip.notes, {});
         
         const driverName = notes.driver || 'Unknown';
         const conductorName = notes.conductor || 'Unknown';

@@ -6,6 +6,25 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Safely parse JSON with fallback - prevents "Unexpected end of JSON input" errors
+ * Handles null, undefined, empty strings, already-parsed objects, and malformed JSON
+ */
+export function safeParseJSON<T>(value: any, fallback: T): T {
+  if (value === null || value === undefined || value === '') {
+    return fallback;
+  }
+  if (typeof value === 'object') {
+    return value as T;
+  }
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    console.warn('safeParseJSON: Failed to parse:', value, e);
+    return fallback;
+  }
+}
+
+/**
  * Format YYYY-MM-DD or timestamp to DD/MM/YYYY for display
  * Uses UTC methods to prevent timezone conversion issues
  */

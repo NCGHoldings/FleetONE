@@ -69,7 +69,7 @@ export const useSeasonalTheme = () => {
     } catch (error) {
       console.error('Error fetching seasonal theme:', error);
       
-      // Try to load from cache if fetch fails
+      // Try to load from cache if fetch fails - use safe parsing
       const cached = localStorage.getItem('seasonal_theme');
       const timestamp = localStorage.getItem('seasonal_theme_timestamp');
       
@@ -77,7 +77,13 @@ export const useSeasonalTheme = () => {
         const cacheAge = Date.now() - parseInt(timestamp);
         // Use cache if less than 1 hour old
         if (cacheAge < 3600000) {
-          setActiveTheme(JSON.parse(cached));
+          // Safe parse to prevent crashes on corrupted localStorage
+          try {
+            const parsed = JSON.parse(cached);
+            if (parsed) setActiveTheme(parsed);
+          } catch {
+            localStorage.removeItem('seasonal_theme');
+          }
         }
       }
     } finally {

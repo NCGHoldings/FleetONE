@@ -1493,6 +1493,14 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         // PRESERVE original calculations for non-route/cost edits (e.g., company name, customer phone)
         console.log('Preserving original calculations - no route-affecting changes detected');
         
+        // Safe JSON parse helper to prevent "Unexpected end of JSON input" errors
+        const safeParseJSON = <T,>(value: any, fallback: T): T => {
+          if (value === null || value === undefined || value === '') return fallback;
+          if (typeof value === 'object') return value as T;
+          try { return JSON.parse(value); } 
+          catch { return fallback; }
+        };
+
         costs = {
           km_parking_to_pickup: initialData.km_parking_to_pickup,
           km_trip: initialData.km_trip,
@@ -1502,19 +1510,19 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           extra_charges: initialData.extra_charges,
           gross_revenue: initialData.gross_revenue,
           driver_charge: initialData.driver_charge || 1500,
-          other_expenses: JSON.parse(initialData.other_expenses || '[]'),
+          other_expenses: safeParseJSON(initialData.other_expenses, []),
           commission_pct: initialData.commission_pct,
           commission_pass_through_pct: initialData.commission_pass_through_pct,
           commission_pass_through_amount: initialData.commission_pass_through_amount,
           commission_amount: initialData.commission_amount,
           discount_percentage: initialData.discount_percentage,
           discount_amount: initialData.discount_amount_lkr,
-          additional_charges: JSON.parse(initialData.additional_charges || '[]'),
+          additional_charges: safeParseJSON(initialData.additional_charges, []),
           total_additional_charges: initialData.total_additional_charges,
           total_expenses: initialData.total_expenses,
           net_profit: initialData.net_profit,
           customerTotalWithFuel: initialData.customer_total_with_fuel,
-          bus_fleet_details: initialData.bus_fleet_details ? JSON.parse(initialData.bus_fleet_details) : null
+          bus_fleet_details: safeParseJSON(initialData.bus_fleet_details, null)
         };
 
         distanceData = {
