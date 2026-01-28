@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, DollarSign, Eye, FileText, Printer } from "lucide-react";
+import { Plus, DollarSign, Eye, FileText, Printer, Search } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import { Input } from "@/components/ui/input";
 
 export const AccountsPayableView = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
@@ -31,7 +32,21 @@ export const AccountsPayableView = () => {
   const [printDocumentOpen, setPrintDocumentOpen] = useState(false);
   const [printDocumentData, setPrintDocumentData] = useState<any>(null);
   const [printDocumentType, setPrintDocumentType] = useState<string>("ap_invoice");
+  const [searchQuery, setSearchQuery] = useState("");
   const { data: invoices, isLoading } = useAPInvoices(statusFilter);
+
+  // Multi-field search filter
+  const filteredInvoices = useMemo(() => {
+    if (!invoices || !searchQuery.trim()) return invoices || [];
+    const query = searchQuery.toLowerCase();
+    return invoices.filter((inv) =>
+      inv.invoice_number?.toLowerCase().includes(query) ||
+      inv.vendors?.vendor_name?.toLowerCase().includes(query) ||
+      inv.vendors?.vendor_code?.toLowerCase().includes(query) ||
+      inv.status?.toLowerCase().includes(query) ||
+      inv.reference?.toLowerCase().includes(query)
+    );
+  }, [invoices, searchQuery]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -224,6 +239,17 @@ export const AccountsPayableView = () => {
           </div>
         </div>
 
+        {/* Search Input */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by invoice #, vendor, status..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 max-w-md"
+          />
+        </div>
+
         <Tabs defaultValue="all" className="space-y-4">
           <TabsList>
             <TabsTrigger value="all" onClick={() => setStatusFilter(undefined)}>
@@ -243,18 +269,17 @@ export const AccountsPayableView = () => {
           <TabsContent value="all" className="mt-4">
             <DataTable
               columns={columns}
-              data={invoices || []}
-              searchKey="invoice_number"
+              data={filteredInvoices}
             />
           </TabsContent>
           <TabsContent value="unpaid">
-            <DataTable columns={columns} data={invoices || []} searchKey="invoice_number" />
+            <DataTable columns={columns} data={filteredInvoices} />
           </TabsContent>
           <TabsContent value="partial">
-            <DataTable columns={columns} data={invoices || []} searchKey="invoice_number" />
+            <DataTable columns={columns} data={filteredInvoices} />
           </TabsContent>
           <TabsContent value="paid">
-            <DataTable columns={columns} data={invoices || []} searchKey="invoice_number" />
+            <DataTable columns={columns} data={filteredInvoices} />
           </TabsContent>
         </Tabs>
       </Card>

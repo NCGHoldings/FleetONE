@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit, Trash2, TreePine, List, AlertCircle, Building2 } from "lucide-react";
+import { Plus, Edit, Trash2, TreePine, List, AlertCircle, Building2, Search } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -36,6 +36,18 @@ export const ChartOfAccountsView = () => {
     },
     enabled: !!selectedCompanyId,
   });
+
+  // Multi-field search filter for accounts (for table view)
+  const filteredAccounts = useMemo(() => {
+    if (!accounts || !searchTerm.trim()) return accounts || [];
+    const query = searchTerm.toLowerCase();
+    return accounts.filter((acc) =>
+      acc.account_code?.toLowerCase().includes(query) ||
+      acc.account_name?.toLowerCase().includes(query) ||
+      acc.account_type?.toLowerCase().includes(query) ||
+      acc.gl_code?.toLowerCase().includes(query)
+    );
+  }, [accounts, searchTerm]);
 
   const getAccountTypeBadge = (type: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -174,12 +186,15 @@ export const ChartOfAccountsView = () => {
       </div>
 
       <div className="flex items-center gap-4 mb-4">
-        <Input
-          placeholder="Search accounts..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by code, name, type..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
         <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "tree" | "table")}>
           <TabsList>
             <TabsTrigger value="tree" className="flex items-center gap-1">
@@ -199,8 +214,7 @@ export const ChartOfAccountsView = () => {
       ) : (
         <DataTable
           columns={columns}
-          data={accounts || []}
-          searchKey="account_name"
+          data={filteredAccounts}
         />
       )}
     </Card>

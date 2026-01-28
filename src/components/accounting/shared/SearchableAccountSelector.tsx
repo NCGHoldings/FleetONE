@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { useChartOfAccounts } from "@/hooks/useAccountingData";
 
-interface AccountSelectorProps {
+interface SearchableAccountSelectorProps {
   value?: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
@@ -26,14 +26,14 @@ interface AccountSelectorProps {
   className?: string;
 }
 
-export const AccountSelector = ({
+export const SearchableAccountSelector = ({
   value,
   onValueChange,
   placeholder = "Select account...",
   accountTypes,
   disabled = false,
   className,
-}: AccountSelectorProps) => {
+}: SearchableAccountSelectorProps) => {
   const [open, setOpen] = useState(false);
   const { data: accounts, isLoading } = useChartOfAccounts();
 
