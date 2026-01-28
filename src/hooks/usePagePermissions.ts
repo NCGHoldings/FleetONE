@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { PageItem } from "@/lib/pages";
 import { useAuth } from "./useAuth";
@@ -6,21 +6,25 @@ import { useAuth } from "./useAuth";
 export type PermissionMap = Record<string, boolean>; // pageId -> has_access
 
 export function usePagePermissions(targetUserId?: string) {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const [permissions, setPermissions] = useState<PermissionMap>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const isSuperAdmin = hasRole('super_admin');
+  
+  // Use targetUserId if provided, otherwise use current user's ID
+  const effectiveUserId = targetUserId ?? user?.id;
+  const isCheckingOwnAccess = !targetUserId;
 
   const fetchPermissions = useCallback(async () => {
-    if (!targetUserId) return;
+    if (!effectiveUserId) return;
     setLoading(true);
     setError(null);
     const { data, error } = await supabase
       .from("user_page_permissions")
       .select("page_identifier, has_access")
-      .eq("user_id", targetUserId);
+      .eq("user_id", effectiveUserId);
 
     if (error) {
       setError(error.message);
@@ -34,7 +38,7 @@ export function usePagePermissions(targetUserId?: string) {
     });
     setPermissions(map);
     setLoading(false);
-  }, [targetUserId]);
+  }, [effectiveUserId]);
 
   useEffect(() => {
     fetchPermissions();
@@ -42,25 +46,28 @@ export function usePagePermissions(targetUserId?: string) {
 
   const hasAccess = useCallback(
     (pageId: string) => {
-      // Super admins bypass all page restrictions when checking their own access
-      if (isSuperAdmin && !targetUserId) {
+      // Super admins bypass all page restrictions when checking own access
+      if (isSuperAdmin && isCheckingOwnAccess) {
         return true;
       }
       
-      // Management roles (admin, supervisor, finance) get default access
-      // unless explicitly denied (has_access === false)
-      const hasManagementRole = hasRole('admin') || hasRole('supervisor') || hasRole('finance');
-      if (hasManagementRole && !targetUserId) {
-        const value = permissions[pageId];
-        // If explicitly denied, respect that; otherwise allow
-        return value === false ? false : true;
+      const value = permissions[pageId];
+      
+      // If explicit permission exists, use it
+      if (value !== undefined) {
+        return value;
       }
       
-      // Zero-Trust: Deny by default if no explicit permission set for other roles
-      const value = permissions[pageId];
-      return value === undefined ? false : !!value;
+      // Management roles get default access when no explicit permission set
+      const hasManagementRole = hasRole('admin') || hasRole('supervisor') || hasRole('finance');
+      if (hasManagementRole && isCheckingOwnAccess) {
+        return true;
+      }
+      
+      // Zero-Trust: Deny by default for other roles
+      return false;
     },
-    [permissions, isSuperAdmin, targetUserId, hasRole]
+    [permissions, isSuperAdmin, isCheckingOwnAccess, hasRole]
   );
 
   const setAccess = useCallback((pageId: string, value: boolean) => {
