@@ -15,8 +15,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { PageAccessModal } from "@/components/staff/PageAccessModal";
+import { CompanyAccessModal } from "@/components/staff/CompanyAccessModal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { TemporaryAccountsSection } from "@/components/staff/TemporaryAccountsSection";
+import { Building2 } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -40,9 +42,10 @@ interface RoleManagementCellProps {
   onToggleRole: (userId: string, role: string, shouldHaveRole: boolean) => void;
   isSuperAdmin: boolean;
   onOpenPageAccess: () => void;
+  onOpenCompanyAccess: () => void;
 }
 
-function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAccess }: RoleManagementCellProps) {
+function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAccess, onOpenCompanyAccess }: RoleManagementCellProps) {
   const userRoles = staff.roles;
   
   return (
@@ -73,10 +76,16 @@ function RoleManagementCell({ staff, onToggleRole, isSuperAdmin, onOpenPageAcces
       </div>
       
       {isSuperAdmin && (
-        <Button variant="outline" size="sm" onClick={onOpenPageAccess} className="mt-2">
-          <Lock className="h-4 w-4 mr-2" />
-          Page Access
-        </Button>
+        <div className="flex gap-2 mt-2">
+          <Button variant="outline" size="sm" onClick={onOpenPageAccess}>
+            <Lock className="h-4 w-4 mr-2" />
+            Page Access
+          </Button>
+          <Button variant="outline" size="sm" onClick={onOpenCompanyAccess}>
+            <Building2 className="h-4 w-4 mr-2" />
+            Company Access
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -91,6 +100,8 @@ export default function StaffManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [pageAccessOpen, setPageAccessOpen] = useState(false);
   const [pageAccessTarget, setPageAccessTarget] = useState<Profile | null>(null);
+  const [companyAccessOpen, setCompanyAccessOpen] = useState(false);
+  const [companyAccessTarget, setCompanyAccessTarget] = useState<Profile | null>(null);
   
   // Form states
   const [firstName, setFirstName] = useState("");
@@ -316,7 +327,15 @@ export default function StaffManagement() {
     ...(isSuperAdmin ? [{
       id: "actions",
       header: "Actions",
-      cell: ({ row }: { row: any }) => <RoleManagementCell staff={row.original} onToggleRole={handleToggleRole} isSuperAdmin={isSuperAdmin} onOpenPageAccess={() => { setPageAccessTarget(row.original); setPageAccessOpen(true); }} />,
+      cell: ({ row }: { row: any }) => (
+        <RoleManagementCell 
+          staff={row.original} 
+          onToggleRole={handleToggleRole} 
+          isSuperAdmin={isSuperAdmin} 
+          onOpenPageAccess={() => { setPageAccessTarget(row.original); setPageAccessOpen(true); }}
+          onOpenCompanyAccess={() => { setCompanyAccessTarget(row.original); setCompanyAccessOpen(true); }}
+        />
+      ),
     }] : []),
   ];
 
@@ -635,12 +654,20 @@ export default function StaffManagement() {
         <CardContent>
           <DataTable columns={columns} data={staff} />
           {isSuperAdmin && (
-            <PageAccessModal
-              open={pageAccessOpen}
-              onOpenChange={setPageAccessOpen}
-              userId={pageAccessTarget?.user_id || null}
-              userName={pageAccessTarget ? `${pageAccessTarget.first_name} ${pageAccessTarget.last_name}` : undefined}
-            />
+            <>
+              <PageAccessModal
+                open={pageAccessOpen}
+                onOpenChange={setPageAccessOpen}
+                userId={pageAccessTarget?.user_id || null}
+                userName={pageAccessTarget ? `${pageAccessTarget.first_name} ${pageAccessTarget.last_name}` : undefined}
+              />
+              <CompanyAccessModal
+                open={companyAccessOpen}
+                onOpenChange={setCompanyAccessOpen}
+                userId={companyAccessTarget?.user_id || null}
+                userName={companyAccessTarget ? `${companyAccessTarget.first_name} ${companyAccessTarget.last_name}` : undefined}
+              />
+            </>
           )}
         </CardContent>
       </Card>
