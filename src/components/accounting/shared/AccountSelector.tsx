@@ -81,12 +81,21 @@ export const AccountSelector = ({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0 z-50 bg-popover" align="start">
-        <Command shouldFilter={true}>
-          <CommandInput placeholder="Search by code or name..." />
-          <CommandList>
+      <PopoverContent 
+        className="w-[400px] p-0 z-[100] bg-popover border shadow-lg" 
+        align="start"
+        sideOffset={4}
+      >
+        <Command className="bg-popover" shouldFilter={true}>
+          <div className="flex items-center border-b px-3">
+            <CommandInput 
+              placeholder="Search by code or name..." 
+              className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+          <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>No account found.</CommandEmpty>
-            <CommandGroup className="max-h-[300px] overflow-y-auto">
+            <CommandGroup>
               {filteredAccounts.map((account) => (
                 <CommandItem
                   key={account.id}
@@ -95,15 +104,15 @@ export const AccountSelector = ({
                     onValueChange(account.id === value ? "" : account.id);
                     setOpen(false);
                   }}
-                  className="cursor-pointer"
+                  className="cursor-pointer hover:bg-accent"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "mr-2 h-4 w-4 flex-shrink-0",
                       value === account.id ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  <span className="font-mono text-xs text-muted-foreground mr-2">
+                  <span className="font-mono text-xs text-muted-foreground mr-2 flex-shrink-0">
                     {account.account_code}
                   </span>
                   <span className="truncate">{account.account_name}</span>
