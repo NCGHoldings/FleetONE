@@ -139,13 +139,41 @@ export const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     onChange(e.target.value);
   };
 
-  const handleSuggestionClick = (suggestion: LocationSuggestion) => {
+  const handleSuggestionClick = async (suggestion: LocationSuggestion) => {
     // Set flags to prevent re-searching
     skipNextSearchRef.current = true;
     lastSelectedValueRef.current = suggestion.place_name;
     
-    // Pass coordinates if available from suggestion
-    onChange(suggestion.place_name, suggestion.coordinates);
+    // Check if coordinates are valid (not [0,0])
+    const hasValidCoords = suggestion.coordinates && 
+      suggestion.coordinates[0] !== 0 && 
+      suggestion.coordinates[1] !== 0;
+    
+    if (hasValidCoords) {
+      // Use existing valid coordinates
+      onChange(suggestion.place_name, suggestion.coordinates);
+    } else {
+      // Fetch real coordinates from Place Details API
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase.functions.invoke('search-locations', {
+          body: { getDetails: true, placeId: suggestion.id }
+        });
+        
+        if (!error && data?.coordinates && data.coordinates[0] !== 0 && data.coordinates[1] !== 0) {
+          console.log('Fetched coordinates for', suggestion.place_name, ':', data.coordinates);
+          onChange(suggestion.place_name, data.coordinates);
+        } else {
+          console.warn('Could not fetch coordinates, passing name only');
+          onChange(suggestion.place_name);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch coordinates:', error);
+        onChange(suggestion.place_name);
+      } finally {
+        setIsLoading(false);
+      }
+    }
     
     setShowSuggestions(false);
     setSuggestions([]);

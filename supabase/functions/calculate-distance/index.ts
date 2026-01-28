@@ -169,20 +169,37 @@ serve(async (req) => {
     };
 
     // Resolve pickup and drop points: prefer provided coords, else geocode text
-    // OPTIMIZATION: If coordinates are provided, skip geocoding to save API calls
-    const pickupPoint = pickupCoordsInput && pickupCoordsInput.length === 2
+    // OPTIMIZATION: If coordinates are provided AND VALID (not [0,0]), skip geocoding
+    const hasValidPickupCoords = pickupCoordsInput && 
+      pickupCoordsInput.length === 2 && 
+      pickupCoordsInput[0] !== 0 && 
+      pickupCoordsInput[1] !== 0;
+    
+    const hasValidDropCoords = dropCoordsInput && 
+      dropCoordsInput.length === 2 && 
+      dropCoordsInput[0] !== 0 && 
+      dropCoordsInput[1] !== 0;
+
+    console.log('Coordinate validation:', {
+      pickupCoordsInput,
+      dropCoordsInput,
+      hasValidPickupCoords,
+      hasValidDropCoords
+    });
+
+    const pickupPoint = hasValidPickupCoords
       ? { lat: pickupCoordsInput[1], lng: pickupCoordsInput[0], formatted_address: pickupLocation }
       : await geocodeLK(pickupLocation);
 
-    const dropPoint = dropCoordsInput && dropCoordsInput.length === 2
+    const dropPoint = hasValidDropCoords
       ? { lat: dropCoordsInput[1], lng: dropCoordsInput[0], formatted_address: dropLocation }
       : await geocodeLK(dropLocation);
     
     // Log if coordinates were reused (cache hit equivalent)
-    if (pickupCoordsInput && pickupCoordsInput.length === 2) {
+    if (hasValidPickupCoords) {
       await logApiUsage(supabase, 'geocoding', pickupLocation, true, 'COORDS_PROVIDED');
     }
-    if (dropCoordsInput && dropCoordsInput.length === 2) {
+    if (hasValidDropCoords) {
       await logApiUsage(supabase, 'geocoding', dropLocation, true, 'COORDS_PROVIDED');
     }
 
