@@ -46,16 +46,19 @@ export function usePagePermissions(targetUserId?: string) {
 
   const hasAccess = useCallback(
     (pageId: string) => {
-      // Super admins bypass all page restrictions when checking own access
-      if (isSuperAdmin && isCheckingOwnAccess) {
-        return true;
-      }
-      
       const value = permissions[pageId];
       
-      // If explicit permission exists, use it
+      // If explicit permission exists in database, always use it
+      // This allows denying access even to super_admins
       if (value !== undefined) {
         return value;
+      }
+      
+      // No explicit permission set - apply role-based defaults
+      
+      // Super admins get default access when no explicit permission
+      if (isSuperAdmin && isCheckingOwnAccess) {
+        return true;
       }
       
       // Management roles get default access when no explicit permission set
