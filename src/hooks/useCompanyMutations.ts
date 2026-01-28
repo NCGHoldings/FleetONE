@@ -569,12 +569,20 @@ export const useCompanyCreateAccount = () => {
       parent_account_id?: string;
       is_header?: boolean;
       description?: string;
+      // Level fields for 5-level COA structure
+      level1?: string | null;
+      level2?: string | null;
+      level3?: string | null;
+      level4?: string | null;
+      level5?: string | null;
+      account_level?: number;
+      gl_code?: string;
     }) => {
       if (!companyId) {
         throw new Error("No company selected");
       }
 
-      // Use raw insert to include company_id (column exists in DB, types not yet updated)
+      // Use raw insert to include company_id and level fields
       const { data, error } = await supabase
         .from("chart_of_accounts")
         .insert([{ 
@@ -587,6 +595,14 @@ export const useCompanyCreateAccount = () => {
           is_active: true,
           current_balance: 0,
           company_id: companyId,
+          // Level fields for tree structure
+          level1: account.level1,
+          level2: account.level2,
+          level3: account.level3,
+          level4: account.level4,
+          level5: account.level5,
+          account_level: account.account_level,
+          gl_code: account.gl_code,
         } as any])
         .select()
         .single();
@@ -596,6 +612,7 @@ export const useCompanyCreateAccount = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts-all", companyId] });
       toast.success("Account created successfully");
     },
     onError: (error) => {
