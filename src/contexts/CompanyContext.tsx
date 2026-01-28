@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,7 +28,8 @@ export interface Company {
 interface CompanyContextType {
   selectedCompanyId: string | null;
   selectedCompany: Company | null;
-  companies: Company[];
+  companies: Company[]; // Filtered based on user access
+  allCompanies: Company[]; // All companies (for admin use)
   parentCompanies: Company[];
   subCompanies: Company[];
   isLoading: boolean;
@@ -41,6 +42,9 @@ interface CompanyContextType {
   isNCGHoldingOrSubCompany: (companyId: string) => boolean; // NCG Holding or any of its sub-companies
   getEffectiveCompanyId: () => string | null; // Returns parent for sub-companies, otherwise selected
   getBusinessUnitCode: () => string | null; // Returns short_code for sub-companies, null for parent
+  // Access control
+  hasCompanyAccess: (companyId: string) => boolean;
+  allowedCompanyIds: string[];
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -57,8 +61,62 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     return null;
   });
 
+  // Fetch current user session
+  const { data: session } = useQuery({
+    queryKey: ["auth-session-company"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      return data.session;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const userId = session?.user?.id;
+
+  // Fetch user's company access permissions
+  const { data: userCompanyAccess = [] } = useQuery({
+    queryKey: ["user-company-access-current", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      
+      const { data, error } = await supabase
+        .from("user_company_access")
+        .select("company_id")
+        .eq("user_id", userId);
+      
+      if (error) {
+        console.error("Error fetching company access:", error);
+        return [];
+      }
+      
+      return data || [];
+    },
+    enabled: !!userId,
+  });
+
+  // Fetch user roles
+  const { data: userRoles = [] } = useQuery({
+    queryKey: ["user-roles-company", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+      
+      if (error) {
+        console.error("Error fetching user roles:", error);
+        return [];
+      }
+      
+      return data?.map(r => r.role) || [];
+    },
+    enabled: !!userId,
+  });
+
   // Fetch all companies with hierarchy support
-  const { data: companies = [], isLoading, error } = useQuery({
+  const { data: allCompanies = [], isLoading, error } = useQuery({
     queryKey: ["companies-hierarchy"],
     queryFn: async () => {
       console.log("Fetching companies...");
@@ -87,32 +145,67 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, [error]);
 
-  // Derive parent and sub companies
+  // Determine allowed company IDs
+  const allowedCompanyIds = useMemo(() => {
+    return userCompanyAccess.map(a => a.company_id);
+  }, [userCompanyAccess]);
+
+  // Check if user has explicit access configured
+  const hasExplicitAccess = allowedCompanyIds.length > 0;
+
+  // Management roles that see all companies by default
+  const isManagementRole = userRoles.some(role => 
+    ['super_admin', 'admin', 'finance'].includes(role)
+  );
+
+  // Filter companies based on user permissions
+  const companies = useMemo(() => {
+    // If user has explicit company access configured, use that
+    if (hasExplicitAccess) {
+      return allCompanies.filter(c => allowedCompanyIds.includes(c.id));
+    }
+    
+    // Management roles see all companies when no explicit permissions set
+    if (isManagementRole) {
+      return allCompanies;
+    }
+    
+    // Other roles see no companies (zero-trust)
+    return [];
+  }, [allCompanies, allowedCompanyIds, hasExplicitAccess, isManagementRole]);
+
+  // Check if user has access to a specific company
+  const hasCompanyAccess = (companyId: string): boolean => {
+    if (isManagementRole && !hasExplicitAccess) return true;
+    return allowedCompanyIds.includes(companyId);
+  };
+
+  // Derive parent and sub companies from filtered list
   const parentCompanies = companies.filter(c => !c.parent_company_id);
   const subCompanies = companies.filter(c => c.parent_company_id);
 
-  // Get sub-companies for a specific parent
+  // Get sub-companies for a specific parent (uses allCompanies for admin modal access)
   const getSubCompaniesFor = (parentId: string) => {
-    return companies.filter(c => c.parent_company_id === parentId);
+    return allCompanies.filter(c => c.parent_company_id === parentId);
   };
 
-  // Get selected company details
-  const selectedCompany = companies.find(c => c.id === selectedCompanyId) || null;
+  // Get selected company details (check allCompanies first, then filtered)
+  const selectedCompany = allCompanies.find(c => c.id === selectedCompanyId) || null;
 
-  // Consolidated GL helpers
+  // Consolidated GL helpers (use allCompanies to ensure lookups work)
   const getParentCompanyId = (companyId: string): string => {
-    const company = companies.find(c => c.id === companyId);
+    const company = allCompanies.find(c => c.id === companyId);
     return company?.parent_company_id || companyId;
   };
 
   const isSubCompany = (companyId: string): boolean => {
-    const company = companies.find(c => c.id === companyId);
+    const company = allCompanies.find(c => c.id === companyId);
     return !!company?.parent_company_id;
   };
 
   // Specifically checks if company is a sub-company of NCG Holding
   const isSubCompanyOfNCGHolding = (companyId: string): boolean => {
-    const company = companies.find(c => c.id === companyId);
+    const company = allCompanies.find(c => c.id === companyId);
     return company?.parent_company_id === NCG_HOLDING_ID;
   };
 
@@ -207,6 +300,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
         selectedCompanyId,
         selectedCompany,
         companies,
+        allCompanies,
         parentCompanies,
         subCompanies,
         isLoading,
@@ -218,6 +312,8 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
         isNCGHoldingOrSubCompany,
         getEffectiveCompanyId,
         getBusinessUnitCode,
+        hasCompanyAccess,
+        allowedCompanyIds,
       }}
     >
       {children}
