@@ -42,6 +42,18 @@ interface AccountFormProps {
   onSuccess: () => void;
 }
 
+interface ParentAccount {
+  id: string;
+  account_code: string;
+  account_name: string;
+  level1: string | null;
+  level2: string | null;
+  level3: string | null;
+  level4: string | null;
+  level5: string | null;
+  account_level: number | null;
+}
+
 const ACCOUNT_TYPES = [
   { value: "asset", label: "Asset" },
   { value: "liability", label: "Liability" },
@@ -49,6 +61,68 @@ const ACCOUNT_TYPES = [
   { value: "revenue", label: "Revenue" },
   { value: "expense", label: "Expense" },
 ];
+
+// Derive level fields based on parent account
+const deriveLevelFields = (
+  accountName: string,
+  parentAccount: ParentAccount | null
+): {
+  level1: string | null;
+  level2: string | null;
+  level3: string | null;
+  level4: string | null;
+  level5: string | null;
+  accountLevel: number;
+} => {
+  if (!parentAccount) {
+    // No parent - this is a top-level (level 1) account
+    return {
+      level1: accountName,
+      level2: null,
+      level3: null,
+      level4: null,
+      level5: null,
+      accountLevel: 1,
+    };
+  }
+
+  // Determine parent's current level and place new account in next level
+  const parentLevel = parentAccount.account_level || 1;
+  const nextLevel = Math.min(parentLevel + 1, 5);
+
+  const result = {
+    level1: parentAccount.level1,
+    level2: parentAccount.level2,
+    level3: parentAccount.level3,
+    level4: parentAccount.level4,
+    level5: parentAccount.level5,
+    accountLevel: nextLevel,
+  };
+
+  // Place the new account name in the appropriate level
+  switch (nextLevel) {
+    case 2:
+      result.level2 = accountName;
+      result.level3 = null;
+      result.level4 = null;
+      result.level5 = null;
+      break;
+    case 3:
+      result.level3 = accountName;
+      result.level4 = null;
+      result.level5 = null;
+      break;
+    case 4:
+      result.level4 = accountName;
+      result.level5 = null;
+      break;
+    case 5:
+      result.level5 = accountName;
+      break;
+  }
+
+  return result;
+};
 
 export const AccountForm = ({ onSuccess }: AccountFormProps) => {
   const { selectedCompanyId } = useCompany();
@@ -66,20 +140,19 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
     },
   });
 
-  // Fetch existing accounts for parent selection (only header accounts)
+  // Fetch ALL accounts for parent selection (with level info)
   const { data: parentAccounts } = useQuery({
-    queryKey: ["chart-of-accounts-headers", selectedCompanyId],
+    queryKey: ["chart-of-accounts-all", selectedCompanyId],
     queryFn: async () => {
       if (!selectedCompanyId) return [];
       const { data, error } = await supabase
         .from("chart_of_accounts")
-        .select("id, account_code, account_name")
+        .select("id, account_code, account_name, level1, level2, level3, level4, level5, account_level")
         .eq("company_id", selectedCompanyId)
-        .eq("is_header", true)
         .order("account_code");
       
       if (error) throw error;
-      return data;
+      return data as ParentAccount[];
     },
     enabled: !!selectedCompanyId,
   });
@@ -90,6 +163,14 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
       ? undefined 
       : data.parent_account_id;
     
+    // Find the selected parent account to derive level fields
+    const selectedParent = parentId 
+      ? parentAccounts?.find(acc => acc.id === parentId) || null
+      : null;
+    
+    // Derive level fields based on parent
+    const derivedLevels = deriveLevelFields(data.account_name, selectedParent);
+    
     createAccount.mutate(
       {
         account_code: data.account_code,
@@ -98,6 +179,14 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
         parent_account_id: parentId,
         is_header: data.is_header,
         description: data.description,
+        // Level fields for tree structure
+        level1: derivedLevels.level1,
+        level2: derivedLevels.level2,
+        level3: derivedLevels.level3,
+        level4: derivedLevels.level4,
+        level5: derivedLevels.level5,
+        account_level: derivedLevels.accountLevel,
+        gl_code: data.account_code,
       },
       {
         onSuccess: () => {
@@ -172,13 +261,13 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Parent Account (Optional)</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value || ""}>
+              <Select onValueChange={field.onChange} value={field.value ?? "_none"}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select parent account" />
                   </SelectTrigger>
                 </FormControl>
-              <SelectContent>
+                <SelectContent>
                   <SelectItem value="_none">No Parent (Top Level)</SelectItem>
                   {parentAccounts?.filter(account => account.id && account.id.trim() !== '').map((account) => (
                     <SelectItem key={account.id} value={account.id}>
