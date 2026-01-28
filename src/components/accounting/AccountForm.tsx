@@ -60,7 +60,7 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
       account_code: "",
       account_name: "",
       account_type: undefined,
-      parent_account_id: "",
+      parent_account_id: "_none",
       is_header: false,
       description: "",
     },
@@ -85,12 +85,17 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
   });
 
   const onSubmit = (data: AccountFormData) => {
+    // Convert "_none" placeholder to undefined for database
+    const parentId = data.parent_account_id === "_none" || !data.parent_account_id 
+      ? undefined 
+      : data.parent_account_id;
+    
     createAccount.mutate(
       {
         account_code: data.account_code,
         account_name: data.account_name,
         account_type: data.account_type,
-        parent_account_id: data.parent_account_id || undefined,
+        parent_account_id: parentId,
         is_header: data.is_header,
         description: data.description,
       },
@@ -173,9 +178,9 @@ export const AccountForm = ({ onSuccess }: AccountFormProps) => {
                     <SelectValue placeholder="Select parent account" />
                   </SelectTrigger>
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="">No Parent (Top Level)</SelectItem>
-                  {parentAccounts?.map((account) => (
+              <SelectContent>
+                  <SelectItem value="_none">No Parent (Top Level)</SelectItem>
+                  {parentAccounts?.filter(account => account.id && account.id.trim() !== '').map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.account_code} - {account.account_name}
                     </SelectItem>
