@@ -4,6 +4,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, Legend } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { Route, TrendingUp } from "lucide-react";
+import { safeParseJSON } from "@/lib/utils";
 
 interface StaffPerformanceChartsProps {
   staffId: string;
@@ -49,15 +50,11 @@ export function StaffPerformanceCharts({ staffId, staffName }: StaffPerformanceC
 
         // Match trips by staff name in notes
         const staffTrips = (trips || []).filter(trip => {
-          try {
-            const notes = typeof trip.notes === 'string' ? JSON.parse(trip.notes) : trip.notes;
-            const driverName = notes?.driver?.toLowerCase() || '';
-            const conductorName = notes?.conductor?.toLowerCase() || '';
-            const staffNameLower = staffName?.toLowerCase() || '';
-            return driverName.includes(staffNameLower) || conductorName.includes(staffNameLower);
-          } catch {
-            return false;
-          }
+          const notes = safeParseJSON(trip.notes, {});
+          const driverName = (notes as any)?.driver?.toLowerCase() || '';
+          const conductorName = (notes as any)?.conductor?.toLowerCase() || '';
+          const staffNameLower = staffName?.toLowerCase() || '';
+          return driverName.includes(staffNameLower) || conductorName.includes(staffNameLower);
         });
 
         // Group by route

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { safeParseJSON } from "@/lib/utils";
 
 export interface StaffMemberPerformance {
   id: string;
@@ -135,15 +136,11 @@ export function useStaffPerformance(options: UseStaffPerformanceOptions = {}) {
 
         // Match trips by staff name in notes
         const staffTrips = (trips || []).filter(trip => {
-          try {
-            const notes = typeof trip.notes === 'string' ? JSON.parse(trip.notes) : trip.notes;
-            const driverName = notes?.driver?.toLowerCase() || '';
-            const conductorName = notes?.conductor?.toLowerCase() || '';
-            const staffNameLower = staff.staff_name?.toLowerCase() || '';
-            return driverName.includes(staffNameLower) || conductorName.includes(staffNameLower);
-          } catch {
-            return false;
-          }
+          const notes = safeParseJSON(trip.notes, {});
+          const driverName = (notes as any)?.driver?.toLowerCase() || '';
+          const conductorName = (notes as any)?.conductor?.toLowerCase() || '';
+          const staffNameLower = staff.staff_name?.toLowerCase() || '';
+          return driverName.includes(staffNameLower) || conductorName.includes(staffNameLower);
         });
 
         // Calculate metrics

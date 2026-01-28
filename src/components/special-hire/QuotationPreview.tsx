@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { safeParseJSON } from "@/lib/utils";
 
 interface QuotationData {
   id: string;
@@ -78,10 +79,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
   const parsedQuotation = {
     ...quotation,
     bus_fleet_details: (() => {
-      const parsed =
-        typeof quotation.bus_fleet_details === "string"
-          ? JSON.parse(quotation.bus_fleet_details)
-          : quotation.bus_fleet_details;
+      const parsed = safeParseJSON(quotation.bus_fleet_details, null);
 
       // Handle if bus_fleet_details is just an array (legacy format from database)
       if (Array.isArray(parsed)) {
@@ -173,28 +171,10 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
   const customerDistance = parsedQuotation.km_trip || 0;
 
   // Parse intermediate stops for display
-  let intermediateStops = [];
-  try {
-    if (parsedQuotation.intermediate_stops) {
-      intermediateStops = JSON.parse(parsedQuotation.intermediate_stops);
-    }
-  } catch (e) {
-    console.warn("Failed to parse intermediate stops:", e);
-  }
+  const intermediateStops = safeParseJSON(parsedQuotation.intermediate_stops, []);
 
   // Parse additional charges for display
-  let additionalCharges = [];
-  try {
-    if (parsedQuotation.additional_charges) {
-      if (typeof parsedQuotation.additional_charges === "string") {
-        additionalCharges = JSON.parse(parsedQuotation.additional_charges);
-      } else {
-        additionalCharges = parsedQuotation.additional_charges;
-      }
-    }
-  } catch (e) {
-    console.warn("Failed to parse additional charges:", e);
-  }
+  const additionalCharges = safeParseJSON(parsedQuotation.additional_charges, []);
 
   // Build route description
   let routeDescription = `From ${parsedQuotation.pickup_location}`;
