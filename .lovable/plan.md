@@ -1,164 +1,136 @@
 
-# Company Access Management for Finance ERP
+# Fix: Page Access Not Working
 
-## Overview
+## Problem Summary
 
-Add flexible company visibility controls to the Staff Management page, allowing administrators to configure which companies each user can see in the Finance & Accounting ERP dropdown (CompanySwitcher).
+Pages are showing even when you don't grant page access. This happens because the permission system has a bug that prevents it from loading permissions correctly.
 
-## Current System Architecture
+## Root Cause Analysis
 
-```text
-Companies Hierarchy:
-├── NCG Express (standalone)
-└── NCG Holding (parent)
-    ├── Light Vehicle Sales (LTV)
-    ├── School Bus Operations (SBO)
-    ├── Sinotruck Sales (SNT)
-    ├── Special Hire (SPH)
-    └── Yutong Sales (YUT)
+There are two issues in the `usePagePermissions` hook:
+
+### Issue 1: Permissions Never Loaded for Current User
+When the sidebar checks "does this user have access to this page?", it calls `usePagePermissions()` without passing a user ID. The hook then skips loading any permissions because of this code:
+
+```
+if (!targetUserId) return;  // Skips fetching!
 ```
 
-Currently, all users see all companies in the dropdown. The `user_company_access` table exists but is not utilized.
+Result: The permissions map stays empty, so the system doesn't know what access was granted or denied.
 
-## Solution Design
+### Issue 2: Empty Permissions = Default Allow for Management Roles
+When permissions are empty, the logic defaults to "allow" for management roles (admin, supervisor, finance, super_admin):
 
-### 1. Database Schema
-Use the existing `user_company_access` table with a new hook and modal to manage assignments:
+| Role | Empty Permissions Result |
+|------|-------------------------|
+| super_admin | Always allowed (bypasses everything) |
+| admin/supervisor/finance | Allowed (defaults to true) |
+| staff/driver | Denied (zero-trust) |
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| user_id | uuid | The staff member |
-| company_id | uuid | The company they can access |
-| can_edit | boolean | Future: whether they can edit (not used yet) |
-| created_at | timestamp | When access was granted |
+This is why abisheka fernando sees all pages - they have the `super_admin` role.
 
-### 2. Access Logic
+## Solution
 
-**Default Behavior (no entries):**
-- Super Admins: See all companies
-- Admin/Supervisor/Finance roles: See all companies (management roles)
-- Other roles: See no companies (zero-trust)
+The `usePagePermissions` hook needs to fetch the **current user's** permissions when no `targetUserId` is provided. This requires getting the current user's ID from the auth context and fetching their permissions.
 
-**When entries exist:**
-- User only sees companies explicitly granted in `user_company_access`
-- Parent company access DOES NOT automatically grant sub-company access
-- Each company/sub-company must be explicitly assigned
+### Changes Required
 
-### 3. UI Component: Company Access Modal
+**File: `src/hooks/usePagePermissions.ts`**
 
-Add a new "Company Access" button to the Staff Management page (next to "Page Access") that opens a modal similar to the Page Access modal:
+1. Import and use `user` from the `useAuth` hook
+2. Determine the effective user ID: use `targetUserId` if provided, otherwise use the current logged-in user's ID
+3. Fetch permissions for the effective user ID
+4. Only apply super_admin bypass when there's no explicit permission entry
+
+### Updated Logic Flow
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│  Company Access — John Doe                              │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  NCG Express                                            │
-│  ─────────────────────────────────────────────────────  │
-│  [ ] NCG Express                                        │
-│                                                         │
-│  NCG Holding                                            │
-│  ─────────────────────────────────────────────────────  │
-│  [ ] NCG Holding (All Data)    [Select All] [Clear]     │
-│                                                         │
-│     Sub-Companies:                                      │
-│     [x] Light Vehicle Sales                             │
-│     [x] School Bus Operations                           │
-│     [ ] Sinotruck Sales                                 │
-│     [x] Special Hire                                    │
-│     [ ] Yutong Sales                                    │
-│                                                         │
-├─────────────────────────────────────────────────────────┤
-│                            [Cancel]  [Save]             │
-└─────────────────────────────────────────────────────────┘
+1. Sidebar renders
+2. usePagePermissions() called (no targetUserId)
+3. Hook detects no targetUserId, uses current user's ID instead
+4. Fetches permissions from user_page_permissions table
+5. hasAccess() checks:
+   - If super_admin: return true (bypass all)
+   - If explicit permission exists: use that value
+   - If management role + no explicit permission: return true (default allow)
+   - Otherwise: return false (zero-trust)
 ```
 
-### 4. CompanySwitcher Integration
+### Code Changes
 
-Modify `CompanySwitcher` to filter companies based on user permissions:
+```typescript
+// src/hooks/usePagePermissions.ts
 
-- Fetch user's allowed companies from `user_company_access`
-- Filter the dropdown to only show allowed companies
-- If no explicit permissions exist, fall back to role-based defaults
+export function usePagePermissions(targetUserId?: string) {
+  const { hasRole, user } = useAuth();  // Add user
+  const [permissions, setPermissions] = useState<PermissionMap>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const isSuperAdmin = hasRole('super_admin');
+  
+  // Use targetUserId if provided, otherwise use current user's ID
+  const effectiveUserId = targetUserId ?? user?.id;
+  const isCheckingOwnAccess = !targetUserId;
 
-## Implementation Steps
+  const fetchPermissions = useCallback(async () => {
+    if (!effectiveUserId) return;  // Now fetches for current user too
+    setLoading(true);
+    setError(null);
+    const { data, error } = await supabase
+      .from("user_page_permissions")
+      .select("page_identifier, has_access")
+      .eq("user_id", effectiveUserId);
 
-### Step 1: Create `useCompanyAccess` Hook
-Create a new hook `src/hooks/useCompanyAccess.ts`:
-- Fetch user's company access from `user_company_access`
-- Provide `hasCompanyAccess(companyId)` function
-- Provide methods to grant/revoke company access
-- Handle save/upsert operations
+    // ... rest of fetch logic
+  }, [effectiveUserId]);
 
-### Step 2: Create Company Access Modal
-Create `src/components/staff/CompanyAccessModal.tsx`:
-- Display companies grouped by parent (NCG Express section, NCG Holding section)
-- Show sub-companies indented under NCG Holding
-- "Select All" / "Clear" buttons per group
-- Checkboxes for each company with proper hierarchy display
+  const hasAccess = useCallback(
+    (pageId: string) => {
+      // Super admins bypass all page restrictions
+      if (isSuperAdmin && isCheckingOwnAccess) {
+        return true;
+      }
+      
+      const value = permissions[pageId];
+      
+      // If explicit permission exists, use it
+      if (value !== undefined) {
+        return value;
+      }
+      
+      // Management roles get default access when no explicit permission
+      const hasManagementRole = hasRole('admin') || hasRole('supervisor') || hasRole('finance');
+      if (hasManagementRole && isCheckingOwnAccess) {
+        return true;
+      }
+      
+      // Zero-Trust: Deny by default for other roles
+      return false;
+    },
+    [permissions, isSuperAdmin, isCheckingOwnAccess, hasRole]
+  );
 
-### Step 3: Update StaffManagement Page
-Add a "Company Access" button next to "Page Access" in the staff actions column:
-- Only visible to Super Admins
-- Opens CompanyAccessModal for the selected user
+  // ... rest of hook
+}
+```
 
-### Step 4: Update CompanyContext
-Modify `src/contexts/CompanyContext.tsx`:
-- Add new state for `allowedCompanyIds`
-- Fetch user's allowed companies on auth state change
-- Filter `companies` array based on permissions
-- Expose `allowedCompanyIds` in context
+## Important Note About Super Admin
 
-### Step 5: Update CompanySwitcher
-Modify `src/components/accounting/CompanySwitcher.tsx`:
-- Use filtered companies from context
-- Only render companies user has access to
+The user "abisheka fernando" has the `super_admin` role. Super admins are designed to bypass all page restrictions. If you want to test page access:
 
-## Files to Create
-| File | Purpose |
-|------|---------|
-| `src/hooks/useCompanyAccess.ts` | Hook for company access management |
-| `src/components/staff/CompanyAccessModal.tsx` | Modal UI for assigning companies |
+1. **Test with a non-super_admin user** - Create a test user with only "staff" role and configure their page access
+2. **Or temporarily remove super_admin role** - But this is not recommended for production users
+
+## Testing After Fix
+
+1. Create a test user with "staff" role only
+2. Set specific page access for them (e.g., only Dashboard and Fleet Management)
+3. Log in as that test user
+4. Verify only the granted pages appear in the sidebar
 
 ## Files to Modify
-| File | Changes |
-|------|---------|
-| `src/contexts/CompanyContext.tsx` | Filter companies based on user permissions |
-| `src/components/accounting/CompanySwitcher.tsx` | Use filtered companies |
-| `src/pages/StaffManagement.tsx` | Add Company Access button |
 
-## Example Scenarios
-
-### Scenario 1: NCG Express Only User
-```
-user_company_access entries:
-- user_id: abc123, company_id: ncg_express_id
-```
-Result: User only sees "NCG Express" in dropdown
-
-### Scenario 2: NCG Holding - School Bus & Special Hire
-```
-user_company_access entries:
-- user_id: xyz789, company_id: ncg_holding_id
-- user_id: xyz789, company_id: sbo_id
-- user_id: xyz789, company_id: sph_id
-```
-Result: User sees NCG Holding parent + SBO and SPH sub-companies
-
-### Scenario 3: Super Admin (no entries needed)
-No entries in `user_company_access`
-Result: User sees all companies (super_admin role bypass)
-
-## Security Considerations
-
-- RLS policies on `user_company_access` already exist (referenced in types)
-- Super Admins bypass company restrictions
-- Empty permissions = role-based default (not zero-access for managers)
-- Changes are logged with `created_at` timestamp
-
-## Technical Notes
-
-- Uses existing `user_company_access` table (no schema changes needed)
-- Follows same pattern as `PageAccessModal` for consistency
-- Company permissions are separate from page permissions
-- Both can be managed independently for maximum flexibility
+| File | Change |
+|------|--------|
+| `src/hooks/usePagePermissions.ts` | Fetch current user's permissions; fix access logic |
