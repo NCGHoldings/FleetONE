@@ -2,10 +2,12 @@ import React, { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, Mail, Edit, Trash2, X } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Download, Mail, Edit, Trash2, X, Eye, PenTool } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { SinotruckQuotationPreview } from './SinotruckQuotationPreview';
+import { SinotruckSignatureManager } from './SinotruckSignatureManager';
 import { toast } from 'sonner';
 
 interface SinotruckQuotation {
@@ -86,7 +88,6 @@ export function SinotruckQuotationViewModal({
       const pdf = new jsPDF('p', 'mm', 'a4');
       
       const pageWidth = 210;
-      const pageHeight = 297;
       const imgWidth = pageWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -161,10 +162,32 @@ export function SinotruckQuotationViewModal({
           )}
         </div>
 
-        {/* Preview */}
-        <div className="border rounded-lg overflow-auto" style={{ maxHeight: '70vh' }}>
-          <SinotruckQuotationPreview ref={printRef} quotation={quotation} />
-        </div>
+        {/* Tabs */}
+        <Tabs defaultValue="preview" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="preview" className="flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Preview
+            </TabsTrigger>
+            <TabsTrigger value="signatures" className="flex items-center gap-2">
+              <PenTool className="h-4 w-4" />
+              Manage Signatures
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="preview">
+            <div className="border rounded-lg overflow-auto" style={{ maxHeight: '70vh' }}>
+              <SinotruckQuotationPreview ref={printRef} quotation={quotation} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="signatures">
+            <SinotruckSignatureManager
+              quotationId={quotation.id}
+              onSignaturesUpdated={onRefresh}
+            />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
