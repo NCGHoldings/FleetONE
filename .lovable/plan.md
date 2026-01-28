@@ -1,178 +1,273 @@
 
-# Fix: Searchable Dropdowns and Enhanced Search Across Accounting Module
+# Sinotruck Full Sales Flow Implementation
 
-## Problem Summary
+## Overview
 
-The current accounting module has several search and dropdown usability issues:
+This plan implements the complete Sinotruck sales document flow matching Yutong and Light Vehicle modules, including:
 
-1. **AccountSelector** - No search capability within the dropdown. Users must scroll through potentially hundreds of accounts to find the one they need.
-
-2. **DataTable search** - The `searchKey` prop only filters by a single column accessor. This is limiting for users who want to search across multiple fields.
-
-3. **Various views** have inconsistent search implementations - some work, some don't, some have search but it's column-specific.
-
----
-
-## Solution Overview
-
-Create a **Searchable Combobox pattern** for all account/entity selectors and enhance search across all major accounting views. This involves:
-
-1. **New Component**: `SearchableAccountSelector` - A combobox with built-in search using the Command component (cmdk)
-2. **Update existing views** to use consistent global search across multiple fields
-3. **Ensure all dropdowns are searchable** with type-to-filter capability
+- Quotation View with Signatures tab
+- Invoice Generation (Direct + Proforma)
+- Cash Receipts with signatures
+- Full document management with PDF generation
 
 ---
 
-## Implementation Details
+## Current State Analysis
 
-### 1. New Searchable Account Selector Component
+### What Sinotruck Already Has
+- `sinotruck_quotations` table with quotation data
+- `sinotruck_quotation_signatures` table for quotation signatures
+- `sinotruck_orders` table with order management
+- `sinotruck_customer_payments` and `sinotruck_payment_schedules` tables
+- `SinotruckPaymentTracking` component with GL integration
+- `SinotruckQuotationViewModal` - basic view (no signatures tab)
+- `SinotruckQuotationSignatureModal` - signature capture exists
+- `SinotruckQuotationPreview` - quotation preview exists
 
-**File:** `src/components/accounting/shared/SearchableAccountSelector.tsx`
+### What's Missing (Compared to Yutong)
+1. **Signature Manager** - No `SinotruckSignatureManager` component
+2. **Invoice Records Table** - No `sinotruck_invoice_records` table
+3. **Invoice Documents Table** - No `sinotruck_invoice_documents` table
+4. **Invoice Generator** - Current `SinotruckInvoiceGenerator` only generates quotation PDFs
+5. **Order Invoice Generator** - No `SinotruckOrderInvoiceGenerator` component
+6. **Cash Receipts** - No `sinotruck_cash_receipts` table or components
+7. **Hooks** - No `useSinotruckSignatures`, `useSinotruckOrderInvoiceManagement`, `useSinotruckCashReceipts`
+8. **Quotation View Modal** - Missing Tabs for Preview + Signatures
 
-Create a new searchable combobox component that:
-- Uses the Command (cmdk) component for fuzzy search
-- Displays account code + account name
-- Supports filtering by account type
-- Has keyboard navigation
-- Shows a search input at the top of the dropdown
+---
+
+## Implementation Plan
+
+### Phase 1: Database Schema (New Tables)
+
+Create migration for:
 
 ```text
-+----------------------------------+
-|  Select account...          [v] |
-+----------------------------------+
-     | [Search accounts...]        |
-     +-----------------------------+
-     | 1101 - Cash in Hand         |
-     | 1102 - Bank - BOC           |
-     | 1103 - Bank - HNB           |
-     | 1200 - Accounts Receivable  |
-     +-----------------------------+
+sinotruck_invoice_records
+├── id (UUID)
+├── invoice_no (TEXT, UNIQUE)
+├── order_id (FK to sinotruck_orders)
+├── quotation_id (FK to sinotruck_quotations)
+├── invoice_date, invoice_amount
+├── status (draft/approved)
+├── invoice_category (direct_invoice/proforma_invoice)
+├── proforma fields (amount_percentage, finance_company, purpose)
+├── approved_by, approved_at
+└── timestamps
+
+sinotruck_invoice_documents
+├── id (UUID)
+├── invoice_record_id (FK)
+├── file_name, file_path, file_size
+├── document_status
+├── invoice_data (JSONB)
+└── timestamps
+
+sinotruck_invoice_signatures
+├── id (UUID)
+├── invoice_record_id (FK)
+├── signature_role (prepared_by/approved_by/received_by)
+├── signer_name, signature_data, signature_type
+├── signed_at, signed_by
+└── timestamps
+
+sinotruck_cash_receipts
+├── id (UUID)
+├── receipt_no (TEXT, UNIQUE)
+├── order_id (FK)
+├── payment_id (FK)
+├── receipt_date, receipt_amount
+├── payment_method
+├── customer/finance signature data
+└── timestamps
 ```
 
-### 2. Update AccountSelector Component
-
-**File:** `src/components/accounting/shared/AccountSelector.tsx`
-
-Replace the simple Select with a Popover + Command combination that allows:
-- Type-ahead search filtering
-- Search by account code OR account name
-- Keyboard navigation (arrows, enter to select)
-- Clear selection option
-
-### 3. Enhance DataTable Views with Global Search
-
-Update the following views to implement proper multi-field search:
-
-| View | Current State | Fix |
-|------|---------------|-----|
-| `ChartOfAccountsView.tsx` | Has search but only for tree view | Add search for table view too |
-| `AccountsPayableView.tsx` | `searchKey="invoice_number"` | Add global search across vendor, invoice#, status |
-| `AccountsReceivableView.tsx` | `searchKey="invoice_number"` | Add global search across customer, invoice#, status |
-| `InventoryView.tsx` | `searchKey="item_name"` | Add global search across code, name, category |
-| `VendorMasterView.tsx` | Has manual filtering | Already working, verify consistency |
-| `CustomerMasterView.tsx` | Has manual filtering | Already working, verify consistency |
-
-### 4. Specific File Changes
+Also create:
+- `generate_sinotruck_invoice_no()` function
+- `generate_sinotruck_receipt_no()` function
+- RLS policies for all tables
+- Performance indexes
 
 ---
 
-#### `src/components/accounting/shared/SearchableAccountSelector.tsx` (NEW)
+### Phase 2: Hooks
 
-Create a reusable searchable dropdown for account selection using Popover + Command:
+| Hook | Purpose |
+|------|---------|
+| `useSinotruckSignatures.ts` | Fetch/save/delete quotation signatures |
+| `useSinotruckOrderInvoiceManagement.ts` | Generate, approve, regenerate invoices |
+| `useSinotruckCashReceipts.ts` | Create and manage cash receipts |
 
-- Props: `value`, `onValueChange`, `placeholder`, `accountTypes`, `disabled`
-- Features: Built-in search, account code display, loading state
-- Uses existing `useChartOfAccounts` hook
+These will mirror the Yutong hooks with Sinotruck-specific table names.
 
 ---
 
-#### `src/components/accounting/AccountsPayableView.tsx`
+### Phase 3: Invoice Generation Library
 
-Add multi-field search:
+Create `src/lib/sinotruck-order-invoice-generator.ts`:
+- `SinotruckOrderInvoiceData` interface
+- `generateSinotruckOrderInvoiceHTML()` function
+- `generateSinotruckOrderInvoicePDF()` function
 
-```typescript
-const [searchQuery, setSearchQuery] = useState("");
+Template styled for truck sales (similar to Yutong bus invoice).
 
-// Add useMemo for filtered data
-const filteredInvoices = useMemo(() => {
-  if (!invoices || !searchQuery.trim()) return invoices || [];
-  const query = searchQuery.toLowerCase();
-  return invoices.filter((inv) =>
-    inv.invoice_number?.toLowerCase().includes(query) ||
-    inv.vendors?.vendor_name?.toLowerCase().includes(query) ||
-    inv.vendors?.vendor_code?.toLowerCase().includes(query) ||
-    inv.status?.toLowerCase().includes(query)
-  );
-}, [invoices, searchQuery]);
+---
+
+### Phase 4: UI Components
+
+#### 4.1 Update `SinotruckQuotationViewModal`
+Add Tabs pattern matching Yutong/Light Vehicle:
+- **Preview tab** - Quotation preview
+- **Manage Signatures tab** - `SinotruckSignatureManager`
+
+#### 4.2 Create `SinotruckSignatureManager`
+Replicate `YutongSignatureManager`:
+- Three signature slots: Sales Manager, Approved By, Customer
+- Add/Update/Remove signatures
+- Connect to `SinotruckQuotationSignatureModal`
+
+#### 4.3 Create `SinotruckOrderInvoiceGenerator`
+Replicate `YutongOrderInvoiceGenerator`:
+- Vehicle details completion check
+- Generate Invoice dropdown (Direct/Proforma)
+- Invoice type modal for proforma config
+- List existing invoices with View/Download
+
+#### 4.4 Create `SinotruckOrderInvoiceViewModal`
+- Preview tab with invoice iframe
+- Signatures tab for invoice signatures
+- Approve, Regenerate, Download, Email buttons
+
+#### 4.5 Create `SinotruckInvoiceSignatureManager`
+For managing invoice signatures (Prepared By, Approved By, Received By).
+
+#### 4.6 Create `SinotruckCashReceiptModal`
+Replicate `YutongCashReceiptModal`:
+- Cash receipt preview
+- Customer and Finance signature options
+- PDF download
+
+#### 4.7 Create `SinotruckCashReceiptPreview`
+Receipt layout matching company branding.
+
+#### 4.8 Update `EnhancedSinotrukOrderDetailsModal`
+- Add Invoice Generator to Documents tab
+- Add Cash Receipt generation to Financial tab
+
+---
+
+### Phase 5: Integration Points
+
+1. **Payment Tracking**: Update `SinotruckPaymentTracking` to:
+   - Show "Generate Receipt" button for verified payments
+   - Link to cash receipt modal
+
+2. **Order Details Modal**: Wire up Documents tab with `SinotruckOrderInvoiceGenerator`
+
+3. **Quotation List**: Ensure "View" action opens updated modal with signatures
+
+---
+
+## Files to Create
+
+| File | Description |
+|------|-------------|
+| `supabase/migrations/XXXX_sinotruck_invoice_system.sql` | Database tables, functions, RLS |
+| `src/hooks/useSinotruckSignatures.ts` | Quotation signature management |
+| `src/hooks/useSinotruckOrderInvoiceManagement.ts` | Invoice CRUD operations |
+| `src/hooks/useSinotruckCashReceipts.ts` | Cash receipt management |
+| `src/lib/sinotruck-order-invoice-generator.ts` | Invoice HTML/PDF generation |
+| `src/components/sinotruck/SinotruckSignatureManager.tsx` | Quotation signature UI |
+| `src/components/sinotruck/SinotruckOrderInvoiceGenerator.tsx` | Invoice generation UI |
+| `src/components/sinotruck/SinotruckOrderInvoiceViewModal.tsx` | Invoice view with signatures |
+| `src/components/sinotruck/SinotruckInvoiceSignatureManager.tsx` | Invoice signature UI |
+| `src/components/sinotruck/SinotruckInvoiceTypeModal.tsx` | Direct/Proforma selection |
+| `src/components/sinotruck/SinotruckInvoiceDataModal.tsx` | Vehicle data input |
+| `src/components/sinotruck/SinotruckCashReceiptModal.tsx` | Receipt modal |
+| `src/components/sinotruck/SinotruckCashReceiptPreview.tsx` | Receipt preview |
+| `src/components/sinotruck/SinotruckCashReceiptSignatureModal.tsx` | Receipt signatures |
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/sinotruck/SinotruckQuotationViewModal.tsx` | Add Tabs, Signatures tab |
+| `src/components/sinotruck/SinotruckPaymentTracking.tsx` | Add cash receipt generation |
+| `src/components/sinotruck/EnhancedSinotrukOrderDetailsModal.tsx` | Wire Documents tab |
+| `src/integrations/supabase/types.ts` | Auto-generated after migration |
+
+---
+
+## Document Flow Diagram
+
+```text
+QUOTATION FLOW
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│  Create     │────▶│   View &     │────▶│  Confirm    │
+│  Quotation  │     │   Sign       │     │  Order      │
+└─────────────┘     └──────────────┘     └─────────────┘
+                           │
+                    ┌──────┴──────┐
+                    ▼             ▼
+              Sales Manager    Customer
+              Signature        Signature
+
+ORDER + INVOICE FLOW
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Record    │────▶│   Verify     │────▶│  Generate   │
+│   Payment   │     │   Payment    │     │   Receipt   │
+└─────────────┘     └──────────────┘     └─────────────┘
+                           │
+                    ┌──────┴──────┐
+                    ▼             ▼
+               GL Posted      AR Invoice
+                           Created
+
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│  Complete   │────▶│  Generate    │────▶│   Approve   │
+│  Vehicle    │     │  Invoice     │     │   & Send    │
+│  Details    │     │  (Draft)     │     └─────────────┘
+└─────────────┘     └──────────────┘
+                           │
+                    ┌──────┴──────┐
+                    ▼             ▼
+              Direct Invoice   Proforma Invoice
+              (Customer)       (Finance Company)
 ```
 
-Add search input above DataTable and pass filtered data.
-
 ---
 
-#### `src/components/accounting/AccountsReceivableView.tsx`
-
-Add multi-field search (same pattern as AP):
-
-- Search across invoice_number, customer_name, customer_code, status
-- Add Input with Search icon above DataTable
-
----
-
-#### `src/components/accounting/InventoryView.tsx`
-
-Add multi-field search:
-
-- Search across item_code, item_name, category_name, description
-- Apply to both items and stock tabs
-
----
-
-#### `src/components/accounting/ChartOfAccountsView.tsx`
-
-The search already exists and works for tree view. Ensure it also filters the table view by passing filtered accounts to DataTable.
-
----
-
-## Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `src/components/accounting/shared/SearchableAccountSelector.tsx` | Create | New searchable combobox component |
-| `src/components/accounting/AccountsPayableView.tsx` | Modify | Add global search across multiple fields |
-| `src/components/accounting/AccountsReceivableView.tsx` | Modify | Add global search across multiple fields |
-| `src/components/accounting/InventoryView.tsx` | Modify | Add global search for items and stock |
-| `src/components/accounting/ChartOfAccountsView.tsx` | Modify | Ensure search works for table view too |
-
----
-
-## Testing Steps
+## Testing Checklist
 
 After implementation:
 
-1. **Searchable Account Selector**
-   - Open any form with account selection (e.g., Journal Entry Form)
-   - Click the account dropdown
-   - Start typing - verify accounts filter as you type
-   - Verify you can search by code (e.g., "1101") or name (e.g., "Cash")
-   - Select an account and verify it's properly set
+1. **Quotation Signatures**
+   - Open a Sinotruck quotation
+   - Click "Manage Signatures" tab
+   - Add Sales Manager, Approved By, Customer signatures
+   - Download PDF with signatures embedded
 
-2. **Accounts Payable Search**
-   - Navigate to Accounts Payable
-   - Type in the search box
-   - Verify filtering works across invoice #, vendor name, and status
-   - Clear search and verify all invoices return
+2. **Invoice Generation**
+   - Create an order from confirmed quotation
+   - Complete vehicle details (engine, chassis, etc.)
+   - Generate Direct Invoice - verify PDF
+   - Generate Proforma Invoice with finance company details
 
-3. **Accounts Receivable Search**
-   - Navigate to Accounts Receivable
-   - Test search across invoice #, customer name, and status
+3. **Invoice Signatures**
+   - View generated invoice
+   - Add Prepared By, Approved By, Received By signatures
+   - Regenerate PDF with signatures
+   - Approve invoice
 
-4. **Inventory Search**
-   - Navigate to Inventory
-   - Test search on Items tab (by code, name, category)
-   - Test search on Stock tab
+4. **Cash Receipts**
+   - Record a payment
+   - Verify payment (GL should post)
+   - Generate cash receipt
+   - Add customer and finance signatures
+   - Download receipt PDF
 
-5. **Chart of Accounts Search**
-   - Navigate to Chart of Accounts
-   - Switch between Tree and Table views
-   - Verify search works in both views
+5. **End-to-End Flow**
+   - Quotation → Confirm → Order
+   - Payment → Verify → GL Entry
+   - Complete Details → Generate Invoice
+   - Sign → Approve → Send to Customer
