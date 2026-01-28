@@ -13892,6 +13892,108 @@ export type Database = {
         }
         Relationships: []
       }
+      sinotruck_cash_receipts: {
+        Row: {
+          amount: number
+          amount_in_words: string | null
+          created_at: string
+          created_by: string | null
+          customer_address: string | null
+          customer_contact: string | null
+          customer_name: string | null
+          customer_signature_data: string | null
+          customer_signature_type: string | null
+          customer_signed_at: string | null
+          customer_signer_name: string | null
+          finance_signature_data: string | null
+          finance_signature_type: string | null
+          finance_signed_at: string | null
+          finance_signer_name: string | null
+          id: string
+          order_id: string
+          payment_id: string
+          payment_method: string | null
+          pdf_url: string | null
+          product_description: string | null
+          quotation_no: string | null
+          receipt_date: string
+          receipt_no: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          amount_in_words?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_address?: string | null
+          customer_contact?: string | null
+          customer_name?: string | null
+          customer_signature_data?: string | null
+          customer_signature_type?: string | null
+          customer_signed_at?: string | null
+          customer_signer_name?: string | null
+          finance_signature_data?: string | null
+          finance_signature_type?: string | null
+          finance_signed_at?: string | null
+          finance_signer_name?: string | null
+          id?: string
+          order_id: string
+          payment_id: string
+          payment_method?: string | null
+          pdf_url?: string | null
+          product_description?: string | null
+          quotation_no?: string | null
+          receipt_date?: string
+          receipt_no: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          amount_in_words?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_address?: string | null
+          customer_contact?: string | null
+          customer_name?: string | null
+          customer_signature_data?: string | null
+          customer_signature_type?: string | null
+          customer_signed_at?: string | null
+          customer_signer_name?: string | null
+          finance_signature_data?: string | null
+          finance_signature_type?: string | null
+          finance_signed_at?: string | null
+          finance_signer_name?: string | null
+          id?: string
+          order_id?: string
+          payment_id?: string
+          payment_method?: string | null
+          pdf_url?: string | null
+          product_description?: string | null
+          quotation_no?: string | null
+          receipt_date?: string
+          receipt_no?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_cash_receipts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_cash_receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_customer_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sinotruck_customer_payments: {
         Row: {
           ar_receipt_id: string | null
@@ -14162,6 +14264,184 @@ export type Database = {
             columns: ["wht_payable_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sinotruck_invoice_documents: {
+        Row: {
+          created_at: string
+          document_status: string
+          file_name: string
+          file_path: string
+          file_size: number
+          generated_at: string | null
+          id: string
+          invoice_data: Json | null
+          invoice_record_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_status?: string
+          file_name: string
+          file_path: string
+          file_size?: number
+          generated_at?: string | null
+          id?: string
+          invoice_data?: Json | null
+          invoice_record_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_status?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          generated_at?: string | null
+          id?: string
+          invoice_data?: Json | null
+          invoice_record_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_invoice_documents_invoice_record_id_fkey"
+            columns: ["invoice_record_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_invoice_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sinotruck_invoice_records: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          finance_company_address: string | null
+          finance_company_name: string | null
+          generated_at: string | null
+          generated_by: string | null
+          id: string
+          invoice_amount: number
+          invoice_category: string | null
+          invoice_date: string
+          invoice_no: string
+          invoice_type: string | null
+          notes: string | null
+          order_id: string | null
+          proforma_amount: number | null
+          proforma_amount_percentage: number | null
+          proforma_purpose: string | null
+          quotation_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          finance_company_address?: string | null
+          finance_company_name?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          invoice_amount: number
+          invoice_category?: string | null
+          invoice_date?: string
+          invoice_no: string
+          invoice_type?: string | null
+          notes?: string | null
+          order_id?: string | null
+          proforma_amount?: number | null
+          proforma_amount_percentage?: number | null
+          proforma_purpose?: string | null
+          quotation_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          finance_company_address?: string | null
+          finance_company_name?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          invoice_amount?: number
+          invoice_category?: string | null
+          invoice_date?: string
+          invoice_no?: string
+          invoice_type?: string | null
+          notes?: string | null
+          order_id?: string | null
+          proforma_amount?: number | null
+          proforma_amount_percentage?: number | null
+          proforma_purpose?: string | null
+          quotation_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_invoice_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sinotruck_invoice_records_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sinotruck_invoice_signatures: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_record_id: string
+          signature_data: string
+          signature_role: string
+          signature_type: string
+          signed_at: string
+          signed_by: string | null
+          signer_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_record_id: string
+          signature_data: string
+          signature_role: string
+          signature_type?: string
+          signed_at?: string
+          signed_by?: string | null
+          signer_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_record_id?: string
+          signature_data?: string
+          signature_role?: string
+          signature_type?: string
+          signed_at?: string
+          signed_by?: string | null
+          signer_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sinotruck_invoice_signatures_invoice_record_id_fkey"
+            columns: ["invoice_record_id"]
+            isOneToOne: false
+            referencedRelation: "sinotruck_invoice_records"
             referencedColumns: ["id"]
           },
         ]
@@ -21702,8 +21982,10 @@ export type Database = {
         Returns: string
       }
       generate_sinotruck_customer_code: { Args: never; Returns: string }
+      generate_sinotruck_invoice_no: { Args: never; Returns: string }
       generate_sinotruck_order_no: { Args: never; Returns: string }
       generate_sinotruck_quotation_no: { Args: never; Returns: string }
+      generate_sinotruck_receipt_no: { Args: never; Returns: string }
       generate_sph_ar_invoice_number: {
         Args: { p_company_id: string }
         Returns: string
