@@ -12,6 +12,7 @@ import { CostBreakdown } from './CostBreakdown';
 import { EnhancedSearch } from '@/components/ui/enhanced-search';
 import { format } from 'date-fns';
 import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
+import { safeParseJSON } from '@/lib/utils';
 
 interface QuotationData {
   id: string;
@@ -275,16 +276,8 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
         .maybeSingle();
 
       // Parse additional charges from quotation (stored as JSONB)
-      let additionalCharges: Array<{ type: string; amount: number; distance?: number; reason?: string }> = [];
-      if (quotation.additional_charges) {
-        try {
-          additionalCharges = Array.isArray(quotation.additional_charges) 
-            ? quotation.additional_charges 
-            : JSON.parse(quotation.additional_charges as any);
-        } catch (e) {
-          console.error('Error parsing additional charges:', e);
-        }
-      }
+      const additionalCharges: Array<{ type: string; amount: number; distance?: number; reason?: string }> = 
+        safeParseJSON(quotation.additional_charges, []);
 
       // Calculate base rate from rate card (NOT from hire_charge)
       const fixedRate = rateCard?.flat_fee_lkr || 30000;

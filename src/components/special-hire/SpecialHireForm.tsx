@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, safeParseJSON } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CostBreakdown } from './CostBreakdown';
@@ -258,80 +258,37 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     // If editing, set intermediate stops, additional charges, and other expenses from initial data
     if (isEditing && initialData) {
       // Load intermediate stops
-      if (initialData.intermediate_stops) {
-        try {
-          const stops = Array.isArray(initialData.intermediate_stops) 
-            ? initialData.intermediate_stops 
-            : JSON.parse(initialData.intermediate_stops);
-          setIntermediateStops(stops || []);
-        } catch (e) {
-          console.warn('Failed to parse intermediate stops:', e);
-          setIntermediateStops([]);
-        }
-      }
+      const stops = safeParseJSON(initialData.intermediate_stops, []);
+      setIntermediateStops(stops);
 
       // Load additional charges
-      if (initialData.additional_charges) {
-        try {
-          const charges = Array.isArray(initialData.additional_charges) 
-            ? initialData.additional_charges 
-            : JSON.parse(initialData.additional_charges);
-          
-          // Convert to internal format with IDs
-          const formattedCharges = charges.map((charge: any, index: number) => ({
-            id: `existing-${index}`,
-            type: charge.type || 'other',
-            amount: Number(charge.amount) || 0,
-            reason: charge.reason || ''
-          }));
-          
-          setAdditionalCharges(formattedCharges);
-        } catch (e) {
-          console.warn('Failed to parse additional charges:', e);
-          setAdditionalCharges([]);
-        }
-      }
+      const charges = safeParseJSON(initialData.additional_charges, []);
+      const formattedCharges = charges.map((charge: any, index: number) => ({
+        id: `existing-${index}`,
+        type: charge.type || 'other',
+        amount: Number(charge.amount) || 0,
+        reason: charge.reason || '',
+        applyPerBus: charge.applyPerBus || false,
+        busesCount: charge.busesCount || 1
+      }));
+      setAdditionalCharges(formattedCharges);
 
       // Load other expenses
-      if (initialData.other_expenses) {
-        try {
-          const expenses = Array.isArray(initialData.other_expenses) 
-            ? initialData.other_expenses 
-            : JSON.parse(initialData.other_expenses);
-          
-          // Convert to internal format with IDs
-          const formattedExpenses = expenses.map((expense: any, index: number) => ({
-            id: `existing-expense-${index}`,
-            category: expense.category || 'other',
-            amount: Number(expense.amount) || 0,
-            description: expense.description || ''
-          }));
-          
-          setOtherExpenses(formattedExpenses);
-        } catch (e) {
-          console.warn('Failed to parse other expenses:', e);
-          setOtherExpenses([]);
-        }
-      }
+      const expenses = safeParseJSON(initialData.other_expenses, []);
+      const formattedExpenses = expenses.map((expense: any, index: number) => ({
+        id: `existing-expense-${index}`,
+        label: expense.label || expense.category || 'other',
+        amount: Number(expense.amount) || 0
+      }));
+      setOtherExpenses(formattedExpenses);
     }
   }, [isEditing, initialData]);
 
   // Initialize costData from initialData when editing to enable submit button
   useEffect(() => {
     if (isEditing && initialData) {
-      // Parse stored JSON fields safely
-      const parseJsonSafe = (value: any, fallback: any[] = []) => {
-        if (!value) return fallback;
-        if (Array.isArray(value)) return value;
-        try {
-          return JSON.parse(value);
-        } catch (e) {
-          return fallback;
-        }
-      };
-
-      const parsedAdditionalCharges = parseJsonSafe(initialData.additional_charges, []);
-      const parsedOtherExpenses = parseJsonSafe(initialData.other_expenses, []);
+      const parsedAdditionalCharges = safeParseJSON(initialData.additional_charges, []);
+      const parsedOtherExpenses = safeParseJSON(initialData.other_expenses, []);
 
       // Calculate actual hours from pickup/drop times
       let actualHours = 0;
@@ -403,7 +360,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     try {
       const savedData = localStorage.getItem(AUTO_SAVE_KEY);
       if (savedData && !isEditing && !submissionData && !initialData) {
-        const parsed = JSON.parse(savedData);
+        const parsed = safeParseJSON(savedData, null);
+        if (!parsed) return;
         // Only load if saved within last 7 days
         if (Date.now() - parsed.timestamp < 7 * 24 * 60 * 60 * 1000) {
           // Set form values
@@ -1427,7 +1385,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
     // Check intermediate stops changes
     const currentStops = intermediateStops.filter(s => s.location && s.location.trim());
-    const originalStops = JSON.parse(originalData.intermediate_stops || '[]');
+    const originalStops = safeParseJSON(originalData.intermediate_stops, []);
     if (currentStops.length !== originalStops.length) return true;
     for (let i = 0; i < currentStops.length; i++) {
       if (currentStops[i].location !== originalStops[i]?.location) return true;
@@ -1435,7 +1393,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
     // Check additional distance charges
     const currentDistanceCharges = additionalCharges.filter(c => c.type === 'additional_distance');
-    const originalCharges = JSON.parse(originalData.additional_charges || '[]');
+    const originalCharges = safeParseJSON(originalData.additional_charges, []);
     const originalDistanceCharges = originalCharges.filter((c: any) => c.type === 'additional_distance');
     if (currentDistanceCharges.length !== originalDistanceCharges.length) return true;
     const currentDistanceTotal = currentDistanceCharges.reduce((sum, c) => sum + (c.distance || 0), 0);
@@ -1492,14 +1450,6 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       } else {
         // PRESERVE original calculations for non-route/cost edits (e.g., company name, customer phone)
         console.log('Preserving original calculations - no route-affecting changes detected');
-        
-        // Safe JSON parse helper to prevent "Unexpected end of JSON input" errors
-        const safeParseJSON = <T,>(value: any, fallback: T): T => {
-          if (value === null || value === undefined || value === '') return fallback;
-          if (typeof value === 'object') return value as T;
-          try { return JSON.parse(value); } 
-          catch { return fallback; }
-        };
 
         costs = {
           km_parking_to_pickup: initialData.km_parking_to_pickup,

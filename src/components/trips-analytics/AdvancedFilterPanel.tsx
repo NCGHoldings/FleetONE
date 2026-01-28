@@ -19,7 +19,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, safeParseJSON } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -65,12 +65,8 @@ interface FilterPreset {
 const extractDriverName = (trip: RawTrip): string => {
   let driverName = '';
   if (trip.notes) {
-    try {
-      const notes = typeof trip.notes === 'string' ? JSON.parse(trip.notes || '{}') : trip.notes;
-      driverName = (notes as any).driver || '';
-    } catch {
-      driverName = '';
-    }
+    const notes = safeParseJSON(trip.notes, {});
+    driverName = (notes as any).driver || '';
   }
   if (!driverName && trip.profiles) {
     driverName = `${trip.profiles.first_name} ${trip.profiles.last_name}`.trim();

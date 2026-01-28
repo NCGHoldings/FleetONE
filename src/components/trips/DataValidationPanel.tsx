@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { AlertTriangle, CheckCircle, Trash2, XCircle } from "lucide-react";
-import { formatDateDisplay } from "@/lib/utils";
+import { formatDateDisplay, safeParseJSON } from "@/lib/utils";
 
 interface InvalidTrip {
   id: string;
@@ -48,7 +48,7 @@ export function DataValidationPanel() {
       const problematic = (trips || []).filter(trip => {
         if (trip.status === 'scheduled' && trip.income === 0) return true;
         
-        const notes = safeParseJSON(trip.notes);
+        const notes = safeParseJSON(trip.notes, null);
         // Check if notes contains bus data but no bus_id link
         if (notes?.bus_no && !trip.bus_id) return true;
         if (notes?.excel_bus) return true; // Excel import with unmatched bus
@@ -65,9 +65,6 @@ export function DataValidationPanel() {
     }
   };
 
-  const safeParseJSON = (str?: string) => {
-    try { return str ? JSON.parse(str) : null; } catch { return null; }
-  };
 
   const deleteTrip = async (tripId: string) => {
     try {
@@ -195,7 +192,7 @@ export function DataValidationPanel() {
 
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
               {invalidTrips.map((trip) => {
-                const notes = safeParseJSON(trip.notes);
+                const notes = safeParseJSON(trip.notes, null);
                 return (
                   <div
                     key={trip.id}

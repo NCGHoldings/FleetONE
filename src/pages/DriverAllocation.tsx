@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Calendar, CheckCircle, MessageCircle, Plus, Send, ShieldAlert, Upload, Download, Edit, Trash2 } from "lucide-react";
 import * as XLSX from 'xlsx-js-style';
-import { formatDateDisplay } from "@/lib/utils";
+import { formatDateDisplay, safeParseJSON } from "@/lib/utils";
 
 interface AllocationRow {
   id: string;
@@ -132,9 +132,6 @@ export default function DriverAllocation() {
   };
   const phoneOf = (userId?: string) => people.find(p => p.user_id === userId)?.phone;
 
-  const safeParseJSON = (str?: string) => {
-    try { return str ? JSON.parse(str) : null; } catch { return null; }
-  };
 
   const fetchAllocations = async () => {
     try {
@@ -157,7 +154,7 @@ export default function DriverAllocation() {
       if (error) throw error;
 
       const rows: AllocationRow[] = (data || []).map((r: any) => {
-        const meta = safeParseJSON(r.notes);
+        const meta = safeParseJSON(r.notes, null);
         
         // PRIORITY: Get actual database values first, fallback to notes only if missing
         const actualRoute = routes.find(rt => rt.id === r.route_id);
