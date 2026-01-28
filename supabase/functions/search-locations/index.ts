@@ -92,11 +92,14 @@ serve(async (req) => {
       await logApiUsage('place_details', placeId, false, detailsData.status, { place_id: placeId });
 
       // Cache the coordinates
-      await supabase
-        .from('cached_locations')
-        .update({ coordinates, last_accessed_at: new Date().toISOString() })
-        .eq('place_id', placeId)
-        .catch(() => {});
+      try {
+        await supabase
+          .from('cached_locations')
+          .update({ coordinates, last_accessed_at: new Date().toISOString() })
+          .eq('place_id', placeId);
+      } catch (e) {
+        console.warn('Failed to cache coordinates:', e);
+      }
 
       console.log('Fetched and cached coordinates from Google API');
       return new Response(
@@ -224,18 +227,21 @@ serve(async (req) => {
     // Cache the results in background (don't await)
     Promise.all(
       suggestions.map(async (suggestion: any) => {
-        await supabase
-          .from('cached_locations')
-          .upsert({
-            place_id: suggestion.id,
-            place_name: suggestion.place_name,
-            main_text: suggestion.text,
-            search_terms: [searchQuery],
-            last_accessed_at: new Date().toISOString()
-          }, { onConflict: 'place_id' })
-          .catch(() => {});
+        try {
+          await supabase
+            .from('cached_locations')
+            .upsert({
+              place_id: suggestion.id,
+              place_name: suggestion.place_name,
+              main_text: suggestion.text,
+              search_terms: [searchQuery],
+              last_accessed_at: new Date().toISOString()
+            }, { onConflict: 'place_id' });
+        } catch (e) {
+          console.warn('Failed to cache location:', e);
+        }
       })
-    );
+    ).catch(() => {});
 
     console.log(`Returning ${suggestions.length} suggestions from Google API (1 API call only)`);
 
