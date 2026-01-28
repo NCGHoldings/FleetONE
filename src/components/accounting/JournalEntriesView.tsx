@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, CheckCircle, XCircle, RotateCcw } from "lucide-react";
+import { Plus, Eye, CheckCircle, XCircle, RotateCcw, Search } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "./shared/StatusBadge";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
@@ -9,6 +9,7 @@ import { DateDisplay } from "./shared/DateDisplay";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { JournalEntryForm } from "./JournalEntryForm";
 import { JournalEntryDetailDialog } from "./JournalEntryDetailDialog";
 import { useJournalEntries } from "@/hooks/useAccountingData";
@@ -30,6 +31,7 @@ export const JournalEntriesView = () => {
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [filterBusinessUnit, setFilterBusinessUnit] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { selectedCompany, getSubCompaniesFor, isSubCompany, selectedCompanyId } = useCompany();
   
@@ -42,6 +44,18 @@ export const JournalEntriesView = () => {
   const postEntry = usePostJournalEntry();
   const rejectEntry = useRejectJournalEntry();
   const reverseEntry = useReverseJournalEntry();
+
+  // Filter entries based on search query across multiple fields
+  const filteredEntries = useMemo(() => {
+    if (!entries || !searchQuery.trim()) return entries || [];
+    const query = searchQuery.toLowerCase();
+    return entries.filter((entry: any) => 
+      entry.entry_number?.toLowerCase().includes(query) ||
+      entry.description?.toLowerCase().includes(query) ||
+      entry.reference?.toLowerCase().includes(query) ||
+      entry.business_unit_code?.toLowerCase().includes(query)
+    );
+  }, [entries, searchQuery]);
 
   const handleApprove = (entryId: string) => {
     postEntry.mutate(entryId, {
@@ -213,10 +227,20 @@ export const JournalEntriesView = () => {
         </div>
       </div>
 
+      {/* Search Input */}
+      <div className="relative max-w-sm mb-4">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by entry #, description, reference..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
       <DataTable
         columns={columns}
-        data={entries || []}
-        searchKey="description"
+        data={filteredEntries}
       />
 
       {/* Entry Detail Dialog */}

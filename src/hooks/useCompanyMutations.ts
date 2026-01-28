@@ -586,6 +586,7 @@ export const useCompanyCreateAccount = () => {
           description: account.description,
           is_active: true,
           current_balance: 0,
+          company_id: companyId,
         } as any])
         .select()
         .single();

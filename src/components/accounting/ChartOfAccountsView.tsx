@@ -12,10 +12,13 @@ import { ChartOfAccountsTree } from "./ChartOfAccountsTree";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AccountForm } from "./AccountForm";
 
 export const ChartOfAccountsView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"tree" | "table">("tree");
+  const [showAccountForm, setShowAccountForm] = useState(false);
   const { selectedCompanyId, selectedCompany } = useCompany();
 
   const { data: accounts, isLoading, refetch } = useQuery({
@@ -150,10 +153,23 @@ export const ChartOfAccountsView = () => {
         </div>
         <div className="flex gap-2">
           <ChartOfAccountsUpload onUploadComplete={refetch} companyId={selectedCompanyId} />
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Account
-          </Button>
+          <Dialog open={showAccountForm} onOpenChange={setShowAccountForm}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Account
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Add New Account</DialogTitle>
+              </DialogHeader>
+              <AccountForm onSuccess={() => {
+                setShowAccountForm(false);
+                refetch();
+              }} />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
