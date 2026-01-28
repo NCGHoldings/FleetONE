@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { PageItem } from "@/lib/pages";
+import { ALL_PAGES_FLAT } from "@/lib/pages";
 import { useAuth } from "./useAuth";
 
 export type PermissionMap = Record<string, boolean>; // pageId -> has_access
@@ -32,10 +33,17 @@ export function usePagePermissions(targetUserId?: string) {
       return;
     }
 
+    // Initialize ALL pages with false (no access) by default
     const map: PermissionMap = {};
+    ALL_PAGES_FLAT.forEach((page) => {
+      map[page.id] = false;
+    });
+    
+    // Override with actual permissions from database
     (data || []).forEach((row: any) => {
       map[row.page_identifier] = row.has_access;
     });
+    
     setPermissions(map);
     setLoading(false);
   }, [effectiveUserId]);
@@ -48,29 +56,20 @@ export function usePagePermissions(targetUserId?: string) {
     (pageId: string) => {
       const value = permissions[pageId];
       
-      // If explicit permission exists in database, always use it
-      // This allows denying access even to super_admins
+      // If explicit permission exists, use it
       if (value !== undefined) {
         return value;
       }
       
-      // No explicit permission set - apply role-based defaults
-      
-      // Super admins get default access when no explicit permission
+      // No permission entry - only super_admin gets default access
       if (isSuperAdmin && isCheckingOwnAccess) {
         return true;
       }
       
-      // Management roles get default access when no explicit permission set
-      const hasManagementRole = hasRole('admin') || hasRole('supervisor') || hasRole('finance');
-      if (hasManagementRole && isCheckingOwnAccess) {
-        return true;
-      }
-      
-      // Zero-Trust: Deny by default for other roles
+      // Zero-Trust: Deny by default for everyone else
       return false;
     },
-    [permissions, isSuperAdmin, isCheckingOwnAccess, hasRole]
+    [permissions, isSuperAdmin, isCheckingOwnAccess]
   );
 
   const setAccess = useCallback((pageId: string, value: boolean) => {
