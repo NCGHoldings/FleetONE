@@ -157,6 +157,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const [autoSaved, setAutoSaved] = useState(false);
   const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState(false);
   
+  // CRITICAL: Capture coordinates from LocationAutocomplete to avoid re-geocoding errors
+  // Google can return wrong locations (e.g., "Isurupura, Malabe" instead of "Isurupura, Anuradhapura")
+  const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(null); // [lng, lat]
+  const [dropCoords, setDropCoords] = useState<[number, number] | null>(null); // [lng, lat]
+  
   // Referral Agent state
   const [referralAgents, setReferralAgents] = useState<any[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
@@ -627,9 +632,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     setIntermediateStops(intermediateStops.filter(stop => stop.id !== id));
   };
 
-  const updateIntermediateStop = (id: string, location: string) => {
+  // CRITICAL: Accept coordinates from LocationAutocomplete to avoid re-geocoding errors
+  const updateIntermediateStop = (id: string, location: string, coords?: [number, number]) => {
     setIntermediateStops(intermediateStops.map(stop => 
-      stop.id === id ? { ...stop, location } : stop
+      stop.id === id 
+        ? { ...stop, location, lat: coords?.[1], lng: coords?.[0] } 
+        : stop
     ));
   };
 
@@ -1030,16 +1038,20 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         numberOfBuses: data.numberOfBuses,
       };
 
-      // OPTIMIZATION: Pass existing coordinates when editing to skip geocoding API calls
-      if (isEditing && initialData) {
-        // Pass pickup coordinates if available
-        if (initialData.pickup_lat && initialData.pickup_lng) {
-          distanceCalculationBody.pickupCoords = [initialData.pickup_lng, initialData.pickup_lat];
-        }
-        // Pass drop coordinates if available
-        if (initialData.drop_lat && initialData.drop_lng) {
-          distanceCalculationBody.dropCoords = [initialData.drop_lng, initialData.drop_lat];
-        }
+      // CRITICAL: Pass captured coordinates to skip re-geocoding API calls
+      // This prevents Google from returning wrong locations (e.g., "Isurupura, Malabe" instead of "Isurupura, Anuradhapura")
+      // Priority: 1. Freshly captured coordinates from autocomplete selection
+      //           2. Coordinates from initialData when editing
+      if (pickupCoords) {
+        distanceCalculationBody.pickupCoords = pickupCoords;
+      } else if (isEditing && initialData?.pickup_lat && initialData?.pickup_lng) {
+        distanceCalculationBody.pickupCoords = [initialData.pickup_lng, initialData.pickup_lat];
+      }
+      
+      if (dropCoords) {
+        distanceCalculationBody.dropCoords = dropCoords;
+      } else if (isEditing && initialData?.drop_lat && initialData?.drop_lng) {
+        distanceCalculationBody.dropCoords = [initialData.drop_lng, initialData.drop_lat];
       }
 
       if (useMultiParking && busDetails.length > 0) {
@@ -2017,17 +2029,23 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                      render={({ field }) => (
                        <FormItem>
                          <FormLabel>Pickup Location *</FormLabel>
-                         <FormControl>
-                           <LocationAutocomplete
-                             value={field.value || ""}
-                             onChange={field.onChange}
-                             placeholder="Enter pickup location"
-                           />
-                         </FormControl>
-                         <FormMessage />
-                       </FormItem>
-                     )}
-                   />
+                           <FormControl>
+                            <LocationAutocomplete
+                              value={field.value || ""}
+                              onChange={(value, coords) => {
+                                field.onChange(value);
+                                // CRITICAL: Capture coordinates to prevent re-geocoding errors
+                                if (coords) {
+                                  setPickupCoords(coords);
+                                }
+                              }}
+                              placeholder="Enter pickup location"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                    <FormField
                      control={form.control}
@@ -2035,17 +2053,23 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                      render={({ field }) => (
                        <FormItem>
                          <FormLabel>Drop Location *</FormLabel>
-                         <FormControl>
-                           <LocationAutocomplete
-                             value={field.value || ""}
-                             onChange={field.onChange}
-                             placeholder="Enter drop location"
-                           />
-                         </FormControl>
-                         <FormMessage />
-                       </FormItem>
-                     )}
-                   />
+                          <FormControl>
+                            <LocationAutocomplete
+                              value={field.value || ""}
+                              onChange={(value, coords) => {
+                                field.onChange(value);
+                                // CRITICAL: Capture coordinates to prevent re-geocoding errors
+                                if (coords) {
+                                  setDropCoords(coords);
+                                }
+                              }}
+                              placeholder="Enter drop location"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                  </div>
 
 
@@ -2063,7 +2087,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       <div key={stop.id} className="flex items-center gap-2">
                         <LocationAutocomplete
                           value={stop.location}
-                          onChange={(value) => updateIntermediateStop(stop.id, value)}
+                          onChange={(value, coords) => updateIntermediateStop(stop.id, value, coords)}
                           placeholder={`Stop ${index + 1} location`}
                           className="flex-1"
                         />
