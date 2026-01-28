@@ -1,127 +1,158 @@
 
-# Complete System-Wide JSON Safety Fix Plan
+# Fix for Wrong Distance Calculation (391 km instead of 9 km)
 
 ## Problem Summary
 
-The screenshot shows **"Unexpected end of JSON input"** error when editing a Special Hire quotation. This error occurs because database fields sometimes contain empty strings (`""`) instead of null/valid JSON.
+When creating a Special Hire quotation for:
+- **Pickup**: Lyceum International School, Anuradhapura
+- **Stop**: Keells - Anuradhapura  
+- **Drop**: Lyceum International School, Anuradhapura
 
-### Root Cause
-```javascript
-JSON.parse("")  // Throws "Unexpected end of JSON input"
+The system calculates **391 km** instead of the correct **9 km** shown in Google Maps.
+
+## Root Cause
+
+### Critical Finding from Edge Function Logs
+
+The user typed "Lyceum International School, 128, Isurupura New Kandy Rd, **Anuradhapura** 50000" but Google Geocoding returned:
+```
+lat: 6.9135511, lng: 79.978717
+formatted_address: "Isurupura, Malabe, Sri Lanka"
 ```
 
-Many places in the code check `typeof value === 'string'` and then call `JSON.parse()`, but empty strings pass this check and crash.
+**Malabe is near Colombo, ~170 km from Anuradhapura!** Google matched "Isurupura" (a common place name) to the wrong location.
 
----
+### Why This Happens
 
-## Vulnerable Locations Found
+1. **When user selects a location from the autocomplete dropdown**, the `LocationAutocomplete` component returns BOTH the place name AND coordinates
+2. **But the form only captures the text** and discards the coordinates
+3. **During cost calculation**, the system re-geocodes the text address using Google
+4. **Google returns the WRONG location** because it matches "Isurupura" to Malabe instead of Anuradhapura
 
-### Critical - Causing Your Current Error
+### Code Evidence
 
-| File | Line | Code Pattern | Issue |
-|------|------|--------------|-------|
-| `QuotationPreview.tsx` | 83 | `JSON.parse(quotation.bus_fleet_details)` | **No protection at all** |
-| `QuotationPreview.tsx` | 179 | `JSON.parse(parsedQuotation.intermediate_stops)` | In try-catch but redundant |
-| `QuotationPreview.tsx` | 190 | `JSON.parse(parsedQuotation.additional_charges)` | In try-catch but redundant |
-| `SpecialHireForm.tsx` | 265 | `JSON.parse(initialData.intermediate_stops)` | In try-catch but empty string check missing |
-| `SpecialHireForm.tsx` | 278 | `JSON.parse(initialData.additional_charges)` | In try-catch but empty string check missing |
-| `SpecialHireForm.tsx` | 300 | `JSON.parse(initialData.other_expenses)` | In try-catch but empty string check missing |
-| `SpecialHireForm.tsx` | 406 | `JSON.parse(savedData)` | In try-catch but localStorage might have empty string |
-| `SpecialHireForm.tsx` | 1430 | `JSON.parse(originalData.intermediate_stops \|\| '[]')` | Looks safe but `""` passes first check |
-| `SpecialHireForm.tsx` | 1438 | `JSON.parse(originalData.additional_charges \|\| '[]')` | Same issue |
-| `EnhancedCostCalculator.tsx` | 283 | `JSON.parse(quotation.additional_charges)` | In try-catch but no empty string check |
-
-### Other System-Wide Issues
-
-| File | Line | Issue |
-|------|------|-------|
-| `StaffPerformanceCharts.tsx` | 53 | `JSON.parse(trip.notes)` |
-| `useStaffPerformance.ts` | 139 | `JSON.parse(trip.notes)` |
-| `AdvancedFilterPanel.tsx` | 69 | `JSON.parse(trip.notes)` |
-| `DriverAllocation.tsx` | 136 | Local `safeParseJSON` - inconsistent |
-| `DataValidationPanel.tsx` | 69 | Local `safeParseJSON` - inconsistent |
-
----
-
-## Fix Strategy
-
-### Step 1: Import Centralized `safeParseJSON` Everywhere
-
-The `safeParseJSON` function already exists in `src/lib/utils.ts`. All files should use it instead of creating local versions or using raw `JSON.parse`.
-
-### Step 2: Fix Critical Special Hire Files
-
-**QuotationPreview.tsx** - Replace unsafe parsing:
+**Current code (broken):**
 ```typescript
-import { safeParseJSON } from '@/lib/utils';
+// SpecialHireForm.tsx line 2021-2025
+<LocationAutocomplete
+  value={field.value || ""}
+  onChange={field.onChange}  // ← Only stores text, loses coordinates!
+  placeholder="Enter pickup location"
+/>
+```
 
-// Line 80-84 - Fix bus_fleet_details parsing
-bus_fleet_details: (() => {
-  const parsed = safeParseJSON(quotation.bus_fleet_details, null);
-  if (Array.isArray(parsed)) {
-    return { buses: parsed, ... };
+The `LocationAutocomplete.onChange` signature accepts coordinates:
+```typescript
+onChange: (value: string, coordinates?: [number, number]) => void
+```
+
+But `field.onChange` from react-hook-form only stores the string!
+
+**Same issue for intermediate stops (line 2066):**
+```typescript
+onChange={(value) => updateIntermediateStop(stop.id, value)}
+// The updateIntermediateStop function ignores coordinates completely
+```
+
+---
+
+## Technical Solution
+
+### Step 1: Add Coordinate State
+
+Add new state variables to track coordinates:
+```typescript
+const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(null);
+const [dropCoords, setDropCoords] = useState<[number, number] | null>(null);
+```
+
+### Step 2: Capture Coordinates on Location Selection
+
+**For Pickup Location:**
+```typescript
+<LocationAutocomplete
+  value={field.value || ""}
+  onChange={(value, coords) => {
+    field.onChange(value);
+    if (coords) {
+      setPickupCoords(coords);
+    }
+  }}
+  placeholder="Enter pickup location"
+/>
+```
+
+**For Drop Location:**
+```typescript
+<LocationAutocomplete
+  value={field.value || ""}
+  onChange={(value, coords) => {
+    field.onChange(value);
+    if (coords) {
+      setDropCoords(coords);
+    }
+  }}
+  placeholder="Enter drop location"
+/>
+```
+
+### Step 3: Update Intermediate Stops Handler
+
+Change the `updateIntermediateStop` function to accept coordinates:
+```typescript
+const updateIntermediateStop = (id: string, location: string, coords?: [number, number]) => {
+  setIntermediateStops(intermediateStops.map(stop => 
+    stop.id === id 
+      ? { ...stop, location, lat: coords?.[1], lng: coords?.[0] } 
+      : stop
+  ));
+};
+```
+
+Update the JSX:
+```typescript
+<LocationAutocomplete
+  value={stop.location}
+  onChange={(value, coords) => updateIntermediateStop(stop.id, value, coords)}
+  placeholder={`Stop ${index + 1} location`}
+  className="flex-1"
+/>
+```
+
+### Step 4: Pass Coordinates to Distance Calculation
+
+Update the distance calculation body to include coordinates when available:
+```typescript
+let distanceCalculationBody: any = {
+  pickupLocation: data.pickupLocation,
+  dropLocation: data.dropLocation,
+  intermediateStops: validIntermediateStops,
+  numberOfBuses: data.numberOfBuses,
+};
+
+// CRITICAL: Pass coordinates to skip re-geocoding
+if (pickupCoords) {
+  distanceCalculationBody.pickupCoords = pickupCoords;
+}
+if (dropCoords) {
+  distanceCalculationBody.dropCoords = dropCoords;
+}
+```
+
+### Step 5: Load Coordinates When Editing
+
+When loading an existing quotation for editing, initialize the coordinate state:
+```typescript
+// In the initialization useEffect
+if (isEditing && initialData) {
+  if (initialData.pickup_lat && initialData.pickup_lng) {
+    setPickupCoords([initialData.pickup_lng, initialData.pickup_lat]);
   }
-  return parsed;
-})(),
-
-// Line 176-183 - Fix intermediate_stops
-intermediateStops = safeParseJSON(parsedQuotation.intermediate_stops, []);
-
-// Line 186-196 - Fix additional_charges  
-additionalCharges = safeParseJSON(parsedQuotation.additional_charges, []);
+  if (initialData.drop_lat && initialData.drop_lng) {
+    setDropCoords([initialData.drop_lng, initialData.drop_lat]);
+  }
+}
 ```
-
-**SpecialHireForm.tsx** - Replace 6 unsafe locations:
-```typescript
-import { safeParseJSON } from '@/lib/utils';
-
-// Lines 263-266 - Fix intermediate stops loading
-const stops = safeParseJSON(initialData.intermediate_stops, []);
-setIntermediateStops(stops);
-
-// Lines 276-278 - Fix additional charges loading  
-const charges = safeParseJSON(initialData.additional_charges, []);
-
-// Lines 298-300 - Fix other expenses loading
-const expenses = safeParseJSON(initialData.other_expenses, []);
-
-// Lines 404-406 - Fix localStorage loading
-const savedData = localStorage.getItem(AUTO_SAVE_KEY);
-const parsed = safeParseJSON(savedData, null);
-if (parsed && Date.now() - parsed.timestamp < 7 * 24 * 60 * 60 * 1000) { ... }
-
-// Lines 1430, 1438 - Fix hasRouteChanged function
-const originalStops = safeParseJSON(originalData.intermediate_stops, []);
-const originalCharges = safeParseJSON(originalData.additional_charges, []);
-```
-
-**EnhancedCostCalculator.tsx** - Fix line 283:
-```typescript
-import { safeParseJSON } from '@/lib/utils';
-
-// Line 281-283
-additionalCharges = safeParseJSON(quotation.additional_charges, []);
-```
-
-### Step 3: Fix Other System Files
-
-| File | Changes |
-|------|---------|
-| `AdvancedFilterPanel.tsx` | Use `safeParseJSON` for trip.notes |
-| `StaffPerformanceCharts.tsx` | Use `safeParseJSON` for trip.notes |
-| `useStaffPerformance.ts` | Use `safeParseJSON` for trip.notes |
-| `DriverAllocation.tsx` | Replace local with import |
-| `DataValidationPanel.tsx` | Replace local with import |
-
-### Step 4: Remove Redundant Local `safeParseJSON` Definitions
-
-Multiple files have their own copy of `safeParseJSON`:
-- `QuotationsList.tsx` (lines 180-184, 355-359)
-- `SpecialHireForm.tsx` (lines 323-331, 1497-1502)
-- `useSystemFlowDiagram.ts` (lines 58-62)
-- `useCrewGroupedTrips.ts` (lines 126-130)
-
-These should all import from `@/lib/utils` instead.
 
 ---
 
@@ -129,42 +160,22 @@ These should all import from `@/lib/utils` instead.
 
 | File | Changes |
 |------|---------|
-| `src/components/special-hire/QuotationPreview.tsx` | Replace 3 unsafe JSON.parse with safeParseJSON |
-| `src/components/special-hire/SpecialHireForm.tsx` | Replace 6 unsafe JSON.parse, remove 2 local definitions |
-| `src/components/special-hire/EnhancedCostCalculator.tsx` | Replace 1 unsafe JSON.parse |
-| `src/components/trips-analytics/AdvancedFilterPanel.tsx` | Replace 2 unsafe JSON.parse |
-| `src/components/staff/StaffPerformanceCharts.tsx` | Replace 1 unsafe JSON.parse |
-| `src/hooks/useStaffPerformance.ts` | Replace 1 unsafe JSON.parse |
-| `src/pages/DriverAllocation.tsx` | Replace local safeParseJSON with import |
-| `src/components/trips/DataValidationPanel.tsx` | Replace local safeParseJSON with import |
-| `src/components/special-hire/QuotationsList.tsx` | Remove duplicate local definitions |
-| `src/hooks/useCrewGroupedTrips.ts` | Remove duplicate local definition |
-| `src/hooks/useSystemFlowDiagram.ts` | Remove duplicate local definition |
+| `src/components/special-hire/SpecialHireForm.tsx` | Add coordinate state, capture coordinates on selection, pass to distance calculation |
 
 ---
 
-## Why Previous Fix Didn't Work
+## Expected Outcome
 
-The previous fix added `safeParseJSON` to some files but:
-1. Missed `QuotationPreview.tsx` line 83 - **this is likely your current error**
-2. Left redundant local copies that could have bugs
-3. Didn't fix `SpecialHireForm.tsx` lines 265, 278, 300 in the initialization useEffect
-
----
-
-## Verification After Fix
-
-1. Open Special Hire quotations list - no errors
-2. Edit a quotation with empty bus_fleet_details - no crash
-3. Edit a quotation with empty additional_charges - no crash
-4. Load QuotationPreview for any quotation - no crash
-5. Analytics and staff performance pages load without errors
+After this fix:
+1. When user selects "Lyceum International School" in Anuradhapura from autocomplete → coordinates are captured
+2. During cost calculation → system uses captured coordinates instead of re-geocoding
+3. Distance is calculated correctly as **~9 km** instead of 391 km
 
 ---
 
-## Future Prevention
+## Why This Was Missed
 
-All new code should:
-1. Import `safeParseJSON` from `@/lib/utils`
-2. Never use raw `JSON.parse` for database fields
-3. Always provide appropriate fallback (`[]` for arrays, `{}` for objects, `null` for optional)
+1. The LocationAutocomplete component was correctly designed to return coordinates
+2. But the form integration didn't capture them
+3. The issue only appears when Google geocoding returns ambiguous results
+4. "Isurupura" is a place name that exists in multiple locations in Sri Lanka
