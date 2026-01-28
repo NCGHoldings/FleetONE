@@ -1,157 +1,102 @@
 
-# Fix for Wrong Distance Calculation (391 km instead of 9 km)
+# Fix for Distance Calculation: Coordinates Not Being Passed
 
 ## Problem Summary
 
-When creating a Special Hire quotation for:
-- **Pickup**: Lyceum International School, Anuradhapura
-- **Stop**: Keells - Anuradhapura  
-- **Drop**: Lyceum International School, Anuradhapura
+The distance calculation shows **391 km instead of 9 km** because coordinates are not being captured from location selection.
 
-The system calculates **391 km** instead of the correct **9 km** shown in Google Maps.
+## Root Cause Analysis
 
-## Root Cause
-
-### Critical Finding from Edge Function Logs
-
-The user typed "Lyceum International School, 128, Isurupura New Kandy Rd, **Anuradhapura** 50000" but Google Geocoding returned:
+### Finding 1: Edge Function Logs Confirm No Coordinates Received
 ```
-lat: 6.9135511, lng: 79.978717
-formatted_address: "Isurupura, Malabe, Sri Lanka"
+pickupCoordsInput: undefined,
+dropCoordsInput: undefined,
 ```
 
-**Malabe is near Colombo, ~170 km from Anuradhapura!** Google matched "Isurupura" (a common place name) to the wrong location.
-
-### Why This Happens
-
-1. **When user selects a location from the autocomplete dropdown**, the `LocationAutocomplete` component returns BOTH the place name AND coordinates
-2. **But the form only captures the text** and discards the coordinates
-3. **During cost calculation**, the system re-geocodes the text address using Google
-4. **Google returns the WRONG location** because it matches "Isurupura" to Malabe instead of Anuradhapura
-
-### Code Evidence
-
-**Current code (broken):**
+### Finding 2: LocationAutocomplete Returns [0, 0]
+The `search-locations` edge function returns placeholder coordinates:
 ```typescript
-// SpecialHireForm.tsx line 2021-2025
-<LocationAutocomplete
-  value={field.value || ""}
-  onChange={field.onChange}  // ← Only stores text, loses coordinates!
-  placeholder="Enter pickup location"
-/>
+// search-locations/index.ts line 220
+coordinates: [0, 0], // Will be fetched when user selects
 ```
 
-The `LocationAutocomplete.onChange` signature accepts coordinates:
-```typescript
-onChange: (value: string, coordinates?: [number, number]) => void
-```
+When user clicks a suggestion, `LocationAutocomplete` passes these `[0, 0]` values to the form.
 
-But `field.onChange` from react-hook-form only stores the string!
+### Finding 3: No Place Details API Call
+The `LocationAutocomplete` component was designed to fetch real coordinates on selection using `getDetails`, but this was never implemented. The comment says "Will be fetched when user selects" but no such fetch exists.
 
-**Same issue for intermediate stops (line 2066):**
-```typescript
-onChange={(value) => updateIntermediateStop(stop.id, value)}
-// The updateIntermediateStop function ignores coordinates completely
+### The Broken Flow
+```text
+1. User types "Lyceum International School"
+2. search-locations returns suggestions with coordinates: [0, 0]
+3. User clicks suggestion → LocationAutocomplete passes [0, 0] to form
+4. Form stores pickupCoords = [0, 0] 
+5. When calculating: [0, 0] is technically truthy but invalid
+6. Edge function sees [0, 0] and should reject it → falls back to geocoding
+7. Geocoding returns wrong location (Malabe instead of Anuradhapura)
 ```
 
 ---
 
-## Technical Solution
+## Solution: Fetch Coordinates on Selection
 
-### Step 1: Add Coordinate State
+When the user selects a location from the dropdown, we need to fetch the actual coordinates using Google Place Details API.
 
-Add new state variables to track coordinates:
+### Step 1: Update LocationAutocomplete to Fetch Coordinates
+
+Modify `handleSuggestionClick` to call the `search-locations` edge function with `getDetails: true` to fetch real coordinates:
+
 ```typescript
-const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(null);
-const [dropCoords, setDropCoords] = useState<[number, number] | null>(null);
-```
-
-### Step 2: Capture Coordinates on Location Selection
-
-**For Pickup Location:**
-```typescript
-<LocationAutocomplete
-  value={field.value || ""}
-  onChange={(value, coords) => {
-    field.onChange(value);
-    if (coords) {
-      setPickupCoords(coords);
+const handleSuggestionClick = async (suggestion: LocationSuggestion) => {
+  skipNextSearchRef.current = true;
+  lastSelectedValueRef.current = suggestion.place_name;
+  
+  // If coordinates are valid (not [0,0]), use them directly
+  if (suggestion.coordinates && 
+      suggestion.coordinates[0] !== 0 && 
+      suggestion.coordinates[1] !== 0) {
+    onChange(suggestion.place_name, suggestion.coordinates);
+  } else {
+    // Fetch real coordinates from Place Details API
+    try {
+      const { data } = await supabase.functions.invoke('search-locations', {
+        body: { getDetails: true, placeId: suggestion.id }
+      });
+      
+      if (data?.coordinates && data.coordinates[0] !== 0) {
+        onChange(suggestion.place_name, data.coordinates);
+      } else {
+        // Fallback: just pass the name, edge function will geocode
+        onChange(suggestion.place_name);
+      }
+    } catch (error) {
+      console.warn('Failed to fetch coordinates:', error);
+      onChange(suggestion.place_name);
     }
-  }}
-  placeholder="Enter pickup location"
-/>
-```
-
-**For Drop Location:**
-```typescript
-<LocationAutocomplete
-  value={field.value || ""}
-  onChange={(value, coords) => {
-    field.onChange(value);
-    if (coords) {
-      setDropCoords(coords);
-    }
-  }}
-  placeholder="Enter drop location"
-/>
-```
-
-### Step 3: Update Intermediate Stops Handler
-
-Change the `updateIntermediateStop` function to accept coordinates:
-```typescript
-const updateIntermediateStop = (id: string, location: string, coords?: [number, number]) => {
-  setIntermediateStops(intermediateStops.map(stop => 
-    stop.id === id 
-      ? { ...stop, location, lat: coords?.[1], lng: coords?.[0] } 
-      : stop
-  ));
+  }
+  
+  setShowSuggestions(false);
+  setSuggestions([]);
+  setHighlightedIndex(-1);
+  
+  if (inputRef.current) {
+    inputRef.current.blur();
+  }
 };
 ```
 
-Update the JSX:
+### Step 2: Add Validation in Edge Function
+
+Update `calculate-distance` to reject invalid `[0, 0]` coordinates:
+
 ```typescript
-<LocationAutocomplete
-  value={stop.location}
-  onChange={(value, coords) => updateIntermediateStop(stop.id, value, coords)}
-  placeholder={`Stop ${index + 1} location`}
-  className="flex-1"
-/>
-```
-
-### Step 4: Pass Coordinates to Distance Calculation
-
-Update the distance calculation body to include coordinates when available:
-```typescript
-let distanceCalculationBody: any = {
-  pickupLocation: data.pickupLocation,
-  dropLocation: data.dropLocation,
-  intermediateStops: validIntermediateStops,
-  numberOfBuses: data.numberOfBuses,
-};
-
-// CRITICAL: Pass coordinates to skip re-geocoding
-if (pickupCoords) {
-  distanceCalculationBody.pickupCoords = pickupCoords;
-}
-if (dropCoords) {
-  distanceCalculationBody.dropCoords = dropCoords;
-}
-```
-
-### Step 5: Load Coordinates When Editing
-
-When loading an existing quotation for editing, initialize the coordinate state:
-```typescript
-// In the initialization useEffect
-if (isEditing && initialData) {
-  if (initialData.pickup_lat && initialData.pickup_lng) {
-    setPickupCoords([initialData.pickup_lng, initialData.pickup_lat]);
-  }
-  if (initialData.drop_lat && initialData.drop_lng) {
-    setDropCoords([initialData.drop_lng, initialData.drop_lat]);
-  }
-}
+// calculate-distance/index.ts lines 173-179
+const pickupPoint = pickupCoordsInput && 
+  pickupCoordsInput.length === 2 && 
+  pickupCoordsInput[0] !== 0 && 
+  pickupCoordsInput[1] !== 0
+    ? { lat: pickupCoordsInput[1], lng: pickupCoordsInput[0], formatted_address: pickupLocation }
+    : await geocodeLK(pickupLocation);
 ```
 
 ---
@@ -160,22 +105,50 @@ if (isEditing && initialData) {
 
 | File | Changes |
 |------|---------|
-| `src/components/special-hire/SpecialHireForm.tsx` | Add coordinate state, capture coordinates on selection, pass to distance calculation |
+| `src/components/ui/location-autocomplete.tsx` | Fetch real coordinates when user selects a location |
+| `supabase/functions/calculate-distance/index.ts` | Reject invalid [0,0] coordinates and fall back to geocoding |
 
 ---
 
-## Expected Outcome
+## API Cost Consideration
 
-After this fix:
-1. When user selects "Lyceum International School" in Anuradhapura from autocomplete → coordinates are captured
-2. During cost calculation → system uses captured coordinates instead of re-geocoding
-3. Distance is calculated correctly as **~9 km** instead of 391 km
+This solution adds one Place Details API call per location selection. Cost impact:
+- Place Details: $17 per 1000 calls
+- Estimated additional cost: ~$0.017 per location selected
+- For 500 quotations/month with 3 locations each = 1,500 calls = ~$25.50/month
+
+However, this is **necessary** for accurate distance calculation. The alternative (wrong 391 km calculations) leads to incorrect customer quotes and lost revenue.
 
 ---
 
-## Why This Was Missed
+## Alternative: Geocoding with Regional Bias
 
-1. The LocationAutocomplete component was correctly designed to return coordinates
-2. But the form integration didn't capture them
-3. The issue only appears when Google geocoding returns ambiguous results
-4. "Isurupura" is a place name that exists in multiple locations in Sri Lanka
+If Place Details cost is too high, we could enhance the geocoding in `calculate-distance` to use regional bias:
+
+```typescript
+// Add bounds for Sri Lanka to improve geocoding accuracy
+const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&components=country:LK&bounds=5.9,79.4|10.0,82.0&key=${GOOGLE_API_KEY}`;
+```
+
+This is lower cost ($5/1000 vs $17/1000) but less reliable.
+
+---
+
+## Recommended Approach
+
+Implement **Option 1** (fetch coordinates on selection) because:
+1. It guarantees correct coordinates from the exact place the user clicked
+2. It prevents all future geocoding errors
+3. Cost increase is manageable within budget
+4. Provides the best user experience
+
+---
+
+## Testing Plan
+
+1. Select "Lyceum International School, Anuradhapura" from dropdown
+2. Verify console logs show coordinates like `[80.39, 8.32]` (Anuradhapura area)
+3. Add intermediate stop "Keells - Anuradhapura"
+4. Click "Calculate Costs"
+5. Verify edge function logs show `pickupCoordsInput: [80.xx, 8.xx]` (not undefined)
+6. Verify trip distance is ~9 km (not 391 km)
