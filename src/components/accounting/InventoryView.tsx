@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Package, AlertTriangle, TrendingDown, BarChart3 } from "lucide-react";
+import { Plus, Package, AlertTriangle, TrendingDown, BarChart3, Search } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useItems, useItemStock, useItemCategories } from "@/hooks/useAccountingData";
@@ -10,6 +10,7 @@ import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ItemForm } from "./ItemForm";
 import { StockAdjustmentForm } from "./StockAdjustmentForm";
 import { ItemCategoryForm } from "./ItemCategoryForm";
+import { Input } from "@/components/ui/input";
 
 export const InventoryView = () => {
   const { data: items, isLoading } = useItems();
@@ -18,6 +19,30 @@ export const InventoryView = () => {
   const [showItemForm, setShowItemForm] = useState(false);
   const [showAdjustmentForm, setShowAdjustmentForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Multi-field search filter for items
+  const filteredItems = useMemo(() => {
+    if (!items || !searchQuery.trim()) return items || [];
+    const query = searchQuery.toLowerCase();
+    return items.filter((item) =>
+      item.item_code?.toLowerCase().includes(query) ||
+      item.item_name?.toLowerCase().includes(query) ||
+      item.description?.toLowerCase().includes(query) ||
+      item.item_categories?.category_name?.toLowerCase().includes(query)
+    );
+  }, [items, searchQuery]);
+
+  // Multi-field search filter for stock
+  const filteredStock = useMemo(() => {
+    if (!stock || !searchQuery.trim()) return stock || [];
+    const query = searchQuery.toLowerCase();
+    return stock.filter((s) =>
+      s.items?.item_code?.toLowerCase().includes(query) ||
+      s.items?.item_name?.toLowerCase().includes(query) ||
+      s.warehouse_id?.toLowerCase().includes(query)
+    );
+  }, [stock, searchQuery]);
 
   const getStockStatus = (quantity: number, reorderLevel: number) => {
     if (quantity <= 0) return { label: "Out of Stock", variant: "destructive" as const };
@@ -210,6 +235,17 @@ export const InventoryView = () => {
 
       {/* Main Content */}
       <Card className="p-6">
+        {/* Search Input */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by code, name, category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 max-w-md"
+          />
+        </div>
+
         <Tabs defaultValue="items" className="space-y-4">
           <TabsList>
             <TabsTrigger value="items">Item Master</TabsTrigger>
@@ -221,16 +257,14 @@ export const InventoryView = () => {
           <TabsContent value="items" className="mt-4">
             <DataTable
               columns={itemColumns}
-              data={items || []}
-              searchKey="item_name"
+              data={filteredItems}
             />
           </TabsContent>
 
           <TabsContent value="stock" className="mt-4">
             <DataTable
               columns={stockColumns}
-              data={stock || []}
-              searchKey="location"
+              data={filteredStock}
             />
           </TabsContent>
 
