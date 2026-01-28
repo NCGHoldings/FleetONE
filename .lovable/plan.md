@@ -1,121 +1,148 @@
 
-# Fix: AccountForm for 5-Level COA Structure
+# Fix: Searchable Dropdowns and Enhanced Search Across Accounting Module
 
-## Issues Found
+## Problem Summary
 
-### 1. Parent Account Dropdown Nearly Empty
-The current form only shows header accounts (`is_header = true`) as parent options, but only 2 accounts in the entire COA have this flag set. Most accounts should be potential parents.
+The current accounting module has several search and dropdown usability issues:
 
-**Solution:** Modify the parent account query to show ALL accounts (not just headers) so users can select any account as a parent.
+1. **AccountSelector** - No search capability within the dropdown. Users must scroll through potentially hundreds of accounts to find the one they need.
 
-### 2. Missing Level Fields for Tree Display
-The COA upload populates these critical fields:
-- `level1` through `level5` - Hierarchical category names
-- `account_level` - Which level (1-5) the account is at
-- `gl_code` - The GL code
+2. **DataTable search** - The `searchKey` prop only filters by a single column accessor. This is limiting for users who want to search across multiple fields.
 
-The AccountForm doesn't populate any of these, so new accounts won't appear correctly in the tree view.
-
-**Solution:** Add logic to automatically derive these fields based on:
-- The selected parent account (inherit its level structure)
-- Set appropriate account_level and determine if it's a header
-
-### 3. Controlled/Uncontrolled Warning
-The parent account Select has `value={field.value || ""}` which causes React warnings.
-
-**Solution:** Always use consistent value handling with the "_none" placeholder.
+3. **Various views** have inconsistent search implementations - some work, some don't, some have search but it's column-specific.
 
 ---
 
-## Implementation
+## Solution Overview
 
-### File: `src/components/accounting/AccountForm.tsx`
+Create a **Searchable Combobox pattern** for all account/entity selectors and enhance search across all major accounting views. This involves:
 
-**Changes:**
-
-1. **Update parent account query** - Fetch ALL accounts (remove `is_header = true` filter) and include level information
-
-2. **Add level derivation logic** - When saving:
-   - If parent selected: inherit parent's level1-level4, put account name in next level
-   - If no parent: this is a top-level account, put name in level1
-   - Set `account_level` based on which level is populated
-   - Determine `is_header` automatically (accounts with children or explicitly marked)
-
-3. **Fix Select controlled/uncontrolled issue** - Use `value={field.value ?? "_none"}` consistently
-
-4. **Update mutation data** - Include all level fields in the insert
+1. **New Component**: `SearchableAccountSelector` - A combobox with built-in search using the Command component (cmdk)
+2. **Update existing views** to use consistent global search across multiple fields
+3. **Ensure all dropdowns are searchable** with type-to-filter capability
 
 ---
 
-## Technical Details
+## Implementation Details
 
-### Level Derivation Logic
+### 1. New Searchable Account Selector Component
 
-When a parent is selected:
-```typescript
-// Example: Parent account has level1="ASSETS", level2="CURRENT ASSETS", level3="CASH"
-// New account "Petty Cash" will get:
-{
-  level1: "ASSETS",      // Inherited from parent
-  level2: "CURRENT ASSETS", // Inherited from parent
-  level3: "CASH",        // Inherited from parent
-  level4: "Petty Cash",  // New account name goes in next available level
-  level5: null,
-  account_level: 4,
-  is_header: false       // Leaf accounts are not headers by default
-}
+**File:** `src/components/accounting/shared/SearchableAccountSelector.tsx`
+
+Create a new searchable combobox component that:
+- Uses the Command (cmdk) component for fuzzy search
+- Displays account code + account name
+- Supports filtering by account type
+- Has keyboard navigation
+- Shows a search input at the top of the dropdown
+
+```text
++----------------------------------+
+|  Select account...          [v] |
++----------------------------------+
+     | [Search accounts...]        |
+     +-----------------------------+
+     | 1101 - Cash in Hand         |
+     | 1102 - Bank - BOC           |
+     | 1103 - Bank - HNB           |
+     | 1200 - Accounts Receivable  |
+     +-----------------------------+
 ```
 
-### Updated Parent Query
-```typescript
-// Fetch ALL accounts with level info for parent selection
-const { data: parentAccounts } = useQuery({
-  queryKey: ["chart-of-accounts-all", selectedCompanyId],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("chart_of_accounts")
-      .select("id, account_code, account_name, level1, level2, level3, level4, level5, account_level")
-      .eq("company_id", selectedCompanyId)
-      .order("account_code");
-    
-    if (error) throw error;
-    return data;
-  },
-  enabled: !!selectedCompanyId,
-});
-```
+### 2. Update AccountSelector Component
 
-### Updated Insert Data
-```typescript
-const insertData = {
-  account_code: data.account_code,
-  account_name: data.account_name,
-  account_type: data.account_type,
-  parent_account_id: parentId,
-  is_header: data.is_header,
-  description: data.description,
-  is_active: true,
-  current_balance: 0,
-  company_id: companyId,
-  // New level fields:
-  level1: derivedLevels.level1,
-  level2: derivedLevels.level2,
-  level3: derivedLevels.level3,
-  level4: derivedLevels.level4,
-  level5: derivedLevels.level5,
-  account_level: derivedLevels.accountLevel,
-  gl_code: data.account_code,
-};
-```
+**File:** `src/components/accounting/shared/AccountSelector.tsx`
+
+Replace the simple Select with a Popover + Command combination that allows:
+- Type-ahead search filtering
+- Search by account code OR account name
+- Keyboard navigation (arrows, enter to select)
+- Clear selection option
+
+### 3. Enhance DataTable Views with Global Search
+
+Update the following views to implement proper multi-field search:
+
+| View | Current State | Fix |
+|------|---------------|-----|
+| `ChartOfAccountsView.tsx` | Has search but only for tree view | Add search for table view too |
+| `AccountsPayableView.tsx` | `searchKey="invoice_number"` | Add global search across vendor, invoice#, status |
+| `AccountsReceivableView.tsx` | `searchKey="invoice_number"` | Add global search across customer, invoice#, status |
+| `InventoryView.tsx` | `searchKey="item_name"` | Add global search across code, name, category |
+| `VendorMasterView.tsx` | Has manual filtering | Already working, verify consistency |
+| `CustomerMasterView.tsx` | Has manual filtering | Already working, verify consistency |
+
+### 4. Specific File Changes
 
 ---
 
-## Files to Modify
+#### `src/components/accounting/shared/SearchableAccountSelector.tsx` (NEW)
 
-| File | Changes |
-|------|---------|
-| `src/components/accounting/AccountForm.tsx` | Update parent query, add level derivation, fix Select value |
-| `src/hooks/useCompanyMutations.ts` | Add level fields to insert statement |
+Create a reusable searchable dropdown for account selection using Popover + Command:
+
+- Props: `value`, `onValueChange`, `placeholder`, `accountTypes`, `disabled`
+- Features: Built-in search, account code display, loading state
+- Uses existing `useChartOfAccounts` hook
+
+---
+
+#### `src/components/accounting/AccountsPayableView.tsx`
+
+Add multi-field search:
+
+```typescript
+const [searchQuery, setSearchQuery] = useState("");
+
+// Add useMemo for filtered data
+const filteredInvoices = useMemo(() => {
+  if (!invoices || !searchQuery.trim()) return invoices || [];
+  const query = searchQuery.toLowerCase();
+  return invoices.filter((inv) =>
+    inv.invoice_number?.toLowerCase().includes(query) ||
+    inv.vendors?.vendor_name?.toLowerCase().includes(query) ||
+    inv.vendors?.vendor_code?.toLowerCase().includes(query) ||
+    inv.status?.toLowerCase().includes(query)
+  );
+}, [invoices, searchQuery]);
+```
+
+Add search input above DataTable and pass filtered data.
+
+---
+
+#### `src/components/accounting/AccountsReceivableView.tsx`
+
+Add multi-field search (same pattern as AP):
+
+- Search across invoice_number, customer_name, customer_code, status
+- Add Input with Search icon above DataTable
+
+---
+
+#### `src/components/accounting/InventoryView.tsx`
+
+Add multi-field search:
+
+- Search across item_code, item_name, category_name, description
+- Apply to both items and stock tabs
+
+---
+
+#### `src/components/accounting/ChartOfAccountsView.tsx`
+
+The search already exists and works for tree view. Ensure it also filters the table view by passing filtered accounts to DataTable.
+
+---
+
+## Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/accounting/shared/SearchableAccountSelector.tsx` | Create | New searchable combobox component |
+| `src/components/accounting/AccountsPayableView.tsx` | Modify | Add global search across multiple fields |
+| `src/components/accounting/AccountsReceivableView.tsx` | Modify | Add global search across multiple fields |
+| `src/components/accounting/InventoryView.tsx` | Modify | Add global search for items and stock |
+| `src/components/accounting/ChartOfAccountsView.tsx` | Modify | Ensure search works for table view too |
 
 ---
 
@@ -123,11 +150,29 @@ const insertData = {
 
 After implementation:
 
-1. Open Chart of Accounts
-2. Click "Add Account"
-3. Verify parent dropdown shows all accounts (not just headers)
-4. Select a parent account (e.g., under CASH category)
-5. Fill in account code, name, type
-6. Click "Create Account"
-7. Verify the new account appears in the correct position in the tree view
-8. Verify the account has proper level1-level5 values in the database
+1. **Searchable Account Selector**
+   - Open any form with account selection (e.g., Journal Entry Form)
+   - Click the account dropdown
+   - Start typing - verify accounts filter as you type
+   - Verify you can search by code (e.g., "1101") or name (e.g., "Cash")
+   - Select an account and verify it's properly set
+
+2. **Accounts Payable Search**
+   - Navigate to Accounts Payable
+   - Type in the search box
+   - Verify filtering works across invoice #, vendor name, and status
+   - Clear search and verify all invoices return
+
+3. **Accounts Receivable Search**
+   - Navigate to Accounts Receivable
+   - Test search across invoice #, customer name, and status
+
+4. **Inventory Search**
+   - Navigate to Inventory
+   - Test search on Items tab (by code, name, category)
+   - Test search on Stock tab
+
+5. **Chart of Accounts Search**
+   - Navigate to Chart of Accounts
+   - Switch between Tree and Table views
+   - Verify search works in both views
