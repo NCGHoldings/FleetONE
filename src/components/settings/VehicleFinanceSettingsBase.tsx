@@ -9,11 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, Save, DollarSign, Building2, CreditCard, Calculator } from 'lucide-react';
+import { SearchableFinanceAccountSelector } from './SearchableFinanceAccountSelector';
 import { 
   VehicleModule, 
   VehicleFinanceSettings,
@@ -166,24 +166,14 @@ export function VehicleFinanceSettingsBase({
           {label}
           {required && <span className="text-destructive">*</span>}
         </Label>
-        <Select
-          value={settings[field] as string || '_none'}
-          onValueChange={(value) => setSettings({ ...settings, [field]: value === '_none' ? null : value })}
-        >
-          <SelectTrigger className={required && !hasValue ? 'border-destructive' : ''}>
-            <SelectValue placeholder={placeholder} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_none">-- Not Configured --</SelectItem>
-            {getAccountsByType(accountTypes)
-              .filter(account => account.id && account.id.trim() !== '')
-              .map((account) => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.account_code} - {account.account_name}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
+        <SearchableFinanceAccountSelector
+          value={settings[field] as string | null}
+          onValueChange={(value) => setSettings({ ...settings, [field]: value })}
+          accounts={getAccountsByType(accountTypes)}
+          placeholder={placeholder}
+          required={required}
+          hasError={required && !hasValue}
+        />
         {required && !hasValue && (
           <p className="text-xs text-destructive">This field is required</p>
         )}

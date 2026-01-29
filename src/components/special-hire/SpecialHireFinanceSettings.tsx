@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -25,6 +24,7 @@ import {
 } from "lucide-react";
 import { useSpecialHireFinanceSettings, useUpdateSpecialHireFinanceSettings } from "@/hooks/useSpecialHireFinance";
 import { useChartOfAccounts } from "@/hooks/useAccountingData";
+import { SearchableFinanceAccountSelector } from "@/components/settings/SearchableFinanceAccountSelector";
 
 interface SettingsState {
   // Revenue
@@ -166,23 +166,14 @@ export function SpecialHireFinanceSettings() {
             {/* Revenue - Internal */}
             <div className="space-y-2">
               <Label>Special Hire Revenue - Internal (Credit on Invoice)</Label>
-              <Select
-                value={settings.revenue_internal_account_id}
+              <SearchableFinanceAccountSelector
+                value={settings.revenue_internal_account_id || null}
                 onValueChange={(value) =>
-                  setSettings({ ...settings, revenue_internal_account_id: value })
+                  setSettings({ ...settings, revenue_internal_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select internal revenue account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {revenueAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={revenueAccounts}
+                placeholder="Select internal revenue account"
+              />
               <p className="text-xs text-muted-foreground">
                 Used for internal/inter-company special hire bookings
               </p>
@@ -191,23 +182,14 @@ export function SpecialHireFinanceSettings() {
             {/* Revenue - External */}
             <div className="space-y-2">
               <Label>Special Hire Revenue - External (Credit on Invoice)</Label>
-              <Select
-                value={settings.revenue_external_account_id}
+              <SearchableFinanceAccountSelector
+                value={settings.revenue_external_account_id || null}
                 onValueChange={(value) =>
-                  setSettings({ ...settings, revenue_external_account_id: value })
+                  setSettings({ ...settings, revenue_external_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select external revenue account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {revenueAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={revenueAccounts}
+                placeholder="Select external revenue account"
+              />
               <p className="text-xs text-muted-foreground">
                 Used for external customer special hire bookings
               </p>
@@ -216,31 +198,14 @@ export function SpecialHireFinanceSettings() {
             {/* Trade Receivable */}
             <div className="space-y-2">
               <Label>Trade Receivable Account (Debit on Invoice)</Label>
-              <Select
-                value={settings.trade_receivable_account_id}
+              <SearchableFinanceAccountSelector
+                value={settings.trade_receivable_account_id || null}
                 onValueChange={(value) =>
-                  setSettings({ ...settings, trade_receivable_account_id: value })
+                  setSettings({ ...settings, trade_receivable_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select receivable account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {receivableAccounts.length > 0 ? (
-                    receivableAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.account_code} - {account.account_name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    assetAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.account_code} - {account.account_name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                accounts={receivableAccounts.length > 0 ? receivableAccounts : assetAccounts}
+                placeholder="Select receivable account"
+              />
               <p className="text-xs text-muted-foreground">
                 Debited when invoice is generated, credited when payment received
               </p>
@@ -249,31 +214,14 @@ export function SpecialHireFinanceSettings() {
             {/* Customer Advance (Liability) */}
             <div className="space-y-2">
               <Label>Customer Advance Receipt Account (Credit on Advance)</Label>
-              <Select
-                value={settings.customer_advance_account_id}
+              <SearchableFinanceAccountSelector
+                value={settings.customer_advance_account_id || null}
                 onValueChange={(value) =>
-                  setSettings({ ...settings, customer_advance_account_id: value })
+                  setSettings({ ...settings, customer_advance_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select advance receipt account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {advanceAccounts.length > 0 ? (
-                    advanceAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.account_code} - {account.account_name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    liabilityAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.account_code} - {account.account_name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                accounts={advanceAccounts.length > 0 ? advanceAccounts : liabilityAccounts}
+                placeholder="Select advance receipt account"
+              />
               <p className="text-xs text-muted-foreground">
                 <strong>Liability account</strong> - Credited when advance received, debited when applied to invoice
               </p>
@@ -296,31 +244,14 @@ export function SpecialHireFinanceSettings() {
         <CardContent>
           <div className="max-w-md space-y-2">
             <Label>Default Bank/Cash Account (Debit on Payment Received)</Label>
-            <Select
-              value={settings.default_bank_account_id}
+            <SearchableFinanceAccountSelector
+              value={settings.default_bank_account_id || null}
               onValueChange={(value) =>
-                setSettings({ ...settings, default_bank_account_id: value })
+                setSettings({ ...settings, default_bank_account_id: value || "" })
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select bank/cash account" />
-              </SelectTrigger>
-              <SelectContent>
-                {bankCashAccounts.length > 0 ? (
-                  bankCashAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  assetAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+              accounts={bankCashAccounts.length > 0 ? bankCashAccounts : assetAccounts}
+              placeholder="Select bank/cash account"
+            />
             <p className="text-xs text-muted-foreground">
               This account is debited when advance or balance payments are received
             </p>
@@ -344,23 +275,14 @@ export function SpecialHireFinanceSettings() {
             {/* Discount Expense */}
             <div className="space-y-2">
               <Label>Discount Expense Account</Label>
-              <Select
-                value={settings.discount_expense_account_id}
+              <SearchableFinanceAccountSelector
+                value={settings.discount_expense_account_id || null}
                 onValueChange={(value) =>
-                  setSettings({ ...settings, discount_expense_account_id: value })
+                  setSettings({ ...settings, discount_expense_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select discount account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={expenseAccounts}
+                placeholder="Select discount account"
+              />
               <p className="text-xs text-muted-foreground">
                 Debited when discounts are given
               </p>
@@ -369,23 +291,14 @@ export function SpecialHireFinanceSettings() {
             {/* Commission Expense */}
             <div className="space-y-2">
               <Label>Commission Expense Account</Label>
-              <Select
-                value={settings.commission_expense_account_id}
+              <SearchableFinanceAccountSelector
+                value={settings.commission_expense_account_id || null}
                 onValueChange={(value) =>
-                  setSettings({ ...settings, commission_expense_account_id: value })
+                  setSettings({ ...settings, commission_expense_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select commission account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={expenseAccounts}
+                placeholder="Select commission account"
+              />
               <p className="text-xs text-muted-foreground">
                 Debited when referral commissions are paid
               </p>
@@ -394,23 +307,14 @@ export function SpecialHireFinanceSettings() {
             {/* Refund Expense */}
             <div className="space-y-2">
               <Label>Refund Expense Account</Label>
-              <Select
-                value={settings.refund_expense_account_id}
+              <SearchableFinanceAccountSelector
+                value={settings.refund_expense_account_id || null}
                 onValueChange={(value) =>
-                  setSettings({ ...settings, refund_expense_account_id: value })
+                  setSettings({ ...settings, refund_expense_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select refund account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={expenseAccounts}
+                placeholder="Select refund account"
+              />
               <p className="text-xs text-muted-foreground">
                 Used for tracking refund expenses
               </p>
@@ -435,23 +339,14 @@ export function SpecialHireFinanceSettings() {
             {/* VAT Output */}
             <div className="space-y-2">
               <Label>VAT Output Account</Label>
-              <Select
-                value={settings.vat_output_account_id}
+              <SearchableFinanceAccountSelector
+                value={settings.vat_output_account_id || null}
                 onValueChange={(value) =>
-                  setSettings({ ...settings, vat_output_account_id: value })
+                  setSettings({ ...settings, vat_output_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select VAT output account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {liabilityAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={liabilityAccounts}
+                placeholder="Select VAT output account"
+              />
               <p className="text-xs text-muted-foreground">
                 Credited when VAT is charged on invoices
               </p>
@@ -460,23 +355,14 @@ export function SpecialHireFinanceSettings() {
             {/* WHT Payable */}
             <div className="space-y-2">
               <Label>WHT Payable Account</Label>
-              <Select
-                value={settings.wht_payable_account_id}
+              <SearchableFinanceAccountSelector
+                value={settings.wht_payable_account_id || null}
                 onValueChange={(value) =>
-                  setSettings({ ...settings, wht_payable_account_id: value })
+                  setSettings({ ...settings, wht_payable_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select WHT payable account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {liabilityAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={liabilityAccounts}
+                placeholder="Select WHT payable account"
+              />
               <p className="text-xs text-muted-foreground">
                 Used when withholding tax is applicable
               </p>
