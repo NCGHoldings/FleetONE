@@ -1,332 +1,716 @@
 
+# School Bus & Yutong Finance Integration - Complete Flow Diagrams
 
-# School Bus Finance Integration - Complete System Audit & Fix
-
-## Executive Summary
-
-The School Bus finance integration has several issues that need fixing:
-
-1. **AR Invoice Sync Issue**: When payments are made, `school_ar_invoices` is updated correctly, but `ar_invoices` (Finance module) is NOT updated when `ar_invoice_id` is NULL on old records
-2. **GL Posting Working**: Payment GL entries ARE being created correctly (SBS-PAY entries visible)
-3. **Expense GL Not Active**: Expense GL posting is implemented but `auto_post_expenses` is disabled and expense accounts are not configured
-4. **Missing Trigger Coverage**: The `sync_school_ar_to_finance_trigger` only fires on UPDATE - if `ar_invoice_id` was NULL when the school invoice was created, payments never sync to Finance AR
+## Document Purpose
+This document provides detailed operation-to-finance flow diagrams for verification by the Finance Team. It covers the complete lifecycle of transactions from operational events to General Ledger postings.
 
 ---
 
-## Current System Flow Analysis
+## SCHOOL BUS MODULE - Complete Finance Flow
 
-### Revenue Flow (AR Invoices & Payments)
-
-| Step | Current Status | Issue |
-|------|---------------|-------|
-| 1. Create AR Invoice Batch | Working | GL Entry created (DR Receivable / CR Revenue) |
-| 2. Link to Finance AR | Partial | Some old batches have `ar_invoice_id: NULL` |
-| 3. Record Payment | Working | Payment saved to `school_payment_transactions` |
-| 4. GL Payment Entry | Working | SBS-PAY journal entries posted (DR Bank / CR Receivable) |
-| 5. FIFO Settlement | Working | `apply_payment_to_invoices()` updates `school_ar_invoices` |
-| 6. Sync to Finance AR | **BROKEN** | Trigger fires, but if `ar_invoice_id IS NULL`, nothing happens |
-
-### Expense Flow
-
-| Step | Current Status | Issue |
-|------|---------------|-------|
-| 1. Record Route Expense | Working | Saved to `route_expenses` table |
-| 2. GL Expense Entry | **Not Active** | `auto_post_expenses: false` in all settings |
-| 3. Expense Account Mapping | **Not Configured** | All expense account IDs are NULL |
-
----
-
-## Database Evidence
-
-### Problem 1: School Invoices Without Finance AR Link
+### Overview Architecture
 ```text
-ID: 3ae8cc11-ef4c-45ee-bb56-dfa9465ba7de
-Student: A.A.Lihen Aradhya Amarathunga
-Paid Amount: 10,200 LKR
-ar_invoice_id: NULL  ← Payment can't sync to Finance AR
-```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                        SCHOOL BUS FINANCE ARCHITECTURE                           │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  Business Unit Code: SBO                                                         │
+│  Parent Company: NCG Holding (Consolidated GL)                                   │
+│  Finance Settings: school_bus_finance_settings                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
-### Problem 2: Expense Settings Not Configured
-```text
-auto_post_expenses: false
-fuel_expense_account_id: NULL
-maintenance_expense_account_id: NULL
-salary_expense_account_id: NULL
-expense_cash_account_id: NULL
-```
-
-### Working Evidence
-```text
-Journal Entries with SBO:
-- SBS-JE-20260129-C6A0: School Bus AR - 5,900 LKR
-- SBS-PAY-20260123-XCHS: School Bus Payment - 7,275 LKR
-- 15+ GL entries correctly tagged with business_unit_code: 'SBO'
-```
-
----
-
-## Root Cause Analysis
-
-### Issue 1: AR Invoice Not Updating
-The `sync_school_ar_to_finance_ar` trigger function checks:
-```sql
-IF v_ar_invoice_id IS NULL THEN
-  RETURN NEW;  -- Exits early, does nothing
-END IF;
-```
-
-**Cause**: Some `school_ar_invoices` were created before the AR Invoice creation was added, so they have `ar_invoice_id: NULL`.
-
-### Issue 2: Expense GL Not Posting
-The `usePostExpenseToGL` hook correctly checks:
-```typescript
-if (!effectiveSettings?.auto_post_expenses) {
-  return null; // Skip GL posting
-}
-```
-
-**Cause**: `auto_post_expenses` is `false` and expense accounts are not configured.
-
----
-
-## Solution Plan
-
-### Fix 1: Backfill Missing AR Invoice Links (Code Change)
-Add a function to retroactively create Finance AR Invoices for school invoices that are missing the link.
-
-**File: `src/hooks/useSchoolBusFinance.ts`**
-
-Add new function `useBackfillARInvoiceLinks`:
-- Query `school_ar_invoices` where `ar_invoice_id IS NULL`
-- For each, create corresponding `ar_invoices` record
-- Update `school_ar_invoices.ar_invoice_id` with the new ID
-- This allows the sync trigger to work for future payments
-
-### Fix 2: Enhanced Payment Recording (Code Change)
-Update `RecordPaymentModal.tsx` to handle cases where `ar_invoice_id` is NULL:
-
-**File: `src/components/school/RecordPaymentModal.tsx`**
-
-After payment is recorded and FIFO settlement done:
-1. Check if any `school_ar_invoices` updated by FIFO have `ar_invoice_id IS NULL`
-2. If so, manually update the corresponding `ar_invoices` record OR create one
-3. This ensures real-time sync even for legacy data
-
-### Fix 3: Expense GL Integration (UI + Code)
-Enable and configure expense posting:
-
-**File: `src/components/school/SchoolBusFinanceSettings.tsx`**
-- Add validation to ensure expense accounts are configured before enabling auto-post
-- Show warning badge when expense posting is enabled but accounts are not configured
-
-**File: `src/hooks/useSchoolBusExpense.ts`**
-- Already implemented correctly - just needs configuration
-
-### Fix 4: Add AR Sync Verification Button (UI)
-Add a "Verify Finance Sync" button in School Bus module to:
-- Check for orphaned school invoices (no AR link)
-- Report sync status
-- Trigger backfill if needed
-
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/hooks/useSchoolBusFinance.ts` | Add `useBackfillARInvoiceLinks` function, add `useSyncPaymentToFinanceAR` helper |
-| `src/components/school/RecordPaymentModal.tsx` | After FIFO payment, manually update Finance AR if `ar_invoice_id` was NULL |
-| `src/components/school/SchoolBusFinanceSettings.tsx` | Add validation for expense accounts, add "Verify Sync" button |
-| `src/pages/SchoolBus.tsx` (or relevant view) | Add sync verification/repair UI |
-
----
-
-## Implementation Details
-
-### 1. Add AR Invoice Backfill Function
-
-```typescript
-// In useSchoolBusFinance.ts
-export function useBackfillARInvoiceLinks() {
-  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
-  
-  return useMutation({
-    mutationFn: async () => {
-      // 1. Find school_ar_invoices without ar_invoice_id
-      const { data: orphaned } = await supabase
-        .from("school_ar_invoices")
-        .select("*, student:school_students(student_name)")
-        .is("ar_invoice_id", null)
-        .eq("status", "posted");
-      
-      if (!orphaned?.length) return { fixed: 0 };
-      
-      let fixedCount = 0;
-      for (const inv of orphaned) {
-        // 2. Create Finance AR Invoice
-        const { data: arInv } = await supabase
-          .from("ar_invoices")
-          .insert({
-            company_id: getEffectiveCompanyId(),
-            business_unit_code: getBusinessUnitCode() || 'SBO',
-            invoice_number: inv.invoice_number,
-            total_amount: inv.amount,
-            balance: inv.amount - (inv.paid_amount || 0),
-            paid_amount: inv.paid_amount || 0,
-            status: inv.status === 'paid' ? 'paid' : inv.paid_amount > 0 ? 'partial' : 'unpaid',
-            // ... other fields
-          })
-          .select()
-          .single();
-        
-        if (arInv) {
-          // 3. Link back to school invoice
-          await supabase
-            .from("school_ar_invoices")
-            .update({ ar_invoice_id: arInv.id })
-            .eq("id", inv.id);
-          fixedCount++;
-        }
-      }
-      return { fixed: fixedCount };
-    }
-  });
-}
-```
-
-### 2. Update Payment Recording to Handle Legacy Data
-
-```typescript
-// In RecordPaymentModal.tsx - after FIFO settlement
-// Check if any updated invoices need AR sync
-const { data: updatedInvoices } = await supabase
-  .from("school_ar_invoices")
-  .select("id, ar_invoice_id, paid_amount, amount, status")
-  .eq("student_id", student.id)
-  .is("ar_invoice_id", null)
-  .in("status", ["paid", "partial"]);
-
-// If there are orphaned invoices with payments, create AR invoices for them
-if (updatedInvoices?.length) {
-  // Call backfill for these specific invoices
-  for (const inv of updatedInvoices) {
-    // Create or update Finance AR Invoice...
-  }
-}
-```
-
-### 3. Expense Settings Validation
-
-```typescript
-// In SchoolBusFinanceSettings.tsx
-const validateExpenseSettings = () => {
-  if (defaultSettings.auto_post_expenses) {
-    const missing = [];
-    if (!defaultSettings.expense_account_id) missing.push('General Expense');
-    if (!defaultSettings.expense_cash_account_id) missing.push('Cash/Bank for Expenses');
-    
-    if (missing.length > 0) {
-      toast.error(`Configure these accounts first: ${missing.join(', ')}`);
-      return false;
-    }
-  }
-  return true;
-};
+REQUIRED GL ACCOUNTS:
+┌────────────────────────────┬────────────────────┬───────────────────────────────┐
+│ Account Type               │ Purpose            │ Account Category              │
+├────────────────────────────┼────────────────────┼───────────────────────────────┤
+│ Trade Receivable Account   │ Student AR balance │ Asset                         │
+│ SBS Collection Account     │ Fee Revenue        │ Revenue                       │
+│ Bank/Cash Account          │ Payment receipt    │ Asset                         │
+│ Fuel Expense Account       │ Fuel costs         │ Expense                       │
+│ Maintenance Expense Account│ Repairs            │ Expense                       │
+│ Salary Expense Account     │ Driver wages       │ Expense                       │
+│ Expense Cash Account       │ Cash for expenses  │ Asset                         │
+└────────────────────────────┴────────────────────┴───────────────────────────────┘
 ```
 
 ---
 
-## Complete Finance Flow After Fix
+### FLOW 1: AR Invoice Generation (Revenue Recognition)
 
 ```text
-REVENUE FLOW:
-┌─────────────────────────┐
-│ 1. Generate AR Batch    │
-│    - Creates school_ar_invoices
-│    - Creates ar_invoices (Finance)
-│    - Creates GL Entry (DR Receivable / CR Revenue)
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐
-│ 2. Record Payment       │
-│    - Creates school_payment_transactions
-│    - Creates GL Entry (DR Bank / CR Receivable)
-│    - FIFO applies to school_ar_invoices
-│    - Trigger syncs to ar_invoices
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐
-│ 3. Verification         │
-│    - All ar_invoices show correct balance
-│    - COA balances updated
-│    - Business unit tagged as SBO
-└─────────────────────────┘
-
-EXPENSE FLOW:
-┌─────────────────────────┐
-│ 1. Add Route Expense    │
-│    - Creates route_expenses record
-│    - If auto_post_expenses = true:
-│      → Creates GL Entry (DR Expense / CR Cash)
-│      → Updates COA balances
-└─────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      STEP 1: GENERATE AR INVOICE BATCH                           │
+│                      Trigger: User clicks "Generate AR Invoices"                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  FOR EACH STUDENT (Processed in parallel chunks of 50):                         │
+│                                                                                  │
+│  1. Create school_ar_invoice_batches                                            │
+│     └─ batch_number: SBS-BATCH-YYYYMMDD-NNNN                                    │
+│     └─ status: "pending" → "posted"                                             │
+│                                                                                  │
+│  2. Get/Create Finance Customer                                                 │
+│     └─ customers table                                                          │
+│     └─ customer_code: SBS-{BRANCH_CODE}                                         │
+│     └─ business_unit_code: SBO                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  3. CREATE JOURNAL ENTRY (Per Student)                                          │
+│     └─ entry_number: SBS-JE-YYYYMMDD-{STUDENT_SHORT_ID}                         │
+│     └─ business_unit_code: SBO                                                  │
+│     └─ company_id: NCG Holding (Consolidated GL)                                │
+│     └─ status: "posted"                                                         │
+│                                                                                  │
+│  JOURNAL ENTRY LINES:                                                           │
+│  ┌────────────────────────────────────────┬───────────┬───────────┐            │
+│  │ Account                                │ Debit     │ Credit    │            │
+│  ├────────────────────────────────────────┼───────────┼───────────┤            │
+│  │ Trade Receivable (Asset)               │ AMOUNT    │           │            │
+│  │ SBS Collection Revenue (Revenue)       │           │ AMOUNT    │            │
+│  └────────────────────────────────────────┴───────────┴───────────┘            │
+│                                                                                  │
+│  4. UPDATE COA BALANCES                                                         │
+│     └─ Trade Receivable: +AMOUNT (Debit normal)                                 │
+│     └─ SBS Collection: +AMOUNT (Credit normal)                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  5. CREATE FINANCE AR INVOICE (ar_invoices table)                               │
+│     └─ invoice_number: SBS-INV-YYYYMM-NNNNN                                     │
+│     └─ customer_id: {Finance Customer ID}                                       │
+│     └─ business_unit_code: SBO                                                  │
+│     └─ total_amount: student.current_amount_due                                 │
+│     └─ balance: student.current_amount_due                                      │
+│     └─ paid_amount: 0                                                           │
+│     └─ status: "unpaid"                                                         │
+│     └─ journal_entry_id: {Created JE ID}                                        │
+│                                                                                  │
+│  6. CREATE SCHOOL AR INVOICE (school_ar_invoices table)                         │
+│     └─ batch_id: {Batch ID}                                                     │
+│     └─ student_id: {Student ID}                                                 │
+│     └─ ar_invoice_id: {Finance AR Invoice ID}  ← CRITICAL LINK                  │
+│     └─ journal_entry_id: {JE ID}                                                │
+│     └─ status: "posted"                                                         │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Testing Checklist
+### FLOW 2: Payment Recording (Cash Receipt)
 
-### Revenue Testing
-1. Configure Finance Settings with all required accounts
-2. Generate a new AR invoice batch for 2-3 students
-3. Verify AR Invoices appear in Finance module
-4. Record payment for one student
-5. Verify:
-   - `school_ar_invoices.paid_amount` updated
-   - `school_ar_invoices.status` = 'paid' or 'partial'
-   - `ar_invoices.paid_amount` updated (sync trigger worked)
-   - `ar_invoices.balance` reduced
-   - GL Entry created (SBS-PAY-xxx)
-   - COA balances updated
-
-### Expense Testing
-1. Enable `auto_post_expenses` in School Bus Finance Settings
-2. Configure expense accounts (Fuel, Maintenance, General, Cash)
-3. Add a fuel expense to a route
-4. Verify:
-   - `route_expenses` record created
-   - GL Entry created (SBS-EXP-xxx)
-   - COA balances updated (Expense increased, Cash decreased)
-
-### Backfill Testing
-1. Run "Verify Finance Sync" to identify orphaned invoices
-2. Run backfill function
-3. Verify orphaned invoices now have `ar_invoice_id`
-4. Make a payment on previously orphaned invoice
-5. Verify Finance AR now updates correctly
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      STEP 1: RECORD PAYMENT                                      │
+│                      Trigger: User records student payment                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  1. CREATE PAYMENT TRANSACTION (school_payment_transactions)                     │
+│     └─ student_id: {Student ID}                                                 │
+│     └─ payment_month: selected month                                            │
+│     └─ amount_paid: received amount                                             │
+│     └─ payment_method: Cash/Bank/Online/Cheque                                  │
+│     └─ payment_balance_before: previous balance                                 │
+│     └─ payment_balance_after: new balance                                       │
+│                                                                                  │
+│  DATABASE TRIGGER FIRES: update_student_balance_on_payment_trigger              │
+│     └─ Updates student.current_amount_due (decreases)                           │
+│     └─ Updates student.payment_balance                                          │
+│     └─ FIFO Settlement: Applies payment to oldest invoices first                │
+│        └─ Updates school_ar_invoices.paid_amount                                │
+│        └─ Updates school_ar_invoices.status (unpaid → partial → paid)           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  2. POST PAYMENT TO GL (If auto_post_payments = true)                           │
+│     └─ entry_number: SBS-PAY-YYYYMMDD-XXXX                                      │
+│     └─ business_unit_code: SBO                                                  │
+│                                                                                  │
+│  JOURNAL ENTRY LINES:                                                           │
+│  ┌────────────────────────────────────────┬───────────┬───────────┐            │
+│  │ Account                                │ Debit     │ Credit    │            │
+│  ├────────────────────────────────────────┼───────────┼───────────┤            │
+│  │ Bank/Cash Account (Asset)              │ AMOUNT    │           │            │
+│  │ Trade Receivable (Asset)               │           │ AMOUNT    │            │
+│  └────────────────────────────────────────┴───────────┴───────────┘            │
+│                                                                                  │
+│  COA BALANCE UPDATES:                                                           │
+│     └─ Bank/Cash: +AMOUNT (Debit normal)                                        │
+│     └─ Trade Receivable: -AMOUNT (Debit normal, credit reduces)                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  3. SYNC TO FINANCE AR MODULE                                                   │
+│                                                                                  │
+│  IF school_ar_invoices.ar_invoice_id EXISTS:                                    │
+│     └─ Update ar_invoices.paid_amount                                           │
+│     └─ Update ar_invoices.balance                                               │
+│     └─ Update ar_invoices.status (unpaid → partial → paid)                      │
+│                                                                                  │
+│  IF school_ar_invoices.ar_invoice_id IS NULL (Legacy Data):                     │
+│     └─ Create new ar_invoices record                                            │
+│     └─ Link back: school_ar_invoices.ar_invoice_id = new ID                     │
+│     └─ syncPaymentToFinanceAR() handles this automatically                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## User Configuration Required
+### FLOW 3: Expense Recording
 
-Before the system works correctly, ensure these are configured in **Settings → School Bus Finance**:
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      STEP 1: ADD ROUTE EXPENSE                                   │
+│                      Trigger: User adds expense to route                         │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  1. CREATE EXPENSE RECORD (route_expenses)                                       │
+│     └─ route_id: {Route ID}                                                     │
+│     └─ bus_id: {Optional Bus ID}                                                │
+│     └─ expense_category: Fuel/Maintenance/Salary/General                        │
+│     └─ amount: expense amount                                                   │
+│     └─ expense_date: date                                                       │
+│     └─ notes: description                                                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  2. POST EXPENSE TO GL (If auto_post_expenses = true)                           │
+│     └─ entry_number: SBS-EXP-YYYYMMDD-XXXX                                      │
+│     └─ business_unit_code: SBO                                                  │
+│                                                                                  │
+│  ACCOUNT SELECTION BY CATEGORY:                                                 │
+│  ┌────────────────────┬────────────────────────────────────────┐               │
+│  │ Category           │ GL Account Used                        │               │
+│  ├────────────────────┼────────────────────────────────────────┤               │
+│  │ Fuel               │ fuel_expense_account_id                │               │
+│  │ Maintenance        │ maintenance_expense_account_id         │               │
+│  │ Salary             │ salary_expense_account_id              │               │
+│  │ General            │ expense_account_id (default)           │               │
+│  └────────────────────┴────────────────────────────────────────┘               │
+│                                                                                  │
+│  JOURNAL ENTRY LINES:                                                           │
+│  ┌────────────────────────────────────────┬───────────┬───────────┐            │
+│  │ Account                                │ Debit     │ Credit    │            │
+│  ├────────────────────────────────────────┼───────────┼───────────┤            │
+│  │ Expense Account (Expense)              │ AMOUNT    │           │            │
+│  │ Expense Cash Account (Asset)           │           │ AMOUNT    │            │
+│  └────────────────────────────────────────┴───────────┴───────────┘            │
+│                                                                                  │
+│  COA BALANCE UPDATES:                                                           │
+│     └─ Expense Account: +AMOUNT (Debit normal)                                  │
+│     └─ Cash Account: -AMOUNT (Debit normal, credit reduces)                     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
 
-**Revenue Accounts:**
-- Trade Receivable Account (Asset)
-- SBS Collection Revenue Account (Revenue)
-- Cash/Bank Account (Asset)
+---
 
-**Expense Accounts:**
-- General Expense Account
-- Fuel Expense Account
-- Maintenance Expense Account
-- Salary Expense Account
-- Cash/Bank Account for Expenses
+### School Bus - Complete Data Flow Diagram
 
-**Toggles:**
-- Auto-Post Invoices to GL: ON
-- Auto-Post Payments to GL: ON
-- Auto-Post Expenses to GL: ON (after configuring expense accounts)
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           SCHOOL BUS DATA FLOW                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
+OPERATIONS LAYER                        FINANCE LAYER                    ACCOUNTING LAYER
+─────────────────                       ─────────────                    ────────────────
+
+┌──────────────────┐                   ┌──────────────────┐            ┌──────────────────┐
+│ school_students  │                   │    customers     │            │ chart_of_accounts│
+│                  │                   │                  │            │                  │
+│ • student_name   │                   │ • customer_code  │            │ • account_code   │
+│ • current_due    │                   │ • business_unit  │            │ • current_balance│
+│ • payment_balance│                   │   _code: SBO     │            │ • account_type   │
+└────────┬─────────┘                   └────────┬─────────┘            └────────┬─────────┘
+         │                                      │                               │
+         ▼                                      ▼                               │
+┌──────────────────┐     ar_invoice_id  ┌──────────────────┐                   │
+│school_ar_invoices│────────────────────│   ar_invoices    │                   │
+│                  │                    │                  │                    │
+│ • invoice_number │                    │ • invoice_number │                    │
+│ • amount         │                    │ • total_amount   │                    │
+│ • paid_amount    │──── SYNCED ────────│ • paid_amount    │                    │
+│ • status         │                    │ • balance        │                    │
+│ • ar_invoice_id ─┼───────────────────→│ • status         │                    │
+│ • journal_entry  │                    │ • business_unit  │                    │
+│   _id            │                    │   _code: SBO     │                    │
+└────────┬─────────┘                    └──────────────────┘                    │
+         │                                                                       │
+         ▼                                                                       │
+┌──────────────────┐     journal_entry_id  ┌──────────────────┐                │
+│school_payment_   │───────────────────────│ journal_entries  │────────────────┤
+│transactions      │                       │                  │                │
+│                  │                       │ • entry_number   │                │
+│ • amount_paid    │                       │ • total_debit    │                │
+│ • payment_method │                       │ • total_credit   │                │
+│ • gl_posted      │                       │ • business_unit  │                │
+│ • journal_entry  │                       │   _code: SBO     │                │
+│   _id            │                       │ • company_id:    │                │
+└──────────────────┘                       │   NCG_HOLDING    │                │
+                                           └────────┬─────────┘                │
+                                                    │                          │
+                                                    ▼                          │
+                                           ┌──────────────────┐                │
+                                           │journal_entry_    │ Updates        │
+                                           │lines             │────────────────┘
+                                           │                  │
+                                           │ • account_id     │
+                                           │ • debit          │
+                                           │ • credit         │
+                                           └──────────────────┘
+```
+
+---
+
+## YUTONG MODULE - Complete Finance Flow
+
+### Overview Architecture
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                        YUTONG SALES FINANCE ARCHITECTURE                         │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  Business Unit Code: YUT                                                         │
+│  Parent Company: NCG Holding (Consolidated GL)                                   │
+│  Finance Settings: yutong_finance_settings                                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+REQUIRED GL ACCOUNTS (* = Mandatory for operation):
+┌────────────────────────────┬────────────────────┬───────────────────────────────┐
+│ Account Type               │ Purpose            │ Account Category              │
+├────────────────────────────┼────────────────────┼───────────────────────────────┤
+│ *Bank Account              │ Payment receipt    │ Asset                         │
+│ *Customer Advance Account  │ Advance Liability  │ Liability                     │
+│ *Sales Revenue Account     │ Vehicle Sales      │ Revenue                       │
+│ *Trade Receivable Account  │ Invoice balance    │ Asset                         │
+│ Spare Parts Revenue        │ Parts Sales        │ Revenue (Optional)            │
+│ Discount Expense           │ Discounts given    │ Expense (Optional)            │
+│ Commission Expense         │ Sales commission   │ Expense (Optional)            │
+│ VAT Output                 │ VAT collected      │ Liability (Optional)          │
+│ WHT Payable                │ Withholding tax    │ Liability (Optional)          │
+└────────────────────────────┴────────────────────┴───────────────────────────────┘
+```
+
+---
+
+### FLOW 1: Customer Payment Verification (Cash Receipt = GL ONLY)
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      STEP 1: RECORD CUSTOMER PAYMENT                             │
+│                      Trigger: Customer pays advance/deposit                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  1. CREATE PAYMENT RECORD (yutong_customer_payments)                             │
+│     └─ order_id: {Order ID}                                                     │
+│     └─ payment_amount: amount received                                          │
+│     └─ payment_method: bank_transfer/cash/cheque/LC                             │
+│     └─ payment_reference: bank slip/cheque no                                   │
+│     └─ status: "pending"                                                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      STEP 2: VERIFY PAYMENT (Finance Approval)                   │
+│                      Trigger: Finance team clicks "Verify Payment"               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  1. CREATE/GET FINANCE CUSTOMER (If auto_create_customer = true)                 │
+│     └─ customers table                                                          │
+│     └─ customer_code: YUT-{TIMESTAMP}-{RANDOM}                                  │
+│     └─ business_unit_code: YUT                                                  │
+│     └─ Link to order: yutong_orders.finance_customer_id                         │
+│                                                                                  │
+│  2. POST TO GL (If auto_post_on_verify = true)                                  │
+│     └─ entry_number: YUT-ADV-{ORDER_NO}                                         │
+│     └─ reference: YUT ADV - {ORDER_NO} - {CUSTOMER_NAME}                        │
+│     └─ business_unit_code: YUT                                                  │
+│                                                                                  │
+│  CRITICAL: Payment = Advance Receipt (Liability), NOT Revenue                   │
+│                                                                                  │
+│  JOURNAL ENTRY LINES:                                                           │
+│  ┌────────────────────────────────────────┬───────────┬───────────┐            │
+│  │ Account                                │ Debit     │ Credit    │            │
+│  ├────────────────────────────────────────┼───────────┼───────────┤            │
+│  │ Bank Account (Asset)                   │ AMOUNT    │           │            │
+│  │ Customer Advance (Liability)           │           │ AMOUNT    │            │
+│  └────────────────────────────────────────┴───────────┴───────────┘            │
+│                                                                                  │
+│  COA BALANCE UPDATES:                                                           │
+│     └─ Bank Account: +AMOUNT (Debit normal)                                     │
+│     └─ Customer Advance: +AMOUNT (Credit normal - liability increases)          │
+│                                                                                  │
+│  3. UPDATE PAYMENT STATUS                                                       │
+│     └─ status: "verified"                                                       │
+│     └─ verified_by: {User ID}                                                   │
+│     └─ verified_at: timestamp                                                   │
+│     └─ journal_entry_id: {JE ID}                                                │
+│     └─ ar_receipt_id: NULL ← NOT created yet (no invoice exists)                │
+│                                                                                  │
+│  ⚠️ AR INVOICE IS NOT CREATED HERE - Created when System Invoice approved       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### FLOW 2: System Invoice Approval (Revenue Recognition)
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      STEP 1: GENERATE DRAFT INVOICE                              │
+│                      Trigger: User generates invoice from order                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  1. CREATE INVOICE RECORD (yutong_invoice_records)                               │
+│     └─ invoice_no: YUT-INV-YYYYMM-XXXX                                          │
+│     └─ order_id: {Order ID}                                                     │
+│     └─ invoice_amount: total vehicle price                                      │
+│     └─ status: "draft"                                                          │
+│                                                                                  │
+│  2. CREATE INVOICE DOCUMENT (yutong_invoice_documents)                           │
+│     └─ PDF generated with watermark "DRAFT"                                     │
+│     └─ Stored in yutong-invoices bucket                                         │
+│     └─ document_status: "draft"                                                 │
+│                                                                                  │
+│  ⚠️ NO GL ENTRY - Draft invoices don't affect accounting                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      STEP 2: APPROVE INVOICE (Finance Approval)                  │
+│                      Trigger: Authorized user clicks "Approve Invoice"           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  1. UPDATE INVOICE STATUS                                                       │
+│     └─ yutong_invoice_records.status: "approved"                                │
+│     └─ approved_by: {User ID}                                                   │
+│     └─ approved_at: timestamp                                                   │
+│                                                                                  │
+│  2. REGENERATE PDF (Without "DRAFT" watermark)                                   │
+│     └─ yutong_invoice_documents.document_status: "approved"                     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  3. CREATE FINANCE AR INVOICE (ar_invoices table)                               │
+│     └─ invoice_number: YUT-INV-YYMM-{TIMESTAMP}                                 │
+│     └─ customer_id: {Finance Customer ID from order}                            │
+│     └─ business_unit_code: YUT                                                  │
+│     └─ total_amount: invoice amount                                             │
+│     └─ paid_amount: total verified payments (advances)                          │
+│     └─ balance: total_amount - paid_amount                                      │
+│     └─ status: based on balance (paid/partial/unpaid)                           │
+│                                                                                  │
+│  4. LINK AR INVOICE TO ORDER                                                    │
+│     └─ yutong_orders.ar_invoice_id = {New AR Invoice ID}                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  5. POST REVENUE RECOGNITION GL ENTRY                                           │
+│     └─ entry_number: YUT-INV-{ORDER_NO}                                         │
+│     └─ reference: YUT INVOICE - {ORDER_NO} - {CUSTOMER_NAME}                    │
+│     └─ business_unit_code: YUT                                                  │
+│                                                                                  │
+│  JOURNAL ENTRY LINES:                                                           │
+│  ┌────────────────────────────────────────┬───────────┬───────────┐            │
+│  │ Account                                │ Debit     │ Credit    │            │
+│  ├────────────────────────────────────────┼───────────┼───────────┤            │
+│  │ Trade Receivable (Asset)               │ AMOUNT    │           │            │
+│  │ Sales Revenue (Revenue)                │           │ AMOUNT    │            │
+│  └────────────────────────────────────────┴───────────┴───────────┘            │
+│                                                                                  │
+│  COA BALANCE UPDATES:                                                           │
+│     └─ Trade Receivable: +AMOUNT (Debit normal)                                 │
+│     └─ Sales Revenue: +AMOUNT (Credit normal)                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  6. APPLY ADVANCES AGAINST RECEIVABLE (If advances exist)                       │
+│     └─ entry_number: YUT-ADV-APPLY-{ORDER_NO}                                   │
+│     └─ Reduces both liability and receivable                                    │
+│                                                                                  │
+│  JOURNAL ENTRY LINES:                                                           │
+│  ┌────────────────────────────────────────┬───────────┬───────────┐            │
+│  │ Account                                │ Debit     │ Credit    │            │
+│  ├────────────────────────────────────────┼───────────┼───────────┤            │
+│  │ Customer Advance (Liability)           │ AMOUNT    │           │            │
+│  │ Trade Receivable (Asset)               │           │ AMOUNT    │            │
+│  └────────────────────────────────────────┴───────────┴───────────┘            │
+│                                                                                  │
+│  COA BALANCE UPDATES:                                                           │
+│     └─ Customer Advance: -AMOUNT (Credit normal, debit reduces)                 │
+│     └─ Trade Receivable: -AMOUNT (Debit normal, credit reduces)                 │
+│                                                                                  │
+│  NET EFFECT: Advance liability cleared, receivable reduced by advance amount    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### FLOW 3: Balance Payment (After Invoice)
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      BALANCE PAYMENT (After Invoice Exists)                      │
+│                      Trigger: Customer pays remaining balance                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  1. RECORD & VERIFY PAYMENT                                                     │
+│     └─ Same process as advance payment                                          │
+│     └─ Payment type detected as "balance" (if AR invoice exists)                │
+│                                                                                  │
+│  2. POST BALANCE GL ENTRY                                                       │
+│     └─ entry_number: YUT-BAL-{ORDER_NO}                                         │
+│                                                                                  │
+│  JOURNAL ENTRY LINES:                                                           │
+│  ┌────────────────────────────────────────┬───────────┬───────────┐            │
+│  │ Account                                │ Debit     │ Credit    │            │
+│  ├────────────────────────────────────────┼───────────┼───────────┤            │
+│  │ Bank Account (Asset)                   │ AMOUNT    │           │            │
+│  │ Trade Receivable (Asset)               │           │ AMOUNT    │            │
+│  └────────────────────────────────────────┴───────────┴───────────┘            │
+│                                                                                  │
+│  3. UPDATE AR INVOICE                                                           │
+│     └─ ar_invoices.paid_amount: increased                                       │
+│     └─ ar_invoices.balance: decreased                                           │
+│     └─ ar_invoices.status: "partial" or "paid"                                  │
+│                                                                                  │
+│  4. CREATE AR RECEIPT (ar_receipts table)                                       │
+│     └─ Links payment to AR Invoice                                              │
+│     └─ receipt_number: YUT-RCT-YYMM-{TIMESTAMP}                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Yutong - Complete Data Flow Diagram
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           YUTONG SALES DATA FLOW                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+OPERATIONS LAYER                        FINANCE LAYER                    ACCOUNTING LAYER
+─────────────────                       ─────────────                    ────────────────
+
+┌──────────────────┐                   ┌──────────────────┐            ┌──────────────────┐
+│yutong_quotations │                   │    customers     │            │ chart_of_accounts│
+│                  │                   │                  │            │                  │
+│ • quotation_no   │                   │ • customer_code  │            │ • account_code   │
+│ • customer_name  │                   │ • business_unit  │            │ • current_balance│
+│ • total_amount   │                   │   _code: YUT     │            │ • account_type   │
+└────────┬─────────┘                   └────────┬─────────┘            └────────┬─────────┘
+         │                                      │                               │
+         ▼                                      │                               │
+┌──────────────────┐                            │                               │
+│  yutong_orders   │←───────────────────────────┤                               │
+│                  │  finance_customer_id       │                               │
+│ • order_no       │                            │                               │
+│ • total_amount   │                            │                               │
+│ • total_paid     │                            │                               │
+│ • balance_due    │                            │                               │
+│ • finance_       │                            │                               │
+│   customer_id ───┼────────────────────────────┘                               │
+│ • ar_invoice_id ─┼────────────────┐                                           │
+└────────┬─────────┘                │                                           │
+         │                          │                                           │
+         ▼                          ▼                                           │
+┌──────────────────┐         ┌──────────────────┐                              │
+│yutong_customer_  │         │   ar_invoices    │                              │
+│payments          │         │                  │                               │
+│                  │         │ • invoice_number │                               │
+│ • payment_amount │         │ • total_amount   │                               │
+│ • payment_method │         │ • paid_amount    │                               │
+│ • status         │         │ • balance        │                               │
+│ • journal_entry  │         │ • status         │                               │
+│   _id ───────────┼─────┐   │ • business_unit  │                               │
+│ • ar_receipt_id ─┼───┐ │   │   _code: YUT     │                               │
+└────────┬─────────┘   │ │   └──────────────────┘                               │
+         │             │ │                                                       │
+         │             │ │                                                       │
+         ▼             │ │                                                       │
+┌──────────────────┐   │ │   ┌──────────────────┐                               │
+│yutong_invoice_   │   │ └──→│ journal_entries  │───────────────────────────────┤
+│records           │   │     │                  │                               │
+│                  │   │     │ • entry_number   │                               │
+│ • invoice_no     │   │     │ • total_debit    │                               │
+│ • invoice_amount │   │     │ • total_credit   │                               │
+│ • status         │   │     │ • business_unit  │                               │
+│ • approved_by    │   │     │   _code: YUT     │                               │
+└──────────────────┘   │     │ • company_id:    │                               │
+                       │     │   NCG_HOLDING    │                               │
+                       │     └────────┬─────────┘                               │
+                       │              │                                          │
+                       │              ▼                                          │
+                       │     ┌──────────────────┐                               │
+                       │     │journal_entry_    │ Updates                        │
+                       │     │lines             │───────────────────────────────┘
+                       │     │                  │
+                       │     │ • account_id     │
+                       │     │ • debit          │
+                       │     │ • credit         │
+                       │     └──────────────────┘
+                       │
+                       │     ┌──────────────────┐
+                       └────→│   ar_receipts    │
+                             │                  │
+                             │ • receipt_number │
+                             │ • amount         │
+                             │ • business_unit  │
+                             │   _code: YUT     │
+                             └──────────────────┘
+```
+
+---
+
+## COMPARISON: School Bus vs Yutong Accounting Treatment
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    ACCOUNTING TREATMENT COMPARISON                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+                    SCHOOL BUS (SBO)                    YUTONG (YUT)
+                    ────────────────                    ────────────
+REVENUE MODEL:      Monthly subscription                One-time vehicle sale
+                    (recurring)                         (high-value)
+
+WHEN REVENUE        At invoice generation               At system invoice approval
+IS RECOGNIZED:      (same time as AR)                   (separate from payment)
+
+PAYMENT FLOW:       Direct to Receivable                1. Advance → Liability
+                    DR Bank | CR Receivable             2. Invoice → Revenue
+                                                        3. Apply advance
+
+AR INVOICE          When AR batch is created            When system invoice is approved
+CREATED:            (same time as GL)                   (not at payment time)
+
+PAYMENT GL:         DR Bank                             Payment BEFORE invoice:
+                    CR Trade Receivable                   DR Bank | CR Customer Advance
+                    (direct reduction)                  
+                                                        Payment AFTER invoice:
+                                                          DR Bank | CR Trade Receivable
+
+KEY DIFFERENCE:     No liability stage                  Advance is a liability until
+                    (payment = revenue earned)          invoice is issued
+
+FIFO SETTLEMENT:    Yes (oldest invoice first)          No (explicit allocation)
+
+EXPENSE TRACKING:   Yes (route_expenses)                No (vehicle cost is inventory)
+```
+
+---
+
+## GAP ANALYSIS - MISSING POINTS IDENTIFIED
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         GAP ANALYSIS & RECOMMENDATIONS                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅ IMPLEMENTED & WORKING:
+──────────────────────────
+│ Item                                              │ School Bus │ Yutong │
+├───────────────────────────────────────────────────┼────────────┼────────┤
+│ AR Invoice Generation                             │     ✅      │   ✅    │
+│ GL Entry for Revenue Recognition                  │     ✅      │   ✅    │
+│ Payment GL Posting                                │     ✅      │   ✅    │
+│ Business Unit Tagging (SBO/YUT)                   │     ✅      │   ✅    │
+│ COA Balance Auto-Update                           │     ✅      │   ✅    │
+│ Finance Customer Creation                         │     ✅      │   ✅    │
+│ AR Invoice Status Sync (unpaid/partial/paid)      │     ✅      │   ✅    │
+│ Backfill for Legacy Data                          │     ✅      │   N/A  │
+│ Advance → Liability Accounting                    │     N/A    │   ✅    │
+│ Revenue Recognition at Invoice Approval           │     N/A    │   ✅    │
+│ Advance Application to Receivable                 │     N/A    │   ✅    │
+└───────────────────────────────────────────────────┴────────────┴────────┘
+
+⚠️ CONFIGURATION REQUIRED (Not Code Issues):
+──────────────────────────────────────────────
+│ Issue                                             │ Action Required                │
+├───────────────────────────────────────────────────┼────────────────────────────────┤
+│ Yutong: Bank Account not configured               │ Settings → Yutong Finance      │
+│ Yutong: Trade Receivable not configured           │ Settings → Yutong Finance      │
+│ Yutong: Sales Revenue not configured              │ Settings → Yutong Finance      │
+│ School Bus: Expense accounts not configured       │ Settings → School Bus Finance  │
+│ School Bus: auto_post_expenses = false            │ Enable after configuring accts │
+└───────────────────────────────────────────────────┴────────────────────────────────┘
+
+🔄 POTENTIAL IMPROVEMENTS (Optional):
+──────────────────────────────────────
+1. Add AR Receipt creation for Yutong balance payments (after invoice)
+2. Add reversal entry capability for voided invoices
+3. Add period-end closing entries automation
+4. Add multi-currency support for international vehicle sales
+5. Add tax computation (VAT/WHT) automation in GL entries
+```
+
+---
+
+## AUDIT TRAIL SUMMARY
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           COMPLETE AUDIT TRAIL                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+SCHOOL BUS (SBO):
+Operation Record → school_ar_invoices → ar_invoices → journal_entries → COA
+      ↓                    ↓                              ↓
+  school_students    school_payment_        journal_entry_lines
+                     transactions
+
+YUTONG (YUT):
+Operation Record → yutong_orders → ar_invoices → journal_entries → COA
+      ↓                  ↓              ↓              ↓
+ yutong_quotations  yutong_customer_  ar_receipts  journal_entry_lines
+                    payments
+
+All records are linked via:
+• business_unit_code: SBO or YUT
+• company_id: NCG Holding (consolidated)
+• journal_entry_id: Direct link to GL
+• ar_invoice_id: Direct link to Finance AR
+```
+
+---
+
+## TESTING RECOMMENDATIONS FOR FINANCE TEAM
+
+### School Bus Testing:
+1. Generate AR invoices for a batch of students
+2. Verify `ar_invoices` shows correct totals
+3. Record a partial payment
+4. Verify `ar_invoices.status` updates to "partial"
+5. Check GL entries show correct account postings
+6. Verify COA balances updated correctly
+
+### Yutong Testing:
+1. Record an advance payment (before invoice)
+2. Verify GL shows: DR Bank | CR Customer Advance (NOT revenue)
+3. Generate and approve a system invoice
+4. Verify AR Invoice is created NOW (not before)
+5. Verify GL shows: DR Trade Receivable | CR Sales Revenue
+6. Verify Advance Application GL: DR Advance | CR Receivable
+7. Record balance payment
+8. Verify AR Invoice status updates to "paid"
