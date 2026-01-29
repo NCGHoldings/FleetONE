@@ -11,7 +11,6 @@ export interface LightVehicleInvoiceSignature {
   signature_type: string;
   signed_at: string;
   signed_by?: string;
-  created_at?: string;
 }
 
 export function useLightVehicleInvoiceSignatures() {
@@ -25,7 +24,7 @@ export function useLightVehicleInvoiceSignatures() {
         .from('lightvehicle_invoice_signatures')
         .select('*')
         .eq('invoice_record_id', invoiceRecordId)
-        .order('created_at', { ascending: true });
+        .order('signed_at', { ascending: true });
 
       if (error) throw error;
       return data || [];

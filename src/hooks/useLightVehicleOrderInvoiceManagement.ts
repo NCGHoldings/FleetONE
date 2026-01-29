@@ -152,18 +152,26 @@ export function useLightVehicleOrderInvoiceManagement() {
       if (recordError) throw recordError;
 
       // Create invoice document record
-      const { error: docError } = await supabase
+      console.log('Inserting document record for:', invoiceRecord.id);
+      const { data: docData, error: docError } = await supabase
         .from('lightvehicle_invoice_documents')
         .insert({
           invoice_record_id: invoiceRecord.id,
+          document_type: 'invoice',
           file_name: `${invoiceNo}_draft.pdf`,
           file_path: fileName,
           file_size: pdfBlob.size,
           document_status: 'draft',
           document_data: JSON.stringify(fullInvoiceData)
-        });
+        })
+        .select()
+        .single();
 
-      if (docError) throw docError;
+      if (docError) {
+        console.error('Document insert error:', docError);
+        throw docError;
+      }
+      console.log('Document record created:', docData);
 
       toast.success(`Invoice ${invoiceNo} generated successfully`);
       return invoiceRecord.id;
