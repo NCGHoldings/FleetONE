@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Settings2, Building2, CreditCard, FileText, CheckCircle, AlertCircle, Save, Receipt } from "lucide-react";
@@ -13,6 +12,7 @@ import { useChartOfAccounts } from "@/hooks/useAccountingData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { SearchableFinanceAccountSelector } from "@/components/settings/SearchableFinanceAccountSelector";
 
 interface BranchSetting {
   id: string;
@@ -176,28 +176,14 @@ export function SchoolBusFinanceSettings() {
             {/* Trade Receivables Account */}
             <div className="space-y-2">
               <Label>Trade Receivables Account (Debit on Invoice)</Label>
-              <Select
-                value={defaultSettings.trade_receivable_account_id}
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.trade_receivable_account_id || null}
                 onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, trade_receivable_account_id: value })
+                  setDefaultSettings({ ...defaultSettings, trade_receivable_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {receivableAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                  {chartOfAccounts?.filter((a) => a.account_type === "asset").map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={[...receivableAccounts, ...chartOfAccounts?.filter((a) => a.account_type === "asset") || []]}
+                placeholder="Select account"
+              />
               <p className="text-xs text-muted-foreground">
                 This account will be debited when AR invoices are created
               </p>
@@ -206,23 +192,14 @@ export function SchoolBusFinanceSettings() {
             {/* SBS Collection Account */}
             <div className="space-y-2">
               <Label>SBS Collection Revenue Account (Credit on Invoice)</Label>
-              <Select
-                value={defaultSettings.sbs_collection_account_id}
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.sbs_collection_account_id || null}
                 onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, sbs_collection_account_id: value })
+                  setDefaultSettings({ ...defaultSettings, sbs_collection_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {revenueAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={revenueAccounts}
+                placeholder="Select account"
+              />
               <p className="text-xs text-muted-foreground">
                 This account will be credited when AR invoices are created
               </p>
@@ -231,23 +208,14 @@ export function SchoolBusFinanceSettings() {
             {/* Default Cash Account */}
             <div className="space-y-2">
               <Label>Default Cash/Bank Account (for payments without branch mapping)</Label>
-              <Select
-                value={defaultSettings.cash_account_id}
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.cash_account_id || null}
                 onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, cash_account_id: value })
+                  setDefaultSettings({ ...defaultSettings, cash_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cashAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={cashAccounts}
+                placeholder="Select account"
+              />
             </div>
 
             {/* Invoice Prefix */}
@@ -341,23 +309,14 @@ export function SchoolBusFinanceSettings() {
             {/* General Expense Account */}
             <div className="space-y-2">
               <Label>General Expense Account (Debit)</Label>
-              <Select
-                value={defaultSettings.expense_account_id}
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.expense_account_id || null}
                 onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, expense_account_id: value })
+                  setDefaultSettings({ ...defaultSettings, expense_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select expense account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={expenseAccounts}
+                placeholder="Select expense account"
+              />
               <p className="text-xs text-muted-foreground">
                 Default account for "Other" expense types
               </p>
@@ -366,23 +325,14 @@ export function SchoolBusFinanceSettings() {
             {/* Fuel Expense Account */}
             <div className="space-y-2">
               <Label>Fuel Expense Account (Debit)</Label>
-              <Select
-                value={defaultSettings.fuel_expense_account_id}
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.fuel_expense_account_id || null}
                 onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, fuel_expense_account_id: value })
+                  setDefaultSettings({ ...defaultSettings, fuel_expense_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select fuel expense account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={expenseAccounts}
+                placeholder="Select fuel expense account"
+              />
               <p className="text-xs text-muted-foreground">
                 Specific account for fuel expenses
               </p>
@@ -391,23 +341,14 @@ export function SchoolBusFinanceSettings() {
             {/* Maintenance Expense Account */}
             <div className="space-y-2">
               <Label>Maintenance Expense Account (Debit)</Label>
-              <Select
-                value={defaultSettings.maintenance_expense_account_id}
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.maintenance_expense_account_id || null}
                 onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, maintenance_expense_account_id: value })
+                  setDefaultSettings({ ...defaultSettings, maintenance_expense_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select maintenance expense account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={expenseAccounts}
+                placeholder="Select maintenance expense account"
+              />
               <p className="text-xs text-muted-foreground">
                 Specific account for maintenance/repairs
               </p>
@@ -416,23 +357,14 @@ export function SchoolBusFinanceSettings() {
             {/* Salary Expense Account */}
             <div className="space-y-2">
               <Label>Salary/Staff Expense Account (Debit)</Label>
-              <Select
-                value={defaultSettings.salary_expense_account_id}
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.salary_expense_account_id || null}
                 onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, salary_expense_account_id: value })
+                  setDefaultSettings({ ...defaultSettings, salary_expense_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select salary expense account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={expenseAccounts}
+                placeholder="Select salary expense account"
+              />
               <p className="text-xs text-muted-foreground">
                 Specific account for driver/staff salaries
               </p>
@@ -441,23 +373,14 @@ export function SchoolBusFinanceSettings() {
             {/* Expense Cash/Bank Account */}
             <div className="space-y-2 md:col-span-2">
               <Label>Cash/Bank Account for Expenses (Credit)</Label>
-              <Select
-                value={defaultSettings.expense_cash_account_id}
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.expense_cash_account_id || null}
                 onValueChange={(value) =>
-                  setDefaultSettings({ ...defaultSettings, expense_cash_account_id: value })
+                  setDefaultSettings({ ...defaultSettings, expense_cash_account_id: value || "" })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select cash/bank account for expense payments" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cashAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                accounts={cashAccounts}
+                placeholder="Select cash/bank account for expense payments"
+              />
               <p className="text-xs text-muted-foreground">
                 This account will be credited when expenses are recorded (cash paid out)
               </p>
@@ -508,26 +431,18 @@ export function SchoolBusFinanceSettings() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Select
-                          value={branchSettings[branch.id]?.branch_gl_account_id || ""}
+                        <SearchableFinanceAccountSelector
+                          value={branchSettings[branch.id]?.branch_gl_account_id || null}
                           onValueChange={(value) =>
                             setBranchSettings({
                               ...branchSettings,
-                              [branch.id]: { branch_gl_account_id: value },
+                              [branch.id]: { branch_gl_account_id: value || "" },
                             })
                           }
-                        >
-                          <SelectTrigger className="w-[350px]">
-                            <SelectValue placeholder="Select cash/bank GL account..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {cashAccounts.map((account) => (
-                              <SelectItem key={account.id} value={account.id}>
-                                {account.account_code} - {account.account_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          accounts={cashAccounts}
+                          placeholder="Select cash/bank GL account..."
+                          className="w-[350px]"
+                        />
                       </td>
                       <td className="px-4 py-3 text-center">
                         {isConfigured ? (
