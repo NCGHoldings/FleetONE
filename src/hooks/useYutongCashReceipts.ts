@@ -285,6 +285,49 @@ export const useYutongCashReceipts = () => {
     }
   };
 
+  // Regenerate cash receipt with updated amount_in_words format (Million instead of Lakh)
+  const regenerateCashReceipt = async (receiptId: string): Promise<YutongCashReceipt | null> => {
+    try {
+      setLoading(true);
+      
+      // Get the existing receipt
+      const { data: receipt, error: fetchError } = await supabase
+        .from('yutong_cash_receipts')
+        .select('*')
+        .eq('id', receiptId)
+        .single();
+      
+      if (fetchError || !receipt) {
+        throw fetchError || new Error('Receipt not found');
+      }
+      
+      // Regenerate amount in words using the updated Million format function
+      const newAmountInWords = numberToWords(receipt.amount);
+      
+      // Update the receipt with new amount_in_words
+      const { data: updatedReceipt, error: updateError } = await supabase
+        .from('yutong_cash_receipts')
+        .update({
+          amount_in_words: newAmountInWords,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', receiptId)
+        .select()
+        .single();
+      
+      if (updateError) throw updateError;
+      
+      toast.success('Cash receipt regenerated with updated format');
+      return updatedReceipt as YutongCashReceipt;
+    } catch (error: any) {
+      console.error('Error regenerating cash receipt:', error);
+      toast.error(`Failed to regenerate cash receipt: ${error.message}`);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loading,
     generateReceiptNumber,
@@ -293,6 +336,7 @@ export const useYutongCashReceipts = () => {
     getCashReceiptsForOrder,
     updateReceiptSignature,
     updateReceiptPdfUrl,
+    regenerateCashReceipt,
     numberToWords
   };
 };
