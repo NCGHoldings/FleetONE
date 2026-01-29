@@ -1,101 +1,71 @@
 
-# Light Vehicle Complete Sales Flow - Full Development Plan
+# Fix Light Vehicle Payment Tracking and Invoice Generation
 
-## Executive Summary
+## Problems Identified
 
-This plan will bring the Light Vehicle Sales module to full feature parity with the Yutong module, ensuring a complete end-to-end sales workflow from quotation to delivery with proper payment tracking, document generation, and signature management.
+### 1. Payment Tracking Not Loading - Database Column Name Mismatch
 
----
+**Error**: `column lightvehicle_quotations_1.quotation_no does not exist`
 
-## Current State Analysis
-
-### What Light Vehicle Has (Partially Working)
-| Component | Status | Issues |
-|-----------|--------|--------|
-| Order Details Modal | Partial | Missing payment tracking integration |
-| Cash Receipt System | Exists | Not integrated with payment verification flow |
-| Invoice Generator | Exists | Working but limited view/download functions |
-| Payment Tracking | Exists | Not integrated into Order Details modal |
-| Progress Tab | Basic | Static timeline, missing journey tracking |
-
-### What Yutong Has (Light Vehicle Needs)
-| Feature | Yutong Component | Light Vehicle Status |
-|---------|-----------------|---------------------|
-| Order Journey Tracker | YutongOrderJourney | Missing |
-| Integrated Payment Tracking | YutongPaymentTracking in Financial tab | Missing integration |
-| Cash Receipt from Payment | Generate Receipt button per payment | Exists but broken |
-| Invoice View/Approve | YutongOrderInvoiceViewModal with signatures | Exists but limited |
-| Process Management | ProcessManagement for multi-stage operations | Missing |
-| Operations Tab | Supplier, Logistics, Customs, etc. | Missing |
-
----
-
-## Implementation Plan
-
-### Phase 1: Fix Order Details Modal Integration
-
-The `EnhancedLightVehicleOrderDetailsModal` needs to properly integrate the `LightVehiclePaymentTracking` component in the Financial tab instead of the current inline implementation.
-
-**Current Problem**: Financial tab has custom inline payment display that doesn't match the full-featured `LightVehiclePaymentTracking` component.
-
-**Solution**: Replace the inline Financial tab content with the proper `LightVehiclePaymentTracking` component that includes:
-- Payment schedule display with milestones
-- Record payment functionality
-- Verify payment with GL posting
-- Generate receipt per payment
-- Complete payment history
-
-### Phase 2: Create Order Journey Component
-
-Create `LightVehicleOrderJourney.tsx` modeled on `YutongOrderJourney.tsx` with stages appropriate for light vehicle sales:
-
-**Proposed Light Vehicle Journey Stages**:
-1. Order Confirmation
-2. Payment Collection (Advance)
-3. Vehicle Preparation
-4. Documentation
-5. Vehicle Inspection
-6. RMV Registration (if applicable)
-7. Final Inspection
-8. Delivery
-
-### Phase 3: Enhance Financial Tab
-
-Replace current Financial tab with integrated payment tracking:
-
-```text
-Financial Tab Structure:
-+----------------------------------+
-| Payment Summary Cards            |
-| [Total] [Paid] [Pending] [Due]   |
-+----------------------------------+
-| Payment Schedule                 |
-| - Milestone 1: Advance (10%)     |
-| - Milestone 2: Interim (40%)     |
-| - Milestone 3: Balance (50%)     |
-+----------------------------------+
-| Payment History                  |
-| [Date] [Ref] [Amount] [Status]   |
-| Actions: Verify | Generate Receipt|
-+----------------------------------+
-| Cash Receipts                    |
-| View/Download generated receipts |
-+----------------------------------+
+**Root Cause**: In `LightVehiclePaymentTracking.tsx` line 73, the query uses:
+```typescript
+.select('*, lightvehicle_quotations(quotation_no, customer_name, customer_phone)')
 ```
 
-### Phase 4: Add Journey/Operations Tab
+But the actual database column is `quotation_number`, not `quotation_no`.
 
-Add new tabs to match Yutong structure:
-- **Journey Tab**: Visual order progress tracker
-- **Operations Tab**: Process management for vehicle preparation
+### 2. Invoice Generator Not Getting Correct Data
 
-### Phase 5: Ensure Receipt Integration Works
+The `LightVehicleOrderInvoiceGenerator` receives order data that expects fields like:
+- `order_no`, `quotation_no`, `vehicle_make`, `vehicle_model`
 
-Fix the cash receipt generation flow:
-1. When payment is verified, enable "Generate Receipt" button
-2. Receipt modal opens with signature collection
-3. PDF download with customer and finance signatures
-4. Status update to "finalized"
+But the payment tracking component must first load successfully to populate the order details.
+
+### 3. Invoice Template Needs Yutong-Style Professional Header/Footer
+
+Current Light Vehicle invoice uses a basic template. It needs:
+- Professional NCG header image (like Yutong uses)
+- Blue color scheme matching corporate branding
+- Payment tracking with bank details
+- Multi-page support with signatures
+
+---
+
+## Solution
+
+### Fix 1: Update LightVehiclePaymentTracking Query
+
+Change the database query from `quotation_no` to `quotation_number`:
+
+```typescript
+// Line 73 - BEFORE:
+.select('*, lightvehicle_quotations(quotation_no, customer_name, customer_phone)')
+
+// AFTER:
+.select('*, lightvehicle_quotations!quotation_id(quotation_number, customer_name, customer_phone)')
+```
+
+### Fix 2: Update Receipt Generation to Use Correct Field Names
+
+In the `handleGenerateReceipt` function, update the reference to use `quotation_number`:
+
+```typescript
+// Line 124 - BEFORE:
+quotationNo: orderDetails.lightvehicle_quotations?.quotation_no
+
+// AFTER:
+quotationNo: orderDetails.lightvehicle_quotations?.quotation_number
+```
+
+### Fix 3: Update Invoice Generator HTML Template
+
+Enhance `lightvehicle-order-invoice-generator.ts` to match Yutong's professional format:
+- Add NCG Holdings header section with company branding
+- Professional blue color scheme
+- 2-page layout with bank details and terms
+- Payment history section
+- Signature boxes matching Yutong format
+- Sri Lankan Rupees (LKR) currency formatting
 
 ---
 
@@ -103,81 +73,71 @@ Fix the cash receipt generation flow:
 
 | File | Changes |
 |------|---------|
-| `src/components/lightvehicle/EnhancedLightVehicleOrderDetailsModal.tsx` | Add Journey tab, integrate LightVehiclePaymentTracking in Financial tab, add Operations tab |
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/components/lightvehicle/LightVehicleOrderJourney.tsx` | Visual order progress tracker with stages |
-| `src/components/lightvehicle/LightVehicleProcessManagement.tsx` | Process management for vehicle operations |
+| `src/components/lightvehicle/LightVehiclePaymentTracking.tsx` | Fix query column name `quotation_no` -> `quotation_number` |
+| `src/lib/lightvehicle-order-invoice-generator.ts` | Enhance to Yutong-style professional format |
 
 ---
 
 ## Technical Details
 
-### EnhancedLightVehicleOrderDetailsModal Changes
+### LightVehiclePaymentTracking.tsx Fixes
 
-**Current Tabs**: Overview, Financial, Documents, Progress
-
-**New Tabs**: Overview, Journey, Financial, Documents, Operations
-
+**Line 73**: Fix the Supabase join query:
 ```typescript
-// Add import for new components
-import { LightVehiclePaymentTracking } from './LightVehiclePaymentTracking';
-import { LightVehicleOrderJourney } from './LightVehicleOrderJourney';
-
-// Update TabsList to include new tabs
-<TabsList className="grid w-full grid-cols-5">
-  <TabsTrigger value="overview">Overview</TabsTrigger>
-  <TabsTrigger value="journey">Journey</TabsTrigger>
-  <TabsTrigger value="financial">Financial</TabsTrigger>
-  <TabsTrigger value="documents">Documents</TabsTrigger>
-  <TabsTrigger value="operations">Operations</TabsTrigger>
-</TabsList>
-
-// Journey Tab - NEW
-<TabsContent value="journey">
-  <LightVehicleOrderJourney order={order} onRefresh={loadOrder} />
-</TabsContent>
-
-// Financial Tab - REPLACE current content
-<TabsContent value="financial">
-  <LightVehiclePaymentTracking 
-    orderId={order.id} 
-    onRefresh={loadOrder} 
-  />
-</TabsContent>
+const { data: order, error: orderError } = await supabase
+  .from('lightvehicle_orders')
+  .select('*, lightvehicle_quotations!quotation_id(quotation_number, customer_name, customer_phone)')
+  .eq('id', orderId)
+  .single();
 ```
 
-### LightVehicleOrderJourney Component Structure
-
+**Line 124**: Fix receipt quotation number reference:
 ```typescript
-// Light vehicle specific journey stages
-const journeySteps = [
-  { key: 'order_confirmation', label: 'Order Confirmation', days: 1 },
-  { key: 'payment_collection', label: 'Payment Collection', days: 3 },
-  { key: 'vehicle_preparation', label: 'Vehicle Preparation', days: 5 },
-  { key: 'documentation', label: 'Documentation', days: 2 },
-  { key: 'vehicle_inspection', label: 'Vehicle Inspection', days: 1 },
-  { key: 'registration', label: 'RMV Registration', days: 5 },
-  { key: 'final_check', label: 'Final Check', days: 1 },
-  { key: 'delivery', label: 'Delivery', days: 1 }
-];
+quotationNo: orderDetails.lightvehicle_quotations?.quotation_number
 ```
 
-### LightVehiclePaymentTracking Integration
+### Invoice Generator Enhancements
 
-The existing component already has:
-- Payment recording
-- Payment verification with GL posting
-- Payment schedule display
-- Milestone tracking
+Update the HTML generator to include:
 
-Needs to add:
-- Cash receipt generation button per verified payment
-- Integration with `useLightVehicleCashReceipts` hook
-- View receipt modal trigger
+1. **Professional Header**:
+   - NCG Holdings company logo/name
+   - Company address and contact details
+   - Invoice/Proforma badge
+
+2. **Billing Section**:
+   - Customer details box
+   - Finance company box (for proforma)
+
+3. **Vehicle Details Grid**:
+   - Make, Model, Year, Color
+   - Engine/Chassis numbers
+   - Technical specs
+
+4. **Pricing Table**:
+   - Product description
+   - Unit price, Quantity, Total
+   - Proforma percentage handling
+
+5. **Bank Details Section** (Page 2):
+   - NCG Holdings bank account info
+   - Commercial Bank Nugegoda details
+
+6. **Payment Tracking**:
+   - Payment history table
+   - Total paid, Balance due
+
+7. **Signatures Section**:
+   - Prepared By
+   - Approved By  
+   - Received By
+
+8. **Footer**:
+   - Professional company contact info
+   - Terms and conditions
+
+9. **Currency Format**:
+   - Change from USD to LKR (Sri Lankan Rupees)
 
 ---
 
@@ -185,44 +145,35 @@ Needs to add:
 
 After implementation:
 
-1. **Complete Order View**: Modal shows all order details with proper data from quotation join
-2. **Visual Journey Tracking**: Users can see order progress through defined stages
-3. **Full Payment Workflow**: Record payment -> Verify -> GL Post -> Generate Receipt -> Sign -> Finalize
-4. **Invoice Management**: Generate Direct/Proforma invoices with signatures
-5. **Operations Tracking**: Track vehicle preparation, inspection, and delivery stages
-6. **Cash Receipts**: Professional receipts with customer and finance signatures
+1. **Payment Tracking Works**: Financial tab loads with correct order and payment data
+2. **Record Payment Works**: Users can record new payments
+3. **Verify Payment Works**: GL posting triggers correctly
+4. **Generate Invoice Works**: Direct and Proforma invoices generate with professional layout
+5. **Invoice View Works**: Preview shows Yutong-matching format
+6. **Receipt Generation Works**: Cash receipts generate from verified payments
 
 ---
 
 ## Testing Checklist
 
-After implementation:
+1. **Payment Tracking**
+   - Open any order's Financial tab
+   - Verify payment summary cards show correct totals (not LKR 0)
+   - Verify "Record Payment" button works
+   - Verify payment history displays
 
-1. **Order List**
-   - View button opens modal correctly
-   - Edit button allows status updates
-   - Orders display correct customer/vehicle info
+2. **Invoice Generation**
+   - Click "Generate Invoice"
+   - Select Direct Invoice or Proforma
+   - Verify invoice generates with professional format
+   - Verify NCG header displays
+   - Verify customer and vehicle details correct
+   - Verify bank details show on page 2
+   - Download and check PDF quality
 
-2. **Journey Tab**
-   - Shows current phase highlighted
-   - Progress percentage matches phase
-   - Can advance to next phase
-
-3. **Financial Tab**
-   - Payment summary shows correct totals
-   - Payment schedules display with milestones
-   - Record Payment works
-   - Verify Payment posts to GL
-   - Generate Receipt creates cash receipt
-   - View Receipt opens modal with signatures
-
-4. **Documents Tab**
-   - Generate Invoice (Direct/Proforma) works
-   - View Invoice shows preview
-   - Download Invoice works
-   - Invoice signatures can be added
-
-5. **Operations Tab**
-   - Vehicle preparation stages tracked
-   - Inspection checklist available
-   - Delivery confirmation works
+3. **Receipt Generation**
+   - Verify a payment
+   - Click "Generate Receipt"
+   - Verify receipt modal opens
+   - Add signatures
+   - Download receipt PDF
