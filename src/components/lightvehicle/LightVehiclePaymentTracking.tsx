@@ -67,10 +67,10 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   const loadPaymentData = async () => {
     setIsLoading(true);
     try {
-      // Load order details
+      // Load order details with quotation data
       const { data: order, error: orderError } = await supabase
         .from('lightvehicle_orders')
-        .select('*, lightvehicle_quotations(quotation_no, customer_name, customer_phone)')
+        .select('*, lightvehicle_quotations!quotation_id(quotation_number, customer_name, customer_phone, customer_address)')
         .eq('id', orderId)
         .single();
 
@@ -121,9 +121,9 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
       amount: payment.amount,
       paymentMethod: payment.payment_method || 'Bank Transfer',
       productDescription: `${orderDetails.brand || ''} ${orderDetails.vehicle_name || ''}`.trim(),
-      quotationNo: orderDetails.lightvehicle_quotations?.quotation_no,
+      quotationNo: orderDetails.lightvehicle_quotations?.quotation_number,
       customerName: orderDetails.lightvehicle_quotations?.customer_name || orderDetails.customer_name,
-      customerAddress: orderDetails.customer_address,
+      customerAddress: orderDetails.lightvehicle_quotations?.customer_address || orderDetails.customer_address,
       customerContact: orderDetails.lightvehicle_quotations?.customer_phone
     });
 
