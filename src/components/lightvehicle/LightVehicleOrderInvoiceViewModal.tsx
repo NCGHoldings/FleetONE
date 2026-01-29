@@ -72,7 +72,7 @@ export function LightVehicleOrderInvoiceViewModal({
       orderId: orderData.orderId,
       orderNo: orderData.orderNo,
       quotationNo: orderData.quotationNo,
-      invoiceDate: invoiceRecord.invoice_date,
+      invoiceDate: invoiceRecord.generated_at || invoiceRecord.created_at,
       customerName: orderData.customerName,
       customerAddress: orderData.customerAddress,
       customerPhone: orderData.customerPhone,
