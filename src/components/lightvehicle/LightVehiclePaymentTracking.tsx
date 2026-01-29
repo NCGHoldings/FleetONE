@@ -1,6 +1,6 @@
 /**
  * Light Vehicle Payment Tracking Component
- * Handles payment recording, verification, and GL integration
+ * Handles payment recording, verification, GL integration, and receipt generation
  */
 
 import React, { useState, useEffect } from 'react';
@@ -13,10 +13,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, Plus, RefreshCw, MoreHorizontal, FileText, Receipt, Eye } from 'lucide-react';
+import { useLightVehicleCashReceipts, LightVehicleCashReceipt } from '@/hooks/useLightVehicleCashReceipts';
+import { LightVehicleCashReceiptModal } from './LightVehicleCashReceiptModal';
 import {
   fetchVehicleFinanceSettings,
   createVehicleCustomer,
@@ -40,6 +42,11 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
+  const [receipts, setReceipts] = useState<LightVehicleCashReceipt[]>([]);
+  const [selectedReceipt, setSelectedReceipt] = useState<LightVehicleCashReceipt | null>(null);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  
+  const { fetchReceiptsForOrder, createReceipt, isCreating } = useLightVehicleCashReceipts();
   
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -89,12 +96,47 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
 
       if (paymentError) throw paymentError;
       setPayments(paymentData || []);
+
+      // Load receipts
+      const receiptData = await fetchReceiptsForOrder(orderId);
+      setReceipts(receiptData);
     } catch (error: any) {
       console.error('Error loading payment data:', error);
       toast.error('Failed to load payment data');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getPaymentReceipt = (paymentId: string) => {
+    return receipts.find(r => r.payment_id === paymentId);
+  };
+
+  const handleGenerateReceipt = async (payment: any) => {
+    if (!orderDetails) return;
+
+    const receipt = await createReceipt({
+      orderId: orderDetails.id,
+      paymentId: payment.id,
+      amount: payment.amount,
+      paymentMethod: payment.payment_method || 'Bank Transfer',
+      productDescription: `${orderDetails.brand || ''} ${orderDetails.vehicle_name || ''}`.trim(),
+      quotationNo: orderDetails.lightvehicle_quotations?.quotation_no,
+      customerName: orderDetails.lightvehicle_quotations?.customer_name || orderDetails.customer_name,
+      customerAddress: orderDetails.customer_address,
+      customerContact: orderDetails.lightvehicle_quotations?.customer_phone
+    });
+
+    if (receipt) {
+      setReceipts(prev => [receipt, ...prev]);
+      setSelectedReceipt(receipt);
+      setReceiptModalOpen(true);
+    }
+  };
+
+  const handleViewReceipt = (receipt: LightVehicleCashReceipt) => {
+    setSelectedReceipt(receipt);
+    setReceiptModalOpen(true);
   };
 
   const handleRecordPayment = async () => {
@@ -435,49 +477,81 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payments.map((payment) => (
-                    <TableRow key={payment.id}>
-                      <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{payment.reference_number || '-'}</TableCell>
-                      <TableCell className="capitalize">{payment.payment_method?.replace('_', ' ')}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        LKR {payment.amount?.toLocaleString()}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(payment.status)}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {(payment.status === 'pending' || payment.status === 'received') && (
-                              <DropdownMenuItem
-                                onClick={() => handleVerifyPayment(payment.id)}
-                                disabled={verifyingPayment === payment.id}
-                              >
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                {verifyingPayment === payment.id ? 'Verifying...' : 'Verify & Post GL'}
-                              </DropdownMenuItem>
-                            )}
-                            {payment.journal_entry_id && (
-                              <DropdownMenuItem disabled>
-                                <FileText className="h-4 w-4 mr-2" />
-                                GL Posted ✓
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {payments.map((payment) => {
+                    const receipt = getPaymentReceipt(payment.id);
+                    return (
+                      <TableRow key={payment.id}>
+                        <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
+                        <TableCell>{payment.reference_number || '-'}</TableCell>
+                        <TableCell className="capitalize">{payment.payment_method?.replace('_', ' ')}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          LKR {payment.amount?.toLocaleString()}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(payment.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {(payment.status === 'pending' || payment.status === 'received') && (
+                                <DropdownMenuItem
+                                  onClick={() => handleVerifyPayment(payment.id)}
+                                  disabled={verifyingPayment === payment.id}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  {verifyingPayment === payment.id ? 'Verifying...' : 'Verify & Post GL'}
+                                </DropdownMenuItem>
+                              )}
+                              {payment.journal_entry_id && (
+                                <DropdownMenuItem disabled>
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  GL Posted ✓
+                                </DropdownMenuItem>
+                              )}
+                              {(payment.status === 'verified' || payment.verified) && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  {receipt ? (
+                                    <DropdownMenuItem onClick={() => handleViewReceipt(receipt)}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View Receipt
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      onClick={() => handleGenerateReceipt(payment)}
+                                      disabled={isCreating}
+                                    >
+                                      <Receipt className="h-4 w-4 mr-2" />
+                                      {isCreating ? 'Creating...' : 'Generate Receipt'}
+                                    </DropdownMenuItem>
+                                  )}
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Receipt Modal */}
+      {selectedReceipt && (
+        <LightVehicleCashReceiptModal
+          open={receiptModalOpen}
+          onOpenChange={setReceiptModalOpen}
+          receipt={selectedReceipt}
+          onRefresh={loadPaymentData}
+        />
+      )}
 
       {/* Record Payment Modal */}
       <Dialog open={isRecordModalOpen} onOpenChange={setIsRecordModalOpen}>

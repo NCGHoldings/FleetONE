@@ -7,12 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { LightVehicleOrderInvoiceGenerator } from './LightVehicleOrderInvoiceGenerator';
 import { LightVehicleCashReceiptModal } from './LightVehicleCashReceiptModal';
+import { LightVehiclePaymentTracking } from './LightVehiclePaymentTracking';
+import { LightVehicleOrderJourney } from './LightVehicleOrderJourney';
+import { LightVehicleProcessManagement } from './LightVehicleProcessManagement';
 import { useLightVehicleCashReceipts, LightVehicleCashReceipt } from '@/hooks/useLightVehicleCashReceipts';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Car, User, Phone, Mail, MapPin, Calendar, DollarSign, 
   FileText, Receipt, CreditCard, Package, Clock, CheckCircle,
-  Eye, Plus, Loader2
+  Eye, Plus, Loader2, Route, Settings
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -49,6 +52,8 @@ interface OrderData {
   balance_due?: number;
   notes?: string;
   created_at?: string;
+  current_phase?: string;
+  progress_percentage?: number;
 }
 
 interface EnhancedLightVehicleOrderDetailsModalProps {
@@ -127,7 +132,9 @@ export function EnhancedLightVehicleOrderDetailsModal({
         total_paid: data.total_paid || 0,
         balance_due: data.balance_due || 0,
         notes: data.notes,
-        created_at: data.created_at
+        created_at: data.created_at,
+        current_phase: data.current_phase || 'order_confirmation',
+        progress_percentage: data.progress_percentage || 0
       };
       
       setOrder(mappedOrder);
@@ -223,10 +230,14 @@ export function EnhancedLightVehicleOrderDetailsModal({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               Overview
+            </TabsTrigger>
+            <TabsTrigger value="journey" className="flex items-center gap-2">
+              <Route className="h-4 w-4" />
+              Journey
             </TabsTrigger>
             <TabsTrigger value="financial" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
@@ -236,9 +247,9 @@ export function EnhancedLightVehicleOrderDetailsModal({
               <FileText className="h-4 w-4" />
               Documents
             </TabsTrigger>
-            <TabsTrigger value="progress" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Progress
+            <TabsTrigger value="operations" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Operations
             </TabsTrigger>
           </TabsList>
 
@@ -351,120 +362,29 @@ export function EnhancedLightVehicleOrderDetailsModal({
             </Card>
           </TabsContent>
 
-          {/* Financial Tab */}
-          <TabsContent value="financial" className="mt-4 space-y-4">
-            {/* Payment Summary */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-blue-600" />
-                  Payment Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-600">Total Amount</p>
-                    <p className="text-xl font-bold text-blue-700">{formatCurrency(order.total_price)}</p>
-                  </div>
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <p className="text-sm text-green-600">Amount Paid</p>
-                    <p className="text-xl font-bold text-green-700">{formatCurrency(order.total_paid || 0)}</p>
-                  </div>
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <p className="text-sm text-amber-600">Balance Due</p>
-                    <p className="text-xl font-bold text-amber-700">{formatCurrency(order.balance_due || (order.total_price - (order.total_paid || 0)))}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Journey Tab */}
+          <TabsContent value="journey" className="mt-4">
+            <LightVehicleOrderJourney 
+              order={{
+                id: order.id,
+                order_number: order.order_number,
+                status: order.status,
+                current_phase: order.current_phase,
+                progress_percentage: order.progress_percentage,
+                customer_name: order.customer_name,
+                vehicle_name: order.vehicle_model,
+                brand: order.vehicle_make
+              }} 
+              onRefresh={loadOrder} 
+            />
+          </TabsContent>
 
-            {/* Payment History */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Receipt className="h-4 w-4 text-blue-600" />
-                  Payment History & Receipts
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {payments.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No payments recorded yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {payments.map((payment) => {
-                      const receipt = getPaymentReceipt(payment.id);
-                      return (
-                        <div key={payment.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{formatCurrency(payment.amount || 0)}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {format(new Date(payment.payment_date || payment.created_at), 'MMM dd, yyyy')} • {payment.payment_method || 'N/A'}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={payment.status === 'verified' || payment.verified ? 'default' : 'secondary'}>
-                              {payment.status || (payment.verified ? 'verified' : 'pending')}
-                            </Badge>
-                            {receipt ? (
-                              <Button variant="outline" size="sm" onClick={() => handleViewReceipt(receipt)}>
-                                <Eye className="h-4 w-4 mr-1" />
-                                View Receipt
-                              </Button>
-                            ) : (payment.status === 'verified' || payment.verified) ? (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => handleGenerateReceipt(payment)}
-                                disabled={isCreating}
-                              >
-                                {isCreating ? (
-                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                ) : (
-                                  <Plus className="h-4 w-4 mr-1" />
-                                )}
-                                Generate Receipt
-                              </Button>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Existing Receipts */}
-            {receipts.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">All Receipts</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {receipts.map((receipt) => (
-                      <div key={receipt.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                        <div>
-                          <p className="font-medium">{receipt.receipt_no}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(receipt.receipt_date), 'MMM dd, yyyy')} • {formatCurrency(receipt.amount)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={receipt.status === 'finalized' ? 'default' : 'secondary'}>
-                            {receipt.status}
-                          </Badge>
-                          <Button variant="ghost" size="sm" onClick={() => handleViewReceipt(receipt)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+          {/* Financial Tab - Integrated Payment Tracking */}
+          <TabsContent value="financial" className="mt-4">
+            <LightVehiclePaymentTracking 
+              orderId={order.id} 
+              onRefresh={loadOrder}
+            />
           </TabsContent>
 
           {/* Documents Tab */}
@@ -498,57 +418,19 @@ export function EnhancedLightVehicleOrderDetailsModal({
             />
           </TabsContent>
 
-          {/* Progress Tab */}
-          <TabsContent value="progress" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-blue-600" />
-                  Order Timeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Order Created</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(order.order_date), 'MMM dd, yyyy')}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {(order.total_paid || 0) > 0 && (
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Payment Received</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatCurrency(order.total_paid || 0)} of {formatCurrency(order.total_price)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {order.status === 'completed' && (
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Order Completed</p>
-                        <p className="text-sm text-muted-foreground">Vehicle delivered to customer</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          {/* Operations Tab */}
+          <TabsContent value="operations" className="mt-4">
+            <LightVehicleProcessManagement 
+              order={{
+                id: order.id,
+                order_number: order.order_number,
+                status: order.status,
+                vehicle_name: order.vehicle_model,
+                brand: order.vehicle_make,
+                customer_name: order.customer_name
+              }} 
+              onRefresh={loadOrder}
+            />
           </TabsContent>
         </Tabs>
 
