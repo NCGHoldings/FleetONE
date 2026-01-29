@@ -1,247 +1,228 @@
 
-# Fix Light Vehicle Module - Complete Process Development
+# Light Vehicle Complete Sales Flow - Full Development Plan
 
-## Overview
+## Executive Summary
 
-Multiple issues are preventing the Light Vehicle module from functioning properly. This plan addresses all identified problems to enable the complete quotation-to-order-to-payment workflow.
-
----
-
-## Problems Identified
-
-### 1. Database Schema Mismatches
-
-The `lightvehicle_customer_payments` table has columns that don't match what the code is trying to use:
-
-| Code Expects | Database Has |
-|-------------|--------------|
-| `payment_amount` | `amount` |
-| `payment_reference` | `reference_number` |
-| `bank_name` | Not present |
-| `cheque_no` | Not present |
-| `status` | `verified` (boolean only) |
-| `verification_status` | Not present |
-
-### 2. Missing RLS Policies
-
-Several tables are missing `authenticated` user policies, blocking CRUD operations:
-
-| Table | Status |
-|-------|--------|
-| `lightvehicle_addons` | service_role only |
-| `lightvehicle_customers` | service_role only |
-| `lightvehicle_customization_options` | service_role only |
-| `lightvehicle_model_images` | service_role only |
-| `lightvehicle_referral_commission_payments` | service_role only |
-| `lightvehicle_responsible_persons` | service_role only |
-| `lightvehicle_shipment_group_orders` | service_role only |
-| `lightvehicle_shipment_groups` | service_role only |
-| `lightvehicle_vehicle_data_sheets` | service_role only |
-| `lightvehicle_vehicle_records` | service_role only |
-| `lightvehicle_customer_payments` | Policy targets `public` role incorrectly |
-
-### 3. Payment Tracking Component Issues
-
-The `LightVehiclePaymentTracking.tsx` component tries to:
-- Insert columns that don't exist in the database
-- Read `payment_amount` when the column is actually `amount`
-- Read `verification_status` instead of using `verified` boolean
-- Access `status` column which doesn't exist
-
-### 4. Order Details Modal Data Query
-
-The `EnhancedLightVehicleOrderDetailsModal.tsx` queries `lightvehicle_customer_payments` reading non-existent column names.
+This plan will bring the Light Vehicle Sales module to full feature parity with the Yutong module, ensuring a complete end-to-end sales workflow from quotation to delivery with proper payment tracking, document generation, and signature management.
 
 ---
 
-## Solution
+## Current State Analysis
 
-### Migration 1: Add Missing Columns to Customer Payments Table
+### What Light Vehicle Has (Partially Working)
+| Component | Status | Issues |
+|-----------|--------|--------|
+| Order Details Modal | Partial | Missing payment tracking integration |
+| Cash Receipt System | Exists | Not integrated with payment verification flow |
+| Invoice Generator | Exists | Working but limited view/download functions |
+| Payment Tracking | Exists | Not integrated into Order Details modal |
+| Progress Tab | Basic | Static timeline, missing journey tracking |
 
-```sql
-ALTER TABLE public.lightvehicle_customer_payments
-  ADD COLUMN IF NOT EXISTS bank_name TEXT,
-  ADD COLUMN IF NOT EXISTS cheque_no TEXT,
-  ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending',
-  ADD COLUMN IF NOT EXISTS verification_status TEXT DEFAULT 'pending';
+### What Yutong Has (Light Vehicle Needs)
+| Feature | Yutong Component | Light Vehicle Status |
+|---------|-----------------|---------------------|
+| Order Journey Tracker | YutongOrderJourney | Missing |
+| Integrated Payment Tracking | YutongPaymentTracking in Financial tab | Missing integration |
+| Cash Receipt from Payment | Generate Receipt button per payment | Exists but broken |
+| Invoice View/Approve | YutongOrderInvoiceViewModal with signatures | Exists but limited |
+| Process Management | ProcessManagement for multi-stage operations | Missing |
+| Operations Tab | Supplier, Logistics, Customs, etc. | Missing |
 
--- Update existing records to have proper status based on verified flag
-UPDATE public.lightvehicle_customer_payments 
-SET status = CASE WHEN verified = true THEN 'verified' ELSE 'pending' END,
-    verification_status = CASE WHEN verified = true THEN 'verified' ELSE 'pending' END
-WHERE status IS NULL;
+---
+
+## Implementation Plan
+
+### Phase 1: Fix Order Details Modal Integration
+
+The `EnhancedLightVehicleOrderDetailsModal` needs to properly integrate the `LightVehiclePaymentTracking` component in the Financial tab instead of the current inline implementation.
+
+**Current Problem**: Financial tab has custom inline payment display that doesn't match the full-featured `LightVehiclePaymentTracking` component.
+
+**Solution**: Replace the inline Financial tab content with the proper `LightVehiclePaymentTracking` component that includes:
+- Payment schedule display with milestones
+- Record payment functionality
+- Verify payment with GL posting
+- Generate receipt per payment
+- Complete payment history
+
+### Phase 2: Create Order Journey Component
+
+Create `LightVehicleOrderJourney.tsx` modeled on `YutongOrderJourney.tsx` with stages appropriate for light vehicle sales:
+
+**Proposed Light Vehicle Journey Stages**:
+1. Order Confirmation
+2. Payment Collection (Advance)
+3. Vehicle Preparation
+4. Documentation
+5. Vehicle Inspection
+6. RMV Registration (if applicable)
+7. Final Inspection
+8. Delivery
+
+### Phase 3: Enhance Financial Tab
+
+Replace current Financial tab with integrated payment tracking:
+
+```text
+Financial Tab Structure:
++----------------------------------+
+| Payment Summary Cards            |
+| [Total] [Paid] [Pending] [Due]   |
++----------------------------------+
+| Payment Schedule                 |
+| - Milestone 1: Advance (10%)     |
+| - Milestone 2: Interim (40%)     |
+| - Milestone 3: Balance (50%)     |
++----------------------------------+
+| Payment History                  |
+| [Date] [Ref] [Amount] [Status]   |
+| Actions: Verify | Generate Receipt|
++----------------------------------+
+| Cash Receipts                    |
+| View/Download generated receipts |
++----------------------------------+
 ```
 
-### Migration 2: Fix RLS Policies
+### Phase 4: Add Journey/Operations Tab
 
-Add `authenticated` user policies for all 10 tables currently missing them plus fix the customer_payments policy.
+Add new tabs to match Yutong structure:
+- **Journey Tab**: Visual order progress tracker
+- **Operations Tab**: Process management for vehicle preparation
 
-### Code Fix: Update LightVehiclePaymentTracking.tsx
+### Phase 5: Ensure Receipt Integration Works
 
-Fix the column name mappings to use actual database columns:
-- Change `payment_amount` to `amount` in insert and read operations
-- Change `payment_reference` to `reference_number`
-- Add proper status field handling
-
-### Code Fix: Update EnhancedLightVehicleOrderDetailsModal.tsx
-
-Fix payment data reading to use correct column names.
+Fix the cash receipt generation flow:
+1. When payment is verified, enable "Generate Receipt" button
+2. Receipt modal opens with signature collection
+3. PDF download with customer and finance signatures
+4. Status update to "finalized"
 
 ---
 
-## Files to Create/Modify
+## Files to Modify
 
-| File | Action | Purpose |
-|------|--------|---------|
-| `supabase/migrations/XXXX_fix_lightvehicle_customer_payments_schema.sql` | Create | Add missing columns |
-| `supabase/migrations/XXXX_fix_remaining_lightvehicle_rls.sql` | Create | Add RLS policies for 10 tables |
-| `src/components/lightvehicle/LightVehiclePaymentTracking.tsx` | Modify | Fix column name mappings |
-| `src/components/lightvehicle/EnhancedLightVehicleOrderDetailsModal.tsx` | Modify | Fix payment data reading |
+| File | Changes |
+|------|---------|
+| `src/components/lightvehicle/EnhancedLightVehicleOrderDetailsModal.tsx` | Add Journey tab, integrate LightVehiclePaymentTracking in Financial tab, add Operations tab |
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/components/lightvehicle/LightVehicleOrderJourney.tsx` | Visual order progress tracker with stages |
+| `src/components/lightvehicle/LightVehicleProcessManagement.tsx` | Process management for vehicle operations |
 
 ---
 
 ## Technical Details
 
-### Database Migration 1: Customer Payments Schema
+### EnhancedLightVehicleOrderDetailsModal Changes
 
-```sql
--- Add missing columns to lightvehicle_customer_payments
-ALTER TABLE public.lightvehicle_customer_payments
-  ADD COLUMN IF NOT EXISTS bank_name TEXT,
-  ADD COLUMN IF NOT EXISTS cheque_no TEXT,
-  ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending',
-  ADD COLUMN IF NOT EXISTS verification_status TEXT DEFAULT 'pending';
+**Current Tabs**: Overview, Financial, Documents, Progress
 
--- Backfill status for existing records
-UPDATE public.lightvehicle_customer_payments 
-SET status = CASE WHEN verified = true THEN 'verified' ELSE 'pending' END,
-    verification_status = CASE WHEN verified = true THEN 'verified' ELSE 'pending' END
-WHERE status IS NULL OR verification_status IS NULL;
-```
+**New Tabs**: Overview, Journey, Financial, Documents, Operations
 
-### Database Migration 2: RLS Policies
-
-```sql
--- Fix customer_payments policy (currently targets public, should be authenticated)
-DROP POLICY IF EXISTS "Authenticated users can manage lightvehicle_customer_payments" 
-  ON public.lightvehicle_customer_payments;
-  
-CREATE POLICY "Authenticated users can manage lightvehicle_customer_payments" 
-  ON public.lightvehicle_customer_payments 
-  FOR ALL 
-  TO authenticated 
-  USING (true) 
-  WITH CHECK (true);
-
--- Add policies for other tables...
-CREATE POLICY "Authenticated users can manage lightvehicle_addons" 
-  ON public.lightvehicle_addons 
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "Authenticated users can manage lightvehicle_customers" 
-  ON public.lightvehicle_customers 
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
--- (Similar for remaining 8 tables)
-```
-
-### Code Fix: LightVehiclePaymentTracking.tsx
-
-Key changes at line ~114-128:
 ```typescript
-// BEFORE (incorrect):
-const { error } = await supabase
-  .from('lightvehicle_customer_payments')
-  .insert({
-    payment_amount: amount,        // Wrong column name
-    payment_reference: ref,        // Wrong column name
-    // ...
-  });
+// Add import for new components
+import { LightVehiclePaymentTracking } from './LightVehiclePaymentTracking';
+import { LightVehicleOrderJourney } from './LightVehicleOrderJourney';
 
-// AFTER (correct):
-const { error } = await supabase
-  .from('lightvehicle_customer_payments')
-  .insert({
-    amount: amount,                // Correct column name
-    reference_number: ref,         // Correct column name
-    bank_name: paymentForm.bank_name,
-    cheque_no: paymentForm.cheque_no,
-    status: 'pending',
-    verification_status: 'pending',
-    // ...
-  });
+// Update TabsList to include new tabs
+<TabsList className="grid w-full grid-cols-5">
+  <TabsTrigger value="overview">Overview</TabsTrigger>
+  <TabsTrigger value="journey">Journey</TabsTrigger>
+  <TabsTrigger value="financial">Financial</TabsTrigger>
+  <TabsTrigger value="documents">Documents</TabsTrigger>
+  <TabsTrigger value="operations">Operations</TabsTrigger>
+</TabsList>
+
+// Journey Tab - NEW
+<TabsContent value="journey">
+  <LightVehicleOrderJourney order={order} onRefresh={loadOrder} />
+</TabsContent>
+
+// Financial Tab - REPLACE current content
+<TabsContent value="financial">
+  <LightVehiclePaymentTracking 
+    orderId={order.id} 
+    onRefresh={loadOrder} 
+  />
+</TabsContent>
 ```
 
-Also fix reading payment data (lines ~330-335):
+### LightVehicleOrderJourney Component Structure
+
 ```typescript
-// BEFORE:
-.reduce((sum, p) => sum + p.payment_amount, 0);
-
-// AFTER:
-.reduce((sum, p) => sum + (p.amount || 0), 0);
+// Light vehicle specific journey stages
+const journeySteps = [
+  { key: 'order_confirmation', label: 'Order Confirmation', days: 1 },
+  { key: 'payment_collection', label: 'Payment Collection', days: 3 },
+  { key: 'vehicle_preparation', label: 'Vehicle Preparation', days: 5 },
+  { key: 'documentation', label: 'Documentation', days: 2 },
+  { key: 'vehicle_inspection', label: 'Vehicle Inspection', days: 1 },
+  { key: 'registration', label: 'RMV Registration', days: 5 },
+  { key: 'final_check', label: 'Final Check', days: 1 },
+  { key: 'delivery', label: 'Delivery', days: 1 }
+];
 ```
 
-### Code Fix: EnhancedLightVehicleOrderDetailsModal.tsx
+### LightVehiclePaymentTracking Integration
 
-Fix payment display (lines ~400-403):
-```typescript
-// BEFORE:
-<p className="font-medium">{formatCurrency(payment.amount)}</p>
+The existing component already has:
+- Payment recording
+- Payment verification with GL posting
+- Payment schedule display
+- Milestone tracking
 
-// AFTER (already correct, but ensure verification_status is handled):
-<Badge variant={payment.status === 'verified' ? 'default' : 'secondary'}>
-  {payment.status || 'pending'}
-</Badge>
-```
+Needs to add:
+- Cash receipt generation button per verified payment
+- Integration with `useLightVehicleCashReceipts` hook
+- View receipt modal trigger
 
 ---
 
 ## Expected Outcome
 
-After these fixes:
+After implementation:
 
-1. **Order Creation**: Works end-to-end from confirmed quotation
-2. **View Button**: Shows complete order details with customer and vehicle info from linked quotation
-3. **Edit Button**: Allows updating order status, progress, and delivery dates
-4. **Payment Recording**: Successfully saves to database with all fields
-5. **Payment Verification**: Updates status correctly and triggers GL posting
-6. **Payment History**: Displays correct amounts and statuses
-7. **Document Generation**: Invoices and receipts work properly
+1. **Complete Order View**: Modal shows all order details with proper data from quotation join
+2. **Visual Journey Tracking**: Users can see order progress through defined stages
+3. **Full Payment Workflow**: Record payment -> Verify -> GL Post -> Generate Receipt -> Sign -> Finalize
+4. **Invoice Management**: Generate Direct/Proforma invoices with signatures
+5. **Operations Tracking**: Track vehicle preparation, inspection, and delivery stages
+6. **Cash Receipts**: Professional receipts with customer and finance signatures
 
 ---
 
 ## Testing Checklist
 
-After deployment:
+After implementation:
 
-1. **Quotation Flow**
-   - Create new quotation
-   - Update status to "Confirmed"
-   
-2. **Order Creation**
-   - Click "Create Order" 
-   - Select confirmed quotation
-   - Choose payment mode (Cash/Lease)
-   - Verify order appears in list
+1. **Order List**
+   - View button opens modal correctly
+   - Edit button allows status updates
+   - Orders display correct customer/vehicle info
 
-3. **View Order**
-   - Click "View" button
-   - Verify all tabs display data (Overview, Financial, Documents, Progress)
-   - Verify customer details show from quotation
+2. **Journey Tab**
+   - Shows current phase highlighted
+   - Progress percentage matches phase
+   - Can advance to next phase
 
-4. **Edit Order**
-   - Click "Edit" button
-   - Change status and progress
-   - Save and verify changes persist
+3. **Financial Tab**
+   - Payment summary shows correct totals
+   - Payment schedules display with milestones
+   - Record Payment works
+   - Verify Payment posts to GL
+   - Generate Receipt creates cash receipt
+   - View Receipt opens modal with signatures
 
-5. **Payment Recording**
-   - Open order details
-   - Go to Financial tab
-   - Click "Record Payment"
-   - Fill form and save
-   - Verify payment appears in list
+4. **Documents Tab**
+   - Generate Invoice (Direct/Proforma) works
+   - View Invoice shows preview
+   - Download Invoice works
+   - Invoice signatures can be added
 
-6. **Payment Verification**
-   - Click verify on pending payment
-   - Verify GL entry is created
-   - Verify payment status updates
+5. **Operations Tab**
+   - Vehicle preparation stages tracked
+   - Inspection checklist available
+   - Delivery confirmation works
