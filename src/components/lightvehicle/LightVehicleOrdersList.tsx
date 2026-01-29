@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Eye, Edit, Loader2 } from 'lucide-react';
+import { Eye, Edit, Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { EnhancedLightVehicleOrderDetailsModal } from './EnhancedLightVehicleOrderDetailsModal';
+import { LightVehicleCreateOrderModal } from './LightVehicleCreateOrderModal';
 
 interface LightVehicleOrder {
   id: string;
@@ -32,6 +33,7 @@ export function LightVehicleOrdersList() {
   const [loading, setLoading] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [createOrderModalOpen, setCreateOrderModalOpen] = useState(false);
   const { toast } = useToast();
 
   const loadOrders = async () => {
@@ -101,6 +103,10 @@ export function LightVehicleOrdersList() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Light Vehicle Orders</CardTitle>
+            <Button onClick={() => setCreateOrderModalOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Order
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -174,6 +180,12 @@ export function LightVehicleOrdersList() {
           onRefresh={loadOrders}
         />
       )}
+
+      <LightVehicleCreateOrderModal
+        open={createOrderModalOpen}
+        onOpenChange={setCreateOrderModalOpen}
+        onSuccess={loadOrders}
+      />
     </>
   );
 }
