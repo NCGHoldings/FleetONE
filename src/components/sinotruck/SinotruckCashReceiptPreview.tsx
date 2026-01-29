@@ -116,13 +116,41 @@ export const SinotruckCashReceiptPreview = forwardRef<HTMLDivElement, SinotruckC
         <style dangerouslySetInnerHTML={{ __html: pageStyles }} />
         
         <div className="cash-receipt-page" style={{ border: '2px solid #dc2626', padding: '0' }}>
-          {/* Header - Sinotruck branding */}
-          <div className="receipt-header">
-            <img
-              src="https://ncg-fleetflow.lovable.app/lovable-uploads/c2a8d40e-c5fd-421b-a6b9-43dca02eb90a.png"
-              alt="Cash Receipt Header - NCG Holdings & Sinotruck"
-              style={{ width: '100%', height: 'auto', display: 'block' }}
-            />
+          {/* Header - Receipt specific branding */}
+          <div className="receipt-header" style={{
+            background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+            padding: '15px 25px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <img 
+                src="/lovable-uploads/4f23f225-3dd1-4b3a-a078-0be25fd07b9c.png" 
+                alt="NCG Holdings" 
+                style={{ height: '50px', objectFit: 'contain' }}
+              />
+              <div style={{ color: 'white' }}>
+                <div style={{ fontSize: '14px', fontWeight: 'bold' }}>NCG HOLDINGS (PVT) LTD</div>
+                <div style={{ fontSize: '10px', opacity: 0.9 }}>Authorized Dealer</div>
+              </div>
+            </div>
+            <div style={{ 
+              color: 'white', 
+              fontSize: '32px', 
+              fontWeight: 'bold',
+              letterSpacing: '4px',
+              textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+            }}>
+              RECEIPT
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <img 
+                src="/lovable-uploads/3b2d4cfc-0490-40f7-b329-fa8a328ce48a.png" 
+                alt="Sinotruck" 
+                style={{ height: '40px', objectFit: 'contain' }}
+              />
+            </div>
           </div>
 
           <div style={{ padding: '20px' }}>

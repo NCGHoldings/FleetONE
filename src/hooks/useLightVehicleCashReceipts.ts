@@ -29,18 +29,18 @@ export interface LightVehicleCashReceipt {
   created_at: string;
 }
 
-// Number to words conversion
+// Number to words conversion - International Million format with RUPEES
 function numberToWords(num: number): string {
-  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
+    'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+  const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
   
-  if (num === 0) return 'Zero';
+  if (num === 0) return 'ZERO RUPEES ONLY';
   
   function convertHundreds(n: number): string {
     let result = '';
     if (n >= 100) {
-      result += ones[Math.floor(n / 100)] + ' Hundred ';
+      result += ones[Math.floor(n / 100)] + ' HUNDRED ';
       n %= 100;
     }
     if (n >= 20) {
@@ -53,18 +53,27 @@ function numberToWords(num: number): string {
     return result;
   }
   
-  let result = '';
-  const billion = Math.floor(num / 1000000000);
-  const million = Math.floor((num % 1000000000) / 1000000);
-  const thousand = Math.floor((num % 1000000) / 1000);
-  const remainder = Math.floor(num % 1000);
+  const rupees = Math.floor(num);
+  const cents = Math.round((num - rupees) * 100);
   
-  if (billion) result += convertHundreds(billion) + 'Billion ';
-  if (million) result += convertHundreds(million) + 'Million ';
-  if (thousand) result += convertHundreds(thousand) + 'Thousand ';
+  let result = '';
+  const billion = Math.floor(rupees / 1000000000);
+  const million = Math.floor((rupees % 1000000000) / 1000000);
+  const thousand = Math.floor((rupees % 1000000) / 1000);
+  const remainder = Math.floor(rupees % 1000);
+  
+  if (billion) result += convertHundreds(billion) + 'BILLION ';
+  if (million) result += convertHundreds(million) + 'MILLION ';
+  if (thousand) result += convertHundreds(thousand) + 'THOUSAND ';
   if (remainder) result += convertHundreds(remainder);
   
-  return result.trim();
+  result = result.trim() + ' RUPEES';
+  if (cents > 0) {
+    result += ' AND ' + convertHundreds(cents).trim() + ' CENTS';
+  }
+  result += ' ONLY';
+  
+  return result;
 }
 
 export function useLightVehicleCashReceipts() {
@@ -124,7 +133,7 @@ export function useLightVehicleCashReceipts() {
       const { data: receiptNo, error: noError } = await supabase.rpc('generate_lightvehicle_receipt_no');
       if (noError) throw noError;
 
-      const amountInWords = numberToWords(Math.floor(receiptData.amount)) + ' Dollars Only';
+      const amountInWords = numberToWords(receiptData.amount);
 
       const { data: user } = await supabase.auth.getUser();
 
