@@ -8932,9 +8932,14 @@ export type Database = {
           created_at: string | null
           due_date: string | null
           id: string
+          milestone_name: string
           notes: string | null
           order_id: string | null
+          payment_date: string | null
+          payment_method: string | null
+          payment_reference: string | null
           payment_type: string
+          sequence_order: number | null
           status: string | null
           updated_at: string | null
         }
@@ -8943,9 +8948,14 @@ export type Database = {
           created_at?: string | null
           due_date?: string | null
           id?: string
+          milestone_name?: string
           notes?: string | null
           order_id?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           payment_type: string
+          sequence_order?: number | null
           status?: string | null
           updated_at?: string | null
         }
@@ -8954,9 +8964,14 @@ export type Database = {
           created_at?: string | null
           due_date?: string | null
           id?: string
+          milestone_name?: string
           notes?: string | null
           order_id?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           payment_type?: string
+          sequence_order?: number | null
           status?: string | null
           updated_at?: string | null
         }
