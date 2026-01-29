@@ -925,6 +925,55 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
               <b>10. Indemnity, Marketing & Assignment:</b> The buyer agrees to indemnify the seller against any claims arising from use or resale of the vehicle. The seller may use vehicle images for promotional purposes. The buyer may not assign or transfer this agreement without written consent.
             </p>
           </div>
+
+          {/* Additional Terms Section - Warranty, Delivery, Payment */}
+          {(quotation.warranty_terms || quotation.delivery_timeline || quotation.payment_terms) && (
+            <div style={{ 
+              marginTop: "15px", 
+              padding: "12px", 
+              border: "2px solid #003366", 
+              borderRadius: "8px", 
+              background: "#f8f9fa" 
+            }}>
+              <h4 style={{ 
+                color: "#003366", 
+                marginBottom: "8px", 
+                fontSize: "12px", 
+                fontWeight: "bold",
+                borderBottom: "1px solid #003366",
+                paddingBottom: "4px"
+              }}>
+                ADDITIONAL TERMS
+              </h4>
+              
+              {quotation.warranty_terms && (
+                <div style={{ marginBottom: "8px" }}>
+                  <b style={{ color: "#003366", fontSize: "11px" }}>WARRANTY TERMS:</b>
+                  <p style={{ margin: "4px 0 0 0", whiteSpace: "pre-line", fontSize: "10px", lineHeight: "1.4" }}>
+                    {quotation.warranty_terms}
+                  </p>
+                </div>
+              )}
+              
+              {quotation.delivery_timeline && (
+                <div style={{ marginBottom: "8px" }}>
+                  <b style={{ color: "#003366", fontSize: "11px" }}>DELIVERY TIMELINE:</b>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "10px", lineHeight: "1.4" }}>
+                    {quotation.delivery_timeline}
+                  </p>
+                </div>
+              )}
+              
+              {quotation.payment_terms && (
+                <div style={{ marginBottom: "0" }}>
+                  <b style={{ color: "#003366", fontSize: "11px" }}>PAYMENT TERMS:</b>
+                  <p style={{ margin: "4px 0 0 0", whiteSpace: "pre-line", fontSize: "10px", lineHeight: "1.4" }}>
+                    {quotation.payment_terms}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Page 2 Footer with Signatures */}
