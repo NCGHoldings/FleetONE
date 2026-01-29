@@ -1,180 +1,137 @@
 
-# Fix Light Vehicle Sales Flow - Order Creation from Quotations
+# Fix Light Vehicle RLS Policy Issues
 
-## Problem Identified
+## Problem
 
-The Light Vehicle module currently shows "No orders found. Orders are created from confirmed quotations." but there is no mechanism to actually create orders from confirmed quotations. The flow is broken because:
+When creating an order from a confirmed quotation, the system fails with:
+```
+"new row violates row-level security policy for table 'lightvehicle_orders'"
+```
 
-1. When a quotation status is changed to "confirmed", no order is automatically created
-2. There is no "Create Order" button or modal to manually create orders from confirmed quotations
-3. The module is missing the `useLightVehicleOrderManagement` hook that handles the quotation-to-order conversion
+This happens because several Light Vehicle tables are missing RLS policies for authenticated users. They only have `service_role` policies, which means only backend services can access them - not logged-in users from the app.
 
-This is different from the Yutong and Sinotruck modules which have:
-- A "Create Order" button in their Orders list
-- A `CreateOrderModal` that shows confirmed quotations and allows order creation
-- A dedicated order management hook with `createOrderFromQuotation()` function
+## Affected Tables
 
----
+The following tables need RLS policies added for authenticated users:
+
+| Table | Current State | Needed |
+|-------|--------------|--------|
+| `lightvehicle_orders` | service_role only | Add authenticated policies |
+| `lightvehicle_order_tasks` | service_role only | Add authenticated policies |
+| `lightvehicle_payment_schedules` | service_role only | Add authenticated policies |
+| `lightvehicle_quotation_addons` | service_role only | Add authenticated policies |
+| `lightvehicle_invoice_records` | service_role only | Add authenticated policies |
+| `lightvehicle_invoice_documents` | service_role only | Add authenticated policies |
+| `lightvehicle_invoice_signatures` | service_role only | Add authenticated policies |
 
 ## Solution
 
-Replicate the Yutong/Sinotruck order creation pattern for Light Vehicle:
+Create a database migration that adds proper RLS policies allowing authenticated users to perform CRUD operations on these tables.
 
-### Phase 1: Create Order Management Hook
+### Migration File
 
-Create `src/hooks/useLightVehicleOrderManagement.ts` with:
-- `createOrderFromQuotation()` function
-- `createPaymentSchedule()` function  
-- `getOrdersWithDetails()` function
-- `updateOrderPhase()` function
+Create `supabase/migrations/XXXX_fix_lightvehicle_rls_policies.sql`:
 
-The hook will:
-1. Fetch quotation details when creating an order
-2. Generate order number (using pattern LVO-YYYY-NNNN)
-3. Create order record in `lightvehicle_orders` table
-4. Create payment schedule in `lightvehicle_payment_schedules` table
-5. Update quotation status to `converted_to_order`
+```sql
+-- Fix missing RLS policies for Light Vehicle tables
+-- These tables currently only have service_role policies
 
-### Phase 2: Create Order Modal
+-- 1. lightvehicle_orders
+CREATE POLICY "Authenticated users can view lightvehicle_orders" 
+  ON public.lightvehicle_orders 
+  FOR SELECT 
+  TO authenticated 
+  USING (true);
 
-Create `src/components/lightvehicle/LightVehicleCreateOrderModal.tsx`:
-- Dropdown to select from confirmed quotations (excluding those already converted)
-- Display selected quotation details (customer, vehicle, price)
-- Payment mode selection (cash/lease)
-- Expected delivery date input
-- Order notes field
-- Create Order button
+CREATE POLICY "Authenticated users can insert lightvehicle_orders" 
+  ON public.lightvehicle_orders 
+  FOR INSERT 
+  TO authenticated 
+  WITH CHECK (true);
 
-### Phase 3: Update Orders List
+CREATE POLICY "Authenticated users can update lightvehicle_orders" 
+  ON public.lightvehicle_orders 
+  FOR UPDATE 
+  TO authenticated 
+  USING (true);
 
-Update `src/components/lightvehicle/LightVehicleOrdersList.tsx`:
-- Add "Create Order" button in the header
-- Add state for controlling the create order modal
-- Import and render `LightVehicleCreateOrderModal`
-- Add view mode toggle (table/card) like Yutong
-- Display order details with progress tracking
+CREATE POLICY "Authenticated users can delete lightvehicle_orders" 
+  ON public.lightvehicle_orders 
+  FOR DELETE 
+  TO authenticated 
+  USING (true);
 
-### Phase 4: Database Trigger (if needed)
+-- 2. lightvehicle_order_tasks
+CREATE POLICY "Authenticated users can manage lightvehicle_order_tasks" 
+  ON public.lightvehicle_order_tasks 
+  FOR ALL 
+  TO authenticated 
+  USING (true) 
+  WITH CHECK (true);
 
-Check if `lightvehicle_orders` has an auto-numbering trigger. If not, create one:
-- Function: `generate_lightvehicle_order_number()`
-- Trigger: Auto-populate `order_number` on insert
+-- 3. lightvehicle_payment_schedules
+CREATE POLICY "Authenticated users can manage lightvehicle_payment_schedules" 
+  ON public.lightvehicle_payment_schedules 
+  FOR ALL 
+  TO authenticated 
+  USING (true) 
+  WITH CHECK (true);
 
----
+-- 4. lightvehicle_quotation_addons
+CREATE POLICY "Authenticated users can manage lightvehicle_quotation_addons" 
+  ON public.lightvehicle_quotation_addons 
+  FOR ALL 
+  TO authenticated 
+  USING (true) 
+  WITH CHECK (true);
+
+-- 5. lightvehicle_invoice_records
+CREATE POLICY "Authenticated users can manage lightvehicle_invoice_records" 
+  ON public.lightvehicle_invoice_records 
+  FOR ALL 
+  TO authenticated 
+  USING (true) 
+  WITH CHECK (true);
+
+-- 6. lightvehicle_invoice_documents
+CREATE POLICY "Authenticated users can manage lightvehicle_invoice_documents" 
+  ON public.lightvehicle_invoice_documents 
+  FOR ALL 
+  TO authenticated 
+  USING (true) 
+  WITH CHECK (true);
+
+-- 7. lightvehicle_invoice_signatures
+CREATE POLICY "Authenticated users can manage lightvehicle_invoice_signatures" 
+  ON public.lightvehicle_invoice_signatures 
+  FOR ALL 
+  TO authenticated 
+  USING (true) 
+  WITH CHECK (true);
+```
 
 ## Files to Create
 
-| File | Description |
-|------|-------------|
-| `src/hooks/useLightVehicleOrderManagement.ts` | Order creation, payment schedules, phase updates |
-| `src/components/lightvehicle/LightVehicleCreateOrderModal.tsx` | Modal for creating orders from quotations |
-
-## Files to Modify
-
-| File | Changes |
+| File | Purpose |
 |------|---------|
-| `src/components/lightvehicle/LightVehicleOrdersList.tsx` | Add Create Order button, modal integration |
-| `supabase/migrations/...` | Add order number generation trigger if missing |
+| `supabase/migrations/XXXX_fix_lightvehicle_rls_policies.sql` | Add missing RLS policies |
 
----
+## Expected Outcome
 
-## Technical Details
+After this migration:
+1. Authenticated users can create orders from quotations
+2. Payment schedules can be created automatically
+3. Invoice generation and signatures will work
+4. Cash receipts can be created and managed
+5. The complete Light Vehicle sales flow will function end-to-end
 
-### Order Creation Flow
+## Testing
 
-```text
-User clicks "Create Order"
-         │
-         ▼
-┌─────────────────────────┐
-│  LightVehicleCreate     │
-│  OrderModal opens       │
-└─────────────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│ Load confirmed          │
-│ quotations (not yet     │
-│ converted to orders)    │
-└─────────────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│ User selects quotation  │
-│ + payment mode + notes  │
-└─────────────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│ createOrderFromQuotation│
-│ 1. Fetch quotation      │
-│ 2. Insert order record  │
-│ 3. Create pay schedule  │
-│ 4. Update quotation     │
-│    status to converted  │
-└─────────────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│ Order appears in        │
-│ Orders list             │
-└─────────────────────────┘
-```
-
-### Payment Structure
-
-**Cash Payment Mode:**
-- 10% Advance (due immediately)
-- 40% Interim (30 days)
-- 50% Balance (on delivery)
-
-**Lease Payment Mode:**
-- 20% Down payment
-- 80% Bank financing
-
-### Hook Interface
-
-```typescript
-interface CreateOrderData {
-  quotation_id: string;
-  payment_mode: 'cash' | 'lease';
-  expected_delivery_date?: string;
-  notes?: string;
-}
-
-interface UseLightVehicleOrderManagement {
-  isLoading: boolean;
-  createOrderFromQuotation: (data: CreateOrderData) => Promise<{ success: boolean; order?: any; error?: any }>;
-  getOrdersWithDetails: () => Promise<{ success: boolean; orders?: any[] }>;
-  updateOrderPhase: (orderId: string, phase: string, progress: number) => Promise<{ success: boolean }>;
-}
-```
-
----
-
-## Testing Checklist
-
-After implementation:
-
-1. **Create Order Flow**
-   - Confirm a quotation (change status to "confirmed")
-   - Go to Orders tab
-   - Click "Create Order" button
-   - Verify confirmed quotation appears in dropdown
-   - Select quotation, choose payment mode
-   - Click Create Order
-   - Verify order appears in orders list
-
-2. **Order Details**
-   - Click View on a created order
-   - Verify order shows customer details
-   - Verify Financial tab shows payment schedule
-   - Verify Documents tab works
-
-3. **Quotation Status**
-   - After creating order, verify quotation status changes to "converted_to_order"
-   - Verify converted quotation no longer appears in Create Order dropdown
-
-4. **Payment Schedule**
-   - Verify payment milestones are created correctly
-   - Check amounts match the percentages for selected payment mode
+After deployment:
+1. Go to Light Vehicle Quotations
+2. Click "Create Order" button
+3. Select a confirmed quotation
+4. Choose payment mode and set delivery date
+5. Click "Create Order"
+6. Verify order appears in the Orders list
+7. Open order details and verify all tabs work
