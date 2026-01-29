@@ -77,14 +77,60 @@ export function EnhancedLightVehicleOrderDetailsModal({
   const loadOrder = async () => {
     setLoading(true);
     try {
+      // Fetch order with related quotation data
       const { data, error } = await supabase
         .from('lightvehicle_orders')
-        .select('*')
+        .select(`
+          *,
+          quotation:lightvehicle_quotations!quotation_id (
+            quotation_number,
+            customer_address,
+            customer_phone,
+            customer_email,
+            engine_cc,
+            transmission,
+            fuel_type,
+            color,
+            year
+          )
+        `)
         .eq('id', orderId)
         .single();
 
       if (error) throw error;
-      setOrder(data);
+      
+      // Map database fields to display fields
+      const mappedOrder: OrderData = {
+        id: data.id,
+        order_no: data.order_number,
+        order_number: data.order_number,
+        quotation_no: data.quotation?.quotation_number || '',
+        order_date: data.created_at,
+        status: data.status,
+        customer_name: data.customer_name,
+        customer_address: data.quotation?.customer_address || '',
+        customer_phone: data.quotation?.customer_phone || '',
+        customer_email: data.quotation?.customer_email || '',
+        vehicle_make: data.brand || '',
+        vehicle_model: data.vehicle_name || '',
+        vehicle_name: data.vehicle_name,
+        brand: data.brand,
+        year_of_manufacture: data.quotation?.year?.toString() || '',
+        color_scheme: data.quotation?.color || '',
+        engine_capacity: data.quotation?.engine_cc || '',
+        transmission: data.quotation?.transmission || '',
+        fuel_type: data.quotation?.fuel_type || '',
+        unit_price: data.unit_price,
+        quantity: data.quantity,
+        total_price: data.total_amount,
+        total_amount: data.total_amount,
+        total_paid: data.total_paid || 0,
+        balance_due: data.balance_due || 0,
+        notes: data.notes,
+        created_at: data.created_at
+      };
+      
+      setOrder(mappedOrder);
 
       // Load receipts
       const receiptData = await fetchReceiptsForOrder(orderId);
