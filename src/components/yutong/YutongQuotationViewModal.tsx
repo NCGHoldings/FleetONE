@@ -87,6 +87,24 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
     }
   };
 
+  // Helper function to preload images as base64 for PDF generation
+  const loadImageAsBase64 = async (url: string): Promise<string> => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return '';
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error loading image:', url, error);
+      return '';
+    }
+  };
+
   const generatePDFBase64 = async (): Promise<string> => {
     if (!printRef.current) throw new Error('Print reference not found');
 
@@ -97,68 +115,110 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
       throw new Error('No pages found in quotation preview');
     }
 
+    // Pre-load all images from lovable-uploads as base64
+    const allImages = printRef.current.querySelectorAll('img[src*="lovable-uploads"]');
+    const originalSrcs: Map<HTMLImageElement, string> = new Map();
+    
+    // Load unique image URLs
+    const uniqueUrls = new Set<string>();
+    allImages.forEach(img => {
+      const imgEl = img as HTMLImageElement;
+      uniqueUrls.add(imgEl.src);
+    });
+    
+    // Pre-load all unique images
+    const base64Map: Map<string, string> = new Map();
+    await Promise.all(
+      Array.from(uniqueUrls).map(async (url) => {
+        const base64 = await loadImageAsBase64(url);
+        if (base64) {
+          base64Map.set(url, base64);
+        }
+      })
+    );
+    
+    // Replace image sources with base64
+    allImages.forEach((img) => {
+      const imgEl = img as HTMLImageElement;
+      originalSrcs.set(imgEl, imgEl.src);
+      const base64 = base64Map.get(imgEl.src);
+      if (base64) {
+        imgEl.src = base64;
+      }
+    });
+    
+    // Wait for images to update
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     const pdf = new jsPDF('p', 'mm', 'a4');
     
     // A4 dimensions in mm
     const pageWidth = 210;
     const pageHeight = 297;
     
-    for (let i = 0; i < pages.length; i++) {
-      const page = pages[i] as HTMLElement;
-      
-      // Store original styles
-      const originalWidth = page.style.width;
-      const originalMinHeight = page.style.minHeight;
-      const originalMaxWidth = page.style.maxWidth;
-      
-      // Set A4 dimensions for accurate capture
-      page.style.width = '210mm';
-      page.style.minHeight = '297mm';
-      page.style.maxWidth = '210mm';
-      
-      // Create canvas for each page individually
-      const canvas = await html2canvas(page, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        width: 794, // A4 width in pixels at 96dpi
-        height: page.scrollHeight,
-        scrollX: 0,
-        scrollY: 0,
-        foreignObjectRendering: false,
-        removeContainer: true,
-        logging: false
+    try {
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i] as HTMLElement;
+        
+        // Store original styles
+        const originalWidth = page.style.width;
+        const originalMinHeight = page.style.minHeight;
+        const originalMaxWidth = page.style.maxWidth;
+        
+        // Set A4 dimensions for accurate capture
+        page.style.width = '210mm';
+        page.style.minHeight = '297mm';
+        page.style.maxWidth = '210mm';
+        
+        // Create canvas for each page individually
+        const canvas = await html2canvas(page, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          width: 794, // A4 width in pixels at 96dpi
+          height: page.scrollHeight,
+          scrollX: 0,
+          scrollY: 0,
+          foreignObjectRendering: false,
+          removeContainer: true,
+          logging: false
+        });
+        
+        // Restore original styles
+        page.style.width = originalWidth;
+        page.style.minHeight = originalMinHeight;
+        page.style.maxWidth = originalMaxWidth;
+
+        const imgData = canvas.toDataURL('image/png');
+        
+        // Add new page if not the first page
+        if (i > 0) {
+          pdf.addPage();
+        }
+        
+        // Calculate dimensions to fit A4 width, position at TOP (not centered)
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * pageWidth) / canvas.width;
+        
+        // If image height exceeds page height, scale it down
+        if (imgHeight > pageHeight) {
+          const scaledHeight = pageHeight;
+          const scaledWidth = (canvas.width * pageHeight) / canvas.height;
+          pdf.addImage(imgData, 'PNG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
+        } else {
+          // Position at TOP of page (not centered)
+          pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        }
+      }
+
+      return pdf.output('datauristring').split(',')[1];
+    } finally {
+      // Restore original image sources
+      originalSrcs.forEach((originalSrc, imgEl) => {
+        imgEl.src = originalSrc;
       });
-      
-      // Restore original styles
-      page.style.width = originalWidth;
-      page.style.minHeight = originalMinHeight;
-      page.style.maxWidth = originalMaxWidth;
-
-      const imgData = canvas.toDataURL('image/png');
-      
-      // Add new page if not the first page
-      if (i > 0) {
-        pdf.addPage();
-      }
-      
-      // Calculate dimensions to fit A4 width, position at TOP (not centered)
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
-      
-      // If image height exceeds page height, scale it down
-      if (imgHeight > pageHeight) {
-        const scaledHeight = pageHeight;
-        const scaledWidth = (canvas.width * pageHeight) / canvas.height;
-        pdf.addImage(imgData, 'PNG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
-      } else {
-        // Position at TOP of page (not centered)
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      }
     }
-
-    return pdf.output('datauristring').split(',')[1];
   };
 
   const handleDownload = async () => {

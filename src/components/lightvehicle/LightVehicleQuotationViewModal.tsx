@@ -94,6 +94,24 @@ export function LightVehicleQuotationViewModal({ quotation, open, onClose }: Lig
     }
   };
 
+  // Helper function to preload images as base64 for PDF generation
+  const loadImageAsBase64 = async (url: string): Promise<string> => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return '';
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error loading image:', url, error);
+      return '';
+    }
+  };
+
   const generatePDFBase64 = async (): Promise<string> => {
     if (!printRef.current) throw new Error('Print reference not found');
 
@@ -103,59 +121,101 @@ export function LightVehicleQuotationViewModal({ quotation, open, onClose }: Lig
       throw new Error('No pages found in quotation preview');
     }
 
+    // Pre-load all images from lovable-uploads as base64
+    const allImages = printRef.current.querySelectorAll('img[src*="lovable-uploads"]');
+    const originalSrcs: Map<HTMLImageElement, string> = new Map();
+    
+    // Load unique image URLs
+    const uniqueUrls = new Set<string>();
+    allImages.forEach(img => {
+      const imgEl = img as HTMLImageElement;
+      uniqueUrls.add(imgEl.src);
+    });
+    
+    // Pre-load all unique images
+    const base64Map: Map<string, string> = new Map();
+    await Promise.all(
+      Array.from(uniqueUrls).map(async (url) => {
+        const base64 = await loadImageAsBase64(url);
+        if (base64) {
+          base64Map.set(url, base64);
+        }
+      })
+    );
+    
+    // Replace image sources with base64
+    allImages.forEach((img) => {
+      const imgEl = img as HTMLImageElement;
+      originalSrcs.set(imgEl, imgEl.src);
+      const base64 = base64Map.get(imgEl.src);
+      if (base64) {
+        imgEl.src = base64;
+      }
+    });
+    
+    // Wait for images to update
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     const pdf = new jsPDF('p', 'mm', 'a4');
     
     const pageWidth = 210;
     const pageHeight = 297;
     
-    for (let i = 0; i < pages.length; i++) {
-      const page = pages[i] as HTMLElement;
-      
-      const originalWidth = page.style.width;
-      const originalMinHeight = page.style.minHeight;
-      const originalMaxWidth = page.style.maxWidth;
-      
-      page.style.width = '210mm';
-      page.style.minHeight = '297mm';
-      page.style.maxWidth = '210mm';
-      
-      const canvas = await html2canvas(page, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        width: 794,
-        height: page.scrollHeight,
-        scrollX: 0,
-        scrollY: 0,
-        foreignObjectRendering: false,
-        removeContainer: true,
-        logging: false
+    try {
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i] as HTMLElement;
+        
+        const originalWidth = page.style.width;
+        const originalMinHeight = page.style.minHeight;
+        const originalMaxWidth = page.style.maxWidth;
+        
+        page.style.width = '210mm';
+        page.style.minHeight = '297mm';
+        page.style.maxWidth = '210mm';
+        
+        const canvas = await html2canvas(page, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          width: 794,
+          height: page.scrollHeight,
+          scrollX: 0,
+          scrollY: 0,
+          foreignObjectRendering: false,
+          removeContainer: true,
+          logging: false
+        });
+        
+        page.style.width = originalWidth;
+        page.style.minHeight = originalMinHeight;
+        page.style.maxWidth = originalMaxWidth;
+
+        const imgData = canvas.toDataURL('image/png');
+        
+        if (i > 0) {
+          pdf.addPage();
+        }
+        
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * pageWidth) / canvas.width;
+        
+        if (imgHeight > pageHeight) {
+          const scaledHeight = pageHeight;
+          const scaledWidth = (canvas.width * pageHeight) / canvas.height;
+          pdf.addImage(imgData, 'PNG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
+        } else {
+          pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        }
+      }
+
+      return pdf.output('datauristring').split(',')[1];
+    } finally {
+      // Restore original image sources
+      originalSrcs.forEach((originalSrc, imgEl) => {
+        imgEl.src = originalSrc;
       });
-      
-      page.style.width = originalWidth;
-      page.style.minHeight = originalMinHeight;
-      page.style.maxWidth = originalMaxWidth;
-
-      const imgData = canvas.toDataURL('image/png');
-      
-      if (i > 0) {
-        pdf.addPage();
-      }
-      
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
-      
-      if (imgHeight > pageHeight) {
-        const scaledHeight = pageHeight;
-        const scaledWidth = (canvas.width * pageHeight) / canvas.height;
-        pdf.addImage(imgData, 'PNG', (pageWidth - scaledWidth) / 2, 0, scaledWidth, scaledHeight);
-      } else {
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      }
     }
-
-    return pdf.output('datauristring').split(',')[1];
   };
 
   const handleDownload = async () => {
