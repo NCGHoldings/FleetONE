@@ -712,3 +712,262 @@ export function useARInvoiceBatches(branchId?: string) {
     enabled: !!selectedCompanyId,
   });
 }
+
+// Check for orphaned school invoices without Finance AR link
+export function useOrphanedSchoolInvoices() {
+  const { selectedCompanyId } = useCompany();
+
+  return useQuery({
+    queryKey: ["orphaned-school-invoices", selectedCompanyId],
+    queryFn: async () => {
+      const { data, error, count } = await supabase
+        .from("school_ar_invoices")
+        .select(`
+          id,
+          invoice_number,
+          amount,
+          paid_amount,
+          status,
+          ar_invoice_id,
+          student:school_students(id, student_name, branch_id),
+          batch:school_ar_invoice_batches!inner(company_id)
+        `, { count: 'exact' })
+        .is("ar_invoice_id", null)
+        .in("status", ["posted", "partial", "paid"]);
+
+      if (error) throw error;
+      
+      // Filter by company
+      const filtered = data?.filter((inv: any) => 
+        inv.batch?.company_id === selectedCompanyId
+      ) || [];
+      
+      return {
+        orphanedInvoices: filtered,
+        totalOrphaned: filtered.length,
+      };
+    },
+    enabled: !!selectedCompanyId,
+  });
+}
+
+// Backfill missing AR Invoice links
+export function useBackfillARInvoiceLinks() {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = getBusinessUnitCode();
+
+  return useMutation({
+    mutationFn: async () => {
+      // 1. Get default finance settings
+      const { data: defaultSettings } = await supabase
+        .from("school_bus_finance_settings")
+        .select("*")
+        .eq("company_id", selectedCompanyId)
+        .is("branch_id", null)
+        .maybeSingle();
+
+      if (!defaultSettings?.trade_receivable_account_id || !defaultSettings?.sbs_collection_account_id) {
+        throw new Error("Please configure Trade Receivable and SBS Collection accounts in Finance Settings first");
+      }
+
+      // 2. Find orphaned school_ar_invoices without ar_invoice_id
+      const { data: orphanedInvoices, error: fetchError } = await supabase
+        .from("school_ar_invoices")
+        .select(`
+          id,
+          invoice_number,
+          invoice_month,
+          amount,
+          paid_amount,
+          status,
+          student:school_students(id, student_name, branch_id),
+          batch:school_ar_invoice_batches!inner(company_id, branch_id)
+        `)
+        .is("ar_invoice_id", null)
+        .in("status", ["posted", "partial", "paid"]);
+
+      if (fetchError) throw fetchError;
+
+      // Filter by company
+      const toFix = orphanedInvoices?.filter((inv: any) => 
+        inv.batch?.company_id === selectedCompanyId
+      ) || [];
+
+      if (toFix.length === 0) {
+        return { fixed: 0, message: "All invoices are already linked to Finance AR" };
+      }
+
+      // 3. Get or create SBS customer in Finance
+      let customerId: string | null = null;
+      const { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("company_id", effectiveCompanyId)
+        .eq("customer_code", "SBS-DEFAULT")
+        .maybeSingle();
+
+      if (existingCustomer) {
+        customerId = existingCustomer.id;
+      } else {
+        const { data: newCustomer, error: customerError } = await supabase
+          .from("customers")
+          .insert({
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode || 'SBO',
+            customer_code: "SBS-DEFAULT",
+            customer_name: "School Bus Students (Backfill)",
+            is_active: true,
+          } as any)
+          .select()
+          .single();
+
+        if (customerError) throw customerError;
+        customerId = newCustomer?.id || null;
+      }
+
+      if (!customerId) {
+        throw new Error("Failed to create Finance customer for SBS");
+      }
+
+      // 4. Create Finance AR Invoices for each orphaned school invoice
+      let fixedCount = 0;
+      for (const inv of toFix) {
+        try {
+          // Determine correct status based on payment
+          let arStatus = "unpaid";
+          if (inv.status === "paid") {
+            arStatus = "paid";
+          } else if ((inv.paid_amount || 0) > 0) {
+            arStatus = "partial";
+          }
+
+          // Create Finance AR Invoice
+          const { data: arInvoice, error: arError } = await supabase
+            .from("ar_invoices")
+            .insert({
+              company_id: effectiveCompanyId,
+              business_unit_code: businessUnitCode || 'SBO',
+              customer_id: customerId,
+              invoice_number: inv.invoice_number,
+              invoice_date: inv.invoice_month,
+              due_date: inv.invoice_month, // Same as invoice date for simplicity
+              total_amount: inv.amount,
+              balance: (inv.amount || 0) - (inv.paid_amount || 0),
+              paid_amount: inv.paid_amount || 0,
+              status: arStatus,
+              reference: `Backfill: ${(inv.student as any)?.student_name || 'Unknown Student'}`,
+              notes: `School Bus AR Invoice (backfilled)`,
+            } as any)
+            .select()
+            .single();
+
+          if (arError) {
+            console.error(`Failed to create AR invoice for ${inv.invoice_number}:`, arError);
+            continue;
+          }
+
+          // Link school invoice to Finance AR invoice
+          const { error: updateError } = await supabase
+            .from("school_ar_invoices")
+            .update({ ar_invoice_id: arInvoice.id })
+            .eq("id", inv.id);
+
+          if (updateError) {
+            console.error(`Failed to link invoice ${inv.invoice_number}:`, updateError);
+            continue;
+          }
+
+          fixedCount++;
+        } catch (err) {
+          console.error(`Error processing invoice ${inv.invoice_number}:`, err);
+        }
+      }
+
+      return { fixed: fixedCount, total: toFix.length, message: `Fixed ${fixedCount} of ${toFix.length} invoices` };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["orphaned-school-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["school-ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      toast.success(result.message);
+    },
+    onError: (error) => {
+      toast.error(`Failed to backfill AR invoices: ${error.message}`);
+    },
+  });
+}
+
+// Sync payment to Finance AR manually (for invoices that had NULL ar_invoice_id)
+export async function syncPaymentToFinanceAR(
+  schoolInvoiceId: string,
+  paidAmount: number,
+  totalAmount: number,
+  effectiveCompanyId: string,
+  businessUnitCode: string | null,
+  customerId: string
+): Promise<string | null> {
+  // First check if ar_invoice_id already exists
+  const { data: schoolInv } = await supabase
+    .from("school_ar_invoices")
+    .select("ar_invoice_id, invoice_number, invoice_month, student:school_students(student_name)")
+    .eq("id", schoolInvoiceId)
+    .single();
+
+  if (!schoolInv) return null;
+
+  // If ar_invoice_id exists, update it
+  if (schoolInv.ar_invoice_id) {
+    const balance = totalAmount - paidAmount;
+    const status = balance <= 0 ? "paid" : paidAmount > 0 ? "partial" : "unpaid";
+    
+    await supabase
+      .from("ar_invoices")
+      .update({
+        paid_amount: paidAmount,
+        balance: balance,
+        status: status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", schoolInv.ar_invoice_id);
+
+    return schoolInv.ar_invoice_id;
+  }
+
+  // Create new AR invoice if missing
+  const arStatus = paidAmount >= totalAmount ? "paid" : paidAmount > 0 ? "partial" : "unpaid";
+  
+  const { data: arInvoice, error } = await supabase
+    .from("ar_invoices")
+    .insert({
+      company_id: effectiveCompanyId,
+      business_unit_code: businessUnitCode || 'SBO',
+      customer_id: customerId,
+      invoice_number: schoolInv.invoice_number,
+      invoice_date: schoolInv.invoice_month,
+      due_date: schoolInv.invoice_month,
+      total_amount: totalAmount,
+      balance: totalAmount - paidAmount,
+      paid_amount: paidAmount,
+      status: arStatus,
+      reference: `${(schoolInv.student as any)?.student_name || 'Student'}`,
+      notes: `School Bus AR Invoice (auto-linked on payment)`,
+    } as any)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to create Finance AR invoice:", error);
+    return null;
+  }
+
+  // Link back to school invoice
+  await supabase
+    .from("school_ar_invoices")
+    .update({ ar_invoice_id: arInvoice.id })
+    .eq("id", schoolInvoiceId);
+
+  return arInvoice.id;
+}

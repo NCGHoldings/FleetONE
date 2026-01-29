@@ -12,7 +12,8 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { usePostPaymentToGL, useBranchFinanceSettings } from "@/hooks/useSchoolBusFinance";
+import { usePostPaymentToGL, useBranchFinanceSettings, syncPaymentToFinanceAR } from "@/hooks/useSchoolBusFinance";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface Student {
   id: string;
@@ -42,6 +43,7 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
 
   const postPaymentToGL = usePostPaymentToGL();
   const { data: financeSettings } = useBranchFinanceSettings(student?.branch_id || null);
+  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
 
   useEffect(() => {
     if (isOpen && student) {
@@ -118,6 +120,82 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
       // 1. Student's current_amount_due (decreases by amount_paid)
       // 2. Student's payment_balance (set to payment_balance_after)
       // 3. School AR invoices status (marks as 'paid' or 'partial' using FIFO)
+
+      // After FIFO settlement, sync orphaned invoices to Finance AR
+      // This handles legacy invoices that have ar_invoice_id = NULL
+      try {
+        const effectiveCompanyId = getEffectiveCompanyId();
+        const businessUnitCode = getBusinessUnitCode();
+        
+        // Find updated school invoices for this student that may need syncing
+        const { data: updatedInvoices } = await supabase
+          .from("school_ar_invoices")
+          .select("id, amount, paid_amount, status, ar_invoice_id")
+          .eq("student_id", student.id)
+          .in("status", ["paid", "partial"]);
+
+        if (updatedInvoices?.length) {
+          // Get or create SBS customer
+          let customerId: string | null = null;
+          const { data: existingCustomer } = await supabase
+            .from("customers")
+            .select("id")
+            .eq("company_id", effectiveCompanyId)
+            .eq("customer_code", "SBS-DEFAULT")
+            .maybeSingle();
+
+          if (existingCustomer) {
+            customerId = existingCustomer.id;
+          } else {
+            const { data: newCustomer } = await supabase
+              .from("customers")
+              .insert({
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode || 'SBO',
+                customer_code: "SBS-DEFAULT",
+                customer_name: "School Bus Students",
+                is_active: true,
+              } as any)
+              .select()
+              .single();
+            customerId = newCustomer?.id || null;
+          }
+
+          if (customerId) {
+            // Process each invoice that needs syncing
+            for (const inv of updatedInvoices) {
+              if (!inv.ar_invoice_id || inv.ar_invoice_id === null) {
+                // Create Finance AR invoice for orphaned school invoice
+                await syncPaymentToFinanceAR(
+                  inv.id,
+                  inv.paid_amount || 0,
+                  inv.amount || 0,
+                  effectiveCompanyId,
+                  businessUnitCode,
+                  customerId
+                );
+              } else {
+                // Update existing Finance AR invoice
+                const balance = (inv.amount || 0) - (inv.paid_amount || 0);
+                const status = balance <= 0 ? "paid" : (inv.paid_amount || 0) > 0 ? "partial" : "unpaid";
+                
+                await supabase
+                  .from("ar_invoices")
+                  .update({
+                    paid_amount: inv.paid_amount || 0,
+                    balance: balance,
+                    status: status,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", inv.ar_invoice_id);
+              }
+            }
+          }
+        }
+      } catch (syncError) {
+        console.error("Finance AR sync failed:", syncError);
+        // Payment still recorded, just sync failed - this is non-critical
+      }
 
       toast.success("Payment recorded successfully");
       onSuccess();
