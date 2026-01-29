@@ -29,7 +29,7 @@ export interface LightVehicleInvoiceDocument {
   file_path?: string;
   file_size?: number;
   document_status?: string;
-  invoice_data?: any;
+  document_data?: string;
   created_at: string;
 }
 
@@ -160,7 +160,7 @@ export function useLightVehicleOrderInvoiceManagement() {
           file_path: fileName,
           file_size: pdfBlob.size,
           document_status: 'draft',
-          invoice_data: fullInvoiceData
+          document_data: JSON.stringify(fullInvoiceData)
         });
 
       if (docError) throw docError;
@@ -224,7 +224,7 @@ export function useLightVehicleOrderInvoiceManagement() {
           file_name: `${record.invoice_number}_${record.status}.pdf`,
           file_path: fileName,
           file_size: pdfBlob.size,
-          invoice_data: fullInvoiceData
+          document_data: JSON.stringify(fullInvoiceData)
         })
         .eq('invoice_record_id', invoiceRecordId);
 
