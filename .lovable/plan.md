@@ -1,85 +1,142 @@
 
-# Fix Missing Columns in lightvehicle_payment_schedules
+# Fix Light Vehicle Order Buttons - View and Edit Functionality
 
-## Problem
+## Problems Identified
 
-The error "Could not find the 'milestone_name' column of 'lightvehicle_payment_schedules' in the schema cache" occurs because the `lightvehicle_payment_schedules` table is missing several columns that the order creation code requires.
+### 1. View Button Issues
+The "View" button opens `EnhancedLightVehicleOrderDetailsModal`, but this modal expects data fields that don't exist in the `lightvehicle_orders` table:
 
-**Current Table Structure:**
-- `id`, `order_id`, `payment_type`, `amount`, `due_date`, `status`, `notes`, `created_at`, `updated_at`
+| Modal Expects | Order Table Has |
+|--------------|-----------------|
+| `order_no` | `order_number` |
+| `quotation_no` | `quotation_id` (UUID only) |
+| `order_date` | `created_at` |
+| `vehicle_make`, `vehicle_model` | `vehicle_name` only |
+| `customer_address`, `customer_phone`, `customer_email` | Not stored |
+| `total_price` | `total_amount` |
+| Technical specs (engine, chassis, etc.) | Not stored |
 
-**Columns Being Inserted by Code:**
-- `milestone_name` (missing)
-- `sequence_order` (missing)
+The modal crashes or shows empty data because it can't find the expected fields.
 
-**Additional Columns for Parity with Yutong:**
-- `payment_date` (missing)
-- `payment_reference` (missing)
-- `payment_method` (missing)
+### 2. Edit Button Issues
+The "Edit" button has no `onClick` handler - it does nothing when clicked.
 
 ---
 
 ## Solution
 
-Create a database migration to add the missing columns to `lightvehicle_payment_schedules`.
+### Fix 1: Update EnhancedLightVehicleOrderDetailsModal
 
-### Migration Details
+Modify the modal to:
+1. Fetch order data WITH related quotation data using a join query
+2. Map the actual database fields to display fields correctly
+3. Handle missing data gracefully
 
-| Column | Type | Default | Purpose |
-|--------|------|---------|---------|
-| `milestone_name` | TEXT NOT NULL | 'Payment' | Name of the payment milestone (e.g., "Order Confirmation Advance") |
-| `sequence_order` | INTEGER | 1 | Order in which payments should be made |
-| `payment_date` | DATE | NULL | Actual date payment was received |
-| `payment_reference` | TEXT | NULL | Reference number for the payment |
-| `payment_method` | TEXT | NULL | Method of payment (cash, cheque, bank transfer) |
-
-### SQL Migration
-
+The SQL query should join orders with quotations:
 ```sql
--- Add missing columns to lightvehicle_payment_schedules
-ALTER TABLE public.lightvehicle_payment_schedules 
-ADD COLUMN IF NOT EXISTS milestone_name TEXT NOT NULL DEFAULT 'Payment';
-
-ALTER TABLE public.lightvehicle_payment_schedules 
-ADD COLUMN IF NOT EXISTS sequence_order INTEGER DEFAULT 1;
-
-ALTER TABLE public.lightvehicle_payment_schedules 
-ADD COLUMN IF NOT EXISTS payment_date DATE;
-
-ALTER TABLE public.lightvehicle_payment_schedules 
-ADD COLUMN IF NOT EXISTS payment_reference TEXT;
-
-ALTER TABLE public.lightvehicle_payment_schedules 
-ADD COLUMN IF NOT EXISTS payment_method TEXT;
+lightvehicle_orders (*, lightvehicle_quotations!quotation_id (*))
 ```
 
----
+### Fix 2: Create Edit Order Modal
 
-## Files
+Create `LightVehicleEditOrderModal.tsx` to allow editing:
+- Order status
+- Expected delivery date
+- Actual delivery date  
+- Notes
+- Current phase/progress
 
-| File | Action |
-|------|--------|
-| `supabase/migrations/XXXX_add_lightvehicle_payment_schedule_columns.sql` | Create |
-| `src/integrations/supabase/types.ts` | Auto-regenerated after migration |
+### Fix 3: Update Orders List
 
----
-
-## Expected Outcome
-
-After this migration:
-1. Order creation from quotation will succeed
-2. Payment schedules will be created with proper milestone names
-3. The Light Vehicle module will have full payment tracking like Yutong/Sinotruck
+Wire the Edit button to open the new edit modal.
 
 ---
 
-## Testing
+## Files to Modify
 
-After deployment:
-1. Go to Light Vehicle Orders tab
-2. Click "Create Order"
-3. Select a confirmed quotation
-4. Choose payment mode (Cash or Lease)
-5. Click "Create Order"
-6. Verify order is created successfully
-7. Open order details and verify payment schedule shows milestones
+| File | Changes |
+|------|---------|
+| `src/components/lightvehicle/EnhancedLightVehicleOrderDetailsModal.tsx` | Fix data loading to join with quotations, map correct field names |
+| `src/components/lightvehicle/LightVehicleOrdersList.tsx` | Add Edit modal state and wire Edit button |
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/components/lightvehicle/LightVehicleEditOrderModal.tsx` | Modal for editing order details |
+
+---
+
+## Technical Details
+
+### Data Mapping Fix
+
+The modal needs to handle both scenarios:
+1. Orders created with full data (legacy)
+2. Orders created from quotations (current)
+
+For quotation-based orders, pull customer and vehicle details from the linked quotation:
+
+```typescript
+// Load order with quotation data
+const { data } = await supabase
+  .from('lightvehicle_orders')
+  .select(`
+    *,
+    quotation:lightvehicle_quotations!quotation_id (
+      quotation_number,
+      customer_address,
+      customer_phone,
+      customer_email,
+      engine_cc,
+      transmission,
+      fuel_type,
+      color,
+      year
+    )
+  `)
+  .eq('id', orderId)
+  .single();
+
+// Map to display format
+const displayOrder = {
+  order_no: data.order_number,
+  quotation_no: data.quotation?.quotation_number,
+  customer_name: data.customer_name,
+  customer_address: data.quotation?.customer_address,
+  customer_phone: data.quotation?.customer_phone,
+  // ... etc
+};
+```
+
+### Edit Modal Fields
+
+The edit modal will allow modifying:
+- **Status**: pending, processing, shipped, delivered, cancelled
+- **Expected Delivery Date**: Date picker
+- **Actual Delivery Date**: Date picker (for completed orders)
+- **Current Phase**: Dropdown with phases
+- **Progress Percentage**: Slider or input
+- **Notes**: Text area
+
+---
+
+## Testing Checklist
+
+After implementation:
+
+1. **View Button Test**
+   - Click "View" on any order
+   - Verify modal opens and shows order details
+   - Verify customer info displays (from quotation)
+   - Verify vehicle info displays
+   - Verify financial summary shows correct amounts
+   - Check all tabs work (Overview, Financial, Documents, Progress)
+
+2. **Edit Button Test**
+   - Click "Edit" on any order
+   - Verify edit modal opens
+   - Change status and save
+   - Verify order list reflects changes
+   - Test editing delivery dates
+   - Test updating notes
