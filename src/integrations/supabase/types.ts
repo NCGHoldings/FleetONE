@@ -8072,6 +8072,108 @@ export type Database = {
         }
         Relationships: []
       }
+      lightvehicle_cash_receipts: {
+        Row: {
+          amount: number
+          amount_in_words: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_address: string | null
+          customer_contact: string | null
+          customer_name: string | null
+          customer_signature_data: string | null
+          customer_signature_type: string | null
+          customer_signed_at: string | null
+          customer_signer_name: string | null
+          finance_signature_data: string | null
+          finance_signature_type: string | null
+          finance_signed_at: string | null
+          finance_signer_name: string | null
+          id: string
+          order_id: string | null
+          payment_id: string | null
+          payment_method: string | null
+          pdf_url: string | null
+          product_description: string | null
+          quotation_no: string | null
+          receipt_date: string
+          receipt_no: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          amount_in_words?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_address?: string | null
+          customer_contact?: string | null
+          customer_name?: string | null
+          customer_signature_data?: string | null
+          customer_signature_type?: string | null
+          customer_signed_at?: string | null
+          customer_signer_name?: string | null
+          finance_signature_data?: string | null
+          finance_signature_type?: string | null
+          finance_signed_at?: string | null
+          finance_signer_name?: string | null
+          id?: string
+          order_id?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
+          pdf_url?: string | null
+          product_description?: string | null
+          quotation_no?: string | null
+          receipt_date?: string
+          receipt_no: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          amount_in_words?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_address?: string | null
+          customer_contact?: string | null
+          customer_name?: string | null
+          customer_signature_data?: string | null
+          customer_signature_type?: string | null
+          customer_signed_at?: string | null
+          customer_signer_name?: string | null
+          finance_signature_data?: string | null
+          finance_signature_type?: string | null
+          finance_signed_at?: string | null
+          finance_signer_name?: string | null
+          id?: string
+          order_id?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
+          pdf_url?: string | null
+          product_description?: string | null
+          quotation_no?: string | null
+          receipt_date?: string
+          receipt_no?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lightvehicle_cash_receipts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_cash_receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_customer_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lightvehicle_customer_payments: {
         Row: {
           amount: number
@@ -8390,8 +8492,10 @@ export type Database = {
         Row: {
           created_at: string | null
           document_data: string | null
+          document_status: string | null
           document_type: string | null
           file_name: string | null
+          file_path: string | null
           file_size: number | null
           id: string
           invoice_record_id: string | null
@@ -8399,8 +8503,10 @@ export type Database = {
         Insert: {
           created_at?: string | null
           document_data?: string | null
+          document_status?: string | null
           document_type?: string | null
           file_name?: string | null
+          file_path?: string | null
           file_size?: number | null
           id?: string
           invoice_record_id?: string | null
@@ -8408,8 +8514,10 @@ export type Database = {
         Update: {
           created_at?: string | null
           document_data?: string | null
+          document_status?: string | null
           document_type?: string | null
           file_name?: string | null
+          file_path?: string | null
           file_size?: number | null
           id?: string
           invoice_record_id?: string | null
@@ -8427,40 +8535,67 @@ export type Database = {
       lightvehicle_invoice_records: {
         Row: {
           amount: number | null
+          approved_at: string | null
+          approved_by: string | null
           created_at: string | null
+          finance_company_address: string | null
+          finance_company_name: string | null
           generated_at: string | null
           generated_by: string | null
           id: string
+          invoice_category: string | null
           invoice_data: Json | null
           invoice_number: string
           invoice_type: string | null
           order_id: string | null
+          proforma_amount: number | null
+          proforma_amount_percentage: number | null
+          proforma_purpose: string | null
+          quotation_id: string | null
           status: string | null
           updated_at: string | null
         }
         Insert: {
           amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string | null
+          finance_company_address?: string | null
+          finance_company_name?: string | null
           generated_at?: string | null
           generated_by?: string | null
           id?: string
+          invoice_category?: string | null
           invoice_data?: Json | null
           invoice_number: string
           invoice_type?: string | null
           order_id?: string | null
+          proforma_amount?: number | null
+          proforma_amount_percentage?: number | null
+          proforma_purpose?: string | null
+          quotation_id?: string | null
           status?: string | null
           updated_at?: string | null
         }
         Update: {
           amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string | null
+          finance_company_address?: string | null
+          finance_company_name?: string | null
           generated_at?: string | null
           generated_by?: string | null
           id?: string
+          invoice_category?: string | null
           invoice_data?: Json | null
           invoice_number?: string
           invoice_type?: string | null
           order_id?: string | null
+          proforma_amount?: number | null
+          proforma_amount_percentage?: number | null
+          proforma_purpose?: string | null
+          quotation_id?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -8470,6 +8605,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "lightvehicle_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_invoice_records_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_quotations"
             referencedColumns: ["id"]
           },
         ]
@@ -21961,8 +22103,10 @@ export type Database = {
       }
       generate_inquiry_number: { Args: never; Returns: string }
       generate_journal_entry_number: { Args: never; Returns: string }
+      generate_lightvehicle_invoice_no: { Args: never; Returns: string }
       generate_lightvehicle_order_number: { Args: never; Returns: string }
       generate_lightvehicle_quotation_number: { Args: never; Returns: string }
+      generate_lightvehicle_receipt_no: { Args: never; Returns: string }
       generate_lightvehicle_shipment_number: { Args: never; Returns: string }
       generate_next_lightvehicle_version_number: {
         Args: { p_parent_id: string }
