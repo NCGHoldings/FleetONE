@@ -20,9 +20,7 @@ import jsPDF from 'jspdf';
 import {
   fetchVehicleFinanceSettings,
   createVehicleCustomer,
-  createVehicleARInvoice,
   postVehiclePaymentToGL,
-  createVehicleARReceipt,
   updateOrderFinanceLinks,
   NCG_HOLDING_ID,
 } from '@/hooks/useVehicleSalesFinance';
@@ -210,6 +208,11 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     }
   };
 
+  /**
+   * PROPER ACCOUNTING FLOW:
+   * Cash Receipt (Payment Verification) = GL Entry ONLY (DR Bank / CR Customer Advance)
+   * AR Invoice is created when SYSTEM INVOICE is approved, NOT at payment time
+   */
   const handleVerifyPayment = async (paymentId: string) => {
     try {
       const payment = payments.find(p => p.id === paymentId);
@@ -232,6 +235,16 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
         return;
       }
 
+      // Validate required accounts for advance payment GL posting
+      if (!settings.default_bank_account_id) {
+        toast.error('Bank Account not configured. Go to Finance → Settings → Yutong Finance.');
+        return;
+      }
+      if (!settings.customer_advance_account_id) {
+        toast.error('Customer Advance Account not configured. Go to Finance → Settings → Yutong Finance.');
+        return;
+      }
+
       const customerName = orderDetails?.yutong_quotations?.customer_name || 'Unknown';
       const orderNo = orderDetails?.order_no;
 
@@ -250,45 +263,22 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
             orderId: selectedOrderId!,
             financeCustomerId: customerId,
           });
+          // Update local state to reflect the customer
+          setOrderDetails((prev: any) => ({ ...prev, finance_customer_id: customerId }));
         }
       }
 
-      // 2. Create AR Invoice if not exists
-      let invoiceId = orderDetails?.ar_invoice_id;
-      if (!invoiceId && customerId) {
-        const arResult = await createVehicleARInvoice({
-          module: 'yutong',
-          orderId: selectedOrderId!,
-          orderNo,
-          customerId,
-          totalAmount: orderDetails?.total_amount || 0,
-          advanceAmount: payment.payment_amount,
-          companyId: NCG_HOLDING_ID,
-          settings,
-        });
-
-        if (arResult) {
-          invoiceId = arResult.invoiceId;
-          await updateOrderFinanceLinks({
-            module: 'yutong',
-            orderId: selectedOrderId!,
-            arInvoiceId: invoiceId,
-          });
-          toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
-        }
-      }
-
-      // 3. Post to GL
+      // 2. Post to GL ONLY (DR Bank | CR Customer Advance)
+      //    AR Invoice is NOT created here - it's created when system invoice is approved
       let journalEntryId: string | undefined;
       if (settings.auto_post_on_verify) {
-        const paymentType = selectedSchedule?.milestone_name?.toLowerCase().includes('advance') ? 'advance' : 'balance';
-        
+        // All payments before invoice are treated as advance (Liability)
         const glResult = await postVehiclePaymentToGL({
           module: 'yutong',
           orderNo,
           customerName,
           amount: payment.payment_amount,
-          paymentType,
+          paymentType: 'advance', // Always advance until invoice is generated
           paymentMethod: payment.payment_method,
           settings,
           effectiveCompanyId: NCG_HOLDING_ID,
@@ -296,31 +286,14 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
 
         if (glResult) {
           journalEntryId = glResult.journalEntryId;
-          toast.success(`GL Entry posted: ${glResult.entryNumber}`);
+          toast.success(`GL Entry posted: ${glResult.entryNumber} (DR Bank / CR Customer Advance)`);
+        } else {
+          toast.error('Failed to post GL entry. Check Finance Settings.');
+          return;
         }
       }
 
-      // 4. Create AR Receipt
-      let receiptId: string | undefined;
-      if (customerId) {
-        const receiptResult = await createVehicleARReceipt({
-          module: 'yutong',
-          paymentId,
-          invoiceId,
-          customerId,
-          amount: payment.payment_amount,
-          paymentMethod: payment.payment_method,
-          paymentDate: payment.payment_date,
-          settings,
-          effectiveCompanyId: NCG_HOLDING_ID,
-        });
-
-        if (receiptResult) {
-          receiptId = receiptResult.receiptId;
-        }
-      }
-
-      // 5. Update payment status with GL links
+      // 3. Update payment status with GL link (NO AR Receipt - invoice not created yet)
       const { error } = await supabase
         .from('yutong_customer_payments')
         .update({
@@ -328,19 +301,19 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
           verified_at: new Date().toISOString(),
           verified_by: user.id,
           journal_entry_id: journalEntryId,
-          ar_receipt_id: receiptId,
+          // ar_receipt_id is NOT set here - AR Receipt requires AR Invoice first
         })
         .eq('id', paymentId);
 
       if (error) throw error;
 
-      // Update order totals
+      // 4. Update order totals
       await updateOrderFinancials();
 
-      // Regenerate all invoices for this order with updated payment data
+      // 5. Regenerate all invoices for this order with updated payment data
       await regenerateOrderInvoices();
 
-      toast.success('Payment verified and GL posted successfully');
+      toast.success('Payment verified successfully. GL entry posted (Bank vs Customer Advance).');
       loadPaymentData();
       onRefresh();
     } catch (error: any) {

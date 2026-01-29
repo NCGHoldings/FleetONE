@@ -91,18 +91,26 @@ export function VehicleFinanceSettingsBase({
     }
   };
 
+  /**
+   * PROPER ACCOUNTING VALIDATION:
+   * All 4 key accounts are required for the complete vehicle sales finance flow:
+   * 1. Bank Account - Receives cash payments (Asset)
+   * 2. Customer Advance - Holds advance payments until invoice (Liability)
+   * 3. Sales Revenue - Recognizes revenue when invoice approved (Revenue)
+   * 4. Trade Receivable - Tracks outstanding invoices (Asset)
+   */
   const validateSettings = (): boolean => {
-    const errors: string[] = [];
+    const requiredFields = [
+      { key: 'default_bank_account_id', label: 'Bank Account' },
+      { key: 'customer_advance_account_id', label: 'Customer Advance Account' },
+      { key: 'sales_revenue_account_id', label: 'Sales Revenue Account' },
+      { key: 'trade_receivable_account_id', label: 'Trade Receivable Account' },
+    ];
     
-    if (!settings.default_bank_account_id) {
-      errors.push('Default Bank Account is required for payment processing');
-    }
-    if (!settings.customer_advance_account_id) {
-      errors.push('Customer Advance Account is required for advance payments');
-    }
+    const missingFields = requiredFields.filter(f => !(settings as any)[f.key]);
     
-    if (errors.length > 0) {
-      errors.forEach(error => toast.error(error));
+    if (missingFields.length > 0) {
+      toast.error(`Required accounts missing: ${missingFields.map(f => f.label).join(', ')}`);
       return false;
     }
     return true;
@@ -135,7 +143,12 @@ export function VehicleFinanceSettingsBase({
   };
 
   const isRequiredField = (field: keyof VehicleFinanceSettings): boolean => {
-    return ['default_bank_account_id', 'customer_advance_account_id'].includes(field);
+    return [
+      'default_bank_account_id', 
+      'customer_advance_account_id',
+      'sales_revenue_account_id',
+      'trade_receivable_account_id'
+    ].includes(field);
   };
 
   const renderAccountSelect = (

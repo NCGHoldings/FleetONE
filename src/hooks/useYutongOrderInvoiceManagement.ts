@@ -6,6 +6,14 @@ import {
   generateYutongOrderInvoicePDF,
   YutongOrderInvoiceData 
 } from '@/lib/yutong-order-invoice-generator';
+import {
+  fetchVehicleFinanceSettings,
+  createVehicleARInvoice,
+  postVehicleInvoiceToGL,
+  applyAdvanceToReceivable,
+  updateOrderFinanceLinks,
+  NCG_HOLDING_ID,
+} from '@/hooks/useVehicleSalesFinance';
 
 interface YutongStoredInvoice {
   id: string;
@@ -215,6 +223,13 @@ export function useYutongOrderInvoiceManagement() {
     }
   };
 
+  /**
+   * PROPER ACCOUNTING FLOW:
+   * When invoice is APPROVED:
+   * 1. Create AR Invoice in Finance module
+   * 2. Post Revenue Recognition GL: DR Trade Receivable | CR Sales Revenue
+   * 3. Apply advances against receivable: DR Customer Advance | CR Trade Receivable
+   */
   const approveInvoice = async (
     invoiceId: string,
     documentId: string
@@ -231,7 +246,7 @@ export function useYutongOrderInvoiceManagement() {
       
       if (docError) throw docError;
       
-      // Get invoice record
+      // Get invoice record with order details
       const { data: invoice, error: invError } = await supabase
         .from('yutong_invoice_records')
         .select('*')
@@ -239,6 +254,15 @@ export function useYutongOrderInvoiceManagement() {
         .single();
       
       if (invError) throw invError;
+
+      // Get order details for finance integration
+      const { data: orderDetails, error: orderError } = await supabase
+        .from('yutong_orders')
+        .select('*, yutong_quotations(customer_name)')
+        .eq('id', invoice.order_id)
+        .single();
+
+      if (orderError) throw orderError;
       
       // Regenerate PDF without draft watermark
       const invoiceData: YutongOrderInvoiceData = document.invoice_data as unknown as YutongOrderInvoiceData;
@@ -287,6 +311,79 @@ export function useYutongOrderInvoiceManagement() {
         .eq('id', documentId);
       
       if (updateDocError) throw updateDocError;
+
+      // ==========================================
+      // FINANCE INTEGRATION - PROPER ACCOUNTING
+      // ==========================================
+      const settings = await fetchVehicleFinanceSettings('yutong', NCG_HOLDING_ID);
+      
+      if (settings && orderDetails?.finance_customer_id) {
+        const customerName = orderDetails?.yutong_quotations?.customer_name || 'Unknown';
+        const orderNo = orderDetails?.order_no;
+        const invoiceAmount = invoice.invoice_amount;
+        const totalPaid = orderDetails?.total_paid || 0;
+
+        // Check if AR Invoice already exists
+        let arInvoiceId = orderDetails?.ar_invoice_id;
+        
+        if (!arInvoiceId && settings.trade_receivable_account_id && settings.sales_revenue_account_id) {
+          // 1. Create AR Invoice in Finance module (at invoice approval)
+          const arResult = await createVehicleARInvoice({
+            module: 'yutong',
+            orderId: invoice.order_id,
+            orderNo,
+            customerId: orderDetails.finance_customer_id,
+            totalAmount: invoiceAmount,
+            advanceAmount: totalPaid, // Apply already verified payments
+            companyId: NCG_HOLDING_ID,
+            settings,
+          });
+
+          if (arResult) {
+            arInvoiceId = arResult.invoiceId;
+            await updateOrderFinanceLinks({
+              module: 'yutong',
+              orderId: invoice.order_id,
+              arInvoiceId: arResult.invoiceId,
+            });
+            toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
+          }
+
+          // 2. Post Revenue Recognition GL: DR Trade Receivable | CR Sales Revenue
+          const revenueGLResult = await postVehicleInvoiceToGL({
+            module: 'yutong',
+            orderNo,
+            customerName,
+            invoiceAmount,
+            settings,
+            effectiveCompanyId: NCG_HOLDING_ID,
+          });
+
+          if (revenueGLResult) {
+            console.log(`[Yutong] Revenue GL posted: ${revenueGLResult.entryNumber}`);
+          }
+
+          // 3. Apply advances against receivable: DR Customer Advance | CR Trade Receivable
+          if (totalPaid > 0 && settings.customer_advance_account_id) {
+            const advanceResult = await applyAdvanceToReceivable({
+              module: 'yutong',
+              orderNo,
+              customerName,
+              advanceAmount: totalPaid,
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
+
+            if (advanceResult) {
+              console.log(`[Yutong] Advance applied GL: ${advanceResult.entryNumber}`);
+            }
+          }
+        }
+      } else if (!settings) {
+        console.warn('[Yutong] Finance settings not configured - skipping AR/GL integration');
+      } else if (!orderDetails?.finance_customer_id) {
+        console.warn('[Yutong] No finance customer linked - skipping AR/GL integration');
+      }
       
       toast.success('Invoice approved successfully');
       
