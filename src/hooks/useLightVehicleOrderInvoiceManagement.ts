@@ -8,7 +8,7 @@ export interface LightVehicleInvoiceRecord {
   invoice_number: string;
   order_id: string;
   quotation_id?: string;
-  invoice_date?: string;
+  generated_at?: string;
   amount: number;
   status: string;
   invoice_category?: string;
@@ -136,7 +136,7 @@ export function useLightVehicleOrderInvoiceManagement() {
           invoice_number: invoiceNo,
           order_id: invoiceData.orderId,
           quotation_id: invoiceData.quotationId,
-          invoice_date: new Date().toISOString().split('T')[0],
+          generated_at: new Date().toISOString(),
           amount: invoiceAmount,
           status: 'draft',
           invoice_category: invoiceCategory,

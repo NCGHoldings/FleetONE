@@ -223,7 +223,7 @@ export function LightVehicleOrderInvoiceGenerator({ order, onRefresh }: LightVeh
                   <div>
                     <p className="font-medium">{invoice.invoice_number}</p>
                     <p className="text-sm text-muted-foreground">
-                      {invoice.invoice_date && format(new Date(invoice.invoice_date), 'MMM dd, yyyy')} • {formatCurrency(invoice.amount)}
+                      {(invoice.generated_at || invoice.created_at) && format(new Date(invoice.generated_at || invoice.created_at), 'MMM dd, yyyy')} • {formatCurrency(invoice.amount)}
                     </p>
                   </div>
                 </div>
