@@ -1,92 +1,161 @@
 
-# Fix Yutong Quotation PDF Download - Missing Header Image
+# Fix Warranty Terms & Missing Fields in Quotation Preview
 
 ## Problem Identified
 
-When downloading the Yutong quotation PDF, the header image (with "QUOTATION" title, NCG Holdings logo, and Yutong logo) is visible in the preview but **missing in the downloaded PDF**.
+The user entered warranty terms in the quotation edit form, but they are **NOT appearing** in the quotation preview/PDF. This is because:
 
-**Root Cause:** The `html2canvas` library fails to capture images loaded from relative paths like `/lovable-uploads/...`. While the preview works (browser loads images normally), during PDF generation, `html2canvas` cannot reliably fetch these images even with `useCORS: true`.
+1. **Warranty Terms**: Field exists in database and form but is NOT rendered in the preview template
+2. **Delivery Timeline**: Same issue - field exists but not rendered
+3. **Payment Terms**: Shows hardcoded text, but custom terms from form are not fully utilized
 
-## Existing Working Solution
+This affects both **Yutong** and **Light Vehicle** quotation previews.
 
-The `yutong-order-invoice-generator.ts` already has a working solution using a `loadImageAsBase64()` function that:
-1. Pre-loads images via `fetch()`
-2. Converts to base64 data URL
-3. Replaces image URLs in HTML with base64 data before running `html2canvas`
+---
 
 ## Solution
 
-Apply the same image preloading technique to the quotation PDF generation.
+Add a dedicated "Custom Terms" section on **Page 2** of the quotation (after the hardcoded Terms & Conditions), displaying:
 
-### Files to Modify
+1. **Warranty Terms** (if entered)
+2. **Delivery Timeline** (if entered) 
+3. **Payment Terms** (if custom terms entered)
+
+This section will appear between the standard Terms & Conditions and the Customer Acceptance section.
+
+---
+
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/yutong/YutongQuotationViewModal.tsx` | Add image preloading before `html2canvas` capture |
-| `src/components/lightvehicle/LightVehicleQuotationViewModal.tsx` | Apply same fix for consistency |
+| `src/components/yutong/YutongQuotationPreview.tsx` | Add Warranty Terms & Custom Terms section after T&C |
+| `src/components/lightvehicle/LightVehicleQuotationPreview.tsx` | Add same section for consistency |
 
-### Technical Implementation
+---
 
-**1. Add helper function to preload images as base64:**
+## Implementation Details
 
-```typescript
-async function loadImageAsBase64(url: string): Promise<string> {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) return '';
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error('Error loading image:', url, error);
-    return '';
-  }
-}
+### For Yutong Quotation Preview
+
+Add a new section on Page 2, after line 926 (after the last T&C paragraph), before the signatures:
+
+```text
+{/* Custom Terms Section - Warranty, Delivery, Payment */}
+{(quotation.warranty_terms || quotation.delivery_timeline || quotation.payment_terms) && (
+  <div style={{ 
+    marginTop: "20px", 
+    padding: "15px", 
+    border: "2px solid #003366", 
+    borderRadius: "8px", 
+    background: "#f8f9fa" 
+  }}>
+    <h4 style={{ 
+      color: "#003366", 
+      marginBottom: "10px", 
+      fontSize: "13px", 
+      fontWeight: "bold",
+      borderBottom: "1px solid #003366",
+      paddingBottom: "5px"
+    }}>
+      ADDITIONAL TERMS
+    </h4>
+    
+    {quotation.warranty_terms && (
+      <div style={{ marginBottom: "10px" }}>
+        <b style={{ color: "#003366" }}>WARRANTY TERMS:</b>
+        <p style={{ margin: "5px 0 0 0", whiteSpace: "pre-line", fontSize: "11px" }}>
+          {quotation.warranty_terms}
+        </p>
+      </div>
+    )}
+    
+    {quotation.delivery_timeline && (
+      <div style={{ marginBottom: "10px" }}>
+        <b style={{ color: "#003366" }}>DELIVERY TIMELINE:</b>
+        <p style={{ margin: "5px 0 0 0", fontSize: "11px" }}>
+          {quotation.delivery_timeline}
+        </p>
+      </div>
+    )}
+    
+    {quotation.payment_terms && (
+      <div style={{ marginBottom: "0" }}>
+        <b style={{ color: "#003366" }}>PAYMENT TERMS:</b>
+        <p style={{ margin: "5px 0 0 0", whiteSpace: "pre-line", fontSize: "11px" }}>
+          {quotation.payment_terms}
+        </p>
+      </div>
+    )}
+  </div>
+)}
 ```
 
-**2. Modify `generatePDFBase64()` to preload images before capture:**
+### For Light Vehicle Quotation Preview
 
-```typescript
-const generatePDFBase64 = async (): Promise<string> => {
-  if (!printRef.current) throw new Error('Print reference not found');
+Add the same section with Light Vehicle branding colors (blue: `#1e40af`).
 
-  // Pre-load header image as base64
-  const headerImageUrl = '/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png';
-  const headerBase64 = await loadImageAsBase64(headerImageUrl);
-
-  // Find all header images in the preview and replace src with base64
-  const headerImages = printRef.current.querySelectorAll('img[src*="lovable-uploads"]');
-  const originalSrcs: Map<HTMLImageElement, string> = new Map();
-  
-  headerImages.forEach((img) => {
-    const imgEl = img as HTMLImageElement;
-    originalSrcs.set(imgEl, imgEl.src);
-    if (headerBase64) {
-      imgEl.src = headerBase64;
-    }
-  });
-
-  // Wait a moment for images to be applied
-  await new Promise(resolve => setTimeout(resolve, 100));
-
-  try {
-    // ... existing html2canvas logic
-  } finally {
-    // Restore original image sources
-    originalSrcs.forEach((originalSrc, imgEl) => {
-      imgEl.src = originalSrc;
-    });
-  }
-};
-```
+---
 
 ## Expected Result
 
-After the fix:
-- Header image with "QUOTATION", NCG Holdings logo, and Yutong logo will appear in downloaded PDF
-- Preview will continue to work as before
-- Same fix applied to Light Vehicle quotations for consistency
+After the fix, when a user enters warranty terms like:
+```
+Engine and Gearbox - 3 years or 300,000km (whichever comes first)
+Wearable Parts - 1 month
+Tires - 40,000km
+Body and Paint - 5 years
+```
+
+The quotation will display a dedicated **"ADDITIONAL TERMS"** box on Page 2 containing:
+- **WARRANTY TERMS**: The entered warranty information
+- **DELIVERY TIMELINE**: Custom delivery estimate (if entered)
+- **PAYMENT TERMS**: Custom payment conditions (if entered)
+
+This box will appear after the standard Terms & Conditions and before the signature area.
+
+---
+
+## Visual Layout (Page 2)
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                     [QUOTATION HEADER]                          │
+│                  QUOTATION NO: YUT-xxxx - Terms & Conditions    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Terms & Conditions                                             │
+│  ──────────────────                                             │
+│  1. Payment & Order Confirmation: ...                           │
+│  2. Delivery Timeline: ...                                      │
+│  3. Customisations: ...                                         │
+│  ... (10 standard terms)                                        │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ ADDITIONAL TERMS                                          │  │ ← NEW
+│  │ ─────────────────                                         │  │
+│  │ WARRANTY TERMS:                                           │  │
+│  │ Engine and Gearbox - 3 years or 300,000km                 │  │
+│  │ Wearable Parts - 1 month                                  │  │
+│  │ Tires - 40,000km                                          │  │
+│  │ Body and Paint - 5 years                                  │  │
+│  │                                                           │  │
+│  │ DELIVERY TIMELINE: 3-4 months                             │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  [Signatures: Sales Manager | Approved By | Customer]           │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ 📞 Contact  |  📍 Address  |  ✉️ Email                  │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Technical Notes
+
+- Uses `whiteSpace: "pre-line"` to preserve line breaks entered by user
+- Only displays section if at least one custom term is entered
+- Consistent styling with existing quotation theme (Yutong = blue #003366, Light Vehicle = blue #1e40af)
+- Positioned after hardcoded T&C but before signatures for proper document flow
