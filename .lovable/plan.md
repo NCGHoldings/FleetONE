@@ -1,92 +1,83 @@
 
-# Sinotruck Full Sales Flow Implementation
+# Light Vehicle Full Sales Flow Implementation
 
 ## Overview
 
-This plan implements the complete Sinotruck sales document flow matching Yutong and Light Vehicle modules, including:
+This plan implements the complete Light Vehicle sales document flow matching Yutong and Sinotruck modules, including:
 
-- Quotation View with Signatures tab
+- Enhanced Order Details Modal with tabs
 - Invoice Generation (Direct + Proforma)
 - Cash Receipts with signatures
 - Full document management with PDF generation
+- Quotation-to-Order conversion flow
 
 ---
 
 ## Current State Analysis
 
-### What Sinotruck Already Has
-- `sinotruck_quotations` table with quotation data
-- `sinotruck_quotation_signatures` table for quotation signatures
-- `sinotruck_orders` table with order management
-- `sinotruck_customer_payments` and `sinotruck_payment_schedules` tables
-- `SinotruckPaymentTracking` component with GL integration
-- `SinotruckQuotationViewModal` - basic view (no signatures tab)
-- `SinotruckQuotationSignatureModal` - signature capture exists
-- `SinotruckQuotationPreview` - quotation preview exists
+### What Light Vehicle Already Has
+- `lightvehicle_quotations` table with quotation data
+- `lightvehicle_quotation_signatures` table for quotation signatures
+- `lightvehicle_orders` table with order management
+- `lightvehicle_customer_payments` and `lightvehicle_payment_schedules` tables
+- `lightvehicle_invoice_records`, `lightvehicle_invoice_documents`, `lightvehicle_invoice_signatures` tables (basic structure)
+- `LightVehicleQuotationViewModal` with Tabs for Preview + Signatures
+- `LightVehicleSignatureManager` component for quotation signatures
+- `LightVehiclePaymentTracking` component with GL integration
 
 ### What's Missing (Compared to Yutong)
-1. **Signature Manager** - No `SinotruckSignatureManager` component
-2. **Invoice Records Table** - No `sinotruck_invoice_records` table
-3. **Invoice Documents Table** - No `sinotruck_invoice_documents` table
-4. **Invoice Generator** - Current `SinotruckInvoiceGenerator` only generates quotation PDFs
-5. **Order Invoice Generator** - No `SinotruckOrderInvoiceGenerator` component
-6. **Cash Receipts** - No `sinotruck_cash_receipts` table or components
-7. **Hooks** - No `useSinotruckSignatures`, `useSinotruckOrderInvoiceManagement`, `useSinotruckCashReceipts`
-8. **Quotation View Modal** - Missing Tabs for Preview + Signatures
+1. **Cash Receipts Table** - No `lightvehicle_cash_receipts` table
+2. **Invoice Proforma Fields** - Missing `invoice_category`, `proforma_amount`, `finance_company` columns
+3. **Invoice Document Storage** - Missing `file_path`, `document_status` columns
+4. **Order Details Modal** - No enhanced modal with Documents/Financial tabs
+5. **Order Invoice Generator** - No `LightVehicleOrderInvoiceGenerator` component
+6. **Invoice View Modal** - No `LightVehicleOrderInvoiceViewModal`
+7. **Hooks** - Missing `useLightVehicleOrderInvoiceManagement`, `useLightVehicleCashReceipts`, `useLightVehicleInvoiceSignatures`
+8. **PDF Generator Library** - No `lightvehicle-order-invoice-generator.ts`
 
 ---
 
 ## Implementation Plan
 
-### Phase 1: Database Schema (New Tables)
+### Phase 1: Database Schema Updates
 
-Create migration for:
-
+#### 1.1 Create Cash Receipts Table
 ```text
-sinotruck_invoice_records
+lightvehicle_cash_receipts
 ├── id (UUID)
-├── invoice_no (TEXT, UNIQUE)
-├── order_id (FK to sinotruck_orders)
-├── quotation_id (FK to sinotruck_quotations)
-├── invoice_date, invoice_amount
-├── status (draft/approved)
-├── invoice_category (direct_invoice/proforma_invoice)
-├── proforma fields (amount_percentage, finance_company, purpose)
-├── approved_by, approved_at
-└── timestamps
-
-sinotruck_invoice_documents
-├── id (UUID)
-├── invoice_record_id (FK)
-├── file_name, file_path, file_size
-├── document_status
-├── invoice_data (JSONB)
-└── timestamps
-
-sinotruck_invoice_signatures
-├── id (UUID)
-├── invoice_record_id (FK)
-├── signature_role (prepared_by/approved_by/received_by)
-├── signer_name, signature_data, signature_type
-├── signed_at, signed_by
-└── timestamps
-
-sinotruck_cash_receipts
-├── id (UUID)
+├── order_id (FK to lightvehicle_orders)
+├── payment_id (FK to lightvehicle_customer_payments)
 ├── receipt_no (TEXT, UNIQUE)
-├── order_id (FK)
-├── payment_id (FK)
-├── receipt_date, receipt_amount
-├── payment_method
-├── customer/finance signature data
+├── receipt_date, amount, amount_in_words
+├── payment_method, product_description
+├── quotation_no, customer_name, customer_address, customer_contact
+├── customer_signature_data/type/signed_at/signer_name
+├── finance_signature_data/type/signed_at/signer_name
+├── pdf_url, status
 └── timestamps
 ```
 
-Also create:
-- `generate_sinotruck_invoice_no()` function
-- `generate_sinotruck_receipt_no()` function
-- RLS policies for all tables
-- Performance indexes
+#### 1.2 Enhance Invoice Records Table
+Add columns:
+- `invoice_category` (direct_invoice/proforma_invoice)
+- `proforma_amount_percentage`
+- `proforma_amount`
+- `finance_company_name`
+- `finance_company_address`
+- `proforma_purpose`
+- `quotation_id` (FK)
+- `approved_by`, `approved_at`
+
+#### 1.3 Enhance Invoice Documents Table
+Add columns:
+- `file_path`
+- `document_status` (draft/approved)
+
+#### 1.4 Create Functions and Policies
+- `generate_lightvehicle_invoice_no()` function
+- `generate_lightvehicle_receipt_no()` function
+- RLS policies for new table
+- Storage bucket for invoices
 
 ---
 
@@ -94,77 +85,73 @@ Also create:
 
 | Hook | Purpose |
 |------|---------|
-| `useSinotruckSignatures.ts` | Fetch/save/delete quotation signatures |
-| `useSinotruckOrderInvoiceManagement.ts` | Generate, approve, regenerate invoices |
-| `useSinotruckCashReceipts.ts` | Create and manage cash receipts |
-
-These will mirror the Yutong hooks with Sinotruck-specific table names.
+| `useLightVehicleOrderInvoiceManagement.ts` | Generate, approve, regenerate invoices |
+| `useLightVehicleCashReceipts.ts` | Create and manage cash receipts |
+| `useLightVehicleInvoiceSignatures.ts` | Manage invoice signatures |
 
 ---
 
-### Phase 3: Invoice Generation Library
+### Phase 3: PDF Generation Library
 
-Create `src/lib/sinotruck-order-invoice-generator.ts`:
-- `SinotruckOrderInvoiceData` interface
-- `generateSinotruckOrderInvoiceHTML()` function
-- `generateSinotruckOrderInvoicePDF()` function
+Create `src/lib/lightvehicle-order-invoice-generator.ts`:
+- `LightVehicleOrderInvoiceData` interface
+- `generateLightVehicleOrderInvoiceHTML()` function
+- `generateLightVehicleOrderInvoicePDF()` function
 
-Template styled for truck sales (similar to Yutong bus invoice).
+Template styled with blue/brown theme matching Light Vehicle branding.
 
 ---
 
 ### Phase 4: UI Components
 
-#### 4.1 Update `SinotruckQuotationViewModal`
-Add Tabs pattern matching Yutong/Light Vehicle:
-- **Preview tab** - Quotation preview
-- **Manage Signatures tab** - `SinotruckSignatureManager`
+#### 4.1 Create `EnhancedLightVehicleOrderDetailsModal`
+Full tabbed order details modal:
+- **Overview tab** - Order summary, customer details, vehicle info
+- **Financial tab** - `LightVehiclePaymentTracking` + Receipt generation
+- **Documents tab** - `LightVehicleOrderInvoiceGenerator`
+- **Progress tab** - Order phases and milestones
 
-#### 4.2 Create `SinotruckSignatureManager`
-Replicate `YutongSignatureManager`:
-- Three signature slots: Sales Manager, Approved By, Customer
-- Add/Update/Remove signatures
-- Connect to `SinotruckQuotationSignatureModal`
-
-#### 4.3 Create `SinotruckOrderInvoiceGenerator`
+#### 4.2 Create `LightVehicleOrderInvoiceGenerator`
 Replicate `YutongOrderInvoiceGenerator`:
 - Vehicle details completion check
 - Generate Invoice dropdown (Direct/Proforma)
 - Invoice type modal for proforma config
 - List existing invoices with View/Download
 
-#### 4.4 Create `SinotruckOrderInvoiceViewModal`
+#### 4.3 Create `LightVehicleInvoiceTypeModal`
+For selecting invoice type (Direct Customer / Proforma for Finance).
+
+#### 4.4 Create `LightVehicleInvoiceDataModal`
+For completing vehicle details (engine/chassis numbers, etc.) before invoice generation.
+
+#### 4.5 Create `LightVehicleOrderInvoiceViewModal`
 - Preview tab with invoice iframe
 - Signatures tab for invoice signatures
 - Approve, Regenerate, Download, Email buttons
 
-#### 4.5 Create `SinotruckInvoiceSignatureManager`
+#### 4.6 Create `LightVehicleOrderInvoicePreview`
+Invoice preview component for iframe rendering.
+
+#### 4.7 Create `LightVehicleInvoiceSignatureManager`
 For managing invoice signatures (Prepared By, Approved By, Received By).
 
-#### 4.6 Create `SinotruckCashReceiptModal`
-Replicate `YutongCashReceiptModal`:
+#### 4.8 Create `LightVehicleInvoiceSignatureModal`
+Modal for capturing invoice signatures.
+
+#### 4.9 Create `LightVehicleCashReceiptModal`
 - Cash receipt preview
 - Customer and Finance signature options
 - PDF download
 
-#### 4.7 Create `SinotruckCashReceiptPreview`
-Receipt layout matching company branding.
+#### 4.10 Create `LightVehicleCashReceiptPreview`
+Receipt layout with blue Light Vehicle branding.
 
-#### 4.8 Update `EnhancedSinotrukOrderDetailsModal`
-- Add Invoice Generator to Documents tab
-- Add Cash Receipt generation to Financial tab
+#### 4.11 Create `LightVehicleCashReceiptSignatureModal`
+For capturing receipt signatures.
 
----
-
-### Phase 5: Integration Points
-
-1. **Payment Tracking**: Update `SinotruckPaymentTracking` to:
-   - Show "Generate Receipt" button for verified payments
-   - Link to cash receipt modal
-
-2. **Order Details Modal**: Wire up Documents tab with `SinotruckOrderInvoiceGenerator`
-
-3. **Quotation List**: Ensure "View" action opens updated modal with signatures
+#### 4.12 Update `LightVehicleOrdersList`
+- Wire up View button to open `EnhancedLightVehicleOrderDetailsModal`
+- Add order conversion from quotation flow
 
 ---
 
@@ -172,28 +159,29 @@ Receipt layout matching company branding.
 
 | File | Description |
 |------|-------------|
-| `supabase/migrations/XXXX_sinotruck_invoice_system.sql` | Database tables, functions, RLS |
-| `src/hooks/useSinotruckSignatures.ts` | Quotation signature management |
-| `src/hooks/useSinotruckOrderInvoiceManagement.ts` | Invoice CRUD operations |
-| `src/hooks/useSinotruckCashReceipts.ts` | Cash receipt management |
-| `src/lib/sinotruck-order-invoice-generator.ts` | Invoice HTML/PDF generation |
-| `src/components/sinotruck/SinotruckSignatureManager.tsx` | Quotation signature UI |
-| `src/components/sinotruck/SinotruckOrderInvoiceGenerator.tsx` | Invoice generation UI |
-| `src/components/sinotruck/SinotruckOrderInvoiceViewModal.tsx` | Invoice view with signatures |
-| `src/components/sinotruck/SinotruckInvoiceSignatureManager.tsx` | Invoice signature UI |
-| `src/components/sinotruck/SinotruckInvoiceTypeModal.tsx` | Direct/Proforma selection |
-| `src/components/sinotruck/SinotruckInvoiceDataModal.tsx` | Vehicle data input |
-| `src/components/sinotruck/SinotruckCashReceiptModal.tsx` | Receipt modal |
-| `src/components/sinotruck/SinotruckCashReceiptPreview.tsx` | Receipt preview |
-| `src/components/sinotruck/SinotruckCashReceiptSignatureModal.tsx` | Receipt signatures |
+| `supabase/migrations/XXXX_lightvehicle_invoice_system.sql` | Database tables, columns, functions, RLS |
+| `src/hooks/useLightVehicleOrderInvoiceManagement.ts` | Invoice CRUD operations |
+| `src/hooks/useLightVehicleCashReceipts.ts` | Cash receipt management |
+| `src/hooks/useLightVehicleInvoiceSignatures.ts` | Invoice signature management |
+| `src/lib/lightvehicle-order-invoice-generator.ts` | Invoice HTML/PDF generation |
+| `src/components/lightvehicle/EnhancedLightVehicleOrderDetailsModal.tsx` | Tabbed order details |
+| `src/components/lightvehicle/LightVehicleOrderInvoiceGenerator.tsx` | Invoice generation UI |
+| `src/components/lightvehicle/LightVehicleInvoiceTypeModal.tsx` | Direct/Proforma selection |
+| `src/components/lightvehicle/LightVehicleInvoiceDataModal.tsx` | Vehicle data input |
+| `src/components/lightvehicle/LightVehicleOrderInvoiceViewModal.tsx` | Invoice view with signatures |
+| `src/components/lightvehicle/LightVehicleOrderInvoicePreview.tsx` | Invoice preview component |
+| `src/components/lightvehicle/LightVehicleInvoiceSignatureManager.tsx` | Invoice signature UI |
+| `src/components/lightvehicle/LightVehicleInvoiceSignatureModal.tsx` | Invoice signature capture |
+| `src/components/lightvehicle/LightVehicleCashReceiptModal.tsx` | Receipt modal |
+| `src/components/lightvehicle/LightVehicleCashReceiptPreview.tsx` | Receipt preview |
+| `src/components/lightvehicle/LightVehicleCashReceiptSignatureModal.tsx` | Receipt signatures |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/sinotruck/SinotruckQuotationViewModal.tsx` | Add Tabs, Signatures tab |
-| `src/components/sinotruck/SinotruckPaymentTracking.tsx` | Add cash receipt generation |
-| `src/components/sinotruck/EnhancedSinotrukOrderDetailsModal.tsx` | Wire Documents tab |
+| `src/components/lightvehicle/LightVehicleOrdersList.tsx` | Add modal trigger, order details |
+| `src/components/lightvehicle/LightVehiclePaymentTracking.tsx` | Add cash receipt generation |
 | `src/integrations/supabase/types.ts` | Auto-generated after migration |
 
 ---
@@ -242,31 +230,36 @@ ORDER + INVOICE FLOW
 After implementation:
 
 1. **Quotation Signatures**
-   - Open a Sinotruck quotation
+   - Open a Light Vehicle quotation
    - Click "Manage Signatures" tab
    - Add Sales Manager, Approved By, Customer signatures
    - Download PDF with signatures embedded
 
-2. **Invoice Generation**
-   - Create an order from confirmed quotation
-   - Complete vehicle details (engine, chassis, etc.)
+2. **Order Creation from Quotation**
+   - Confirm a quotation
+   - Verify order is created with linked quotation
+   - Open order details modal
+
+3. **Invoice Generation**
+   - Open order details, go to Documents tab
+   - Complete vehicle details (if needed)
    - Generate Direct Invoice - verify PDF
    - Generate Proforma Invoice with finance company details
 
-3. **Invoice Signatures**
+4. **Invoice Signatures**
    - View generated invoice
    - Add Prepared By, Approved By, Received By signatures
    - Regenerate PDF with signatures
    - Approve invoice
 
-4. **Cash Receipts**
+5. **Cash Receipts**
    - Record a payment
    - Verify payment (GL should post)
    - Generate cash receipt
    - Add customer and finance signatures
    - Download receipt PDF
 
-5. **End-to-End Flow**
+6. **End-to-End Flow**
    - Quotation → Confirm → Order
    - Payment → Verify → GL Entry
    - Complete Details → Generate Invoice
