@@ -6,13 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Settings2, Building2, CreditCard, FileText, CheckCircle, AlertCircle, Save, Receipt } from "lucide-react";
-import { useSchoolBusFinanceSettings, useUpdateSchoolBusFinanceSettings } from "@/hooks/useSchoolBusFinance";
+import { Settings2, Building2, CreditCard, FileText, CheckCircle, AlertCircle, Save, Receipt, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
+import { useSchoolBusFinanceSettings, useUpdateSchoolBusFinanceSettings, useOrphanedSchoolInvoices, useBackfillARInvoiceLinks } from "@/hooks/useSchoolBusFinance";
 import { useChartOfAccounts } from "@/hooks/useAccountingData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { SearchableFinanceAccountSelector } from "@/components/settings/SearchableFinanceAccountSelector";
+import { cn } from "@/lib/utils";
 
 interface BranchSetting {
   id: string;
@@ -32,6 +33,8 @@ export function SchoolBusFinanceSettings() {
   const { data: existingSettings, isLoading: settingsLoading } = useSchoolBusFinanceSettings();
   const { data: chartOfAccounts } = useChartOfAccounts();
   const updateSettings = useUpdateSchoolBusFinanceSettings();
+  const { data: orphanedData, isLoading: orphanedLoading, refetch: refetchOrphaned } = useOrphanedSchoolInvoices();
+  const backfillMutation = useBackfillARInvoiceLinks();
 
   // Fetch school branches
   const { data: branches } = useQuery({
@@ -99,7 +102,27 @@ export function SchoolBusFinanceSettings() {
     }
   }, [existingSettings]);
 
+  // Validate expense settings before enabling auto-post
+  const validateExpenseSettings = (): boolean => {
+    if (defaultSettings.auto_post_expenses) {
+      const missing: string[] = [];
+      if (!defaultSettings.expense_account_id) missing.push("General Expense Account");
+      if (!defaultSettings.expense_cash_account_id) missing.push("Cash/Bank for Expenses");
+      
+      if (missing.length > 0) {
+        toast.error(`Please configure these accounts first: ${missing.join(", ")}`);
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSaveDefaultSettings = async () => {
+    // Validate expense accounts if auto-post is enabled
+    if (!validateExpenseSettings()) {
+      return;
+    }
+
     try {
       // Convert empty strings to null for UUID fields before saving
       const sanitizedSettings = Object.fromEntries(
@@ -116,6 +139,11 @@ export function SchoolBusFinanceSettings() {
     } catch (error) {
       // Error handled by mutation
     }
+  };
+
+  const handleBackfillARInvoices = async () => {
+    await backfillMutation.mutateAsync();
+    refetchOrphaned();
   };
 
   const handleSaveBranchSettings = async (branchId: string) => {
@@ -160,6 +188,86 @@ export function SchoolBusFinanceSettings() {
 
   return (
     <div className="space-y-6">
+      {/* Finance Sync Status Card */}
+      <Card className={orphanedData?.totalOrphaned ? "border-amber-500" : "border-green-500"}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5" />
+            Finance Integration Status
+          </CardTitle>
+          <CardDescription>
+            Check if all School Bus invoices are properly linked to the Finance AR module
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center gap-3">
+              {orphanedLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : orphanedData?.totalOrphaned ? (
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+              ) : (
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              )}
+              <div>
+                <p className="font-medium">
+                  {orphanedLoading 
+                    ? "Checking sync status..." 
+                    : orphanedData?.totalOrphaned 
+                      ? `${orphanedData.totalOrphaned} invoices need syncing`
+                      : "All invoices synced to Finance AR"
+                  }
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {orphanedData?.totalOrphaned 
+                    ? "Some school AR invoices are not linked to Finance AR. Payments on these won't update Finance."
+                    : "School Bus payments will automatically update Finance AR invoices."
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchOrphaned()}
+                disabled={orphanedLoading}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", orphanedLoading && "animate-spin")} />
+                Check
+              </Button>
+              {!!orphanedData?.totalOrphaned && (
+                <Button
+                  size="sm"
+                  onClick={handleBackfillARInvoices}
+                  disabled={backfillMutation.isPending}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  {backfillMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Fix Now
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          {/* Show warning if auto-post is on but accounts not configured */}
+          {defaultSettings.auto_post_expenses && (
+            !defaultSettings.expense_account_id || !defaultSettings.expense_cash_account_id
+          ) && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm">
+                Expense auto-posting is enabled but expense accounts are not configured. Configure them below.
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Default GL Account Mappings */}
       <Card>
         <CardHeader>
