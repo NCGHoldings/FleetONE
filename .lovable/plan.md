@@ -1,160 +1,53 @@
 
-# Fix Light Vehicle Invoice Module - Comprehensive Fixes
+# Fix Cash Receipt Header and Amount in Words Format
 
-## Summary of Issues Found
+## Problems Identified
 
-I've identified **5 distinct issues** affecting the Light Vehicle invoice module:
+### Issue 1: Wrong Header Image on Cash Receipts
+The Yutong Cash Receipt uses the quotation header image which displays "QUOTATION" in the banner instead of "RECEIPT".
 
-| Issue | Description | Severity |
-|-------|-------------|----------|
-| 1. View Button Not Working | Modal missing DialogTitle causing accessibility warnings | Medium |
-| 2. Download Not Working | Document records not being created in database - table is empty | High |
-| 3. Currency Format Wrong | LightVehicleInvoiceTypeModal still shows USD instead of LKR | Low |
-| 4. Accessibility Warning | DialogContent missing required DialogTitle | Low |
-| 5. Document Insert Failing | Silent failure - documents table is empty despite successful uploads | High |
+**Current State:**
+- File: `src/components/yutong/YutongCashReceiptPreview.tsx`
+- Uses: `/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png` (Quotation header)
 
----
+**Solution:**
+Create a CSS-based receipt header that matches the branding but says "RECEIPT" instead of relying on the quotation image.
 
-## Root Cause Analysis
+### Issue 2: Amount in Words Uses Lakh/Crore Format
+The `numberToWords` function in multiple files uses Indian numbering system (Lakh, Crore) instead of the international Million format.
 
-### Issue 1 & 4: View Button / DialogTitle Warning
-The console shows: `DialogContent requires a DialogTitle for the component to be accessible`
-
-Looking at `LightVehicleInvoiceSignatureModal.tsx`, all dialogs appear to have DialogTitle. The warning likely comes from a conditional render or missing title in certain states.
-
-### Issue 2 & 5: Download Not Working / Documents Not Saved
-**Database Evidence:**
-- `lightvehicle_invoice_records`: Has 3 records (invoices created successfully)
-- `lightvehicle_invoice_documents`: **0 records** (documents NOT being saved)
-
-Despite the code appearing correct, the document insert is silently failing. Looking at the database schema, all columns are nullable except `id`, so the insert should work. However, the storage bucket is working (files exist).
-
-**Possible cause**: The `invoice_record_id` might not be properly linked, or there's a timing issue between invoice record creation and document insertion.
-
-### Issue 3: Currency Format in TypeModal
-In `LightVehicleInvoiceTypeModal.tsx` line 50-55:
-```typescript
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD'  // Should be LKR
-  }).format(amount);
-};
-```
+**Affected Files:**
+| File | Current Format | Status |
+|------|----------------|--------|
+| `src/hooks/useYutongCashReceipts.ts` | Lakh/Crore | Needs fix |
+| `src/hooks/useSinotruckCashReceipts.ts` | Lakh/Crore | Needs fix |
+| `src/hooks/useLightVehicleCashReceipts.ts` | Million but says "Dollars" | Needs fix |
+| `src/lib/number-to-words.ts` | Lakh/Crore | Needs fix |
 
 ---
 
 ## Solution
 
-### Fix 1: LightVehicleInvoiceTypeModal.tsx - Currency Format
+### Fix 1: Update All Cash Receipt Headers
+Replace the quotation header image with a CSS-based header that says "RECEIPT" for all three vehicle modules.
 
-Update the currency formatter to use LKR:
+**Files to Modify:**
+- `src/components/yutong/YutongCashReceiptPreview.tsx`
+- `src/components/sinotruck/SinotruckCashReceiptPreview.tsx`
 
-```typescript
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-LK', {
-    style: 'currency',
-    currency: 'LKR',
-    minimumFractionDigits: 2
-  }).format(amount);
-};
+### Fix 2: Create Unified Number-to-Words Utility with Million Format
+
+Update all `numberToWords` functions to use the international format:
+- Million instead of Lakh
+- Billion instead of Crore
+- Always "RUPEES ONLY" at the end
+
+**New Algorithm:**
+```text
+6,000,000 → SIX MILLION RUPEES ONLY
+60,000,000 → SIXTY MILLION RUPEES ONLY
+1,500,000 → ONE MILLION FIVE HUNDRED THOUSAND RUPEES ONLY
 ```
-
-### Fix 2: useLightVehicleOrderInvoiceManagement.ts - Improve Document Creation
-
-The document insert appears to be in the correct format, but it may be failing silently. I'll add more robust error handling and ensure the data is properly structured.
-
-**Changes:**
-1. Add explicit null checks before document insert
-2. Ensure `invoice_record_id` is properly passed
-3. Add additional logging to debug any remaining issues
-4. Ensure the transaction completes properly
-
-```typescript
-// Enhanced document insertion with better error handling
-if (!invoiceRecord?.id) {
-  throw new Error('Invoice record ID is missing');
-}
-
-console.log('Creating document for invoice record:', invoiceRecord.id, 'with path:', fileName);
-
-const documentPayload = {
-  invoice_record_id: invoiceRecord.id,
-  document_type: 'invoice',
-  file_name: `${invoiceNo}_draft.pdf`,
-  file_path: fileName,
-  file_size: pdfBlob.size,
-  document_status: 'draft',
-  document_data: JSON.stringify(fullInvoiceData)
-};
-
-console.log('Document payload:', JSON.stringify(documentPayload, null, 2));
-
-const { data: docData, error: docError } = await supabase
-  .from('lightvehicle_invoice_documents')
-  .insert(documentPayload)
-  .select()
-  .single();
-
-if (docError) {
-  console.error('Document insert error:', docError);
-  // Don't throw - invoice is already created, just log warning
-  toast.warning('Invoice created but document record failed to save');
-} else {
-  console.log('Document record created successfully:', docData);
-}
-```
-
-### Fix 3: Add Fallback Download Method
-
-If the document record doesn't exist, provide a fallback that constructs the path from the invoice number:
-
-```typescript
-const getInvoiceDownloadUrl = async (invoiceRecordId: string): Promise<string | null> => {
-  try {
-    // First try to get from documents table
-    const docs = await fetchInvoiceDocuments(invoiceRecordId);
-    
-    if (docs.length > 0 && docs[0].file_path) {
-      const { data } = supabase.storage
-        .from('lightvehicle-invoices')
-        .getPublicUrl(docs[0].file_path);
-      return data.publicUrl;
-    }
-
-    // Fallback: construct path from invoice record
-    const { data: record } = await supabase
-      .from('lightvehicle_invoice_records')
-      .select('invoice_number, order_id, status')
-      .eq('id', invoiceRecordId)
-      .single();
-
-    if (record) {
-      const fallbackPath = `${record.order_id}/${record.invoice_number}_${record.status}.pdf`;
-      const { data } = supabase.storage
-        .from('lightvehicle-invoices')
-        .getPublicUrl(fallbackPath);
-      return data.publicUrl;
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error getting download URL:', error);
-    return null;
-  }
-};
-```
-
-### Fix 4: LightVehicleInvoiceSignatureModal.tsx - Ensure DialogTitle
-
-Add VisuallyHidden wrapper or ensure DialogTitle is always present:
-
-```typescript
-import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
-// DialogTitle is already present - no fix needed here
-```
-
-After reviewing `LightVehicleInvoiceSignatureModal.tsx`, it already has `DialogTitle`. The warning might come from another modal - need to check `LightVehicleInvoiceDataModal.tsx`.
 
 ---
 
@@ -162,75 +55,117 @@ After reviewing `LightVehicleInvoiceSignatureModal.tsx`, it already has `DialogT
 
 | File | Changes |
 |------|---------|
-| `src/components/lightvehicle/LightVehicleInvoiceTypeModal.tsx` | Fix currency format USD to LKR |
-| `src/hooks/useLightVehicleOrderInvoiceManagement.ts` | Improve document insert with better logging and fallback download |
-| `src/components/lightvehicle/LightVehicleInvoiceDataModal.tsx` | Check and fix DialogTitle if missing |
+| `src/hooks/useYutongCashReceipts.ts` | Update `numberToWords` to use Million format |
+| `src/hooks/useSinotruckCashReceipts.ts` | Update `numberToWords` to use Million format |
+| `src/hooks/useLightVehicleCashReceipts.ts` | Fix to use RUPEES instead of Dollars, uppercase |
+| `src/lib/number-to-words.ts` | Update shared utility to use Million format |
+| `src/components/yutong/YutongCashReceiptPreview.tsx` | Replace quotation header with receipt header |
+| `src/components/sinotruck/SinotruckCashReceiptPreview.tsx` | Verify receipt header is correct |
 
 ---
 
-## Technical Implementation
+## Technical Changes
 
-### 1. LightVehicleInvoiceTypeModal.tsx (Lines 50-55)
+### 1. Updated `numberToWords` Function (All Hooks)
 
 ```typescript
-// BEFORE
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD'
-  }).format(amount);
-};
-
-// AFTER
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-LK', {
-    style: 'currency',
-    currency: 'LKR',
-    minimumFractionDigits: 2
-  }).format(amount);
+export const numberToWords = (num: number): string => {
+  const ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
+    'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+  const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+  
+  if (num === 0) return 'ZERO RUPEES ONLY';
+  
+  const convertHundreds = (n: number): string => {
+    let result = '';
+    if (n >= 100) {
+      result += ones[Math.floor(n / 100)] + ' HUNDRED ';
+      n %= 100;
+    }
+    if (n >= 20) {
+      result += tens[Math.floor(n / 10)] + ' ';
+      n %= 10;
+    }
+    if (n > 0) {
+      result += ones[n] + ' ';
+    }
+    return result;
+  };
+  
+  let result = '';
+  const billion = Math.floor(num / 1000000000);
+  const million = Math.floor((num % 1000000000) / 1000000);
+  const thousand = Math.floor((num % 1000000) / 1000);
+  const remainder = Math.floor(num % 1000);
+  
+  if (billion) result += convertHundreds(billion) + 'BILLION ';
+  if (million) result += convertHundreds(million) + 'MILLION ';
+  if (thousand) result += convertHundreds(thousand) + 'THOUSAND ';
+  if (remainder) result += convertHundreds(remainder);
+  
+  return result.trim() + ' RUPEES ONLY';
 };
 ```
 
-### 2. useLightVehicleOrderInvoiceManagement.ts - Document Insert (Lines 154-174)
+**Examples:**
+- 6,000,000 → "SIX MILLION RUPEES ONLY"
+- 60,000,000 → "SIXTY MILLION RUPEES ONLY"
+- 1,234,567 → "ONE MILLION TWO HUNDRED THIRTY FOUR THOUSAND FIVE HUNDRED SIXTY SEVEN RUPEES ONLY"
 
-Add validation and improved fallback download logic.
+### 2. YutongCashReceiptPreview.tsx - Header Change
 
-### 3. Check LightVehicleInvoiceDataModal.tsx for DialogTitle
+Replace the quotation image with a CSS-styled receipt header:
 
-Ensure accessibility requirements are met.
+```typescript
+{/* Header - Receipt specific branding */}
+<div className="receipt-header" style={{
+  background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
+  padding: '15px 20px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center'
+}}>
+  <div style={{ 
+    color: 'white', 
+    fontSize: '28px', 
+    fontWeight: 'bold',
+    letterSpacing: '3px'
+  }}>
+    RECEIPT
+  </div>
+  <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+    <img src="/lovable-uploads/ncg-logo.png" alt="NCG Holdings" style={{ height: '50px' }} />
+    <img src="/lovable-uploads/yutong-logo.png" alt="Yutong" style={{ height: '40px' }} />
+  </div>
+</div>
+```
+
+Alternatively, we can create a new receipt header image that says "RECEIPT" instead of "QUOTATION" - this would maintain design consistency with the quotation documents.
 
 ---
 
 ## Expected Outcome
 
 After these fixes:
-
-1. Currency will display as LKR throughout the invoice module
-2. Document records will be created with proper error handling
-3. Download will work via fallback path if document record is missing
-4. Accessibility warnings will be resolved
-5. View button will work correctly
+1. Cash Receipt header will display "RECEIPT" instead of "QUOTATION"
+2. Amount in words will show:
+   - "SIX MILLION RUPEES ONLY" instead of "SIXTY LAKH RUPEES ONLY"
+   - Consistent format across all three vehicle modules (Yutong, Sinotruck, Light Vehicle)
 
 ---
 
 ## Testing Checklist
 
-1. Generate a new Direct Invoice
-   - Verify currency shows LKR in type modal
-   - Verify invoice generates successfully
-   - Check console for document creation logs
-   - Verify document appears in database
+1. **Yutong Cash Receipt**
+   - Generate a new cash receipt
+   - Verify header says "RECEIPT" not "QUOTATION"
+   - Verify amount 6,000,000 shows "SIX MILLION RUPEES ONLY"
 
-2. Test Download functionality
-   - Click Download on newly created invoice
-   - Verify PDF opens in new tab
-   - Test on older invoices (uses fallback path)
+2. **Sinotruck Cash Receipt**
+   - Generate a new cash receipt
+   - Verify amount format is in millions
 
-3. Test View functionality
-   - Click View button
-   - Verify modal opens without console errors
-   - Check preview loads correctly
-
-4. Check browser console
-   - No DialogTitle accessibility warnings
-   - No other errors related to invoices
+3. **Light Vehicle Cash Receipt**
+   - Generate a new cash receipt
+   - Verify it says "RUPEES" not "DOLLARS"
+   - Verify uppercase format matches other modules
