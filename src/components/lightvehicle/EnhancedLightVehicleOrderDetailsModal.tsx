@@ -397,21 +397,21 @@ export function EnhancedLightVehicleOrderDetailsModal({
                       return (
                         <div key={payment.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div>
-                            <p className="font-medium">{formatCurrency(payment.amount)}</p>
+                            <p className="font-medium">{formatCurrency(payment.amount || 0)}</p>
                             <p className="text-sm text-muted-foreground">
                               {format(new Date(payment.payment_date || payment.created_at), 'MMM dd, yyyy')} • {payment.payment_method || 'N/A'}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant={payment.verification_status === 'verified' ? 'default' : 'secondary'}>
-                              {payment.verification_status || 'pending'}
+                            <Badge variant={payment.status === 'verified' || payment.verified ? 'default' : 'secondary'}>
+                              {payment.status || (payment.verified ? 'verified' : 'pending')}
                             </Badge>
                             {receipt ? (
                               <Button variant="outline" size="sm" onClick={() => handleViewReceipt(receipt)}>
                                 <Eye className="h-4 w-4 mr-1" />
                                 View Receipt
                               </Button>
-                            ) : payment.verification_status === 'verified' ? (
+                            ) : (payment.status === 'verified' || payment.verified) ? (
                               <Button 
                                 variant="outline" 
                                 size="sm" 

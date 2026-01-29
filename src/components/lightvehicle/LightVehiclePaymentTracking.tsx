@@ -111,19 +111,20 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
         return;
       }
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('lightvehicle_customer_payments')
         .insert({
           order_id: orderId,
           payment_schedule_id: selectedSchedule?.id || null,
-          payment_amount: amount,
+          amount: amount,
           payment_date: paymentForm.payment_date,
           payment_method: paymentForm.payment_method,
-          payment_reference: paymentForm.reference_no || null,
+          reference_number: paymentForm.reference_no || null,
           bank_name: paymentForm.bank_name || null,
           cheque_no: paymentForm.cheque_no || null,
           notes: paymentForm.notes || null,
           status: 'pending',
+          verification_status: 'pending',
           created_by: user.id
         });
 
@@ -194,7 +195,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           orderNo,
           customerId,
           totalAmount: orderDetails?.total_amount || 0,
-          advanceAmount: payment.payment_amount,
+          advanceAmount: payment.amount,
           companyId: NCG_HOLDING_ID,
           settings,
         });
@@ -221,7 +222,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           module: 'lightvehicle',
           orderNo,
           customerName,
-          amount: payment.payment_amount,
+          amount: payment.amount,
           paymentType,
           paymentMethod: payment.payment_method,
           settings,
@@ -242,7 +243,7 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
           paymentId,
           invoiceId,
           customerId,
-          amount: payment.payment_amount,
+          amount: payment.amount,
           paymentMethod: payment.payment_method,
           paymentDate: payment.payment_date,
           settings,
@@ -259,6 +260,8 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
         .from('lightvehicle_customer_payments')
         .update({
           status: 'verified',
+          verification_status: 'verified',
+          verified: true,
           verified_at: new Date().toISOString(),
           verified_by: user.id,
           journal_entry_id: journalEntryId,
@@ -329,10 +332,10 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
 
   const totalPaid = payments
     .filter(p => p.status === 'verified')
-    .reduce((sum, p) => sum + p.payment_amount, 0);
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
   const totalPending = payments
     .filter(p => p.status === 'pending' || p.status === 'received')
-    .reduce((sum, p) => sum + p.payment_amount, 0);
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
   const balanceDue = (orderDetails?.total_amount || 0) - totalPaid;
 
   return (
@@ -435,10 +438,10 @@ export function LightVehiclePaymentTracking({ orderId, onRefresh }: LightVehicle
                   {payments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{payment.payment_reference || '-'}</TableCell>
+                      <TableCell>{payment.reference_number || '-'}</TableCell>
                       <TableCell className="capitalize">{payment.payment_method?.replace('_', ' ')}</TableCell>
                       <TableCell className="text-right font-medium">
-                        LKR {payment.payment_amount?.toLocaleString()}
+                        LKR {payment.amount?.toLocaleString()}
                       </TableCell>
                       <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell className="text-right">
