@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { EnhancedLightVehicleOrderDetailsModal } from './EnhancedLightVehicleOrderDetailsModal';
 import { LightVehicleCreateOrderModal } from './LightVehicleCreateOrderModal';
+import { LightVehicleEditOrderModal } from './LightVehicleEditOrderModal';
 
 interface LightVehicleOrder {
   id: string;
@@ -33,6 +34,7 @@ export function LightVehicleOrdersList() {
   const [loading, setLoading] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [createOrderModalOpen, setCreateOrderModalOpen] = useState(false);
   const { toast } = useToast();
 
@@ -64,6 +66,11 @@ export function LightVehicleOrdersList() {
   const handleViewOrder = (orderId: string) => {
     setSelectedOrderId(orderId);
     setDetailsModalOpen(true);
+  };
+
+  const handleEditOrder = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setEditModalOpen(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -159,7 +166,7 @@ export function LightVehicleOrdersList() {
                         <Eye className="h-4 w-4 mr-1" />
                         View
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleEditOrder(order.id)}>
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
                       </Button>
@@ -173,12 +180,20 @@ export function LightVehicleOrdersList() {
       </Card>
 
       {selectedOrderId && (
-        <EnhancedLightVehicleOrderDetailsModal
-          open={detailsModalOpen}
-          onOpenChange={setDetailsModalOpen}
-          orderId={selectedOrderId}
-          onRefresh={loadOrders}
-        />
+        <>
+          <EnhancedLightVehicleOrderDetailsModal
+            open={detailsModalOpen}
+            onOpenChange={setDetailsModalOpen}
+            orderId={selectedOrderId}
+            onRefresh={loadOrders}
+          />
+          <LightVehicleEditOrderModal
+            open={editModalOpen}
+            onOpenChange={setEditModalOpen}
+            orderId={selectedOrderId}
+            onSuccess={loadOrders}
+          />
+        </>
       )}
 
       <LightVehicleCreateOrderModal
