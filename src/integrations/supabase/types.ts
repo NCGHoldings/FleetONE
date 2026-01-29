@@ -8178,6 +8178,8 @@ export type Database = {
         Row: {
           amount: number
           ar_receipt_id: string | null
+          bank_name: string | null
+          cheque_no: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -8189,6 +8191,8 @@ export type Database = {
           payment_schedule_id: string | null
           receipt_url: string | null
           reference_number: string | null
+          status: string | null
+          verification_status: string | null
           verified: boolean | null
           verified_at: string | null
           verified_by: string | null
@@ -8196,6 +8200,8 @@ export type Database = {
         Insert: {
           amount: number
           ar_receipt_id?: string | null
+          bank_name?: string | null
+          cheque_no?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -8207,6 +8213,8 @@ export type Database = {
           payment_schedule_id?: string | null
           receipt_url?: string | null
           reference_number?: string | null
+          status?: string | null
+          verification_status?: string | null
           verified?: boolean | null
           verified_at?: string | null
           verified_by?: string | null
@@ -8214,6 +8222,8 @@ export type Database = {
         Update: {
           amount?: number
           ar_receipt_id?: string | null
+          bank_name?: string | null
+          cheque_no?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -8225,6 +8235,8 @@ export type Database = {
           payment_schedule_id?: string | null
           receipt_url?: string | null
           reference_number?: string | null
+          status?: string | null
+          verification_status?: string | null
           verified?: boolean | null
           verified_at?: string | null
           verified_by?: string | null
