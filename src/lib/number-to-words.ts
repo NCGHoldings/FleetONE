@@ -1,72 +1,51 @@
+// International Million format - NO Lakh/Crore
 export function convertNumberToWords(amount: number): string {
-  if (amount === 0) return "ZERO RUPEES";
+  if (amount === 0) return "ZERO RUPEES ONLY";
 
-  const ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
-  const teens = ['TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+  const ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
+    'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
   const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
 
-  function convertLessThanThousand(num: number): string {
-    if (num === 0) return '';
-    if (num < 10) return ones[num];
-    if (num < 20) return teens[num - 10];
-    if (num < 100) {
-      const ten = Math.floor(num / 10);
-      const one = num % 10;
-      return tens[ten] + (one > 0 ? ' ' + ones[one] : '');
+  function convertHundreds(n: number): string {
+    let result = '';
+    if (n >= 100) {
+      result += ones[Math.floor(n / 100)] + ' HUNDRED ';
+      n %= 100;
     }
-    const hundred = Math.floor(num / 100);
-    const rest = num % 100;
-    return ones[hundred] + ' HUNDRED' + (rest > 0 ? ' ' + convertLessThanThousand(rest) : '');
+    if (n >= 20) {
+      result += tens[Math.floor(n / 10)] + ' ';
+      n %= 10;
+    }
+    if (n > 0) {
+      result += ones[n] + ' ';
+    }
+    return result;
   }
 
-  // Split into crores, lakhs, thousands, hundreds
-  const crores = Math.floor(amount / 10000000);
-  const lakhs = Math.floor((amount % 10000000) / 100000);
-  const thousands = Math.floor((amount % 100000) / 1000);
-  const hundreds = Math.floor(amount % 1000);
+  const rupees = Math.floor(amount);
   const cents = Math.round((amount % 1) * 100);
 
-  let words = '';
+  let result = '';
+  const billion = Math.floor(rupees / 1000000000);
+  const million = Math.floor((rupees % 1000000000) / 1000000);
+  const thousand = Math.floor((rupees % 1000000) / 1000);
+  const remainder = Math.floor(rupees % 1000);
 
-  if (crores > 0) {
-    words += convertLessThanThousand(crores) + ' CRORE ';
-  }
+  if (billion) result += convertHundreds(billion) + 'BILLION ';
+  if (million) result += convertHundreds(million) + 'MILLION ';
+  if (thousand) result += convertHundreds(thousand) + 'THOUSAND ';
+  if (remainder) result += convertHundreds(remainder);
 
-  if (lakhs > 0) {
-    words += convertLessThanThousand(lakhs) + ' LAKH ';
-  }
-
-  if (thousands > 0) {
-    words += convertLessThanThousand(thousands) + ' THOUSAND ';
-  }
-
-  if (hundreds > 0) {
-    words += convertLessThanThousand(hundreds);
-  }
-
-  words = words.trim();
-  
-  if (words === '') {
-    return 'ZERO RUPEES';
-  }
-
-  // For million format
-  const millions = Math.floor(amount / 1000000);
-  if (millions > 0 && crores === 0) {
-    words = convertLessThanThousand(millions) + ' MILLION';
-    const remainder = amount % 1000000;
-    if (remainder > 0) {
-      words += ' ' + convertLessThanThousand(remainder);
-    }
-  }
-
-  words += ' RUPEES';
+  result = result.trim() + ' RUPEES';
 
   if (cents > 0) {
-    words += ' & ' + convertLessThanThousand(cents) + ' CENTS';
-  } else {
-    words += ' & ZERO';
+    result += ' AND ' + convertHundreds(cents).trim() + ' CENTS';
   }
 
-  return words;
+  result += ' ONLY';
+
+  return result;
 }
+
+// Alias for backward compatibility
+export const numberToWords = convertNumberToWords;

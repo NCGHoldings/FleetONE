@@ -116,13 +116,41 @@ export const YutongCashReceiptPreview = forwardRef<HTMLDivElement, YutongCashRec
         <style dangerouslySetInnerHTML={{ __html: pageStyles }} />
         
         <div className="cash-receipt-page" style={{ border: '2px solid #003366', padding: '0' }}>
-          {/* Header - Using same style as quotation */}
-          <div className="receipt-header">
-            <img
-              src="/lovable-uploads/3a890245-ca01-4bcf-b6a0-346e06befe92.png"
-              alt="Cash Receipt Header - NCG Holdings & Yutong"
-              style={{ width: '100%', height: 'auto', display: 'block' }}
-            />
+          {/* Header - Receipt specific branding */}
+          <div className="receipt-header" style={{
+            background: 'linear-gradient(135deg, #003366 0%, #0055a5 100%)',
+            padding: '15px 25px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <img 
+                src="/lovable-uploads/4f23f225-3dd1-4b3a-a078-0be25fd07b9c.png" 
+                alt="NCG Holdings" 
+                style={{ height: '50px', objectFit: 'contain' }}
+              />
+              <div style={{ color: 'white' }}>
+                <div style={{ fontSize: '14px', fontWeight: 'bold' }}>NCG HOLDINGS (PVT) LTD</div>
+                <div style={{ fontSize: '10px', opacity: 0.9 }}>Authorized Dealer</div>
+              </div>
+            </div>
+            <div style={{ 
+              color: 'white', 
+              fontSize: '32px', 
+              fontWeight: 'bold',
+              letterSpacing: '4px',
+              textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+            }}>
+              RECEIPT
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <img 
+                src="/lovable-uploads/d67d9e6e-2e96-4e8e-8807-d504e49a6e2e.png" 
+                alt="Yutong" 
+                style={{ height: '40px', objectFit: 'contain' }}
+              />
+            </div>
           </div>
 
           <div style={{ padding: '20px' }}>
