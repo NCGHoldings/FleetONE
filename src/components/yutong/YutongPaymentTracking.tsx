@@ -42,7 +42,7 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
   const { regenerateInvoice } = useYutongOrderInvoiceManagement();
-  const { createCashReceipt, getCashReceiptByPaymentId } = useYutongCashReceipts();
+  const { createCashReceipt, getCashReceiptByPaymentId, regenerateCashReceipt } = useYutongCashReceipts();
   
   // Cash receipt states
   const [cashReceipts, setCashReceipts] = useState<Record<string, YutongCashReceipt>>({});
@@ -450,6 +450,24 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
     }
   };
 
+  // Handle regenerating a cash receipt with updated format
+  const handleRegenerateReceipt = async (paymentId: string) => {
+    const receipt = cashReceipts[paymentId];
+    if (!receipt) {
+      toast.error('Receipt not found');
+      return;
+    }
+    
+    const updatedReceipt = await regenerateCashReceipt(receipt.id);
+    if (updatedReceipt) {
+      setCashReceipts(prev => ({ ...prev, [paymentId]: updatedReceipt }));
+      // If this receipt is currently selected, update it
+      if (selectedReceipt?.id === updatedReceipt.id) {
+        setSelectedReceipt(updatedReceipt);
+      }
+    }
+  };
+
   const handleRefreshReceipts = async () => {
     // Reload cash receipts
     if (selectedOrderId) {
@@ -664,6 +682,10 @@ export function YutongPaymentTracking({ orderId, onRefresh }: YutongPaymentTrack
                                     }}>
                                       <Download className="h-4 w-4 mr-2" />
                                       Download PDF
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleRegenerateReceipt(payment.id)}>
+                                      <RefreshCw className="h-4 w-4 mr-2" />
+                                      Regenerate Receipt
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>

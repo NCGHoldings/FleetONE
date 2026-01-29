@@ -91,7 +91,29 @@ export function VehicleFinanceSettingsBase({
     }
   };
 
+  const validateSettings = (): boolean => {
+    const errors: string[] = [];
+    
+    if (!settings.default_bank_account_id) {
+      errors.push('Default Bank Account is required for payment processing');
+    }
+    if (!settings.customer_advance_account_id) {
+      errors.push('Customer Advance Account is required for advance payments');
+    }
+    
+    if (errors.length > 0) {
+      errors.forEach(error => toast.error(error));
+      return false;
+    }
+    return true;
+  };
+
   const handleSave = async () => {
+    // Validate required fields before saving
+    if (!validateSettings()) {
+      return;
+    }
+    
     setSaving(true);
     try {
       const result = await saveVehicleFinanceSettings(module, settings, NCG_HOLDING_ID);
@@ -112,34 +134,49 @@ export function VehicleFinanceSettingsBase({
     return accounts.filter(a => types.includes(a.account_type));
   };
 
+  const isRequiredField = (field: keyof VehicleFinanceSettings): boolean => {
+    return ['default_bank_account_id', 'customer_advance_account_id'].includes(field);
+  };
+
   const renderAccountSelect = (
     label: string,
     field: keyof VehicleFinanceSettings,
     accountTypes: string[],
     placeholder: string
-  ) => (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <Select
-        value={settings[field] as string || '_none'}
-        onValueChange={(value) => setSettings({ ...settings, [field]: value === '_none' ? null : value })}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="_none">-- Not Configured --</SelectItem>
-          {getAccountsByType(accountTypes)
-            .filter(account => account.id && account.id.trim() !== '')
-            .map((account) => (
-              <SelectItem key={account.id} value={account.id}>
-                {account.account_code} - {account.account_name}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
+  ) => {
+    const required = isRequiredField(field);
+    const hasValue = !!settings[field];
+    
+    return (
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1">
+          {label}
+          {required && <span className="text-destructive">*</span>}
+        </Label>
+        <Select
+          value={settings[field] as string || '_none'}
+          onValueChange={(value) => setSettings({ ...settings, [field]: value === '_none' ? null : value })}
+        >
+          <SelectTrigger className={required && !hasValue ? 'border-destructive' : ''}>
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_none">-- Not Configured --</SelectItem>
+            {getAccountsByType(accountTypes)
+              .filter(account => account.id && account.id.trim() !== '')
+              .map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.account_code} - {account.account_name}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+        {required && !hasValue && (
+          <p className="text-xs text-destructive">This field is required</p>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
