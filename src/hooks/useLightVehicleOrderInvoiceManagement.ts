@@ -151,27 +151,41 @@ export function useLightVehicleOrderInvoiceManagement() {
 
       if (recordError) throw recordError;
 
-      // Create invoice document record
-      console.log('Inserting document record for:', invoiceRecord.id);
+      // Create invoice document record with explicit validation
+      if (!invoiceRecord?.id) {
+        throw new Error('Invoice record ID is missing');
+      }
+
+      const documentPayload = {
+        invoice_record_id: invoiceRecord.id,
+        document_type: 'invoice',
+        file_name: `${invoiceNo}_draft.pdf`,
+        file_path: fileName,
+        file_size: pdfBlob.size,
+        document_status: 'draft',
+        document_data: JSON.stringify(fullInvoiceData)
+      };
+
+      console.log('Inserting document with payload:', JSON.stringify(documentPayload, null, 2));
+      
       const { data: docData, error: docError } = await supabase
         .from('lightvehicle_invoice_documents')
-        .insert({
-          invoice_record_id: invoiceRecord.id,
-          document_type: 'invoice',
-          file_name: `${invoiceNo}_draft.pdf`,
-          file_path: fileName,
-          file_size: pdfBlob.size,
-          document_status: 'draft',
-          document_data: JSON.stringify(fullInvoiceData)
-        })
+        .insert(documentPayload)
         .select()
         .single();
 
       if (docError) {
-        console.error('Document insert error:', docError);
-        throw docError;
+        console.error('Document insert error details:', {
+          code: docError.code,
+          message: docError.message,
+          details: docError.details,
+          hint: docError.hint
+        });
+        // Don't throw - invoice is already created, just show warning
+        toast.warning('Invoice created but document record failed to save. Downloads may use fallback.');
+      } else {
+        console.log('Document record created successfully:', docData);
       }
-      console.log('Document record created:', docData);
 
       toast.success(`Invoice ${invoiceNo} generated successfully`);
       return invoiceRecord.id;
@@ -281,14 +295,34 @@ export function useLightVehicleOrderInvoiceManagement() {
 
   const getInvoiceDownloadUrl = async (invoiceRecordId: string): Promise<string | null> => {
     try {
+      // First try to get from documents table
       const docs = await fetchInvoiceDocuments(invoiceRecordId);
-      if (docs.length === 0 || !docs[0].file_path) return null;
+      
+      if (docs.length > 0 && docs[0].file_path) {
+        const { data } = supabase.storage
+          .from('lightvehicle-invoices')
+          .getPublicUrl(docs[0].file_path);
+        return data.publicUrl;
+      }
 
-      const { data } = supabase.storage
-        .from('lightvehicle-invoices')
-        .getPublicUrl(docs[0].file_path);
+      // Fallback: construct path from invoice record
+      console.log('No document record found, trying fallback path for:', invoiceRecordId);
+      const { data: record } = await supabase
+        .from('lightvehicle_invoice_records')
+        .select('invoice_number, order_id, status')
+        .eq('id', invoiceRecordId)
+        .single();
 
-      return data.publicUrl;
+      if (record) {
+        const fallbackPath = `${record.order_id}/${record.invoice_number}_${record.status}.pdf`;
+        console.log('Using fallback path:', fallbackPath);
+        const { data } = supabase.storage
+          .from('lightvehicle-invoices')
+          .getPublicUrl(fallbackPath);
+        return data.publicUrl;
+      }
+
+      return null;
     } catch (error) {
       console.error('Error getting download URL:', error);
       return null;
