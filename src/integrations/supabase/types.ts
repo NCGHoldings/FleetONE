@@ -4624,8 +4624,10 @@ export type Database = {
           food: number | null
           fuel_cost: number | null
           fuel_liters: number | null
+          gl_posted: boolean | null
           highway_charges: number | null
           id: string
+          journal_entry_id: string | null
           legal_court: number | null
           log_sheet: number | null
           notes: string | null
@@ -4657,8 +4659,10 @@ export type Database = {
           food?: number | null
           fuel_cost?: number | null
           fuel_liters?: number | null
+          gl_posted?: boolean | null
           highway_charges?: number | null
           id?: string
+          journal_entry_id?: string | null
           legal_court?: number | null
           log_sheet?: number | null
           notes?: string | null
@@ -4690,8 +4694,10 @@ export type Database = {
           food?: number | null
           fuel_cost?: number | null
           fuel_liters?: number | null
+          gl_posted?: boolean | null
           highway_charges?: number | null
           id?: string
+          journal_entry_id?: string | null
           legal_court?: number | null
           log_sheet?: number | null
           notes?: string | null
@@ -4726,6 +4732,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
+          {
+            foreignKeyName: "daily_bus_expenses_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
         ]
       }
       daily_trips: {
@@ -4743,9 +4756,11 @@ export type Database = {
           entry_deadline_exceeded: boolean | null
           fuel_cost: number | null
           fuel_liters: number | null
+          gl_posted: boolean | null
           id: string
           income: number | null
           income_details: Json | null
+          journal_entry_id: string | null
           km_per_liter: number | null
           late_entry_request_id: string | null
           net_income: number | null
@@ -4778,9 +4793,11 @@ export type Database = {
           entry_deadline_exceeded?: boolean | null
           fuel_cost?: number | null
           fuel_liters?: number | null
+          gl_posted?: boolean | null
           id?: string
           income?: number | null
           income_details?: Json | null
+          journal_entry_id?: string | null
           km_per_liter?: number | null
           late_entry_request_id?: string | null
           net_income?: number | null
@@ -4813,9 +4830,11 @@ export type Database = {
           entry_deadline_exceeded?: boolean | null
           fuel_cost?: number | null
           fuel_liters?: number | null
+          gl_posted?: boolean | null
           id?: string
           income?: number | null
           income_details?: Json | null
+          journal_entry_id?: string | null
           km_per_liter?: number | null
           late_entry_request_id?: string | null
           net_income?: number | null
@@ -4854,6 +4873,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_trips_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
           {
@@ -10583,6 +10609,297 @@ export type Database = {
             columns: ["route_id"]
             isOneToOne: false
             referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ncg_express_finance_settings: {
+        Row: {
+          accident_expense_account_id: string | null
+          auto_post_expenses: boolean | null
+          auto_post_revenue: boolean | null
+          body_wash_expense_account_id: string | null
+          cash_account_id: string | null
+          company_id: string | null
+          created_at: string
+          emission_fitness_expense_account_id: string | null
+          expense_cash_account_id: string | null
+          expense_prefix: string | null
+          food_expense_account_id: string | null
+          fuel_expense_account_id: string | null
+          highway_expense_account_id: string | null
+          id: string
+          legal_court_expense_account_id: string | null
+          log_sheet_expense_account_id: string | null
+          ntc_expense_account_id: string | null
+          other_expense_account_id: string | null
+          parking_expense_account_id: string | null
+          permits_expense_account_id: string | null
+          police_expense_account_id: string | null
+          repair_expense_account_id: string | null
+          revenue_prefix: string | null
+          route_revenue_account_id: string | null
+          runner_expense_account_id: string | null
+          salary_expense_account_id: string | null
+          short_misc_expense_account_id: string | null
+          staff_accommodation_expense_account_id: string | null
+          temporary_permit_expense_account_id: string | null
+          ticket_revenue_account_id: string | null
+          tyre_expense_account_id: string | null
+          updated_at: string
+          vehicle_hire_expense_account_id: string | null
+        }
+        Insert: {
+          accident_expense_account_id?: string | null
+          auto_post_expenses?: boolean | null
+          auto_post_revenue?: boolean | null
+          body_wash_expense_account_id?: string | null
+          cash_account_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          emission_fitness_expense_account_id?: string | null
+          expense_cash_account_id?: string | null
+          expense_prefix?: string | null
+          food_expense_account_id?: string | null
+          fuel_expense_account_id?: string | null
+          highway_expense_account_id?: string | null
+          id?: string
+          legal_court_expense_account_id?: string | null
+          log_sheet_expense_account_id?: string | null
+          ntc_expense_account_id?: string | null
+          other_expense_account_id?: string | null
+          parking_expense_account_id?: string | null
+          permits_expense_account_id?: string | null
+          police_expense_account_id?: string | null
+          repair_expense_account_id?: string | null
+          revenue_prefix?: string | null
+          route_revenue_account_id?: string | null
+          runner_expense_account_id?: string | null
+          salary_expense_account_id?: string | null
+          short_misc_expense_account_id?: string | null
+          staff_accommodation_expense_account_id?: string | null
+          temporary_permit_expense_account_id?: string | null
+          ticket_revenue_account_id?: string | null
+          tyre_expense_account_id?: string | null
+          updated_at?: string
+          vehicle_hire_expense_account_id?: string | null
+        }
+        Update: {
+          accident_expense_account_id?: string | null
+          auto_post_expenses?: boolean | null
+          auto_post_revenue?: boolean | null
+          body_wash_expense_account_id?: string | null
+          cash_account_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          emission_fitness_expense_account_id?: string | null
+          expense_cash_account_id?: string | null
+          expense_prefix?: string | null
+          food_expense_account_id?: string | null
+          fuel_expense_account_id?: string | null
+          highway_expense_account_id?: string | null
+          id?: string
+          legal_court_expense_account_id?: string | null
+          log_sheet_expense_account_id?: string | null
+          ntc_expense_account_id?: string | null
+          other_expense_account_id?: string | null
+          parking_expense_account_id?: string | null
+          permits_expense_account_id?: string | null
+          police_expense_account_id?: string | null
+          repair_expense_account_id?: string | null
+          revenue_prefix?: string | null
+          route_revenue_account_id?: string | null
+          runner_expense_account_id?: string | null
+          salary_expense_account_id?: string | null
+          short_misc_expense_account_id?: string | null
+          staff_accommodation_expense_account_id?: string | null
+          temporary_permit_expense_account_id?: string | null
+          ticket_revenue_account_id?: string | null
+          tyre_expense_account_id?: string | null
+          updated_at?: string
+          vehicle_hire_expense_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ncg_express_finance_settings_accident_expense_account_id_fkey"
+            columns: ["accident_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_body_wash_expense_account_id_fkey"
+            columns: ["body_wash_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_cash_account_id_fkey"
+            columns: ["cash_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_emission_fitness_expense_acco_fkey"
+            columns: ["emission_fitness_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_expense_cash_account_id_fkey"
+            columns: ["expense_cash_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_food_expense_account_id_fkey"
+            columns: ["food_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_fuel_expense_account_id_fkey"
+            columns: ["fuel_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_highway_expense_account_id_fkey"
+            columns: ["highway_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_legal_court_expense_account_i_fkey"
+            columns: ["legal_court_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_log_sheet_expense_account_id_fkey"
+            columns: ["log_sheet_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_ntc_expense_account_id_fkey"
+            columns: ["ntc_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_other_expense_account_id_fkey"
+            columns: ["other_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_parking_expense_account_id_fkey"
+            columns: ["parking_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_permits_expense_account_id_fkey"
+            columns: ["permits_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_police_expense_account_id_fkey"
+            columns: ["police_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_repair_expense_account_id_fkey"
+            columns: ["repair_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_route_revenue_account_id_fkey"
+            columns: ["route_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_runner_expense_account_id_fkey"
+            columns: ["runner_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_salary_expense_account_id_fkey"
+            columns: ["salary_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_short_misc_expense_account_id_fkey"
+            columns: ["short_misc_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_staff_accommodation_expense_a_fkey"
+            columns: ["staff_accommodation_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_temporary_permit_expense_acco_fkey"
+            columns: ["temporary_permit_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_ticket_revenue_account_id_fkey"
+            columns: ["ticket_revenue_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_tyre_expense_account_id_fkey"
+            columns: ["tyre_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ncg_express_finance_settings_vehicle_hire_expense_account__fkey"
+            columns: ["vehicle_hire_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]
           },
         ]
