@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => ({
     componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: false
+      },
       includeAssets: ['favicon.ico', 'robots.txt'],
       manifest: {
         name: 'NCG Speed Transport Management System',
