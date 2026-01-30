@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreVertical, Edit, Plus, TrendingUp, AlertTriangle, Pencil, BookOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +17,9 @@ import { format } from "date-fns";
 import { ExpenseBreakdownPreview, DailyExpenseData } from "./ExpenseBreakdownPreview";
 import { InlineExpenseEditor } from "./InlineExpenseEditor";
 import { InlineRevenueEditor } from "./InlineRevenueEditor";
+import { GLStatusBadge, GLAggregatedStatus } from "@/components/ncg-express/GLStatusBadge";
+import { useNCGExpressFinanceSettings, postTripRevenueToGL } from "@/hooks/useNCGExpressFinance";
+import { toast } from "@/hooks/use-toast";
 interface BusDailySummaryTableProps {
   summaries: BusDailySummary[];
   onRefresh: () => void;
@@ -24,6 +28,8 @@ interface BusDailySummaryTableProps {
 export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTableProps) {
   const navigate = useNavigate();
   const [expandedBuses, setExpandedBuses] = useState<Set<string>>(new Set());
+  const [postingBusId, setPostingBusId] = useState<string | null>(null);
+  const { settings } = useNCGExpressFinanceSettings();
   
   // Inline editor states
   const [editingExpenseBus, setEditingExpenseBus] = useState<{
@@ -53,6 +59,68 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
       newExpanded.add(busId);
     }
     setExpandedBuses(newExpanded);
+  };
+
+  const handlePostAllTripsToGL = async (summary: BusDailySummary) => {
+    if (!settings) {
+      toast({
+        title: "Settings not configured",
+        description: "Please configure NCG Express Finance Settings first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPostingBusId(summary.bus_id);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const trip of summary.trips) {
+        if (trip.gl_posted) continue; // Skip already posted
+        if (!trip.income || trip.income <= 0) continue; // Skip zero income
+
+        const result = await postTripRevenueToGL(
+          {
+            id: trip.id,
+            trip_no: trip.trip_no,
+            trip_date: trip.trip_date,
+            bus_no: summary.bus_no,
+            route_name: trip.route_name,
+            income: trip.income,
+          },
+          settings
+        );
+
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Posted to GL",
+          description: `${successCount} trip(s) posted successfully${failCount > 0 ? `, ${failCount} failed` : ''}`,
+        });
+        onRefresh();
+      } else if (failCount > 0) {
+        toast({
+          title: "Posting failed",
+          description: `Failed to post ${failCount} trip(s)`,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setPostingBusId(null);
+    }
   };
 
   const getProfitColor = (margin: number) => {
@@ -132,6 +200,13 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
 
                   <div className="col-span-1 text-center">
                     <Badge variant="outline">{summary.trip_count} trips</Badge>
+                    <div className="mt-1">
+                      <GLAggregatedStatus 
+                        posted={summary.trips.filter(t => t.gl_posted).length}
+                        total={summary.trips.filter(t => t.income > 0).length}
+                        size="sm"
+                      />
+                    </div>
                   </div>
 
                   <div className="col-span-2 text-right">
@@ -188,6 +263,23 @@ export function BusDailySummaryTable({ summaries, onRefresh }: BusDailySummaryTa
                           <TrendingUp className="mr-2 h-4 w-4" />
                           View Analytics
                         </DropdownMenuItem>
+                        {summary.trips.some(t => !t.gl_posted && t.income > 0) && settings?.cash_account_id && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => handlePostAllTripsToGL(summary)}
+                              disabled={postingBusId === summary.bus_id}
+                              className="text-green-600"
+                            >
+                              {postingBusId === summary.bus_id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <BookOpen className="mr-2 h-4 w-4" />
+                              )}
+                              Post All Trips to GL
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

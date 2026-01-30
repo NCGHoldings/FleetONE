@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users } from "lucide-react";
+import { CalendarIcon, LayoutGrid, LayoutList, Plus, Upload, ChevronLeft, ChevronRight, FileSpreadsheet, Settings, Users, BookOpen } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useDailyBusGroupedTrips } from "@/hooks/useDailyBusGroupedTrips";
@@ -19,6 +19,7 @@ import { ImportFromAllocationModal } from "@/components/trips/ImportFromAllocati
 import { GLExportModal } from "@/components/trips/GLExportModal";
 import { RouteGLCodesAdmin } from "@/components/trips/RouteGLCodesAdmin";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { BulkGLPostingDialog } from "@/components/ncg-express/BulkGLPostingDialog";
 import { toast } from "sonner";
 import type { DateRange } from "react-day-picker";
 
@@ -32,6 +33,7 @@ export default function DailyTrips() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showGLExportModal, setShowGLExportModal] = useState(false);
   const [showRouteGLAdmin, setShowRouteGLAdmin] = useState(false);
+  const [showBulkGLPostingDialog, setShowBulkGLPostingDialog] = useState(false);
   
   // Validate and prepare date range for hook
   const validDateRange = dateMode === "range" && dateRange?.from && dateRange?.to
@@ -188,6 +190,16 @@ export default function DailyTrips() {
 
               <Button 
                 variant="outline"
+                onClick={() => setShowBulkGLPostingDialog(true)}
+                className="border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Post to GL</span>
+                <span className="sm:hidden">GL</span>
+              </Button>
+
+              <Button 
+                variant="outline"
                 onClick={() => setShowRouteGLAdmin(true)}
                 className="bg-secondary/50"
               >
@@ -332,6 +344,16 @@ export default function DailyTrips() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <BulkGLPostingDialog
+        open={showBulkGLPostingDialog}
+        onOpenChange={setShowBulkGLPostingDialog}
+        type="trips"
+        onComplete={() => {
+          handleRefetch();
+          toast.success('GL posting complete!');
+        }}
+      />
     </div>
   );
 }

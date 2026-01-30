@@ -55,9 +55,12 @@ export interface NCGExpressFinanceSettings {
 
 export interface DailyTripForGL {
   id: string;
+  trip_no?: string;
   trip_date: string;
-  bus_id: string;
+  bus_id?: string;
+  bus_no?: string;
   route_id?: string;
+  route_name?: string;
   income: number;
   buses?: { bus_no: string };
   routes?: { route_name: string };
@@ -183,8 +186,8 @@ export async function postTripRevenueToGL(
       return { success: false, error: 'No income to post' };
     }
 
-    const busNo = trip.buses?.bus_no || 'Unknown';
-    const routeName = trip.routes?.route_name || 'Unknown Route';
+    const busNo = trip.bus_no || trip.buses?.bus_no || 'Unknown';
+    const routeName = trip.route_name || trip.routes?.route_name || 'Unknown Route';
     const tripDate = format(new Date(trip.trip_date), 'yyyy-MM-dd');
 
     // Create journal entry
