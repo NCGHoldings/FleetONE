@@ -523,7 +523,8 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   <FormControl>
                     <Textarea 
                       placeholder="Any special features or customizations" 
-                      {...field} 
+                      value={field.value || ''} 
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />
@@ -539,7 +540,11 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   <FormItem>
                     <FormLabel>Delivery Timeline</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., 3-4 months" {...field} />
+                      <Input 
+                        placeholder="e.g., 3-4 months" 
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -553,7 +558,12 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   <FormItem>
                     <FormLabel>Payment Terms</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., 30% advance" {...field} />
+                      <Textarea 
+                        placeholder="e.g., 30% advance, balance on delivery" 
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        className="min-h-[60px]"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -567,7 +577,12 @@ export function YutongQuotationForm({ onSubmit, onCancel }: YutongQuotationFormP
                   <FormItem>
                     <FormLabel>Warranty Terms</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., 2 years" {...field} />
+                      <Textarea 
+                        placeholder="e.g., Engine - 3 years, Wearable Parts - 1 month" 
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        className="min-h-[60px]"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

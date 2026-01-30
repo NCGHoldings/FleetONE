@@ -1006,7 +1006,13 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                     <FormItem>
                       <FormLabel>Delivery Timeline</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="e.g., 3-4 months" />
+                        <Input 
+                          placeholder="e.g., 3-4 months" 
+                          value={field.value || ''} 
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1021,7 +1027,13 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                   <FormItem>
                     <FormLabel>Special Features</FormLabel>
                     <FormControl>
-                      <Textarea {...field} />
+                      <Textarea 
+                        placeholder="Enter any special features or customizations"
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1035,7 +1047,13 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                   <FormItem>
                     <FormLabel>Payment Terms</FormLabel>
                     <FormControl>
-                      <Textarea {...field} />
+                      <Textarea 
+                        placeholder="Enter payment terms (e.g., 30% advance, balance on delivery)"
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1049,7 +1067,13 @@ export function YutongEditQuotationModal({ quotation, open, onClose, onSuccess }
                   <FormItem>
                     <FormLabel>Warranty Terms</FormLabel>
                     <FormControl>
-                      <Textarea {...field} />
+                      <Textarea 
+                        placeholder="Enter warranty terms"
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
