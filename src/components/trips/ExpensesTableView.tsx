@@ -2,8 +2,11 @@ import { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
+import { Eye, BookOpen, Loader2 } from "lucide-react";
 import { ExpenseDetailsModal } from "./ExpenseDetailsModal";
+import { GLStatusBadge } from "@/components/ncg-express/GLStatusBadge";
+import { useNCGExpressFinanceSettings, postExpensesToGL } from "@/hooks/useNCGExpressFinance";
+import { toast } from "@/hooks/use-toast";
 
 interface ExpensesTableViewProps {
   expenses: any[];
@@ -13,6 +16,8 @@ interface ExpensesTableViewProps {
 export function ExpensesTableView({ expenses, onRefresh }: ExpensesTableViewProps) {
   const [selectedExpense, setSelectedExpense] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [postingId, setPostingId] = useState<string | null>(null);
+  const { settings } = useNCGExpressFinanceSettings();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-LK', {
@@ -25,6 +30,43 @@ export function ExpensesTableView({ expenses, onRefresh }: ExpensesTableViewProp
 
   const calculateCategoryTotal = (expense: any, fields: string[]) => {
     return fields.reduce((sum, field) => sum + (expense[field] || 0), 0);
+  };
+
+  const handlePostToGL = async (expense: any) => {
+    if (!settings) {
+      toast({
+        title: "Settings not configured",
+        description: "Please configure NCG Express Finance Settings first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPostingId(expense.id);
+    try {
+      const result = await postExpensesToGL(expense, settings);
+      if (result.success) {
+        toast({
+          title: "Posted to GL",
+          description: `Expenses for ${expense.buses?.bus_no} posted successfully`,
+        });
+        onRefresh();
+      } else {
+        toast({
+          title: "Posting failed",
+          description: result.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setPostingId(null);
+    }
   };
 
   const columns: ColumnDef<any>[] = [
@@ -93,6 +135,17 @@ export function ExpensesTableView({ expenses, onRefresh }: ExpensesTableViewProp
       },
     },
     {
+      id: "gl_status",
+      header: "GL Status",
+      cell: ({ row }) => (
+        <GLStatusBadge 
+          glPosted={row.original.gl_posted} 
+          journalEntryId={row.original.journal_entry_id}
+          size="sm"
+        />
+      ),
+    },
+    {
       id: "total",
       header: "Total",
       accessorFn: (row) => row.total_daily_expenses || 0,
@@ -106,16 +159,35 @@ export function ExpensesTableView({ expenses, onRefresh }: ExpensesTableViewProp
       id: "actions",
       header: "Actions",
       cell: ({ row }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setSelectedExpense(row.original);
-            setModalOpen(true);
-          }}
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSelectedExpense(row.original);
+              setModalOpen(true);
+            }}
+            title="View Details"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          {!row.original.gl_posted && settings?.expense_cash_account_id && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handlePostToGL(row.original)}
+              disabled={postingId === row.original.id}
+              title="Post to GL"
+              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+            >
+              {postingId === row.original.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <BookOpen className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+        </div>
       ),
     },
   ];

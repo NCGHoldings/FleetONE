@@ -19,6 +19,8 @@ export interface Trip {
   end_odo?: number;
   start_time?: string;
   end_time?: string;
+  gl_posted?: boolean;
+  journal_entry_id?: string;
 }
 
 export interface DailyBusExpense {
@@ -159,6 +161,8 @@ export function useDailyBusGroupedTrips(
           start_time,
           end_time,
           notes,
+          gl_posted,
+          journal_entry_id,
           buses:bus_id(bus_no),
           routes:route_id(route_name, route_no, gl_code)
         `)
@@ -275,6 +279,8 @@ export function useDailyBusGroupedTrips(
           end_odo: trip.odometer_end,
           start_time: trip.start_time,
           end_time: trip.end_time,
+          gl_posted: trip.gl_posted,
+          journal_entry_id: trip.journal_entry_id,
         });
       });
 

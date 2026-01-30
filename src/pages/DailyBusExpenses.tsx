@@ -44,7 +44,8 @@ import {
   LayoutGrid,
   Table as TableIcon,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Receipt
 } from "lucide-react";
 import { format } from "date-fns";
 import { DailyBusExpensesForm } from "@/components/trips/DailyBusExpensesForm";
@@ -54,6 +55,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExpensesTableView } from "@/components/trips/ExpensesTableView";
+import { GLStatusBadge } from "@/components/ncg-express/GLStatusBadge";
+import { BulkGLPostingDialog } from "@/components/ncg-express/BulkGLPostingDialog";
 
 export default function DailyBusExpenses() {
   const [searchParams] = useSearchParams();
@@ -62,6 +65,7 @@ export default function DailyBusExpenses() {
   const { expenses, loading, saveExpense, deleteExpense, refetch } = useDailyBusExpenses(date);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [expandAll, setExpandAll] = useState(false);
+  const [showBulkGLPostingDialog, setShowBulkGLPostingDialog] = useState(false);
   
   // Check if we're in view-only mode from OCR
   const queryDate = searchParams.get('date');
@@ -158,6 +162,16 @@ export default function DailyBusExpenses() {
                       {expandAll ? "Collapse All" : "Expand All"}
                     </Button>
                   )}
+
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBulkGLPostingDialog(true)}
+                    className="border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
+                  >
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Post to GL
+                  </Button>
                 </>
               )}
             </div>
@@ -265,6 +279,11 @@ export default function DailyBusExpenses() {
                         <CardDescription>{format(date, "EEEE, MMMM d, yyyy")}</CardDescription>
                       </div>
                       <div className="flex items-center gap-3">
+                        <GLStatusBadge 
+                          glPosted={(expense as any).gl_posted} 
+                          journalEntryId={(expense as any).journal_entry_id}
+                          showLink={true}
+                        />
                         <div className="text-right">
                           <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Expenses</div>
                            <div className="text-3xl font-bold text-primary">
@@ -452,6 +471,15 @@ export default function DailyBusExpenses() {
           )}
         </div>
       </div>
+
+      <BulkGLPostingDialog
+        open={showBulkGLPostingDialog}
+        onOpenChange={setShowBulkGLPostingDialog}
+        type="expenses"
+        onComplete={() => {
+          refetch();
+        }}
+      />
     </AppLayout>
   );
 }
