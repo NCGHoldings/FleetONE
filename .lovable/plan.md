@@ -1,190 +1,176 @@
 
-# Fix Yutong Quotation Form - Warranty Terms, Payment Terms & Special Features
+# Yutong Cash Receipt Update - Header Image & No Refunds Seal
 
-## Problem Summary
+## Summary
 
-When editing and updating Yutong quotations, the following fields are not displaying correctly in the form or not being saved properly:
-- **Warranty Terms** - Shows in database but not populating in edit form
-- **Payment Terms** - Not displaying or saving correctly  
-- **Special Features** - Not displaying or saving correctly
-- **Delivery Timeline** - May have similar issues
-
-## Root Causes Identified
-
-### Issue 1: Textarea Value Handling
-In `YutongEditQuotationModal.tsx`, the Textarea components spread `{...field}` directly, but when `field.value` is `undefined`, this can cause React controlled component warnings and prevent proper display.
-
-**Current Code (Lines 1024, 1038, 1052):**
-```typescript
-<Textarea {...field} />
-```
-
-**Problem:** When the form initially loads or if the database returns `null`, the value may be undefined, causing the controlled input to behave unexpectedly.
-
-### Issue 2: Form Field Type Inconsistency
-- **Create Form** uses `<Input>` for warranty_terms and payment_terms (single line)
-- **Edit Form** uses `<Textarea>` (multi-line)
-
-This is actually intentional (Textarea allows more detailed terms), but needs proper value handling.
-
-### Issue 3: Null/Empty String Handling
-The form reset at line 181-184 handles null → empty string conversion:
-```typescript
-special_features: quotation.special_features || '',
-delivery_timeline: quotation.delivery_timeline || '',
-payment_terms: quotation.payment_terms || '',
-warranty_terms: quotation.warranty_terms || '',
-```
-
-But the Textarea needs explicit value handling to ensure empty string is passed.
+This plan updates the Yutong Cash Receipt to:
+1. Replace the current CSS-based header with the new professional header image
+2. Add the "NO REFUNDS" company seal below the receipt table
 
 ---
 
-## Solution
+## Changes Required
 
-### Fix 1: Update Textarea Fields in Edit Modal
+### 1. Copy Uploaded Images to Project
 
-**File: `src/components/yutong/YutongEditQuotationModal.tsx`**
+**Files to Copy**:
+| Source | Destination | Purpose |
+|--------|-------------|---------|
+| `user-uploads://Screenshot_2026-01-30_at_15.57.44.png` | `public/lovable-uploads/yutong-cash-receipt-header.png` | Cash Receipt header banner |
+| `user-uploads://photo_2026-01-30_15-58-08.jpg` | `public/lovable-uploads/ncg-no-refunds-seal.png` | No Refunds company seal |
 
-Change all Textarea form fields to explicitly handle values:
+---
 
-```typescript
-// Line 1024: special_features
-<Textarea 
-  placeholder="Enter any special features or customizations"
-  value={field.value || ''} 
-  onChange={field.onChange}
-  onBlur={field.onBlur}
-  name={field.name}
-/>
+### 2. Update YutongCashReceiptPreview.tsx
 
-// Line 1038: payment_terms
-<Textarea 
-  placeholder="Enter payment terms (e.g., 30% advance, balance on delivery)"
-  value={field.value || ''} 
-  onChange={field.onChange}
-  onBlur={field.onBlur}
-  name={field.name}
-/>
+**File**: `src/components/yutong/YutongCashReceiptPreview.tsx`
 
-// Line 1052: warranty_terms  
-<Textarea 
-  placeholder="Enter warranty terms"
-  value={field.value || ''} 
-  onChange={field.onChange}
-  onBlur={field.onBlur}
-  name={field.name}
-/>
+**Change 1: Replace CSS Header with Image** (Lines 118-154)
+
+Current implementation uses inline CSS gradient with logos. Replace with the uploaded header image:
+
+```tsx
+// Replace this CSS-based header:
+<div className="receipt-header" style={{
+  background: 'linear-gradient(135deg, #003366 0%, #0055a5 100%)',
+  padding: '15px 25px',
+  display: 'flex',
+  ...
+}}>
+  {/* Multiple elements: logos, text, etc. */}
+</div>
+
+// With single header image:
+<div className="receipt-header">
+  <img 
+    src="/lovable-uploads/yutong-cash-receipt-header.png" 
+    alt="NCG Holdings - Cash Receipt" 
+    style={{ 
+      width: '100%', 
+      height: 'auto', 
+      display: 'block' 
+    }}
+  />
+</div>
 ```
 
-### Fix 2: Update Delivery Timeline Input
+**Change 2: Remove "CASH RECEIPT" Underlined Title** (Lines 158-167)
 
-**Line 1009:**
-```typescript
-<Input 
-  placeholder="e.g., 3-4 months" 
-  value={field.value || ''} 
-  onChange={field.onChange}
-  onBlur={field.onBlur}
-  name={field.name}
-/>
+Since the header image already contains "CASH RECEIPT" text, remove the duplicate title:
+
+```tsx
+// Remove this block:
+<div style={{ 
+  textAlign: 'center', 
+  fontSize: '24px', 
+  fontWeight: 'bold', 
+  color: '#003366',
+  marginBottom: '20px',
+  textDecoration: 'underline'
+}}>
+  CASH RECEIPT
+</div>
 ```
 
-### Fix 3: Ensure Create Form Uses Proper Handling
+**Change 3: Add "NO REFUNDS" Seal After Table** (After Line 235)
 
-**File: `src/components/yutong/YutongQuotationForm.tsx`**
+Add the seal image after the receipt table and before the signature section:
 
-Update the warranty_terms and payment_terms fields to also use Textarea for consistency and proper multi-line support, matching the edit form:
-
-**Lines 549-575:**
-```typescript
-<FormField
-  control={form.control}
-  name="payment_terms"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Payment Terms</FormLabel>
-      <FormControl>
-        <Textarea 
-          placeholder="e.g., 30% advance, balance on delivery" 
-          value={field.value || ''} 
-          onChange={field.onChange}
-        />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
-
-<FormField
-  control={form.control}
-  name="warranty_terms"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Warranty Terms</FormLabel>
-      <FormControl>
-        <Textarea 
-          placeholder="e.g., Engine - 3 years, Wearable Parts - 1 month" 
-          value={field.value || ''} 
-          onChange={field.onChange}
-        />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
-```
-
-Also update special_features (Line 524):
-```typescript
-<Textarea 
-  placeholder="Any special features or customizations" 
-  value={field.value || ''} 
-  onChange={field.onChange}
-/>
+```tsx
+// After closing </table> tag, add:
+<div style={{ 
+  display: 'flex', 
+  justifyContent: 'flex-end', 
+  marginTop: '15px',
+  marginBottom: '10px'
+}}>
+  <img 
+    src="/lovable-uploads/ncg-no-refunds-seal.png" 
+    alt="No Refunds - NCG Holdings" 
+    style={{ 
+      width: '120px', 
+      height: 'auto', 
+      opacity: 0.85 
+    }}
+  />
+</div>
 ```
 
 ---
 
-## Files to Modify
+### 3. Update Page Styles for Image Header
 
-| File | Changes |
-|------|---------|
-| `src/components/yutong/YutongEditQuotationModal.tsx` | Fix Textarea value handling for warranty_terms, payment_terms, special_features, delivery_timeline |
-| `src/components/yutong/YutongQuotationForm.tsx` | Update Input→Textarea for warranty_terms & payment_terms, fix value handling |
+Update the CSS in `pageStyles` to handle the new image-based header properly:
 
----
-
-## Technical Details
-
-### Why This Fixes the Issue
-
-1. **Explicit Value Binding**: Using `value={field.value || ''}` ensures the input always has a defined string value, preventing React controlled/uncontrolled component issues.
-
-2. **Consistent Field Behavior**: Explicitly passing `onChange`, `onBlur`, and `name` ensures all form field callbacks are properly wired.
-
-3. **Form Consistency**: Using Textarea for multi-line terms in both create and edit forms provides consistent UX.
-
-### Database Verification
-
-Confirmed the columns exist and contain data:
-- `warranty_terms` (text) ✓
-- `payment_terms` (text) ✓  
-- `special_features` (text) ✓
-- `delivery_timeline` (text) ✓
-
-Example data: Quotation YTQ-20260113-0001-v1.10 has:
-- warranty_terms: "Engine and Gearbox - 3 years or 300,000km..."
-- special_features: "Super Luxury Seats - 28+1+1"
+```css
+.receipt-header {
+  margin-bottom: 0; /* Remove extra margin since image has its own spacing */
+}
+.receipt-header img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+```
 
 ---
 
-## Expected Outcome
+## Visual Layout After Changes
 
-After these fixes:
-1. ✅ Warranty Terms will properly display in edit form with existing data
-2. ✅ Payment Terms will properly display and save
-3. ✅ Special Features will properly display and save
-4. ✅ All fields will be persisted when clicking "Update Quotation"
-5. ✅ New quotation versions will correctly inherit these fields
-6. ✅ Quotation preview will show the Additional Terms section correctly
+```text
+┌──────────────────────────────────────────────────────────┐
+│  [CASH RECEIPT HEADER IMAGE - Full Width]                │
+│  ┌──────────────────────────────────────────────────────┐│
+│  │ CASH RECEIPT | NCG Holdings | YUTONG logos           ││
+│  └──────────────────────────────────────────────────────┘│
+├──────────────────────────────────────────────────────────┤
+│  CUSTOMER: O B Perera          RECEIPT NO: NCGYTQ-...    │
+│  ADDRESS: ...                  QUOTATION NO: YTQ-...     │
+│  CONTACT: ...                  MODE OF PAYMENT: [...]    │
+│  DATE: 29/01/2026                                        │
+├──────────────────────────────────────────────────────────┤
+│  ┌──────────────────────────────────────────────────────┐│
+│  │ DESCRIPTION                      │ TOTAL             ││
+│  ├──────────────────────────────────┼───────────────────┤│
+│  │ ADVANCE PAYMENT FOR 1 UNIT...    │ LKR 6,000,000     ││
+│  ├──────────────────────────────────┴───────────────────┤│
+│  │ AMOUNT IN WORDS: SIX MILLION RUPEES ONLY             ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│                             ┌─────────────────────────┐  │
+│                             │  NO REFUNDS             │  │
+│                             │  NCG HOLDINGS           │  │
+│                             │  (PRIVATE) LIMITED      │  │
+│                             └─────────────────────────┘  │
+│                                   [Small Seal Image]     │
+├──────────────────────────────────────────────────────────┤
+│  _______________          DATE:          _______________ │
+│    Customer           29/01/2026       Finance Dept      │
+├──────────────────────────────────────────────────────────┤
+│  📞 +94 77 766 5501  📍 Address  ✉️ info@yutonglankabus.lk│
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `public/lovable-uploads/yutong-cash-receipt-header.png` | Create (copy from upload) |
+| `public/lovable-uploads/ncg-no-refunds-seal.png` | Create (copy from upload) |
+| `src/components/yutong/YutongCashReceiptPreview.tsx` | Modify (header image, seal, remove duplicate title) |
+
+---
+
+## Technical Notes
+
+1. **PDF Generation Compatibility**: The images will be captured correctly by `html2canvas` since they use direct `src` paths to `public/lovable-uploads/`.
+
+2. **Image Sizing**:
+   - Header: Full-width (`width: 100%`) to match container
+   - Seal: Small size (`width: 120px`) positioned right-aligned below the table
+
+3. **Opacity**: The seal uses `opacity: 0.85` to give a subtle "stamped" appearance without overwhelming the document.
+
+4. **Consistency**: This approach aligns with how `yutong-invoice-header.png` is used in the invoice generator.
