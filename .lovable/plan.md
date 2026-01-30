@@ -1,319 +1,297 @@
 
-# NCG Express Public Transport - Complete Finance Integration Plan
+# NCG Express Finance Integration - Phase 5 Implementation Plan
 
 ## Overview
 
-NCG Express is a standalone company (separate from NCG Holding) that operates **Public Transport services**. The operations involve:
-- **Daily Trips**: Route-based bus trips generating ticket revenue (income)
-- **Daily Bus Expenses**: 21 expense categories per bus per day (fuel, repairs, salary, etc.)
-
-Currently, these operational records exist in the database but are NOT connected to the Finance/Accounting module. This plan builds the complete Operations-to-Finance integration.
+This plan completes the NCG Express Finance Integration by adding GL posting UI elements, status indicators, bulk posting dialogs, and auto-posting integration to the Daily Trips and Daily Bus Expenses pages.
 
 ---
 
-## Architecture Summary
+## Current State
+
+| Component | Status |
+|-----------|--------|
+| `ncg_express_finance_settings` table | Created |
+| `journal_entry_id` / `gl_posted` columns on daily_trips | Created |
+| `journal_entry_id` / `gl_posted` columns on daily_bus_expenses | Created |
+| `useNCGExpressFinance.ts` hook | Created |
+| `NCGExpressFinanceSettings.tsx` component | Created |
+| Settings tab in Settings.tsx | Added |
+| **GL Status badges on pages** | **PENDING** |
+| **Post to GL buttons** | **PENDING** |
+| **Bulk posting dialogs** | **PENDING** |
+| **Auto-posting on save** | **PENDING** |
+
+---
+
+## Implementation Details
+
+### 1. Create GL Status Badge Component
+
+**New File**: `src/components/ncg-express/GLStatusBadge.tsx`
+
+A reusable badge component that shows:
+- "Posted" (green) when `gl_posted = true`
+- "Unposted" (orange) when `gl_posted = false` or null
+- Optional link to view the journal entry
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                    NCG EXPRESS FINANCE ARCHITECTURE                              │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│  Company: NCG Express (NCGE) - STANDALONE (Separate GL from NCG Holding)        │
-│  Company ID: 7ece7595-8b7b-46de-8bfc-c1e8e0da7513                               │
-│  Business Unit Code: NCGE                                                        │
-└─────────────────────────────────────────────────────────────────────────────────┘
-
-OPERATIONS LAYER                           FINANCE LAYER
-─────────────────                          ─────────────
-┌──────────────────┐                      ┌──────────────────┐
-│   daily_trips    │  ─── Revenue GL ──→  │ journal_entries  │
-│ (ticket income)  │                      │                  │
-└──────────────────┘                      │ (NCG Express GL) │
-                                          │                  │
-┌──────────────────┐                      │                  │
-│daily_bus_expenses│  ─── Expense GL ──→  │                  │
-│ (21 categories)  │                      └────────┬─────────┘
-└──────────────────┘                               │
-                                                   ▼
-                                          ┌──────────────────┐
-                                          │ chart_of_accounts│
-                                          │ (NCG Express CoA)│
-                                          └──────────────────┘
+Props:
+- glPosted: boolean | null
+- journalEntryId?: string
+- size?: 'sm' | 'default'
 ```
 
 ---
 
-## Phase 1: Database Schema
+### 2. Create Bulk GL Posting Dialog Component
 
-### New Table: `ncg_express_finance_settings`
+**New File**: `src/components/ncg-express/BulkGLPostingDialog.tsx`
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | uuid | Primary key |
-| `company_id` | uuid | NCG Express company ID |
-| **Revenue Accounts** | | |
-| `ticket_revenue_account_id` | uuid | Credit: Bus ticket revenue |
-| `route_revenue_account_id` | uuid | (Optional) Per-route revenue tracking |
-| `cash_account_id` | uuid | Debit: Cash received from conductors |
-| **Expense Accounts** | | |
-| `fuel_expense_account_id` | uuid | Debit: Diesel/Fuel costs |
-| `repair_expense_account_id` | uuid | Debit: Repairs & maintenance |
-| `tyre_expense_account_id` | uuid | Debit: Tyre & tube expenses |
-| `salary_expense_account_id` | uuid | Debit: Driver/conductor salary |
-| `police_expense_account_id` | uuid | Debit: Police fines |
-| `food_expense_account_id` | uuid | Debit: Staff food allowance |
-| `highway_expense_account_id` | uuid | Debit: Highway tolls |
-| `parking_expense_account_id` | uuid | Debit: Parking charges |
-| `permit_expense_account_id` | uuid | Debit: Permits & renewals |
-| `general_expense_account_id` | uuid | Debit: Miscellaneous/other |
-| `expense_cash_account_id` | uuid | Credit: Cash paid for expenses |
-| **Auto-posting Toggles** | | |
-| `auto_post_revenue` | boolean | Auto-post when trip income entered |
-| `auto_post_expenses` | boolean | Auto-post when expenses saved |
-| `revenue_prefix` | text | JE prefix: "NCGE-REV" |
-| `expense_prefix` | text | JE prefix: "NCGE-EXP" |
-
-### Table Modifications
-
-| Table | New Columns | Purpose |
-|-------|-------------|---------|
-| `daily_trips` | `journal_entry_id`, `gl_posted` | Link trip to GL entry |
-| `daily_bus_expenses` | `journal_entry_id`, `gl_posted` | Link expenses to GL entry |
-
----
-
-## Phase 2: Settings Page
-
-**File**: `src/components/settings/NCGExpressFinanceSettings.tsx`
-
-### UI Sections
-
-1. **Revenue Account Mappings**
-   - Ticket Revenue Account (Credit on trip income)
-   - Cash/Bank Account (Debit when income received)
-
-2. **Expense Account Mappings** (21 categories → GL accounts)
-   - Fuel/Diesel → Fuel Expense Account
-   - Repair → Repair & Maintenance Account
-   - Tyre & Tube → Vehicle Parts Account
-   - Salary → Staff Salary Account
-   - Police → Fines & Penalties Account
-   - Food → Staff Welfare Account
-   - Highway Charges → Transport Expense Account
-   - Parking → Parking Expense Account
-   - Permits/Emission/Fitness → Regulatory Expense Account
-   - Other/Miscellaneous → General Expense Account
-   - Expense Cash/Bank Account (Credit when paying expenses)
-
-3. **Auto-Posting Settings**
-   - Toggle: Auto-post Revenue on Trip Entry
-   - Toggle: Auto-post Expenses on Save
-   - JE Prefix configuration
-
----
-
-## Phase 3: Finance Integration Hook
-
-**File**: `src/hooks/useNCGExpressFinance.ts`
-
-### Key Functions
+A modal dialog for batch posting unposted trips/expenses:
 
 ```text
-1. useNCGExpressFinanceSettings()
-   - Fetch finance settings for NCG Express
+Features:
+- Date range picker
+- Type selector (Trips / Expenses / Both)
+- Preview of unposted records count
+- Progress indicator during posting
+- Success/failure summary
 
-2. usePostTripRevenueToGL()
-   - Trigger: Trip with income is saved
-   - GL Entry:
-     DR Cash/Bank        [income amount]
-     CR Ticket Revenue   [income amount]
-   - Tags: business_unit_code = 'NCGE'
-
-3. usePostExpensesToGL()
-   - Trigger: Daily bus expense is saved
-   - GL Entry: Multiple lines based on expense categories
-     DR Fuel Expense     [fuel_cost]
-     DR Repair Expense   [repair]
-     DR Tyre Expense     [tyre_tube]
-     DR Salary Expense   [salary]
-     ... (all 21 categories)
-     CR Expense Cash     [total_daily_expenses]
-   - Tags: business_unit_code = 'NCGE'
-
-4. useBulkPostRevenueToGL()
-   - Batch post multiple trips' revenue to GL
-   - Date range selection
-
-5. useBulkPostExpensesToGL()
-   - Batch post multiple days' expenses to GL
+Props:
+- open: boolean
+- onOpenChange: (open: boolean) => void
+- type: 'trips' | 'expenses' | 'both'
+- onComplete: () => void
 ```
 
 ---
 
-## Phase 4: Accounting Flow Diagrams
-
-### Flow 1: Daily Trip Revenue Recognition
-
-```text
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                      TRIP REVENUE TO GL FLOW                                     │
-│                      Trigger: User saves daily trip with income                  │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  1. VALIDATE SETTINGS                                                           │
-│     └─ Check auto_post_revenue = true                                           │
-│     └─ Validate cash_account_id configured                                      │
-│     └─ Validate ticket_revenue_account_id configured                            │
-│                                                                                  │
-│  2. CREATE JOURNAL ENTRY                                                        │
-│     └─ entry_number: NCGE-REV-{BUS_NO}-{TRIP_DATE}                              │
-│     └─ description: "Daily Trip Revenue - {Route Name} - {Bus No}"              │
-│     └─ company_id: NCG Express Company ID                                       │
-│     └─ business_unit_code: NCGE                                                 │
-│     └─ status: "posted"                                                         │
-│                                                                                  │
-│  JOURNAL ENTRY LINES:                                                           │
-│  ┌────────────────────────────────────────┬───────────┬───────────┐            │
-│  │ Account                                │ Debit     │ Credit    │            │
-│  ├────────────────────────────────────────┼───────────┼───────────┤            │
-│  │ Cash/Bank Account (Asset)              │ INCOME    │           │            │
-│  │ Ticket Revenue (Revenue)               │           │ INCOME    │            │
-│  └────────────────────────────────────────┴───────────┴───────────┘            │
-│                                                                                  │
-│  3. UPDATE COA BALANCES                                                         │
-│     └─ Cash: +INCOME (Debit normal - increases)                                 │
-│     └─ Revenue: +INCOME (Credit normal - increases)                             │
-│                                                                                  │
-│  4. LINK TO TRIP                                                                │
-│     └─ daily_trips.journal_entry_id = JE ID                                     │
-│     └─ daily_trips.gl_posted = true                                             │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Flow 2: Daily Expense Recording
-
-```text
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                      EXPENSE TO GL FLOW                                          │
-│                      Trigger: User saves daily bus expenses                      │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  1. VALIDATE SETTINGS                                                           │
-│     └─ Check auto_post_expenses = true                                          │
-│     └─ Validate expense accounts configured                                     │
-│     └─ Validate expense_cash_account_id configured                              │
-│                                                                                  │
-│  2. CREATE JOURNAL ENTRY                                                        │
-│     └─ entry_number: NCGE-EXP-{BUS_NO}-{EXPENSE_DATE}                           │
-│     └─ description: "Daily Bus Expenses - {Bus No} - {Date}"                    │
-│     └─ company_id: NCG Express Company ID                                       │
-│     └─ business_unit_code: NCGE                                                 │
-│     └─ status: "posted"                                                         │
-│                                                                                  │
-│  JOURNAL ENTRY LINES (only non-zero amounts):                                   │
-│  ┌────────────────────────────────────────┬───────────┬───────────┐            │
-│  │ Account                                │ Debit     │ Credit    │            │
-│  ├────────────────────────────────────────┼───────────┼───────────┤            │
-│  │ Fuel Expense                           │ fuel_cost │           │            │
-│  │ Repair & Maintenance                   │ repair    │           │            │
-│  │ Tyre & Tube Expense                    │ tyre_tube │           │            │
-│  │ Salary Expense                         │ salary    │           │            │
-│  │ Food/Staff Welfare                     │ food      │           │            │
-│  │ Highway Toll Expense                   │ highway   │           │            │
-│  │ Parking Expense                        │ parking   │           │            │
-│  │ ... (other categories)                 │ ...       │           │            │
-│  │ Expense Cash/Bank Account              │           │ TOTAL     │            │
-│  └────────────────────────────────────────┴───────────┴───────────┘            │
-│                                                                                  │
-│  3. UPDATE COA BALANCES                                                         │
-│     └─ Each Expense: +Amount (Debit normal - increases)                         │
-│     └─ Cash: -TOTAL (Debit normal, credit reduces)                              │
-│                                                                                  │
-│  4. LINK TO EXPENSE                                                             │
-│     └─ daily_bus_expenses.journal_entry_id = JE ID                              │
-│     └─ daily_bus_expenses.gl_posted = true                                      │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Phase 5: UI Integration
-
-### Settings Tab Addition
-
-**File**: `src/pages/Settings.tsx`
-
-Add new tab: "NCG Express Finance"
-- Import `NCGExpressFinanceSettings` component
-- Add Tab trigger with Bus icon
-
-### Daily Trips Page Enhancement
+### 3. Update Daily Trips Page
 
 **File**: `src/pages/DailyTrips.tsx`
 
-Add features:
-- GL Status indicator on each trip row
-- "Post to GL" button for manual posting
-- Batch GL posting action
-- Filter: "Show only unposted trips"
+**Changes**:
+1. Add "Post to GL" button in header actions (next to Export GL button)
+2. Add filter toggle: "Show only unposted trips"
+3. Import and use `BulkGLPostingDialog`
 
-### Daily Bus Expenses Page Enhancement
-
-**File**: `src/pages/DailyBusExpenses.tsx`
-
-Add features:
-- GL Status badge on expense cards
-- "Post Expenses to GL" action button
-- Bulk posting for date range
+**New Header Button**:
+```text
+<Button variant="outline" onClick={() => setShowBulkPostingDialog(true)}>
+  <BookOpen className="mr-2 h-4 w-4" />
+  Post to GL
+</Button>
+```
 
 ---
 
-## Phase 6: Files to Create/Modify
+### 4. Update BusDailySummaryTable Component
 
-### New Files
+**File**: `src/components/trips/BusDailySummaryTable.tsx`
 
+**Changes**:
+1. Fetch `gl_posted` status from trip data
+2. Add GL Status badge column in the summary row
+3. Add "Post to GL" action in the dropdown menu for unposted trips
+4. Show aggregated GL status (e.g., "2/5 trips posted")
+
+**New Imports**:
+```text
+import { GLStatusBadge } from "@/components/ncg-express/GLStatusBadge";
+import { useNCGExpressFinanceSettings, postTripRevenueToGL } from "@/hooks/useNCGExpressFinance";
+```
+
+**Badge Display**:
+```text
+In the summary row, add:
+- Badge showing "X/Y Posted" or "All Posted" 
+- If any unposted, show orange badge
+- Dropdown menu item: "Post All Trips to GL"
+```
+
+---
+
+### 5. Update Daily Bus Expenses Page
+
+**File**: `src/pages/DailyBusExpenses.tsx`
+
+**Changes**:
+1. Add "Post Expenses to GL" button in header
+2. Add GL Status badge next to each expense card's total
+3. Add individual "Post to GL" action button for unposted expenses
+4. Add bulk posting dialog for expenses
+
+**Header Addition**:
+```text
+<Button 
+  variant="outline" 
+  onClick={() => setShowExpensePostingDialog(true)}
+>
+  <Receipt className="mr-2 h-4 w-4" />
+  Post to GL
+</Button>
+```
+
+**Card Modification**:
+In each expense card header, add GL status badge:
+```text
+<div className="flex items-center gap-3">
+  <GLStatusBadge 
+    glPosted={expense.gl_posted} 
+    journalEntryId={expense.journal_entry_id} 
+  />
+  <div className="text-right">...</div>
+</div>
+```
+
+---
+
+### 6. Update ExpensesTableView Component
+
+**File**: `src/components/trips/ExpensesTableView.tsx`
+
+**Changes**:
+1. Add "GL Status" column showing Posted/Unposted badge
+2. Add "Post to GL" action button for unposted expenses
+3. Update the query to include `gl_posted` and `journal_entry_id` fields
+
+**New Column**:
+```text
+{
+  id: "gl_status",
+  header: "GL Status",
+  cell: ({ row }) => (
+    <GLStatusBadge 
+      glPosted={row.original.gl_posted} 
+      journalEntryId={row.original.journal_entry_id}
+    />
+  ),
+}
+```
+
+---
+
+### 7. Integrate Auto-Posting on Save
+
+**File**: `src/hooks/useDailyBusExpenses.ts`
+
+**Changes**:
+1. Import NCG Express finance functions
+2. After successful save, check if `auto_post_expenses = true`
+3. If enabled, automatically call `postExpensesToGL`
+4. Show appropriate toast messages
+
+**Modified saveExpense function**:
+```text
+const saveExpense = async (expense: DailyBusExpense) => {
+  // ... existing save logic ...
+  
+  // After successful save, check auto-posting
+  if (result && settings?.auto_post_expenses) {
+    const glResult = await postExpensesToGL(savedExpense, settings);
+    if (glResult.success) {
+      toast({ title: "Success", description: "Expenses saved and posted to GL" });
+    }
+  }
+  
+  return result;
+};
+```
+
+---
+
+### 8. Update useDailyBusGroupedTrips Hook
+
+**File**: `src/hooks/useDailyBusGroupedTrips.ts`
+
+**Changes**:
+1. Add `gl_posted` and `journal_entry_id` to the trips query select statement
+2. Add these fields to the Trip interface
+3. Include in the grouped data passed to components
+
+**Interface Update**:
+```text
+export interface Trip {
+  // ... existing fields ...
+  gl_posted?: boolean;
+  journal_entry_id?: string;
+}
+```
+
+**Query Update**:
+```text
+.select(`
+  id,
+  trip_no,
+  trip_date,
+  bus_id,
+  route_id,
+  income,
+  income_details,
+  distance_km,
+  odometer_start,
+  odometer_end,
+  start_time,
+  end_time,
+  notes,
+  gl_posted,
+  journal_entry_id,
+  buses:bus_id(bus_no),
+  routes:route_id(route_name, route_no, gl_code)
+`)
+```
+
+---
+
+## File Summary
+
+### New Files (2)
 | File | Purpose |
 |------|---------|
-| `src/components/settings/NCGExpressFinanceSettings.tsx` | Settings UI for GL mappings |
-| `src/hooks/useNCGExpressFinance.ts` | Finance integration hook with GL posting |
+| `src/components/ncg-express/GLStatusBadge.tsx` | Reusable GL status indicator badge |
+| `src/components/ncg-express/BulkGLPostingDialog.tsx` | Dialog for batch posting trips/expenses to GL |
 
-### Files to Modify
-
+### Files to Modify (6)
 | File | Changes |
 |------|---------|
-| `src/pages/Settings.tsx` | Add "NCG Express Finance" tab |
-| `src/pages/DailyTrips.tsx` | Add GL posting UI & status |
-| `src/pages/DailyBusExpenses.tsx` | Add GL posting UI & status |
-| `src/hooks/useDailyBusExpenses.ts` | Integrate GL posting on save |
-| `src/hooks/useDailyBusGroupedTrips.ts` | Integrate GL posting on trip save |
-
-### Database Migrations
-
-1. Create `ncg_express_finance_settings` table
-2. Add `journal_entry_id` and `gl_posted` columns to `daily_trips`
-3. Add `journal_entry_id` and `gl_posted` columns to `daily_bus_expenses`
+| `src/pages/DailyTrips.tsx` | Add Post to GL button, bulk posting dialog |
+| `src/pages/DailyBusExpenses.tsx` | Add GL status badges, Post to GL button, dialog |
+| `src/components/trips/BusDailySummaryTable.tsx` | Add GL status badges, individual posting actions |
+| `src/components/trips/ExpensesTableView.tsx` | Add GL Status column, posting action |
+| `src/hooks/useDailyBusExpenses.ts` | Integrate auto-posting on save |
+| `src/hooks/useDailyBusGroupedTrips.ts` | Include gl_posted/journal_entry_id in query |
 
 ---
 
 ## Implementation Order
 
-1. **Database First**: Create settings table and add columns
-2. **Settings UI**: Build the NCG Express Finance Settings page
-3. **Hook Development**: Create `useNCGExpressFinance.ts` with GL posting logic
-4. **Integration**: Connect hooks to existing trip/expense save operations
-5. **UI Enhancement**: Add GL status and manual posting buttons
-6. **Testing**: Verify GL entries and COA balance updates
+1. **Create GLStatusBadge** - Reusable component first
+2. **Update hooks** - Add gl_posted fields to queries
+3. **Create BulkGLPostingDialog** - Main batch posting interface
+4. **Update DailyBusExpenses page** - Add badges and buttons
+5. **Update ExpensesTableView** - Add GL column
+6. **Update BusDailySummaryTable** - Add trip GL status
+7. **Update DailyTrips page** - Add header button and dialog
+8. **Integrate auto-posting** - Connect to save operations
 
 ---
 
-## Expected Outcome
+## Expected UI Result
 
-After implementation:
-- Every daily trip with income automatically posts revenue to NCG Express GL
-- Every daily expense record automatically posts categorized expenses to GL
-- Finance team can view NCG Express P&L with real operational data
-- Full audit trail from Operation → Journal Entry → COA balances
-- Consistent with other modules (School Bus, Special Hire, Yutong, etc.)
+### Daily Trips Page
+- New "Post to GL" button in header
+- Each bus row shows: "3/5 Posted" badge or "All Posted"
+- Dropdown menu includes "Post All Trips to GL" action
+- Bulk posting dialog with date range and progress
+
+### Daily Bus Expenses Page  
+- New "Post to GL" button in header
+- Each expense card shows GL Status badge (Posted/Unposted)
+- Table view includes GL Status column
+- Bulk posting dialog for expenses
+
+### Auto-Posting Behavior
+- When enabled in settings and expense is saved, automatically posts to GL
+- Shows combined success message: "Expenses saved and posted to GL"
+- If GL posting fails, expense is still saved but status shows "Unposted"
