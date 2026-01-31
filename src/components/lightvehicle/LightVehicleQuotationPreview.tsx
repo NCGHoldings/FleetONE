@@ -34,6 +34,14 @@ interface LightVehicleQuotation {
   payment_terms?: string;
   warranty_terms?: string;
   delivery_timeline?: string;
+  responsible_person_id?: string;
+}
+
+interface ResponsiblePerson {
+  id: string;
+  person_name: string;
+  phone?: string;
+  email?: string;
 }
 
 interface QuotationAddOn {
@@ -54,6 +62,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
     const [addOns, setAddOns] = useState<QuotationAddOn[]>([]);
     const [loading, setLoading] = useState(true);
     const [signatures, setSignatures] = useState<LightVehicleSignature[]>([]);
+    const [responsiblePerson, setResponsiblePerson] = useState<ResponsiblePerson | null>(null);
     const { fetchSignatures } = useLightVehicleSignatures();
 
     const formattedDate = format(new Date(quotation.created_at), "dd/MM/yyyy");
@@ -76,6 +85,29 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
           // Fetch signatures
           const sigs = await fetchSignatures(quotation.id);
           setSignatures(sigs);
+
+          // Fetch responsible person if ID exists
+          if (quotation.responsible_person_id) {
+            const { data: personData } = await supabase
+              .from("lightvehicle_responsible_persons")
+              .select("id, person_name, phone, email")
+              .eq("id", quotation.responsible_person_id)
+              .single();
+            if (personData) {
+              setResponsiblePerson(personData);
+            }
+          } else {
+            // Get default responsible person
+            const { data: defaultPerson } = await supabase
+              .from("lightvehicle_responsible_persons")
+              .select("id, person_name, phone, email")
+              .eq("is_default", true)
+              .eq("is_active", true)
+              .single();
+            if (defaultPerson) {
+              setResponsiblePerson(defaultPerson);
+            }
+          }
         } catch (error) {
           console.error("Error fetching quotation data:", error);
         } finally {
@@ -84,7 +116,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
       };
 
       fetchData();
-    }, [quotation.id]);
+    }, [quotation.id, quotation.responsible_person_id]);
 
     // Calculate totals
     const addOnsTotal = addOns.reduce((sum, addon) => {
@@ -698,9 +730,9 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             </div>
 
             <div className="footer-contact">
-              <div style={{ display: "flex", alignItems: "center" }}>📞 +94 77 123 4567</div>
+              <div style={{ display: "flex", alignItems: "center" }}>📞 {responsiblePerson?.phone || "+94 77 123 4567"}</div>
               <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
-              <div style={{ display: "flex", alignItems: "center" }}>✉️ info@ncgholdings.lk</div>
+              <div style={{ display: "flex", alignItems: "center" }}>✉️ {responsiblePerson?.email || "info@ncgholdings.lk"}</div>
             </div>
           </div>
         </div>
@@ -878,9 +910,9 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
             </div>
 
             <div className="footer-contact">
-              <div style={{ display: "flex", alignItems: "center" }}>📞 +94 77 123 4567</div>
+              <div style={{ display: "flex", alignItems: "center" }}>📞 {responsiblePerson?.phone || "+94 77 123 4567"}</div>
               <div>📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita</div>
-              <div style={{ display: "flex", alignItems: "center" }}>✉️ info@ncgholdings.lk</div>
+              <div style={{ display: "flex", alignItems: "center" }}>✉️ {responsiblePerson?.email || "info@ncgholdings.lk"}</div>
             </div>
           </div>
         </div>

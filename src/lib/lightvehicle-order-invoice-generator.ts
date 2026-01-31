@@ -65,12 +65,18 @@ export interface LightVehicleOrderInvoiceData {
   companyPhone?: string;
   companyEmail?: string;
   companyLogo?: string;
+  
+  // Responsible Person (footer contact)
+  responsiblePersonPhone?: string;
+  responsiblePersonEmail?: string;
 }
 
 export function generateLightVehicleOrderInvoiceHTML(data: LightVehicleOrderInvoiceData): string {
   const isProforma = data.invoiceCategory === 'proforma_invoice';
   const displayAmount = isProforma && data.proformaAmount ? data.proformaAmount : data.totalAmount;
   const invoiceTitle = isProforma ? 'PROFORMA INVOICE' : 'TAX INVOICE';
+  const footerPhone = data.responsiblePersonPhone || '+94 77 123 4567';
+  const footerEmail = data.responsiblePersonEmail || 'info@ncgholdings.lk';
   
   const formatCurrency = (amount: number) => {
     return `LKR ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -712,6 +718,7 @@ export function generateLightVehicleOrderInvoiceHTML(data: LightVehicleOrderInvo
         
         <!-- Footer -->
         <div class="footer">
+          <p>📞 ${footerPhone} | ✉️ ${footerEmail}</p>
           <p><strong>NCG Holdings (Pvt) Ltd</strong> - Light Vehicle Sales Division</p>
           <p>Thank you for choosing NCG Holdings. We appreciate your business!</p>
           <p>This is a computer-generated document. ${isProforma ? 'This proforma invoice is valid for 30 days from the date of issue.' : ''}</p>
