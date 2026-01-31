@@ -16,11 +16,7 @@ export function LightVehicleCashReceiptPreview({
   companyPhone = '+260 XXX XXX XXX'
 }: LightVehicleCashReceiptPreviewProps) {
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount);
+    return `Rs ${amount.toLocaleString()}`;
   };
 
   const html = `
