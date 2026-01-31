@@ -140,9 +140,9 @@ export function LightVehicleOrdersList() {
                       </p>
                     </div>
                     <div className="text-right space-y-1">
-                      <p className="font-bold">${order.total_amount.toLocaleString()}</p>
-                      <p className="text-sm text-green-600">Paid: ${order.total_paid.toLocaleString()}</p>
-                      <p className="text-sm text-destructive">Balance: ${order.balance_due.toLocaleString()}</p>
+                      <p className="font-bold">Rs {order.total_amount.toLocaleString()}</p>
+                      <p className="text-sm text-green-600">Paid: Rs {order.total_paid.toLocaleString()}</p>
+                      <p className="text-sm text-destructive">Balance: Rs {order.balance_due.toLocaleString()}</p>
                     </div>
                   </div>
                   

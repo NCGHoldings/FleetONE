@@ -224,7 +224,7 @@ export function LightVehicleCashReceiptModal({
 
         <div className="flex justify-between items-center pt-4 border-t">
           <div className="text-sm text-muted-foreground">
-            Amount: ${receipt.amount.toLocaleString()}
+            Amount: Rs {receipt.amount.toLocaleString()}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleDownload} disabled={isDownloading}>
