@@ -38,9 +38,19 @@ const formSchema = z.object({
   validity_period: z.string().default('30 days'),
   notes: z.string().optional(),
   referral_agent_id: z.string().optional(),
+  responsible_person_id: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+interface ResponsiblePerson {
+  id: string;
+  person_name: string;
+  designation?: string;
+  phone?: string;
+  email?: string;
+  is_default?: boolean;
+}
 
 interface VehicleModel {
   id: string;
@@ -63,6 +73,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
   const [vehicleModels, setVehicleModels] = useState<VehicleModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<VehicleModel | null>(null);
   const [referralAgents, setReferralAgents] = useState<any[]>([]);
+  const [responsiblePersons, setResponsiblePersons] = useState<ResponsiblePerson[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -80,6 +91,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
   useEffect(() => {
     loadVehicleModels();
     loadReferralAgents();
+    loadResponsiblePersons();
   }, []);
 
   const loadVehicleModels = async () => {
@@ -113,6 +125,27 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
       setReferralAgents(data || []);
     } catch (error: any) {
       console.error('Error loading referral agents:', error);
+    }
+  };
+
+  const loadResponsiblePersons = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lightvehicle_responsible_persons')
+        .select('id, person_name, designation, phone, email, is_default')
+        .eq('is_active', true)
+        .order('person_name');
+
+      if (error) throw error;
+      setResponsiblePersons(data || []);
+      
+      // Auto-select default person
+      const defaultPerson = data?.find((p: any) => p.is_default);
+      if (defaultPerson) {
+        form.setValue('responsible_person_id', defaultPerson.id);
+      }
+    } catch (error: any) {
+      console.error('Error loading responsible persons:', error);
     }
   };
 
@@ -175,6 +208,7 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
         notes: data.notes || null,
         status: 'draft',
         referral_agent_id: data.referral_agent_id || null,
+        responsible_person_id: data.responsible_person_id || null,
         created_by: user?.id
       };
 
@@ -623,6 +657,32 @@ export function LightVehicleQuotationForm({ onSubmit, onCancel }: LightVehicleQu
                           {referralAgents.map((agent) => (
                             <SelectItem key={agent.id} value={agent.id}>
                               {agent.name} ({agent.phone})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="responsible_person_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Responsible Person (Footer Contact)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select responsible person" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {responsiblePersons.map((person) => (
+                            <SelectItem key={person.id} value={person.id}>
+                              {person.person_name} - {person.designation || 'N/A'}
+                              {person.is_default && ' (Default)'}
                             </SelectItem>
                           ))}
                         </SelectContent>

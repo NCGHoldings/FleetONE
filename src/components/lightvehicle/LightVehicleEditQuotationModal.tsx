@@ -33,6 +33,7 @@ const formSchema = z.object({
   delivery_terms: z.string().optional(),
   warranty_terms: z.string().optional(),
   notes: z.string().optional(),
+  responsible_person_id: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -71,6 +72,14 @@ interface LightVehicleQuotation {
   model_id?: string;
   finance_company?: string;
   contact_person?: string;
+  responsible_person_id?: string;
+}
+
+interface ResponsiblePerson {
+  id: string;
+  person_name: string;
+  designation?: string;
+  is_default?: boolean;
 }
 
 interface LightVehicleEditQuotationModalProps {
@@ -83,6 +92,7 @@ interface LightVehicleEditQuotationModalProps {
 export function LightVehicleEditQuotationModal({ quotation, open, onClose, onSuccess }: LightVehicleEditQuotationModalProps) {
   const { toast } = useToast();
   const [showEditTypeModal, setShowEditTypeModal] = useState(true);
+  const [responsiblePersons, setResponsiblePersons] = useState<ResponsiblePerson[]>([]);
   const [editConfig, setEditConfig] = useState<{
     editType: 'staff_edit' | 'customer_request';
     editReason: string;
@@ -111,8 +121,22 @@ export function LightVehicleEditQuotationModal({ quotation, open, onClose, onSuc
       warranty_terms: '',
       notes: '',
       color: '',
+      responsible_person_id: '',
     }
   });
+
+  // Load responsible persons
+  useEffect(() => {
+    const loadResponsiblePersons = async () => {
+      const { data } = await supabase
+        .from('lightvehicle_responsible_persons')
+        .select('id, person_name, designation, is_default')
+        .eq('is_active', true)
+        .order('person_name');
+      setResponsiblePersons(data || []);
+    };
+    if (open) loadResponsiblePersons();
+  }, [open]);
 
   // Reset edit type modal when dialog opens
   useEffect(() => {
@@ -146,6 +170,7 @@ export function LightVehicleEditQuotationModal({ quotation, open, onClose, onSuc
         warranty_terms: quotation.warranty_terms || '',
         notes: quotation.notes || '',
         color: quotation.color || '',
+        responsible_person_id: quotation.responsible_person_id || '',
       });
     }
   }, [quotation, open, form]);
@@ -254,6 +279,7 @@ export function LightVehicleEditQuotationModal({ quotation, open, onClose, onSuc
           notes: data.notes || null,
           status: quotation.status,
           valid_until: quotation.valid_until,
+          responsible_person_id: data.responsible_person_id || null,
           created_by: user.id,
         })
         .select()
@@ -696,6 +722,32 @@ export function LightVehicleEditQuotationModal({ quotation, open, onClose, onSuc
                       <FormControl>
                         <Textarea placeholder="Additional notes" {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="responsible_person_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Responsible Person (Footer Contact)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select responsible person" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {responsiblePersons.map((person) => (
+                            <SelectItem key={person.id} value={person.id}>
+                              {person.person_name} - {person.designation || 'N/A'}
+                              {person.is_default && ' (Default)'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

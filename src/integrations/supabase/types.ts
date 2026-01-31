@@ -9149,6 +9149,7 @@ export type Database = {
           referral_agent_id: string | null
           relationship_notes: string | null
           representative_name: string | null
+          responsible_person_id: string | null
           status: string | null
           tax_registration: string | null
           total_price: number | null
@@ -9197,6 +9198,7 @@ export type Database = {
           referral_agent_id?: string | null
           relationship_notes?: string | null
           representative_name?: string | null
+          responsible_person_id?: string | null
           status?: string | null
           tax_registration?: string | null
           total_price?: number | null
@@ -9245,6 +9247,7 @@ export type Database = {
           referral_agent_id?: string | null
           relationship_notes?: string | null
           representative_name?: string | null
+          responsible_person_id?: string | null
           status?: string | null
           tax_registration?: string | null
           total_price?: number | null
@@ -9277,6 +9280,13 @@ export type Database = {
             columns: ["referral_agent_id"]
             isOneToOne: false
             referencedRelation: "referral_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightvehicle_quotations_responsible_person_id_fkey"
+            columns: ["responsible_person_id"]
+            isOneToOne: false
+            referencedRelation: "lightvehicle_responsible_persons"
             referencedColumns: ["id"]
           },
         ]
@@ -9348,9 +9358,12 @@ export type Database = {
         Row: {
           created_at: string | null
           designation: string | null
+          email: string | null
           id: string
           is_active: boolean | null
+          is_default: boolean | null
           person_name: string
+          phone: string | null
           role: string
           signature_data: string | null
           signature_type: string | null
@@ -9359,9 +9372,12 @@ export type Database = {
         Insert: {
           created_at?: string | null
           designation?: string | null
+          email?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean | null
           person_name: string
+          phone?: string | null
           role: string
           signature_data?: string | null
           signature_type?: string | null
@@ -9370,9 +9386,12 @@ export type Database = {
         Update: {
           created_at?: string | null
           designation?: string | null
+          email?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean | null
           person_name?: string
+          phone?: string | null
           role?: string
           signature_data?: string | null
           signature_type?: string | null

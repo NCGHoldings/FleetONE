@@ -7,17 +7,24 @@ interface LightVehicleCashReceiptPreviewProps {
   companyName?: string;
   companyAddress?: string;
   companyPhone?: string;
+  responsiblePersonPhone?: string;
+  responsiblePersonEmail?: string;
 }
 
 export function LightVehicleCashReceiptPreview({
   receipt,
   companyName = 'NCG FLEET MANAGEMENT',
-  companyAddress = 'Lusaka, Zambia',
-  companyPhone = '+260 XXX XXX XXX'
+  companyAddress = '157 Y, Kebelalowita, Weniwelkola, Polgasowita',
+  companyPhone = '+94 11 XXX XXXX',
+  responsiblePersonPhone,
+  responsiblePersonEmail
 }: LightVehicleCashReceiptPreviewProps) {
   const formatCurrency = (amount: number) => {
     return `Rs ${amount.toLocaleString()}`;
   };
+
+  const footerPhone = responsiblePersonPhone || '+94 77 123 4567';
+  const footerEmail = responsiblePersonEmail || 'info@ncgholdings.lk';
 
   const html = `
     <!DOCTYPE html>
@@ -272,6 +279,7 @@ export function LightVehicleCashReceiptPreview({
         </div>
         
         <div class="footer">
+          <p>📞 ${footerPhone} | ✉️ ${footerEmail}</p>
           <p>Thank you for your payment!</p>
           <p>This is a computer-generated receipt.</p>
         </div>
