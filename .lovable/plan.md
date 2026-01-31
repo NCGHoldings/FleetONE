@@ -1,176 +1,157 @@
 
-# Yutong Cash Receipt Update - Header Image & No Refunds Seal
 
-## Summary
+# Light Vehicle - Add Responsible Persons Footer Selection (Like Yutong)
 
-This plan updates the Yutong Cash Receipt to:
-1. Replace the current CSS-based header with the new professional header image
-2. Add the "NO REFUNDS" company seal below the receipt table
+## Overview
 
----
+The Yutong module allows users to select which sales person's contact details (name, phone, email) appear in the footer of quotations and documents. The Light Vehicle module needs this same capability.
 
-## Changes Required
+## Current State Analysis
 
-### 1. Copy Uploaded Images to Project
+### Yutong Implementation (Target)
+- `yutong_responsible_persons` table has: `name`, `phone`, `email`, `position`, `is_default`
+- `yutong_quotations` has a `responsible_person_id` foreign key
+- Quotation form has dropdown to select responsible person
+- Document footer displays: phone, email, name from selected person
 
-**Files to Copy**:
-| Source | Destination | Purpose |
-|--------|-------------|---------|
-| `user-uploads://Screenshot_2026-01-30_at_15.57.44.png` | `public/lovable-uploads/yutong-cash-receipt-header.png` | Cash Receipt header banner |
-| `user-uploads://photo_2026-01-30_15-58-08.jpg` | `public/lovable-uploads/ncg-no-refunds-seal.png` | No Refunds company seal |
-
----
-
-### 2. Update YutongCashReceiptPreview.tsx
-
-**File**: `src/components/yutong/YutongCashReceiptPreview.tsx`
-
-**Change 1: Replace CSS Header with Image** (Lines 118-154)
-
-Current implementation uses inline CSS gradient with logos. Replace with the uploaded header image:
-
-```tsx
-// Replace this CSS-based header:
-<div className="receipt-header" style={{
-  background: 'linear-gradient(135deg, #003366 0%, #0055a5 100%)',
-  padding: '15px 25px',
-  display: 'flex',
-  ...
-}}>
-  {/* Multiple elements: logos, text, etc. */}
-</div>
-
-// With single header image:
-<div className="receipt-header">
-  <img 
-    src="/lovable-uploads/yutong-cash-receipt-header.png" 
-    alt="NCG Holdings - Cash Receipt" 
-    style={{ 
-      width: '100%', 
-      height: 'auto', 
-      display: 'block' 
-    }}
-  />
-</div>
-```
-
-**Change 2: Remove "CASH RECEIPT" Underlined Title** (Lines 158-167)
-
-Since the header image already contains "CASH RECEIPT" text, remove the duplicate title:
-
-```tsx
-// Remove this block:
-<div style={{ 
-  textAlign: 'center', 
-  fontSize: '24px', 
-  fontWeight: 'bold', 
-  color: '#003366',
-  marginBottom: '20px',
-  textDecoration: 'underline'
-}}>
-  CASH RECEIPT
-</div>
-```
-
-**Change 3: Add "NO REFUNDS" Seal After Table** (After Line 235)
-
-Add the seal image after the receipt table and before the signature section:
-
-```tsx
-// After closing </table> tag, add:
-<div style={{ 
-  display: 'flex', 
-  justifyContent: 'flex-end', 
-  marginTop: '15px',
-  marginBottom: '10px'
-}}>
-  <img 
-    src="/lovable-uploads/ncg-no-refunds-seal.png" 
-    alt="No Refunds - NCG Holdings" 
-    style={{ 
-      width: '120px', 
-      height: 'auto', 
-      opacity: 0.85 
-    }}
-  />
-</div>
-```
+### Light Vehicle Current State
+- `lightvehicle_responsible_persons` table has: `role`, `person_name`, `designation`, `signature_data` (for document signatures)
+- Missing: `phone`, `email` columns
+- `lightvehicle_quotations` does NOT have `responsible_person_id` column
+- Footer is hardcoded: `+94 77 123 4567`, `info@ncgholdings.lk`
 
 ---
 
-### 3. Update Page Styles for Image Header
+## Implementation Plan
 
-Update the CSS in `pageStyles` to handle the new image-based header properly:
+### 1. Database Changes
 
-```css
-.receipt-header {
-  margin-bottom: 0; /* Remove extra margin since image has its own spacing */
-}
-.receipt-header img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
+**Add columns to `lightvehicle_responsible_persons`:**
+```sql
+ALTER TABLE lightvehicle_responsible_persons 
+ADD COLUMN phone TEXT,
+ADD COLUMN email TEXT,
+ADD COLUMN is_default BOOLEAN DEFAULT FALSE;
 ```
+
+**Add column to `lightvehicle_quotations`:**
+```sql
+ALTER TABLE lightvehicle_quotations 
+ADD COLUMN responsible_person_id UUID REFERENCES lightvehicle_responsible_persons(id);
+```
+
+### 2. Update Responsible Persons Admin UI
+
+**File:** `src/components/lightvehicle/LightVehicleResponsiblePersonsAdmin.tsx`
+
+Add form fields for phone, email, and is_default toggle:
+- Add Phone input field
+- Add Email input field  
+- Add "Set as Default" button/toggle
+- Update form schema and submit handlers
+- Display phone/email in the cards list
+
+### 3. Update Quotation Form
+
+**File:** `src/components/lightvehicle/LightVehicleQuotationForm.tsx`
+
+- Add `responsible_person_id` to form schema
+- Load responsible persons on mount (active only)
+- Add dropdown to select responsible person
+- Auto-select default person if available
+- Include `responsible_person_id` in quotation insert
+
+### 4. Update Edit Quotation Modal
+
+**File:** `src/components/lightvehicle/LightVehicleEditQuotationModal.tsx`
+
+- Add `responsible_person_id` field to form
+- Load and populate existing value
+- Include in update/versioning logic
+
+### 5. Update Quotation Preview Footer
+
+**File:** `src/components/lightvehicle/LightVehicleQuotationPreview.tsx`
+
+- Fetch responsible person by `quotation.responsible_person_id`
+- Replace hardcoded footer contact with dynamic values:
+  ```tsx
+  📞 {responsiblePerson?.phone || "+94 77 123 4567"}
+  ✉️ {responsiblePerson?.email || "info@ncgholdings.lk"}
+  👤 {responsiblePerson?.person_name} (if selected)
+  ```
+
+### 6. Update Invoice/Document Generators
+
+**Files:**
+- `src/lib/lightvehicle-order-invoice-generator.ts`
+- `src/components/lightvehicle/LightVehicleCashReceiptPreview.tsx`
+
+Pass responsible person data to document generators and display in footers.
 
 ---
 
-## Visual Layout After Changes
+## UI/UX Flow
 
 ```text
-┌──────────────────────────────────────────────────────────┐
-│  [CASH RECEIPT HEADER IMAGE - Full Width]                │
-│  ┌──────────────────────────────────────────────────────┐│
-│  │ CASH RECEIPT | NCG Holdings | YUTONG logos           ││
-│  └──────────────────────────────────────────────────────┘│
-├──────────────────────────────────────────────────────────┤
-│  CUSTOMER: O B Perera          RECEIPT NO: NCGYTQ-...    │
-│  ADDRESS: ...                  QUOTATION NO: YTQ-...     │
-│  CONTACT: ...                  MODE OF PAYMENT: [...]    │
-│  DATE: 29/01/2026                                        │
-├──────────────────────────────────────────────────────────┤
-│  ┌──────────────────────────────────────────────────────┐│
-│  │ DESCRIPTION                      │ TOTAL             ││
-│  ├──────────────────────────────────┼───────────────────┤│
-│  │ ADVANCE PAYMENT FOR 1 UNIT...    │ LKR 6,000,000     ││
-│  ├──────────────────────────────────┴───────────────────┤│
-│  │ AMOUNT IN WORDS: SIX MILLION RUPEES ONLY             ││
-│  └──────────────────────────────────────────────────────┘│
-│                                                          │
-│                             ┌─────────────────────────┐  │
-│                             │  NO REFUNDS             │  │
-│                             │  NCG HOLDINGS           │  │
-│                             │  (PRIVATE) LIMITED      │  │
-│                             └─────────────────────────┘  │
-│                                   [Small Seal Image]     │
-├──────────────────────────────────────────────────────────┤
-│  _______________          DATE:          _______________ │
-│    Customer           29/01/2026       Finance Dept      │
-├──────────────────────────────────────────────────────────┤
-│  📞 +94 77 766 5501  📍 Address  ✉️ info@yutonglankabus.lk│
-└──────────────────────────────────────────────────────────┘
+Settings > Responsible Persons
+┌────────────────────────────────────────────────────────────┐
+│ Settings - Responsible Persons              [+ Add Person] │
+├────────────────────────────────────────────────────────────┤
+│ ┌────────────────────────────────────────────────────────┐ │
+│ │ Manager          [approved_by]           [★ Default]   │ │
+│ │ General Manager                                        │ │
+│ │ 📞 +94 77 766 5501  ✉️ manager@ncgholdings.lk         │ │
+│ │                                          [Edit] [Del]  │ │
+│ └────────────────────────────────────────────────────────┘ │
+│                                                            │
+│ ┌────────────────────────────────────────────────────────┐ │
+│ │ Sales Executive  [prepared_by]                         │ │
+│ │ Sales Executive                                        │ │
+│ │ 📞 +94 77 123 4567  ✉️ sales@ncgholdings.lk           │ │
+│ │                                          [Edit] [Del]  │ │
+│ └────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────┘
+
+Quotation Form
+┌────────────────────────────────────────────────────────────┐
+│ ... other fields ...                                       │
+│                                                            │
+│ Responsible Person                                         │
+│ ┌──────────────────────────────────────────────────────┐   │
+│ │ Manager - General Manager (Default)              ▼   │   │
+│ └──────────────────────────────────────────────────────┘   │
+│                                                            │
+│ ... other fields ...                                       │
+└────────────────────────────────────────────────────────────┘
+
+Quotation Document Footer
+┌────────────────────────────────────────────────────────────┐
+│ 📞 +94 77 766 5501                                         │
+│ 📍 157 Y, Kebelalowita, Weniwelkola, Polgasowita          │
+│ ✉️ manager@ncgholdings.lk                                  │
+│ 👤 Manager                                                 │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Files to Create/Modify
+## Files to Modify
 
-| File | Action |
-|------|--------|
-| `public/lovable-uploads/yutong-cash-receipt-header.png` | Create (copy from upload) |
-| `public/lovable-uploads/ncg-no-refunds-seal.png` | Create (copy from upload) |
-| `src/components/yutong/YutongCashReceiptPreview.tsx` | Modify (header image, seal, remove duplicate title) |
+| File | Changes |
+|------|---------|
+| `LightVehicleResponsiblePersonsAdmin.tsx` | Add phone, email, is_default fields |
+| `LightVehicleQuotationForm.tsx` | Add responsible person dropdown |
+| `LightVehicleEditQuotationModal.tsx` | Add responsible person field |
+| `LightVehicleQuotationPreview.tsx` | Dynamic footer from responsible person |
+| `LightVehicleCashReceiptPreview.tsx` | Dynamic footer (if applicable) |
+| `lightvehicle-order-invoice-generator.ts` | Accept and display responsible person |
 
 ---
 
 ## Technical Notes
 
-1. **PDF Generation Compatibility**: The images will be captured correctly by `html2canvas` since they use direct `src` paths to `public/lovable-uploads/`.
+1. **Backward Compatibility**: Existing quotations without `responsible_person_id` will show default hardcoded contact info
+2. **Default Selection**: When creating quotations, auto-select the person marked as `is_default`
+3. **Feature Parity**: Implementation mirrors Yutong's `YutongQuotationForm.tsx` lines 593-619 and `YutongQuotationPreview.tsx` footer pattern
 
-2. **Image Sizing**:
-   - Header: Full-width (`width: 100%`) to match container
-   - Seal: Small size (`width: 120px`) positioned right-aligned below the table
-
-3. **Opacity**: The seal uses `opacity: 0.85` to give a subtle "stamped" appearance without overwhelming the document.
-
-4. **Consistency**: This approach aligns with how `yutong-invoice-header.png` is used in the invoice generator.
