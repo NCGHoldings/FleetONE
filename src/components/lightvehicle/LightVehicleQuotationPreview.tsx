@@ -773,7 +773,7 @@ export const LightVehicleQuotationPreview = forwardRef<HTMLDivElement, LightVehi
               </p>
 
               <p style={{ marginBottom: "6px" }}>
-                <b>2. USD Rate Fluctuations:</b> The quoted price is based on the current USD exchange rate and may change if fluctuations occur. The buyer must agree to any price adjustments. If not accepted, the order will be void, and the advance will be forfeited.
+                <b>2. Price Adjustments:</b> The quoted price may be subject to change due to market conditions, import duties, or regulatory changes. The buyer must agree to any price adjustments prior to delivery. If not accepted, the order will be void, and the advance will be forfeited.
               </p>
 
               <p style={{ marginBottom: "6px" }}>
