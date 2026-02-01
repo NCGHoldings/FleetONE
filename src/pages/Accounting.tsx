@@ -73,6 +73,7 @@ import { CompanySwitcher } from "@/components/accounting/CompanySwitcher";
 import { CompanySettingsView } from "@/components/accounting/settings/CompanySettingsView";
 import { DocumentTemplateManager } from "@/components/accounting/settings/DocumentTemplateManager";
 import { ModuleIntegrationView } from "@/components/accounting/settings/ModuleIntegrationView";
+import { BalanceReconciliationTool } from "@/components/accounting/settings/BalanceReconciliationTool";
 
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
@@ -703,6 +704,7 @@ const Accounting = () => {
                   <TabsTrigger value="user-activity">User Activity</TabsTrigger>
                   <TabsTrigger value="notifications">Notifications</TabsTrigger>
                   <TabsTrigger value="data-import">Data Import</TabsTrigger>
+                  <TabsTrigger value="reconciliation">Balance Reconciliation</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -737,6 +739,10 @@ const Accounting = () => {
 
               <TabsContent value="data-import">
                 <DataImportWizard />
+              </TabsContent>
+
+              <TabsContent value="reconciliation">
+                <BalanceReconciliationTool />
               </TabsContent>
             </Tabs>
           )}
