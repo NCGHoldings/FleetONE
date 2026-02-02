@@ -53,7 +53,13 @@ export function VendorMasterView() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const queryClient = useQueryClient();
-  const { selectedCompanyId, selectedCompany } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  
+  // For consolidated GL: use parent company ID for storage, filter by business unit
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = selectedCompanyId && isSubCompanyOfNCGHolding(selectedCompanyId) 
+    ? getBusinessUnitCode() 
+    : null;
 
   const [formData, setFormData] = useState({
     vendor_code: "",
@@ -69,15 +75,20 @@ export function VendorMasterView() {
   });
 
   const { data: vendors, isLoading } = useQuery({
-    queryKey: ["vendors", selectedCompanyId],
+    queryKey: ["vendors", effectiveCompanyId, businessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("vendors")
         .select("*")
         .order("vendor_name");
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      // Filter by business unit for sub-company views
+      if (businessUnitCode) {
+        query = query.eq("business_unit_code", businessUnitCode);
       }
       
       const { data, error } = await query;
@@ -102,12 +113,13 @@ export function VendorMasterView() {
         wht_applicable: data.wht_applicable === "true",
         wht_rate: data.wht_rate ? parseFloat(data.wht_rate) : null,
         is_active: true,
-        company_id: selectedCompanyId,
+        company_id: effectiveCompanyId, // Store under parent company for consolidated GL
+        business_unit_code: businessUnitCode, // Tag with business unit for filtering
       }]);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendors", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
       toast.success("Vendor created successfully");
       resetForm();
       setIsDialogOpen(false);
@@ -137,7 +149,7 @@ export function VendorMasterView() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendors", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
       toast.success("Vendor updated successfully");
       resetForm();
       setIsDialogOpen(false);
@@ -154,7 +166,7 @@ export function VendorMasterView() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendors", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
       toast.success("Vendor deleted successfully");
     },
     onError: (error) => {

@@ -381,11 +381,14 @@ export const useAPInvoices = (status?: string) => {
 };
 
 // ============ AR Receipts ============
+// Filters by business_unit_code when a sub-company is selected
 export const useARReceipts = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
   
   return useQuery({
-    queryKey: ["ar-receipts", selectedCompanyId],
+    queryKey: ["ar-receipts", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("ar_receipts")
@@ -398,8 +401,13 @@ export const useARReceipts = () => {
         `)
         .order("receipt_date", { ascending: false });
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      // Filter by business unit for sub-company views
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
       
       const { data, error } = await query;
@@ -411,11 +419,14 @@ export const useARReceipts = () => {
 };
 
 // ============ AP Payments ============
+// Filters by business_unit_code when a sub-company is selected
 export const useAPPayments = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
   
   return useQuery({
-    queryKey: ["ap-payments", selectedCompanyId],
+    queryKey: ["ap-payments", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("ap_payments")
@@ -428,8 +439,13 @@ export const useAPPayments = () => {
         `)
         .order("payment_date", { ascending: false });
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      // Filter by business unit for sub-company views
+      if (autoBusinessUnitCode) {
+        query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
       
       const { data, error } = await query;
@@ -441,19 +457,21 @@ export const useAPPayments = () => {
 };
 
 // ============ Bank Accounts ============
+// Bank accounts are shared at parent company level for consolidated GL
 export const useBankAccounts = () => {
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
+  const effectiveCompanyId = getEffectiveCompanyId();
   
   return useQuery({
-    queryKey: ["bank-accounts", selectedCompanyId],
+    queryKey: ["bank-accounts", effectiveCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("bank_accounts")
         .select("*")
         .order("account_name");
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       }
       
       const { data, error } = await query;

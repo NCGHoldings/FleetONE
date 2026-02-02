@@ -291,7 +291,7 @@ export const useReverseJournalEntry = () => {
 // ============ AR Invoices ============
 export const useCreateARInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   
   return useMutation({
     mutationFn: async (invoice: {
@@ -313,6 +313,10 @@ export const useCreateARInvoice = () => {
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
+      // For consolidated GL: post to parent company, tag with business unit
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      
       const { lines, ...headerData } = invoice;
       
       const { data, error } = await supabase
@@ -321,7 +325,8 @@ export const useCreateARInvoice = () => {
           ...headerData,
           balance: invoice.total_amount,
           status: "unpaid",
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
         }])
         .select()
         .single();
@@ -332,7 +337,7 @@ export const useCreateARInvoice = () => {
         const lineData = lines.map(line => ({
           invoice_id: data.id,
           ...line,
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
         }));
         
         await supabase.from("ar_invoice_lines").insert(lineData);
@@ -341,8 +346,9 @@ export const useCreateARInvoice = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["ar-summary", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("Invoice created successfully");
     },
     onError: (error) => {
@@ -354,7 +360,7 @@ export const useCreateARInvoice = () => {
 // ============ AR Receipts ============
 export const useCreateARReceipt = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   
   return useMutation({
     mutationFn: async (receipt: {
@@ -374,6 +380,10 @@ export const useCreateARReceipt = () => {
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
+      // For consolidated GL: post to parent company, tag with business unit
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      
       const { data, error } = await supabase
         .from("ar_receipts")
         .insert([{
@@ -387,7 +397,8 @@ export const useCreateARReceipt = () => {
           notes: receipt.notes,
           is_advance: receipt.is_advance || false,
           status: "posted",
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
         }])
         .select()
         .single();
@@ -401,7 +412,7 @@ export const useCreateARReceipt = () => {
             receipt_id: data.id,
             invoice_id: alloc.invoice_id,
             allocated_amount: alloc.allocated_amount,
-            company_id: selectedCompanyId,
+            company_id: effectiveCompanyId,
           }]);
           
           const { data: invoice } = await supabase
@@ -429,10 +440,10 @@ export const useCreateARReceipt = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ar-receipts", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["ar-summary", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["accounting-summary", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ar-receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ar-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("Receipt recorded successfully");
     },
     onError: (error) => {
@@ -444,7 +455,7 @@ export const useCreateARReceipt = () => {
 // ============ AP Invoices ============
 export const useCreateAPInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   
   return useMutation({
     mutationFn: async (invoice: {
@@ -459,13 +470,18 @@ export const useCreateAPInvoice = () => {
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
+      // For consolidated GL: post to parent company, tag with business unit
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      
       const { data, error } = await supabase
         .from("ap_invoices")
         .insert([{
           ...invoice,
           balance: invoice.total_amount - (invoice.wht_amount || 0),
           status: "unpaid",
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
         }])
         .select()
         .single();
@@ -474,8 +490,9 @@ export const useCreateAPInvoice = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["ap-summary", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("Vendor invoice recorded successfully");
     },
     onError: (error) => {
@@ -487,7 +504,7 @@ export const useCreateAPInvoice = () => {
 // ============ AP Payments ============
 export const useCreateAPPayment = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   
   return useMutation({
     mutationFn: async (payment: {
@@ -510,6 +527,10 @@ export const useCreateAPPayment = () => {
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
+      // For consolidated GL: post to parent company, tag with business unit
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      
       const { data, error } = await supabase
         .from("ap_payments")
         .insert([{
@@ -525,7 +546,8 @@ export const useCreateAPPayment = () => {
           notes: payment.notes,
           is_advance: payment.is_advance || false,
           status: "posted",
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
         }])
         .select()
         .single();
@@ -540,7 +562,7 @@ export const useCreateAPPayment = () => {
             invoice_id: alloc.invoice_id,
             allocated_amount: alloc.allocated_amount,
             wht_deducted: alloc.wht_deducted || 0,
-            company_id: selectedCompanyId,
+            company_id: effectiveCompanyId,
           }]);
           
           const { data: invoice } = await supabase
@@ -569,10 +591,10 @@ export const useCreateAPPayment = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ap-payments", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["ap-summary", selectedCompanyId] });
-      queryClient.invalidateQueries({ queryKey: ["accounting-summary", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["ap-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["ap-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       toast.success("Payment recorded successfully");
     },
     onError: (error) => {
