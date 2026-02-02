@@ -9,21 +9,26 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { useVendors, useAPInvoices, useBankAccounts } from "@/hooks/useAccountingData";
 import { useCreateAPPayment } from "@/hooks/useAccountingMutations";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
+import { Wallet, CheckCircle } from "lucide-react";
 
 const paymentSchema = z.object({
   payment_number: z.string().min(1, "Payment number is required"),
   vendor_id: z.string().min(1, "Vendor is required"),
   payment_date: z.string().min(1, "Payment date is required"),
   payment_method: z.string().min(1, "Payment method is required"),
+  amount: z.number().optional(),
   bank_account_id: z.string().optional(),
   cheque_number: z.string().optional(),
+  cheque_date: z.string().optional(),
   reference: z.string().optional(),
   notes: z.string().optional(),
+  is_advance: z.boolean().optional(),
 });
 
 type PaymentFormData = z.infer<typeof paymentSchema>;
@@ -43,9 +48,10 @@ interface APPaymentFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   preselectedVendorId?: string;
+  isAdvanceMode?: boolean;
 }
 
-export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPaymentFormProps) => {
+export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvanceMode = false }: APPaymentFormProps) => {
   const { data: vendors } = useVendors();
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useAPInvoices();
@@ -53,6 +59,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
 
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState(preselectedVendorId || "");
+  const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
+  const [advanceAmount, setAdvanceAmount] = useState(0);
 
   const form = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -63,14 +71,24 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
       payment_method: "bank_transfer",
       reference: "",
       notes: "",
+      is_advance: isAdvanceMode,
     },
   });
 
   const paymentMethod = form.watch("payment_method");
 
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setIsAdvance(isAdvanceMode);
+      form.setValue("is_advance", isAdvanceMode);
+      setAdvanceAmount(0);
+    }
+  }, [open, isAdvanceMode, form]);
+
   // Filter invoices for selected vendor
   useEffect(() => {
-    if (selectedVendorId && allInvoices) {
+    if (selectedVendorId && allInvoices && !isAdvance) {
       const vendorInvoices = allInvoices.filter(
         (inv) => inv.vendor_id === selectedVendorId && (inv.balance || 0) > 0 && inv.approval_status === "approved"
       );
@@ -89,7 +107,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
     } else {
       setAllocations([]);
     }
-  }, [selectedVendorId, allInvoices]);
+  }, [selectedVendorId, allInvoices, isAdvance]);
 
   const handleVendorChange = (vendorId: string) => {
     setSelectedVendorId(vendorId);
@@ -127,11 +145,32 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
     );
   };
 
-  const totalPayment = allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
+  // Mark all as full payment
+  const handleMarkFullPayment = () => {
+    setAllocations(
+      allocations.map((alloc) => ({
+        ...alloc,
+        selected: true,
+        allocated_amount: alloc.balance,
+      }))
+    );
+  };
+
+  const handleAdvanceToggle = (checked: boolean) => {
+    setIsAdvance(checked);
+    form.setValue("is_advance", checked);
+    if (checked) {
+      setAllocations([]);
+    }
+  };
+
+  const totalPayment = isAdvance ? advanceAmount : allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
   const totalWhtDeducted = allocations.reduce((sum, a) => sum + a.wht_deducted, 0);
 
   const onSubmit = async (data: PaymentFormData) => {
-    const selectedAllocations = allocations.filter((a) => a.selected && a.allocated_amount > 0);
+    const selectedAllocations = isAdvance 
+      ? [] 
+      : allocations.filter((a) => a.selected && a.allocated_amount > 0);
     
     try {
       await createPayment.mutateAsync({
@@ -142,8 +181,10 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
         payment_method: data.payment_method,
         bank_account_id: data.bank_account_id,
         cheque_number: data.cheque_number,
+        cheque_date: data.cheque_date,
         reference: data.reference,
         notes: data.notes,
+        is_advance: isAdvance,
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
@@ -153,20 +194,52 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
       onOpenChange(false);
       form.reset();
       setAllocations([]);
+      setIsAdvance(false);
+      setAdvanceAmount(0);
     } catch (error) {
       // Error handled by mutation
     }
   };
 
+  const canSubmit = isAdvance 
+    ? advanceAmount > 0 && selectedVendorId 
+    : totalPayment > 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Record AP Payment</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {isAdvance ? (
+              <>
+                <Wallet className="h-5 w-5 text-orange-600" />
+                Record Advance Payment
+              </>
+            ) : (
+              "Record AP Payment"
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Advance Toggle */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Wallet className="h-5 w-5 text-orange-600" />
+                <div>
+                  <p className="font-medium">Advance Payment</p>
+                  <p className="text-sm text-muted-foreground">
+                    Record payment without allocating to invoices
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={isAdvance}
+                onCheckedChange={handleAdvanceToggle}
+              />
+            </div>
+
             {/* Header Fields */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <FormField
@@ -274,19 +347,34 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
               />
 
               {paymentMethod === "cheque" && (
-                <FormField
-                  control={form.control}
-                  name="cheque_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cheque Number</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Cheque #" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={form.control}
+                    name="cheque_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cheque Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ''} placeholder="Cheque #" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="cheque_date"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cheque Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} value={field.value || ''} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
               )}
 
               <FormField
@@ -296,7 +384,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
                   <FormItem>
                     <FormLabel>Reference</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Transfer ref..." />
+                      <Input {...field} value={field.value || ''} placeholder="Transfer ref..." />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -304,10 +392,44 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
               />
             </div>
 
-            {/* Invoice Allocation */}
-            {selectedVendorId && (
+            {/* Advance Mode: Direct Amount Input */}
+            {isAdvance && (
+              <div className="p-4 border rounded-lg bg-orange-50 dark:bg-orange-950/20">
+                <FormItem>
+                  <FormLabel className="text-lg font-semibold">Advance Amount</FormLabel>
+                  <Input
+                    type="number"
+                    value={advanceAmount}
+                    onChange={(e) => setAdvanceAmount(parseFloat(e.target.value) || 0)}
+                    className="text-2xl h-14 font-bold"
+                    placeholder="Enter advance amount"
+                    min={0}
+                    step="0.01"
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    This amount will be recorded as an advance and can be allocated to invoices later.
+                  </p>
+                </FormItem>
+              </div>
+            )}
+
+            {/* Invoice Allocation (only when not advance mode) */}
+            {!isAdvance && selectedVendorId && (
               <div className="space-y-3">
-                <h3 className="font-semibold">Allocate to Invoices</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Allocate to Invoices</h3>
+                  {allocations.length > 0 && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleMarkFullPayment}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Mark All Full Payment
+                    </Button>
+                  )}
+                </div>
                 {allocations.length > 0 ? (
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full">
@@ -403,7 +525,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea {...field} placeholder="Additional notes..." rows={2} />
+                    <Textarea {...field} value={field.value || ''} placeholder="Additional notes..." rows={2} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -414,8 +536,8 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId }: APPay
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createPayment.isPending || totalPayment === 0}>
-                {createPayment.isPending ? "Processing..." : "Process Payment"}
+              <Button type="submit" disabled={createPayment.isPending || !canSubmit}>
+                {createPayment.isPending ? "Processing..." : isAdvance ? "Record Advance" : "Process Payment"}
               </Button>
             </div>
           </form>

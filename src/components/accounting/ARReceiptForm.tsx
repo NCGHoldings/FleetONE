@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { useCustomers, useARInvoices, useBankAccounts } from "@/hooks/useAccountingData";
 import { useCreateARReceipt } from "@/hooks/useAccountingMutations";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
+import { Wallet, CheckCircle } from "lucide-react";
 
 const receiptSchema = z.object({
   receipt_number: z.string().min(1, "Receipt number is required"),
@@ -24,6 +26,7 @@ const receiptSchema = z.object({
   bank_account_id: z.string().optional(),
   reference: z.string().optional(),
   notes: z.string().optional(),
+  is_advance: z.boolean().optional(),
 });
 
 type ReceiptFormData = z.infer<typeof receiptSchema>;
@@ -41,9 +44,10 @@ interface ARReceiptFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   preselectedCustomerId?: string;
+  isAdvanceMode?: boolean;
 }
 
-export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARReceiptFormProps) => {
+export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId, isAdvanceMode = false }: ARReceiptFormProps) => {
   const { data: customers } = useCustomers();
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useARInvoices();
@@ -51,6 +55,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
 
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(preselectedCustomerId || "");
+  const [isAdvance, setIsAdvance] = useState(isAdvanceMode);
 
   const form = useForm<ReceiptFormData>({
     resolver: zodResolver(receiptSchema),
@@ -62,12 +67,24 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
       payment_method: "bank_transfer",
       reference: "",
       notes: "",
+      is_advance: isAdvanceMode,
     },
   });
 
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setIsAdvance(isAdvanceMode);
+      form.setValue("is_advance", isAdvanceMode);
+      if (!isAdvanceMode) {
+        form.setValue("amount", 0);
+      }
+    }
+  }, [open, isAdvanceMode, form]);
+
   // Filter invoices for selected customer
   useEffect(() => {
-    if (selectedCustomerId && allInvoices) {
+    if (selectedCustomerId && allInvoices && !isAdvance) {
       const customerInvoices = allInvoices.filter(
         (inv) => inv.customer_id === selectedCustomerId && (inv.balance || 0) > 0
       );
@@ -84,7 +101,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
     } else {
       setAllocations([]);
     }
-  }, [selectedCustomerId, allInvoices]);
+  }, [selectedCustomerId, allInvoices, isAdvance]);
 
   const handleCustomerChange = (customerId: string) => {
     setSelectedCustomerId(customerId);
@@ -118,15 +135,39 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
     );
   };
 
+  // Mark all as full payment
+  const handleMarkFullPayment = () => {
+    setAllocations(
+      allocations.map((alloc) => ({
+        ...alloc,
+        selected: true,
+        allocated_amount: alloc.balance,
+      }))
+    );
+  };
+
   const totalAllocated = allocations.reduce((sum, a) => sum + a.allocated_amount, 0);
 
-  // Auto-update amount when allocations change
+  // Auto-update amount when allocations change (only if not advance mode)
   useEffect(() => {
-    form.setValue("amount", totalAllocated);
-  }, [totalAllocated, form]);
+    if (!isAdvance) {
+      form.setValue("amount", totalAllocated);
+    }
+  }, [totalAllocated, form, isAdvance]);
+
+  const handleAdvanceToggle = (checked: boolean) => {
+    setIsAdvance(checked);
+    form.setValue("is_advance", checked);
+    if (checked) {
+      // Clear allocations when switching to advance mode
+      setAllocations([]);
+    }
+  };
 
   const onSubmit = async (data: ReceiptFormData) => {
-    const selectedAllocations = allocations.filter((a) => a.selected && a.allocated_amount > 0);
+    const selectedAllocations = isAdvance 
+      ? [] 
+      : allocations.filter((a) => a.selected && a.allocated_amount > 0);
     
     try {
       await createReceipt.mutateAsync({
@@ -138,6 +179,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
         bank_account_id: data.bank_account_id,
         reference: data.reference,
         notes: data.notes,
+        is_advance: isAdvance,
         allocations: selectedAllocations.map((a) => ({
           invoice_id: a.invoice_id,
           allocated_amount: a.allocated_amount,
@@ -146,20 +188,51 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
       onOpenChange(false);
       form.reset();
       setAllocations([]);
+      setIsAdvance(false);
     } catch (error) {
       // Error handled by mutation
     }
   };
 
+  const canSubmit = isAdvance 
+    ? form.watch("amount") > 0 && selectedCustomerId 
+    : totalAllocated > 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Record AR Receipt</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {isAdvance ? (
+              <>
+                <Wallet className="h-5 w-5 text-orange-600" />
+                Record Advance Receipt
+              </>
+            ) : (
+              "Record AR Receipt"
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Advance Toggle */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Wallet className="h-5 w-5 text-orange-600" />
+                <div>
+                  <p className="font-medium">Advance Receipt</p>
+                  <p className="text-sm text-muted-foreground">
+                    Record payment without allocating to invoices
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={isAdvance}
+                onCheckedChange={handleAdvanceToggle}
+              />
+            </div>
+
             {/* Header Fields */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <FormField
@@ -274,7 +347,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
                   <FormItem>
                     <FormLabel>Reference</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Cheque #, Transfer ref..." />
+                      <Input {...field} value={field.value || ''} placeholder="Cheque #, Transfer ref..." />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -282,10 +355,53 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
               />
             </div>
 
-            {/* Invoice Allocation */}
-            {selectedCustomerId && (
+            {/* Advance Mode: Direct Amount Input */}
+            {isAdvance && (
+              <div className="p-4 border rounded-lg bg-orange-50 dark:bg-orange-950/20">
+                <FormField
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold">Advance Amount</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          className="text-2xl h-14 font-bold"
+                          placeholder="Enter advance amount"
+                          min={0}
+                          step="0.01"
+                        />
+                      </FormControl>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        This amount will be recorded as an advance and can be allocated to invoices later.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Invoice Allocation (only when not advance mode) */}
+            {!isAdvance && selectedCustomerId && (
               <div className="space-y-3">
-                <h3 className="font-semibold">Allocate to Invoices</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Allocate to Invoices</h3>
+                  {allocations.length > 0 && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleMarkFullPayment}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Mark All Full Payment
+                    </Button>
+                  )}
+                </div>
                 {allocations.length > 0 ? (
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full">
@@ -361,7 +477,7 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea {...field} placeholder="Additional notes..." rows={2} />
+                    <Textarea {...field} value={field.value || ''} placeholder="Additional notes..." rows={2} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -372,8 +488,8 @@ export const ARReceiptForm = ({ open, onOpenChange, preselectedCustomerId }: ARR
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createReceipt.isPending || totalAllocated === 0}>
-                {createReceipt.isPending ? "Recording..." : "Record Receipt"}
+              <Button type="submit" disabled={createReceipt.isPending || !canSubmit}>
+                {createReceipt.isPending ? "Recording..." : isAdvance ? "Record Advance" : "Record Receipt"}
               </Button>
             </div>
           </form>
