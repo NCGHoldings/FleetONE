@@ -7,6 +7,8 @@ import { ChartOfAccountsView } from "@/components/accounting/ChartOfAccountsView
 import { JournalEntriesView } from "@/components/accounting/JournalEntriesView";
 import { AccountsPayableView } from "@/components/accounting/AccountsPayableView";
 import { AccountsReceivableView } from "@/components/accounting/AccountsReceivableView";
+import { ARReceiptsView } from "@/components/accounting/ARReceiptsView";
+import { APPaymentsView } from "@/components/accounting/APPaymentsView";
 import { FinancialStatementsView } from "@/components/accounting/FinancialStatementsView";
 import { TaxManagementView } from "@/components/accounting/TaxManagementView";
 import { CustomerMasterView } from "@/components/accounting/CustomerMasterView";
@@ -405,7 +407,7 @@ const Accounting = () => {
               </TabsContent>
 
               <TabsContent value="receipts">
-                <AccountsReceivableView />
+                <ARReceiptsView />
               </TabsContent>
 
               <TabsContent value="credit-notes">
@@ -457,7 +459,7 @@ const Accounting = () => {
               </TabsContent>
 
               <TabsContent value="payments">
-                <AccountsPayableView />
+                <APPaymentsView />
               </TabsContent>
 
               <TabsContent value="debit-notes">

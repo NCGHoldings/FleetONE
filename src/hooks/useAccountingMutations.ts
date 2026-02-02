@@ -366,6 +366,7 @@ export const useCreateARReceipt = () => {
       bank_account_id?: string;
       reference?: string;
       notes?: string;
+      is_advance?: boolean;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -384,6 +385,7 @@ export const useCreateARReceipt = () => {
           bank_account_id: receipt.bank_account_id,
           reference: receipt.reference,
           notes: receipt.notes,
+          is_advance: receipt.is_advance || false,
           status: "posted",
           company_id: selectedCompanyId,
         }])
@@ -392,7 +394,8 @@ export const useCreateARReceipt = () => {
       
       if (error) throw error;
       
-      if (receipt.allocations?.length) {
+      // Only process allocations if not an advance receipt
+      if (!receipt.is_advance && receipt.allocations?.length) {
         for (const alloc of receipt.allocations) {
           await supabase.from("ar_receipt_allocations").insert([{
             receipt_id: data.id,
@@ -429,6 +432,7 @@ export const useCreateARReceipt = () => {
       queryClient.invalidateQueries({ queryKey: ["ar-receipts", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["ar-invoices", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["ar-summary", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary", selectedCompanyId] });
       toast.success("Receipt recorded successfully");
     },
     onError: (error) => {
@@ -494,8 +498,10 @@ export const useCreateAPPayment = () => {
       payment_method: string;
       bank_account_id?: string;
       cheque_number?: string;
+      cheque_date?: string;
       reference?: string;
       notes?: string;
+      is_advance?: boolean;
       allocations?: Array<{
         invoice_id: string;
         allocated_amount: number;
@@ -514,8 +520,10 @@ export const useCreateAPPayment = () => {
           payment_method: payment.payment_method,
           bank_account_id: payment.bank_account_id,
           cheque_number: payment.cheque_number,
+          cheque_date: payment.cheque_date,
           reference: payment.reference,
           notes: payment.notes,
+          is_advance: payment.is_advance || false,
           status: "posted",
           company_id: selectedCompanyId,
         }])
@@ -524,7 +532,8 @@ export const useCreateAPPayment = () => {
       
       if (error) throw error;
       
-      if (payment.allocations?.length) {
+      // Only process allocations if not an advance payment
+      if (!payment.is_advance && payment.allocations?.length) {
         for (const alloc of payment.allocations) {
           await supabase.from("ap_payment_allocations").insert([{
             payment_id: data.id,
@@ -563,6 +572,7 @@ export const useCreateAPPayment = () => {
       queryClient.invalidateQueries({ queryKey: ["ap-payments", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["ap-summary", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["accounting-summary", selectedCompanyId] });
       toast.success("Payment recorded successfully");
     },
     onError: (error) => {
