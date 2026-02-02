@@ -1172,13 +1172,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       // Use trip distance + additional distance for extra time calculations
       const totalTripDistanceForCalculation = tripDistance + totalAdditionalDistance;
 
-      // Calculate extra time charges for Outside hire type
+      // Calculate extra time charges for ALL hire types
       let overtimeCharge = 0;
       let overnightCharge = 0;
       let totalExtraTimeCharge = 0;
       
       if (data.hireType === 'Outside') {
-        // Use only quoted distance (tripDistance) for available hours calculation
+        // Outside hire: distance-based available hours (km / 10 km/h baseline)
         const extraTimeResult = calculateExtraTimeCharge(
           totalTripDistanceForCalculation, // Include additional distance
           data.pickupDateTime,
@@ -1186,7 +1186,25 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           {
             baselineSpeedKmph: 10,
             hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
-            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000
+            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000,
+            useStandardHours: false
+          }
+        );
+        
+        overtimeCharge = extraTimeResult.overtimeCharge;
+        overnightCharge = extraTimeResult.overnightCharge;
+        totalExtraTimeCharge = extraTimeResult.totalExtraCharge;
+      } else {
+        // Lyceum/Internal hire: rate card standard_hours based available hours
+        const extraTimeResult = calculateExtraTimeCharge(
+          tripDistance, // Not used when useStandardHours=true
+          data.pickupDateTime,
+          data.dropDateTime,
+          {
+            hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000,
+            useStandardHours: true,
+            standardHours: rateCard.standard_hours || 8
           }
         );
         

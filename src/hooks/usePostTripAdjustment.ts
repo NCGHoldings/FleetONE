@@ -61,6 +61,9 @@ export interface TimeAdjustmentConfig {
   baselineSpeedKmph?: number;
   hourlyRate?: number;
   nightBlockFee?: number;
+  // Support for Lyceum/Internal hire types
+  useStandardHours?: boolean;
+  standardHours?: number;
 }
 
 export const usePostTripAdjustment = () => {
@@ -68,7 +71,7 @@ export const usePostTripAdjustment = () => {
 
   const calculateTimeAdjustment = (
     originalDistanceKm: number,
-    actualDistanceKm: number,
+    actualDistanceKm: number, // Used for display only, NOT for available hours calculation
     originalPickupDatetime: string | Date,
     originalDropDatetime: string | Date,
     actualPickupDatetime: string | Date,
@@ -79,6 +82,8 @@ export const usePostTripAdjustment = () => {
       baselineSpeedKmph = 10,
       hourlyRate = 500,
       nightBlockFee = 3000,
+      useStandardHours = false,
+      standardHours = 8,
     } = config;
 
     // Calculate original time charges based on original quoted distance and times
@@ -86,15 +91,16 @@ export const usePostTripAdjustment = () => {
       originalDistanceKm,
       originalPickupDatetime,
       originalDropDatetime,
-      { baselineSpeedKmph, hourlyRate, nightBlockFee }
+      { baselineSpeedKmph, hourlyRate, nightBlockFee, useStandardHours, standardHours }
     );
 
-    // Calculate actual time charges based on actual distance and actual times
+    // FIX: Use ORIGINAL distance for available hours baseline (not actualDistanceKm)
+    // Available hours should ALWAYS be based on quoted distance - extra KM doesn't give more time
     const actualTimeResult = calculateExtraTimeCharge(
-      actualDistanceKm,
+      originalDistanceKm, // Use ORIGINAL distance, not actualDistanceKm
       actualPickupDatetime,
       actualDropDatetime,
-      { baselineSpeedKmph, hourlyRate, nightBlockFee }
+      { baselineSpeedKmph, hourlyRate, nightBlockFee, useStandardHours, standardHours }
     );
 
     // Calculate adjustments (difference between actual and original)
@@ -105,7 +111,7 @@ export const usePostTripAdjustment = () => {
     return {
       originalHours: originalTimeResult.actualHours,
       actualHours: actualTimeResult.actualHours,
-      availableHours: actualTimeResult.availableHours,
+      availableHours: originalTimeResult.availableHours, // Use original available hours (based on quoted distance)
       extraHours: actualTimeResult.extraHours,
       originalOvertimeCharge: originalTimeResult.overtimeCharge,
       originalOvernightCharge: originalTimeResult.overnightCharge,
