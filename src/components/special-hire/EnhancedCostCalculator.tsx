@@ -328,26 +328,45 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
       let storedOvernightCharge = quotation.overnight_charge || 0;
       const storedExceedingDistanceCharge = quotation.exceeding_distance_charge || exceedingDistanceCharge;
       
-      // Recalculate overtime/overnight for Outside hire if stored values are 0 (historical data)
-      if (quotation.hire_type === 'Outside' && 
-          storedOvertimeCharge === 0 && 
+      // Recalculate overtime/overnight if stored values are 0 (historical data)
+      if (storedOvertimeCharge === 0 && 
           storedOvernightCharge === 0 && 
           quotation.pickup_datetime && 
           quotation.drop_datetime) {
         
-        const extraTimeResult = calculateExtraTimeCharge(
-          tripDistance, // Use quoted trip distance only
-          quotation.pickup_datetime,
-          quotation.drop_datetime,
-          {
-            baselineSpeedKmph: 10,
-            hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
-            nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000
-          }
-        );
-        
-        storedOvertimeCharge = extraTimeResult.overtimeCharge;
-        storedOvernightCharge = extraTimeResult.overnightCharge;
+        if (quotation.hire_type === 'Outside') {
+          // Outside hire: distance-based available hours (km / 10 km/h)
+          const extraTimeResult = calculateExtraTimeCharge(
+            tripDistance, // Use quoted trip distance only
+            quotation.pickup_datetime,
+            quotation.drop_datetime,
+            {
+              baselineSpeedKmph: 10,
+              hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
+              nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000,
+              useStandardHours: false
+            }
+          );
+          
+          storedOvertimeCharge = extraTimeResult.overtimeCharge;
+          storedOvernightCharge = extraTimeResult.overnightCharge;
+        } else {
+          // Lyceum/Internal hire: rate card standard_hours based
+          const extraTimeResult = calculateExtraTimeCharge(
+            tripDistance, // Not used when useStandardHours=true
+            quotation.pickup_datetime,
+            quotation.drop_datetime,
+            {
+              hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
+              nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000,
+              useStandardHours: true,
+              standardHours: rateCard?.standard_hours || 8
+            }
+          );
+          
+          storedOvertimeCharge = extraTimeResult.overtimeCharge;
+          storedOvernightCharge = extraTimeResult.overnightCharge;
+        }
       }
       
       const data: CostData = {

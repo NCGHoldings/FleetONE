@@ -7,6 +7,9 @@ export interface ExtraTimeConfig {
   baselineSpeedKmph?: number;
   hourlyRate?: number;
   nightBlockFee?: number;
+  // Support for Lyceum/Internal hire types that use rate card standard hours
+  useStandardHours?: boolean;
+  standardHours?: number;
 }
 
 export interface ExtraTimeResult {
@@ -27,11 +30,17 @@ export function calculateExtraTimeCharge(
   const {
     baselineSpeedKmph = 10,
     hourlyRate = 500,
-    nightBlockFee = 3000
+    nightBlockFee = 3000,
+    useStandardHours = false,
+    standardHours = 8
   } = config;
 
-  // Calculate available hours based on quoted distance only (excludes parking distances)
-  const availableHours = quotedDistanceKm / baselineSpeedKmph;
+  // Calculate available hours based on hire type
+  // - Outside hire: distance-based (km / 10 km/h baseline speed)
+  // - Lyceum/Internal hire: rate card standard_hours
+  const availableHours = useStandardHours 
+    ? standardHours 
+    : quotedDistanceKm / baselineSpeedKmph;
 
   // Calculate actual hours from pickup to drop
   const pickupTime = new Date(pickupDatetime).getTime();

@@ -454,7 +454,7 @@ export const PostTripAdjustmentModal = ({
                         <div className="text-center">
                           <div className="font-medium">{timeAdjustmentResult.availableHours.toFixed(1)} hrs</div>
                           <div className="text-muted-foreground text-xs">Available Hours</div>
-                          <div className="text-muted-foreground text-xs">({actualKm} km ÷ 10 km/h)</div>
+                          <div className="text-muted-foreground text-xs">({originalKm} km ÷ 10 km/h)</div>
                         </div>
                         <div className="text-center">
                           <div className="font-medium">{timeAdjustmentResult.originalHours.toFixed(1)} hrs</div>
