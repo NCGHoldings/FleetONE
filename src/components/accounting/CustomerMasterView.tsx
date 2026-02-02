@@ -52,7 +52,13 @@ export function CustomerMasterView() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const queryClient = useQueryClient();
-  const { selectedCompanyId, selectedCompany } = useCompany();
+  const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  
+  // For consolidated GL: use parent company ID for storage, filter by business unit
+  const effectiveCompanyId = getEffectiveCompanyId();
+  const businessUnitCode = selectedCompanyId && isSubCompanyOfNCGHolding(selectedCompanyId) 
+    ? getBusinessUnitCode() 
+    : null;
 
   const [formData, setFormData] = useState({
     customer_code: "",
@@ -66,15 +72,20 @@ export function CustomerMasterView() {
   });
 
   const { data: customers, isLoading } = useQuery({
-    queryKey: ["customers", selectedCompanyId],
+    queryKey: ["customers", effectiveCompanyId, businessUnitCode],
     queryFn: async () => {
       let query = supabase
         .from("customers")
         .select("*")
         .order("customer_name");
       
-      if (selectedCompanyId) {
-        query = query.eq("company_id", selectedCompanyId);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
+      }
+      
+      // Filter by business unit for sub-company views
+      if (businessUnitCode) {
+        query = query.eq("business_unit_code", businessUnitCode);
       }
       
       const { data, error } = await query;
@@ -97,12 +108,13 @@ export function CustomerMasterView() {
         credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : null,
         payment_terms: parseInt(data.payment_terms) || 30,
         is_active: true,
-        company_id: selectedCompanyId,
+        company_id: effectiveCompanyId, // Store under parent company for consolidated GL
+        business_unit_code: businessUnitCode, // Tag with business unit for filtering
       }]);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customers", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
       toast.success("Customer created successfully");
       resetForm();
       setIsDialogOpen(false);
@@ -130,7 +142,7 @@ export function CustomerMasterView() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customers", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
       toast.success("Customer updated successfully");
       resetForm();
       setIsDialogOpen(false);
@@ -147,7 +159,7 @@ export function CustomerMasterView() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customers", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
       toast.success("Customer deleted successfully");
     },
     onError: (error) => {
