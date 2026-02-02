@@ -1,78 +1,31 @@
 
 
-# Fix CI/CD Pipeline Failure - Missing Test Scripts
+# Remove CI/CD Pipeline to Unblock Code Push
 
-## Problem Identified
-
-Your GitHub CI/CD pipeline is failing at the **"Validate Code"** step because the required test scripts are not defined in `package.json`.
-
-The workflow file (`.github/workflows/ci.yml`) attempts to run:
-- `npm run test -- --run --reporter=verbose` (for Unit Tests)
-- `npm run test:e2e -- --project=chromium` (for E2E Tests)
-
-But these scripts do not exist in your `package.json`.
-
----
+## Problem
+The CI/CD pipeline and GitHub Ruleset are blocking your code push. You want to push your Special Hire overtime fixes now and set up CI/CD later.
 
 ## Solution
+Delete the CI/CD workflow file so GitHub won't run any checks, allowing you to push directly.
 
-Add the missing scripts to `package.json`:
+## Files to Delete
 
-| Script | Command | Purpose |
-|--------|---------|---------|
-| `test` | `vitest` | Run Vitest unit tests |
-| `test:e2e` | `playwright test` | Run Playwright E2E tests |
-| `type-check` | `tsc --noEmit` | TypeScript validation (optional but useful) |
-
----
-
-## Implementation
-
-### Update `package.json` scripts section
-
-**Current:**
-```json
-"scripts": {
-  "dev": "vite",
-  "build": "vite build",
-  "build:dev": "vite build --mode development",
-  "lint": "eslint .",
-  "preview": "vite preview"
-}
-```
-
-**Updated:**
-```json
-"scripts": {
-  "dev": "vite",
-  "build": "vite build",
-  "build:dev": "vite build --mode development",
-  "lint": "eslint .",
-  "preview": "vite preview",
-  "test": "vitest",
-  "test:e2e": "playwright test",
-  "type-check": "tsc --noEmit"
-}
-```
-
----
-
-## What Will Happen After This Fix
-
-1. **CI Pipeline Flow:**
-   - Validate Code → TypeScript check, ESLint, Build
-   - Unit Tests → `npm run test` using Vitest
-   - E2E Tests → `npm run test:e2e` using Playwright
-
-2. All three checks should pass (assuming no code errors)
-
-3. Once all checks pass, the commit can be merged to `main`
-
----
-
-## Files to Modify
-
-| File | Change |
+| File | Reason |
 |------|--------|
-| `package.json` | Add `test`, `test:e2e`, and `type-check` scripts |
+| `.github/workflows/ci.yml` | Remove CI pipeline that runs on push/PR |
+
+## What Happens After
+
+1. **Immediate**: No more automated checks will run on push or PR
+2. **You can push**: Your Special Hire overtime fixes will go through
+3. **Later**: When ready, you can recreate the CI/CD pipeline
+
+## Also Recommended (Manual Step on GitHub)
+
+After I delete the workflow file, you should also:
+1. Go to **GitHub → Settings → Rules → Rulesets**
+2. Delete the "Main Branch Protection" ruleset
+3. This removes the requirement for status checks to pass
+
+This will fully unblock your pushes.
 
