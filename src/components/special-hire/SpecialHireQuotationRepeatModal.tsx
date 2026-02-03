@@ -43,24 +43,6 @@ export function SpecialHireQuotationRepeatModal({
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
 
-  // Generate a unique quotation number
-  const generateQuotationNo = async (index: number): Promise<string> => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    
-    // Get the count of quotations created today
-    const { count } = await supabase
-      .from('special_hire_quotations')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', `${year}-${month}-${day}`);
-    
-    const nextNum = (count || 0) + index + 1;
-    
-    return `QUO-${year}-${month}${day}-v1.${nextNum}`;
-  };
-
   const handleRepeat = async () => {
     if (!quotation || !user) return;
 
@@ -77,16 +59,14 @@ export function SpecialHireQuotationRepeatModal({
         throw new Error('Failed to fetch quotation details');
       }
 
-      // Create quotations one by one to get unique quotation numbers
-      const newQuotations = [];
+      // Create quotations one by one to get unique quotation numbers from DB sequence
+      const createdQuotationNos: string[] = [];
       
       for (let i = 0; i < numberOfCopies; i++) {
-        const quotationNo = await generateQuotationNo(i);
-        
         // Copy ALL relevant fields from the original quotation
+        // NOTE: quotation_no is NOT included - database default will auto-generate it
         const duplicateData = {
-          // New quotation identifiers
-          quotation_no: quotationNo,
+          // Status and version for new quotation
           status: 'draft',
           version_number: '1.0',
           is_active_version: true,
@@ -194,17 +174,22 @@ export function SpecialHireQuotationRepeatModal({
           }],
         };
 
+        // Insert WITHOUT quotation_no - let database sequence generate it
         const { data, error } = await supabase
           .from('special_hire_quotations')
           .insert([duplicateData])
-          .select()
+          .select('quotation_no')
           .single();
 
         if (error) throw error;
-        newQuotations.push(data);
+        if (data?.quotation_no) {
+          createdQuotationNos.push(data.quotation_no);
+        }
       }
 
-      toast.success(`${numberOfCopies} quotation${numberOfCopies > 1 ? 's' : ''} created successfully`);
+      // Show actual generated quotation numbers
+      const quotationsList = createdQuotationNos.join(', ');
+      toast.success(`Created: ${quotationsList}`);
 
       onSuccess();
       onClose();
