@@ -1,92 +1,90 @@
 
-# Fix: Lyceum Hires Incorrect Pickup-to-Drop Time Reading
+# Special Hire: "Use Pickup as Parking" Feature
 
-## Problem Identified
+## Overview
+Add an option to mark the customer's pickup location as the same as the parking location. When enabled, this eliminates the "Parking to Pickup" and "Drop to Parking" distance segments and their associated fuel costs from the quotation.
 
-In `SpecialHireForm.tsx`, there are **hardcoded values** for Lyceum hires that cause incorrect time readings:
+## Business Logic
 
-| Field | Current (WRONG) | Should Be |
-|-------|-----------------|-----------|
-| `actualHours` | Hardcoded to `8` for Lyceum | Calculated from pickup/drop times |
-| `availableHours` | Distance-based (km/10) for all | Rate card `standard_hours` for Lyceum |
-| `overtimeHours` | Hardcoded to `0` for Lyceum | Calculated: actualHours - availableHours |
+| Scenario | Parking → Pickup | Trip Distance | Drop → Parking | Fuel Cost |
+|----------|------------------|---------------|----------------|-----------|
+| Normal | Calculated | Calculated | Calculated | Based on empty run |
+| Pickup as Parking | **0 km** | Calculated | **0 km** | **0 LKR** |
 
-### Bug Location 1: Cost Calculation (Lines 1328-1332)
-
-```typescript
-// CURRENT (BUGGY)
-rateCardDetails: {
-  standardHours: rateCard.standard_hours || 8,
-  actualHours: data.hireType === 'Outside' ? /* calculated */ : 8,  // BUG: Hardcoded 8 for Lyceum
-  availableHours: Math.round((tripDistance / 10) * 100) / 100,     // BUG: Same for all hire types
-  overtimeHours: data.hireType === 'Outside' ? /* calculated */ : 0, // BUG: Hardcoded 0 for Lyceum
-}
-```
-
-### Bug Location 2: Edit Initialization (Lines 336-341)
-
-```typescript
-// CURRENT (BUGGY)
-rateCardDetails: {
-  standardHours: 8,                          // BUG: Hardcoded, should use rate card
-  actualHours: actualHours,                  // OK
-  overtimeHours: Math.max(0, actualHours - 8), // BUG: Uses hardcoded 8
-  overnightDays: 0,
-}
-// Missing: availableHours not set at all
-```
+When the bus is already at the customer pickup point (e.g., customer picks up from depot), there's no empty run, so no fuel cost to pass to customer.
 
 ---
 
-## Fix Implementation
+## Implementation Details
 
-### Change 1: Fix Cost Calculation Logic
+### Phase 1: Form UI Changes (`SpecialHireForm.tsx`)
 
-Update lines 1328-1338 to calculate correctly for both hire types:
+Add a toggle switch below the parking location selector:
+
+```text
+Parking Location: [Dropdown]
+
+[Toggle] Pickup Location Same as Parking
+         "Bus starts from customer pickup point - no empty run"
+```
+
+**State Management:**
+- Add `const [usePickupAsParking, setUsePickupAsParking] = useState(false)`
+- When enabled: disable parking location dropdown, show informational badge
+- Initialize from `initialData.uses_pickup_as_parking` when editing
+
+### Phase 2: Distance Calculation (`calculate-distance/index.ts`)
+
+Modify edge function to accept and handle new parameter:
 
 ```typescript
-rateCardDetails: {
-  standardHours: rateCard.standard_hours || 8,
-  // FIXED: Always calculate actual hours from pickup/drop times
-  actualHours: Math.round(((new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60)) * 100) / 100,
-  // FIXED: Use rate card standard_hours for Lyceum, distance/10 for Outside
-  availableHours: data.hireType === 'Outside' 
-    ? Math.round((tripDistance / 10) * 100) / 100 
-    : (rateCard.standard_hours || 8),
-  // FIXED: Calculate overtime for both hire types
-  overtimeHours: (() => {
-    const actualHrs = (new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60);
-    const availableHrs = data.hireType === 'Outside' ? (tripDistance / 10) : (rateCard.standard_hours || 8);
-    return Math.round(Math.max(0, actualHrs - availableHrs) * 100) / 100;
-  })(),
-  agreedDistance: baseCoverageKm,
-  actualDistance: tripDistance,
-  exceedingKm,
-  freeExceedingKm: 0,
-  chargeableExceedingKm: exceedingKm
+const {
+  // ... existing params
+  usePickupAsParking = false,  // NEW
+} = await req.json()
+
+// When usePickupAsParking is true:
+if (usePickupAsParking) {
+  return {
+    kmParkingToPickup: 0,
+    kmTrip: [calculated normally],
+    kmDropToParking: 0,
+    // ... rest of response
+    usePickupAsParking: true,
+  };
 }
 ```
 
-### Change 2: Fix Edit Initialization
+### Phase 3: Data Storage
 
-Update lines 336-341 to properly initialize rate card details when editing:
+Store the setting in the quotation record:
 
-```typescript
-// First, determine available hours based on hire type
-const isLyceumOrInternal = initialData.hire_type === 'Lyceum' || initialData.hire_type === 'Inside';
-const storedStandardHours = initialData.standard_hours || 8;
-const availableHours = isLyceumOrInternal 
-  ? storedStandardHours 
-  : ((initialData.km_trip || 0) / 10);
+| Field | Type | Purpose |
+|-------|------|---------|
+| `uses_pickup_as_parking` | boolean | Flag to indicate pickup = parking |
 
-// Then use in rateCardDetails
-rateCardDetails: {
-  standardHours: storedStandardHours,
-  actualHours: actualHours,
-  availableHours: Math.round(availableHours * 100) / 100,
-  overtimeHours: Math.round(Math.max(0, actualHours - availableHours) * 100) / 100,
-  overnightDays: 0,
-}
+**Note:** The `parking_location_id` will still be stored (as a fallback reference), but when `uses_pickup_as_parking = true`, the system ignores parking distances.
+
+### Phase 4: Cost Calculation Updates
+
+When `usePickupAsParking` is enabled:
+- `kmParkingToPickup = 0`
+- `kmDropToParking = 0`
+- `fuelCostFuelOnly = 0` (no empty run = no fuel cost to customer)
+- Customer total = Hire charge only (no fuel addon)
+
+### Phase 5: Display Updates (`CostBreakdown.tsx`)
+
+Update Distance Analysis section to handle this case:
+
+```text
+Distance Analysis:
+  Parking → Pickup: 0 km (Same location)
+  Trip Distance: 150 km
+  Drop → Parking: 0 km (Same location)
+  Total: 150 km
+
+Fuel Cost (Empty Run): LKR 0 (No empty run)
 ```
 
 ---
@@ -95,28 +93,46 @@ rateCardDetails: {
 
 | File | Changes |
 |------|---------|
-| `src/components/special-hire/SpecialHireForm.tsx` | Fix lines 336-341 (edit init) and 1328-1338 (cost calc) |
+| `src/components/special-hire/SpecialHireForm.tsx` | Add toggle, state, pass to edge function, save to DB |
+| `supabase/functions/calculate-distance/index.ts` | Handle `usePickupAsParking` param, return 0 for parking distances |
+| `src/components/special-hire/CostBreakdown.tsx` | Display "(Same location)" when applicable |
 
 ---
 
-## Time Calculation Logic Summary
+## UI Preview
 
-### Outside Hire
-- **Actual Hours**: Pickup to Drop time (always calculated)
-- **Available Hours**: Trip Distance / 10 km/h
-- **Overtime Hours**: Actual - Available (if positive)
-
-### Lyceum/Internal Hire
-- **Actual Hours**: Pickup to Drop time (always calculated)
-- **Available Hours**: Rate Card `standard_hours` (4h or 8h blocks)
-- **Overtime Hours**: Actual - Standard Hours (if positive)
+```text
+┌─────────────────────────────────────────────────────┐
+│ Hire Type:        [Outside ▼]                       │
+│                                                     │
+│ Parking Location: [Colombo Depot ▼] (disabled)      │
+│                                                     │
+│ ☑ Pickup Location Same as Parking                   │
+│   Bus starts from customer pickup - no empty run    │
+│                                                     │
+│ Multi-parking:    [ ] Different locations per bus   │
+└─────────────────────────────────────────────────────┘
+```
 
 ---
 
-## Expected Outcome
+## Edge Cases
 
-After fix:
-1. Lyceum quotations will show correct "Pickup to Drop" time based on actual datetime values
-2. Available hours will correctly use rate card's standard_hours for Lyceum hires
-3. Overtime calculations will work correctly for all hire types
-4. Editing existing quotations will display correct time analysis
+1. **Multi-parking mode**: When `usePickupAsParking` is enabled, multi-parking should be disabled (mutually exclusive)
+2. **Editing**: Load `uses_pickup_as_parking` from database and restore UI state
+3. **PDF Generation**: Quotation document should reflect "0 km" for parking segments
+
+---
+
+## Data Flow
+
+```text
+1. User enables "Pickup Location Same as Parking" toggle
+2. Parking location dropdown becomes disabled
+3. User clicks "Calculate"
+4. Edge function receives usePickupAsParking: true
+5. Edge function returns kmParkingToPickup: 0, kmDropToParking: 0
+6. Form calculates: fuelCostFuelOnly = 0
+7. CostBreakdown shows: "0 km (Same location)"
+8. On save: uses_pickup_as_parking = true stored in DB
+```
