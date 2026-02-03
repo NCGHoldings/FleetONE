@@ -1,138 +1,94 @@
 
-# Special Hire: "Use Pickup as Parking" Feature
+# Fix: Special Hire Quotation Duplicate Number Generation
 
-## Overview
-Add an option to mark the customer's pickup location as the same as the parking location. When enabled, this eliminates the "Parking to Pickup" and "Drop to Parking" distance segments and their associated fuel costs from the quotation.
+## Problem
+When duplicating Special Hire quotations, the modal manually generates quotation numbers using a flawed approach:
+1. Counts quotations created today
+2. Generates numbers like `QUO-2026-0203-v1.5`
+3. When creating multiple copies, the count query doesn't see uncommitted inserts from the same loop
+4. Results in duplicate or stale quotation numbers
 
-## Business Logic
-
-| Scenario | Parking → Pickup | Trip Distance | Drop → Parking | Fuel Cost |
-|----------|------------------|---------------|----------------|-----------|
-| Normal | Calculated | Calculated | Calculated | Based on empty run |
-| Pickup as Parking | **0 km** | Calculated | **0 km** | **0 LKR** |
-
-When the bus is already at the customer pickup point (e.g., customer picks up from depot), there's no empty run, so no fuel cost to pass to customer.
-
----
-
-## Implementation Details
-
-### Phase 1: Form UI Changes (`SpecialHireForm.tsx`)
-
-Add a toggle switch below the parking location selector:
-
-```text
-Parking Location: [Dropdown]
-
-[Toggle] Pickup Location Same as Parking
-         "Bus starts from customer pickup point - no empty run"
+## Root Cause
+The database already has a **working atomic sequence** for generating quotation numbers:
+```sql
+DEFAULT: 'QUO-' || EXTRACT(year FROM now()) || '-' || lpad(nextval('quotation_seq'), 4, '0')
+-- Example: QUO-2026-1124, QUO-2026-1125, etc.
 ```
 
-**State Management:**
-- Add `const [usePickupAsParking, setUsePickupAsParking] = useState(false)`
-- When enabled: disable parking location dropdown, show informational badge
-- Initialize from `initialData.uses_pickup_as_parking` when editing
+But the duplicate modal overrides this by explicitly setting `quotation_no`, bypassing the safe default.
 
-### Phase 2: Distance Calculation (`calculate-distance/index.ts`)
+## Solution
+**Remove the manual `quotation_no` generation** and let the database default handle it automatically.
 
-Modify edge function to accept and handle new parameter:
+### Changes to `SpecialHireQuotationRepeatModal.tsx`
 
+| Change | Description |
+|--------|-------------|
+| Remove `generateQuotationNo` function | Not needed - database handles this |
+| Remove `quotation_no` from insert data | Let database default generate it |
+| Fetch created quotation numbers for toast | Show the actual generated numbers to user |
+
+### Code Changes
+
+**Before (buggy):**
 ```typescript
-const {
-  // ... existing params
-  usePickupAsParking = false,  // NEW
-} = await req.json()
-
-// When usePickupAsParking is true:
-if (usePickupAsParking) {
-  return {
-    kmParkingToPickup: 0,
-    kmTrip: [calculated normally],
-    kmDropToParking: 0,
-    // ... rest of response
-    usePickupAsParking: true,
-  };
-}
+const quotationNo = await generateQuotationNo(i);
+const duplicateData = {
+  quotation_no: quotationNo,  // Overrides database default
+  // ... other fields
+};
 ```
 
-### Phase 3: Data Storage
+**After (fixed):**
+```typescript
+const duplicateData = {
+  // quotation_no NOT included - database default will generate it
+  // ... other fields
+};
 
-Store the setting in the quotation record:
-
-| Field | Type | Purpose |
-|-------|------|---------|
-| `uses_pickup_as_parking` | boolean | Flag to indicate pickup = parking |
-
-**Note:** The `parking_location_id` will still be stored (as a fallback reference), but when `uses_pickup_as_parking = true`, the system ignores parking distances.
-
-### Phase 4: Cost Calculation Updates
-
-When `usePickupAsParking` is enabled:
-- `kmParkingToPickup = 0`
-- `kmDropToParking = 0`
-- `fuelCostFuelOnly = 0` (no empty run = no fuel cost to customer)
-- Customer total = Hire charge only (no fuel addon)
-
-### Phase 5: Display Updates (`CostBreakdown.tsx`)
-
-Update Distance Analysis section to handle this case:
-
-```text
-Distance Analysis:
-  Parking → Pickup: 0 km (Same location)
-  Trip Distance: 150 km
-  Drop → Parking: 0 km (Same location)
-  Total: 150 km
-
-Fuel Cost (Empty Run): LKR 0 (No empty run)
+const { data } = await supabase
+  .from('special_hire_quotations')
+  .insert([duplicateData])
+  .select('quotation_no')  // Get the generated number
+  .single();
 ```
 
----
+## Implementation
+
+### File: `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx`
+
+1. **Delete lines 46-62**: Remove the `generateQuotationNo` function entirely
+
+2. **Update handleRepeat function (around line 84)**:
+   - Remove the call to `generateQuotationNo(i)`
+   - Remove `quotation_no` from the `duplicateData` object (line 89)
+   - Keep the `.select()` call to fetch the auto-generated quotation_no
+
+3. **Update success toast**:
+   - Show the actual quotation numbers that were created
+   - Example: "Created QUO-2026-1124, QUO-2026-1125"
+
+## Technical Details
+
+### Database Sequence Behavior
+- `quotation_seq` is atomic - each `nextval()` call returns a unique number
+- Even with concurrent inserts, numbers will never collide
+- Format: `QUO-{YEAR}-{4-DIGIT-SEQUENCE}`
+
+### Version Number
+- Keep `version_number: '1.0'` in the insert - this is for version tracking, not the quotation number
+- The quotation number uniquely identifies the quotation
+- Version number tracks revisions of the same quotation
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/components/special-hire/SpecialHireForm.tsx` | Add toggle, state, pass to edge function, save to DB |
-| `supabase/functions/calculate-distance/index.ts` | Handle `usePickupAsParking` param, return 0 for parking distances |
-| `src/components/special-hire/CostBreakdown.tsx` | Display "(Same location)" when applicable |
+| File | Action |
+|------|--------|
+| `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx` | Remove manual number generation, let DB default work |
 
----
-
-## UI Preview
-
-```text
-┌─────────────────────────────────────────────────────┐
-│ Hire Type:        [Outside ▼]                       │
-│                                                     │
-│ Parking Location: [Colombo Depot ▼] (disabled)      │
-│                                                     │
-│ ☑ Pickup Location Same as Parking                   │
-│   Bus starts from customer pickup - no empty run    │
-│                                                     │
-│ Multi-parking:    [ ] Different locations per bus   │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Edge Cases
-
-1. **Multi-parking mode**: When `usePickupAsParking` is enabled, multi-parking should be disabled (mutually exclusive)
-2. **Editing**: Load `uses_pickup_as_parking` from database and restore UI state
-3. **PDF Generation**: Quotation document should reflect "0 km" for parking segments
-
----
-
-## Data Flow
-
-```text
-1. User enables "Pickup Location Same as Parking" toggle
-2. Parking location dropdown becomes disabled
-3. User clicks "Calculate"
-4. Edge function receives usePickupAsParking: true
-5. Edge function returns kmParkingToPickup: 0, kmDropToParking: 0
-6. Form calculates: fuelCostFuelOnly = 0
-7. CostBreakdown shows: "0 km (Same location)"
-8. On save: uses_pickup_as_parking = true stored in DB
-```
+## Expected Result
+After fix:
+- Each duplicated quotation gets a unique, sequential number from the database
+- Numbers follow format: `QUO-2026-1124`, `QUO-2026-1125`, etc.
+- No race conditions or duplicate numbers
+- Multiple copies created simultaneously all get unique numbers
