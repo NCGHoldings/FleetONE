@@ -16148,6 +16148,8 @@ export type Database = {
           km_drop_to_parking: number | null
           km_parking_to_pickup: number | null
           km_trip: number | null
+          manual_km_drop_to_parking: number | null
+          manual_km_parking_to_pickup: number | null
           net_profit: number | null
           number_of_buses: number
           number_of_passengers: number
@@ -16183,6 +16185,7 @@ export type Database = {
           trip_id: string | null
           trip_status: string | null
           updated_at: string | null
+          uses_manual_parking_distance: boolean | null
           uses_multi_parking: boolean | null
           uses_pickup_as_parking: boolean | null
           valid_until: string | null
@@ -16242,6 +16245,8 @@ export type Database = {
           km_drop_to_parking?: number | null
           km_parking_to_pickup?: number | null
           km_trip?: number | null
+          manual_km_drop_to_parking?: number | null
+          manual_km_parking_to_pickup?: number | null
           net_profit?: number | null
           number_of_buses?: number
           number_of_passengers: number
@@ -16277,6 +16282,7 @@ export type Database = {
           trip_id?: string | null
           trip_status?: string | null
           updated_at?: string | null
+          uses_manual_parking_distance?: boolean | null
           uses_multi_parking?: boolean | null
           uses_pickup_as_parking?: boolean | null
           valid_until?: string | null
@@ -16336,6 +16342,8 @@ export type Database = {
           km_drop_to_parking?: number | null
           km_parking_to_pickup?: number | null
           km_trip?: number | null
+          manual_km_drop_to_parking?: number | null
+          manual_km_parking_to_pickup?: number | null
           net_profit?: number | null
           number_of_buses?: number
           number_of_passengers?: number
@@ -16371,6 +16379,7 @@ export type Database = {
           trip_id?: string | null
           trip_status?: string | null
           updated_at?: string | null
+          uses_manual_parking_distance?: boolean | null
           uses_multi_parking?: boolean | null
           uses_pickup_as_parking?: boolean | null
           valid_until?: string | null

@@ -103,6 +103,8 @@ interface CostData {
     total_capacity: number;
     combined_subtotal: number;
   };
+  // Manual parking distance override
+  useManualParkingDistance?: boolean;
 }
 
 interface Props {
@@ -304,13 +306,17 @@ export function CostBreakdown({ data }: Props) {
             const hasAdditionalDistance = additionalDistance > 0;
             const finalTotalDistance = safeData.totalTripDistance + additionalDistance;
             const isPickupAsParking = data.usePickupAsParking || (safeData.kmParkingToPickup === 0 && safeData.kmDropToParking === 0 && safeData.kmTrip > 0);
+            const isManualParkingDistance = data.useManualParkingDistance || false;
             
             return (
               <>
                 <div className={`grid ${hasAdditionalDistance ? 'grid-cols-5' : 'grid-cols-4'} gap-4 text-sm`}>
                   <div className="text-center">
-                    <div className={`font-medium ${isPickupAsParking ? 'text-muted-foreground' : 'text-blue-600'}`}>
+                    <div className={`font-medium ${isPickupAsParking ? 'text-muted-foreground' : isManualParkingDistance ? 'text-purple-600' : 'text-blue-600'}`}>
                       {safeData.kmParkingToPickup} km
+                      {isManualParkingDistance && !isPickupAsParking && (
+                        <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 text-purple-600 border-purple-300">Manual</Badge>
+                      )}
                     </div>
                     <div className="text-muted-foreground">
                       Parking → Pickup
@@ -322,8 +328,11 @@ export function CostBreakdown({ data }: Props) {
                     <div className="text-muted-foreground">Trip Distance</div>
                   </div>
                   <div className="text-center">
-                    <div className={`font-medium ${isPickupAsParking ? 'text-muted-foreground' : 'text-blue-600'}`}>
+                    <div className={`font-medium ${isPickupAsParking ? 'text-muted-foreground' : isManualParkingDistance ? 'text-purple-600' : 'text-blue-600'}`}>
                       {safeData.kmDropToParking} km
+                      {isManualParkingDistance && !isPickupAsParking && (
+                        <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 text-purple-600 border-purple-300">Manual</Badge>
+                      )}
                     </div>
                     <div className="text-muted-foreground">
                       Drop → Parking
@@ -344,6 +353,11 @@ export function CostBreakdown({ data }: Props) {
                 {isPickupAsParking && (
                   <div className="text-xs text-muted-foreground mt-2 text-center bg-muted/30 p-2 rounded">
                     Bus starts from customer pickup point - no empty run costs
+                  </div>
+                )}
+                {isManualParkingDistance && !isPickupAsParking && (
+                  <div className="text-xs text-purple-600 mt-2 text-center bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
+                    Parking distances manually entered (overrides Google Maps calculation)
                   </div>
                 )}
                 {hasAdditionalDistance && (
