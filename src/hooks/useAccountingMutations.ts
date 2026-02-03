@@ -811,7 +811,7 @@ export const useClosePeriod = () => {
 // ============ Customer Mutations ============
 export const useCreateCustomer = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   
   return useMutation({
     mutationFn: async (customer: {
@@ -827,11 +827,16 @@ export const useCreateCustomer = () => {
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
+      // For consolidated GL: store under parent company, tag with business unit
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      
       const { data, error } = await supabase
         .from("customers")
         .insert([{
           ...customer,
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
         }])
         .select()
         .single();
@@ -840,7 +845,7 @@ export const useCreateCustomer = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customers", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
       toast.success("Customer created successfully");
     },
     onError: (error) => {
@@ -875,7 +880,7 @@ export const useUpdateCustomer = () => {
 // ============ Vendor Mutations ============
 export const useCreateVendor = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   
   return useMutation({
     mutationFn: async (vendor: {
@@ -892,11 +897,16 @@ export const useCreateVendor = () => {
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
+      // For consolidated GL: store under parent company, tag with business unit
+      const effectiveCompanyId = getEffectiveCompanyId();
+      const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
+      
       const { data, error } = await supabase
         .from("vendors")
         .insert([{
           ...vendor,
-          company_id: selectedCompanyId,
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode,
         }])
         .select()
         .single();
@@ -905,7 +915,7 @@ export const useCreateVendor = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendors", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
       toast.success("Vendor created successfully");
     },
     onError: (error) => {
