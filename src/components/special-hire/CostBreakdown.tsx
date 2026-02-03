@@ -84,6 +84,8 @@ interface CostData {
     kmDropToParking: number;
   }>;
   isMultiParking?: boolean;
+  // NEW: Pickup as parking flag
+  usePickupAsParking?: boolean;
   // Multi-bus fleet support
   busFleetDetails?: {
     buses: Array<{
@@ -301,21 +303,32 @@ export function CostBreakdown({ data }: Props) {
             
             const hasAdditionalDistance = additionalDistance > 0;
             const finalTotalDistance = safeData.totalTripDistance + additionalDistance;
+            const isPickupAsParking = data.usePickupAsParking || (safeData.kmParkingToPickup === 0 && safeData.kmDropToParking === 0 && safeData.kmTrip > 0);
             
             return (
               <>
                 <div className={`grid ${hasAdditionalDistance ? 'grid-cols-5' : 'grid-cols-4'} gap-4 text-sm`}>
                   <div className="text-center">
-                    <div className="font-medium text-blue-600">{safeData.kmParkingToPickup} km</div>
-                    <div className="text-muted-foreground">Parking → Pickup</div>
+                    <div className={`font-medium ${isPickupAsParking ? 'text-muted-foreground' : 'text-blue-600'}`}>
+                      {safeData.kmParkingToPickup} km
+                    </div>
+                    <div className="text-muted-foreground">
+                      Parking → Pickup
+                      {isPickupAsParking && <span className="block text-xs">(Same location)</span>}
+                    </div>
                   </div>
                   <div className="text-center">
                     <div className="font-medium text-green-600">{safeData.kmTrip} km</div>
                     <div className="text-muted-foreground">Trip Distance</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-medium text-blue-600">{safeData.kmDropToParking} km</div>
-                    <div className="text-muted-foreground">Drop → Parking</div>
+                    <div className={`font-medium ${isPickupAsParking ? 'text-muted-foreground' : 'text-blue-600'}`}>
+                      {safeData.kmDropToParking} km
+                    </div>
+                    <div className="text-muted-foreground">
+                      Drop → Parking
+                      {isPickupAsParking && <span className="block text-xs">(Same location)</span>}
+                    </div>
                   </div>
                   {hasAdditionalDistance && (
                     <div className="text-center">
@@ -328,6 +341,11 @@ export function CostBreakdown({ data }: Props) {
                     <div className="text-muted-foreground">Total Distance</div>
                   </div>
                 </div>
+                {isPickupAsParking && (
+                  <div className="text-xs text-muted-foreground mt-2 text-center bg-muted/30 p-2 rounded">
+                    Bus starts from customer pickup point - no empty run costs
+                  </div>
+                )}
                 {hasAdditionalDistance && (
                   <div className="text-xs text-muted-foreground mt-2 text-center">
                     Base: {safeData.totalTripDistance.toFixed(1)} km + Additional: {additionalDistance} km = Total: {finalTotalDistance.toFixed(1)} km

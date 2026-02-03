@@ -16184,6 +16184,7 @@ export type Database = {
           trip_status: string | null
           updated_at: string | null
           uses_multi_parking: boolean | null
+          uses_pickup_as_parking: boolean | null
           valid_until: string | null
           version_number: string | null
           whatsapp_sent_at: string | null
@@ -16277,6 +16278,7 @@ export type Database = {
           trip_status?: string | null
           updated_at?: string | null
           uses_multi_parking?: boolean | null
+          uses_pickup_as_parking?: boolean | null
           valid_until?: string | null
           version_number?: string | null
           whatsapp_sent_at?: string | null
@@ -16370,6 +16372,7 @@ export type Database = {
           trip_status?: string | null
           updated_at?: string | null
           uses_multi_parking?: boolean | null
+          uses_pickup_as_parking?: boolean | null
           valid_until?: string | null
           version_number?: string | null
           whatsapp_sent_at?: string | null

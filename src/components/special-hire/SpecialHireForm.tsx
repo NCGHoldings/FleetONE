@@ -143,6 +143,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const [costData, setCostData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [useMultiParking, setUseMultiParking] = useState(false);
+  const [usePickupAsParking, setUsePickupAsParking] = useState(initialData?.uses_pickup_as_parking || false);
   const [busDetails, setBusDetails] = useState<Array<{
     busNumber: number;
     parkingLocationId: string;
@@ -1077,6 +1078,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         distanceCalculationBody.parkingLng = fuelSettings.parking_lng;
       }
 
+      // NEW: Pass usePickupAsParking flag to skip empty run calculations
+      if (usePickupAsParking) {
+        distanceCalculationBody.usePickupAsParking = true;
+      }
+
       // Call edge function to calculate real distances
       const { data: distanceData, error } = await supabase.functions.invoke('calculate-distance', {
         body: distanceCalculationBody
@@ -1384,6 +1390,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         // Multi-parking metadata for correct fuel calculation display
         busCalculations: distanceData.busCalculations,
         isMultiParking: !!distanceData.isMultiParking,
+        // Pickup as parking flag for display
+        usePickupAsParking: usePickupAsParking || !!distanceData.usePickupAsParking,
       });
 
       const discountText = data.discountType === 'percentage' && data.discountPct > 0 
@@ -1417,6 +1425,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     if (currentData.pickupLocation !== originalData.pickup_location) return true;
     if (currentData.dropLocation !== originalData.drop_location) return true;
     if (currentData.parkingLocationId !== originalData.parking_location_id) return true;
+
+    // Check usePickupAsParking changes
+    if (usePickupAsParking !== (originalData.uses_pickup_as_parking || false)) return true;
 
     // Check bus configuration changes
     if (currentData.busTypeId !== originalData.bus_type_id) return true;
@@ -1580,6 +1591,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         drop_datetime: data.dropDateTime.toISOString(),
         parking_location_id: data.parkingLocationId,
         uses_multi_parking: useMultiParking,
+        uses_pickup_as_parking: usePickupAsParking,
         pickup_lat: distanceData?.pickupCoords?.[1] || null,
         pickup_lng: distanceData?.pickupCoords?.[0] || null,
         drop_lat: distanceData?.dropCoords?.[1] || null,
@@ -1901,9 +1913,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     control={form.control}
                     name="parkingLocationId"
                     render={({ field }) => (
-                      <FormItem className={useMultiParking ? "opacity-50 pointer-events-none" : ""}>
-                        <FormLabel>Parking Location * {useMultiParking && "(Disabled - Using multi-parking)"}</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={useMultiParking}>
+                      <FormItem className={(useMultiParking || usePickupAsParking) ? "opacity-50 pointer-events-none" : ""}>
+                        <FormLabel>Parking Location * {useMultiParking && "(Disabled - Using multi-parking)"}{usePickupAsParking && "(Using pickup location)"}</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={useMultiParking || usePickupAsParking}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select parking location" />
@@ -1926,6 +1938,32 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     )}
                   />
 
+                  {/* Pickup as Parking toggle */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Pickup Location Same as Parking</Label>
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        checked={usePickupAsParking} 
+                        onCheckedChange={(enabled) => {
+                          setUsePickupAsParking(enabled);
+                          // Disable multi-parking when pickup=parking
+                          if (enabled && useMultiParking) {
+                            setUseMultiParking(false);
+                          }
+                        }}
+                        disabled={useMultiParking}
+                      />
+                      <Label className="text-sm text-muted-foreground">
+                        {usePickupAsParking ? "Bus starts from customer pickup - no empty run" : "Enable if bus starts from pickup point"}
+                      </Label>
+                    </div>
+                    {usePickupAsParking && (
+                      <Badge variant="secondary" className="mt-1">
+                        No parking → pickup & drop → parking costs
+                      </Badge>
+                    )}
+                  </div>
+
                   {/* Multi-parking toggle */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Different parking locations per bus</Label>
@@ -1933,10 +1971,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       <Switch 
                         checked={useMultiParking} 
                         onCheckedChange={handleMultiParkingToggle}
-                        disabled={watchedNumberOfBuses === 1}
+                        disabled={watchedNumberOfBuses === 1 || usePickupAsParking}
                       />
                       <Label className="text-sm text-muted-foreground">
-                        {watchedNumberOfBuses === 1 ? "Single bus - multi-parking not needed" : "Enable for multiple bus locations"}
+                        {usePickupAsParking ? "Disabled - using pickup as parking" : 
+                         watchedNumberOfBuses === 1 ? "Single bus - multi-parking not needed" : "Enable for multiple bus locations"}
                       </Label>
                     </div>
                   </div>
