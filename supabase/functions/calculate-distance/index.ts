@@ -60,6 +60,8 @@ serve(async (req) => {
       // CRITICAL: Default to sequential routing (false) to match Google Maps exactly
       // When optimize:true, Google reorders waypoints which gives WRONG distance for return trips
       optimizeTrip = false, // Sequential routing - preserves exact customer-defined stop order
+      // NEW: When pickup location is same as parking - no empty run costs
+      usePickupAsParking = false,
     } = await req.json()
 
     console.log('Distance calculation request:', {
@@ -77,6 +79,7 @@ serve(async (req) => {
       avoidTolls,
       debugMode,
       routePreference,
+      usePickupAsParking,
     });
 
     const GOOGLE_API_KEY = Deno.env.get('GOOGLE_PLACES_API_KEY');
@@ -226,10 +229,76 @@ serve(async (req) => {
       intermediate: intermediatePoints,
       parking: { lat: parkingLat, lng: parkingLng },
       busDetails,
+      usePickupAsParking,
     });
 
+    // Handle usePickupAsParking - pickup location is same as parking (no empty run)
+    if (usePickupAsParking) {
+      console.log('Using pickup location as parking - no empty run calculation needed');
+      
+      // Calculate only the trip distance (pickup -> intermediate stops -> drop)
+      const tripPoints = [pickupPoint, ...intermediatePoints, dropPoint];
+      let kmTrip = 0;
+      
+      if (tripPoints.length >= 2) {
+        for (let i = 0; i < tripPoints.length - 1; i++) {
+          const origin = tripPoints[i];
+          const destination = tripPoints[i + 1];
+          
+          const routeParams = buildRouteParams();
+          const tripSegmentUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&${routeParams}&key=${GOOGLE_API_KEY}`;
+          const tripSegmentResp = await fetch(tripSegmentUrl);
+          
+          if (tripSegmentResp.ok) {
+            const tripSegmentData = await tripSegmentResp.json();
+            if (tripSegmentData.status === 'OK' && tripSegmentData.routes?.length) {
+              kmTrip += roundKm(tripSegmentData.routes[0].legs[0].distance.value);
+            }
+          }
+        }
+      }
+      
+      const pickupCoords: [number, number] = [pickupPoint.lng, pickupPoint.lat];
+      const dropCoords: [number, number] = [dropPoint.lng, dropPoint.lat];
+      const intermediateCoords: [number, number][] = intermediatePoints.map(p => [p.lng, p.lat]);
+      
+      let routeDescription = `${pickupLocation}`;
+      for (const stop of intermediateStops) {
+        if (stop && stop.location && String(stop.location).trim()) {
+          routeDescription += ` → ${stop.location}`;
+        }
+      }
+      routeDescription += ` → ${dropLocation}`;
+      
+      const result = {
+        kmParkingToPickup: 0, // No empty run - same location
+        kmTrip,
+        kmDropToParking: 0, // No empty run - same location  
+        totalDistance: kmTrip, // Only trip distance matters
+        pickupCoords,
+        dropCoords,
+        intermediateCoords,
+        pickupAddress: pickupPoint.formatted_address || pickupLocation,
+        dropAddress: dropPoint.formatted_address || dropLocation,
+        routeDescription,
+        intermediateStops: intermediateStops.filter((s: any) => s?.location && String(s.location).trim()),
+        usePickupAsParking: true,
+        calculationMethod: 'pickup-as-parking',
+      };
+      
+      console.log('Pickup as Parking result:', result);
+      
+      return new Response(
+        JSON.stringify(result),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      );
+    }
+
     // Multi-parking calculation logic
-    if (busDetails && busDetails.length > 0) {
+    if (busDetails && busDetails.length > 0 && !usePickupAsParking) {
       console.log('Using multi-parking calculation for', busDetails.length, 'buses');
       
       const busCalculations = [];
