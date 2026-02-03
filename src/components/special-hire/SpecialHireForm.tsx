@@ -333,12 +333,21 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         netProfit: initialData.net_profit || 0,
         numberOfBuses: initialData.number_of_buses || 1,
         // Rate card details for display
-        rateCardDetails: {
-          standardHours: 8,
-          actualHours: actualHours,
-          overtimeHours: Math.max(0, actualHours - 8),
-          overnightDays: 0,
-        }
+        rateCardDetails: (() => {
+          // FIXED: Determine available hours based on hire type
+          const isLyceumOrInternal = initialData.hire_type === 'Lyceum' || initialData.hire_type === 'Inside';
+          const storedStandardHours = initialData.standard_hours || 8;
+          const availableHours = isLyceumOrInternal 
+            ? storedStandardHours 
+            : ((initialData.km_trip || 0) / 10);
+          return {
+            standardHours: storedStandardHours,
+            actualHours: actualHours,
+            availableHours: Math.round(availableHours * 100) / 100,
+            overtimeHours: Math.round(Math.max(0, actualHours - availableHours) * 100) / 100,
+            overnightDays: 0,
+          };
+        })()
       });
     }
   }, [isEditing, initialData]);
@@ -1325,17 +1334,27 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         overnightCharge: Math.round(overnightCharge),
         pickupDateTime: data.pickupDateTime.toISOString(),
         dropDateTime: data.dropDateTime.toISOString(),
-        rateCardDetails: {
-          standardHours: rateCard.standard_hours || 8,
-          actualHours: data.hireType === 'Outside' ? Math.round(((new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60)) * 100) / 100 : 8,
-          availableHours: Math.round((tripDistance / 10) * 100) / 100, // Available hours based on quoted distance only
-          overtimeHours: data.hireType === 'Outside' ? Math.round((Math.max(0, (new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60) - (tripDistance / 10))) * 100) / 100 : 0,
-          agreedDistance: baseCoverageKm,
-          actualDistance: tripDistance,
-          exceedingKm,
-          freeExceedingKm: 0,
-          chargeableExceedingKm: exceedingKm
-        },
+        rateCardDetails: (() => {
+          // FIXED: Always calculate actual hours from pickup/drop times for ALL hire types
+          const actualHrs = (new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60);
+          // FIXED: Use rate card standard_hours for Lyceum/Inside, distance/10 for Outside
+          const availableHrs = data.hireType === 'Outside' 
+            ? (tripDistance / 10) 
+            : (rateCard.standard_hours || 8);
+          // FIXED: Calculate overtime for ALL hire types
+          const overtimeHrs = Math.max(0, actualHrs - availableHrs);
+          return {
+            standardHours: rateCard.standard_hours || 8,
+            actualHours: Math.round(actualHrs * 100) / 100,
+            availableHours: Math.round(availableHrs * 100) / 100,
+            overtimeHours: Math.round(overtimeHrs * 100) / 100,
+            agreedDistance: baseCoverageKm,
+            actualDistance: tripDistance,
+            exceedingKm,
+            freeExceedingKm: 0,
+            chargeableExceedingKm: exceedingKm
+          };
+        })(),
         grossRevenue: Math.round(hireCharge * data.numberOfBuses),
         customerTotalWithFuel: Math.round(finalCustomerTotal),
         commissionPassThroughPct: data.commissionPassThroughPct,
