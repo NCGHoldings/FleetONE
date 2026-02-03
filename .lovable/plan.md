@@ -1,215 +1,122 @@
 
-# Complete Finance ERP Data Architecture Fix - AR/AP Payment Flow
+# Special Hire Quotation Duplicate Feature
 
-## Problem Summary
+## Overview
+Add a "Duplicate/Repeat" option for Special Hire quotations, mirroring the existing Yutong quotation duplicate functionality. This allows users to quickly create new quotations based on existing ones with the same customer, route, and pricing details.
 
-The customer dropdown shows empty because of an **architecture mismatch** between how data is stored vs. retrieved. The system uses a Consolidated GL Architecture for NCG Holding sub-companies (SBO, YUT, LTV, SPH, SNT), but this pattern is inconsistently applied.
+## Implementation Approach
 
-### Current Behavior (Broken)
-When "Light Vehicle Sales" is selected:
-- Customer "mihin" was created with `company_id = LTV` and `business_unit_code = NULL`
-- But `useCustomers()` query looks for `company_id = NCG Holding` AND `business_unit_code = LTV`
-- Result: Empty dropdown
+### File 1: Create New Modal Component
+**File:** `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx`
 
-### Expected Behavior (Correct)
-For NCG Holding sub-companies:
-- Store data with `company_id = NCG Holding` (parent) + `business_unit_code = LTV` (tag)
-- Query with same filters to retrieve data
+Create a new modal component similar to `YutongQuotationRepeatModal.tsx` with:
+- Number of copies input (1-20)
+- Display original quotation summary (quotation no, customer, route, total)
+- Generate unique quotation numbers with format `QUO-YYYY-MMDD-XXXX-v1.0`
+- Copy all relevant fields while resetting:
+  - Status to "draft"
+  - Version to "1.0"
+  - Clear trip_id, approval fields, payment fields
+  - Generate new quotation_no
 
----
+### Fields to Duplicate
 
-## Files Requiring Changes
+| Field Category | Fields to Copy |
+|----------------|----------------|
+| Customer Info | customer_name, customer_phone, customer_email, company_name |
+| Route Details | pickup_location, pickup_lat, pickup_lng, drop_location, drop_lat, drop_lng, intermediate_stops, parking_location_id, uses_multi_parking |
+| Trip Details | hire_type, number_of_buses, number_of_passengers, bus_type_id, bus_fleet_details |
+| Dates | pickup_datetime, drop_datetime, valid_until |
+| Pricing | km_parking_to_pickup, km_trip, km_drop_to_parking, fuel_cost_fuel_only, hire_charge, extra_charges, gross_revenue, driver_charge, other_expenses, total_expenses, net_profit, percentage_adjustment |
+| Commission | commission_pct, commission_amount, commission_pass_through_pct, commission_pass_through_amount, referral_agent_id, referral_commission_pct, referral_commission_amount |
+| Discounts | discount_percentage, discount_type, discount_amount_lkr |
+| Additional | additional_charges, total_additional_charges, customer_total_with_fuel, special_request, overtime_charge, overnight_charge, fixed_rate, exceeding_distance_charge |
 
-### 1. Master Data Views (Fix Storage Pattern)
+### Fields NOT to Duplicate (Reset/Skip)
 
-| File | Issue | Fix |
-|------|-------|-----|
-| `CustomerMasterView.tsx` | Uses `selectedCompanyId` directly | Use `effectiveCompanyId` + `business_unit_code` |
-| `VendorMasterView.tsx` | Same issue | Same fix |
+| Field | Reason |
+|-------|--------|
+| id | New UUID generated |
+| quotation_no | New unique number generated |
+| status | Reset to "draft" |
+| version_number | Reset to "1.0" |
+| is_active_version | Set to true |
+| parent_quotation_id | Set to null (new quotation) |
+| trip_id | Clear (no trip linked yet) |
+| approval_status | Reset to "pending" |
+| approved_by, approval_date, approval_comments | Clear |
+| advance_paid, balance_due, total_paid | Reset to 0 |
+| assigned_driver_name, assigned_conductor_name, assigned_bus_no | Clear |
+| trip_status, cancellation_reason, status_changed_by/at | Clear |
+| refund_* fields | Clear |
+| submission_id | Clear |
+| sent_via_whatsapp, whatsapp_sent_at | Clear |
+| finance_customer_id, ar_invoice_id | Clear |
+| audit_log | New audit log |
+| created_by | Current user |
+| created_at, updated_at | Auto-generated |
 
-### 2. Data Fetching Hooks (Fix Query Pattern)
+### File 2: Update QuotationsList.tsx
 
-| Hook | Issue | Fix |
-|------|-------|-----|
-| `useARReceipts` | Missing business_unit_code filter | Add `autoBusinessUnitCode` filter |
-| `useAPPayments` | Missing business_unit_code filter | Add `autoBusinessUnitCode` filter |
-| `useBankAccounts` | Uses `selectedCompanyId` directly | Use `effectiveCompanyId` |
+Add to the actions column:
+1. Import the new modal component
+2. Add state for repeat modal and selected quotation
+3. Add a "Duplicate" button with Copy icon in the actions row
+4. Render the modal at the bottom of the component
 
-### 3. Mutation Hooks (Fix Insert Pattern)
+### UI Design
 
-| Mutation | Issue | Fix |
-|----------|-------|-----|
-| `useCreateARReceipt` | Only sets `company_id` | Add `business_unit_code` |
-| `useCreateAPPayment` | Only sets `company_id` | Add `business_unit_code` |
-| `useCreateARInvoice` | Only sets `company_id` | Add `business_unit_code` |
-| `useCreateAPInvoice` | Only sets `company_id` | Add `business_unit_code` |
-
----
-
-## Implementation Details
-
-### Phase 1: Fix CustomerMasterView.tsx
-
-```typescript
-// BEFORE (broken)
-const { selectedCompanyId } = useCompany();
-query.eq("company_id", selectedCompanyId);
-insert({ company_id: selectedCompanyId });
-
-// AFTER (correct)
-const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-const effectiveCompanyId = getEffectiveCompanyId();
-const businessUnitCode = getBusinessUnitCode();
-
-// Query
-query.eq("company_id", effectiveCompanyId);
-if (businessUnitCode) {
-  query.eq("business_unit_code", businessUnitCode);
-}
-
-// Insert
-insert({
-  company_id: effectiveCompanyId,
-  business_unit_code: businessUnitCode,
-});
+The duplicate button will be placed in the actions column after the Document Flow button:
+```
+[Eye] [GitBranch] [Copy] [Calculator] [Edit] [Delete] [Send] [Mail] [Download]
 ```
 
-### Phase 2: Fix VendorMasterView.tsx
-Same pattern as CustomerMasterView.
+### Modal Features
+- Shows original quotation details (number, customer, route, total revenue)
+- Input for number of copies (1-20)
+- Summary of what will be duplicated
+- Loading state during creation
+- Success toast with count of created quotations
+- Auto-refresh list after success
 
-### Phase 3: Fix useAccountingData.ts
+## Technical Details
 
+### Quotation Number Generation
 ```typescript
-// useARReceipts - Add business unit filter
-export const useARReceipts = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
-  const effectiveCompanyId = getEffectiveCompanyId();
-  const autoBusinessUnitCode = useAutoBusinessUnitFilter();
+const generateQuotationNo = async (index: number): Promise<string> => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
   
-  return useQuery({
-    queryKey: ["ar-receipts", effectiveCompanyId, autoBusinessUnitCode],
-    queryFn: async () => {
-      let query = supabase.from("ar_receipts").select(...);
-      
-      if (effectiveCompanyId) {
-        query = query.eq("company_id", effectiveCompanyId);
-      }
-      
-      // Add business unit filter for sub-company views
-      if (autoBusinessUnitCode) {
-        query = query.eq("business_unit_code", autoBusinessUnitCode);
-      }
-      
-      return (await query).data;
-    },
-  });
-};
-
-// Same fix for useAPPayments and useBankAccounts
-```
-
-### Phase 4: Fix useAccountingMutations.ts
-
-```typescript
-// useCreateARReceipt - Add business unit code
-export const useCreateARReceipt = () => {
-  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  // Count existing quotations for today
+  const { count } = await supabase
+    .from('special_hire_quotations')
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', `${year}-${month}-${day}`);
   
-  return useMutation({
-    mutationFn: async (receipt) => {
-      const effectiveCompanyId = getEffectiveCompanyId();
-      const businessUnitCode = getBusinessUnitCode();
-      
-      await supabase.from("ar_receipts").insert([{
-        ...receipt,
-        company_id: effectiveCompanyId,        // Parent company
-        business_unit_code: businessUnitCode,  // Sub-company tag
-      }]);
-    },
-  });
+  const nextNum = (count || 0) + index + 1;
+  return `QUO-${year}-${month}${day}-v1.${String(nextNum).padStart(1, '0')}`;
 };
-
-// Same fix for useCreateAPPayment, useCreateARInvoice, useCreateAPInvoice
 ```
 
-### Phase 5: Data Migration SQL (Run Once)
-
-Fix existing records that were stored incorrectly:
-
-```sql
--- Fix customers created under sub-company IDs
-UPDATE customers 
-SET 
-  company_id = companies.parent_company_id,
-  business_unit_code = companies.short_code
-FROM companies
-WHERE customers.company_id = companies.id 
-  AND companies.parent_company_id IS NOT NULL
-  AND customers.business_unit_code IS NULL;
-
--- Same pattern for vendors, ar_invoices, ap_invoices, ar_receipts, ap_payments
+### Data Flow
+```
+1. User clicks "Duplicate" button on quotation row
+2. Modal opens showing original quotation details
+3. User sets number of copies (default: 1)
+4. User clicks "Create X Quotation(s)"
+5. For each copy:
+   a. Generate unique quotation number
+   b. Fetch full quotation data from DB
+   c. Create new record with copied fields
+   d. Reset status/version/payment fields
+6. Success toast and list refresh
 ```
 
----
+## Files Summary
 
-## Architecture Diagram
-
-```text
-CONSOLIDATED GL ARCHITECTURE:
-
-+------------------------+     +------------------------+
-|     NCG Holding        |     |     NCG Express        |
-|   (Parent Company)     |     |  (Standalone Company)  |
-+------------------------+     +------------------------+
-| company_id: NCGH       |     | company_id: NCGE       |
-| business_unit_code:    |     | business_unit_code:    |
-|   NULL (parent)        |     |   NULL (standalone)    |
-+------------------------+     +------------------------+
-          |
-   +------+------+------+------+------+
-   |      |      |      |      |      |
-  SBO    YUT    SPH    LTV    SNT
-   |      |      |      |      |
-   v      v      v      v      v
-All sub-companies store data with:
-  - company_id = NCG Holding ID
-  - business_unit_code = SBO/YUT/SPH/LTV/SNT
-```
-
----
-
-## Query Invalidation Fix
-
-Ensure all AR/AP mutations properly invalidate queries with the correct keys:
-
-```typescript
-// After mutation success
-queryClient.invalidateQueries({ queryKey: ["ar-receipts"] });
-queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
-queryClient.invalidateQueries({ queryKey: ["customers"] });
-queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
-```
-
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/accounting/CustomerMasterView.tsx` | Use effectiveCompanyId + business_unit_code |
-| `src/components/accounting/VendorMasterView.tsx` | Use effectiveCompanyId + business_unit_code |
-| `src/hooks/useAccountingData.ts` | Fix useARReceipts, useAPPayments, useBankAccounts |
-| `src/hooks/useAccountingMutations.ts` | Add business_unit_code to all AR/AP mutations |
-
----
-
-## Expected Outcome
-
-After implementation:
-
-1. Customer dropdown will show customers filtered by the selected sub-company's business unit
-2. Vendor dropdown will work the same way
-3. AR Receipts will properly show receipts for the selected business unit
-4. AP Payments will properly show payments for the selected business unit
-5. All new records will be created with correct company_id (parent) and business_unit_code (tag)
-6. Existing data can be migrated via SQL script
+| File | Action |
+|------|--------|
+| `src/components/special-hire/SpecialHireQuotationRepeatModal.tsx` | CREATE |
+| `src/components/special-hire/QuotationsList.tsx` | MODIFY (add duplicate button + modal) |
