@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DataTable } from '@/components/ui/data-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2, Loader2, Calculator, GitBranch } from 'lucide-react';
+import { FileText, Eye, Edit, Mail, Download, Search, Send, Trash2, Loader2, Calculator, GitBranch, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { QuotationModal } from './QuotationModal';
@@ -17,6 +17,7 @@ import { SpecialHireExportModal } from './SpecialHireExportModal';
 import { QuotationPreview } from './QuotationPreview';
 import { QuotationVersionIndicator } from './QuotationVersionIndicator';
 import { DocumentFlowDashboard } from './DocumentFlowDashboard';
+import { SpecialHireQuotationRepeatModal } from './SpecialHireQuotationRepeatModal';
 import {
   Dialog,
   DialogContent,
@@ -139,6 +140,8 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
   const [documentFlowQuotation, setDocumentFlowQuotation] = useState<Quotation | null>(null);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
   const [emailingQuotationId, setEmailingQuotationId] = useState<string | null>(null);
+  const [showRepeatModal, setShowRepeatModal] = useState(false);
+  const [repeatQuotation, setRepeatQuotation] = useState<Quotation | null>(null);
 
   const loadQuotations = async () => {
     try {
@@ -792,6 +795,18 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
               >
                 <Calculator className="h-4 w-4" />
               </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setRepeatQuotation(quotation);
+                  setShowRepeatModal(true);
+                }}
+                title="Duplicate Quotation"
+                className="text-orange-600 hover:text-orange-700"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
               {(quotation.status === 'draft' || quotation.status === 'sent') && (
                 <>
                   <Button 
@@ -1096,6 +1111,20 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Duplicate/Repeat Quotation Modal */}
+      <SpecialHireQuotationRepeatModal
+        quotation={repeatQuotation}
+        open={showRepeatModal}
+        onClose={() => {
+          setShowRepeatModal(false);
+          setRepeatQuotation(null);
+        }}
+        onSuccess={() => {
+          loadQuotations();
+          onRefresh();
+        }}
+      />
     </>
   );
 }
