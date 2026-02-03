@@ -1,138 +1,117 @@
 
-# Special Hire: Manual Trip Distance Override Feature
+# Fix: Vendor Dropdown Not Showing Vendors
 
-## Overview
-Add an option to manually enter/override the trip distance (Pickup → Drop) after the initial Google Maps calculation. This allows staff to adjust the main route distance when Google Maps calculations don't match reality or when using known routes.
+## Problem
+The vendor dropdown in AP Invoice form (and other forms) is empty because:
 
-## Current Manual Override vs. New Feature
+1. **Vendor creation doesn't follow Consolidated GL pattern** - The `useCreateVendor` mutation saves vendors with `company_id = selected company` instead of using the parent company ID with business_unit_code tagging
+2. **Existing vendor has no business_unit_code** - The vendor "abisheka fernado" was created under School Bus Operations but has `business_unit_code: NULL`
+3. **Vendor query filters by business_unit_code** - When viewing under a sub-company (like School Bus or Special Hire), vendors without matching business_unit_code are filtered out
 
-| Feature | Distances Covered |
-|---------|-------------------|
-| **Manual Parking Distance Override** | Parking → Pickup, Drop → Parking (empty run) |
-| **Manual Trip Distance Override (NEW)** | Pickup → Drop (main trip distance) |
-
-## How It Works
-
-1. User fills form and clicks "Calculate" - Google Maps calculates all distances
-2. After calculation, user enables "Manual Trip Distance Override" toggle
-3. Input field appears for "Trip Distance (Pickup → Drop)"
-4. User enters custom distance
-5. System recalculates costs (hire charge, exceeding distance, etc.) based on manual trip distance
-
-## Implementation Details
-
-### Phase 1: State Management (`SpecialHireForm.tsx`)
-
-Add new state variables:
-```typescript
-const [useManualTripDistance, setUseManualTripDistance] = useState(initialData?.uses_manual_trip_distance || false);
-const [manualTripDistance, setManualTripDistance] = useState<number>(initialData?.manual_km_trip || 0);
-const [originalCalculatedTripDistance, setOriginalCalculatedTripDistance] = useState<number>(0);
+## Current Database State
+```
+Vendor: "abisheka fernado"
+- company_id: 0fba4a2f-598b-47e8-b863-283d00380b06 (School Bus Operations)
+- business_unit_code: NULL  ← Missing!
 ```
 
-### Phase 2: UI Toggle & Input Fields
+## Root Cause Analysis
 
-Add below the Manual Parking Distance Override section (around line 2135):
+The **Consolidated GL Architecture** requires:
+- All master data (customers, vendors) stored under **NCG Holding parent company_id**
+- Tagged with **business_unit_code** (SBO, YUT, SPH, LTV, SNT)
+- Hooks filter by both parent company_id AND business_unit_code
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ [Toggle] Manual Trip Distance Override                  │
-│          "Enter custom trip distance manually"          │
-│                                                         │
-│ When enabled:                                           │
-│ ┌─────────────────────────────────────┐                │
-│ │ Trip Distance (Pickup → Drop)       │                │
-│ │ [_______150_______] km              │                │
-│ │ Google calculated: 152.3 km         │                │
-│ └─────────────────────────────────────┘                │
-│                                                         │
-│ [Recalculate with Manual Trip Distance] button          │
-│ [Reset to Google Calculated Value] link                 │
-└─────────────────────────────────────────────────────────┘
-```
+But `useCreateVendor` currently:
+- Uses `selectedCompanyId` directly (the sub-company ID)
+- Does NOT set `business_unit_code`
 
-### Phase 3: Recalculation Logic
+## Solution
 
-When manual trip distance is entered and recalculate is clicked:
+### 1. Fix useCreateVendor Mutation
+
+Update to follow Consolidated GL pattern:
 
 ```typescript
-// Recalculate with manual trip distance
-const tripDistance = manualTripDistance;
+// BEFORE (broken)
+const { data, error } = await supabase
+  .from("vendors")
+  .insert([{
+    ...vendor,
+    company_id: selectedCompanyId,  // Sub-company ID
+  }])
 
-// Find appropriate rate card based on manual distance
-const rateCard = allRateCards.find(card => 
-  tripDistance >= card.from_km && 
-  (card.to_km === null || tripDistance <= card.to_km)
-);
+// AFTER (fixed)
+const effectiveCompanyId = getEffectiveCompanyId();
+const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) 
+  ? getBusinessUnitCode() 
+  : null;
 
-// Recalculate:
-// - Hire charge (from rate card)
-// - Fixed rate
-// - Exceeding distance charge (if applicable)
-// - Available hours (tripDistance / 10 km/h)
-// - Overtime/overnight charges
-// - Total distance and fuel costs
+const { data, error } = await supabase
+  .from("vendors")
+  .insert([{
+    ...vendor,
+    company_id: effectiveCompanyId,  // Parent company ID (NCG Holding)
+    business_unit_code: businessUnitCode,  // SBO, YUT, SPH, etc.
+  }])
 ```
 
-### Phase 4: Database Storage
+### 2. Fix useUpdateVendor Mutation
 
-Add new columns to `special_hire_quotations`:
+Same pattern - ensure business_unit_code is preserved/updated correctly.
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `uses_manual_trip_distance` | boolean | Flag indicating manual trip distance override |
-| `manual_km_trip` | numeric | User-entered trip distance |
+### 3. Fix useCreateCustomer Mutation
 
-### Phase 5: Cost Breakdown Display Update
+Apply same fix for customer creation (same architecture).
 
-Update `CostBreakdown.tsx` to show when manual trip distance is used:
+### 4. Update Existing Data
 
-```
-Distance Analysis:
-  Parking → Pickup: 21.5 km
-  Trip Distance: 150 km (Manual)  ← Badge indicator
-  Drop → Parking: 32.6 km
-  Total: 204.1 km
+Run SQL to fix the existing vendor:
+
+```sql
+-- Fix existing vendor to use Consolidated GL pattern
+UPDATE vendors 
+SET 
+  company_id = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020',  -- NCG Holding
+  business_unit_code = 'SBO'  -- School Bus Operations
+WHERE id = 'b6f69188-058d-4c80-891a-a5348f124e53';
 ```
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/special-hire/SpecialHireForm.tsx` | Add state, UI toggle, input field, recalculation logic |
-| `src/components/special-hire/CostBreakdown.tsx` | Show "(Manual)" badge for trip distance |
-| Database migration | Add `uses_manual_trip_distance`, `manual_km_trip` columns |
-| `src/integrations/supabase/types.ts` | Update types for new columns |
+| `src/hooks/useAccountingMutations.ts` | Update `useCreateVendor` and `useCreateCustomer` to use Consolidated GL pattern |
+| Database | Update existing vendor to have correct company_id and business_unit_code |
 
-## Calculation Impact
+## Technical Details
 
-When manual trip distance is used, the following are recalculated:
-- **Rate Card Selection**: Based on manual distance instead of Google Maps
-- **Hire Charge**: From matched rate card
-- **Exceeding Distance**: If manual distance > rate card coverage
-- **Available Hours**: `manual_km_trip / 10` for overtime calculation
-- **Total Distance**: Parking + Manual Trip + Parking
-- **Fuel Cost**: Based on new total distance
+### Pattern Reference (from useCreateAPInvoice)
+```typescript
+const effectiveCompanyId = getEffectiveCompanyId();
+const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) 
+  ? getBusinessUnitCode() 
+  : null;
 
-## User Flow
-
-```
-1. User fills quotation form with locations
-2. Clicks "Calculate" → System calculates via Google Maps API
-3. Distance Analysis shows: Trip Distance: 152.3 km
-4. User knows the actual route is 150 km
-5. Enables "Manual Trip Distance Override" toggle
-6. Input field appears with current value (152.3)
-7. User changes to 150
-8. Clicks "Recalculate with Manual Trip Distance"
-9. System recalculates all charges with manual distance
-10. Distance Analysis shows: Trip Distance: 150 km (Manual)
-11. On save, manual trip distance is stored in database
+// Insert with parent company_id + business_unit_code
 ```
 
-## Edge Cases
+### After Fix
 
-1. **Editing quotation**: Load saved manual trip distance and toggle state
-2. **Combined overrides**: Can use both parking override AND trip override together
-3. **Reset capability**: Allow reset to Google calculated value
-4. **Validation**: Manual distance must be > 0
+When creating a vendor under "School Bus Operations":
+- `company_id` → NCG Holding ID
+- `business_unit_code` → "SBO"
+
+When viewing vendors under "School Bus Operations":
+- Query filters by `company_id = NCG Holding` AND `business_unit_code = 'SBO'`
+- Vendor appears in dropdown
+
+## Business Unit Codes Reference
+
+| Company | Short Code |
+|---------|------------|
+| School Bus Operations | SBO |
+| Yutong Sales | YUT |
+| Special Hire | SPH |
+| Light Vehicle Sales | LTV |
+| Sinotruck Sales | SNT |
