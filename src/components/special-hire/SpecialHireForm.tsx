@@ -144,6 +144,14 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const [loading, setLoading] = useState(false);
   const [useMultiParking, setUseMultiParking] = useState(false);
   const [usePickupAsParking, setUsePickupAsParking] = useState(initialData?.uses_pickup_as_parking || false);
+  
+  // Manual parking distance override state
+  const [useManualParkingDistance, setUseManualParkingDistance] = useState(initialData?.uses_manual_parking_distance || false);
+  const [manualParkingToPickup, setManualParkingToPickup] = useState<number>(initialData?.manual_km_parking_to_pickup || 0);
+  const [manualDropToParking, setManualDropToParking] = useState<number>(initialData?.manual_km_drop_to_parking || 0);
+  // Store original calculated distances for reset capability
+  const [originalCalculatedParkingToPickup, setOriginalCalculatedParkingToPickup] = useState<number>(0);
+  const [originalCalculatedDropToParking, setOriginalCalculatedDropToParking] = useState<number>(0);
   const [busDetails, setBusDetails] = useState<Array<{
     busNumber: number;
     parkingLocationId: string;
@@ -1429,6 +1437,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     // Check usePickupAsParking changes
     if (usePickupAsParking !== (originalData.uses_pickup_as_parking || false)) return true;
 
+    // Check useManualParkingDistance changes
+    if (useManualParkingDistance !== (originalData.uses_manual_parking_distance || false)) return true;
+    if (useManualParkingDistance) {
+      if (manualParkingToPickup !== (originalData.manual_km_parking_to_pickup || 0)) return true;
+      if (manualDropToParking !== (originalData.manual_km_drop_to_parking || 0)) return true;
+    }
+
     // Check bus configuration changes
     if (currentData.busTypeId !== originalData.bus_type_id) return true;
     if (currentData.numberOfBuses !== originalData.number_of_buses) return true;
@@ -1592,14 +1607,18 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         parking_location_id: data.parkingLocationId,
         uses_multi_parking: useMultiParking,
         uses_pickup_as_parking: usePickupAsParking,
+        uses_manual_parking_distance: useManualParkingDistance,
+        manual_km_parking_to_pickup: useManualParkingDistance ? manualParkingToPickup : 0,
+        manual_km_drop_to_parking: useManualParkingDistance ? manualDropToParking : 0,
         pickup_lat: distanceData?.pickupCoords?.[1] || null,
         pickup_lng: distanceData?.pickupCoords?.[0] || null,
         drop_lat: distanceData?.dropCoords?.[1] || null,
         drop_lng: distanceData?.dropCoords?.[0] || null,
-        km_parking_to_pickup: costs.km_parking_to_pickup,
+        // Use manual distances if enabled, otherwise use calculated
+        km_parking_to_pickup: useManualParkingDistance ? manualParkingToPickup : costs.km_parking_to_pickup,
         km_trip: costs.km_trip,
-        km_drop_to_parking: costs.km_drop_to_parking,
-        fuel_cost_fuel_only: costs.fuel_cost_fuel_only,
+        km_drop_to_parking: useManualParkingDistance ? manualDropToParking : costs.km_drop_to_parking,
+        fuel_cost_fuel_only: useManualParkingDistance ? (costData?.fuelCostFuelOnly || costs.fuel_cost_fuel_only) : costs.fuel_cost_fuel_only,
         hire_charge: costs.hire_charge,
         extra_charges: costs.extra_charges,
         // Store individual time charge components for retrieval/display
@@ -1956,7 +1975,164 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       <Label className="text-sm text-muted-foreground">
                         {usePickupAsParking ? "Bus starts from customer pickup - no empty run" : "Enable if bus starts from pickup point"}
                       </Label>
+                  </div>
+
+                  {/* Manual Parking Distance Override toggle */}
+                  {costData && !usePickupAsParking && (
+                    <div className="space-y-2 border-t pt-4">
+                      <Label className="text-sm font-medium">Manual Parking Distance Override</Label>
+                      <div className="flex items-center space-x-2">
+                        <Switch 
+                          checked={useManualParkingDistance} 
+                          onCheckedChange={(enabled) => {
+                            setUseManualParkingDistance(enabled);
+                            if (enabled) {
+                              // Initialize with current calculated distances if not already set
+                              if (manualParkingToPickup === 0 && costData?.kmParkingToPickup) {
+                                setManualParkingToPickup(costData.kmParkingToPickup);
+                              }
+                              if (manualDropToParking === 0 && costData?.kmDropToParking) {
+                                setManualDropToParking(costData.kmDropToParking);
+                              }
+                              // Store original calculated distances for reset
+                              if (costData?.kmParkingToPickup) {
+                                setOriginalCalculatedParkingToPickup(costData.kmParkingToPickup);
+                              }
+                              if (costData?.kmDropToParking) {
+                                setOriginalCalculatedDropToParking(costData.kmDropToParking);
+                              }
+                            }
+                          }}
+                          disabled={usePickupAsParking}
+                        />
+                        <Label className="text-sm text-muted-foreground">
+                          {useManualParkingDistance ? "Enter custom parking distances manually" : "Override Google Maps calculated distances"}
+                        </Label>
+                      </div>
+                      
+                      {useManualParkingDistance && (
+                        <div className="space-y-4 mt-4 p-4 bg-muted/30 rounded-lg">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-sm">Parking → Pickup (km)</Label>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={manualParkingToPickup}
+                                onChange={(e) => setManualParkingToPickup(parseFloat(e.target.value) || 0)}
+                                className="h-10"
+                              />
+                              {originalCalculatedParkingToPickup > 0 && (
+                                <div className="text-xs text-muted-foreground">
+                                  Google calculated: {originalCalculatedParkingToPickup} km
+                                </div>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Drop → Parking (km)</Label>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={manualDropToParking}
+                                onChange={(e) => setManualDropToParking(parseFloat(e.target.value) || 0)}
+                                className="h-10"
+                              />
+                              {originalCalculatedDropToParking > 0 && (
+                                <div className="text-xs text-muted-foreground">
+                                  Google calculated: {originalCalculatedDropToParking} km
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
+                            onClick={async () => {
+                              if (!costData) return;
+                              setLoading(true);
+                              try {
+                                // Recalculate fuel costs with manual distances
+                                const totalEmptyRun = manualParkingToPickup + manualDropToParking;
+                                const { data: fuelSettings } = await supabase
+                                  .from('fuel_settings')
+                                  .select('*')
+                                  .eq('id', form.getValues('parkingLocationId'))
+                                  .single();
+                                
+                                const { data: busTypeData } = await supabase
+                                  .from('bus_types')
+                                  .select('avg_km_per_l')
+                                  .eq('id', form.getValues('busTypeId'))
+                                  .single();
+                                
+                                const busEfficiency = busTypeData?.avg_km_per_l || 8;
+                                const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 350;
+                                const numberOfBuses = form.getValues('numberOfBuses') || 1;
+                                
+                                // Calculate new fuel cost (empty run only - for customer billing)
+                                const newFuelCost = Math.round((totalEmptyRun / busEfficiency) * fuelPrice * numberOfBuses);
+                                
+                                // Update costData with manual distances
+                                setCostData({
+                                  ...costData,
+                                  kmParkingToPickup: manualParkingToPickup,
+                                  kmDropToParking: manualDropToParking,
+                                  fuelCostFuelOnly: newFuelCost,
+                                  useManualParkingDistance: true,
+                                  // Recalculate totals
+                                  customerTotalWithFuel: (costData.hireCharge || 0) + newFuelCost + 
+                                    (costData.totalAdditionalCharges || 0) - (costData.discountAmount || 0) +
+                                    (costData.commissionPassThroughAmount || 0),
+                                });
+                                
+                                toast({
+                                  title: "Distances Updated",
+                                  description: `Manual: Parking→Pickup: ${manualParkingToPickup}km, Drop→Parking: ${manualDropToParking}km`,
+                                });
+                              } catch (error) {
+                                console.error('Error recalculating with manual distances:', error);
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to recalculate with manual distances",
+                                  variant: "destructive"
+                                });
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            disabled={loading}
+                          >
+                            <Calculator className="h-4 w-4 mr-2" />
+                            Recalculate with Manual Distances
+                          </Button>
+                          
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="w-full text-muted-foreground"
+                            onClick={() => {
+                              setManualParkingToPickup(originalCalculatedParkingToPickup);
+                              setManualDropToParking(originalCalculatedDropToParking);
+                            }}
+                          >
+                            Reset to Google Calculated Values
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {useManualParkingDistance && (
+                        <Badge variant="secondary" className="mt-1">
+                          Manual distances will be saved with quotation
+                        </Badge>
+                      )}
                     </div>
+                  )}
                     {usePickupAsParking && (
                       <Badge variant="secondary" className="mt-1">
                         No parking → pickup & drop → parking costs
