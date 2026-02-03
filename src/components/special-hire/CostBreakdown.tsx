@@ -105,6 +105,8 @@ interface CostData {
   };
   // Manual parking distance override
   useManualParkingDistance?: boolean;
+  // Manual trip distance override
+  useManualTripDistance?: boolean;
 }
 
 interface Props {
@@ -324,7 +326,12 @@ export function CostBreakdown({ data }: Props) {
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="font-medium text-green-600">{safeData.kmTrip} km</div>
+                    <div className={`font-medium ${data.useManualTripDistance ? 'text-purple-600' : 'text-green-600'}`}>
+                      {safeData.kmTrip} km
+                      {data.useManualTripDistance && (
+                        <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 text-purple-600 border-purple-300">Manual</Badge>
+                      )}
+                    </div>
                     <div className="text-muted-foreground">Trip Distance</div>
                   </div>
                   <div className="text-center">
@@ -358,6 +365,11 @@ export function CostBreakdown({ data }: Props) {
                 {isManualParkingDistance && !isPickupAsParking && (
                   <div className="text-xs text-purple-600 mt-2 text-center bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
                     Parking distances manually entered (overrides Google Maps calculation)
+                  </div>
+                )}
+                {data.useManualTripDistance && (
+                  <div className="text-xs text-purple-600 mt-2 text-center bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
+                    Trip distance manually entered (overrides Google Maps calculation)
                   </div>
                 )}
                 {hasAdditionalDistance && (

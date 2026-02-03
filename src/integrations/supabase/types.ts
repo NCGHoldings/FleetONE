@@ -16150,6 +16150,7 @@ export type Database = {
           km_trip: number | null
           manual_km_drop_to_parking: number | null
           manual_km_parking_to_pickup: number | null
+          manual_km_trip: number | null
           net_profit: number | null
           number_of_buses: number
           number_of_passengers: number
@@ -16186,6 +16187,7 @@ export type Database = {
           trip_status: string | null
           updated_at: string | null
           uses_manual_parking_distance: boolean | null
+          uses_manual_trip_distance: boolean | null
           uses_multi_parking: boolean | null
           uses_pickup_as_parking: boolean | null
           valid_until: string | null
@@ -16247,6 +16249,7 @@ export type Database = {
           km_trip?: number | null
           manual_km_drop_to_parking?: number | null
           manual_km_parking_to_pickup?: number | null
+          manual_km_trip?: number | null
           net_profit?: number | null
           number_of_buses?: number
           number_of_passengers: number
@@ -16283,6 +16286,7 @@ export type Database = {
           trip_status?: string | null
           updated_at?: string | null
           uses_manual_parking_distance?: boolean | null
+          uses_manual_trip_distance?: boolean | null
           uses_multi_parking?: boolean | null
           uses_pickup_as_parking?: boolean | null
           valid_until?: string | null
@@ -16344,6 +16348,7 @@ export type Database = {
           km_trip?: number | null
           manual_km_drop_to_parking?: number | null
           manual_km_parking_to_pickup?: number | null
+          manual_km_trip?: number | null
           net_profit?: number | null
           number_of_buses?: number
           number_of_passengers?: number
@@ -16380,6 +16385,7 @@ export type Database = {
           trip_status?: string | null
           updated_at?: string | null
           uses_manual_parking_distance?: boolean | null
+          uses_manual_trip_distance?: boolean | null
           uses_multi_parking?: boolean | null
           uses_pickup_as_parking?: boolean | null
           valid_until?: string | null
