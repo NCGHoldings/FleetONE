@@ -76,6 +76,11 @@ import { CompanySettingsView } from "@/components/accounting/settings/CompanySet
 import { DocumentTemplateManager } from "@/components/accounting/settings/DocumentTemplateManager";
 import { ModuleIntegrationView } from "@/components/accounting/settings/ModuleIntegrationView";
 import { BalanceReconciliationTool } from "@/components/accounting/settings/BalanceReconciliationTool";
+// Expense Management
+import { ExpenseReviewView } from "@/components/accounting/ExpenseReviewView";
+import { CompanyExpensesView } from "@/components/accounting/CompanyExpensesView";
+import { PettyCashView } from "@/components/accounting/PettyCashView";
+import { IOUManagementView } from "@/components/accounting/IOUManagementView";
 
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
@@ -83,8 +88,9 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useState } from "react";
+import { Receipt, Wallet } from "lucide-react";
 
-type ModuleTab = "gl" | "ar" | "ap" | "inventory" | "procurement" | "banking" | "assets" | "reports" | "settings";
+type ModuleTab = "gl" | "ar" | "ap" | "expenses" | "inventory" | "procurement" | "banking" | "assets" | "reports" | "settings";
 
 const Accounting = () => {
   const [activeModule, setActiveModule] = useState<ModuleTab>("gl");
@@ -112,6 +118,7 @@ const Accounting = () => {
     { id: "gl" as ModuleTab, label: "General Ledger", icon: BookOpen },
     { id: "ar" as ModuleTab, label: "AR", icon: TrendingUp },
     { id: "ap" as ModuleTab, label: "AP", icon: TrendingDown },
+    { id: "expenses" as ModuleTab, label: "Expenses", icon: Receipt },
     { id: "inventory" as ModuleTab, label: "Inventory", icon: Package },
     { id: "procurement" as ModuleTab, label: "Procurement", icon: Truck },
     { id: "banking" as ModuleTab, label: "Banking", icon: Landmark },
@@ -484,6 +491,37 @@ const Accounting = () => {
 
               <TabsContent value="vendor-performance">
                 <VendorPerformanceView />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* Expenses Module */}
+          {activeModule === "expenses" && (
+            <Tabs defaultValue="requests" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="requests">Expense Requests</TabsTrigger>
+                  <TabsTrigger value="company">Company Expenses</TabsTrigger>
+                  <TabsTrigger value="petty-cash">Petty Cash</TabsTrigger>
+                  <TabsTrigger value="iou">IOUs</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="requests">
+                <ExpenseReviewView />
+              </TabsContent>
+
+              <TabsContent value="company">
+                <CompanyExpensesView />
+              </TabsContent>
+
+              <TabsContent value="petty-cash">
+                <PettyCashView />
+              </TabsContent>
+
+              <TabsContent value="iou">
+                <IOUManagementView />
               </TabsContent>
             </Tabs>
           )}
