@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,8 +167,8 @@ export const CompanyExpensesView = () => {
             </TableHeader>
             <TableBody>
               {Object.entries(groupedCategories).map(([group, categories]) => (
-                <>
-                  <TableRow key={group} className="bg-muted/50">
+                <Fragment key={group}>
+                  <TableRow className="bg-muted/50">
                     <TableCell colSpan={BUSINESS_UNITS.length + 2} className="font-semibold">
                       {group}
                     </TableCell>
@@ -190,7 +190,7 @@ export const CompanyExpensesView = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                </>
+                </Fragment>
               ))}
               <TableRow className="bg-primary/5 font-bold">
                 <TableCell>Grand Total</TableCell>
