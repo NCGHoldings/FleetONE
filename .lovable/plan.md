@@ -1,117 +1,119 @@
 
-# Fix: Vendor Dropdown Not Showing Vendors
+# Fix Staff Performance Page Issues
 
-## Problem
-The vendor dropdown in AP Invoice form (and other forms) is empty because:
+## Problems Identified
 
-1. **Vendor creation doesn't follow Consolidated GL pattern** - The `useCreateVendor` mutation saves vendors with `company_id = selected company` instead of using the parent company ID with business_unit_code tagging
-2. **Existing vendor has no business_unit_code** - The vendor "abisheka fernado" was created under School Bus Operations but has `business_unit_code: NULL`
-3. **Vendor query filters by business_unit_code** - When viewing under a sub-company (like School Bus or Special Hire), vendors without matching business_unit_code are filtered out
+1. **Eye Icon (View Details) Not Working**: The Dialog component in the actions column uses `DialogTrigger asChild` with a Button that has `onClick`. This can cause event handling conflicts where the click is captured but the dialog doesn't properly open.
 
-## Current Database State
-```
-Vendor: "abisheka fernado"
-- company_id: 0fba4a2f-598b-47e8-b863-283d00380b06 (School Bus Operations)
-- business_unit_code: NULL  ← Missing!
-```
+2. **Filter for Drivers/Conductors Only**: While the database only contains 'driver' and 'conductor' types, the hook should explicitly filter for these to be defensive against future data changes.
 
-## Root Cause Analysis
-
-The **Consolidated GL Architecture** requires:
-- All master data (customers, vendors) stored under **NCG Holding parent company_id**
-- Tagged with **business_unit_code** (SBO, YUT, SPH, LTV, SNT)
-- Hooks filter by both parent company_id AND business_unit_code
-
-But `useCreateVendor` currently:
-- Uses `selectedCompanyId` directly (the sub-company ID)
-- Does NOT set `business_unit_code`
+3. **Missing Details in Staff View**: Several fields from staff_registry are not displayed:
+   - Emergency Contact
+   - Staff Notes
+   - Account Created Date
+   - Last Updated Date
 
 ## Solution
 
-### 1. Fix useCreateVendor Mutation
+### 1. Fix Eye Icon Dialog - Use Controlled Dialog State
 
-Update to follow Consolidated GL pattern:
+Change from uncontrolled to controlled Dialog to ensure proper opening:
+
+**Current (Broken):**
+```jsx
+<Dialog>
+  <DialogTrigger asChild>
+    <Button onClick={() => handleStaffClick(row.original)}>
+      <Eye />
+    </Button>
+  </DialogTrigger>
+  <DialogContent>...</DialogContent>
+</Dialog>
+```
+
+**Fixed (Controlled):**
+```jsx
+<Dialog 
+  open={openDialogId === row.original.id} 
+  onOpenChange={(open) => {
+    if (open) {
+      setOpenDialogId(row.original.id);
+      handleStaffClick(row.original);
+    } else {
+      setOpenDialogId(null);
+    }
+  }}
+>
+  <DialogTrigger asChild>
+    <Button variant="ghost" size="sm">
+      <Eye />
+    </Button>
+  </DialogTrigger>
+  <DialogContent>...</DialogContent>
+</Dialog>
+```
+
+### 2. Filter Staff Types in Hook
+
+Add explicit filter in `useStaffPerformance.ts`:
 
 ```typescript
-// BEFORE (broken)
-const { data, error } = await supabase
-  .from("vendors")
-  .insert([{
-    ...vendor,
-    company_id: selectedCompanyId,  // Sub-company ID
-  }])
-
-// AFTER (fixed)
-const effectiveCompanyId = getEffectiveCompanyId();
-const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) 
-  ? getBusinessUnitCode() 
-  : null;
-
-const { data, error } = await supabase
-  .from("vendors")
-  .insert([{
-    ...vendor,
-    company_id: effectiveCompanyId,  // Parent company ID (NCG Holding)
-    business_unit_code: businessUnitCode,  // SBO, YUT, SPH, etc.
-  }])
+const { data: staffRegistry, error: staffError } = await supabase
+  .from('staff_registry')
+  .select('*')
+  .in('staff_type', ['driver', 'conductor'])  // Only fetch drivers and conductors
+  .order('staff_name');
 ```
 
-### 2. Fix useUpdateVendor Mutation
+### 3. Add Missing Details to StaffDetailContent
 
-Same pattern - ensure business_unit_code is preserved/updated correctly.
+Update the Personal Information section to include:
 
-### 3. Fix useCreateCustomer Mutation
+| Field | Display |
+|-------|---------|
+| Emergency Contact | Phone number for emergencies |
+| Notes | Staff notes/comments |
+| Member Since | Account creation date |
+| Last Updated | Last profile update |
 
-Apply same fix for customer creation (same architecture).
+### 4. Update Interface and Data Flow
 
-### 4. Update Existing Data
-
-Run SQL to fix the existing vendor:
-
-```sql
--- Fix existing vendor to use Consolidated GL pattern
-UPDATE vendors 
-SET 
-  company_id = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020',  -- NCG Holding
-  business_unit_code = 'SBO'  -- School Bus Operations
-WHERE id = 'b6f69188-058d-4c80-891a-a5348f124e53';
-```
+Add new fields to `StaffMemberPerformance` interface:
+- `emergency_contact?: string`
+- `notes?: string`
+- `created_at?: string`
+- `updated_at?: string`
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/hooks/useAccountingMutations.ts` | Update `useCreateVendor` and `useCreateCustomer` to use Consolidated GL pattern |
-| Database | Update existing vendor to have correct company_id and business_unit_code |
+| `src/pages/StaffPerformance.tsx` | Add controlled dialog state, update eye icon column, enhance StaffDetailContent |
+| `src/hooks/useStaffPerformance.ts` | Add staff_type filter, include emergency_contact, notes, created_at, updated_at |
 
-## Technical Details
+## UI Preview for Enhanced Details Section
 
-### Pattern Reference (from useCreateAPInvoice)
-```typescript
-const effectiveCompanyId = getEffectiveCompanyId();
-const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) 
-  ? getBusinessUnitCode() 
-  : null;
-
-// Insert with parent company_id + business_unit_code
+```
+Personal Information:
+┌────────────────────────────────────────────────────┐
+│ Phone:        +94 77 123 4567                      │
+│ NIC:          199012345678V                        │
+│ Address:      123 Main Street, Colombo             │
+│ Emergency:    +94 77 987 6543                      │
+├────────────────────────────────────────────────────┤
+│ Salary Type:  [Monthly]                            │
+│ Daily Rate:   LKR 2,500                            │
+│ Monthly:      LKR 65,000                           │
+├────────────────────────────────────────────────────┤
+│ Notes:        Experienced highway driver           │
+│ Member Since: Jan 15, 2024                         │
+│ Last Updated: Feb 01, 2026                         │
+└────────────────────────────────────────────────────┘
 ```
 
-### After Fix
+## Expected Outcome
 
-When creating a vendor under "School Bus Operations":
-- `company_id` → NCG Holding ID
-- `business_unit_code` → "SBO"
-
-When viewing vendors under "School Bus Operations":
-- Query filters by `company_id = NCG Holding` AND `business_unit_code = 'SBO'`
-- Vendor appears in dropdown
-
-## Business Unit Codes Reference
-
-| Company | Short Code |
-|---------|------------|
-| School Bus Operations | SBO |
-| Yutong Sales | YUT |
-| Special Hire | SPH |
-| Light Vehicle Sales | LTV |
-| Sinotruck Sales | SNT |
+1. Clicking the eye icon will properly open the staff details dialog
+2. Only drivers and conductors will appear in the list
+3. All available staff information will be displayed in the details view
+4. Summary stats will accurately reflect only driver/conductor counts
