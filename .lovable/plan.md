@@ -1,82 +1,92 @@
 
-# Fix: Expense Page Not Working
+# Fix: New Expense Button White Screen
 
 ## Problem Identified
-The expense page shows a blank white screen due to a React rendering error in `CompanyExpensesView.tsx`.
+The ExpenseRequestForm crashes immediately when opening because it contains `SelectItem` components with empty string values (`value=""`). Radix UI Select explicitly prohibits this.
+
+**Error:** `A <Select.Item /> must have a value prop that is not an empty string`
 
 ## Root Cause
-On lines 169-194, the code uses a React fragment (`<>...</>`) inside a `.map()` without a key prop:
+Two Select components have SelectItem with `value=""`:
 
+1. **Line 205** - Bus selection:
 ```tsx
-{Object.entries(groupedCategories).map(([group, categories]) => (
-  <>   // <-- Missing key prop - React error!
-    <TableRow key={group}>...</TableRow>
-    {categories.map((cat) => (...))}
-  </>
-))}
+<SelectItem value="">-- No Bus --</SelectItem>
 ```
 
-React requires all elements in a list to have unique keys. While the inner `TableRow` elements have keys, the outer fragment doesn't, which causes:
-1. React console warnings
-2. Potential rendering failures
-3. White/blank screen in some cases
+2. **Line 363** - Vendor selection:
+```tsx
+<SelectItem value="">-- Unknown Vendor --</SelectItem>
+```
 
 ## Solution
-Replace the shorthand fragment `<>...</>` with `<React.Fragment key={group}>...</React.Fragment>` or use the Fragment import.
+Apply the established pattern from the codebase: use placeholder values like `"_none"` instead of empty strings, then convert back to `undefined` in the value change handlers.
 
-### Code Fix
+### Changes Required
 
-**File:** `src/components/accounting/CompanyExpensesView.tsx`
+**File:** `src/components/accounting/ExpenseRequestForm.tsx`
 
-**Lines 169-194 - Before:**
+### Fix 1: Bus Selection (Lines 198-215)
+
+**Before:**
 ```tsx
-{Object.entries(groupedCategories).map(([group, categories]) => (
-  <>
-    <TableRow key={group} className="bg-muted/50">
-      <TableCell colSpan={BUSINESS_UNITS.length + 2} className="font-semibold">
-        {group}
-      </TableCell>
-    </TableRow>
-    {categories.map((cat) => (
-      <TableRow key={cat.key}>
-        ...
-      </TableRow>
-    ))}
-  </>
-))}
+<Select onValueChange={field.onChange} value={field.value || ""}>
+  ...
+  <SelectContent>
+    <SelectItem value="">-- No Bus --</SelectItem>
+    {buses?.map((bus) => (
+      <SelectItem key={bus.id} value={bus.id}>
 ```
 
-**Lines 169-194 - After:**
+**After:**
 ```tsx
-{Object.entries(groupedCategories).map(([group, categories]) => (
-  <Fragment key={group}>
-    <TableRow className="bg-muted/50">
-      <TableCell colSpan={BUSINESS_UNITS.length + 2} className="font-semibold">
-        {group}
-      </TableCell>
-    </TableRow>
-    {categories.map((cat) => (
-      <TableRow key={cat.key}>
-        ...
-      </TableRow>
-    ))}
-  </Fragment>
-))}
+<Select 
+  onValueChange={(val) => field.onChange(val === "_none" ? undefined : val)} 
+  value={field.value || "_none"}
+>
+  ...
+  <SelectContent>
+    <SelectItem value="_none">-- No Bus --</SelectItem>
+    {buses?.map((bus) => (
+      <SelectItem key={bus.id} value={bus.id}>
 ```
 
-Also add the import at the top:
+### Fix 2: Vendor Selection (Lines 356-369)
+
+**Before:**
 ```tsx
-import { useState, Fragment } from "react";
+<Select onValueChange={field.onChange} value={field.value || ""}>
+  ...
+  <SelectContent>
+    <SelectItem value="">-- Unknown Vendor --</SelectItem>
+    {vendors?.map((vendor) => (
+      <SelectItem key={vendor.id} value={vendor.id}>
 ```
 
-## Files to Modify
+**After:**
+```tsx
+<Select 
+  onValueChange={(val) => field.onChange(val === "_none" ? undefined : val)} 
+  value={field.value || "_none"}
+>
+  ...
+  <SelectContent>
+    <SelectItem value="_none">-- Unknown Vendor --</SelectItem>
+    {vendors?.map((vendor) => (
+      <SelectItem key={vendor.id} value={vendor.id}>
+```
 
-| File | Change |
-|------|--------|
-| `src/components/accounting/CompanyExpensesView.tsx` | Add Fragment import and use it with key prop |
+## Summary of Changes
+
+| Location | Change |
+|----------|--------|
+| Line 198 | Update Select value and onValueChange for bus_id |
+| Line 205 | Change `value=""` to `value="_none"` |
+| Line 356 | Update Select value and onValueChange for vendor_id |
+| Line 363 | Change `value=""` to `value="_none"` |
 
 ## Expected Outcome
 After this fix:
-1. The Expenses page will render correctly
-2. All sub-tabs (Expense Requests, Company Expenses, Petty Cash, IOUs) will display properly
-3. No React key warnings in console
+1. Clicking "New Expense" will properly open the expense form dialog
+2. Users can select "No Bus" or "Unknown Vendor" options without errors
+3. The form will correctly submit `undefined` values for these optional fields
