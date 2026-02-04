@@ -195,14 +195,14 @@ export const ExpenseRequestForm = ({ open, onOpenChange, defaultBusinessUnit }: 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Bus Number (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select onValueChange={(val) => field.onChange(val === "_none" ? undefined : val)} value={field.value || "_none"}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select bus" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">-- No Bus --</SelectItem>
+                        <SelectItem value="_none">-- No Bus --</SelectItem>
                         {buses?.map((bus) => (
                           <SelectItem key={bus.id} value={bus.id}>
                             <div className="flex items-center gap-2">
@@ -353,14 +353,14 @@ export const ExpenseRequestForm = ({ open, onOpenChange, defaultBusinessUnit }: 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Vendor (if known)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select onValueChange={(val) => field.onChange(val === "_none" ? undefined : val)} value={field.value || "_none"}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select vendor" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">-- Unknown Vendor --</SelectItem>
+                        <SelectItem value="_none">-- Unknown Vendor --</SelectItem>
                         {vendors?.map((vendor) => (
                           <SelectItem key={vendor.id} value={vendor.id}>
                             {vendor.vendor_name}
