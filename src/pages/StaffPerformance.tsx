@@ -17,8 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { 
   User, Phone, Bus, Star, Eye, Clock, Award, TrendingUp, 
   RefreshCw, Users, DollarSign, AlertTriangle, Filter,
-  Calendar, Fuel, Route, MapPin
+  Calendar, Fuel, Route, MapPin, PhoneCall, FileText
 } from "lucide-react";
+import { format } from "date-fns";
 import { ColumnDef } from "@tanstack/react-table";
 
 export default function StaffPerformance() {
@@ -29,6 +30,7 @@ export default function StaffPerformance() {
   const [searchQuery, setSearchQuery] = useState("");
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [openDialogId, setOpenDialogId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Fetch attendance when staff is selected
@@ -273,9 +275,19 @@ export default function StaffPerformance() {
       id: "actions",
       header: "",
       cell: ({ row }) => (
-        <Dialog>
+        <Dialog 
+          open={openDialogId === row.original.id} 
+          onOpenChange={(open) => {
+            if (open) {
+              setOpenDialogId(row.original.id);
+              handleStaffClick(row.original);
+            } else {
+              setOpenDialogId(null);
+            }
+          }}
+        >
           <DialogTrigger asChild>
-            <Button variant="ghost" size="sm" onClick={() => handleStaffClick(row.original)}>
+            <Button variant="ghost" size="sm">
               <Eye className="h-4 w-4" />
             </Button>
           </DialogTrigger>
@@ -554,7 +566,8 @@ function StaffDetailContent({
             <CardTitle className="text-base">Personal Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Contact & Identity */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
@@ -571,7 +584,14 @@ function StaffDetailContent({
                   <span className="font-medium">Address:</span>
                   <span className="truncate">{staff.address || "Not provided"}</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <PhoneCall className="h-4 w-4 text-red-500" />
+                  <span className="font-medium">Emergency Contact:</span>
+                  <span>{staff.emergency_contact || "Not provided"}</span>
+                </div>
               </div>
+              
+              {/* Salary & Financial */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -586,6 +606,37 @@ function StaffDetailContent({
                   <span className="font-medium">Monthly Salary:</span>
                   <span>{staff.monthly_salary ? `LKR ${staff.monthly_salary.toLocaleString()}` : '-'}</span>
                 </div>
+              </div>
+            </div>
+            
+            {/* Notes Section */}
+            {staff.notes && (
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex items-start gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <div>
+                    <span className="font-medium">Notes:</span>
+                    <p className="text-muted-foreground mt-1">{staff.notes}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Timestamps */}
+            <div className="mt-4 pt-4 border-t flex flex-wrap gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span>Member Since:</span>
+                <span className="font-medium text-foreground">
+                  {staff.created_at ? format(new Date(staff.created_at), 'MMM dd, yyyy') : '-'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span>Last Updated:</span>
+                <span className="font-medium text-foreground">
+                  {staff.updated_at ? format(new Date(staff.updated_at), 'MMM dd, yyyy') : '-'}
+                </span>
               </div>
             </div>
           </CardContent>

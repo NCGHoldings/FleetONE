@@ -18,6 +18,12 @@ export interface StaffMemberPerformance {
   monthly_salary?: number;
   is_active: boolean;
   
+  // Additional Details
+  emergency_contact?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  
   // Performance Metrics
   totalTrips: number;
   totalKm: number;
@@ -65,10 +71,11 @@ export function useStaffPerformance(options: UseStaffPerformanceOptions = {}) {
     try {
       setLoading(true);
 
-      // 1. Fetch all staff from staff_registry (primary source)
+      // 1. Fetch only drivers and conductors from staff_registry
       const { data: staffRegistry, error: staffError } = await supabase
         .from('staff_registry')
         .select('*')
+        .in('staff_type', ['driver', 'conductor'])
         .order('staff_name');
 
       if (staffError) throw staffError;
@@ -219,6 +226,10 @@ export function useStaffPerformance(options: UseStaffPerformanceOptions = {}) {
           daily_rate: staff.daily_rate,
           monthly_salary: staff.monthly_salary,
           is_active: staff.is_active ?? true,
+          emergency_contact: staff.emergency_contact,
+          notes: staff.notes,
+          created_at: staff.created_at,
+          updated_at: staff.updated_at,
           totalTrips,
           totalKm: Math.round(totalKm * 10) / 10,
           totalHours: Math.round(totalHours * 10) / 10,
