@@ -356,57 +356,55 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
     padding: 14px;
   }
 
-  .bottom-section {
-    display: flex;
-    justify-content: space-between;
-    margin: 20px 40px 0;
-    gap: 25px;
+  /* Integrated Table Footer Styles */
+  .totals-footer td {
+    border: 2px solid #0b2f66;
+    background: #e8f6ff;
+    padding: 12px 14px;
   }
 
-  .amount-words {
-    flex: 1.2;
+  .amount-words-cell {
+    vertical-align: middle;
+    text-align: center;
     background: #e8f6ff;
-    border: 2px solid #0b2f66;
-    padding: 18px 20px;
-    font-size: 17px;
+  }
+
+  .amount-words-cell .amount-label {
     font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 8px;
+    color: #0b2f66;
+  }
+
+  .amount-words-cell .amount-value {
+    font-weight: 700;
+    font-size: 16px;
     text-transform: uppercase;
+    color: #000;
   }
 
-  .amount-words span {
-    display: block;
-    margin-top: 8px;
-    font-size: 20px;
-  }
-
-  .totals {
-    flex: 0.8;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .totals-row {
-    display: flex;
-    border: 2px solid #0b2f66;
-    background: #e8f6ff;
-  }
-
-  .totals-row .label {
-    flex: 1;
-    border-right: 2px solid #0b2f66;
+  .totals-label {
     text-align: center;
     font-weight: 700;
-    padding: 14px 0;
-    font-size: 17px;
+    font-size: 16px;
+    color: #0b2f66;
   }
 
-  .totals-row .value {
-    width: 200px;
-    text-align: center;
-    font-size: 18px;
+  .totals-value {
+    text-align: right;
     font-weight: 700;
-    padding: 14px 0;
+    font-size: 16px;
+    padding-right: 20px !important;
+  }
+
+  .totals-footer.total-row td {
+    background: #0b2f66;
+    color: white;
+  }
+
+  .totals-footer.total-row .totals-label,
+  .totals-footer.total-row .totals-value {
+    color: white;
   }
 
   .page-indicator {
@@ -717,9 +715,9 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
           <tr class="invoice-body">
              <td style="font-weight: 700; width: 45%;">MAKE</td>
              <td>${data.make}</td>
-             <td rowspan="11" class="qty merged-cell">${data.quantity}.00</td>
-             <td rowspan="11" class="price merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 }))}</td>
-             <td rowspan="11" class="total merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+              <td rowspan="8" class="qty merged-cell">${data.quantity}.00</td>
+              <td rowspan="8" class="price merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 }))}</td>
+              <td rowspan="8" class="total merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
            </tr>
            <tr class="invoice-body">
              <td style="font-weight: 700;">BUS MODEL</td>
@@ -730,12 +728,8 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
              <td>${data.seating_capacity}</td>
            </tr>
            <tr class="invoice-body">
-             <td style="font-weight: 700;">YEAR OF MANUFACTURE</td>
+              <td style="font-weight: 700;">YEAR</td>
              <td>${data.year_of_manufacture}</td>
-           </tr>
-           <tr class="invoice-body">
-             <td style="font-weight: 700;">COUNTRY OF ORIGIN</td>
-             <td>${data.country_of_origin}</td>
            </tr>
            <tr class="invoice-body">
              <td style="font-weight: 700;">CONDITION</td>
@@ -746,20 +740,29 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
              <td>${data.fuel_type}</td>
            </tr>
            <tr class="invoice-body">
-             <td style="font-weight: 700;">ENGINE CAPACITY</td>
-             <td>${data.engine_capacity}</td>
-           </tr>
-           <tr class="invoice-body">
-             <td style="font-weight: 700;">COLOUR</td>
-             <td>${data.color_scheme}</td>
-           </tr>
-           <tr class="invoice-body">
              <td style="font-weight: 700;">ENGINE NO</td>
              <td>${data.engine_number}</td>
            </tr>
            <tr class="invoice-body">
-             <td style="font-weight: 700;">CHASIS NO</td>
+              <td style="font-weight: 700;">CHASIS NUMBER</td>
              <td>${data.chassis_number}</td>
+          </tr>
+          <!-- Integrated Footer Rows -->
+          <tr class="totals-footer">
+            <td colspan="2" rowspan="3" class="amount-words-cell">
+              <div class="amount-label">${isTaxInvoice ? 'AMOUNT IN WORD<br/>(BALANCE PAYABLE)' : `AMOUNT IN WORD${isProforma ? ` (${data.proforma_amount_percentage || 0}% OF TOTAL)` : ''}`}</div>
+              <div class="amount-value">${isTaxInvoice ? taxAmountInWords : amountInWords}</div>
+            </td>
+            <td colspan="2" class="totals-label">${isTaxInvoice ? 'SUB TOTAL' : 'SUB TOTAL'}</td>
+            <td class="totals-value">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+          </tr>
+          <tr class="totals-footer">
+            <td colspan="2" class="totals-label">${isTaxInvoice ? `VAT ${taxRate}%` : 'PAYMENT'}</td>
+            <td class="totals-value">${isTaxInvoice ? vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (data.totalPaid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+          </tr>
+          <tr class="totals-footer total-row">
+            <td colspan="2" class="totals-label">TOTAL</td>
+            <td class="totals-value">${(data.balanceDue !== undefined && data.balanceDue !== null && data.balanceDue === 0) ? '-' : data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
           </tr>
         </tbody>
       </table>
@@ -776,47 +779,6 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
          </div>
        </div>
        ` : ''}
-
-      <div class="bottom-section">
-         <div class="amount-words${isProforma ? ' proforma-amount-display' : ''}">
-           ${isTaxInvoice ? 'AMOUNT IN WORD (BALANCE PAYABLE)' : `AMOUNT IN WORD${isProforma ? ` (${data.proforma_amount_percentage || 0}% OF TOTAL)` : ''}`}
-           <span>${isTaxInvoice ? taxAmountInWords : amountInWords}</span>
-        </div>
-        <div class="totals">
-           ${isTaxInvoice ? `
-             <div class="tax-totals-row">
-               <div class="label">SUB TOTAL</div>
-               <div class="value">${baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-             </div>
-             <div class="tax-totals-row">
-               <div class="label">VAT ${taxRate}%</div>
-               <div class="value">${vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-             </div>
-             <div class="tax-totals-row total-row">
-               <div class="label">TOTAL</div>
-               <div class="value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-             </div>
-           ` : isProforma ? `
-            <div class="totals-row">
-              <div class="label">FULL PRICE</div>
-              <div class="value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-            </div>
-            <div class="totals-row proforma-amount-display">
-              <div class="label">PROFORMA (${data.proforma_amount_percentage || 0}%)</div>
-              <div class="value" style="font-size: 20px;">${displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-            </div>
-          ` : `
-            <div class="totals-row">
-              <div class="label">SUBTOTAL</div>
-              <div class="value">${data.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-            </div>
-            <div class="totals-row">
-              <div class="label">TOTAL</div>
-              <div class="value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-            </div>
-          `}
-        </div>
-      </div>
 
       ${isProforma ? `
         <div class="proforma-info">
