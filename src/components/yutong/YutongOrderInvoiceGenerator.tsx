@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Download, RefreshCw, CheckCircle, AlertCircle, ChevronDown, User, Building } from 'lucide-react';
+import { FileText, Download, RefreshCw, CheckCircle, AlertCircle, ChevronDown, User, Building, Receipt } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceManagement';
@@ -47,7 +47,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
   const [invoices, setInvoices] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [quotation, setQuotation] = useState<any>(null);
-  const [defaultInvoiceType, setDefaultInvoiceType] = useState<'direct_invoice' | 'proforma_invoice'>('direct_invoice');
+   const [defaultInvoiceType, setDefaultInvoiceType] = useState<'direct_invoice' | 'proforma_invoice' | 'tax_invoice'>('direct_invoice');
   const [loadingInvoices, setLoadingInvoices] = useState(true);
 
   const {
@@ -152,7 +152,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     };
   };
 
-  const handleGenerateInvoice = (invoiceType: 'direct_invoice' | 'proforma_invoice') => {
+   const handleGenerateInvoice = (invoiceType: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice') => {
     console.log('🎬 Generate Invoice clicked, type:', invoiceType);
     console.log('📦 Order data:', order);
     console.log('📋 Quotation data:', quotation);
@@ -239,7 +239,15 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       proforma_amount: config.proformaAmount,
       finance_company_name: config.financeCompanyName,
       finance_company_address: config.financeCompanyAddress,
-      proforma_purpose: config.proformaPurpose
+       proforma_purpose: config.proformaPurpose,
+       
+       // Tax invoice fields
+       is_tax_invoice: config.isTaxInvoice,
+       customer_vat_number: config.customerVatNumber,
+       tax_rate: config.taxRate,
+       company_vat_number: '101116190 - 7000',
+       base_amount: config.isTaxInvoice ? order.total_amount / (1 + (config.taxRate || 18) / 100) : undefined,
+       vat_amount: config.isTaxInvoice ? order.total_amount - (order.total_amount / (1 + (config.taxRate || 18) / 100)) : undefined
     };
     
     console.log('📋 Final invoice data prepared:', invoiceData);
@@ -255,9 +263,12 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
 
     if (result.success) {
       console.log('✅ Invoice generated successfully!');
-      toast.success(config.invoiceCategory === 'proforma_invoice' 
-        ? 'Proforma invoice generated successfully' 
-        : 'Invoice generated successfully');
+       const successMessage = config.invoiceCategory === 'proforma_invoice' 
+         ? 'Proforma invoice generated successfully'
+         : config.invoiceCategory === 'tax_invoice'
+           ? 'Tax invoice generated successfully'
+           : 'Invoice generated successfully';
+       toast.success(successMessage);
       await loadData();
       if (onRefresh) onRefresh();
     } else {
@@ -371,6 +382,13 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
                         <div className="text-xs text-muted-foreground">For bank/finance company</div>
                       </div>
                     </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => handleGenerateInvoice('tax_invoice')}>
+                       <Receipt className="h-4 w-4 mr-2" />
+                       <div>
+                         <div className="font-medium">Tax Invoice</div>
+                         <div className="text-xs text-muted-foreground">With VAT breakdown</div>
+                       </div>
+                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
