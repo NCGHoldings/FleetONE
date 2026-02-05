@@ -28,12 +28,19 @@ export interface YutongOrderInvoiceData {
   total: number;
   invoice_status: 'draft' | 'approved';
   // Invoice category - direct or proforma
-  invoice_category?: 'direct_invoice' | 'proforma_invoice';
+   invoice_category?: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice';
   proforma_amount_percentage?: number;
   proforma_amount?: number;
   finance_company_name?: string;
   finance_company_address?: string;
   proforma_purpose?: string;
+   // Tax Invoice fields
+   is_tax_invoice?: boolean;
+   company_vat_number?: string;
+   customer_vat_number?: string;
+   tax_rate?: number;
+   base_amount?: number;
+   vat_amount?: number;
   // Payment tracking
   paymentsReceived?: Array<{
     payment_date: string;
@@ -69,9 +76,20 @@ export interface YutongOrderInvoiceData {
 export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): string {
   const isDraft = data.invoice_status === 'draft';
   const isProforma = data.invoice_category === 'proforma_invoice';
+   const isTaxInvoice = data.invoice_category === 'tax_invoice' || data.is_tax_invoice;
   const displayAmount = isProforma && data.proforma_amount ? data.proforma_amount : data.total;
   const amountInWords = convertNumberToWords(displayAmount);
-  const invoiceTitle = isProforma ? 'PROFORMA INVOICE' : 'INVOICE';
+   
+   // Tax calculation for tax invoices
+   const taxRate = data.tax_rate || 18;
+   const baseAmount = isTaxInvoice ? (data.base_amount || data.total / (1 + taxRate / 100)) : data.subtotal;
+   const vatAmount = isTaxInvoice ? (data.vat_amount || data.total - baseAmount) : 0;
+   const taxAmountInWords = isTaxInvoice ? convertNumberToWords(baseAmount) : amountInWords;
+   
+   // Header image based on invoice type
+   const headerImage = isTaxInvoice 
+     ? '/lovable-uploads/yutong-tax-invoice-header.png' 
+     : '/lovable-uploads/yutong-invoice-header.png';
 
   return `<!doctype html>
 <html lang="en">
@@ -145,6 +163,57 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
     color: #ea580c;
   }
   ` : ''}
+   
+   .vat-info {
+     margin: 15px 40px 0;
+     padding: 12px 16px;
+     background: #f0f9ff;
+     border: 1px solid #0b2f66;
+     border-radius: 4px;
+   }
+   .vat-info .vat-row {
+     display: flex;
+     gap: 20px;
+     font-size: 15px;
+     margin: 4px 0;
+   }
+   .vat-info .vat-label {
+     font-weight: 700;
+     color: #0b2f66;
+     min-width: 160px;
+   }
+   .tax-totals-row {
+     display: flex;
+     border: 2px solid #0b2f66;
+     background: #e8f6ff;
+   }
+   .tax-totals-row .label {
+     flex: 1;
+     border-right: 2px solid #0b2f66;
+     text-align: center;
+     font-weight: 700;
+     padding: 12px 0;
+     font-size: 16px;
+   }
+   .tax-totals-row .value {
+     width: 200px;
+     text-align: center;
+     font-size: 17px;
+     font-weight: 700;
+     padding: 12px 0;
+   }
+   .tax-totals-row.total-row {
+     background: #0b2f66;
+     color: white;
+   }
+   .tax-totals-row.total-row .label {
+     border-right-color: rgba(255,255,255,0.3);
+   }
+   
+   .merged-cell {
+     vertical-align: middle !important;
+     text-align: center;
+   }
 
   .invoice-container {
     width: 900px;
@@ -608,7 +677,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
     ${isProforma ? '<div class="proforma-badge">Proforma Invoice</div>' : ''}
     <div class="page-content">
       <div class="header-section">
-        <img src="/lovable-uploads/yutong-invoice-header.png" alt="Invoice Header" class="header-image">
+         <img src="${headerImage}" alt="Invoice Header" class="header-image">
       </div>
 
       <div class="section">
@@ -638,43 +707,96 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
       <table class="invoice-table">
         <thead>
           <tr>
-            <th style="width:55%;">PRODUCT</th>
-            <th style="width:20%;">UNIT PRICE</th>
-            <th style="width:10%;">QTY</th>
-            <th style="width:15%;">TOTAL</th>
+             <th colspan="2" style="width:55%;">PRODUCT</th>
+             <th style="width:10%;">QTY</th>
+             <th style="width:17%;">UNIT PRICE</th>
+             <th style="width:18%;">TOTAL</th>
           </tr>
         </thead>
         <tbody>
           <tr class="invoice-body">
-            <td>
-              <table class="details-table">
-                <tr><td>MAKE</td><td>${data.make}</td></tr>
-                <tr><td>BUS MODEL</td><td>${data.bus_model}</td></tr>
-                <tr><td>SEATING CAPACITY</td><td>${data.seating_capacity}</td></tr>
-                <tr><td>YEAR OF MANUFACTURE</td><td>${data.year_of_manufacture}</td></tr>
-                <tr><td>COUNTRY OF ORIGIN</td><td>${data.country_of_origin}</td></tr>
-                <tr><td>CONDITION</td><td>${data.vehicle_condition}</td></tr>
-                <tr><td>FUEL TYPE</td><td>${data.fuel_type}</td></tr>
-                <tr><td>ENGINE CAPACITY</td><td>${data.engine_capacity}</td></tr>
-                <tr><td>COLOUR</td><td>${data.color_scheme}</td></tr>
-                <tr><td>ENGINE NO</td><td>${data.engine_number}</td></tr>
-                <tr><td>CHASIS NO</td><td>${data.chassis_number}</td></tr>
-              </table>
-            </td>
-            <td class="price">${isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-            <td class="qty">${data.quantity}</td>
-            <td class="total">${displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+             <td style="font-weight: 700; width: 45%;">MAKE</td>
+             <td>${data.make}</td>
+             <td rowspan="11" class="qty merged-cell">${data.quantity}.00</td>
+             <td rowspan="11" class="price merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 }))}</td>
+             <td rowspan="11" class="total merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">BUS MODEL</td>
+             <td>${data.bus_model}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">SEATING CAPACITY</td>
+             <td>${data.seating_capacity}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">YEAR OF MANUFACTURE</td>
+             <td>${data.year_of_manufacture}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">COUNTRY OF ORIGIN</td>
+             <td>${data.country_of_origin}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">CONDITION</td>
+             <td>${data.vehicle_condition}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">FUEL TYPE</td>
+             <td>${data.fuel_type}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">ENGINE CAPACITY</td>
+             <td>${data.engine_capacity}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">COLOUR</td>
+             <td>${data.color_scheme}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">ENGINE NO</td>
+             <td>${data.engine_number}</td>
+           </tr>
+           <tr class="invoice-body">
+             <td style="font-weight: 700;">CHASIS NO</td>
+             <td>${data.chassis_number}</td>
           </tr>
         </tbody>
       </table>
+       
+       ${isTaxInvoice ? `
+       <div class="vat-info">
+         <div class="vat-row">
+           <span class="vat-label">OUR VAT NO :</span>
+           <span>${data.company_vat_number || '101116190 - 7000'}</span>
+         </div>
+         <div class="vat-row">
+           <span class="vat-label">CUSTOMER VAT NO :</span>
+           <span>${data.customer_vat_number || ''}</span>
+         </div>
+       </div>
+       ` : ''}
 
       <div class="bottom-section">
-        <div class="amount-words${isProforma ? ' proforma-amount-display' : ''}">
-          AMOUNT IN WORD${isProforma ? ` (${data.proforma_amount_percentage || 0}% OF TOTAL)` : ''}
-          <span>${amountInWords}</span>
+         <div class="amount-words${isProforma ? ' proforma-amount-display' : ''}">
+           ${isTaxInvoice ? 'AMOUNT IN WORD (BALANCE PAYABLE)' : `AMOUNT IN WORD${isProforma ? ` (${data.proforma_amount_percentage || 0}% OF TOTAL)` : ''}`}
+           <span>${isTaxInvoice ? taxAmountInWords : amountInWords}</span>
         </div>
         <div class="totals">
-          ${isProforma ? `
+           ${isTaxInvoice ? `
+             <div class="tax-totals-row">
+               <div class="label">SUB TOTAL</div>
+               <div class="value">${baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+             </div>
+             <div class="tax-totals-row">
+               <div class="label">VAT ${taxRate}%</div>
+               <div class="value">${vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+             </div>
+             <div class="tax-totals-row total-row">
+               <div class="label">TOTAL</div>
+               <div class="value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+             </div>
+           ` : isProforma ? `
             <div class="totals-row">
               <div class="label">FULL PRICE</div>
               <div class="value">${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
@@ -713,7 +835,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
     ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
     <div class="page-content">
       <div class="header-section">
-        <img src="/lovable-uploads/yutong-invoice-header.png" alt="Invoice Header" class="header-image">
+         <img src="${headerImage}" alt="Invoice Header" class="header-image">
       </div>
 
       <div class="page-spacer"></div>
@@ -897,11 +1019,16 @@ async function loadImageAsBase64(url: string): Promise<string> {
 export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData): Promise<Blob> {
   console.log('📄 Starting PDF generation for invoice:', data.invoice_no);
   
+   const isTaxInvoice = data.invoice_category === 'tax_invoice' || data.is_tax_invoice;
+   const headerImagePath = isTaxInvoice 
+     ? '/lovable-uploads/yutong-tax-invoice-header.png' 
+     : '/lovable-uploads/yutong-invoice-header.png';
+   
   // Pre-load header image as base64
   console.log('🖼️ Loading header image...');
-  const headerImage = await loadImageAsBase64('/lovable-uploads/yutong-invoice-header.png');
+   const headerImageBase64 = await loadImageAsBase64(headerImagePath);
   
-  if (!headerImage) {
+   if (!headerImageBase64) {
     console.warn('⚠️ Header image failed to load, proceeding anyway...');
   }
   
@@ -909,7 +1036,7 @@ export async function generateYutongOrderInvoicePDF(data: YutongOrderInvoiceData
   
   // Replace image URL with base64 data
   const htmlWithEmbeddedImages = htmlContent
-    .replace(/\/lovable-uploads\/yutong-invoice-header\.png/g, headerImage || '/lovable-uploads/yutong-invoice-header.png');
+     .replace(new RegExp(headerImagePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), headerImageBase64 || headerImagePath);
   
   const container = document.createElement('div');
   container.innerHTML = htmlWithEmbeddedImages;

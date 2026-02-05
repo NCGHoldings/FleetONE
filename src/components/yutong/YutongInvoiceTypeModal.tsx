@@ -7,16 +7,20 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Building, Percent, AlertCircle } from 'lucide-react';
+import { FileText, Building, Percent, AlertCircle, Receipt } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export interface ProformaInvoiceConfig {
-  invoiceCategory: 'direct_invoice' | 'proforma_invoice';
+   invoiceCategory: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice';
   proformaAmountPercentage?: number;
   proformaAmount?: number;
   financeCompanyName?: string;
   financeCompanyAddress?: string;
   proformaPurpose?: string;
+   // Tax Invoice fields
+   isTaxInvoice?: boolean;
+   customerVatNumber?: string;
+   taxRate?: number;
 }
 
 interface YutongInvoiceTypeModalProps {
@@ -25,7 +29,7 @@ interface YutongInvoiceTypeModalProps {
   totalAmount: number;
   onConfirm: (config: ProformaInvoiceConfig) => void;
   isLoading?: boolean;
-  defaultInvoiceType?: 'direct_invoice' | 'proforma_invoice';
+   defaultInvoiceType?: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice';
 }
 
 const FINANCE_PURPOSES = [
@@ -45,11 +49,12 @@ export function YutongInvoiceTypeModal({
   isLoading = false,
   defaultInvoiceType = 'direct_invoice'
 }: YutongInvoiceTypeModalProps) {
-  const [invoiceCategory, setInvoiceCategory] = useState<'direct_invoice' | 'proforma_invoice'>(defaultInvoiceType);
+   const [invoiceCategory, setInvoiceCategory] = useState<'direct_invoice' | 'proforma_invoice' | 'tax_invoice'>(defaultInvoiceType);
   const [proformaPercentage, setProformaPercentage] = useState(70);
   const [financeCompanyName, setFinanceCompanyName] = useState('');
   const [financeCompanyAddress, setFinanceCompanyAddress] = useState('');
   const [proformaPurpose, setProformaPurpose] = useState('bank_leasing');
+   const [customerVatNumber, setCustomerVatNumber] = useState('');
 
   // Update invoice category when defaultInvoiceType changes
   useEffect(() => {
@@ -57,6 +62,11 @@ export function YutongInvoiceTypeModal({
   }, [defaultInvoiceType, isOpen]);
 
   const proformaAmount = Math.round((totalAmount * proformaPercentage) / 100);
+   
+   // Tax calculation (18% VAT rate)
+   const taxRate = 18;
+   const baseAmount = totalAmount / (1 + taxRate / 100);
+   const vatAmount = totalAmount - baseAmount;
 
   const handleConfirm = () => {
     const config: ProformaInvoiceConfig = {
@@ -67,7 +77,12 @@ export function YutongInvoiceTypeModal({
         financeCompanyName: financeCompanyName || undefined,
         financeCompanyAddress: financeCompanyAddress || undefined,
         proformaPurpose
-      })
+       }),
+       ...(invoiceCategory === 'tax_invoice' && {
+         isTaxInvoice: true,
+         customerVatNumber: customerVatNumber || undefined,
+         taxRate
+       })
     };
     onConfirm(config);
   };
@@ -79,6 +94,7 @@ export function YutongInvoiceTypeModal({
     setFinanceCompanyName('');
     setFinanceCompanyAddress('');
     setProformaPurpose('bank_leasing');
+     setCustomerVatNumber('');
     onClose();
   };
 
@@ -96,7 +112,7 @@ export function YutongInvoiceTypeModal({
           {/* Invoice Type Selection */}
           <RadioGroup
             value={invoiceCategory}
-            onValueChange={(value) => setInvoiceCategory(value as 'direct_invoice' | 'proforma_invoice')}
+             onValueChange={(value) => setInvoiceCategory(value as 'direct_invoice' | 'proforma_invoice' | 'tax_invoice')}
             className="space-y-3"
           >
             <div className="flex items-start space-x-3 p-4 border rounded-lg hover:border-primary transition-colors cursor-pointer">
@@ -125,8 +141,59 @@ export function YutongInvoiceTypeModal({
                 </p>
               </div>
             </div>
+             
+             <div className="flex items-start space-x-3 p-4 border rounded-lg hover:border-primary transition-colors cursor-pointer">
+               <RadioGroupItem value="tax_invoice" id="tax" className="mt-1" />
+               <div className="flex-1">
+                 <Label htmlFor="tax" className="font-semibold text-base cursor-pointer">
+                   Tax Invoice
+                 </Label>
+                 <p className="text-sm text-muted-foreground mt-1">
+                   Invoice with VAT breakdown for registered businesses
+                 </p>
+                 <p className="text-sm font-medium mt-2">
+                   Amount: LKR {totalAmount.toLocaleString()} (incl. 18% VAT)
+                 </p>
+               </div>
+             </div>
           </RadioGroup>
 
+           {/* Tax Invoice Options */}
+           {invoiceCategory === 'tax_invoice' && (
+             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+               <Alert>
+                 <Receipt className="h-4 w-4" />
+                 <AlertDescription>
+                   Tax invoice will show VAT breakdown calculated from total amount.
+                 </AlertDescription>
+               </Alert>
+               
+               <div className="space-y-3">
+                 <Label>Customer VAT Number (Optional)</Label>
+                 <Input
+                   placeholder="e.g., 790701950 - 7000"
+                   value={customerVatNumber}
+                   onChange={(e) => setCustomerVatNumber(e.target.value)}
+                 />
+               </div>
+               
+               <div className="grid grid-cols-3 gap-4 p-3 bg-background rounded border">
+                 <div>
+                   <p className="text-xs text-muted-foreground">Sub Total</p>
+                   <p className="font-medium">LKR {baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs text-muted-foreground">VAT (18%)</p>
+                   <p className="font-medium text-destructive">LKR {vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs text-muted-foreground">Total</p>
+                   <p className="font-bold text-primary">LKR {totalAmount.toLocaleString()}</p>
+                 </div>
+               </div>
+             </div>
+           )}
+           
           {/* Proforma Invoice Options */}
           {invoiceCategory === 'proforma_invoice' && (
             <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
