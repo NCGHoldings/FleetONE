@@ -211,7 +211,7 @@ export async function postTripRevenueToGL(
 
     if (jeError) throw jeError;
 
-    // Create journal entry lines
+    // Create journal entry lines with bus/route metadata for multi-dimensional reporting
     const lines = [
       {
         journal_entry_id: journalEntry.id,
@@ -220,6 +220,9 @@ export async function postTripRevenueToGL(
         credit: 0,
         description: `Cash from trip - ${routeName}`,
         company_id: NCG_EXPRESS_COMPANY_ID,
+        bus_id: trip.bus_id || null,
+        route_id: trip.route_id || null,
+        trip_id: trip.id,
       },
       {
         journal_entry_id: journalEntry.id,
@@ -228,6 +231,9 @@ export async function postTripRevenueToGL(
         credit: trip.income,
         description: `Ticket revenue - ${routeName}`,
         company_id: NCG_EXPRESS_COMPANY_ID,
+        bus_id: trip.bus_id || null,
+        route_id: trip.route_id || null,
+        trip_id: trip.id,
       },
     ];
 
@@ -340,7 +346,7 @@ export async function postExpensesToGL(
 
     if (jeError) throw jeError;
 
-    // Create journal entry lines for each expense category
+    // Create journal entry lines for each expense category with bus metadata
     const jeLines = expenseLines.map(line => ({
       journal_entry_id: journalEntry.id,
       account_id: line.accountId,
@@ -348,9 +354,11 @@ export async function postExpensesToGL(
       credit: 0,
       description: `${line.label} - Bus ${busNo}`,
       company_id: NCG_EXPRESS_COMPANY_ID,
+      bus_id: expense.bus_id || null,
+      expense_id: expense.id,
     }));
 
-    // Add the credit line for cash
+    // Add the credit line for cash with bus metadata
     jeLines.push({
       journal_entry_id: journalEntry.id,
       account_id: settings.expense_cash_account_id,
@@ -358,6 +366,8 @@ export async function postExpensesToGL(
       credit: totalExpenses,
       description: `Cash paid for expenses - Bus ${busNo}`,
       company_id: NCG_EXPRESS_COMPANY_ID,
+      bus_id: expense.bus_id || null,
+      expense_id: expense.id,
     });
 
     const { error: linesError } = await supabase

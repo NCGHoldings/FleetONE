@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Loader2, Download, X, Filter } from "lucide-react";
+import { Loader2, Download, X, Filter, Bus, Route } from "lucide-react";
 import { format } from "date-fns";
 
 interface DrillDownModalProps {
@@ -50,10 +50,41 @@ export const DrillDownModal = ({
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>(initialDateRange || {});
   const [businessUnitFilter, setBusinessUnitFilter] = useState<string>("_all");
   const [transactionType, setTransactionType] = useState<string>("all");
+  const [busFilter, setBusFilter] = useState<string>("_all");
+  const [routeFilter, setRouteFilter] = useState<string>("_all");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
+  // Fetch buses for filter
+  const { data: buses } = useQuery({
+    queryKey: ["buses-filter-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("buses")
+        .select("id, bus_no")
+        .eq("status", "active")
+        .order("bus_no");
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Fetch routes for filter
+  const { data: routes } = useQuery({
+    queryKey: ["routes-filter-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("routes")
+        .select("id, route_name")
+        .order("route_name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ["account-transactions", accountId, dateRange, businessUnitFilter],
+    queryKey: ["account-transactions", accountId, dateRange, businessUnitFilter, busFilter, routeFilter],
     queryFn: async () => {
       if (!accountId) return [];
 
@@ -66,6 +97,12 @@ export const DrillDownModal = ({
           credit,
           description,
           created_at,
+          bus_id,
+          route_id,
+          trip_id,
+          expense_id,
+          buses:bus_id(bus_no),
+          routes:route_id(route_name),
           journal_entries!inner(
             id,
             entry_number,
@@ -93,6 +130,16 @@ export const DrillDownModal = ({
       // Apply business unit filter
       if (businessUnitFilter && businessUnitFilter !== "_all") {
         query = query.eq("journal_entries.business_unit_code", businessUnitFilter);
+      }
+
+      // Apply bus filter
+      if (busFilter && busFilter !== "_all") {
+        query = query.eq("bus_id", busFilter);
+      }
+
+      // Apply route filter
+      if (routeFilter && routeFilter !== "_all") {
+        query = query.eq("route_id", routeFilter);
       }
 
       const { data, error } = await query;
@@ -153,20 +200,29 @@ export const DrillDownModal = ({
     setDateRange({});
     setBusinessUnitFilter("_all");
     setTransactionType("all");
+    setBusFilter("_all");
+    setRouteFilter("_all");
   };
+
+  const hasActiveFilters = businessUnitFilter !== "_all" || transactionType !== "all" || 
+    busFilter !== "_all" || routeFilter !== "_all" || dateRange.from || dateRange.to;
 
   const exportToCSV = () => {
     const dataToExport = selectedRows.size > 0
       ? transactionsWithBalance.filter((t) => selectedRows.has(t.id))
       : transactionsWithBalance;
 
-    const headers = ["Date", "Entry #", "Business Unit", "Reference", "Description", "Debit", "Credit", "Balance"];
+    const headers = ["Date", "Entry #", "Business Unit", "Bus", "Route", "Reference", "Description", "Debit", "Credit", "Balance"];
     const rows = dataToExport.map((t) => {
       const entry = t.journal_entries as any;
+      const busInfo = t.buses as any;
+      const routeInfo = t.routes as any;
       return [
         format(new Date(entry?.entry_date || t.created_at), "yyyy-MM-dd"),
         entry?.entry_number || "",
         entry?.business_unit_code || "",
+        busInfo?.bus_no || "",
+        routeInfo?.route_name || "",
         entry?.reference || "",
         (t.description || entry?.description || "").replace(/,/g, ";"),
         t.debit || 0,
@@ -187,7 +243,7 @@ export const DrillDownModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             Account Transactions: {accountName}
@@ -209,11 +265,43 @@ export const DrillDownModal = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="_all">All Units</SelectItem>
+              <SelectItem value="NCGE">NCG Express</SelectItem>
               <SelectItem value="SBO">School Bus</SelectItem>
               <SelectItem value="YUT">Yutong</SelectItem>
               <SelectItem value="SNT">Sinotruck</SelectItem>
               <SelectItem value="LTV">Light Vehicle</SelectItem>
               <SelectItem value="SPH">Spare Parts</SelectItem>
+              <SelectItem value="FLEET">Fleet</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={busFilter} onValueChange={setBusFilter}>
+            <SelectTrigger className="w-[140px]">
+              <Bus className="h-4 w-4 mr-1" />
+              <SelectValue placeholder="Bus" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">All Buses</SelectItem>
+              {buses?.map((bus) => (
+                <SelectItem key={bus.id} value={bus.id}>
+                  {bus.bus_no}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={routeFilter} onValueChange={setRouteFilter}>
+            <SelectTrigger className="w-[160px]">
+              <Route className="h-4 w-4 mr-1" />
+              <SelectValue placeholder="Route" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">All Routes</SelectItem>
+              {routes?.map((route) => (
+                <SelectItem key={route.id} value={route.id}>
+                  {route.route_name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -228,10 +316,12 @@ export const DrillDownModal = ({
             </SelectContent>
           </Select>
 
-          <Button variant="ghost" size="sm" onClick={clearFilters}>
-            <X className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
         </div>
 
         {/* Summary Cards */}
@@ -285,6 +375,8 @@ export const DrillDownModal = ({
                   <TableHead>Date</TableHead>
                   <TableHead>Entry #</TableHead>
                   <TableHead>BU</TableHead>
+                  <TableHead>Bus</TableHead>
+                  <TableHead>Route</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Debit</TableHead>
@@ -295,6 +387,8 @@ export const DrillDownModal = ({
               <TableBody>
                 {transactionsWithBalance.map((t) => {
                   const entry = t.journal_entries as any;
+                  const busInfo = t.buses as any;
+                  const routeInfo = t.routes as any;
                   return (
                     <TableRow
                       key={t.id}
@@ -319,10 +413,20 @@ export const DrillDownModal = ({
                           </Badge>
                         )}
                       </TableCell>
+                      <TableCell className="text-xs">
+                        {busInfo?.bus_no && (
+                          <Badge variant="secondary" className="text-xs">
+                            {busInfo.bus_no}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs max-w-[100px] truncate" title={routeInfo?.route_name}>
+                        {routeInfo?.route_name || "-"}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {entry?.reference || "-"}
                       </TableCell>
-                      <TableCell className="max-w-[200px] truncate">
+                      <TableCell className="max-w-[150px] truncate">
                         {t.description || entry?.description}
                       </TableCell>
                       <TableCell className="text-right font-mono text-green-600 dark:text-green-400">
