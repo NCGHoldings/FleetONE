@@ -12,12 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BankAccountForm } from "./BankAccountForm";
 import { BankTransactionForm } from "./BankTransactionForm";
 import { BankReconciliationWorksheet } from "./BankReconciliationWorksheet";
+import { InterBankTransferForm } from "./InterBankTransferForm";
+import { InterBankTransferList } from "./InterBankTransferList";
 
 export const BankingView = () => {
   const [selectedBankId, setSelectedBankId] = useState<string | undefined>();
   const [showBankForm, setShowBankForm] = useState(false);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showReconciliation, setShowReconciliation] = useState(false);
+  const [showTransferForm, setShowTransferForm] = useState(false);
   
   const { data: bankAccounts, isLoading: accountsLoading } = useBankAccounts();
   const { data: transactions } = useBankTransactions(selectedBankId);
@@ -203,6 +206,7 @@ export const BankingView = () => {
         <TabsList>
           <TabsTrigger value="accounts">Bank Accounts</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="transfers">Fund Transfers</TabsTrigger>
           <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
         </TabsList>
 
@@ -259,6 +263,26 @@ export const BankingView = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="transfers">
+          <div className="space-y-6">
+            <Card className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">Inter-Bank Fund Transfers</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Transfer funds between bank accounts with automatic GL posting
+                  </p>
+                </div>
+                <Button onClick={() => setShowTransferForm(true)}>
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  New Transfer
+                </Button>
+              </div>
+            </Card>
+            <InterBankTransferList />
+          </div>
+        </TabsContent>
+
         <TabsContent value="reconciliation">
           <Card className="p-6">
             <div className="flex justify-between items-center mb-6">
@@ -299,6 +323,10 @@ export const BankingView = () => {
       <BankTransactionForm 
         open={showTransactionForm} 
         onOpenChange={setShowTransactionForm}
+      />
+      <InterBankTransferForm
+        open={showTransferForm}
+        onOpenChange={setShowTransferForm}
       />
     </div>
   );

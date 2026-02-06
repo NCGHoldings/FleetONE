@@ -7706,6 +7706,106 @@ export type Database = {
           },
         ]
       }
+      inter_bank_transfers: {
+        Row: {
+          amount: number
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          from_bank_account_id: string
+          from_gl_account_id: string
+          id: string
+          journal_entry_id: string | null
+          notes: string | null
+          reference: string | null
+          status: string | null
+          to_bank_account_id: string
+          to_gl_account_id: string
+          transfer_date: string
+          transfer_number: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          from_bank_account_id: string
+          from_gl_account_id: string
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          reference?: string | null
+          status?: string | null
+          to_bank_account_id: string
+          to_gl_account_id: string
+          transfer_date: string
+          transfer_number: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          from_bank_account_id?: string
+          from_gl_account_id?: string
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          reference?: string | null
+          status?: string | null
+          to_bank_account_id?: string
+          to_gl_account_id?: string
+          transfer_date?: string
+          transfer_number?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inter_bank_transfers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inter_bank_transfers_from_bank_account_id_fkey"
+            columns: ["from_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inter_bank_transfers_from_gl_account_id_fkey"
+            columns: ["from_gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inter_bank_transfers_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inter_bank_transfers_to_bank_account_id_fkey"
+            columns: ["to_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inter_bank_transfers_to_gl_account_id_fkey"
+            columns: ["to_gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_ageing_config: {
         Row: {
           bucket_name: string
@@ -13769,6 +13869,7 @@ export type Database = {
           created_at: string | null
           expense_account_id: string | null
           expense_cash_account_id: string | null
+          fuel_bank_account_id: string | null
           fuel_expense_account_id: string | null
           id: string
           invoice_prefix: string | null
@@ -13791,6 +13892,7 @@ export type Database = {
           created_at?: string | null
           expense_account_id?: string | null
           expense_cash_account_id?: string | null
+          fuel_bank_account_id?: string | null
           fuel_expense_account_id?: string | null
           id?: string
           invoice_prefix?: string | null
@@ -13813,6 +13915,7 @@ export type Database = {
           created_at?: string | null
           expense_account_id?: string | null
           expense_cash_account_id?: string | null
+          fuel_bank_account_id?: string | null
           fuel_expense_account_id?: string | null
           id?: string
           invoice_prefix?: string | null
@@ -13869,6 +13972,13 @@ export type Database = {
           {
             foreignKeyName: "school_bus_finance_settings_expense_cash_account_id_fkey"
             columns: ["expense_cash_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_bus_finance_settings_fuel_bank_account_id_fkey"
+            columns: ["fuel_bank_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]

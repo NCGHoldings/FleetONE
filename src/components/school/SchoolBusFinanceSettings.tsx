@@ -50,7 +50,7 @@ export function SchoolBusFinanceSettings() {
     },
   });
 
-  // Default settings state (now includes expense accounts)
+  // Default settings state (now includes expense accounts and fuel bank)
   const [defaultSettings, setDefaultSettings] = useState({
     trade_receivable_account_id: "",
     sbs_collection_account_id: "",
@@ -62,6 +62,7 @@ export function SchoolBusFinanceSettings() {
     // Expense accounts
     expense_account_id: "",
     fuel_expense_account_id: "",
+    fuel_bank_account_id: "", // NEW: Dedicated fuel bank account
     maintenance_expense_account_id: "",
     salary_expense_account_id: "",
     expense_cash_account_id: "",
@@ -86,6 +87,7 @@ export function SchoolBusFinanceSettings() {
           // Expense accounts
           expense_account_id: defaultSetting.expense_account_id || "",
           fuel_expense_account_id: defaultSetting.fuel_expense_account_id || "",
+          fuel_bank_account_id: defaultSetting.fuel_bank_account_id || "",
           maintenance_expense_account_id: defaultSetting.maintenance_expense_account_id || "",
           salary_expense_account_id: defaultSetting.salary_expense_account_id || "",
           expense_cash_account_id: defaultSetting.expense_cash_account_id || "",
@@ -443,6 +445,25 @@ export function SchoolBusFinanceSettings() {
               />
               <p className="text-xs text-muted-foreground">
                 Specific account for fuel expenses
+              </p>
+            </div>
+
+            {/* Fuel Bank Account - NEW */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                Fuel Bank Account (Credit)
+                <span className="text-destructive">*</span>
+              </Label>
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.fuel_bank_account_id || null}
+                onValueChange={(value) =>
+                  setDefaultSettings({ ...defaultSettings, fuel_bank_account_id: value || "" })
+                }
+                accounts={cashAccounts}
+                placeholder="Select fuel bank account"
+              />
+              <p className="text-xs text-muted-foreground">
+                Dedicated bank account for fuel payments (will be credited when fuel is purchased)
               </p>
             </div>
 

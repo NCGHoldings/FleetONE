@@ -171,6 +171,7 @@ function sanitizeSettingsForDB(settings: Record<string, any>): Record<string, an
     'cash_account_id',
     'expense_account_id',
     'fuel_expense_account_id',
+    'fuel_bank_account_id',
     'maintenance_expense_account_id',
     'salary_expense_account_id',
     'expense_cash_account_id',
