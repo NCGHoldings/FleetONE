@@ -3289,10 +3289,14 @@ export type Database = {
       bus_loan_payments: {
         Row: {
           actual_payment_date: string | null
+          ap_invoice_id: string | null
+          ap_payment_id: string | null
           balance_remaining: number
           created_at: string
+          gl_posted: boolean | null
           id: string
           interest_amount: number
+          journal_entry_id: string | null
           loan_id: string
           paid_by: string | null
           payment_date: string
@@ -3304,10 +3308,14 @@ export type Database = {
         }
         Insert: {
           actual_payment_date?: string | null
+          ap_invoice_id?: string | null
+          ap_payment_id?: string | null
           balance_remaining: number
           created_at?: string
+          gl_posted?: boolean | null
           id?: string
           interest_amount: number
+          journal_entry_id?: string | null
           loan_id: string
           paid_by?: string | null
           payment_date: string
@@ -3319,10 +3327,14 @@ export type Database = {
         }
         Update: {
           actual_payment_date?: string | null
+          ap_invoice_id?: string | null
+          ap_payment_id?: string | null
           balance_remaining?: number
           created_at?: string
+          gl_posted?: boolean | null
           id?: string
           interest_amount?: number
+          journal_entry_id?: string | null
           loan_id?: string
           paid_by?: string | null
           payment_date?: string
@@ -3333,6 +3345,27 @@ export type Database = {
           total_installment?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "bus_loan_payments_ap_invoice_id_fkey"
+            columns: ["ap_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ap_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bus_loan_payments_ap_payment_id_fkey"
+            columns: ["ap_payment_id"]
+            isOneToOne: false
+            referencedRelation: "ap_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bus_loan_payments_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bus_loan_payments_loan_id_fkey"
             columns: ["loan_id"]
@@ -3345,10 +3378,14 @@ export type Database = {
       bus_loans: {
         Row: {
           bus_id: string
+          business_unit_code: string | null
+          company_id: string | null
           created_at: string
           created_by: string | null
           end_date: string
+          finance_synced: boolean | null
           id: string
+          initial_je_id: string | null
           interest_rate: number
           lender_contact: string | null
           lender_name: string
@@ -3360,13 +3397,18 @@ export type Database = {
           start_date: string
           status: string
           updated_at: string
+          vendor_id: string | null
         }
         Insert: {
           bus_id: string
+          business_unit_code?: string | null
+          company_id?: string | null
           created_at?: string
           created_by?: string | null
           end_date: string
+          finance_synced?: boolean | null
           id?: string
+          initial_je_id?: string | null
           interest_rate: number
           lender_contact?: string | null
           lender_name: string
@@ -3378,13 +3420,18 @@ export type Database = {
           start_date?: string
           status?: string
           updated_at?: string
+          vendor_id?: string | null
         }
         Update: {
           bus_id?: string
+          business_unit_code?: string | null
+          company_id?: string | null
           created_at?: string
           created_by?: string | null
           end_date?: string
+          finance_synced?: boolean | null
           id?: string
+          initial_je_id?: string | null
           interest_rate?: number
           lender_contact?: string | null
           lender_name?: string
@@ -3396,6 +3443,7 @@ export type Database = {
           start_date?: string
           status?: string
           updated_at?: string
+          vendor_id?: string | null
         }
         Relationships: [
           {
@@ -3403,6 +3451,27 @@ export type Database = {
             columns: ["bus_id"]
             isOneToOne: false
             referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bus_loans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bus_loans_initial_je_id_fkey"
+            columns: ["initial_je_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bus_loans_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -8148,6 +8217,7 @@ export type Database = {
       journal_entry_lines: {
         Row: {
           account_id: string
+          bus_id: string | null
           business_unit_code: string | null
           company_id: string | null
           cost_center_id: string | null
@@ -8155,14 +8225,18 @@ export type Database = {
           credit: number
           debit: number
           description: string | null
+          expense_id: string | null
           id: string
           journal_entry_id: string
           location_id: string | null
           project_id: string | null
+          route_id: string | null
           segment_id: string | null
+          trip_id: string | null
         }
         Insert: {
           account_id: string
+          bus_id?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           cost_center_id?: string | null
@@ -8170,14 +8244,18 @@ export type Database = {
           credit?: number
           debit?: number
           description?: string | null
+          expense_id?: string | null
           id?: string
           journal_entry_id: string
           location_id?: string | null
           project_id?: string | null
+          route_id?: string | null
           segment_id?: string | null
+          trip_id?: string | null
         }
         Update: {
           account_id?: string
+          bus_id?: string | null
           business_unit_code?: string | null
           company_id?: string | null
           cost_center_id?: string | null
@@ -8185,11 +8263,14 @@ export type Database = {
           credit?: number
           debit?: number
           description?: string | null
+          expense_id?: string | null
           id?: string
           journal_entry_id?: string
           location_id?: string | null
           project_id?: string | null
+          route_id?: string | null
           segment_id?: string | null
+          trip_id?: string | null
         }
         Relationships: [
           {
@@ -8197,6 +8278,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entry_lines_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
             referencedColumns: ["id"]
           },
           {
@@ -8211,6 +8299,13 @@ export type Database = {
             columns: ["cost_center_id"]
             isOneToOne: false
             referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entry_lines_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "daily_bus_expenses"
             referencedColumns: ["id"]
           },
           {
@@ -8235,10 +8330,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "journal_entry_lines_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "journal_entry_lines_segment_id_fkey"
             columns: ["segment_id"]
             isOneToOne: false
             referencedRelation: "segments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entry_lines_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "daily_trips"
             referencedColumns: ["id"]
           },
         ]
@@ -8294,6 +8403,93 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      leasing_finance_settings: {
+        Row: {
+          ap_prefix: string | null
+          auto_create_ap_invoice: boolean | null
+          auto_create_vendor: boolean | null
+          auto_post_gl_on_payment: boolean | null
+          bank_account_id: string | null
+          business_unit_code: string | null
+          company_id: string | null
+          created_at: string | null
+          gl_prefix: string | null
+          id: string
+          interest_expense_account_id: string | null
+          lease_asset_account_id: string | null
+          leasing_liability_account_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ap_prefix?: string | null
+          auto_create_ap_invoice?: boolean | null
+          auto_create_vendor?: boolean | null
+          auto_post_gl_on_payment?: boolean | null
+          bank_account_id?: string | null
+          business_unit_code?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          gl_prefix?: string | null
+          id?: string
+          interest_expense_account_id?: string | null
+          lease_asset_account_id?: string | null
+          leasing_liability_account_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ap_prefix?: string | null
+          auto_create_ap_invoice?: boolean | null
+          auto_create_vendor?: boolean | null
+          auto_post_gl_on_payment?: boolean | null
+          bank_account_id?: string | null
+          business_unit_code?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          gl_prefix?: string | null
+          id?: string
+          interest_expense_account_id?: string | null
+          lease_asset_account_id?: string | null
+          leasing_liability_account_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leasing_finance_settings_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leasing_finance_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leasing_finance_settings_interest_expense_account_id_fkey"
+            columns: ["interest_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leasing_finance_settings_lease_asset_account_id_fkey"
+            columns: ["lease_asset_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leasing_finance_settings_leasing_liability_account_id_fkey"
+            columns: ["leasing_liability_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
           },
         ]
       }

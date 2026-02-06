@@ -29,7 +29,8 @@ import { YutongFinanceSettings } from "@/components/settings/YutongFinanceSettin
 import { SinotruckFinanceSettings } from "@/components/settings/SinotruckFinanceSettings";
 import { LightVehicleFinanceSettings } from "@/components/settings/LightVehicleFinanceSettings";
 import { NCGExpressFinanceSettings } from "@/components/settings/NCGExpressFinanceSettings";
-import { Truck } from "lucide-react";
+import { LeasingFinanceSettings } from "@/components/settings/LeasingFinanceSettings";
+import { Truck, Wallet as WalletIcon } from "lucide-react";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -157,6 +158,10 @@ export default function Settings() {
           <TabsTrigger value="ncgexpress-finance" className="flex items-center gap-1">
             <Bus className="h-3 w-3" />
             NCG Express Finance
+          </TabsTrigger>
+          <TabsTrigger value="leasing-finance" className="flex items-center gap-1">
+            <WalletIcon className="h-3 w-3" />
+            Leasing Finance
           </TabsTrigger>
         </TabsList>
 
@@ -622,6 +627,10 @@ export default function Settings() {
 
         <TabsContent value="ncgexpress-finance" className="space-y-6 mt-6">
           <NCGExpressFinanceSettings />
+        </TabsContent>
+
+        <TabsContent value="leasing-finance" className="space-y-6 mt-6">
+          <LeasingFinanceSettings />
         </TabsContent>
       </Tabs>
     </div>

@@ -6,10 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { DollarSign, Calendar, TrendingUp, CheckCircle, Clock, AlertCircle, FileDown } from "lucide-react";
+import { DollarSign, Calendar, TrendingUp, CheckCircle, Clock, AlertCircle, FileDown, Receipt, BookOpen } from "lucide-react";
 import { formatCurrency, calculateLoanProgress } from "@/lib/loan-calculator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { 
+  fetchLeasingFinanceSettings, 
+  processLeasingPaymentWithFinance,
+  LeasingFinanceSettings
+} from "@/hooks/useLeasingFinance";
 
 interface BusLoanDashboardModalProps {
   open: boolean;
@@ -20,6 +25,7 @@ interface BusLoanDashboardModalProps {
 
 interface LoanData {
   id: string;
+  bus_id: string;
   loan_amount: number;
   interest_rate: number;
   loan_tenure_months: number;
@@ -29,6 +35,7 @@ interface LoanData {
   lender_name: string;
   loan_type: string;
   status: string;
+  vendor_id?: string;
 }
 
 interface PaymentData {
@@ -41,6 +48,9 @@ interface PaymentData {
   balance_remaining: number;
   payment_status: string;
   actual_payment_date: string | null;
+  journal_entry_id?: string;
+  ap_invoice_id?: string;
+  gl_posted?: boolean;
 }
 
 export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: BusLoanDashboardModalProps) {
@@ -48,10 +58,16 @@ export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: 
   const [loan, setLoan] = useState<LoanData | null>(null);
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
+  const [financeSettings, setFinanceSettings] = useState<LeasingFinanceSettings | null>(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   const fetchLoanData = async () => {
     try {
       setLoading(true);
+
+      // Fetch finance settings
+      const settings = await fetchLeasingFinanceSettings();
+      setFinanceSettings(settings);
 
       // Fetch active loan
       const { data: loanData, error: loanError } = await supabase
@@ -88,9 +104,14 @@ export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: 
   }, [open, busId]);
 
   const handleMarkAsPaid = async () => {
-    if (!selectedPayment) return;
+    if (!selectedPayment || !loan) return;
 
+    const payment = payments.find(p => p.id === selectedPayment);
+    if (!payment) return;
+
+    setProcessingPayment(true);
     try {
+      // Update payment status first
       const { error } = await supabase
         .from("bus_loan_payments")
         .update({
@@ -101,12 +122,40 @@ export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: 
 
       if (error) throw error;
 
-      toast.success("Payment marked as paid");
+      // If finance settings are configured, process finance integration
+      if (financeSettings?.auto_post_gl_on_payment) {
+        const financeResult = await processLeasingPaymentWithFinance({
+          paymentId: selectedPayment,
+          loanId: loan.id,
+          paymentData: {
+            ...payment,
+            actual_payment_date: new Date().toISOString().split("T")[0],
+          },
+          busId: loan.bus_id,
+          busNumber,
+          lenderName: loan.lender_name,
+          vendorId: loan.vendor_id,
+          apInvoiceId: payment.ap_invoice_id,
+        });
+
+        if (financeResult.success && financeResult.journalEntryId) {
+          toast.success(`Payment marked as paid. GL Entry created.`);
+        } else if (!financeResult.success) {
+          toast.warning(`Payment marked as paid, but GL posting failed: ${financeResult.error}`);
+        } else {
+          toast.success("Payment marked as paid");
+        }
+      } else {
+        toast.success("Payment marked as paid");
+      }
+
       setSelectedPayment(null);
       await fetchLoanData();
     } catch (error) {
       console.error("Error marking payment:", error);
       toast.error("Failed to mark payment");
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -141,10 +190,15 @@ export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: 
   const progress = calculateLoanProgress(totalPaid, loan.loan_amount);
   const nextPayment = payments.find((p) => p.payment_status === "pending");
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, glPosted?: boolean) => {
     switch (status) {
       case "paid":
-        return <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />Paid</Badge>;
+        return (
+          <div className="flex items-center gap-1">
+            <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />Paid</Badge>
+            {glPosted && <Badge variant="outline" className="text-xs"><BookOpen className="h-2 w-2 mr-1" />GL</Badge>}
+          </div>
+        );
       case "overdue":
         return <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" />Overdue</Badge>;
       default:
@@ -228,6 +282,33 @@ export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: 
             </Card>
           </div>
 
+          {/* Finance Integration Status */}
+          {financeSettings && (
+            <Card className="bg-muted/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <Receipt className="h-4 w-4 inline mr-1" />
+                  Finance Integration
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  {financeSettings.auto_post_gl_on_payment ? (
+                    <Badge className="bg-green-600">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Auto GL Posting Enabled
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Manual GL Posting
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Loan Details */}
           <Card>
             <CardHeader>
@@ -288,7 +369,7 @@ export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: 
                         <TableCell className="text-right">{formatCurrency(payment.interest_amount)}</TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(payment.total_installment)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(payment.balance_remaining)}</TableCell>
-                        <TableCell>{getStatusBadge(payment.payment_status)}</TableCell>
+                        <TableCell>{getStatusBadge(payment.payment_status, payment.gl_posted)}</TableCell>
                         <TableCell>
                           {payment.payment_status === "pending" && (
                             <Button
@@ -322,11 +403,19 @@ export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: 
             <AlertDialogTitle>Mark Payment as Paid</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to mark this installment as paid? This action will update the payment status and record the payment date.
+              {financeSettings?.auto_post_gl_on_payment && (
+                <span className="block mt-2 text-primary font-medium">
+                  <BookOpen className="h-4 w-4 inline mr-1" />
+                  A GL entry will be automatically created (DR Interest Expense + DR Lease Liability / CR Bank).
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleMarkAsPaid}>Confirm Payment</AlertDialogAction>
+            <AlertDialogCancel disabled={processingPayment}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMarkAsPaid} disabled={processingPayment}>
+              {processingPayment ? "Processing..." : "Confirm Payment"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
