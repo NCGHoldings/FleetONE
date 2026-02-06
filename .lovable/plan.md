@@ -1,340 +1,331 @@
 
-# Complete NCG Express Finance Integration: Bus/Route P&L Reports
+# Document Template System - Complete Fix Plan
 
-## Overview
+## Executive Summary
 
-This implementation completes the NCG Express finance integration by:
-1. Updating GL posting to include bus_id/route_id metadata in journal entry lines
-2. Enhancing the DrillDownModal with bus/route filters
-3. Creating Bus-wise P&L Report
-4. Creating Route-wise P&L Report
-
-The database already has the required columns (`bus_id`, `route_id`, `trip_id`, `expense_id`) in `journal_entry_lines` - we just need to populate them during GL posting.
+The document template system has several issues causing the preview to display incorrectly:
+1. **Company data is empty** - All companies have NULL values for address, phone, email
+2. **Only 1 template exists** - System has 12 document types × 7 companies = 84 potential templates, but only 1 exists
+3. **Template structure needs improvement** - Header, body, and footer separation not enforced
+4. **No fallback templates** - When no template exists, preview shows basic error message
 
 ---
 
-## Part 1: Update NCG Express GL Posting
+## Issues Analysis
 
-### File: `src/hooks/useNCGExpressFinance.ts`
+### Issue 1: Missing Company Data
+The screenshot shows "Tel: | Email:" with empty values because the companies table has no contact data:
 
-Update both `postTripRevenueToGL` and `postExpensesToGL` functions to include bus_id and route_id in journal entry lines.
+| Company | Address | Phone | Email |
+|---------|---------|-------|-------|
+| NCG Holding | NULL | NULL | NULL |
+| School Bus Operations | NULL | NULL | NULL |
+| Yutong Sales | NULL | NULL | NULL |
+| Special Hire | NULL | NULL | NULL |
+| Light Vehicle Sales | NULL | NULL | NULL |
+| Sinotruck Sales | NULL | NULL | NULL |
+| NCG Express | NULL | NULL | NULL |
 
-**Current State (lines 215-232):**
-```typescript
-const lines = [
-  {
-    journal_entry_id: journalEntry.id,
-    account_id: settings.cash_account_id,
-    debit: trip.income,
-    credit: 0,
-    description: `Cash from trip - ${routeName}`,
-    company_id: NCG_EXPRESS_COMPANY_ID,
-  },
-  // ...
-];
+**Fix**: User needs to populate company details in Settings → Company Management
+
+### Issue 2: Missing Templates
+Current state: Only 1 template exists (AR Invoice for School Bus Operations named "ar")
+
+**Required Templates** (12 document types × 7 companies):
+```
+AR Module:
+- ar_invoice (AR Invoice / Sales Invoice)
+- ar_receipt (AR Receipt / Sales Receipt)
+- ar_credit_note (AR Credit Note)
+- advance_receipt (Advance Payment Receipt)
+
+AP Module:
+- ap_invoice (AP Invoice / Purchase Invoice)
+- ap_payment_voucher (AP Payment Voucher)
+- ap_debit_note (AP Debit Note)
+- advance_payment (Advance Payment Voucher)
+
+Other Modules:
+- journal_voucher (General Journal Voucher)
+- cheque_voucher (Cheque Payment Voucher)
+- wht_certificate (WHT Certificate)
+- grn (Goods Receipt Note)
 ```
 
-**Updated State:**
-```typescript
-const lines = [
-  {
-    journal_entry_id: journalEntry.id,
-    account_id: settings.cash_account_id,
-    debit: trip.income,
-    credit: 0,
-    description: `Cash from trip - ${routeName}`,
-    company_id: NCG_EXPRESS_COMPANY_ID,
-    bus_id: trip.bus_id || null,        // NEW
-    route_id: trip.route_id || null,    // NEW
-    trip_id: trip.id,                    // NEW
-  },
-  // ...
-];
-```
-
-Similarly update expense posting to include `bus_id` and `expense_id` in journal lines.
+### Issue 3: Template Structure
+Current template embeds all HTML including header, body, footer in one field. Need structured sections for consistent rendering.
 
 ---
 
-## Part 2: Enhance DrillDownModal with Bus/Route Filters
+## Solution Architecture
 
-### File: `src/components/accounting/DrillDownModal.tsx`
+### Part 1: Template Seeder System
 
-Add new filter dropdowns for Bus and Route selection.
+Create a new utility to auto-generate professional templates for all document types.
 
-**Changes:**
-1. Add state for `busFilter` and `routeFilter`
-2. Fetch buses and routes lists
-3. Add filter dropdowns in the filter bar
-4. Update query to filter by bus_id/route_id when selected
-5. Add Bus/Route columns to the table display
-6. Include in CSV export
-
-**New Query Structure:**
+#### New File: `src/lib/document-template-seeder.ts`
 ```typescript
-let query = supabase
-  .from("journal_entry_lines")
-  .select(`
-    id, debit, credit, description, created_at,
-    bus_id, route_id, trip_id, expense_id,
-    buses:bus_id(bus_no),
-    routes:route_id(route_name),
-    journal_entries!inner(...)
-  `)
-  .eq("account_id", accountId);
-
-// Apply bus filter
-if (busFilter && busFilter !== "_all") {
-  query = query.eq("bus_id", busFilter);
-}
-
-// Apply route filter
-if (routeFilter && routeFilter !== "_all") {
-  query = query.eq("route_id", routeFilter);
-}
+// Professional template generators for each document type
+export const defaultTemplates = {
+  ar_invoice: generateARInvoiceTemplate(),
+  ar_receipt: generateARReceiptTemplate(),
+  ar_credit_note: generateCreditNoteTemplate(),
+  ap_invoice: generateAPInvoiceTemplate(),
+  ap_payment_voucher: generatePaymentVoucherTemplate(),
+  ap_debit_note: generateDebitNoteTemplate(),
+  advance_receipt: generateAdvanceReceiptTemplate(),
+  advance_payment: generateAdvancePaymentTemplate(),
+  journal_voucher: generateJournalVoucherTemplate(),
+  cheque_voucher: generateChequeVoucherTemplate(),
+  wht_certificate: generateWHTCertificateTemplate(),
+  grn: generateGRNTemplate(),
+};
 ```
 
----
+### Part 2: Template HTML Structure
 
-## Part 3: Bus-wise P&L Report
-
-### New File: `src/components/ncg-express/BusProfitabilityReport.tsx`
-
-A comprehensive report showing profitability per bus.
-
-**Features:**
-- Date range selector
-- KPI cards: Total Revenue, Total Expenses, Net Profit, Profit Margin
-- Bar chart comparing bus profitability
-- Detailed table with sortable columns
-- Export to CSV/PDF
-
-**Data Structure:**
-```typescript
-interface BusProfitability {
-  busId: string;
-  busNo: string;
-  category: string;
-  totalRevenue: number;
-  totalExpenses: number;
-  fuelCost: number;
-  maintenanceCost: number;
-  salaryCost: number;
-  otherCosts: number;
-  netProfit: number;
-  profitMargin: number;
-  tripCount: number;
-  totalKm: number;
-  profitPerKm: number;
-}
+Each template will follow this structure:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    /* Page setup for A4 printing */
+    @page { size: A4 portrait; margin: 15mm; }
+    @media print { body { -webkit-print-color-adjust: exact; } }
+    
+    /* Header section */
+    .document-header { /* styling */ }
+    
+    /* Body section */
+    .document-body { /* styling */ }
+    
+    /* Footer section */
+    .document-footer { /* styling */ }
+  </style>
+</head>
+<body>
+  <!-- HEADER SECTION -->
+  <div class="document-header">
+    {{company_logo}}
+    <div class="company-info">
+      <h1>{{company_name}}</h1>
+      <p>{{company_address}}</p>
+      <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
+    </div>
+  </div>
+  
+  <!-- BODY SECTION -->
+  <div class="document-body">
+    <h2 class="document-title">INVOICE</h2>
+    <!-- Document-specific content -->
+  </div>
+  
+  <!-- FOOTER SECTION -->
+  <div class="document-footer">
+    <div class="signature-area">...</div>
+    <div class="footer-notes">{{notes}}</div>
+  </div>
+</body>
+</html>
 ```
 
-**Query Approach:**
-```typescript
-// Aggregate revenue from daily_trips
-const { data: revenueData } = await supabase
-  .from('daily_trips')
-  .select('bus_id, income, km_run, buses(bus_no, category)')
-  .gte('trip_date', startDate)
-  .lte('trip_date', endDate);
+### Part 3: New Files to Create
 
-// Aggregate expenses from daily_bus_expenses
-const { data: expenseData } = await supabase
-  .from('daily_bus_expenses')
-  .select('bus_id, fuel_cost, repair, salary, ..., buses(bus_no)')
-  .gte('expense_date', startDate)
-  .lte('expense_date', endDate);
-```
-
----
-
-## Part 4: Route-wise P&L Report
-
-### New File: `src/components/ncg-express/RouteProfitabilityReport.tsx`
-
-A report showing profitability per route.
-
-**Features:**
-- Date range selector
-- KPI cards: Best Route, Worst Route, Average Revenue/Trip
-- Line chart showing revenue trend by route
-- Detailed table with cost allocation
-- Export capabilities
-
-**Data Structure:**
-```typescript
-interface RouteProfitability {
-  routeId: string;
-  routeName: string;
-  totalRevenue: number;
-  allocatedExpenses: number;
-  tripCount: number;
-  averageRevenuePerTrip: number;
-  totalKm: number;
-  revenuePerKm: number;
-  estimatedProfit: number;
-  profitMargin: number;
-}
-```
-
-**Expense Allocation Logic:**
-Since expenses are tracked at bus level, we'll allocate expenses to routes proportionally based on trip count or KM:
-```typescript
-// Calculate expense allocation per bus
-const busExpenseMap = new Map();
-expenseData.forEach(exp => {
-  busExpenseMap.set(exp.bus_id, calculateTotalExpense(exp));
-});
-
-// Allocate to routes based on trips
-routeTripData.forEach(route => {
-  const busTrips = route.trips;
-  busTrips.forEach(trip => {
-    const busExpense = busExpenseMap.get(trip.bus_id);
-    const allocationRatio = 1 / busTripsCount[trip.bus_id];
-    route.allocatedExpense += busExpense * allocationRatio;
-  });
-});
-```
-
----
-
-## Part 5: Hook for Profitability Data
-
-### New File: `src/hooks/useNCGExpressProfitability.ts`
-
-A dedicated hook for fetching profitability data.
-
-```typescript
-export function useBusProfitability(startDate: Date, endDate: Date) {
-  return useQuery({
-    queryKey: ['ncge-bus-profitability', startDate, endDate],
-    queryFn: async () => {
-      // Fetch and aggregate data
-    }
-  });
-}
-
-export function useRouteProfitability(startDate: Date, endDate: Date) {
-  return useQuery({
-    queryKey: ['ncge-route-profitability', startDate, endDate],
-    queryFn: async () => {
-      // Fetch and aggregate data
-    }
-  });
-}
-```
-
----
-
-## Part 6: Integration into NCG Express Module
-
-### Update NCG Express Navigation
-
-Add the new reports to the NCG Express section of the application.
-
-**Location:** Add tabs/buttons in the Daily Trips or a dedicated NCG Express Finance Reports page.
-
-```typescript
-<Tabs defaultValue="trips">
-  <TabsList>
-    <TabsTrigger value="trips">Daily Trips</TabsTrigger>
-    <TabsTrigger value="expenses">Expenses</TabsTrigger>
-    <TabsTrigger value="bus-pl">Bus P&L</TabsTrigger>
-    <TabsTrigger value="route-pl">Route P&L</TabsTrigger>
-  </TabsList>
-</Tabs>
-```
-
----
-
-## Implementation Sequence
-
-| Step | Task | File(s) |
-|------|------|---------|
-| 1 | Update GL posting with bus_id/route_id | `useNCGExpressFinance.ts` |
-| 2 | Create profitability data hook | `useNCGExpressProfitability.ts` (new) |
-| 3 | Enhance DrillDownModal with filters | `DrillDownModal.tsx` |
-| 4 | Create Bus P&L Report | `BusProfitabilityReport.tsx` (new) |
-| 5 | Create Route P&L Report | `RouteProfitabilityReport.tsx` (new) |
-| 6 | Integrate into navigation | `DailyTrips.tsx` or new page |
-
----
-
-## Visual Preview
-
-### Bus P&L Report Layout
-```
-+------------------------------------------------------------------+
-|  NCG EXPRESS - BUS PROFITABILITY REPORT                          |
-+------------------------------------------------------------------+
-|  [Date Range: Jan 1 - Jan 31, 2026]  [Export CSV] [Export PDF]   |
-+------------------------------------------------------------------+
-
-+---------------+  +---------------+  +---------------+  +---------------+
-| TOTAL REVENUE |  | TOTAL EXPENSE |  | NET PROFIT    |  | AVG MARGIN    |
-| Rs 4,500,000  |  | Rs 3,200,000  |  | Rs 1,300,000  |  | 28.9%         |
-+---------------+  +---------------+  +---------------+  +---------------+
-
-[=============== BAR CHART: Profit by Bus ================]
-
-+-------+----------+------------+------------+-----------+--------+
-| BUS   | REVENUE  | EXPENSES   | PROFIT     | MARGIN    | TRIPS  |
-+-------+----------+------------+------------+-----------+--------+
-| NC-01 | 450,000  | 320,000    | 130,000    | 28.9%     | 45     |
-| NC-02 | 380,000  | 290,000    | 90,000     | 23.7%     | 38     |
-| NC-03 | 520,000  | 400,000    | 120,000    | 23.1%     | 52     |
-+-------+----------+------------+------------+-----------+--------+
-```
-
-### Route P&L Report Layout
-```
-+------------------------------------------------------------------+
-|  NCG EXPRESS - ROUTE PROFITABILITY REPORT                        |
-+------------------------------------------------------------------+
-
-+---------------+  +---------------+  +---------------+  +---------------+
-| BEST ROUTE    |  | WORST ROUTE   |  | AVG REV/TRIP  |  | TOTAL ROUTES  |
-| CMB-KDY       |  | CMB-ANU       |  | Rs 12,500     |  | 15            |
-| Rs 850,000    |  | Rs 120,000    |  |               |  |               |
-+---------------+  +---------------+  +---------------+  +---------------+
-
-[============= LINE CHART: Revenue Trend by Route ==============]
-
-+------------+----------+-------------+-------+-----------+--------+
-| ROUTE      | REVENUE  | ALLOC. EXP  | TRIPS | REV/TRIP  | MARGIN |
-+------------+----------+-------------+-------+-----------+--------+
-| CMB-KDY    | 850,000  | 580,000     | 70    | 12,143    | 31.8%  |
-| CMB-GLI    | 620,000  | 450,000     | 55    | 11,273    | 27.4%  |
-| CMB-ANU    | 120,000  | 95,000      | 12    | 10,000    | 20.8%  |
-+------------+----------+-------------+-------+-----------+--------+
-```
-
----
-
-## Files Summary
-
-### New Files
 | File | Purpose |
 |------|---------|
-| `src/hooks/useNCGExpressProfitability.ts` | Data fetching hooks for bus/route P&L |
-| `src/components/ncg-express/BusProfitabilityReport.tsx` | Bus-wise P&L report UI |
-| `src/components/ncg-express/RouteProfitabilityReport.tsx` | Route-wise P&L report UI |
+| `src/lib/document-template-seeder.ts` | Template generation utilities |
+| `src/components/accounting/settings/TemplateInitializerButton.tsx` | Button to seed all templates |
 
-### Updated Files
+### Part 4: Files to Update
+
 | File | Changes |
 |------|---------|
-| `src/hooks/useNCGExpressFinance.ts` | Add bus_id/route_id to journal lines |
-| `src/components/accounting/DrillDownModal.tsx` | Add bus/route filter dropdowns |
-| `src/pages/DailyTrips.tsx` | Add tabs for P&L reports |
+| `src/components/accounting/settings/DocumentTemplateManager.tsx` | Add "Initialize All Templates" button |
+| `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx` | Improved fallback rendering |
+| `src/lib/document-template-utils.ts` | Enhanced placeholder mapping |
 
 ---
 
-## Expected Outcome
+## Implementation Details
+
+### Step 1: Create Template Seeder
+
+Generate professional HTML templates for all 12 document types with:
+- Consistent header with company branding
+- Document-specific body sections
+- Signature areas and footer
+- Print-optimized CSS
+
+### Step 2: Update DocumentTemplateManager
+
+Add "Initialize Templates" button that:
+1. Checks which templates are missing for each company
+2. Creates default templates from seeder
+3. Reports success/failure
+
+### Step 3: Improve Preview Modal
+
+When no template exists:
+- Show professional fallback with clear guidance
+- Option to auto-create template
+- Display document data in basic format
+
+### Step 4: Template HTML Examples
+
+**AR Invoice Template:**
+```html
+<!-- Professional invoice with header image support -->
+<div class="document-header">
+  <div class="header-row">
+    <div class="logo-area">{{company_logo}}</div>
+    <div class="company-details">
+      <h1>{{company_name}}</h1>
+      <p>{{company_address}}</p>
+      <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
+      <p>TIN: {{company_tax_id}}</p>
+    </div>
+  </div>
+</div>
+
+<div class="document-body">
+  <h2 class="title">TAX INVOICE</h2>
+  
+  <div class="info-grid">
+    <div class="info-row">
+      <span class="label">Invoice No:</span>
+      <span class="value">{{invoice_number}}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Date:</span>
+      <span class="value">{{invoice_date}}</span>
+    </div>
+    <!-- More fields -->
+  </div>
+  
+  <div class="customer-section">
+    <h3>Bill To:</h3>
+    <p><strong>{{customer_name}}</strong></p>
+    <p>{{customer_address}}</p>
+  </div>
+  
+  {{line_items}}
+  
+  <div class="totals-section">
+    <div class="total-row"><span>Subtotal:</span><span>{{subtotal}}</span></div>
+    <div class="total-row"><span>Tax:</span><span>{{tax_amount}}</span></div>
+    <div class="total-row grand"><span>Total:</span><span>{{total_amount}}</span></div>
+    <div class="amount-words">{{amount_in_words}}</div>
+  </div>
+</div>
+
+<div class="document-footer">
+  <div class="signature-grid">
+    <div class="sig-box"><div class="sig-line">Prepared By</div></div>
+    <div class="sig-box"><div class="sig-line">Authorized Signature</div></div>
+  </div>
+  <div class="footer-notes">{{notes}}</div>
+</div>
+```
+
+**AR Receipt Template:**
+```html
+<div class="document-header">
+  {{company_logo}}
+  <h1>{{company_name}}</h1>
+  <p>{{company_address}}</p>
+</div>
+
+<div class="document-body">
+  <h2>RECEIPT</h2>
+  
+  <div class="receipt-details">
+    <div><strong>Receipt No:</strong> {{receipt_number}}</div>
+    <div><strong>Date:</strong> {{receipt_date}}</div>
+    <div><strong>Received From:</strong> {{customer_name}}</div>
+  </div>
+  
+  <div class="amount-box">
+    <div class="amount">{{amount}}</div>
+    <div class="words">{{amount_in_words}}</div>
+  </div>
+  
+  <div class="payment-info">
+    <div><strong>Payment Method:</strong> {{payment_method}}</div>
+    <div><strong>Reference:</strong> {{reference}}</div>
+  </div>
+  
+  {{allocations}}
+</div>
+
+<div class="document-footer">
+  <div class="signature-area">
+    <div class="sig-line">Received By</div>
+  </div>
+</div>
+```
+
+---
+
+## User Actions Required
+
+### Before Implementation:
+1. **Populate Company Data** - Go to Settings → Company Management → Edit each company to add:
+   - Address
+   - Phone number
+   - Email
+   - Tax Registration Number
+   - Logo (optional)
+
+### After Implementation:
+1. **Initialize Templates** - Click "Initialize All Templates" button in Document Templates settings
+2. **Customize Templates** - Edit any template to match specific branding needs
+3. **Set Default Templates** - Mark one template per type as "Default"
+
+---
+
+## File Changes Summary
+
+### New Files
+```
+src/lib/document-template-seeder.ts
+src/components/accounting/settings/TemplateInitializerButton.tsx
+```
+
+### Modified Files
+```
+src/components/accounting/settings/DocumentTemplateManager.tsx
+src/components/accounting/shared/FinanceDocumentPreviewModal.tsx
+src/lib/document-template-utils.ts
+```
+
+---
+
+## Expected Results
 
 After implementation:
-1. All NCG Express GL postings will include bus and route metadata
-2. Finance team can filter ledger drill-downs by specific buses or routes
-3. Management can view bus-wise profitability to identify high/low performers
-4. Route profitability analysis enables data-driven route optimization
-5. All reports exportable to CSV/PDF for external sharing
+1. All 12 document types will have professional default templates
+2. Templates will display company header correctly when company data is filled
+3. Header images (logos) will render properly in preview and print
+4. Document body with line items, amounts will be properly formatted
+5. Footer with signatures will display correctly
+6. Print/PDF output will match A4 page dimensions
+
+---
+
+## Template Type Matrix
+
+| Document Type | Module | Key Placeholders |
+|---------------|--------|------------------|
+| AR Invoice | AR | invoice_number, customer_name, line_items, total_amount |
+| AR Receipt | AR | receipt_number, customer_name, amount, payment_method |
+| AR Credit Note | AR | credit_note_number, original_invoice, amount, reason |
+| AP Invoice | AP | invoice_number, vendor_name, line_items, total_amount |
+| AP Payment Voucher | AP | voucher_number, vendor_name, amount, cheque_number |
+| AP Debit Note | AP | debit_note_number, vendor_name, amount, reason |
+| Advance Receipt | AR | receipt_number, customer_name, amount, purpose |
+| Advance Payment | AP | voucher_number, vendor_name, amount, purpose |
+| Journal Voucher | GL | voucher_number, journal_lines, total_debit, total_credit |
+| Cheque Voucher | Banking | voucher_number, payee_name, amount, cheque_number |
+| WHT Certificate | Tax | certificate_number, vendor_name, wht_amount |
+| GRN | Inventory | grn_number, supplier_name, items |
