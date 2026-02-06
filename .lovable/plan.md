@@ -1,331 +1,407 @@
 
-# Document Template System - Complete Fix Plan
+# School Bus Fuel Expense & Finance Integration System
 
 ## Executive Summary
 
-The document template system has several issues causing the preview to display incorrectly:
-1. **Company data is empty** - All companies have NULL values for address, phone, email
-2. **Only 1 template exists** - System has 12 document types × 7 companies = 84 potential templates, but only 1 exists
-3. **Template structure needs improvement** - Header, body, and footer separation not enforced
-4. **No fallback templates** - When no template exists, preview shows basic error message
+This plan creates a complete interconnected system for School Bus Operations (SBO) fuel expense management with:
+1. Dedicated Fuel Bank Account mapping per branch
+2. Automated fuel expense recording with GL posting
+3. Inter-bank fund transfer functionality with proper double entries
+4. Real-time COA balance updates
+5. Complete audit trail from operation to finance
 
 ---
 
-## Issues Analysis
+## Current State Analysis
 
-### Issue 1: Missing Company Data
-The screenshot shows "Tel: | Email:" with empty values because the companies table has no contact data:
+### What Exists:
+- `school_bus_finance_settings` table has `fuel_expense_account_id` for GL expense account
+- `expense_cash_account_id` for general expense cash account
+- Branch-wise settings with `branch_gl_account_id`
+- `ExpenseRequestForm` component for creating expense requests
+- `bank_transactions` table with transfer_in/transfer_out types
+- Bank transaction form with basic transfer functionality
 
-| Company | Address | Phone | Email |
-|---------|---------|-------|-------|
-| NCG Holding | NULL | NULL | NULL |
-| School Bus Operations | NULL | NULL | NULL |
-| Yutong Sales | NULL | NULL | NULL |
-| Special Hire | NULL | NULL | NULL |
-| Light Vehicle Sales | NULL | NULL | NULL |
-| Sinotruck Sales | NULL | NULL | NULL |
-| NCG Express | NULL | NULL | NULL |
-
-**Fix**: User needs to populate company details in Settings → Company Management
-
-### Issue 2: Missing Templates
-Current state: Only 1 template exists (AR Invoice for School Bus Operations named "ar")
-
-**Required Templates** (12 document types × 7 companies):
-```
-AR Module:
-- ar_invoice (AR Invoice / Sales Invoice)
-- ar_receipt (AR Receipt / Sales Receipt)
-- ar_credit_note (AR Credit Note)
-- advance_receipt (Advance Payment Receipt)
-
-AP Module:
-- ap_invoice (AP Invoice / Purchase Invoice)
-- ap_payment_voucher (AP Payment Voucher)
-- ap_debit_note (AP Debit Note)
-- advance_payment (Advance Payment Voucher)
-
-Other Modules:
-- journal_voucher (General Journal Voucher)
-- cheque_voucher (Cheque Payment Voucher)
-- wht_certificate (WHT Certificate)
-- grn (Goods Receipt Note)
-```
-
-### Issue 3: Template Structure
-Current template embeds all HTML including header, body, footer in one field. Need structured sections for consistent rendering.
+### What's Missing:
+1. **No dedicated Fuel Bank Account mapping** - branches need specific fuel bank accounts
+2. **No branch-wise fuel bank mapping** - each branch may use different fuel banks
+3. **No automated GL posting for fuel expenses** - currently manual process
+4. **No inter-bank fund transfer with GL entries** - basic transfer exists but no accounting integration
+5. **No fuel expense-to-AP workflow** - fuel bills not creating AP invoices automatically
 
 ---
 
 ## Solution Architecture
 
-### Part 1: Template Seeder System
+### Part 1: Database Schema Updates
 
-Create a new utility to auto-generate professional templates for all document types.
-
-#### New File: `src/lib/document-template-seeder.ts`
-```typescript
-// Professional template generators for each document type
-export const defaultTemplates = {
-  ar_invoice: generateARInvoiceTemplate(),
-  ar_receipt: generateARReceiptTemplate(),
-  ar_credit_note: generateCreditNoteTemplate(),
-  ap_invoice: generateAPInvoiceTemplate(),
-  ap_payment_voucher: generatePaymentVoucherTemplate(),
-  ap_debit_note: generateDebitNoteTemplate(),
-  advance_receipt: generateAdvanceReceiptTemplate(),
-  advance_payment: generateAdvancePaymentTemplate(),
-  journal_voucher: generateJournalVoucherTemplate(),
-  cheque_voucher: generateChequeVoucherTemplate(),
-  wht_certificate: generateWHTCertificateTemplate(),
-  grn: generateGRNTemplate(),
-};
+#### Add Fuel Bank Account Column to Settings
+```sql
+ALTER TABLE school_bus_finance_settings 
+ADD COLUMN IF NOT EXISTS fuel_bank_account_id UUID REFERENCES chart_of_accounts(id);
 ```
 
-### Part 2: Template HTML Structure
-
-Each template will follow this structure:
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    /* Page setup for A4 printing */
-    @page { size: A4 portrait; margin: 15mm; }
-    @media print { body { -webkit-print-color-adjust: exact; } }
-    
-    /* Header section */
-    .document-header { /* styling */ }
-    
-    /* Body section */
-    .document-body { /* styling */ }
-    
-    /* Footer section */
-    .document-footer { /* styling */ }
-  </style>
-</head>
-<body>
-  <!-- HEADER SECTION -->
-  <div class="document-header">
-    {{company_logo}}
-    <div class="company-info">
-      <h1>{{company_name}}</h1>
-      <p>{{company_address}}</p>
-      <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-    </div>
-  </div>
+#### Create Inter-Bank Transfer Table
+```sql
+CREATE TABLE inter_bank_transfers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  transfer_number VARCHAR(50) NOT NULL,
+  transfer_date DATE NOT NULL,
   
-  <!-- BODY SECTION -->
-  <div class="document-body">
-    <h2 class="document-title">INVOICE</h2>
-    <!-- Document-specific content -->
-  </div>
+  -- Source Bank
+  from_bank_account_id UUID REFERENCES bank_accounts(id) NOT NULL,
+  from_gl_account_id UUID REFERENCES chart_of_accounts(id) NOT NULL,
   
-  <!-- FOOTER SECTION -->
-  <div class="document-footer">
-    <div class="signature-area">...</div>
-    <div class="footer-notes">{{notes}}</div>
-  </div>
-</body>
-</html>
+  -- Destination Bank
+  to_bank_account_id UUID REFERENCES bank_accounts(id) NOT NULL,
+  to_gl_account_id UUID REFERENCES chart_of_accounts(id) NOT NULL,
+  
+  amount NUMERIC(15,2) NOT NULL,
+  reference VARCHAR(100),
+  notes TEXT,
+  
+  -- Journal Entry Link
+  journal_entry_id UUID REFERENCES journal_entries(id),
+  
+  -- Audit
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
-
-### Part 3: New Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/lib/document-template-seeder.ts` | Template generation utilities |
-| `src/components/accounting/settings/TemplateInitializerButton.tsx` | Button to seed all templates |
-
-### Part 4: Files to Update
-
-| File | Changes |
-|------|---------|
-| `src/components/accounting/settings/DocumentTemplateManager.tsx` | Add "Initialize All Templates" button |
-| `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx` | Improved fallback rendering |
-| `src/lib/document-template-utils.ts` | Enhanced placeholder mapping |
 
 ---
 
-## Implementation Details
+### Part 2: Complete System Flow
 
-### Step 1: Create Template Seeder
+```
++================================================================================+
+|           SCHOOL BUS FUEL EXPENSE & FINANCE INTEGRATION FLOW                    |
++================================================================================+
 
-Generate professional HTML templates for all 12 document types with:
-- Consistent header with company branding
-- Document-specific body sections
-- Signature areas and footer
-- Print-optimized CSS
-
-### Step 2: Update DocumentTemplateManager
-
-Add "Initialize Templates" button that:
-1. Checks which templates are missing for each company
-2. Creates default templates from seeder
-3. Reports success/failure
-
-### Step 3: Improve Preview Modal
-
-When no template exists:
-- Show professional fallback with clear guidance
-- Option to auto-create template
-- Display document data in basic format
-
-### Step 4: Template HTML Examples
-
-**AR Invoice Template:**
-```html
-<!-- Professional invoice with header image support -->
-<div class="document-header">
-  <div class="header-row">
-    <div class="logo-area">{{company_logo}}</div>
-    <div class="company-details">
-      <h1>{{company_name}}</h1>
-      <p>{{company_address}}</p>
-      <p>Tel: {{company_phone}} | Email: {{company_email}}</p>
-      <p>TIN: {{company_tax_id}}</p>
-    </div>
-  </div>
-</div>
-
-<div class="document-body">
-  <h2 class="title">TAX INVOICE</h2>
-  
-  <div class="info-grid">
-    <div class="info-row">
-      <span class="label">Invoice No:</span>
-      <span class="value">{{invoice_number}}</span>
-    </div>
-    <div class="info-row">
-      <span class="label">Date:</span>
-      <span class="value">{{invoice_date}}</span>
-    </div>
-    <!-- More fields -->
-  </div>
-  
-  <div class="customer-section">
-    <h3>Bill To:</h3>
-    <p><strong>{{customer_name}}</strong></p>
-    <p>{{customer_address}}</p>
-  </div>
-  
-  {{line_items}}
-  
-  <div class="totals-section">
-    <div class="total-row"><span>Subtotal:</span><span>{{subtotal}}</span></div>
-    <div class="total-row"><span>Tax:</span><span>{{tax_amount}}</span></div>
-    <div class="total-row grand"><span>Total:</span><span>{{total_amount}}</span></div>
-    <div class="amount-words">{{amount_in_words}}</div>
-  </div>
-</div>
-
-<div class="document-footer">
-  <div class="signature-grid">
-    <div class="sig-box"><div class="sig-line">Prepared By</div></div>
-    <div class="sig-box"><div class="sig-line">Authorized Signature</div></div>
-  </div>
-  <div class="footer-notes">{{notes}}</div>
-</div>
+                           FUND MANAGEMENT
++----------------+     +------------------+     +------------------+
+|   MAIN BANK    |     |   FUND TRANSFER  |     |   FUEL BANK      |
+| (Company Bank) |---->|   DR Fuel Bank   |---->| (Dedicated Fuel) |
+|                |     |   CR Main Bank   |     |                  |
++----------------+     +------------------+     +------------------+
+                              |                         |
+                              v                         |
+                       +--------------+                 |
+                       | JE Created   |                 |
+                       | + COA Update |                 |
+                       +--------------+                 |
+                                                        |
+                                                        v
+                          EXPENSE WORKFLOW
++----------------+     +------------------+     +------------------+
+|   OPERATIONS   |     |   EXPENSE PAGE   |     |   FINANCE TEAM   |
+| (Branch Staff) |---->| Add Fuel Expense |---->|  Review/Approve  |
+|                |     | - Amount         |     |                  |
++----------------+     | - Fuel Station   |     +------------------+
+                       | - Branch         |              |
+                       | - Bus (optional) |              |
+                       +------------------+              |
+                              |                         |
+                              v                         v
+                       +--------------+          +--------------+
+                       | GL AUTO-POST |<---------|  AP INVOICE  |
+                       +--------------+          | (if vendor)  |
+                       | DR Fuel Exp  |          +--------------+
+                       | CR Fuel Bank |
+                       +--------------+
+                              |
+                              v
+                       +--------------+
+                       | COA BALANCE  |
+                       | UPDATE       |
+                       +--------------+
+                       | - Fuel Exp (+)|
+                       | - Fuel Bank(-)|
+                       +--------------+
 ```
 
-**AR Receipt Template:**
-```html
-<div class="document-header">
-  {{company_logo}}
-  <h1>{{company_name}}</h1>
-  <p>{{company_address}}</p>
-</div>
+---
 
-<div class="document-body">
-  <h2>RECEIPT</h2>
-  
-  <div class="receipt-details">
-    <div><strong>Receipt No:</strong> {{receipt_number}}</div>
-    <div><strong>Date:</strong> {{receipt_date}}</div>
-    <div><strong>Received From:</strong> {{customer_name}}</div>
-  </div>
-  
-  <div class="amount-box">
-    <div class="amount">{{amount}}</div>
-    <div class="words">{{amount_in_words}}</div>
-  </div>
-  
-  <div class="payment-info">
-    <div><strong>Payment Method:</strong> {{payment_method}}</div>
-    <div><strong>Reference:</strong> {{reference}}</div>
-  </div>
-  
-  {{allocations}}
-</div>
+### Part 3: GL Double Entry Mappings
 
-<div class="document-footer">
-  <div class="signature-area">
-    <div class="sig-line">Received By</div>
-  </div>
-</div>
+#### 1. Fund Transfer (Main Bank to Fuel Bank)
+| Account | Debit | Credit | Description |
+|---------|-------|--------|-------------|
+| Fuel Bank (Asset) | Rs 500,000 | | Increase fuel bank balance |
+| Main Bank (Asset) | | Rs 500,000 | Decrease main bank balance |
+
+#### 2. Fuel Expense Recording
+| Account | Debit | Credit | Description |
+|---------|-------|--------|-------------|
+| Fuel Expense | Rs 25,000 | | Expense for fuel purchase |
+| Fuel Bank (Asset) | | Rs 25,000 | Payment from fuel bank |
+
+#### 3. If Fuel Bill Goes Through AP (Credit Purchase)
+**Step 1: AP Invoice Created**
+| Account | Debit | Credit |
+|---------|-------|--------|
+| Fuel Expense | Rs 25,000 | |
+| Trade Payable | | Rs 25,000 |
+
+**Step 2: AP Payment**
+| Account | Debit | Credit |
+|---------|-------|--------|
+| Trade Payable | Rs 25,000 | |
+| Fuel Bank | | Rs 25,000 |
+
+---
+
+### Part 4: Implementation Files
+
+#### New Files to Create:
+
+| File | Purpose |
+|------|---------|
+| `src/hooks/useFuelExpenseFinance.ts` | Hook for fuel expense GL posting |
+| `src/hooks/useInterBankTransfer.ts` | Hook for inter-bank transfers |
+| `src/components/accounting/InterBankTransferForm.tsx` | UI for fund transfers |
+| `src/components/accounting/InterBankTransferList.tsx` | Transfer history view |
+| `src/components/school/FuelExpenseForm.tsx` | Dedicated fuel expense entry |
+
+#### Files to Update:
+
+| File | Changes |
+|------|---------|
+| `src/components/school/SchoolBusFinanceSettings.tsx` | Add Fuel Bank Account mapping per branch |
+| `src/hooks/useSchoolBusFinance.ts` | Add fuel_bank_account_id to settings interface |
+| `src/components/accounting/BankingView.tsx` | Add Inter-Bank Transfer tab |
+| `src/pages/Accounting.tsx` | Add Fund Transfer section |
+
+---
+
+### Part 5: Settings UI Updates
+
+#### School Bus Finance Settings - New Section
+
+```
++------------------------------------------------------------------+
+|  FUEL EXPENSE GL ACCOUNT MAPPINGS                                 |
++------------------------------------------------------------------+
+|                                                                   |
+|  +------------------------+    +------------------------+         |
+|  | Fuel Expense Account   |    | Fuel Bank Account      |         |
+|  | [Fuel/Diesel Expense]  |    | [SBO Fuel Bank - BOC]  |         |
+|  +------------------------+    +------------------------+         |
+|                                                                   |
+|  Branch-wise Fuel Bank Mapping:                                   |
+|  +----------+-----------------------+--------+                    |
+|  | Branch   | Fuel Bank Account     | Status |                    |
+|  +----------+-----------------------+--------+                    |
+|  | Nugegoda | BOC Fuel Account 001  |   ✓    |                    |
+|  | LNU      | BOC Fuel Account 002  |   ✓    |                    |
+|  | Kurunegala| Sampath Fuel Acct    |   ✓    |                    |
+|  +----------+-----------------------+--------+                    |
+|                                                                   |
+|  [x] Auto-post fuel expenses to GL                                |
+|  [x] Create AP Invoice for credit fuel purchases                  |
+|                                                                   |
++------------------------------------------------------------------+
+```
+
+---
+
+### Part 6: Inter-Bank Transfer UI
+
+```
++------------------------------------------------------------------+
+|  INTER-BANK FUND TRANSFER                                         |
++------------------------------------------------------------------+
+|                                                                   |
+|  Transfer Number: IBT-2026-0001 (auto-generated)                  |
+|                                                                   |
+|  +------------------------+    +------------------------+         |
+|  | From Account           |    | To Account             |         |
+|  | [Main Operating Bank]  |    | [Fuel Bank Account]    |         |
+|  | Balance: Rs 2,500,000  |    | Balance: Rs 150,000    |         |
+|  +------------------------+    +------------------------+         |
+|                                                                   |
+|  Amount: [___500,000___] LKR                                      |
+|  Reference: [___FUEL-TOPUP-JAN___]                                |
+|  Date: [___2026-02-06___]                                         |
+|                                                                   |
+|  GL Preview:                                                      |
+|  +--------------------------------------------------------+      |
+|  | DR: Fuel Bank Account (Asset)       Rs 500,000         |      |
+|  | CR: Main Operating Bank (Asset)     Rs 500,000         |      |
+|  +--------------------------------------------------------+      |
+|                                                                   |
+|                              [Cancel] [Process Transfer]          |
++------------------------------------------------------------------+
+```
+
+---
+
+### Part 7: Fuel Expense Entry Flow
+
+```
++------------------------------------------------------------------+
+|  ADD FUEL EXPENSE - SCHOOL BUS OPERATIONS                         |
++------------------------------------------------------------------+
+|                                                                   |
+|  Branch: [v Nugegoda Branch         ]                             |
+|  Bus (Optional): [v NC-1234 - Yutong]                             |
+|                                                                   |
+|  Expense Date: [2026-02-06]                                       |
+|  Fuel Station/Vendor: [v CEYPETCO Nugegoda] or [Type new...]     |
+|                                                                   |
+|  Fuel Amount: [___25,000___] LKR                                  |
+|  Liters (Optional): [___50___]                                    |
+|  Bill/Receipt No: [___FUE-123456___]                              |
+|                                                                   |
+|  Payment Method:                                                  |
+|  (•) Direct from Fuel Bank  ← Auto reduces fuel bank              |
+|  ( ) Credit (Create AP Invoice)  ← Creates AP, pay later          |
+|                                                                   |
+|  [Upload Bill Image]                                              |
+|                                                                   |
+|  GL Preview (Auto-post enabled):                                  |
+|  +--------------------------------------------------------+      |
+|  | DR: Fuel Expense Account            Rs 25,000          |      |
+|  | CR: Fuel Bank (Nugegoda)            Rs 25,000          |      |
+|  +--------------------------------------------------------+      |
+|                                                                   |
+|                              [Cancel] [Save & Post to GL]         |
++------------------------------------------------------------------+
+```
+
+---
+
+### Part 8: Implementation Sequence
+
+#### Phase 1: Database & Settings (First)
+| Step | Task | Files |
+|------|------|-------|
+| 1 | Add fuel_bank_account_id column to settings | SQL Migration |
+| 2 | Create inter_bank_transfers table | SQL Migration |
+| 3 | Update SchoolBusFinanceSettings UI | `SchoolBusFinanceSettings.tsx` |
+| 4 | Update settings interface | `useSchoolBusFinance.ts` |
+
+#### Phase 2: Fund Transfer System
+| Step | Task | Files |
+|------|------|-------|
+| 5 | Create useInterBankTransfer hook | `useInterBankTransfer.ts` (new) |
+| 6 | Create InterBankTransferForm | `InterBankTransferForm.tsx` (new) |
+| 7 | Create InterBankTransferList | `InterBankTransferList.tsx` (new) |
+| 8 | Add to Banking section | `BankingView.tsx` |
+
+#### Phase 3: Fuel Expense Integration
+| Step | Task | Files |
+|------|------|-------|
+| 9 | Create useFuelExpenseFinance hook | `useFuelExpenseFinance.ts` (new) |
+| 10 | Create FuelExpenseForm | `FuelExpenseForm.tsx` (new) |
+| 11 | Update ExpenseRequestForm for fuel | `ExpenseRequestForm.tsx` |
+| 12 | Add GL auto-posting logic | `useFuelExpenseFinance.ts` |
+
+#### Phase 4: Integration & Testing
+| Step | Task | Files |
+|------|------|-------|
+| 13 | Add AP Invoice creation for credit fuel | Integration logic |
+| 14 | Add bus_id tracking to journal lines | GL posting update |
+| 15 | Test end-to-end flow | All components |
+
+---
+
+## Technical Details
+
+### Hook: useFuelExpenseFinance.ts
+
+```typescript
+interface FuelExpenseForGL {
+  expenseDate: string;
+  branchId: string;
+  busId?: string;
+  amount: number;
+  fuelLiters?: number;
+  vendorId?: string;
+  vendorName?: string;
+  reference?: string;
+  paymentMethod: 'direct' | 'credit';
+}
+
+export function usePostFuelExpenseToGL() {
+  // 1. Get branch fuel bank account from settings
+  // 2. Get fuel expense account from settings
+  // 3. If direct payment:
+  //    - Create JE: DR Fuel Expense / CR Fuel Bank
+  //    - Update COA balances
+  // 4. If credit:
+  //    - Create AP Invoice
+  //    - Create JE: DR Fuel Expense / CR Trade Payable
+}
+```
+
+### Hook: useInterBankTransfer.ts
+
+```typescript
+interface InterBankTransferData {
+  fromBankAccountId: string;
+  toBankAccountId: string;
+  amount: number;
+  reference?: string;
+  notes?: string;
+}
+
+export function useCreateInterBankTransfer() {
+  // 1. Validate both banks have GL account mappings
+  // 2. Create transfer record
+  // 3. Create JE: DR To Bank / CR From Bank
+  // 4. Update COA balances for both accounts
+  // 5. Update bank_transactions for both accounts
+}
+```
+
+---
+
+## Expected Outcomes
+
+After implementation:
+
+1. **Branch-wise Fuel Bank Mapping** - Each branch can have its own fuel bank account
+2. **Fund Transfers** - Easy transfer from main bank to fuel bank with auto GL posting
+3. **Fuel Expense Recording** - Dedicated form with auto GL entries
+4. **Real-time Balance Updates** - COA balances update immediately on transactions
+5. **Complete Audit Trail** - Every fuel expense links to JE, bus, branch, and vendor
+6. **AP Integration** - Credit fuel purchases create AP invoices for later payment
+7. **Bus-level Tracking** - Fuel expenses can be tracked per bus for cost analysis
+
+---
+
+## Files Summary
+
+### New Files (6)
+```
+src/hooks/useFuelExpenseFinance.ts
+src/hooks/useInterBankTransfer.ts
+src/components/accounting/InterBankTransferForm.tsx
+src/components/accounting/InterBankTransferList.tsx
+src/components/school/FuelExpenseForm.tsx
+supabase/migrations/[timestamp]_fuel_bank_integration.sql
+```
+
+### Updated Files (5)
+```
+src/components/school/SchoolBusFinanceSettings.tsx
+src/hooks/useSchoolBusFinance.ts
+src/components/accounting/BankingView.tsx
+src/pages/Accounting.tsx
+src/components/accounting/ExpenseRequestForm.tsx
 ```
 
 ---
 
 ## User Actions Required
 
-### Before Implementation:
-1. **Populate Company Data** - Go to Settings → Company Management → Edit each company to add:
-   - Address
-   - Phone number
-   - Email
-   - Tax Registration Number
-   - Logo (optional)
-
 ### After Implementation:
-1. **Initialize Templates** - Click "Initialize All Templates" button in Document Templates settings
-2. **Customize Templates** - Edit any template to match specific branding needs
-3. **Set Default Templates** - Mark one template per type as "Default"
+1. **Configure Fuel Bank Accounts** - Go to Settings → School Bus Finance → Add fuel bank accounts per branch
+2. **Map GL Accounts** - Ensure fuel expense account and fuel bank COA accounts are mapped
+3. **Create Bank Accounts** - Add fuel bank accounts in Banking → Bank Accounts with proper GL links
+4. **Fund Transfer** - Use Inter-Bank Transfer to move funds from main bank to fuel bank
+5. **Record Fuel Expenses** - Use the new fuel expense form for daily fuel purchases
 
----
-
-## File Changes Summary
-
-### New Files
-```
-src/lib/document-template-seeder.ts
-src/components/accounting/settings/TemplateInitializerButton.tsx
-```
-
-### Modified Files
-```
-src/components/accounting/settings/DocumentTemplateManager.tsx
-src/components/accounting/shared/FinanceDocumentPreviewModal.tsx
-src/lib/document-template-utils.ts
-```
-
----
-
-## Expected Results
-
-After implementation:
-1. All 12 document types will have professional default templates
-2. Templates will display company header correctly when company data is filled
-3. Header images (logos) will render properly in preview and print
-4. Document body with line items, amounts will be properly formatted
-5. Footer with signatures will display correctly
-6. Print/PDF output will match A4 page dimensions
-
----
-
-## Template Type Matrix
-
-| Document Type | Module | Key Placeholders |
-|---------------|--------|------------------|
-| AR Invoice | AR | invoice_number, customer_name, line_items, total_amount |
-| AR Receipt | AR | receipt_number, customer_name, amount, payment_method |
-| AR Credit Note | AR | credit_note_number, original_invoice, amount, reason |
-| AP Invoice | AP | invoice_number, vendor_name, line_items, total_amount |
-| AP Payment Voucher | AP | voucher_number, vendor_name, amount, cheque_number |
-| AP Debit Note | AP | debit_note_number, vendor_name, amount, reason |
-| Advance Receipt | AR | receipt_number, customer_name, amount, purpose |
-| Advance Payment | AP | voucher_number, vendor_name, amount, purpose |
-| Journal Voucher | GL | voucher_number, journal_lines, total_debit, total_credit |
-| Cheque Voucher | Banking | voucher_number, payee_name, amount, cheque_number |
-| WHT Certificate | Tax | certificate_number, vendor_name, wht_amount |
-| GRN | Inventory | grn_number, supplier_name, items |
