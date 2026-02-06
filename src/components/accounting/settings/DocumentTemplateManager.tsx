@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   useDeleteDocumentTemplate 
 } from "@/hooks/useDocumentTemplates";
 import { DocumentTemplateEditor } from "./DocumentTemplateEditor";
+import { TemplateInitializerButton } from "./TemplateInitializerButton";
 import { Plus, FileText, Pencil, Trash2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export const DocumentTemplateManager = () => {
+  const queryClient = useQueryClient();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
   const [selectedTypeId, setSelectedTypeId] = useState<string>("all");
   const [editorOpen, setEditorOpen] = useState(false);
@@ -47,11 +49,16 @@ export const DocumentTemplateManager = () => {
   });
 
   const { data: templateTypes } = useDocumentTemplateTypes();
-  const { data: templates, isLoading } = useDocumentTemplates(
+  const { data: templates, isLoading, refetch } = useDocumentTemplates(
     selectedCompanyId === "all" ? undefined : selectedCompanyId,
     selectedTypeId === "all" ? undefined : selectedTypeId
   );
   const deleteTemplate = useDeleteDocumentTemplate();
+  
+  const handleTemplatesInitialized = () => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ["document-templates"] });
+  };
 
   const openNewTemplate = () => {
     setEditingTemplate(null);
@@ -172,10 +179,19 @@ export const DocumentTemplateManager = () => {
             Create and manage HTML templates for invoices, receipts, vouchers, and other documents
           </p>
         </div>
-        <Button onClick={openNewTemplate}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Template
-        </Button>
+        <div className="flex gap-2">
+          {companies && templateTypes && (
+            <TemplateInitializerButton
+              companies={companies}
+              templateTypes={templateTypes}
+              onComplete={handleTemplatesInitialized}
+            />
+          )}
+          <Button onClick={openNewTemplate}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Template
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

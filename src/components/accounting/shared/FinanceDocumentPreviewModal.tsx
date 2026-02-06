@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer, Download, FileText } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Printer, Download, FileText, AlertTriangle, Wand2 } from "lucide-react";
 import { useDocumentTemplates } from "@/hooks/useDocumentTemplates";
 import { useCompanies } from "@/hooks/useAccountingData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { mapDocumentToPlaceholders, replacePlaceholders, generatePrintableDocument } from "@/lib/document-template-utils";
+import { defaultTemplates } from "@/lib/document-template-seeder";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { toast } from "sonner";
@@ -15,7 +17,7 @@ import { toast } from "sonner";
 interface FinanceDocumentPreviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  documentType: string; // "ar_invoice" | "ar_receipt" | "ar_credit_note" | "ap_invoice" | "ap_payment_voucher" | "ap_debit_note"
+  documentType: string; // All 12 document types supported
   documentData: any;
   companyId?: string;
 }
@@ -125,35 +127,71 @@ export const FinanceDocumentPreviewModal = ({
 
   const selectedTemplate = availableTemplates?.find((t) => t.id === selectedTemplateId);
   const company = companies?.find((c) => c.id === (companyId || selectedTemplate?.company_id));
+  const hasNoTemplate = !availableTemplates || availableTemplates.length === 0;
 
-  // Generate rendered HTML
-  const getRenderedHtml = (): string => {
-    if (!selectedTemplate || !documentData) {
-      return generatePrintableDocument(`
-        <div style="text-align: center; padding: 40px;">
-          <h2 style="color: #666;">No Template Available</h2>
-          <p>Please create a template for "${documentType.replace('_', ' ')}" in Document Settings.</p>
+  // Generate fallback HTML using default template
+  const generateFallbackHtml = (): string => {
+    const templateGenerator = defaultTemplates[documentType];
+    if (!templateGenerator) {
+      return `
+        <div style="text-align: center; padding: 40px; font-family: sans-serif;">
+          <h2 style="color: #dc2626;">⚠️ No Template Available</h2>
+          <p style="color: #666;">Document type "${documentType.replace(/_/g, ' ').toUpperCase()}" is not configured.</p>
+          <p style="color: #666; font-size: 12px; margin-top: 20px;">
+            Go to <strong>Settings → Document Templates → Initialize All Templates</strong> to create default templates.
+          </p>
         </div>
-      `);
+      `;
     }
 
+    // Use default template with available data
+    const defaultHtml = templateGenerator();
     const placeholders = mapDocumentToPlaceholders(
       documentType,
       documentData,
       company,
       lineItems || [],
       allocations || [],
-      selectedTemplate.header_image_url || undefined
+      undefined
     );
 
-    const renderedHtml = replacePlaceholders(selectedTemplate.html_content || "", placeholders);
-    
-    return generatePrintableDocument(
-      renderedHtml,
-      selectedTemplate.css_styles || undefined,
-      selectedTemplate.paper_size || "A4",
-      selectedTemplate.orientation || "portrait"
-    );
+    return replacePlaceholders(defaultHtml, placeholders);
+  };
+
+  // Generate rendered HTML
+  const getRenderedHtml = (): string => {
+    if (!documentData) {
+      return generatePrintableDocument(`
+        <div style="text-align: center; padding: 40px;">
+          <h2 style="color: #666;">No Document Data</h2>
+          <p>Unable to preview document - no data provided.</p>
+        </div>
+      `);
+    }
+
+    // Use selected template if available, otherwise use fallback
+    if (selectedTemplate) {
+      const placeholders = mapDocumentToPlaceholders(
+        documentType,
+        documentData,
+        company,
+        lineItems || [],
+        allocations || [],
+        selectedTemplate.header_image_url || undefined
+      );
+
+      const renderedHtml = replacePlaceholders(selectedTemplate.html_content || "", placeholders);
+      
+      return generatePrintableDocument(
+        renderedHtml,
+        selectedTemplate.css_styles || undefined,
+        selectedTemplate.paper_size || "A4",
+        selectedTemplate.orientation || "portrait"
+      );
+    }
+
+    // Fallback to default template
+    return generatePrintableDocument(generateFallbackHtml());
   };
 
   const handlePrint = () => {
@@ -218,13 +256,22 @@ export const FinanceDocumentPreviewModal = ({
     ap_invoice: "AP Invoice",
     ap_payment_voucher: "Payment Voucher",
     ap_debit_note: "Debit Note",
+    advance_receipt: "Advance Receipt",
+    advance_payment: "Advance Payment",
+    journal_voucher: "Journal Voucher",
+    cheque_voucher: "Cheque Voucher",
+    wht_certificate: "WHT Certificate",
+    grn: "Goods Receipt Note",
   }[documentType] || "Document";
 
-  const docNumber = documentData?.invoice_number || 
+  const docNumber = documentData?.invoice_number ||
                     documentData?.receipt_number || 
                     documentData?.payment_number ||
                     documentData?.credit_note_number ||
                     documentData?.debit_note_number ||
+                    documentData?.voucher_number ||
+                    documentData?.certificate_number ||
+                    documentData?.grn_number ||
                     "";
 
   return (
@@ -266,17 +313,29 @@ export const FinanceDocumentPreviewModal = ({
             <Button 
               variant="outline" 
               onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf || !selectedTemplate}
+              disabled={isGeneratingPdf}
             >
               <Download className="h-4 w-4 mr-2" />
               {isGeneratingPdf ? "Generating..." : "Download PDF"}
             </Button>
-            <Button onClick={handlePrint} disabled={!selectedTemplate}>
+            <Button onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
           </div>
         </div>
+
+        {/* Fallback Template Warning */}
+        {hasNoTemplate && (
+          <Alert variant="default" className="bg-warning/10 border-warning/30">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <AlertTitle className="text-warning-foreground">Using Default Template</AlertTitle>
+            <AlertDescription className="text-muted-foreground">
+              No custom template found for this document type. Using system default.
+              Go to <strong>Settings → Document Templates → Initialize All Templates</strong> to create customizable templates.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Document Preview */}
         <div className="flex-1 overflow-hidden border rounded-lg bg-white">

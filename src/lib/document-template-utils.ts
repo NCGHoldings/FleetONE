@@ -1,31 +1,52 @@
 import { format } from "date-fns";
 
-// Convert number to words for amounts
-const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+// Convert number to words for amounts - International format (Million/Billion)
+const ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
+  'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
+const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
 
 const numberToWords = (num: number): string => {
-  if (num === 0) return 'Zero';
-  
-  const convert = (n: number): string => {
-    if (n < 10) return ones[n];
-    if (n < 20) return teens[n - 10];
-    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
-    if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' and ' + convert(n % 100) : '');
-    if (n < 100000) return convert(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 ? ' ' + convert(n % 1000) : '');
-    if (n < 10000000) return convert(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 ? ' ' + convert(n % 100000) : '');
-    return convert(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 ? ' ' + convert(n % 10000000) : '');
+  if (num === 0) return 'ZERO RUPEES ONLY';
+
+  const convertHundreds = (n: number): string => {
+    let result = '';
+    if (n >= 100) {
+      result += ones[Math.floor(n / 100)] + ' HUNDRED ';
+      n %= 100;
+    }
+    if (n >= 20) {
+      result += tens[Math.floor(n / 10)] + ' ';
+      n %= 10;
+    }
+    if (n > 0) {
+      result += ones[n] + ' ';
+    }
+    return result;
   };
-  
+
   const rupees = Math.floor(num);
   const cents = Math.round((num - rupees) * 100);
-  
-  let result = convert(rupees) + ' Rupees';
+
+  let result = '';
+  const billion = Math.floor(rupees / 1000000000);
+  const million = Math.floor((rupees % 1000000000) / 1000000);
+  const thousand = Math.floor((rupees % 1000000) / 1000);
+  const remainder = Math.floor(rupees % 1000);
+
+  if (billion) result += convertHundreds(billion) + 'BILLION ';
+  if (million) result += convertHundreds(million) + 'MILLION ';
+  if (thousand) result += convertHundreds(thousand) + 'THOUSAND ';
+  if (remainder) result += convertHundreds(remainder);
+
+  result = result.trim() + ' RUPEES';
+
   if (cents > 0) {
-    result += ' and ' + convert(cents) + ' Cents';
+    result += ' AND ' + convertHundreds(cents).trim() + ' CENTS';
   }
-  return result + ' Only';
+
+  result += ' ONLY';
+
+  return result;
 };
 
 // Format currency
