@@ -929,6 +929,74 @@ export type Database = {
           },
         ]
       }
+      api_keys: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          ip_whitelist: string[] | null
+          is_active: boolean | null
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          permissions: string[] | null
+          rate_limit: number | null
+          request_count: number | null
+          revoked_at: string | null
+          revoked_by: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          ip_whitelist?: string[] | null
+          is_active?: boolean | null
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          permissions?: string[] | null
+          rate_limit?: number | null
+          request_count?: number | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          ip_whitelist?: string[] | null
+          is_active?: boolean | null
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          permissions?: string[] | null
+          rate_limit?: number | null
+          request_count?: number | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_usage_logs: {
         Row: {
           api_name: string
@@ -2587,6 +2655,69 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bin_locations: {
+        Row: {
+          aisle: string | null
+          bin_code: string
+          bin_name: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          level: string | null
+          rack: string | null
+          updated_at: string | null
+          warehouse_id: string | null
+        }
+        Insert: {
+          aisle?: string | null
+          bin_code: string
+          bin_name?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          level?: string | null
+          rack?: string | null
+          updated_at?: string | null
+          warehouse_id?: string | null
+        }
+        Update: {
+          aisle?: string | null
+          bin_code?: string
+          bin_name?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          level?: string | null
+          rack?: string | null
+          updated_at?: string | null
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bin_locations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bin_locations_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -4421,6 +4552,67 @@ export type Database = {
           },
         ]
       }
+      composite_items: {
+        Row: {
+          company_id: string | null
+          component_item_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          parent_item_id: string | null
+          quantity: number
+          unit_cost: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          component_item_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          parent_item_id?: string | null
+          quantity?: number
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          component_item_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          parent_item_id?: string | null
+          quantity?: number
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composite_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composite_items_component_item_id_fkey"
+            columns: ["component_item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composite_items_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conductor_submissions: {
         Row: {
           applied_at: string | null
@@ -4590,6 +4782,59 @@ export type Database = {
           },
         ]
       }
+      custom_reports: {
+        Row: {
+          company_id: string | null
+          config: Json
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_public: boolean | null
+          is_system: boolean | null
+          name: string
+          report_type: string
+          source_table: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          config?: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          is_system?: boolean | null
+          name: string
+          report_type?: string
+          source_table: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          config?: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          is_system?: boolean | null
+          name?: string
+          report_type?: string
+          source_table?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_reports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_portal_access: {
         Row: {
           created_at: string | null
@@ -4671,6 +4916,55 @@ export type Database = {
             columns: ["portal_access_id"]
             isOneToOne: false
             referencedRelation: "customer_portal_access"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_price_lists: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          is_primary: boolean | null
+          price_list_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          is_primary?: boolean | null
+          price_list_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          is_primary?: boolean | null
+          price_list_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_price_lists_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_price_lists_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_price_lists_price_list_id_fkey"
+            columns: ["price_list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
             referencedColumns: ["id"]
           },
         ]
@@ -11853,12 +12147,18 @@ export type Database = {
           customer_id: string
           description: string | null
           expires_at: string | null
+          failure_reason: string | null
           id: string
           link_code: string
+          metadata: Json | null
           paid_at: string | null
           payment_provider: string | null
           payment_reference: string | null
           status: string | null
+          stripe_checkout_url: string | null
+          stripe_payment_intent: string | null
+          stripe_session_id: string | null
+          updated_at: string | null
         }
         Insert: {
           amount: number
@@ -11869,12 +12169,18 @@ export type Database = {
           customer_id: string
           description?: string | null
           expires_at?: string | null
+          failure_reason?: string | null
           id?: string
           link_code: string
+          metadata?: Json | null
           paid_at?: string | null
           payment_provider?: string | null
           payment_reference?: string | null
           status?: string | null
+          stripe_checkout_url?: string | null
+          stripe_payment_intent?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string | null
         }
         Update: {
           amount?: number
@@ -11885,12 +12191,18 @@ export type Database = {
           customer_id?: string
           description?: string | null
           expires_at?: string | null
+          failure_reason?: string | null
           id?: string
           link_code?: string
+          metadata?: Json | null
           paid_at?: string | null
           payment_provider?: string | null
           payment_reference?: string | null
           status?: string | null
+          stripe_checkout_url?: string | null
+          stripe_payment_intent?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -11963,6 +12275,65 @@ export type Database = {
             columns: ["quotation_id"]
             isOneToOne: false
             referencedRelation: "special_hire_quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_reminder_log: {
+        Row: {
+          channel: string | null
+          company_id: string | null
+          customer_id: string | null
+          email_subject: string | null
+          error_message: string | null
+          id: string
+          invoice_id: string | null
+          invoice_type: string | null
+          message_preview: string | null
+          reminder_rule_id: string | null
+          sent_at: string | null
+          sent_to: string
+          status: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          channel?: string | null
+          company_id?: string | null
+          customer_id?: string | null
+          email_subject?: string | null
+          error_message?: string | null
+          id?: string
+          invoice_id?: string | null
+          invoice_type?: string | null
+          message_preview?: string | null
+          reminder_rule_id?: string | null
+          sent_at?: string | null
+          sent_to: string
+          status?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          channel?: string | null
+          company_id?: string | null
+          customer_id?: string | null
+          email_subject?: string | null
+          error_message?: string | null
+          id?: string
+          invoice_id?: string | null
+          invoice_type?: string | null
+          message_preview?: string | null
+          reminder_rule_id?: string | null
+          sent_at?: string | null
+          sent_to?: string
+          status?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reminder_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -12784,6 +13155,126 @@ export type Database = {
           },
         ]
       }
+      price_list_items: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          discount_percentage: number | null
+          id: string
+          item_id: string | null
+          max_quantity: number | null
+          min_quantity: number | null
+          price: number
+          price_list_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          discount_percentage?: number | null
+          id?: string
+          item_id?: string | null
+          max_quantity?: number | null
+          min_quantity?: number | null
+          price: number
+          price_list_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          discount_percentage?: number | null
+          id?: string
+          item_id?: string | null
+          max_quantity?: number | null
+          min_quantity?: number | null
+          price?: number
+          price_list_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_list_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_list_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_list_items_price_list_id_fkey"
+            columns: ["price_list_id"]
+            isOneToOne: false
+            referencedRelation: "price_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      price_lists: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          description: string | null
+          discount_percentage: number | null
+          effective_from: string | null
+          effective_to: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          name: string
+          price_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          discount_percentage?: number | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name: string
+          price_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          discount_percentage?: number | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name?: string
+          price_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_lists_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           address: string | null
@@ -13423,6 +13914,53 @@ export type Database = {
           },
         ]
       }
+      recurring_invoice_log: {
+        Row: {
+          amount: number | null
+          company_id: string | null
+          customer_id: string | null
+          error_message: string | null
+          generated_at: string | null
+          generated_invoice_id: string | null
+          id: string
+          invoice_number: string | null
+          recurring_invoice_id: string | null
+          status: string | null
+        }
+        Insert: {
+          amount?: number | null
+          company_id?: string | null
+          customer_id?: string | null
+          error_message?: string | null
+          generated_at?: string | null
+          generated_invoice_id?: string | null
+          id?: string
+          invoice_number?: string | null
+          recurring_invoice_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          amount?: number | null
+          company_id?: string | null
+          customer_id?: string | null
+          error_message?: string | null
+          generated_at?: string | null
+          generated_invoice_id?: string | null
+          id?: string
+          invoice_number?: string | null
+          recurring_invoice_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_invoice_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_invoices: {
         Row: {
           account_id: string | null
@@ -13726,6 +14264,87 @@ export type Database = {
           start_time?: string
         }
         Relationships: []
+      }
+      report_schedules: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          email_body: string | null
+          email_subject: string | null
+          format: string | null
+          id: string
+          include_charts: boolean | null
+          is_active: boolean | null
+          last_error: string | null
+          last_sent_at: string | null
+          next_run_at: string | null
+          recipients: string[]
+          report_id: string | null
+          report_name: string | null
+          schedule_day: number | null
+          schedule_time: string | null
+          schedule_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email_body?: string | null
+          email_subject?: string | null
+          format?: string | null
+          id?: string
+          include_charts?: boolean | null
+          is_active?: boolean | null
+          last_error?: string | null
+          last_sent_at?: string | null
+          next_run_at?: string | null
+          recipients?: string[]
+          report_id?: string | null
+          report_name?: string | null
+          schedule_day?: number | null
+          schedule_time?: string | null
+          schedule_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email_body?: string | null
+          email_subject?: string | null
+          format?: string | null
+          id?: string
+          include_charts?: boolean | null
+          is_active?: boolean | null
+          last_error?: string | null
+          last_sent_at?: string | null
+          next_run_at?: string | null
+          recipients?: string[]
+          report_id?: string | null
+          report_name?: string | null
+          schedule_day?: number | null
+          schedule_time?: string | null
+          schedule_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_schedules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_schedules_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "custom_reports"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       route_expenses: {
         Row: {
@@ -18517,39 +19136,79 @@ export type Database = {
       }
       stock_transfers: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string | null
+          completed_at: string | null
+          completed_by: string | null
           created_at: string | null
           created_by: string | null
+          expected_arrival_date: string | null
+          from_bin_id: string | null
           from_warehouse_id: string | null
           id: string
           notes: string | null
           status: string | null
+          to_bin_id: string | null
           to_warehouse_id: string | null
+          total_items: number | null
+          total_value: number | null
           transfer_date: string
           transfer_number: string
+          updated_at: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
           created_at?: string | null
           created_by?: string | null
+          expected_arrival_date?: string | null
+          from_bin_id?: string | null
           from_warehouse_id?: string | null
           id?: string
           notes?: string | null
           status?: string | null
+          to_bin_id?: string | null
           to_warehouse_id?: string | null
+          total_items?: number | null
+          total_value?: number | null
           transfer_date: string
           transfer_number: string
+          updated_at?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
           created_at?: string | null
           created_by?: string | null
+          expected_arrival_date?: string | null
+          from_bin_id?: string | null
           from_warehouse_id?: string | null
           id?: string
           notes?: string | null
           status?: string | null
+          to_bin_id?: string | null
           to_warehouse_id?: string | null
+          total_items?: number | null
+          total_value?: number | null
           transfer_date?: string
           transfer_number?: string
+          updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "stock_transfers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stock_transfers_from_warehouse_id_fkey"
             columns: ["from_warehouse_id"]
@@ -19689,6 +20348,214 @@ export type Database = {
           },
         ]
       }
+      vendor_portal_access: {
+        Row: {
+          company_id: string | null
+          contact_name: string | null
+          created_at: string | null
+          email: string
+          failed_attempts: number | null
+          id: string
+          is_active: boolean | null
+          is_primary: boolean | null
+          last_login_at: string | null
+          locked_until: string | null
+          otp_code: string | null
+          otp_expires_at: string | null
+          updated_at: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          contact_name?: string | null
+          created_at?: string | null
+          email: string
+          failed_attempts?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_login_at?: string | null
+          locked_until?: string | null
+          otp_code?: string | null
+          otp_expires_at?: string | null
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          contact_name?: string | null
+          created_at?: string | null
+          email?: string
+          failed_attempts?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_login_at?: string | null
+          locked_until?: string | null
+          otp_code?: string | null
+          otp_expires_at?: string | null
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_portal_access_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_portal_access_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_portal_sessions: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          session_token: string
+          user_agent: string | null
+          vendor_access_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          session_token: string
+          user_agent?: string | null
+          vendor_access_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          session_token?: string
+          user_agent?: string | null
+          vendor_access_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_portal_sessions_vendor_access_id_fkey"
+            columns: ["vendor_access_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_portal_access"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_submitted_invoices: {
+        Row: {
+          ap_invoice_id: string | null
+          attachment_name: string | null
+          attachment_url: string | null
+          company_id: string | null
+          created_at: string | null
+          due_date: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          notes: string | null
+          po_number: string | null
+          purchase_order_id: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          subtotal: number | null
+          tax_amount: number | null
+          total_amount: number
+          updated_at: string | null
+          vendor_id: string | null
+          vendor_name: string | null
+        }
+        Insert: {
+          ap_invoice_id?: string | null
+          attachment_name?: string | null
+          attachment_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          notes?: string | null
+          po_number?: string | null
+          purchase_order_id?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          total_amount: number
+          updated_at?: string | null
+          vendor_id?: string | null
+          vendor_name?: string | null
+        }
+        Update: {
+          ap_invoice_id?: string | null
+          attachment_name?: string | null
+          attachment_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          notes?: string | null
+          po_number?: string | null
+          purchase_order_id?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          total_amount?: number
+          updated_at?: string | null
+          vendor_id?: string | null
+          vendor_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_submitted_invoices_ap_invoice_id_fkey"
+            columns: ["ap_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ap_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_submitted_invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_submitted_invoices_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_submitted_invoices_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
           address: string | null
@@ -19820,6 +20687,143 @@ export type Database = {
           warehouse_name?: string
         }
         Relationships: []
+      }
+      webhook_deliveries: {
+        Row: {
+          attempt_number: number | null
+          company_id: string | null
+          delivered_at: string | null
+          error_message: string | null
+          event_id: string | null
+          event_type: string
+          id: string
+          next_retry_at: string | null
+          payload: Json
+          request_headers: Json | null
+          response_body: string | null
+          response_headers: Json | null
+          response_status: number | null
+          response_time_ms: number | null
+          success: boolean | null
+          webhook_id: string | null
+        }
+        Insert: {
+          attempt_number?: number | null
+          company_id?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          event_id?: string | null
+          event_type: string
+          id?: string
+          next_retry_at?: string | null
+          payload: Json
+          request_headers?: Json | null
+          response_body?: string | null
+          response_headers?: Json | null
+          response_status?: number | null
+          response_time_ms?: number | null
+          success?: boolean | null
+          webhook_id?: string | null
+        }
+        Update: {
+          attempt_number?: number | null
+          company_id?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          event_id?: string | null
+          event_type?: string
+          id?: string
+          next_retry_at?: string | null
+          payload?: Json
+          request_headers?: Json | null
+          response_body?: string | null
+          response_headers?: Json | null
+          response_status?: number | null
+          response_time_ms?: number | null
+          success?: boolean | null
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_deliveries_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_endpoints: {
+        Row: {
+          company_id: string | null
+          consecutive_failures: number | null
+          created_at: string | null
+          created_by: string | null
+          disabled_reason: string | null
+          events: string[]
+          failure_count: number | null
+          headers: Json | null
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          name: string
+          secret: string
+          success_count: number | null
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          company_id?: string | null
+          consecutive_failures?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          disabled_reason?: string | null
+          events: string[]
+          failure_count?: number | null
+          headers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          name: string
+          secret: string
+          success_count?: number | null
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          company_id?: string | null
+          consecutive_failures?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          disabled_reason?: string | null
+          events?: string[]
+          failure_count?: number | null
+          headers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          name?: string
+          secret?: string
+          success_count?: number | null
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_endpoints_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wht_certificate_details: {
         Row: {
