@@ -80,6 +80,7 @@ import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import SystemHealthDashboard from "./pages/SystemHealthDashboard";
 import Marketing from "./pages/Marketing";
 import CustomerPortal from "./pages/CustomerPortal";
+import VendorPortal from "./pages/VendorPortal";
 
 const queryClient = new QueryClient();
 
@@ -102,6 +103,7 @@ const App = () => (
             <Route path="/public/receipt-upload" element={<PublicReceiptUpload />} />
             <Route path="/public/conductor-upload" element={<PublicConductorUpload />} />
             <Route path="/customer-portal" element={<CustomerPortal />} />
+            <Route path="/vendor-portal" element={<VendorPortal />} />
             
             {/* Protected routes wrapped in AppLayout */}
             <Route 
