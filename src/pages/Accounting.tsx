@@ -52,6 +52,15 @@ import { APReconciliationView } from "@/components/accounting/APReconciliationVi
 // Gap Analysis - Inventory Components
 import { InventoryAgeingView } from "@/components/accounting/InventoryAgeingView";
 import { StockReconciliationView } from "@/components/accounting/StockReconciliationView";
+// Phase 3-5 Advanced Components
+import { ReportBuilder } from "@/components/accounting/reports/ReportBuilder";
+import { CashFlowForecastView } from "@/components/accounting/reports/CashFlowForecastView";
+import { ReportSchedulerView } from "@/components/accounting/reports/ReportSchedulerView";
+import { WarehouseManagementView } from "@/components/accounting/inventory/WarehouseManagementView";
+import { StockTransferForm } from "@/components/accounting/inventory/StockTransferForm";
+import { PriceListsView } from "@/components/accounting/inventory/PriceListsView";
+import { CompositeItemsView } from "@/components/accounting/inventory/CompositeItemsView";
+import { APIWebhooksSettings } from "@/components/accounting/settings/APIWebhooksSettings";
 // Gap Analysis - Banking Components
 import { CashbookView } from "@/components/accounting/CashbookView";
 import { PaymentBatchView } from "@/components/accounting/PaymentBatchView";
@@ -539,6 +548,10 @@ const Accounting = () => {
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="items">Items</TabsTrigger>
                   <TabsTrigger value="stock">Stock Levels</TabsTrigger>
+                  <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
+                  <TabsTrigger value="transfers">Stock Transfers</TabsTrigger>
+                  <TabsTrigger value="price-lists">Price Lists</TabsTrigger>
+                  <TabsTrigger value="assemblies">Assemblies/Kits</TabsTrigger>
                   <TabsTrigger value="batch-serial">Batch/Serial Tracking</TabsTrigger>
                   <TabsTrigger value="ageing">Inventory Ageing</TabsTrigger>
                   <TabsTrigger value="reconciliation">Stock Reconciliation</TabsTrigger>
@@ -552,6 +565,22 @@ const Accounting = () => {
 
               <TabsContent value="stock">
                 <InventoryView />
+              </TabsContent>
+
+              <TabsContent value="warehouses">
+                <WarehouseManagementView />
+              </TabsContent>
+
+              <TabsContent value="transfers">
+                <StockTransferForm />
+              </TabsContent>
+
+              <TabsContent value="price-lists">
+                <PriceListsView />
+              </TabsContent>
+
+              <TabsContent value="assemblies">
+                <CompositeItemsView />
               </TabsContent>
 
               <TabsContent value="batch-serial">
