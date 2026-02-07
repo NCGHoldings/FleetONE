@@ -4590,6 +4590,171 @@ export type Database = {
           },
         ]
       }
+      customer_portal_access: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          email: string
+          id: string
+          is_active: boolean | null
+          last_login_at: string | null
+          login_count: number | null
+          otp_code: string | null
+          otp_expires_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          email: string
+          id?: string
+          is_active?: boolean | null
+          last_login_at?: string | null
+          login_count?: number | null
+          otp_code?: string | null
+          otp_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          last_login_at?: string | null
+          login_count?: number | null
+          otp_code?: string | null
+          otp_expires_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_portal_access_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_portal_sessions: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          portal_access_id: string
+          session_token: string
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          portal_access_id: string
+          session_token: string
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          portal_access_id?: string
+          session_token?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_portal_sessions_portal_access_id_fkey"
+            columns: ["portal_access_id"]
+            isOneToOne: false
+            referencedRelation: "customer_portal_access"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_support_requests: {
+        Row: {
+          assigned_to: string | null
+          company_id: string | null
+          created_at: string | null
+          customer_id: string
+          id: string
+          message: string
+          portal_access_id: string | null
+          priority: string | null
+          related_invoice_id: string | null
+          resolved_at: string | null
+          response_notes: string | null
+          status: string | null
+          subject: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          message: string
+          portal_access_id?: string | null
+          priority?: string | null
+          related_invoice_id?: string | null
+          resolved_at?: string | null
+          response_notes?: string | null
+          status?: string | null
+          subject: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          message?: string
+          portal_access_id?: string | null
+          priority?: string | null
+          related_invoice_id?: string | null
+          resolved_at?: string | null
+          response_notes?: string | null
+          status?: string | null
+          subject?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_support_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_requests_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_requests_portal_access_id_fkey"
+            columns: ["portal_access_id"]
+            isOneToOne: false
+            referencedRelation: "customer_portal_access"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_requests_related_invoice_id_fkey"
+            columns: ["related_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           ar_account_id: string | null
@@ -11678,6 +11843,79 @@ export type Database = {
           },
         ]
       }
+      payment_links: {
+        Row: {
+          amount: number
+          ar_invoice_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string
+          description: string | null
+          expires_at: string | null
+          id: string
+          link_code: string
+          paid_at: string | null
+          payment_provider: string | null
+          payment_reference: string | null
+          status: string | null
+        }
+        Insert: {
+          amount: number
+          ar_invoice_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id: string
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          link_code: string
+          paid_at?: string | null
+          payment_provider?: string | null
+          payment_reference?: string | null
+          status?: string | null
+        }
+        Update: {
+          amount?: number
+          ar_invoice_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          link_code?: string
+          paid_at?: string | null
+          payment_provider?: string | null
+          payment_reference?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_links_ar_invoice_id_fkey"
+            columns: ["ar_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_notifications: {
         Row: {
           created_at: string | null
@@ -11729,6 +11967,77 @@ export type Database = {
           },
         ]
       }
+      payment_reminder_rules: {
+        Row: {
+          applies_to_ap: boolean | null
+          applies_to_ar: boolean | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          days_offset: number
+          email_subject: string | null
+          email_template: string | null
+          id: string
+          is_active: boolean | null
+          max_amount: number | null
+          min_amount: number | null
+          priority: number | null
+          reminder_channel: string
+          rule_name: string
+          sms_template: string | null
+          trigger_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to_ap?: boolean | null
+          applies_to_ar?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          days_offset?: number
+          email_subject?: string | null
+          email_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_amount?: number | null
+          min_amount?: number | null
+          priority?: number | null
+          reminder_channel: string
+          rule_name: string
+          sms_template?: string | null
+          trigger_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to_ap?: boolean | null
+          applies_to_ar?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          days_offset?: number
+          email_subject?: string | null
+          email_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_amount?: number | null
+          min_amount?: number | null
+          priority?: number | null
+          reminder_channel?: string
+          rule_name?: string
+          sms_template?: string | null
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reminder_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_reminders: {
         Row: {
           contact_method: string | null
@@ -11758,6 +12067,89 @@ export type Database = {
           student_id?: string
         }
         Relationships: []
+      }
+      payment_reminders_sent: {
+        Row: {
+          channel: string | null
+          company_id: string | null
+          customer_id: string | null
+          error_message: string | null
+          id: string
+          invoice_id: string | null
+          invoice_type: string | null
+          message_content: string | null
+          recipient_email: string | null
+          recipient_phone: string | null
+          reminder_rule_id: string | null
+          sent_at: string | null
+          sent_status: string | null
+          subject: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          channel?: string | null
+          company_id?: string | null
+          customer_id?: string | null
+          error_message?: string | null
+          id?: string
+          invoice_id?: string | null
+          invoice_type?: string | null
+          message_content?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          reminder_rule_id?: string | null
+          sent_at?: string | null
+          sent_status?: string | null
+          subject?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          channel?: string | null
+          company_id?: string | null
+          customer_id?: string | null
+          error_message?: string | null
+          id?: string
+          invoice_id?: string | null
+          invoice_type?: string | null
+          message_content?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          reminder_rule_id?: string | null
+          sent_at?: string | null
+          sent_status?: string | null
+          subject?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reminders_sent_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reminders_sent_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reminders_sent_reminder_rule_id_fkey"
+            columns: ["reminder_rule_id"]
+            isOneToOne: false
+            referencedRelation: "payment_reminder_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reminders_sent_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payroll_adjustments: {
         Row: {
@@ -12989,6 +13381,154 @@ export type Database = {
           },
         ]
       }
+      recurring_invoice_history: {
+        Row: {
+          ar_invoice_id: string | null
+          generated_at: string | null
+          id: string
+          invoice_amount: number | null
+          recurring_invoice_id: string | null
+          status: string | null
+        }
+        Insert: {
+          ar_invoice_id?: string | null
+          generated_at?: string | null
+          id?: string
+          invoice_amount?: number | null
+          recurring_invoice_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          ar_invoice_id?: string | null
+          generated_at?: string | null
+          id?: string
+          invoice_amount?: number | null
+          recurring_invoice_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_invoice_history_ar_invoice_id_fkey"
+            columns: ["ar_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "ar_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_invoice_history_recurring_invoice_id_fkey"
+            columns: ["recurring_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_invoices: {
+        Row: {
+          account_id: string | null
+          amount: number
+          auto_send_email: boolean | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string
+          day_of_month: number | null
+          day_of_week: number | null
+          description: string | null
+          email_template: string | null
+          end_date: string | null
+          frequency: string
+          id: string
+          invoices_generated: number | null
+          is_active: boolean | null
+          last_run_date: string | null
+          next_run_date: string
+          payment_terms_days: number | null
+          start_date: string
+          tax_amount: number | null
+          tax_rate: number | null
+          template_name: string
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          auto_send_email?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          description?: string | null
+          email_template?: string | null
+          end_date?: string | null
+          frequency: string
+          id?: string
+          invoices_generated?: number | null
+          is_active?: boolean | null
+          last_run_date?: string | null
+          next_run_date: string
+          payment_terms_days?: number | null
+          start_date: string
+          tax_amount?: number | null
+          tax_rate?: number | null
+          template_name: string
+          total_amount: number
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          auto_send_email?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          description?: string | null
+          email_template?: string | null
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          invoices_generated?: number | null
+          is_active?: boolean | null
+          last_run_date?: string | null
+          next_run_date?: string
+          payment_terms_days?: number | null
+          start_date?: string
+          tax_amount?: number | null
+          tax_rate?: number | null
+          template_name?: string
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_journal_entries: {
         Row: {
           amount: number
@@ -13601,6 +14141,77 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sbus_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_tasks: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          last_run_at: string | null
+          last_run_error: string | null
+          last_run_status: string | null
+          next_run_at: string | null
+          run_count: number | null
+          schedule_cron: string | null
+          schedule_day: number | null
+          schedule_time: string | null
+          schedule_type: string | null
+          task_config: Json | null
+          task_name: string
+          task_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          last_run_error?: string | null
+          last_run_status?: string | null
+          next_run_at?: string | null
+          run_count?: number | null
+          schedule_cron?: string | null
+          schedule_day?: number | null
+          schedule_time?: string | null
+          schedule_type?: string | null
+          task_config?: Json | null
+          task_name: string
+          task_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          last_run_error?: string | null
+          last_run_status?: string | null
+          next_run_at?: string | null
+          run_count?: number | null
+          schedule_cron?: string | null
+          schedule_day?: number | null
+          schedule_time?: string | null
+          schedule_type?: string | null
+          task_config?: Json | null
+          task_name?: string
+          task_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_tasks_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -19339,6 +19950,122 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_execution_log: {
+        Row: {
+          action_result: Json | null
+          company_id: string | null
+          error_message: string | null
+          executed_at: string | null
+          execution_status: string | null
+          id: string
+          trigger_record_id: string | null
+          trigger_record_type: string | null
+          workflow_rule_id: string | null
+        }
+        Insert: {
+          action_result?: Json | null
+          company_id?: string | null
+          error_message?: string | null
+          executed_at?: string | null
+          execution_status?: string | null
+          id?: string
+          trigger_record_id?: string | null
+          trigger_record_type?: string | null
+          workflow_rule_id?: string | null
+        }
+        Update: {
+          action_result?: Json | null
+          company_id?: string | null
+          error_message?: string | null
+          executed_at?: string | null
+          execution_status?: string | null
+          id?: string
+          trigger_record_id?: string | null
+          trigger_record_type?: string | null
+          workflow_rule_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_execution_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_execution_log_workflow_rule_id_fkey"
+            columns: ["workflow_rule_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_rules: {
+        Row: {
+          action_config: Json
+          action_type: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          execution_order: number | null
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          rule_name: string
+          trigger_conditions: Json | null
+          trigger_count: number | null
+          trigger_event: string
+          trigger_module: string
+          updated_at: string | null
+        }
+        Insert: {
+          action_config?: Json
+          action_type: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          execution_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          rule_name: string
+          trigger_conditions?: Json | null
+          trigger_count?: number | null
+          trigger_event: string
+          trigger_module: string
+          updated_at?: string | null
+        }
+        Update: {
+          action_config?: Json
+          action_type?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          execution_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          rule_name?: string
+          trigger_conditions?: Json | null
+          trigger_count?: number | null
+          trigger_event?: string
+          trigger_module?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

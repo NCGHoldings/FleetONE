@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PageAccessGuard } from "@/components/auth/PageAccessGuard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, FileText, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building2, Users, Package, Truck, Landmark, HardDrive, Calculator, FileCheck, ClipboardCheck, BarChart3, Settings } from "lucide-react";
+import { BookOpen, FileText, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building2, Users, Package, Truck, Landmark, HardDrive, Calculator, FileCheck, ClipboardCheck, BarChart3, Settings, Zap } from "lucide-react";
 import { ChartOfAccountsView } from "@/components/accounting/ChartOfAccountsView";
 import { JournalEntriesView } from "@/components/accounting/JournalEntriesView";
 import { AccountsPayableView } from "@/components/accounting/AccountsPayableView";
@@ -81,6 +81,11 @@ import { ExpenseReviewView } from "@/components/accounting/ExpenseReviewView";
 import { CompanyExpensesView } from "@/components/accounting/CompanyExpensesView";
 import { PettyCashView } from "@/components/accounting/PettyCashView";
 import { IOUManagementView } from "@/components/accounting/IOUManagementView";
+// Automation Components (Phase 1 - Zoho Parity)
+import { RecurringInvoicesView } from "@/components/accounting/automation/RecurringInvoicesView";
+import { PaymentReminderRulesView } from "@/components/accounting/automation/PaymentReminderRulesView";
+import { WorkflowRulesView } from "@/components/accounting/automation/WorkflowRulesView";
+import { ScheduledTasksView } from "@/components/accounting/automation/ScheduledTasksView";
 
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
@@ -90,7 +95,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { Receipt, Wallet } from "lucide-react";
 
-type ModuleTab = "gl" | "ar" | "ap" | "expenses" | "inventory" | "procurement" | "banking" | "assets" | "reports" | "settings";
+type ModuleTab = "gl" | "ar" | "ap" | "expenses" | "inventory" | "procurement" | "banking" | "assets" | "automation" | "reports" | "settings";
 
 const Accounting = () => {
   const [activeModule, setActiveModule] = useState<ModuleTab>("gl");
@@ -123,6 +128,7 @@ const Accounting = () => {
     { id: "procurement" as ModuleTab, label: "Procurement", icon: Truck },
     { id: "banking" as ModuleTab, label: "Banking", icon: Landmark },
     { id: "assets" as ModuleTab, label: "Fixed Assets", icon: HardDrive },
+    { id: "automation" as ModuleTab, label: "Automation", icon: Zap },
     { id: "reports" as ModuleTab, label: "Reports", icon: BarChart3 },
     { id: "settings" as ModuleTab, label: "Settings", icon: Settings },
   ];
@@ -727,6 +733,37 @@ const Accounting = () => {
 
               <TabsContent value="audit">
                 <AuditReportsView />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* Automation Module */}
+          {activeModule === "automation" && (
+            <Tabs defaultValue="recurring" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="recurring">Recurring Invoices</TabsTrigger>
+                  <TabsTrigger value="reminders">Payment Reminders</TabsTrigger>
+                  <TabsTrigger value="workflows">Workflow Rules</TabsTrigger>
+                  <TabsTrigger value="scheduled">Scheduled Tasks</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="recurring">
+                <RecurringInvoicesView />
+              </TabsContent>
+
+              <TabsContent value="reminders">
+                <PaymentReminderRulesView />
+              </TabsContent>
+
+              <TabsContent value="workflows">
+                <WorkflowRulesView />
+              </TabsContent>
+
+              <TabsContent value="scheduled">
+                <ScheduledTasksView />
               </TabsContent>
             </Tabs>
           )}

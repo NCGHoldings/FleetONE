@@ -79,6 +79,7 @@ import ApiUsageMonitoring from "./pages/ApiUsageMonitoring";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import SystemHealthDashboard from "./pages/SystemHealthDashboard";
 import Marketing from "./pages/Marketing";
+import CustomerPortal from "./pages/CustomerPortal";
 
 const queryClient = new QueryClient();
 
@@ -100,6 +101,7 @@ const App = () => (
             <Route path="/public/special-hire" element={<PublicSpecialHire />} />
             <Route path="/public/receipt-upload" element={<PublicReceiptUpload />} />
             <Route path="/public/conductor-upload" element={<PublicConductorUpload />} />
+            <Route path="/customer-portal" element={<CustomerPortal />} />
             
             {/* Protected routes wrapped in AppLayout */}
             <Route 
