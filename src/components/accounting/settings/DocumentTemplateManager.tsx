@@ -95,6 +95,37 @@ export const DocumentTemplateManager = () => {
     
     // Get company info for placeholders
     const company = companies?.find((c) => c.id === template.company_id);
+    const headerMode = template.header_mode || 'logo_and_html';
+    
+    // Generate header/logo placeholders based on header mode
+    let logoPlaceholder = '';
+    let headerPlaceholder = '';
+    
+    switch (headerMode) {
+      case 'header_image':
+        headerPlaceholder = template.header_image_url 
+          ? `<div class="full-header-image" style="width: 100%; margin-bottom: 10px;"><img src="${template.header_image_url}" style="width: 100%; max-height: 150px; object-fit: contain; display: block;" alt="Document Header" /></div>`
+          : '';
+        logoPlaceholder = '';
+        break;
+      case 'logo_only':
+        logoPlaceholder = template.header_image_url 
+          ? `<img src="${template.header_image_url}" style="max-height: 100px; display: block; margin: 0 auto;" alt="Company Logo" />`
+          : '';
+        headerPlaceholder = '';
+        break;
+      case 'html_only':
+        logoPlaceholder = '';
+        headerPlaceholder = '';
+        break;
+      case 'logo_and_html':
+      default:
+        logoPlaceholder = template.header_image_url 
+          ? `<img src="${template.header_image_url}" style="max-height: 80px; max-width: 200px; object-fit: contain;" alt="Company Logo" />` 
+          : '';
+        headerPlaceholder = '';
+        break;
+    }
     
     // Sample data for preview - replace placeholders with realistic data
     const sampleData: Record<string, string> = {
@@ -113,9 +144,8 @@ export const DocumentTemplateManager = () => {
       "{{company_address}}": company?.address || "Company Address",
       "{{company_phone}}": company?.phone || "+94 11 234 5678",
       "{{company_email}}": company?.email || "info@company.com",
-      "{{company_logo}}": template.header_image_url 
-        ? `<img src="${template.header_image_url}" style="max-height: 80px;" alt="Company Logo" />` 
-        : "",
+      "{{company_logo}}": logoPlaceholder,
+      "{{document_header}}": headerPlaceholder,
       "{{receipt_number}}": "RCV-2024-0001",
       "{{receipt_date}}": "January 20, 2024",
       "{{payment_number}}": "PAY-2024-0001",
@@ -262,10 +292,16 @@ export const DocumentTemplateManager = () => {
                   <Badge variant="outline">
                     {template.companies?.short_code || template.companies?.name || "No Company"}
                   </Badge>
+                  {template.header_mode && template.header_mode !== 'logo_and_html' && (
+                    <Badge variant="secondary" className="text-xs">
+                      {template.header_mode === 'header_image' ? 'Full Banner' : 
+                       template.header_mode === 'logo_only' ? 'Logo Only' : 'Text Only'}
+                    </Badge>
+                  )}
                 </div>
 
-                {template.header_image_url && (
-                  <div className="h-16 bg-muted rounded overflow-hidden">
+                {template.header_image_url && template.header_mode !== 'html_only' && (
+                  <div className={`bg-muted rounded overflow-hidden ${template.header_mode === 'header_image' ? 'h-20' : 'h-16'}`}>
                     <img 
                       src={template.header_image_url} 
                       alt="Header" 

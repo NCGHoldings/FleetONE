@@ -8,7 +8,7 @@ import { useDocumentTemplates } from "@/hooks/useDocumentTemplates";
 import { useCompanies } from "@/hooks/useAccountingData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { mapDocumentToPlaceholders, replacePlaceholders, generatePrintableDocument } from "@/lib/document-template-utils";
+import { mapDocumentToPlaceholders, replacePlaceholders, generatePrintableDocument, HeaderMode } from "@/lib/document-template-utils";
 import { defaultTemplates } from "@/lib/document-template-seeder";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -171,14 +171,15 @@ export const FinanceDocumentPreviewModal = ({
 
     // Use selected template if available, otherwise use fallback
     if (selectedTemplate) {
-      const placeholders = mapDocumentToPlaceholders(
-        documentType,
-        documentData,
-        company,
-        lineItems || [],
-        allocations || [],
-        selectedTemplate.header_image_url || undefined
-      );
+    const placeholders = mapDocumentToPlaceholders(
+      documentType,
+      documentData,
+      company,
+      lineItems || [],
+      allocations || [],
+      selectedTemplate.header_image_url || undefined,
+      (selectedTemplate.header_mode as HeaderMode) || 'logo_and_html'
+    );
 
       const renderedHtml = replacePlaceholders(selectedTemplate.html_content || "", placeholders);
       

@@ -48,6 +48,9 @@ export const useDocumentTemplates = (companyId?: string, typeId?: string) => {
   });
 };
 
+// Header mode type for document templates
+export type HeaderMode = 'header_image' | 'logo_only' | 'html_only' | 'logo_and_html';
+
 // Create a new template
 export const useCreateDocumentTemplate = () => {
   const queryClient = useQueryClient();
@@ -60,6 +63,7 @@ export const useCreateDocumentTemplate = () => {
       template_code?: string;
       html_content: string;
       header_image_url?: string;
+      header_mode?: HeaderMode;
       footer_text?: string;
       css_styles?: string;
       paper_size?: string;
@@ -97,6 +101,7 @@ export const useUpdateDocumentTemplate = () => {
       template_code?: string;
       html_content?: string;
       header_image_url?: string;
+      header_mode?: HeaderMode;
       footer_text?: string;
       css_styles?: string;
       paper_size?: string;

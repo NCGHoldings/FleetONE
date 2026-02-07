@@ -9,8 +9,9 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { useCreateDocumentTemplate, useUpdateDocumentTemplate, useUploadHeaderImage } from "@/hooks/useDocumentTemplates";
-import { Upload, Code, Eye, Copy, X, Info } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useCreateDocumentTemplate, useUpdateDocumentTemplate, useUploadHeaderImage, HeaderMode } from "@/hooks/useDocumentTemplates";
+import { Upload, Code, Eye, Copy, X, Info, Image, FileText, Type, Layout } from "lucide-react";
 import { toast } from "sonner";
 
 interface DocumentTemplateEditorProps {
@@ -114,6 +115,7 @@ export const DocumentTemplateEditor = ({
     template_code: "",
     html_content: defaultHtmlTemplate,
     header_image_url: "",
+    header_mode: "logo_and_html" as HeaderMode,
     footer_text: "",
     paper_size: "A4",
     orientation: "portrait",
@@ -135,6 +137,7 @@ export const DocumentTemplateEditor = ({
         template_code: template.template_code || "",
         html_content: template.html_content || defaultHtmlTemplate,
         header_image_url: template.header_image_url || "",
+        header_mode: (template.header_mode as HeaderMode) || "logo_and_html",
         footer_text: template.footer_text || "",
         paper_size: template.paper_size || "A4",
         orientation: template.orientation || "portrait",
@@ -148,6 +151,7 @@ export const DocumentTemplateEditor = ({
         template_code: "",
         html_content: defaultHtmlTemplate,
         header_image_url: "",
+        header_mode: "logo_and_html",
         footer_text: "",
         paper_size: "A4",
         orientation: "portrait",
@@ -222,6 +226,36 @@ export const DocumentTemplateEditor = ({
   const renderPreview = () => {
     let html = formData.html_content;
     
+    // Generate header/logo placeholders based on header mode
+    let logoPlaceholder = '';
+    let headerPlaceholder = '';
+    
+    switch (formData.header_mode) {
+      case 'header_image':
+        headerPlaceholder = formData.header_image_url 
+          ? `<div class="full-header-image" style="width: 100%; margin-bottom: 10px;"><img src="${formData.header_image_url}" style="width: 100%; max-height: 150px; object-fit: contain; display: block;" alt="Document Header" /></div>`
+          : '';
+        logoPlaceholder = '';
+        break;
+      case 'logo_only':
+        logoPlaceholder = formData.header_image_url 
+          ? `<img src="${formData.header_image_url}" style="max-height: 100px; display: block; margin: 0 auto;" alt="Company Logo" />`
+          : '';
+        headerPlaceholder = '';
+        break;
+      case 'html_only':
+        logoPlaceholder = '';
+        headerPlaceholder = '';
+        break;
+      case 'logo_and_html':
+      default:
+        logoPlaceholder = formData.header_image_url 
+          ? `<img src="${formData.header_image_url}" style="max-height: 80px; max-width: 200px; object-fit: contain;" alt="Company Logo" />` 
+          : '';
+        headerPlaceholder = '';
+        break;
+    }
+    
     // Replace placeholders with sample data
     const sampleData: Record<string, string> = {
       "{{invoice_number}}": "INV-2024-0001",
@@ -234,9 +268,8 @@ export const DocumentTemplateEditor = ({
       "{{company_address}}": "Company Address Here",
       "{{company_phone}}": "+94 11 234 5678",
       "{{company_email}}": "info@company.com",
-      "{{company_logo}}": formData.header_image_url 
-        ? `<img src="${formData.header_image_url}" style="max-height: 80px;" />` 
-        : "",
+      "{{company_logo}}": logoPlaceholder,
+      "{{document_header}}": headerPlaceholder,
       "{{subtotal}}": "LKR 100,000.00",
       "{{tax_amount}}": "LKR 8,000.00",
       "{{discount_amount}}": "LKR 0.00",
@@ -347,46 +380,174 @@ export const DocumentTemplateEditor = ({
               </div>
             </div>
 
-            {/* Header Image */}
-            <Card className="p-4">
-              <Label className="mb-2 block">Header Image / Company Logo</Label>
-              <div className="flex items-center gap-4">
-                {formData.header_image_url ? (
-                  <div className="relative h-16 w-48 bg-muted rounded overflow-hidden">
-                    <img
-                      src={formData.header_image_url}
-                      alt="Header"
-                      className="h-full w-full object-contain"
-                    />
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => setFormData((prev) => ({ ...prev, header_image_url: "" }))}
+            {/* Header Configuration */}
+            <Card className="p-4 space-y-4">
+              <div>
+                <Label className="text-base font-semibold">Header Configuration</Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Choose how the document header should display
+                </p>
+              </div>
+
+              {/* Header Display Mode */}
+              <div className="space-y-3">
+                <Label>Header Display Mode</Label>
+                <RadioGroup 
+                  value={formData.header_mode} 
+                  onValueChange={(val) => setFormData((prev) => ({ ...prev, header_mode: val as HeaderMode }))}
+                  className="grid grid-cols-2 gap-3"
+                >
+                  {/* Full Header Image */}
+                  <div className="relative">
+                    <RadioGroupItem value="header_image" id="header_image" className="peer sr-only" />
+                    <Label
+                      htmlFor="header_image"
+                      className="flex flex-col items-center gap-2 p-4 border-2 rounded-lg cursor-pointer hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 transition-all"
                     >
-                      <X className="h-3 w-3" />
-                    </Button>
+                      <div className="w-full h-8 bg-gradient-to-r from-primary/30 to-primary/10 rounded flex items-center justify-center">
+                        <Image className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="font-medium text-sm">Full Header Image</span>
+                      <span className="text-xs text-muted-foreground text-center">
+                        Full-width banner with embedded logos/title
+                      </span>
+                    </Label>
                   </div>
-                ) : (
-                  <div className="h-16 w-48 bg-muted rounded flex items-center justify-center text-muted-foreground text-sm">
-                    No header image
+
+                  {/* Logo + Company Info */}
+                  <div className="relative">
+                    <RadioGroupItem value="logo_and_html" id="logo_and_html" className="peer sr-only" />
+                    <Label
+                      htmlFor="logo_and_html"
+                      className="flex flex-col items-center gap-2 p-4 border-2 rounded-lg cursor-pointer hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 transition-all"
+                    >
+                      <div className="w-full h-8 flex items-center gap-2">
+                        <div className="w-8 h-6 bg-primary/20 rounded flex items-center justify-center">
+                          <Layout className="h-3 w-3 text-primary" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <div className="h-2 bg-muted-foreground/20 rounded w-3/4"></div>
+                          <div className="h-1.5 bg-muted-foreground/10 rounded w-1/2"></div>
+                        </div>
+                      </div>
+                      <span className="font-medium text-sm">Logo + Company Info</span>
+                      <span className="text-xs text-muted-foreground text-center">
+                        Logo on left, company details on right
+                      </span>
+                    </Label>
                   </div>
-                )}
-                <div>
-                  <Label htmlFor="header-upload" className="cursor-pointer">
-                    <div className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted transition-colors">
-                      <Upload className="h-4 w-4" />
-                      Upload Image
-                    </div>
+
+                  {/* Logo Only */}
+                  <div className="relative">
+                    <RadioGroupItem value="logo_only" id="logo_only" className="peer sr-only" />
+                    <Label
+                      htmlFor="logo_only"
+                      className="flex flex-col items-center gap-2 p-4 border-2 rounded-lg cursor-pointer hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 transition-all"
+                    >
+                      <div className="w-full h-8 flex items-center justify-center">
+                        <div className="w-12 h-6 bg-primary/20 rounded flex items-center justify-center">
+                          <Image className="h-3 w-3 text-primary" />
+                        </div>
+                      </div>
+                      <span className="font-medium text-sm">Logo Only</span>
+                      <span className="text-xs text-muted-foreground text-center">
+                        Centered logo, no company text
+                      </span>
+                    </Label>
+                  </div>
+
+                  {/* HTML/Text Only */}
+                  <div className="relative">
+                    <RadioGroupItem value="html_only" id="html_only" className="peer sr-only" />
+                    <Label
+                      htmlFor="html_only"
+                      className="flex flex-col items-center gap-2 p-4 border-2 rounded-lg cursor-pointer hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 transition-all"
+                    >
+                      <div className="w-full h-8 flex flex-col items-center justify-center gap-1">
+                        <div className="h-2 bg-muted-foreground/30 rounded w-1/2"></div>
+                        <div className="h-1.5 bg-muted-foreground/15 rounded w-3/4"></div>
+                      </div>
+                      <span className="font-medium text-sm">Text Only</span>
+                      <span className="text-xs text-muted-foreground text-center">
+                        Company info from template HTML
+                      </span>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Header Image Upload - shown for all modes except html_only */}
+              {formData.header_mode !== 'html_only' && (
+                <div className="space-y-2 pt-2 border-t">
+                  <Label>
+                    {formData.header_mode === 'header_image' ? 'Header Banner Image' : 'Company Logo'}
                   </Label>
-                  <input
-                    id="header-upload"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                    disabled={!formData.company_id}
-                  />
+                  <p className="text-xs text-muted-foreground">
+                    {formData.header_mode === 'header_image' 
+                      ? 'Upload a pre-designed banner with document title, company name, and logos embedded'
+                      : 'Upload your company logo to display in the document header'
+                    }
+                  </p>
+                  <div className="flex items-center gap-4 mt-2">
+                    {formData.header_image_url ? (
+                      <div className="relative h-16 flex-shrink-0 bg-muted rounded overflow-hidden" style={{ width: formData.header_mode === 'header_image' ? '240px' : '120px' }}>
+                        <img
+                          src={formData.header_image_url}
+                          alt="Header"
+                          className="h-full w-full object-contain"
+                        />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6"
+                          onClick={() => setFormData((prev) => ({ ...prev, header_image_url: "" }))}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="h-16 bg-muted rounded flex items-center justify-center text-muted-foreground text-sm" style={{ width: formData.header_mode === 'header_image' ? '240px' : '120px' }}>
+                        No image uploaded
+                      </div>
+                    )}
+                    <div>
+                      <Label htmlFor="header-upload" className="cursor-pointer">
+                        <div className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted transition-colors">
+                          <Upload className="h-4 w-4" />
+                          Upload Image
+                        </div>
+                      </Label>
+                      <input
+                        id="header-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                        disabled={!formData.company_id}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Mode-specific tips */}
+              <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="text-muted-foreground">
+                    {formData.header_mode === 'header_image' && (
+                      <span>Use <code className="bg-muted px-1 rounded">{'{{document_header}}'}</code> in your template to place the full-width banner. The <code className="bg-muted px-1 rounded">{'{{company_logo}}'}</code> will be empty in this mode.</span>
+                    )}
+                    {formData.header_mode === 'logo_and_html' && (
+                      <span>Use <code className="bg-muted px-1 rounded">{'{{company_logo}}'}</code> to place the logo. Combine with <code className="bg-muted px-1 rounded">{'{{company_name}}'}</code>, <code className="bg-muted px-1 rounded">{'{{company_address}}'}</code> etc. for company details.</span>
+                    )}
+                    {formData.header_mode === 'logo_only' && (
+                      <span>Use <code className="bg-muted px-1 rounded">{'{{company_logo}}'}</code> to place the centered logo. It will automatically be displayed without company text.</span>
+                    )}
+                    {formData.header_mode === 'html_only' && (
+                      <span>No images will be rendered. Use company placeholders like <code className="bg-muted px-1 rounded">{'{{company_name}}'}</code> and <code className="bg-muted px-1 rounded">{'{{company_address}}'}</code> for a text-only header.</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </Card>
