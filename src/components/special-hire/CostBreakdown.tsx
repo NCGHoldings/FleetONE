@@ -584,7 +584,7 @@ export function CostBreakdown({ data }: Props) {
         {/* Working Hours Analysis */}
         <div>
           <h4 className="font-medium mb-2">Working Hours Analysis</h4>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-4 gap-4 text-sm">
             <div className="text-center">
               <div className="font-medium text-blue-600">
                 {safeData.rateCardDetails?.standardHours || 
@@ -616,15 +616,45 @@ export function CostBreakdown({ data }: Props) {
             </div>
             <div className="text-center">
               <div className="font-medium text-green-600">
-                {safeData.rateCardDetails?.actualHours || 
+                {safeData.rateCardDetails?.actualHours?.toFixed(1) || 
                  (data.pickupDateTime && data.dropDateTime ? 
                    (() => {
                      const pickup = new Date(data.pickupDateTime);
                      const drop = new Date(data.dropDateTime);
                      return ((drop.getTime() - pickup.getTime()) / (1000 * 60 * 60)).toFixed(1);
-                   })() : 0)} hrs
+                   })() : '0.0')} hrs
               </div>
               <div className="text-muted-foreground">Actual</div>
+            </div>
+            <div className="text-center">
+              <div className={`font-medium ${(safeData.rateCardDetails?.overtimeHours || 0) > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                {(() => {
+                  // Calculate overtime hours: max(0, actual - available)
+                  const actualHours = safeData.rateCardDetails?.actualHours || 
+                    (data.pickupDateTime && data.dropDateTime ? 
+                      (() => {
+                        const pickup = new Date(data.pickupDateTime);
+                        const drop = new Date(data.dropDateTime);
+                        return (drop.getTime() - pickup.getTime()) / (1000 * 60 * 60);
+                      })() : 0);
+                  
+                  const additionalDistance = Array.isArray(data.additionalCharges) 
+                    ? data.additionalCharges
+                        .filter(charge => charge.type === 'additional_distance')
+                        .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+                    : 0;
+                  const totalDistanceForHours = safeData.kmTrip + additionalDistance;
+                  
+                  const availableHours = safeData.rateCardDetails?.availableHours || 
+                    (totalDistanceForHours > 0 ? totalDistanceForHours / 10 : 0);
+                  
+                  const overtimeHours = safeData.rateCardDetails?.overtimeHours ?? 
+                    Math.max(0, actualHours - availableHours);
+                  
+                  return overtimeHours.toFixed(1);
+                })()} hrs
+              </div>
+              <div className="text-muted-foreground">Overtime</div>
             </div>
           </div>
           <div className="text-xs text-muted-foreground mt-1 text-center">
@@ -637,12 +667,16 @@ export function CostBreakdown({ data }: Props) {
               
               const availableHours = safeData.rateCardDetails?.availableHours || (safeData.kmTrip / 10);
               
-              if (additionalDistance > 0) {
-                return `Available: ${safeData.kmTrip}km + ${additionalDistance}km additional = ${(safeData.kmTrip + additionalDistance).toFixed(1)}km total, calculated as ${safeData.kmTrip}km ÷ 10 kmph = ${availableHours.toFixed(1)} hrs`;
+              // Check if this is Lyceum/Internal hire (standard hours based) or Outside (distance based)
+              const isStandardHoursBased = safeData.rateCardDetails?.standardHours && 
+                safeData.rateCardDetails.availableHours === safeData.rateCardDetails.standardHours;
+              
+              if (isStandardHoursBased) {
+                return `Available hours from rate card: ${availableHours.toFixed(1)} hrs (Lyceum/Internal hire)`;
+              } else if (additionalDistance > 0) {
+                return `Available: ${safeData.kmTrip}km + ${additionalDistance}km additional = ${(safeData.kmTrip + additionalDistance).toFixed(1)}km total ÷ 10 kmph = ${availableHours.toFixed(1)} hrs`;
               } else {
-                return safeData.rateCardDetails?.availableHours ? 
-                  `Available: ${safeData.kmTrip}km ÷ 10 kmph = ${safeData.rateCardDetails.availableHours.toFixed(1)} hrs` :
-                  safeData.kmTrip > 0 ? `Available: ${safeData.kmTrip}km ÷ 10 kmph = ${(safeData.kmTrip / 10).toFixed(1)} hrs` : '';
+                return safeData.kmTrip > 0 ? `Available: ${safeData.kmTrip}km ÷ 10 kmph = ${availableHours.toFixed(1)} hrs (Outside hire)` : '';
               }
             })()}
           </div>

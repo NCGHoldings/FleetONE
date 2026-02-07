@@ -410,7 +410,8 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
           // Calculate actual hours from datetime fields
           let actualHours = 8;
           let availableHours = 8;
-          const standardHours = 8;
+          // Get standard hours from rate card or use database stored value
+          const standardHours = rateCard?.standard_hours || quotation.standard_hours || 8;
           
           if (quotation.pickup_datetime && quotation.drop_datetime) {
             const pickupTime = new Date(quotation.pickup_datetime);
@@ -418,9 +419,19 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
             actualHours = Math.max(0, (dropTime.getTime() - pickupTime.getTime()) / (1000 * 60 * 60));
           }
           
-          // Calculate available hours from distance (baseline speed: 10 km/h)
-          const baselineSpeed = 10; // km/h
-          availableHours = tripDistance / baselineSpeed;
+          // FIXED: Calculate available hours based on hire type
+          // - Outside hire: distance-based (km / 10 km/h baseline speed)
+          // - Lyceum/Internal hire: use rate card standard_hours
+          const isLyceumOrInternal = quotation.hire_type === 'Lyceum' || quotation.hire_type === 'Internal';
+          
+          if (isLyceumOrInternal) {
+            // Lyceum/Internal: available hours = rate card standard hours (typically 4h or 8h blocks)
+            availableHours = standardHours;
+          } else {
+            // Outside hire: available hours = trip distance / 10 km/h baseline speed
+            const baselineSpeed = 10; // km/h
+            availableHours = tripDistance / baselineSpeed;
+          }
           
           // Calculate overtime hours
           const overtimeHours = Math.max(0, actualHours - availableHours);
