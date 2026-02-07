@@ -2190,11 +2190,14 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                               if (!costData) return;
                               setLoading(true);
                               try {
-                                // Recalculate with manual trip distance
+                                // Get form values for recalculation
+                                const formValues = form.getValues();
                                 const kmParkingToPickup = useManualParkingDistance ? manualParkingToPickup : costData.kmParkingToPickup;
                                 const kmDropToParking = useManualParkingDistance ? manualDropToParking : costData.kmDropToParking;
                                 const totalDistance = kmParkingToPickup + manualTripDistance + kmDropToParking;
+                                const numberOfBuses = formValues.numberOfBuses || 1;
                                 
+                                // Get fuel settings
                                 const { data: fuelSettings } = await supabase
                                   .from('fuel_settings')
                                   .select('*')
@@ -2203,33 +2206,155 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                 const { data: busTypeData } = await supabase
                                   .from('bus_types')
                                   .select('avg_km_per_l')
-                                  .eq('id', form.getValues('busTypeId'))
+                                  .eq('id', formValues.busTypeId)
                                   .single();
+                                
+                                // Get rate cards for hire type
+                                const rateCardHireType = formValues.hireType === 'Internal' ? 'Lyceum' : formValues.hireType;
+                                const { data: allRateCards } = await supabase
+                                  .from('hire_rate_cards')
+                                  .select('*')
+                                  .eq('hire_type', rateCardHireType)
+                                  .eq('bus_type_id', formValues.busTypeId)
+                                  .eq('is_active', true)
+                                  .order('from_km');
+                                
+                                if (!allRateCards || allRateCards.length === 0) {
+                                  throw new Error('No rate cards found');
+                                }
                                 
                                 const busEfficiency = busTypeData?.avg_km_per_l || 8;
                                 const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 350;
-                                const numberOfBuses = form.getValues('numberOfBuses') || 1;
                                 
-                                // Calculate new fuel cost (empty run only - for customer billing)
+                                // FULL RECALCULATION: Rate matching, exceeding KM, and overtime
+                                let rateCard = null;
+                                let fixedRate = 0;
+                                let exceedingDistanceCharge = 0;
+                                let baseCoverageKm = 100;
+                                let exceedingKm = 0;
+                                
+                                // Match rate card based on new manual distance
+                                if (formValues.hireType !== 'Outside') {
+                                  rateCard = allRateCards.find(card => 
+                                    manualTripDistance >= (card.from_km || 0) && 
+                                    (card.to_km === null || manualTripDistance <= card.to_km)
+                                  ) || allRateCards[0];
+                                  
+                                  fixedRate = rateCard?.flat_fee_lkr || 0;
+                                  
+                                  if (manualTripDistance > 100) {
+                                    const exceedingRateCard = allRateCards.find(card => 
+                                      card.from_km >= 101 && card.exceeding_km_rate_lkr != null
+                                    );
+                                    if (exceedingRateCard) {
+                                      baseCoverageKm = exceedingRateCard.exceeding_km_threshold || 100;
+                                      exceedingKm = Math.max(0, manualTripDistance - baseCoverageKm);
+                                      exceedingDistanceCharge = exceedingKm * (exceedingRateCard.exceeding_km_rate_lkr || 0);
+                                    }
+                                  }
+                                } else {
+                                  rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
+                                  fixedRate = rateCard?.flat_fee_lkr || 0;
+                                  baseCoverageKm = rateCard?.exceeding_km_threshold || 100;
+                                  exceedingKm = Math.max(0, manualTripDistance - baseCoverageKm);
+                                  exceedingDistanceCharge = exceedingKm * (rateCard?.exceeding_km_rate_lkr || 0);
+                                }
+                                
+                                // RECALCULATE OVERTIME/OVERNIGHT with new distance
+                                let overtimeCharge = 0;
+                                let overnightCharge = 0;
+                                
+                                if (rateCard) {
+                                  if (formValues.hireType === 'Outside') {
+                                    // Outside hire: available hours = distance / 10 km/h
+                                    const extraTimeResult = calculateExtraTimeCharge(
+                                      manualTripDistance,
+                                      formValues.pickupDateTime,
+                                      formValues.dropDateTime,
+                                      {
+                                        baselineSpeedKmph: 10,
+                                        hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+                                        nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000,
+                                        useStandardHours: false
+                                      }
+                                    );
+                                    overtimeCharge = extraTimeResult.overtimeCharge;
+                                    overnightCharge = extraTimeResult.overnightCharge;
+                                  } else {
+                                    // Lyceum/Internal: available hours from rate card standard_hours
+                                    const extraTimeResult = calculateExtraTimeCharge(
+                                      manualTripDistance,
+                                      formValues.pickupDateTime,
+                                      formValues.dropDateTime,
+                                      {
+                                        hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+                                        nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000,
+                                        useStandardHours: true,
+                                        standardHours: rateCard.standard_hours || 8
+                                      }
+                                    );
+                                    overtimeCharge = extraTimeResult.overtimeCharge;
+                                    overnightCharge = extraTimeResult.overnightCharge;
+                                  }
+                                }
+                                
+                                const totalExtraTimeCharge = overtimeCharge + overnightCharge;
+                                const hireCharge = fixedRate + exceedingDistanceCharge + totalExtraTimeCharge;
+                                const grossRevenue = hireCharge * numberOfBuses;
+                                
+                                // Calculate fuel cost (empty run only for customer billing)
                                 const emptyRunDistance = kmParkingToPickup + kmDropToParking;
                                 const newFuelCost = Math.round((emptyRunDistance / busEfficiency) * fuelPrice * numberOfBuses);
                                 
-                                // Update costData with manual trip distance
+                                // Recalculate commission on new gross revenue
+                                const preCommissionTotal = grossRevenue + newFuelCost + 
+                                  (costData.totalAdditionalCharges || 0) - (costData.discountAmount || 0);
+                                const safePassThroughPct = Math.min(formValues.commissionPassThroughPct, formValues.commissionPct);
+                                const commissionPassThroughAmount = preCommissionTotal * (safePassThroughPct / 100);
+                                const commissionExpense = preCommissionTotal * (formValues.commissionPct / 100);
+                                const finalCustomerTotal = preCommissionTotal + commissionPassThroughAmount;
+                                
+                                // Calculate available hours for display
+                                const actualHrs = (new Date(formValues.dropDateTime).getTime() - new Date(formValues.pickupDateTime).getTime()) / (1000 * 60 * 60);
+                                const availableHrs = formValues.hireType === 'Outside' 
+                                  ? (manualTripDistance / 10) 
+                                  : (rateCard?.standard_hours || 8);
+                                const overtimeHrs = Math.max(0, actualHrs - availableHrs);
+                                
+                                // Update costData with FULL recalculation
                                 setCostData({
                                   ...costData,
                                   kmTrip: manualTripDistance,
                                   totalTripDistance: totalDistance,
                                   totalDistance: totalDistance,
                                   useManualTripDistance: true,
-                                  // Update total including manual trip
-                                  customerTotalWithFuel: (costData.hireCharge || 0) + newFuelCost + 
-                                    (costData.totalAdditionalCharges || 0) - (costData.discountAmount || 0) +
-                                    (costData.commissionPassThroughAmount || 0),
+                                  // Updated hire charges
+                                  hireCharge: Math.round(hireCharge),
+                                  fixedRate: Math.round(fixedRate),
+                                  exceedingDistanceCharge: Math.round(exceedingDistanceCharge),
+                                  overtimeCharge: Math.round(overtimeCharge),
+                                  overnightCharge: Math.round(overnightCharge),
+                                  grossRevenue: Math.round(grossRevenue),
+                                  fuelCostFuelOnly: newFuelCost,
+                                  // Updated commission
+                                  commissionAmount: Math.round(commissionExpense),
+                                  commissionPassThroughAmount: Math.round(commissionPassThroughAmount),
+                                  customerTotalWithFuel: Math.round(finalCustomerTotal),
+                                  // Updated rate card details
+                                  rateCardDetails: {
+                                    ...(costData.rateCardDetails || {}),
+                                    standardHours: rateCard?.standard_hours || 8,
+                                    actualHours: Math.round(actualHrs * 100) / 100,
+                                    availableHours: Math.round(availableHrs * 100) / 100,
+                                    overtimeHours: Math.round(overtimeHrs * 100) / 100,
+                                    exceedingKm: exceedingKm,
+                                    chargeableExceedingKm: exceedingKm,
+                                  }
                                 });
                                 
                                 toast({
-                                  title: "Trip Distance Updated",
-                                  description: `Manual trip distance: ${manualTripDistance} km (Total: ${totalDistance.toFixed(1)} km)`,
+                                  title: "Full Recalculation Complete",
+                                  description: `Manual trip: ${manualTripDistance} km | Hire: LKR ${Math.round(hireCharge).toLocaleString()} | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()}`,
                                 });
                               } catch (error) {
                                 console.error('Error recalculating with manual trip distance:', error);
