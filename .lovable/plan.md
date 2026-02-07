@@ -1,260 +1,232 @@
 
-# Fix AP Payment Finance Integration - Complete Workflow
+# Special Hire Module - Comprehensive Testing & Issue Fixes Plan
 
-## Problem Summary
+## Executive Summary
 
-Based on investigation, there are **3 critical issues** preventing the AP Payment system from working correctly:
-
-### Issue 1: Invoices Not Showing in Payment Form
-- **Root Cause**: AP invoices are created with `approval_status: "pending"` (database default)
-- **Impact**: The payment form filters for `approval_status === "approved"` only
-- **Result**: No invoices appear when selecting a vendor
-
-### Issue 2: No GL Posting for AP Payments
-- **Root Cause**: `useCreateAPPayment` mutation only updates invoice balance/status
-- **Missing**: Journal Entry creation (DR Trade Payable / CR Bank)
-- **Impact**: Payments don't affect Chart of Accounts balances
-
-### Issue 3: No Bank Transaction Record
-- **Root Cause**: Bank account is selected but no bank_transactions record created
-- **Impact**: Bank reconciliation doesn't show the payment
+After thorough code analysis of the Special Hire module, I've identified several areas that need attention and testing. This plan covers the complete flow from quotation creation to finance integration.
 
 ---
 
-## Database Verification
+## Part 1: Current Code Analysis - Key Findings
 
-| Table | Field | Current Default |
-|-------|-------|-----------------|
-| ap_invoices | approval_status | 'pending' |
-| ap_invoices | status | 'pending' |
+### A. Manual KM Entry System
+**Current Implementation:**
+- `useManualTripDistance` state controls manual trip distance override
+- `useManualParkingDistance` state controls parking distance override
+- Located in SpecialHireForm.tsx lines 157-159
 
-Current invoices in database:
-- Invoice 001: approval_status = "approved", balance = 122.99
-- Invoice INV-20260122-9KE8: approval_status = "pending", balance = 1309.8
+**Potential Issues Found:**
+1. Manual KM toggle UI may not be prominent enough for users to find
+2. When manual KM is entered, the cost breakdown should recalculate all dependent values
 
----
+### B. Available Hours Calculation Logic
+**Current Implementation (extra-time-calculator.ts):**
+- **Outside Hire:** `availableHours = tripDistance / 10` (distance-based, 10 km/h baseline)
+- **Lyceum/Internal Hire:** `availableHours = standardHours` (rate card based, typically 4h or 8h)
 
-## Solution Components
+**Display in CostBreakdown.tsx (lines 584-673):**
+- Shows: Standard Hours, Available Hours, Actual Hours
+- Missing: **Overtime Hours** is not displayed as a separate row in the Working Hours Analysis section
 
-### Part 1: Add Direct Approval in AccountsPayableView
-
-Add "Approve" button directly in the invoices list so users don't have to navigate to Pending Approvals:
-
-| Current UI | Enhanced UI |
-|------------|-------------|
-| [View] [Pay] (only if approved) | [View] [Approve] [Pay] |
-
-When invoice is pending, show "Approve" button. After approval, show "Pay" button.
-
-### Part 2: Show Pending Invoices Message in APPaymentForm
-
-When a vendor is selected but has no approved invoices, show helpful message:
-
-```
-No approved invoices found for this vendor.
-
-You have 3 invoices pending approval totaling Rs 150,000.
-[Approve All] [Go to Approvals]
-```
-
-### Part 3: Add GL Posting to AP Payment
-
-Update `useCreateAPPayment` mutation to create journal entries:
-
-**Standard AP Payment (Invoice Payment):**
-```
-DR Trade Payable (liability decreases)     25,000
-   CR Bank Account (asset decreases)              25,000
-```
-
-**If WHT Deducted:**
-```
-DR Trade Payable (full payable)            25,000
-   CR Bank Account (net payment)                  23,750
-   CR WHT Payable (withheld amount)                1,250
-```
-
-### Part 4: Create Bank Transaction Record
-
-When payment is made via bank transfer or cheque:
-- Create entry in `bank_transactions` table
-- Type: 'payment' 
-- Links to ap_payment via reference
-
-### Part 5: Update COA Balances
-
-After journal entry is posted:
-- Update Trade Payable account (decrease liability)
-- Update Bank Account (decrease asset)
-- Update WHT Payable if applicable (increase liability)
+### C. Cost Breakdown Display
+**Current sections displayed:**
+1. Distance Analysis (Parking→Pickup, Trip, Drop→Parking, Total)
+2. Bus Fleet Breakdown (if multi-bus)
+3. Post-Trip Adjustments (if finalized)
+4. Hire Charges Breakdown (Base Rate, Overtime, Overnight, Exceeding Distance)
+5. Working Hours Analysis (Standard, Available, Actual)
+6. Deductions (Fuel, Maintenance, Additional Charges, Commission)
+7. Net Profit
 
 ---
 
-## Implementation Flow Diagram
+## Part 2: Issues to Fix
 
-```text
-+======================= COMPLETE AP PAYMENT FLOW =======================+
+### Issue 1: Working Hours Analysis - Missing Overtime Hours Row
 
-CURRENT BROKEN FLOW:
-+----------------+     +----------------+     +----------------+
-|  Create AP     | --> | Pending        | --> | Approve in     |
-|  Invoice       |     | (invisible)    |     | Approvals View |
-+----------------+     +----------------+     +----------------+
-                                                     |
-                                              (Users don't know)
-                                                     v
-+----------------+     +----------------+
-| Select Vendor  | --> | No Invoices!   |
-| in Payment     |     | (Frustration)  |
-+----------------+     +----------------+
+**Problem:** The "Overtime Hours" value is calculated but not displayed as a separate row in the Working Hours Analysis section.
 
-FIXED FLOW:
-+----------------+     +-------------------+     +----------------+
-|  Create AP     | --> | See in AP List    | --> | Click Approve  |
-|  Invoice       |     | (Pending Badge)   |     | (Direct)       |
-+----------------+     +-------------------+     +----------------+
-                                                       |
-                                                       v
-+----------------+     +-------------------+     +----------------+
-| Select Vendor  | --> | See Approved      | --> | Allocate &     |
-| in Payment     |     | Invoices Listed   |     | Mark Payment   |
-+----------------+     +-------------------+     +----------------+
-                                                       |
-                                                       v
-                       +=================================+
-                       |      AUTOMATIC TRIGGERS        |
-                       +=================================+
-                       | 1. AP Invoice Status Updated   |
-                       | 2. Journal Entry Created       |
-                       | 3. COA Balances Updated        |
-                       | 4. Bank Transaction Created    |
-                       +=================================+
-```
+**Location:** `src/components/special-hire/CostBreakdown.tsx` lines 584-673
 
----
+**Fix Required:** Add a fourth column for "Overtime Hours" in the Working Hours Analysis grid.
 
-## File Changes
-
-### Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/accounting/AccountsPayableView.tsx` | Add Approve button in invoice actions column |
-| `src/components/accounting/APPaymentForm.tsx` | Show pending invoices message with quick approve option |
-| `src/hooks/useAccountingMutations.ts` | Add GL posting and bank transaction to useCreateAPPayment |
-
-### Detailed Changes
-
-**1. AccountsPayableView.tsx:**
-- Import `useApproveAPInvoice` mutation
-- Add "Approve" action button for invoices with `approval_status === "pending"`
-- Show confirmation toast on approval
-- Refresh list after approval
-
-**2. APPaymentForm.tsx:**
-- Add query for pending invoices count
-- Show alert when vendor has pending invoices
-- Add "Quick Approve" button to approve all vendor's pending invoices
-- After approval, auto-refresh the allocations list
-
-**3. useAccountingMutations.ts (useCreateAPPayment):**
 ```typescript
-// After saving payment record:
-// 1. Create Journal Entry
-const journalEntry = await createAndPostJournalEntry({
-  entry_date: payment.payment_date,
-  description: `AP Payment to ${vendorName} - ${payment.payment_number}`,
-  reference: payment.payment_number,
-  lines: [
-    { account_id: tradePayableId, description: 'Clear AP', debit: totalPayment, credit: 0 },
-    { account_id: bankAccountId, description: 'Bank Payment', debit: 0, credit: netPayment },
-    // If WHT:
-    { account_id: whtPayableId, description: 'WHT Deducted', debit: 0, credit: whtAmount },
-  ],
-  company_id: effectiveCompanyId,
-  business_unit_code: businessUnitCode,
-});
-
-// 2. Link journal entry to payment
-await supabase.from('ap_payments')
-  .update({ journal_entry_id: journalEntry.id })
-  .eq('id', paymentId);
-
-// 3. Create bank transaction
-await supabase.from('bank_transactions').insert({
-  bank_account_id: payment.bank_account_id,
-  transaction_date: payment.payment_date,
-  transaction_type: 'payment',
-  description: `AP Payment - ${payment.payment_number}`,
-  credit_amount: netPayment,
-  reference: payment.payment_number,
-  company_id: effectiveCompanyId,
-});
+// Current: grid-cols-3
+// Change to: grid-cols-4 with Overtime Hours column
 ```
 
----
+### Issue 2: Available Hours Display Inconsistency
 
-## GL Account Requirements
+**Problem:** For Lyceum/Internal hires, the available hours should show rate card `standard_hours`, but the code may fall back to distance calculation incorrectly.
 
-For AP Payment GL posting to work, these accounts must be configured:
+**Location:** `src/components/special-hire/CostBreakdown.tsx` lines 601-614
 
-| Account | Type | Purpose |
-|---------|------|---------|
-| Trade Payable | Liability | Reduces when paying vendor |
-| Bank Account | Asset | Reduces when making payment |
-| WHT Payable | Liability | Increases when deducting WHT |
+**Fix Required:** Ensure Lyceum/Internal hires use `rateCardDetails.standardHours` instead of distance-based calculation.
 
-These should be configured in Finance Settings under "AP GL Account Mappings".
+### Issue 3: Manual KM Entry Not Triggering Full Recalculation
 
----
+**Problem:** When manual KM is entered, the cost breakdown shows updated distances but some dependent calculations (overtime baseline) may not recalculate.
 
-## User Workflow After Fix
+**Location:** `src/components/special-hire/SpecialHireForm.tsx` around line 1200-1250
 
-### Step 1: Create AP Invoice
-User creates invoice in AP → Status shows as "Pending Approval"
+**Fix Required:** Ensure `calculateExtraTimeCharge` receives the manual trip distance for overtime baseline calculation.
 
-### Step 2: Approve Invoice (NEW - Direct Method)
-In AP Invoices list, click "Approve" button → Invoice becomes payable
+### Issue 4: Calculator Page Missing Hire Type Context
 
-### Step 3: Record Payment
-1. Open Payment Form
-2. Select Vendor → Approved invoices appear
-3. Check invoices to pay
-4. Enter payment amount (auto-calculates)
-5. Select bank account
-6. If cheque: enter cheque number and date
-7. Submit
+**Problem:** The EnhancedCostCalculator uses Outside hire logic for all quotations when recalculating available hours.
 
-### Step 4: Automatic Processing (Behind the scenes)
-- Invoice balance updated
-- Invoice status changed to "paid" or "partial"
-- Journal entry created
-- COA balances updated
-- Bank transaction recorded
+**Location:** `src/components/special-hire/EnhancedCostCalculator.tsx` lines 409-446
+
+**Fix Required:** Pass hire_type to available hours calculation:
+- If Outside: use `tripDistance / 10`
+- If Lyceum/Internal: use `rateCard.standard_hours`
 
 ---
 
-## Testing Checklist
+## Part 3: Testing Checklist
 
-After implementation:
-1. Create new AP Invoice → Verify shows as "Pending Approval"
-2. Click Approve in AP list → Verify status changes to "approved"
-3. Open AP Payment → Verify approved invoices appear for vendor
-4. Make full payment → Verify invoice status becomes "paid"
-5. Check Journal Entries → Verify DR Payable / CR Bank entry exists
-6. Check COA balances → Verify Trade Payable decreased, Bank decreased
-7. Check Bank Transactions → Verify payment transaction recorded
-8. Make partial payment → Verify invoice status becomes "partial"
-9. Test cheque payment → Verify cheque number recorded
-10. Test with WHT deduction → Verify 3-line journal entry
+### Test 1: Create Quotation with Manual KM Entry
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Go to Special Hire → New Quotation | Form opens |
+| 2 | Fill customer details | Fields populate |
+| 3 | Select hire type "Outside" | Rate card loads |
+| 4 | Select bus type | Bus selected |
+| 5 | Enter pickup/drop locations | Google Maps suggestions appear |
+| 6 | Toggle "Manual Trip Distance Override" | Manual KM input appears |
+| 7 | Enter 150 km manually | Distance field shows 150 km |
+| 8 | Click "Calculate" | Cost breakdown displays with manual distance |
+| 9 | Verify Distance Analysis | Shows "Trip Distance: 150 km (Manual)" badge |
+| 10 | Verify Available Hours | Shows 150/10 = 15 hours for Outside hire |
+
+### Test 2: Verify Time Calculations
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Set pickup time: 8:00 AM | Time set |
+| 2 | Set drop time: 6:00 PM (10 hours) | Time set |
+| 3 | With 100km trip | Available: 10h, Actual: 10h, Overtime: 0h |
+| 4 | With 50km trip | Available: 5h, Actual: 10h, Overtime: 5h |
+| 5 | Verify overtime charge | Overtime hours × hourly rate shown |
+
+### Test 3: Lyceum Hire Time Calculation
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Select hire type "Lyceum" | Rate card changes |
+| 2 | Select 4-hour rate card | Standard hours = 4 |
+| 3 | Set trip duration = 6 hours | Actual = 6h |
+| 4 | Verify Available Hours | Shows 4h (from rate card, NOT distance/10) |
+| 5 | Verify Overtime | 6h - 4h = 2h overtime |
+
+### Test 4: Cost Breakdown Completeness
+
+| Section | Required Rows | Verify |
+|---------|---------------|--------|
+| Distance Analysis | Parking→Pickup, Trip, Drop→Parking, Additional KM, Total | ✓ All displayed |
+| Working Hours | Standard, Available, Actual, **Overtime** | ✓ All 4 displayed |
+| Hire Charges | Base Rate, Overtime Charge, Overnight Charge, Exceeding KM | ✓ All displayed |
+| Customer Total | Original Quote Amount | ✓ Highlighted green |
+| Deductions | Fuel, Maintenance, Charges, Commission | ✓ All listed |
+| Net Profit | Final profit amount | ✓ Displayed |
+
+### Test 5: Calculator Page Verification
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Go to Calculator tab | Page loads |
+| 2 | Search for quotation | Quotation appears in list |
+| 3 | Select quotation | Cost breakdown loads |
+| 4 | Verify all sections match quotation form | Identical calculations |
+| 5 | Check Working Hours for Lyceum | Uses standard_hours not distance/10 |
+
+### Test 6: Post-Trip Adjustment Flow
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Go to Confirmed Trips | List shows trips |
+| 2 | Click "Post-Trip Adjustment" | Modal opens |
+| 3 | Enter actual KM traveled | Extra KM calculated |
+| 4 | Enter actual pickup/drop times | Time adjustment calculated |
+| 5 | Add additional expenses | Expenses listed |
+| 6 | Save as Draft | Draft saved |
+| 7 | Finalize adjustment | Status changes to "finalized" |
+| 8 | View cost breakdown | Shows post-trip section with adjustments |
+
+### Test 7: Advance Payment Flow
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Record advance payment | Payment form opens |
+| 2 | Enter amount and method | Data saved |
+| 3 | Upload payment proof | Image uploaded |
+| 4 | Submit for finance approval | Status = "pending_finance" |
+| 5 | Finance approves | Status = "approved" |
+| 6 | Verify GL posting | Journal entry created (DR Bank / CR Customer Advance) |
+| 7 | Verify AR Invoice | Invoice created with advance noted |
+
+### Test 8: Balance Invoice Flow
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Complete post-trip adjustment | Adjustment finalized |
+| 2 | Click "Generate Balance Invoice" | Modal opens |
+| 3 | Review final amounts | Shows original + adjustments - advance |
+| 4 | Generate invoice | Invoice PDF created |
+| 5 | Verify GL posting | DR Trade Receivable / CR Revenue posted |
+
+### Test 9: Finance Integration Verification
+
+| Component | Action | Expected GL Entry |
+|-----------|--------|-------------------|
+| Advance Payment | Approve | DR Bank / CR Customer Advance (Liability) |
+| Balance Invoice | Generate | DR Trade Receivable / CR Sales Revenue |
+| Balance Payment | Approve | DR Bank / CR Trade Receivable |
+| Full Payment | Approve | DR Bank / CR Revenue (direct) |
+
+---
+
+## Part 4: Files to Modify
+
+### File 1: CostBreakdown.tsx
+**Changes:**
+- Add "Overtime Hours" column to Working Hours Analysis
+- Ensure Lyceum/Internal hires show rate card standard_hours correctly
+- Display hire type context in working hours explanation
+
+### File 2: EnhancedCostCalculator.tsx
+**Changes:**
+- Update available hours calculation to respect hire type
+- Add hire type indicator to working hours section
+- Fix historical quotation recalculation for Lyceum type
+
+### File 3: SpecialHireForm.tsx
+**Changes:**
+- Ensure manual KM triggers complete recalculation including overtime baseline
+- Pass hire type to calculateExtraTimeCharge for correct available hours
+
+---
+
+## Part 5: Implementation Sequence
+
+| Step | Task | Priority |
+|------|------|----------|
+| 1 | Fix Working Hours Analysis to show 4 columns including Overtime | High |
+| 2 | Fix Lyceum available hours to use standard_hours | High |
+| 3 | Fix EnhancedCostCalculator hire type logic | Medium |
+| 4 | Test manual KM entry full recalculation | High |
+| 5 | Test all finance flows end-to-end | High |
+| 6 | Verify all cost breakdown sections display correctly | Medium |
 
 ---
 
 ## Summary
 
-This fix addresses all three critical issues:
-1. **Invoice visibility** - Direct approval from AP view + helpful messages in payment form
-2. **GL integration** - Automatic journal entry creation with proper double-entry accounting
-3. **Bank integration** - Bank transaction record for reconciliation
+The Special Hire module has comprehensive functionality but needs these key fixes:
+1. **Working Hours Analysis**: Add Overtime Hours as 4th column
+2. **Hire Type Context**: Ensure Lyceum/Internal uses rate card hours, not distance/10
+3. **Calculator Page**: Fix recalculation logic to respect hire type
+4. **Complete Testing**: All flows need end-to-end verification
 
-The complete interconnected system will ensure that every AP payment triggers proper financial records throughout the system.
+Would you like me to implement these fixes after approval?
