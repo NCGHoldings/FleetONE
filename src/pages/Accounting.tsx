@@ -724,6 +724,9 @@ const Accounting = () => {
                   <TabsTrigger value="sscl">SSCL</TabsTrigger>
                   <TabsTrigger value="tax-returns">Tax Returns</TabsTrigger>
                   <TabsTrigger value="audit">Audit & Logs</TabsTrigger>
+                  <TabsTrigger value="report-builder">Report Builder</TabsTrigger>
+                  <TabsTrigger value="cashflow-forecast">Cash Flow Forecast</TabsTrigger>
+                  <TabsTrigger value="scheduled-reports">Scheduled Reports</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -762,6 +765,18 @@ const Accounting = () => {
 
               <TabsContent value="audit">
                 <AuditReportsView />
+              </TabsContent>
+
+              <TabsContent value="report-builder">
+                <ReportBuilder />
+              </TabsContent>
+
+              <TabsContent value="cashflow-forecast">
+                <CashFlowForecastView />
+              </TabsContent>
+
+              <TabsContent value="scheduled-reports">
+                <ReportSchedulerView />
               </TabsContent>
             </Tabs>
           )}
@@ -811,6 +826,7 @@ const Accounting = () => {
                   <TabsTrigger value="notifications">Notifications</TabsTrigger>
                   <TabsTrigger value="data-import">Data Import</TabsTrigger>
                   <TabsTrigger value="reconciliation">Balance Reconciliation</TabsTrigger>
+                  <TabsTrigger value="api-webhooks">API & Webhooks</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -849,6 +865,10 @@ const Accounting = () => {
 
               <TabsContent value="reconciliation">
                 <BalanceReconciliationTool />
+              </TabsContent>
+
+              <TabsContent value="api-webhooks">
+                <APIWebhooksSettings />
               </TabsContent>
             </Tabs>
           )}
