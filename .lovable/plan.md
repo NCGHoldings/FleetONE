@@ -1,232 +1,625 @@
 
-# Special Hire Module - Comprehensive Testing & Issue Fixes Plan
+
+# NCG FleetFlow Finance ERP vs Zoho Books - Complete Gap Analysis & Development Roadmap
 
 ## Executive Summary
 
-After thorough code analysis of the Special Hire module, I've identified several areas that need attention and testing. This plan covers the complete flow from quotation creation to finance integration.
+After thorough analysis of your Finance & Accounting ERP codebase against Zoho Books' 2026 feature set, I've identified that **NCG FleetFlow already covers approximately 65-70% of Zoho Books functionality**, with particular strengths in multi-company management and operational-to-finance integration. However, there are significant gaps in customer self-service, automation, and advanced features that need to be addressed to achieve competitive parity.
 
 ---
 
-## Part 1: Current Code Analysis - Key Findings
+## Part 1: Feature Mapping - What You Already Have
 
-### A. Manual KM Entry System
-**Current Implementation:**
-- `useManualTripDistance` state controls manual trip distance override
-- `useManualParkingDistance` state controls parking distance override
-- Located in SpecialHireForm.tsx lines 157-159
+### 1. Sales (Receivables) - 75% Complete
 
-**Potential Issues Found:**
-1. Manual KM toggle UI may not be prominent enough for users to find
-2. When manual KM is entered, the cost breakdown should recalculate all dependent values
+| Zoho Feature | NCG Status | Location |
+|-------------|------------|----------|
+| Quotes/Estimates | HAVE | Yutong/Sinotruck/LightVehicle/Special Hire quotations |
+| Manage Customers | HAVE | CustomerMasterView, CustomerForm |
+| Invoices | HAVE | ARInvoiceForm, AccountsReceivableView |
+| Credit Notes | HAVE | ARCreditNotesView, ARCreditNoteForm |
+| Invoice Customization | HAVE | DocumentTemplateManager with header modes |
+| Multi-currency invoicing | HAVE | CurrencyManagementView |
+| Automatic exchange rates | HAVE | Currency management |
+| Multi-transaction number series | HAVE | NumberingSettings by company/entity |
+| Sales Orders | HAVE | YutongOrderManagement, vehicle orders |
+| Retainer invoicing | HAVE | Special Hire advances, vehicle prepayments |
+| Record Offline Payments | HAVE | ARReceiptForm with cash/cheque/bank options |
+| Payment reminders | PARTIAL | PaymentReminderModal (School Bus only) |
+| Progress invoicing | PARTIAL | Special Hire balance invoices |
+| Recurring invoices | MISSING | RecurringEntriesView is for journals only |
+| Sales receipts (instant) | MISSING | No quick receipt generation |
+| Customer portal | MISSING | No self-service portal |
+| Multi-lingual invoicing | MISSING | Single language only |
+| Online payments | MISSING | No payment gateway integration |
+| Generate payment links | MISSING | No shareable payment links |
+| Early payment discount | MISSING | No discount logic |
+| Retention payments | MISSING | No retention tracking |
+| Sales approval | PARTIAL | ApprovalConfigView exists but limited |
+| Revenue recognition | HAVE | Built into vehicle sales flow |
 
-### B. Available Hours Calculation Logic
-**Current Implementation (extra-time-calculator.ts):**
-- **Outside Hire:** `availableHours = tripDistance / 10` (distance-based, 10 km/h baseline)
-- **Lyceum/Internal Hire:** `availableHours = standardHours` (rate card based, typically 4h or 8h)
+### 2. Purchases (Payables) - 80% Complete
 
-**Display in CostBreakdown.tsx (lines 584-673):**
-- Shows: Standard Hours, Available Hours, Actual Hours
-- Missing: **Overtime Hours** is not displayed as a separate row in the Working Hours Analysis section
+| Zoho Feature | NCG Status | Location |
+|-------------|------------|----------|
+| Expenses and Bills | HAVE | AccountsPayableView, APInvoiceForm |
+| Manage Vendors | HAVE | VendorMasterView, VendorForm |
+| Vendor Credits | HAVE | APDebitNotesView |
+| Purchase Orders | HAVE | PurchaseOrderView, PurchaseOrderForm |
+| Purchase Requisitions | HAVE | PurchaseRequisitionView |
+| Invoice Matching | HAVE | InvoiceMatchingView (3-way matching) |
+| Purchase Approval | HAVE | PendingApprovalsView |
+| Multi-currency transactions | HAVE | Currency support in forms |
+| Record payments made | HAVE | APPaymentsView with GL posting |
+| WHT handling | HAVE | WHTCertificateView, WHT deductions |
+| Recurring bills | MISSING | No recurring AP |
+| Recurring expenses | MISSING | No auto-expense recording |
+| Mileage tracking | MISSING | No mileage expense capture |
+| Auto forward receipts | MISSING | No email integration |
+| Receipt autoscans (AI) | MISSING | No OCR capability |
+| Landed costs | MISSING | No allocation to items |
+| Vendor portal | MISSING | No self-service for vendors |
 
-### C. Cost Breakdown Display
-**Current sections displayed:**
-1. Distance Analysis (Parking→Pickup, Trip, Drop→Parking, Total)
-2. Bus Fleet Breakdown (if multi-bus)
-3. Post-Trip Adjustments (if finalized)
-4. Hire Charges Breakdown (Base Rate, Overtime, Overnight, Exceeding Distance)
-5. Working Hours Analysis (Standard, Available, Actual)
-6. Deductions (Fuel, Maintenance, Additional Charges, Commission)
-7. Net Profit
+### 3. Banking - 85% Complete
+
+| Zoho Feature | NCG Status | Location |
+|-------------|------------|----------|
+| Multiple bank accounts | HAVE | BankingView, BankAccountForm |
+| Bank transactions | HAVE | BankTransactionForm |
+| Bank reconciliation | HAVE | BankReconciliationWorksheet |
+| Cheque register | HAVE | ChequeRegisterView |
+| Fund transfers | HAVE | InterBankTransferForm |
+| Cashbook | HAVE | CashbookView |
+| Payment batches | HAVE | PaymentBatchView |
+| Import statements | PARTIAL | Manual upload exists |
+| Transaction rules | MISSING | No auto-categorization |
+| Bank feeds (automated) | MISSING | No live bank connection |
+| Auto forward statements | MISSING | No email integration |
+
+### 4. For Accountants - 90% Complete
+
+| Zoho Feature | NCG Status | Location |
+|-------------|------------|----------|
+| Chart of Accounts | HAVE | ChartOfAccountsView, 5-level hierarchy |
+| Sub-accounts | HAVE | Parent-child structure |
+| Manual journals | HAVE | JournalEntryForm |
+| Recurring journals | HAVE | RecurringEntriesView |
+| Transaction locking | HAVE | FinancialPeriodsView |
+| Period closing | HAVE | PeriodClosingChecklistView |
+| Fixed asset management | HAVE | FixedAssetsView, DepreciationRunView |
+| Asset disposal | HAVE | AssetDisposalForm |
+| Asset revaluation | HAVE | AssetRevaluationForm |
+| Asset transfers | HAVE | AssetTransferForm |
+| Budgeting | HAVE | Budgeting.tsx page |
+| Base currency adjustments | HAVE | Currency revaluation |
+| Bulk update accounts | PARTIAL | DataImportWizard |
+| Journal templates | MISSING | No pre-defined templates |
+| Invite accountant | MISSING | No external accountant access |
+| Account customization | PARTIAL | Limited custom fields |
+
+### 5. Inventory - 60% Complete
+
+| Zoho Feature | NCG Status | Location |
+|-------------|------------|----------|
+| Manage items | HAVE | InventoryView, ItemForm |
+| Item categories | HAVE | ItemCategoryForm |
+| Stock tracking | HAVE | Stock levels view |
+| Stock adjustments | HAVE | StockAdjustmentForm |
+| Batch tracking | HAVE | BatchSerialTrackingView |
+| Serial numbers | HAVE | BatchSerialTrackingView |
+| Stock reconciliation | HAVE | StockReconciliationView |
+| Inventory ageing | HAVE | InventoryAgeingView |
+| Warehouse/location | PARTIAL | warehouse_id field exists, basic UI |
+| Reorder points | PARTIAL | Field exists, no alerts |
+| Price lists | MISSING | No customer-specific pricing |
+| Composite items | MISSING | No kit/assembly support |
+| Shipment tracking | MISSING | No delivery tracking |
+| Bin locations | MISSING | No detailed warehouse bins |
+
+### 6. Reporting - 75% Complete
+
+| Zoho Feature | NCG Status | Location |
+|-------------|------------|----------|
+| Dashboard | HAVE | Accounting dashboard with KPIs |
+| Trial Balance | HAVE | TrialBalanceView |
+| Profit & Loss | HAVE | FinancialStatementsView |
+| Balance Sheet | HAVE | FinancialStatementsView |
+| Cash Flow | PARTIAL | CashFlowView (Coming Soon marker) |
+| Segment Reports | HAVE | SegmentReportView |
+| AR/AP Ageing | HAVE | ARAgeingReport, APAgeingReport |
+| Audit Trail | HAVE | AuditReportsView |
+| Export reports | HAVE | PDF/Excel export buttons |
+| Custom reports | MISSING | No report builder |
+| Schedule reports | MISSING | No automated delivery |
+| Cash flow forecasting | MISSING | No predictive analysis |
+| Dashboard customization | MISSING | Fixed layout |
+
+### 7. Tax - 80% Complete
+
+| Zoho Feature | NCG Status | Location |
+|-------------|------------|----------|
+| Tax codes | HAVE | TaxManagementView |
+| VAT handling | HAVE | Input/Output VAT tracking |
+| WHT management | HAVE | WHTCertificateView |
+| SSCL reports | HAVE | SSCLTransactionsView |
+| Tax returns | HAVE | TaxReturnGeneratorView |
+| Tax treatment for items | PARTIAL | Basic tax assignment |
+| Tax treatment for contacts | MISSING | No per-customer tax status |
+| Tax groups | MISSING | No compound tax rates |
+
+### 8. Internal Finance Control - 85% Complete
+
+| Zoho Feature | NCG Status | Location |
+|-------------|------------|----------|
+| Activity log/Audit trail | HAVE | UserActivityView, AuditReportsView |
+| Transaction locking | HAVE | Period closing |
+| Custom user roles | HAVE | useAuth roles, PageAccessGuard |
+| User access control | HAVE | CompanyAccess, module permissions |
+| Sales approval | HAVE | Approval workflows |
+| Purchase approval | HAVE | PendingApprovalsView |
+| Record locking | PARTIAL | Period-based only |
+| Validation rules | MISSING | No custom validation logic |
+
+### 9. Customization & Automation - 40% Complete
+
+| Zoho Feature | NCG Status | Location |
+|-------------|------------|----------|
+| Invoice customization | HAVE | DocumentTemplateEditor |
+| Custom views | PARTIAL | Search/filter only |
+| API access | HAVE | Supabase API |
+| Email templates | PARTIAL | Document templates exist |
+| Workflow rules | MISSING | No trigger-based automation |
+| Custom fields | MISSING | No dynamic fields |
+| Webhooks | MISSING | No external notifications |
+| Custom modules | MISSING | Fixed module structure |
+| Custom schedulers | MISSING | No scheduled scripts |
+| Custom buttons | MISSING | No user-defined actions |
+| Custom domain | N/A | Handled by Lovable platform |
 
 ---
 
-## Part 2: Issues to Fix
+## Part 2: Priority Gap Analysis - What's Missing
 
-### Issue 1: Working Hours Analysis - Missing Overtime Hours Row
+### Critical Gaps (High Business Impact)
 
-**Problem:** The "Overtime Hours" value is calculated but not displayed as a separate row in the Working Hours Analysis section.
+```
++================================================================+
+|                    CRITICAL MISSING FEATURES                    |
++================================================================+
 
-**Location:** `src/components/special-hire/CostBreakdown.tsx` lines 584-673
+1. CUSTOMER PORTAL (Self-Service)
+   Impact: Customer satisfaction, payment collection efficiency
+   - View invoices and statements
+   - Pay online
+   - Download documents
+   - Track order status
 
-**Fix Required:** Add a fourth column for "Overtime Hours" in the Working Hours Analysis grid.
+2. RECURRING INVOICES
+   Impact: Revenue automation, subscription business models
+   - Auto-generate invoices on schedule
+   - Email delivery
+   - Payment tracking
 
-```typescript
-// Current: grid-cols-3
-// Change to: grid-cols-4 with Overtime Hours column
+3. PAYMENT GATEWAY INTEGRATION
+   Impact: Cash flow, payment speed
+   - Stripe/PayPal integration
+   - Generate payment links
+   - Automatic reconciliation
+
+4. AUTOMATED PAYMENT REMINDERS
+   Impact: Collections, cash flow
+   - Scheduled reminders before due date
+   - Overdue notifications
+   - Multi-channel (Email/SMS)
+
+5. WORKFLOW AUTOMATION ENGINE
+   Impact: Efficiency, consistency
+   - Trigger-based actions
+   - Field updates
+   - Email notifications
+   - Webhooks to external systems
+
++================================================================+
 ```
 
-### Issue 2: Available Hours Display Inconsistency
+### High Priority Gaps
 
-**Problem:** For Lyceum/Internal hires, the available hours should show rate card `standard_hours`, but the code may fall back to distance calculation incorrectly.
+| Feature | Business Value | Complexity |
+|---------|---------------|------------|
+| Custom Reports Builder | High | Medium |
+| Price Lists (Customer-specific) | High | Low |
+| Cash Flow Forecasting | High | Medium |
+| Vendor Portal | Medium | High |
+| Composite Items/Kits | Medium | Medium |
+| Multi-language Support | Medium | High |
+| Advanced Warehouse (Bins) | Medium | Medium |
 
-**Location:** `src/components/special-hire/CostBreakdown.tsx` lines 601-614
+### Medium Priority Gaps
 
-**Fix Required:** Ensure Lyceum/Internal hires use `rateCardDetails.standardHours` instead of distance-based calculation.
-
-### Issue 3: Manual KM Entry Not Triggering Full Recalculation
-
-**Problem:** When manual KM is entered, the cost breakdown shows updated distances but some dependent calculations (overtime baseline) may not recalculate.
-
-**Location:** `src/components/special-hire/SpecialHireForm.tsx` around line 1200-1250
-
-**Fix Required:** Ensure `calculateExtraTimeCharge` receives the manual trip distance for overtime baseline calculation.
-
-### Issue 4: Calculator Page Missing Hire Type Context
-
-**Problem:** The EnhancedCostCalculator uses Outside hire logic for all quotations when recalculating available hours.
-
-**Location:** `src/components/special-hire/EnhancedCostCalculator.tsx` lines 409-446
-
-**Fix Required:** Pass hire_type to available hours calculation:
-- If Outside: use `tripDistance / 10`
-- If Lyceum/Internal: use `rateCard.standard_hours`
+| Feature | Business Value | Complexity |
+|---------|---------------|------------|
+| Receipt Auto-scan (AI/OCR) | Medium | High |
+| Bank Feed Integration | Medium | High |
+| Mileage Tracking | Low | Low |
+| Early Payment Discounts | Low | Low |
+| Retention Payments | Low | Medium |
+| Journal Templates | Low | Low |
 
 ---
 
-## Part 3: Testing Checklist
+## Part 3: Development Roadmap
 
-### Test 1: Create Quotation with Manual KM Entry
+### Phase 1: Customer Experience (4-6 weeks)
 
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Go to Special Hire → New Quotation | Form opens |
-| 2 | Fill customer details | Fields populate |
-| 3 | Select hire type "Outside" | Rate card loads |
-| 4 | Select bus type | Bus selected |
-| 5 | Enter pickup/drop locations | Google Maps suggestions appear |
-| 6 | Toggle "Manual Trip Distance Override" | Manual KM input appears |
-| 7 | Enter 150 km manually | Distance field shows 150 km |
-| 8 | Click "Calculate" | Cost breakdown displays with manual distance |
-| 9 | Verify Distance Analysis | Shows "Trip Distance: 150 km (Manual)" badge |
-| 10 | Verify Available Hours | Shows 150/10 = 15 hours for Outside hire |
+**Module: Customer Portal** (New Main Section)
 
-### Test 2: Verify Time Calculations
+```
+Location: /customer-portal (public-facing)
+         src/pages/CustomerPortal.tsx
+         src/components/customer-portal/
+```
 
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Set pickup time: 8:00 AM | Time set |
-| 2 | Set drop time: 6:00 PM (10 hours) | Time set |
-| 3 | With 100km trip | Available: 10h, Actual: 10h, Overtime: 0h |
-| 4 | With 50km trip | Available: 5h, Actual: 10h, Overtime: 5h |
-| 5 | Verify overtime charge | Overtime hours × hourly rate shown |
+Sub-sections:
+1. **Portal Login** - Email/OTP based authentication
+2. **Invoice History** - View all invoices with PDF download
+3. **Make Payment** - Online payment with gateway integration
+4. **Account Statement** - Running balance view
+5. **Support Requests** - Submit queries
 
-### Test 3: Lyceum Hire Time Calculation
+**Stripe Integration** (Add to Settings)
 
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Select hire type "Lyceum" | Rate card changes |
-| 2 | Select 4-hour rate card | Standard hours = 4 |
-| 3 | Set trip duration = 6 hours | Actual = 6h |
-| 4 | Verify Available Hours | Shows 4h (from rate card, NOT distance/10) |
-| 5 | Verify Overtime | 6h - 4h = 2h overtime |
+```
+Location: Settings -> Payment Gateways
+          src/components/settings/PaymentGatewaySettings.tsx
+```
 
-### Test 4: Cost Breakdown Completeness
-
-| Section | Required Rows | Verify |
-|---------|---------------|--------|
-| Distance Analysis | Parking→Pickup, Trip, Drop→Parking, Additional KM, Total | ✓ All displayed |
-| Working Hours | Standard, Available, Actual, **Overtime** | ✓ All 4 displayed |
-| Hire Charges | Base Rate, Overtime Charge, Overnight Charge, Exceeding KM | ✓ All displayed |
-| Customer Total | Original Quote Amount | ✓ Highlighted green |
-| Deductions | Fuel, Maintenance, Charges, Commission | ✓ All listed |
-| Net Profit | Final profit amount | ✓ Displayed |
-
-### Test 5: Calculator Page Verification
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Go to Calculator tab | Page loads |
-| 2 | Search for quotation | Quotation appears in list |
-| 3 | Select quotation | Cost breakdown loads |
-| 4 | Verify all sections match quotation form | Identical calculations |
-| 5 | Check Working Hours for Lyceum | Uses standard_hours not distance/10 |
-
-### Test 6: Post-Trip Adjustment Flow
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Go to Confirmed Trips | List shows trips |
-| 2 | Click "Post-Trip Adjustment" | Modal opens |
-| 3 | Enter actual KM traveled | Extra KM calculated |
-| 4 | Enter actual pickup/drop times | Time adjustment calculated |
-| 5 | Add additional expenses | Expenses listed |
-| 6 | Save as Draft | Draft saved |
-| 7 | Finalize adjustment | Status changes to "finalized" |
-| 8 | View cost breakdown | Shows post-trip section with adjustments |
-
-### Test 7: Advance Payment Flow
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Record advance payment | Payment form opens |
-| 2 | Enter amount and method | Data saved |
-| 3 | Upload payment proof | Image uploaded |
-| 4 | Submit for finance approval | Status = "pending_finance" |
-| 5 | Finance approves | Status = "approved" |
-| 6 | Verify GL posting | Journal entry created (DR Bank / CR Customer Advance) |
-| 7 | Verify AR Invoice | Invoice created with advance noted |
-
-### Test 8: Balance Invoice Flow
-
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Complete post-trip adjustment | Adjustment finalized |
-| 2 | Click "Generate Balance Invoice" | Modal opens |
-| 3 | Review final amounts | Shows original + adjustments - advance |
-| 4 | Generate invoice | Invoice PDF created |
-| 5 | Verify GL posting | DR Trade Receivable / CR Revenue posted |
-
-### Test 9: Finance Integration Verification
-
-| Component | Action | Expected GL Entry |
-|-----------|--------|-------------------|
-| Advance Payment | Approve | DR Bank / CR Customer Advance (Liability) |
-| Balance Invoice | Generate | DR Trade Receivable / CR Sales Revenue |
-| Balance Payment | Approve | DR Bank / CR Trade Receivable |
-| Full Payment | Approve | DR Bank / CR Revenue (direct) |
+Features:
+- Connect Stripe account
+- Configure payment methods
+- Generate payment links
+- Webhook handling for reconciliation
 
 ---
 
-## Part 4: Files to Modify
+### Phase 2: Automation Engine (4-6 weeks)
 
-### File 1: CostBreakdown.tsx
-**Changes:**
-- Add "Overtime Hours" column to Working Hours Analysis
-- Ensure Lyceum/Internal hires show rate card standard_hours correctly
-- Display hire type context in working hours explanation
+**Module: Workflow Automation** (Add to Finance Settings)
 
-### File 2: EnhancedCostCalculator.tsx
-**Changes:**
-- Update available hours calculation to respect hire type
-- Add hire type indicator to working hours section
-- Fix historical quotation recalculation for Lyceum type
+```
+Location: Finance -> Settings -> Automation
+          src/components/accounting/settings/WorkflowAutomationView.tsx
+```
 
-### File 3: SpecialHireForm.tsx
-**Changes:**
-- Ensure manual KM triggers complete recalculation including overtime baseline
-- Pass hire type to calculateExtraTimeCharge for correct available hours
+Sub-sections:
+1. **Recurring Invoices**
+   - Schedule configuration
+   - Template selection
+   - Auto-email toggle
 
----
+2. **Payment Reminders**
+   - Trigger rules (X days before/after due)
+   - Email/SMS templates
+   - Escalation paths
 
-## Part 5: Implementation Sequence
+3. **Workflow Rules**
+   - Trigger conditions (e.g., Invoice created, Payment received)
+   - Actions (Email, Field update, Webhook)
+   - Approval chains
 
-| Step | Task | Priority |
-|------|------|----------|
-| 1 | Fix Working Hours Analysis to show 4 columns including Overtime | High |
-| 2 | Fix Lyceum available hours to use standard_hours | High |
-| 3 | Fix EnhancedCostCalculator hire type logic | Medium |
-| 4 | Test manual KM entry full recalculation | High |
-| 5 | Test all finance flows end-to-end | High |
-| 6 | Verify all cost breakdown sections display correctly | Medium |
+4. **Scheduled Tasks**
+   - Report generation
+   - Data cleanup
+   - Automated postings
 
 ---
 
-## Summary
+### Phase 3: Advanced Reporting (3-4 weeks)
 
-The Special Hire module has comprehensive functionality but needs these key fixes:
-1. **Working Hours Analysis**: Add Overtime Hours as 4th column
-2. **Hire Type Context**: Ensure Lyceum/Internal uses rate card hours, not distance/10
-3. **Calculator Page**: Fix recalculation logic to respect hire type
-4. **Complete Testing**: All flows need end-to-end verification
+**Module: Report Builder** (Add to Reports)
 
-Would you like me to implement these fixes after approval?
+```
+Location: Finance -> Reports -> Report Builder
+          src/components/accounting/reports/ReportBuilder.tsx
+```
+
+Features:
+1. **Custom Report Designer**
+   - Drag-drop field selection
+   - Filter conditions
+   - Grouping and sorting
+   - Calculated fields
+
+2. **Report Scheduler**
+   - Email delivery schedule
+   - Format selection (PDF/Excel)
+   - Recipient lists
+
+3. **Cash Flow Forecasting**
+   - AR/AP projections
+   - Bank balance predictions
+   - Scenario modeling
+
+4. **Dashboard Customization**
+   - Draggable widgets
+   - Custom KPIs
+   - Save layouts
+
+---
+
+### Phase 4: Advanced Inventory (3-4 weeks)
+
+**Enhance: Inventory Module**
+
+```
+Location: Finance -> Inventory (existing)
+          Add new tabs and features
+```
+
+New Sub-sections:
+1. **Warehouse Management**
+   - Multiple warehouse definitions
+   - Bin/location tracking
+   - Stock transfers between warehouses
+
+2. **Price Lists**
+   - Customer group pricing
+   - Volume discounts
+   - Date-effective prices
+
+3. **Composite Items**
+   - Kit/assembly definition
+   - BOM (Bill of Materials)
+   - Auto-stock deduction
+
+4. **Reorder Alerts**
+   - Threshold monitoring
+   - Auto-PR generation
+   - Supplier suggestions
+
+---
+
+### Phase 5: External Integration (4-6 weeks)
+
+**Module: Integration Hub** (New in Settings)
+
+```
+Location: Settings -> Integrations
+          src/components/settings/IntegrationHub.tsx
+```
+
+Sub-sections:
+1. **Bank Feeds**
+   - Connect bank accounts
+   - Auto-import transactions
+   - Matching rules
+
+2. **Email Integration**
+   - Forward receipts to system
+   - Auto-create expenses
+   - Document attachment
+
+3. **Vendor Portal**
+   - PO acknowledgment
+   - Invoice submission
+   - Payment tracking
+
+4. **API & Webhooks**
+   - API key management
+   - Webhook configuration
+   - Event logs
+
+---
+
+## Part 4: Architecture for One-Page Experience
+
+### Current Module Structure (Keep)
+
+```
+Finance & Accounting ERP (Single Page)
+├── General Ledger (Module)
+│   ├── Dashboard
+│   ├── Chart of Accounts
+│   ├── Journal Entries
+│   ├── Recurring Entries
+│   ├── Financial Periods
+│   ├── Currencies
+│   ├── Period Closing
+│   └── Approvals
+├── AR (Module)
+│   ├── Customers
+│   ├── Invoices
+│   ├── Receipts
+│   ├── Credit Notes
+│   ├── Advances
+│   ├── Ageing
+│   ├── Bad Debts
+│   └── Reconciliation
+├── AP (Module)
+│   ├── Vendors
+│   ├── Invoices
+│   ├── Payments
+│   ├── Debit Notes
+│   ├── Advances
+│   ├── Ageing
+│   ├── WHT
+│   ├── Reconciliation
+│   └── Vendor Performance
+├── Expenses (Module)
+├── Inventory (Module)
+├── Procurement (Module)
+├── Banking (Module)
+├── Fixed Assets (Module)
+├── Reports (Module)
+└── Settings (Module)
+```
+
+### Proposed Additions (Same Page)
+
+```
+Finance & Accounting ERP (Enhanced)
+├── ... existing modules ...
+│
+├── Automation (NEW MODULE) ← Add to module buttons
+│   ├── Recurring Invoices
+│   ├── Payment Reminders
+│   ├── Workflow Rules
+│   └── Scheduled Tasks
+│
+├── Reports (ENHANCED)
+│   ├── ... existing ...
+│   ├── Report Builder (NEW)
+│   ├── Cash Flow Forecast (NEW)
+│   └── Scheduled Reports (NEW)
+│
+└── Settings (ENHANCED)
+    ├── ... existing ...
+    ├── Payment Gateways (NEW)
+    ├── Email Integration (NEW)
+    ├── Bank Feeds (NEW)
+    └── API & Webhooks (NEW)
+```
+
+### Separate Page (Customer/Vendor Portals)
+
+```
+/customer-portal (Public - No Auth Required for View)
+├── Login
+├── Dashboard
+├── Invoices
+├── Payments
+├── Statements
+└── Support
+
+/vendor-portal (Public - Vendor Auth)
+├── Login
+├── Purchase Orders
+├── Submit Invoice
+├── Payment Status
+└── Messages
+```
+
+---
+
+## Part 5: Implementation Priority Matrix
+
+### Must Have (Phase 1-2)
+
+| Feature | Module Location | Estimated Effort |
+|---------|-----------------|------------------|
+| Customer Portal | New /customer-portal page | 3 weeks |
+| Payment Gateway (Stripe) | Settings -> Payment Gateways | 2 weeks |
+| Recurring Invoices | AR -> Recurring Invoices tab | 2 weeks |
+| Payment Reminders | Automation -> Reminders | 2 weeks |
+| Email Alerts | Automation -> Rules | 1 week |
+
+### Should Have (Phase 3-4)
+
+| Feature | Module Location | Estimated Effort |
+|---------|-----------------|------------------|
+| Custom Report Builder | Reports -> Builder tab | 3 weeks |
+| Cash Flow Forecast | Reports -> Forecast tab | 2 weeks |
+| Price Lists | Inventory -> Price Lists tab | 1 week |
+| Warehouse Management | Inventory -> Warehouses tab | 2 weeks |
+| Composite Items | Inventory -> Assemblies tab | 2 weeks |
+
+### Nice to Have (Phase 5+)
+
+| Feature | Module Location | Estimated Effort |
+|---------|-----------------|------------------|
+| Bank Feed Integration | Settings -> Bank Feeds | 4 weeks |
+| Vendor Portal | New /vendor-portal page | 3 weeks |
+| Receipt OCR | Expenses -> Auto-capture | 3 weeks |
+| Multi-language | Settings -> Language | 4 weeks |
+
+---
+
+## Part 6: Technical Implementation Notes
+
+### Database Tables Needed
+
+```sql
+-- Customer Portal
+customer_portal_access (id, customer_id, email, otp_code, last_login)
+payment_links (id, invoice_id, stripe_link, amount, status, expires_at)
+
+-- Automation
+recurring_invoices (id, customer_id, template_id, frequency, next_run, amount)
+payment_reminder_rules (id, days_before, days_after, template_id, channel)
+workflow_rules (id, trigger_event, conditions, actions, is_active)
+scheduled_tasks (id, task_type, schedule, last_run, next_run)
+
+-- Reporting
+custom_reports (id, name, config_json, created_by)
+report_schedules (id, report_id, frequency, recipients, format)
+
+-- Inventory Enhancement
+warehouses (id, name, address, is_default, company_id)
+bin_locations (id, warehouse_id, bin_code, description)
+price_lists (id, name, customer_group, effective_from, effective_to)
+price_list_items (id, price_list_id, item_id, price)
+composite_items (id, parent_item_id, component_item_id, quantity)
+```
+
+### Component Structure
+
+```
+src/components/
+├── accounting/
+│   ├── automation/
+│   │   ├── RecurringInvoicesView.tsx
+│   │   ├── PaymentReminderRulesView.tsx
+│   │   ├── WorkflowRulesView.tsx
+│   │   └── ScheduledTasksView.tsx
+│   ├── reports/
+│   │   ├── ReportBuilder.tsx
+│   │   ├── CashFlowForecastView.tsx
+│   │   └── ReportSchedulerView.tsx
+│   └── settings/
+│       ├── PaymentGatewaySettings.tsx
+│       ├── EmailIntegrationSettings.tsx
+│       └── BankFeedSettings.tsx
+├── customer-portal/
+│   ├── PortalLogin.tsx
+│   ├── InvoiceHistory.tsx
+│   ├── MakePayment.tsx
+│   ├── AccountStatement.tsx
+│   └── SupportRequests.tsx
+└── vendor-portal/
+    ├── VendorLogin.tsx
+    ├── PurchaseOrdersView.tsx
+    ├── SubmitInvoice.tsx
+    └── PaymentTracking.tsx
+```
+
+---
+
+## Summary: Competitive Position
+
+### Current Strengths (vs Zoho Books)
+
+1. **Multi-Company Architecture** - Superior consolidated GL with business unit isolation
+2. **Operational Integration** - Deep integration with Fleet, School Bus, Special Hire
+3. **Sri Lanka Compliance** - Built-in VAT, WHT, SSCL handling
+4. **Industry-Specific Features** - Vehicle sales, trip management, commission tracking
+5. **Document Management** - Comprehensive template system with header modes
+
+### Key Gaps to Close
+
+1. **Customer Self-Service** - Portal and online payments
+2. **Automation** - Recurring invoices, reminders, workflows
+3. **Advanced Reporting** - Custom builder, forecasting
+4. **External Integration** - Bank feeds, payment gateways
+
+### Estimated Total Development Time
+
+| Phase | Duration | Priority |
+|-------|----------|----------|
+| Phase 1: Customer Portal + Payments | 4-6 weeks | Critical |
+| Phase 2: Automation Engine | 4-6 weeks | Critical |
+| Phase 3: Advanced Reporting | 3-4 weeks | High |
+| Phase 4: Advanced Inventory | 3-4 weeks | Medium |
+| Phase 5: External Integration | 4-6 weeks | Medium |
+| **Total** | **18-26 weeks** | - |
+
+After completing these phases, NCG FleetFlow Finance ERP will achieve approximately **90-95% feature parity with Zoho Books** while maintaining unique advantages in operational-to-finance integration and Sri Lankan compliance.
+
