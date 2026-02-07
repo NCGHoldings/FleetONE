@@ -1,407 +1,296 @@
 
-# School Bus Fuel Expense & Finance Integration System
+# Document Template Header System Enhancement
 
-## Executive Summary
+## Problem Analysis
 
-This plan creates a complete interconnected system for School Bus Operations (SBO) fuel expense management with:
-1. Dedicated Fuel Bank Account mapping per branch
-2. Automated fuel expense recording with GL posting
-3. Inter-bank fund transfer functionality with proper double entries
-4. Real-time COA balance updates
-5. Complete audit trail from operation to finance
+Based on the screenshots and current implementation:
 
----
-
-## Current State Analysis
-
-### What Exists:
-- `school_bus_finance_settings` table has `fuel_expense_account_id` for GL expense account
-- `expense_cash_account_id` for general expense cash account
-- Branch-wise settings with `branch_gl_account_id`
-- `ExpenseRequestForm` component for creating expense requests
-- `bank_transactions` table with transfer_in/transfer_out types
-- Bank transaction form with basic transfer functionality
-
-### What's Missing:
-1. **No dedicated Fuel Bank Account mapping** - branches need specific fuel bank accounts
-2. **No branch-wise fuel bank mapping** - each branch may use different fuel banks
-3. **No automated GL posting for fuel expenses** - currently manual process
-4. **No inter-bank fund transfer with GL entries** - basic transfer exists but no accounting integration
-5. **No fuel expense-to-AP workflow** - fuel bills not creating AP invoices automatically
-
----
+1. **Current Issue**: Header image uploads but doesn't preview correctly
+2. **Limitation**: Only one header mode (logo as small image in template)
+3. **Need**: Full flexibility for different header styles:
+   - Full-width header banner image (like Yutong quotation with document title + logos embedded)
+   - Logo only (small logo in designated area)
+   - HTML code only (no image, just company details from template)
+   - Logo + HTML combined (current default)
 
 ## Solution Architecture
 
-### Part 1: Database Schema Updates
+### New Header Mode Options
 
-#### Add Fuel Bank Account Column to Settings
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `header_image` | Full-width banner replaces entire header | Pre-designed headers with document title, logos embedded (Yutong quotation style) |
+| `logo_only` | Only company logo, no text | Minimal header |
+| `html_only` | Template HTML header, no images | Simple text-based header |
+| `logo_and_html` | Logo + company details from HTML | Professional header with both |
+
+### Visual Reference
+
+**Mode: Header Image (Full Banner)**
+```
++------------------------------------------------------------------+
+| [QUOTATION]      [NCG HOLDINGS LOGO]    [YUTONG LOGO]            |
+| =================== Full-width header image ==================== |
++------------------------------------------------------------------+
+```
+
+**Mode: Logo + HTML**
+```
++------------------------------------------------------------------+
+| [LOGO]    |    NCG SPARES (PRIVATE) LIMITED                      |
+|           |    157Y, Keballaovita, Weniwelkola                    |
+|           |    +94 771332795                                      |
++------------------------------------------------------------------+
+```
+
+**Mode: Logo Only**
+```
++------------------------------------------------------------------+
+|                         [COMPANY LOGO]                           |
++------------------------------------------------------------------+
+```
+
+**Mode: HTML Only**
+```
++------------------------------------------------------------------+
+|    NCG EXPRESS COMPANY LIMITED                                   |
+|    123 Main Street, Colombo 03                                   |
+|    Tel: +94 11 234 5678 | Email: info@company.com                |
++------------------------------------------------------------------+
+```
+
+---
+
+## Database Changes
+
+### Add New Column
 ```sql
-ALTER TABLE school_bus_finance_settings 
-ADD COLUMN IF NOT EXISTS fuel_bank_account_id UUID REFERENCES chart_of_accounts(id);
+ALTER TABLE document_templates 
+ADD COLUMN IF NOT EXISTS header_mode VARCHAR(20) DEFAULT 'logo_and_html';
 ```
 
-#### Create Inter-Bank Transfer Table
-```sql
-CREATE TABLE inter_bank_transfers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES companies(id),
-  transfer_number VARCHAR(50) NOT NULL,
-  transfer_date DATE NOT NULL,
-  
-  -- Source Bank
-  from_bank_account_id UUID REFERENCES bank_accounts(id) NOT NULL,
-  from_gl_account_id UUID REFERENCES chart_of_accounts(id) NOT NULL,
-  
-  -- Destination Bank
-  to_bank_account_id UUID REFERENCES bank_accounts(id) NOT NULL,
-  to_gl_account_id UUID REFERENCES chart_of_accounts(id) NOT NULL,
-  
-  amount NUMERIC(15,2) NOT NULL,
-  reference VARCHAR(100),
-  notes TEXT,
-  
-  -- Journal Entry Link
-  journal_entry_id UUID REFERENCES journal_entries(id),
-  
-  -- Audit
-  created_by UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+**Valid Values**: `header_image`, `logo_only`, `html_only`, `logo_and_html`
 
 ---
 
-### Part 2: Complete System Flow
+## Implementation Details
 
-```
-+================================================================================+
-|           SCHOOL BUS FUEL EXPENSE & FINANCE INTEGRATION FLOW                    |
-+================================================================================+
+### Part 1: Database Migration
 
-                           FUND MANAGEMENT
-+----------------+     +------------------+     +------------------+
-|   MAIN BANK    |     |   FUND TRANSFER  |     |   FUEL BANK      |
-| (Company Bank) |---->|   DR Fuel Bank   |---->| (Dedicated Fuel) |
-|                |     |   CR Main Bank   |     |                  |
-+----------------+     +------------------+     +------------------+
-                              |                         |
-                              v                         |
-                       +--------------+                 |
-                       | JE Created   |                 |
-                       | + COA Update |                 |
-                       +--------------+                 |
-                                                        |
-                                                        v
-                          EXPENSE WORKFLOW
-+----------------+     +------------------+     +------------------+
-|   OPERATIONS   |     |   EXPENSE PAGE   |     |   FINANCE TEAM   |
-| (Branch Staff) |---->| Add Fuel Expense |---->|  Review/Approve  |
-|                |     | - Amount         |     |                  |
-+----------------+     | - Fuel Station   |     +------------------+
-                       | - Branch         |              |
-                       | - Bus (optional) |              |
-                       +------------------+              |
-                              |                         |
-                              v                         v
-                       +--------------+          +--------------+
-                       | GL AUTO-POST |<---------|  AP INVOICE  |
-                       +--------------+          | (if vendor)  |
-                       | DR Fuel Exp  |          +--------------+
-                       | CR Fuel Bank |
-                       +--------------+
-                              |
-                              v
-                       +--------------+
-                       | COA BALANCE  |
-                       | UPDATE       |
-                       +--------------+
-                       | - Fuel Exp (+)|
-                       | - Fuel Bank(-)|
-                       +--------------+
+Add `header_mode` column to `document_templates` table with default value `logo_and_html`.
+
+### Part 2: Update DocumentTemplateEditor.tsx
+
+Add header mode selection UI with visual previews:
+
+```typescript
+// New form field
+header_mode: 'logo_and_html' | 'header_image' | 'logo_only' | 'html_only'
+
+// UI: Radio buttons with visual icons
+<div className="space-y-3">
+  <Label>Header Display Mode</Label>
+  <RadioGroup value={formData.header_mode} onValueChange={...}>
+    <div className="grid grid-cols-2 gap-4">
+      <RadioItem value="header_image" label="Full Header Image" 
+        description="Replace entire header with uploaded banner image" />
+      <RadioItem value="logo_and_html" label="Logo + Company Info" 
+        description="Logo on left, company details on right" />
+      <RadioItem value="logo_only" label="Logo Only" 
+        description="Center-aligned logo without text" />
+      <RadioItem value="html_only" label="Text Only" 
+        description="Company info from template, no images" />
+    </div>
+  </RadioGroup>
+</div>
 ```
+
+### Part 3: Update document-template-utils.ts
+
+Modify placeholder mapping to respect header mode:
+
+```typescript
+export const mapDocumentToPlaceholders = (
+  documentType: string,
+  documentData: any,
+  companyData?: any,
+  lineItems?: any[],
+  allocations?: any[],
+  headerImageUrl?: string,
+  headerMode?: string  // NEW PARAMETER
+): Record<string, string> => {
+  
+  // Generate header placeholder based on mode
+  switch (headerMode) {
+    case 'header_image':
+      // Full-width banner image replaces entire header section
+      placeholders['{{document_header}}'] = headerImageUrl 
+        ? `<div class="full-header-image"><img src="${headerImageUrl}" style="width: 100%; max-height: 150px; object-fit: contain;" /></div>`
+        : '';
+      placeholders['{{company_logo}}'] = ''; // No separate logo
+      break;
+      
+    case 'logo_only':
+      placeholders['{{company_logo}}'] = headerImageUrl 
+        ? `<img src="${headerImageUrl}" style="max-height: 80px; display: block; margin: 0 auto;" />`
+        : '';
+      placeholders['{{document_header}}'] = ''; // No full header
+      break;
+      
+    case 'html_only':
+      placeholders['{{company_logo}}'] = ''; // No logo
+      placeholders['{{document_header}}'] = ''; // No image header
+      break;
+      
+    case 'logo_and_html':
+    default:
+      placeholders['{{company_logo}}'] = headerImageUrl 
+        ? `<img src="${headerImageUrl}" style="max-height: 80px; max-width: 200px; object-fit: contain;" />`
+        : '';
+      break;
+  }
+  
+  return placeholders;
+};
+```
+
+### Part 4: Update Preview Modal & Manager
+
+- Pass `header_mode` to placeholder mapping
+- Ensure preview correctly renders all modes
+- Fix the preview iframe rendering for header images
+
+### Part 5: Update Template Seeder
+
+Add new placeholder `{{document_header}}` for full-width banner mode:
+
+```html
+<!-- For header_image mode, this replaces the entire header section -->
+{{document_header}}
+
+<!-- For other modes, use this structure -->
+<div class="document-header">
+  <div class="header-row">
+    <div class="logo-area">{{company_logo}}</div>
+    <div class="company-details">
+      <h1>{{company_name}}</h1>
+      ...
+    </div>
+  </div>
+</div>
+```
+
+### Part 6: Update Hooks
+
+Add `header_mode` to TypeScript interfaces in `useDocumentTemplates.ts`.
 
 ---
 
-### Part 3: GL Double Entry Mappings
+## Files to Change
 
-#### 1. Fund Transfer (Main Bank to Fuel Bank)
-| Account | Debit | Credit | Description |
-|---------|-------|--------|-------------|
-| Fuel Bank (Asset) | Rs 500,000 | | Increase fuel bank balance |
-| Main Bank (Asset) | | Rs 500,000 | Decrease main bank balance |
+### Database Migration (New)
+```
+supabase/migrations/[timestamp]_add_header_mode_to_templates.sql
+```
 
-#### 2. Fuel Expense Recording
-| Account | Debit | Credit | Description |
-|---------|-------|--------|-------------|
-| Fuel Expense | Rs 25,000 | | Expense for fuel purchase |
-| Fuel Bank (Asset) | | Rs 25,000 | Payment from fuel bank |
-
-#### 3. If Fuel Bill Goes Through AP (Credit Purchase)
-**Step 1: AP Invoice Created**
-| Account | Debit | Credit |
-|---------|-------|--------|
-| Fuel Expense | Rs 25,000 | |
-| Trade Payable | | Rs 25,000 |
-
-**Step 2: AP Payment**
-| Account | Debit | Credit |
-|---------|-------|--------|
-| Trade Payable | Rs 25,000 | |
-| Fuel Bank | | Rs 25,000 |
-
----
-
-### Part 4: Implementation Files
-
-#### New Files to Create:
-
-| File | Purpose |
-|------|---------|
-| `src/hooks/useFuelExpenseFinance.ts` | Hook for fuel expense GL posting |
-| `src/hooks/useInterBankTransfer.ts` | Hook for inter-bank transfers |
-| `src/components/accounting/InterBankTransferForm.tsx` | UI for fund transfers |
-| `src/components/accounting/InterBankTransferList.tsx` | Transfer history view |
-| `src/components/school/FuelExpenseForm.tsx` | Dedicated fuel expense entry |
-
-#### Files to Update:
-
+### Updated Files (6)
 | File | Changes |
 |------|---------|
-| `src/components/school/SchoolBusFinanceSettings.tsx` | Add Fuel Bank Account mapping per branch |
-| `src/hooks/useSchoolBusFinance.ts` | Add fuel_bank_account_id to settings interface |
-| `src/components/accounting/BankingView.tsx` | Add Inter-Bank Transfer tab |
-| `src/pages/Accounting.tsx` | Add Fund Transfer section |
+| `src/integrations/supabase/types.ts` | Add header_mode type |
+| `src/hooks/useDocumentTemplates.ts` | Add header_mode to interfaces |
+| `src/components/accounting/settings/DocumentTemplateEditor.tsx` | Add header mode selector UI |
+| `src/lib/document-template-utils.ts` | Update placeholder mapping for header modes |
+| `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx` | Pass header_mode to rendering |
+| `src/components/accounting/settings/DocumentTemplateManager.tsx` | Display header mode in preview |
 
 ---
 
-### Part 5: Settings UI Updates
-
-#### School Bus Finance Settings - New Section
+## UI Design for Header Mode Selection
 
 ```
 +------------------------------------------------------------------+
-|  FUEL EXPENSE GL ACCOUNT MAPPINGS                                 |
+|  HEADER CONFIGURATION                                             |
 +------------------------------------------------------------------+
 |                                                                   |
-|  +------------------------+    +------------------------+         |
-|  | Fuel Expense Account   |    | Fuel Bank Account      |         |
-|  | [Fuel/Diesel Expense]  |    | [SBO Fuel Bank - BOC]  |         |
-|  +------------------------+    +------------------------+         |
+|  Header Display Mode:                                             |
+|  +------------------------+  +------------------------+           |
+|  | ☐ Full Header Image   |  | ☑ Logo + Company Info  |           |
+|  | [====IMAGE====]       |  | [LOGO] Company Name    |           |
+|  | Full-width banner     |  | Address, Phone, Email  |           |
+|  +------------------------+  +------------------------+           |
+|  +------------------------+  +------------------------+           |
+|  | ☐ Logo Only           |  | ☐ Text Only            |           |
+|  |       [LOGO]          |  | Company Name           |           |
+|  | Centered logo         |  | Address, Contact       |           |
+|  +------------------------+  +------------------------+           |
 |                                                                   |
-|  Branch-wise Fuel Bank Mapping:                                   |
-|  +----------+-----------------------+--------+                    |
-|  | Branch   | Fuel Bank Account     | Status |                    |
-|  +----------+-----------------------+--------+                    |
-|  | Nugegoda | BOC Fuel Account 001  |   ✓    |                    |
-|  | LNU      | BOC Fuel Account 002  |   ✓    |                    |
-|  | Kurunegala| Sampath Fuel Acct    |   ✓    |                    |
-|  +----------+-----------------------+--------+                    |
+|  Header Image / Logo:                                             |
+|  +------------------+  +----------------+                         |
+|  | [NCG HOLDINGS]   |  | [Upload Image] |                         |
+|  | [preview image]  |  |                |                         |
+|  +------------------+  +----------------+                         |
 |                                                                   |
-|  [x] Auto-post fuel expenses to GL                                |
-|  [x] Create AP Invoice for credit fuel purchases                  |
+|  ⓘ For "Full Header Image" mode, upload a pre-designed banner     |
+|     that includes document title, logos, and branding.            |
 |                                                                   |
-+------------------------------------------------------------------+
-```
-
----
-
-### Part 6: Inter-Bank Transfer UI
-
-```
-+------------------------------------------------------------------+
-|  INTER-BANK FUND TRANSFER                                         |
-+------------------------------------------------------------------+
-|                                                                   |
-|  Transfer Number: IBT-2026-0001 (auto-generated)                  |
-|                                                                   |
-|  +------------------------+    +------------------------+         |
-|  | From Account           |    | To Account             |         |
-|  | [Main Operating Bank]  |    | [Fuel Bank Account]    |         |
-|  | Balance: Rs 2,500,000  |    | Balance: Rs 150,000    |         |
-|  +------------------------+    +------------------------+         |
-|                                                                   |
-|  Amount: [___500,000___] LKR                                      |
-|  Reference: [___FUEL-TOPUP-JAN___]                                |
-|  Date: [___2026-02-06___]                                         |
-|                                                                   |
-|  GL Preview:                                                      |
-|  +--------------------------------------------------------+      |
-|  | DR: Fuel Bank Account (Asset)       Rs 500,000         |      |
-|  | CR: Main Operating Bank (Asset)     Rs 500,000         |      |
-|  +--------------------------------------------------------+      |
-|                                                                   |
-|                              [Cancel] [Process Transfer]          |
 +------------------------------------------------------------------+
 ```
 
 ---
 
-### Part 7: Fuel Expense Entry Flow
+## Expected Behavior
 
-```
-+------------------------------------------------------------------+
-|  ADD FUEL EXPENSE - SCHOOL BUS OPERATIONS                         |
-+------------------------------------------------------------------+
-|                                                                   |
-|  Branch: [v Nugegoda Branch         ]                             |
-|  Bus (Optional): [v NC-1234 - Yutong]                             |
-|                                                                   |
-|  Expense Date: [2026-02-06]                                       |
-|  Fuel Station/Vendor: [v CEYPETCO Nugegoda] or [Type new...]     |
-|                                                                   |
-|  Fuel Amount: [___25,000___] LKR                                  |
-|  Liters (Optional): [___50___]                                    |
-|  Bill/Receipt No: [___FUE-123456___]                              |
-|                                                                   |
-|  Payment Method:                                                  |
-|  (•) Direct from Fuel Bank  ← Auto reduces fuel bank              |
-|  ( ) Credit (Create AP Invoice)  ← Creates AP, pay later          |
-|                                                                   |
-|  [Upload Bill Image]                                              |
-|                                                                   |
-|  GL Preview (Auto-post enabled):                                  |
-|  +--------------------------------------------------------+      |
-|  | DR: Fuel Expense Account            Rs 25,000          |      |
-|  | CR: Fuel Bank (Nugegoda)            Rs 25,000          |      |
-|  +--------------------------------------------------------+      |
-|                                                                   |
-|                              [Cancel] [Save & Post to GL]         |
-+------------------------------------------------------------------+
-```
+### Full Header Image Mode
+- Uploaded image displays as full-width banner
+- Image should contain document title (e.g., "QUOTATION"), company logos
+- Replaces entire header section including company details
+- Perfect for pre-designed branded headers
+
+### Logo + Company Info Mode (Current Default)
+- Logo appears on left
+- Company name, address, contact on right
+- Most common business document format
+
+### Logo Only Mode
+- Centered logo
+- No company text
+- Clean, minimal header
+
+### HTML Only Mode
+- Company details from template HTML
+- No image rendered
+- Text-based header
 
 ---
 
-### Part 8: Implementation Sequence
+## Implementation Sequence
 
-#### Phase 1: Database & Settings (First)
 | Step | Task | Files |
 |------|------|-------|
-| 1 | Add fuel_bank_account_id column to settings | SQL Migration |
-| 2 | Create inter_bank_transfers table | SQL Migration |
-| 3 | Update SchoolBusFinanceSettings UI | `SchoolBusFinanceSettings.tsx` |
-| 4 | Update settings interface | `useSchoolBusFinance.ts` |
-
-#### Phase 2: Fund Transfer System
-| Step | Task | Files |
-|------|------|-------|
-| 5 | Create useInterBankTransfer hook | `useInterBankTransfer.ts` (new) |
-| 6 | Create InterBankTransferForm | `InterBankTransferForm.tsx` (new) |
-| 7 | Create InterBankTransferList | `InterBankTransferList.tsx` (new) |
-| 8 | Add to Banking section | `BankingView.tsx` |
-
-#### Phase 3: Fuel Expense Integration
-| Step | Task | Files |
-|------|------|-------|
-| 9 | Create useFuelExpenseFinance hook | `useFuelExpenseFinance.ts` (new) |
-| 10 | Create FuelExpenseForm | `FuelExpenseForm.tsx` (new) |
-| 11 | Update ExpenseRequestForm for fuel | `ExpenseRequestForm.tsx` |
-| 12 | Add GL auto-posting logic | `useFuelExpenseFinance.ts` |
-
-#### Phase 4: Integration & Testing
-| Step | Task | Files |
-|------|------|-------|
-| 13 | Add AP Invoice creation for credit fuel | Integration logic |
-| 14 | Add bus_id tracking to journal lines | GL posting update |
-| 15 | Test end-to-end flow | All components |
+| 1 | Add `header_mode` column to database | SQL Migration |
+| 2 | Update Supabase types | `types.ts` |
+| 3 | Update hooks with header_mode | `useDocumentTemplates.ts` |
+| 4 | Update template editor with mode selector | `DocumentTemplateEditor.tsx` |
+| 5 | Update placeholder mapping logic | `document-template-utils.ts` |
+| 6 | Update preview modal rendering | `FinanceDocumentPreviewModal.tsx` |
+| 7 | Update manager preview | `DocumentTemplateManager.tsx` |
+| 8 | Test all document types with all modes | Manual testing |
 
 ---
 
-## Technical Details
+## Technical Notes
 
-### Hook: useFuelExpenseFinance.ts
+### Image Loading for PDF
+- Full header images need proper CORS handling
+- Use `useCORS: true` in html2canvas
+- Pre-load images as base64 for PDF generation reliability
 
-```typescript
-interface FuelExpenseForGL {
-  expenseDate: string;
-  branchId: string;
-  busId?: string;
-  amount: number;
-  fuelLiters?: number;
-  vendorId?: string;
-  vendorName?: string;
-  reference?: string;
-  paymentMethod: 'direct' | 'credit';
-}
+### Template Compatibility
+- Existing templates default to `logo_and_html` mode
+- Templates can be updated to use new modes via editor
+- `{{document_header}}` placeholder added for full banner mode
 
-export function usePostFuelExpenseToGL() {
-  // 1. Get branch fuel bank account from settings
-  // 2. Get fuel expense account from settings
-  // 3. If direct payment:
-  //    - Create JE: DR Fuel Expense / CR Fuel Bank
-  //    - Update COA balances
-  // 4. If credit:
-  //    - Create AP Invoice
-  //    - Create JE: DR Fuel Expense / CR Trade Payable
-}
-```
-
-### Hook: useInterBankTransfer.ts
-
-```typescript
-interface InterBankTransferData {
-  fromBankAccountId: string;
-  toBankAccountId: string;
-  amount: number;
-  reference?: string;
-  notes?: string;
-}
-
-export function useCreateInterBankTransfer() {
-  // 1. Validate both banks have GL account mappings
-  // 2. Create transfer record
-  // 3. Create JE: DR To Bank / CR From Bank
-  // 4. Update COA balances for both accounts
-  // 5. Update bank_transactions for both accounts
-}
-```
-
----
-
-## Expected Outcomes
-
-After implementation:
-
-1. **Branch-wise Fuel Bank Mapping** - Each branch can have its own fuel bank account
-2. **Fund Transfers** - Easy transfer from main bank to fuel bank with auto GL posting
-3. **Fuel Expense Recording** - Dedicated form with auto GL entries
-4. **Real-time Balance Updates** - COA balances update immediately on transactions
-5. **Complete Audit Trail** - Every fuel expense links to JE, bus, branch, and vendor
-6. **AP Integration** - Credit fuel purchases create AP invoices for later payment
-7. **Bus-level Tracking** - Fuel expenses can be tracked per bus for cost analysis
-
----
-
-## Files Summary
-
-### New Files (6)
-```
-src/hooks/useFuelExpenseFinance.ts
-src/hooks/useInterBankTransfer.ts
-src/components/accounting/InterBankTransferForm.tsx
-src/components/accounting/InterBankTransferList.tsx
-src/components/school/FuelExpenseForm.tsx
-supabase/migrations/[timestamp]_fuel_bank_integration.sql
-```
-
-### Updated Files (5)
-```
-src/components/school/SchoolBusFinanceSettings.tsx
-src/hooks/useSchoolBusFinance.ts
-src/components/accounting/BankingView.tsx
-src/pages/Accounting.tsx
-src/components/accounting/ExpenseRequestForm.tsx
-```
-
----
-
-## User Actions Required
-
-### After Implementation:
-1. **Configure Fuel Bank Accounts** - Go to Settings → School Bus Finance → Add fuel bank accounts per branch
-2. **Map GL Accounts** - Ensure fuel expense account and fuel bank COA accounts are mapped
-3. **Create Bank Accounts** - Add fuel bank accounts in Banking → Bank Accounts with proper GL links
-4. **Fund Transfer** - Use Inter-Bank Transfer to move funds from main bank to fuel bank
-5. **Record Fuel Expenses** - Use the new fuel expense form for daily fuel purchases
-
+### Storage
+- Same `document-headers` Supabase storage bucket
+- No changes to upload mechanism
+- Image can be logo or full banner based on mode selection
