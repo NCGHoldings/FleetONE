@@ -129,6 +129,9 @@ const generateAllocationsTable = (allocations: any[]): string => {
   `;
 };
 
+// Header mode type
+export type HeaderMode = 'header_image' | 'logo_only' | 'html_only' | 'logo_and_html';
+
 // Map document data to placeholders based on document type
 export const mapDocumentToPlaceholders = (
   documentType: string,
@@ -136,20 +139,52 @@ export const mapDocumentToPlaceholders = (
   companyData?: any,
   lineItems?: any[],
   allocations?: any[],
-  headerImageUrl?: string
+  headerImageUrl?: string,
+  headerMode: HeaderMode = 'logo_and_html'
 ): Record<string, string> => {
   const placeholders: Record<string, string> = {};
 
-  // Company placeholders
+  // Company placeholders (always available)
   placeholders['{{company_name}}'] = companyData?.name || '';
   placeholders['{{company_address}}'] = companyData?.address || '';
   placeholders['{{company_phone}}'] = companyData?.phone || '';
   placeholders['{{company_email}}'] = companyData?.email || '';
   placeholders['{{company_tax_id}}'] = companyData?.tax_number || companyData?.registration_number || '';
   placeholders['{{company_registration}}'] = companyData?.registration_number || '';
-  placeholders['{{company_logo}}'] = headerImageUrl 
-    ? `<img src="${headerImageUrl}" style="max-height: 80px; max-width: 200px;" alt="Company Logo" />`
-    : '';
+  
+  // Generate header and logo placeholders based on header mode
+  switch (headerMode) {
+    case 'header_image':
+      // Full-width banner image replaces entire header section
+      placeholders['{{document_header}}'] = headerImageUrl 
+        ? `<div class="full-header-image" style="width: 100%; margin-bottom: 10px;"><img src="${headerImageUrl}" style="width: 100%; max-height: 150px; object-fit: contain; display: block;" alt="Document Header" /></div>`
+        : '';
+      placeholders['{{company_logo}}'] = ''; // No separate logo in this mode
+      break;
+      
+    case 'logo_only':
+      // Centered logo only, no company text in header
+      placeholders['{{company_logo}}'] = headerImageUrl 
+        ? `<img src="${headerImageUrl}" style="max-height: 100px; display: block; margin: 0 auto;" alt="Company Logo" />`
+        : '';
+      placeholders['{{document_header}}'] = ''; // No full header banner
+      break;
+      
+    case 'html_only':
+      // No images, only HTML/text-based header
+      placeholders['{{company_logo}}'] = '';
+      placeholders['{{document_header}}'] = '';
+      break;
+      
+    case 'logo_and_html':
+    default:
+      // Standard mode: logo on left + company details (default)
+      placeholders['{{company_logo}}'] = headerImageUrl 
+        ? `<img src="${headerImageUrl}" style="max-height: 80px; max-width: 200px; object-fit: contain;" alt="Company Logo" />`
+        : '';
+      placeholders['{{document_header}}'] = ''; // No full header banner in this mode
+      break;
+  }
 
   // Common date
   placeholders['{{current_date}}'] = formatDate(new Date().toISOString());

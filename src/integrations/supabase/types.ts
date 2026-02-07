@@ -5178,6 +5178,7 @@ export type Database = {
           css_styles: string | null
           footer_text: string | null
           header_image_url: string | null
+          header_mode: string | null
           html_content: string
           id: string
           is_active: boolean | null
@@ -5199,6 +5200,7 @@ export type Database = {
           css_styles?: string | null
           footer_text?: string | null
           header_image_url?: string | null
+          header_mode?: string | null
           html_content?: string
           id?: string
           is_active?: boolean | null
@@ -5220,6 +5222,7 @@ export type Database = {
           css_styles?: string | null
           footer_text?: string | null
           header_image_url?: string | null
+          header_mode?: string | null
           html_content?: string
           id?: string
           is_active?: boolean | null
