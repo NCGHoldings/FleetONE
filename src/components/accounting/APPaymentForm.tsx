@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,12 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useVendors, useAPInvoices, useBankAccounts } from "@/hooks/useAccountingData";
-import { useCreateAPPayment } from "@/hooks/useAccountingMutations";
+import { useCreateAPPayment, useApproveAPInvoice } from "@/hooks/useAccountingMutations";
 import { format } from "date-fns";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, CheckCircle } from "lucide-react";
+import { Wallet, CheckCircle, AlertCircle } from "lucide-react";
 
 const paymentSchema = z.object({
   payment_number: z.string().min(1, "Payment number is required"),
@@ -56,6 +57,7 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
   const { data: bankAccounts } = useBankAccounts();
   const { data: allInvoices } = useAPInvoices();
   const createPayment = useCreateAPPayment();
+  const approveInvoice = useApproveAPInvoice();
 
   const [allocations, setAllocations] = useState<InvoiceAllocation[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState(preselectedVendorId || "");
@@ -86,6 +88,18 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
     }
   }, [open, isAdvanceMode, form]);
 
+  // Get pending invoices for selected vendor
+  const pendingInvoices = useMemo(() => {
+    if (!selectedVendorId || !allInvoices) return [];
+    return allInvoices.filter(
+      (inv) => inv.vendor_id === selectedVendorId && inv.approval_status === "pending" && (inv.balance || 0) > 0
+    );
+  }, [selectedVendorId, allInvoices]);
+
+  const pendingTotal = useMemo(() => {
+    return pendingInvoices.reduce((sum, inv) => sum + (inv.balance || 0), 0);
+  }, [pendingInvoices]);
+
   // Filter invoices for selected vendor
   useEffect(() => {
     if (selectedVendorId && allInvoices && !isAdvance) {
@@ -108,6 +122,13 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
       setAllocations([]);
     }
   }, [selectedVendorId, allInvoices, isAdvance]);
+
+  // Approve all pending invoices for selected vendor
+  const handleApproveAllPending = async () => {
+    for (const inv of pendingInvoices) {
+      await approveInvoice.mutateAsync(inv.id);
+    }
+  };
 
   const handleVendorChange = (vendorId: string) => {
     setSelectedVendorId(vendorId);
@@ -416,6 +437,31 @@ export const APPaymentForm = ({ open, onOpenChange, preselectedVendorId, isAdvan
             {/* Invoice Allocation (only when not advance mode) */}
             {!isAdvance && selectedVendorId && (
               <div className="space-y-3">
+                {/* Pending Invoices Alert */}
+                {pendingInvoices.length > 0 && (
+                  <Alert variant="default" className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                    <AlertTitle className="text-yellow-800 dark:text-yellow-400">Pending Approval</AlertTitle>
+                    <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+                      <span>
+                        {pendingInvoices.length} invoice{pendingInvoices.length > 1 ? "s" : ""} pending approval totaling{" "}
+                        <CurrencyDisplay amount={pendingTotal} className="font-semibold" />.
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="ml-3 border-yellow-600 text-yellow-700 hover:bg-yellow-100"
+                        onClick={handleApproveAllPending}
+                        disabled={approveInvoice.isPending}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        {approveInvoice.isPending ? "Approving..." : "Approve All"}
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">Allocate to Invoices</h3>
                   {allocations.length > 0 && (

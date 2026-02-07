@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, DollarSign, Eye, FileText, Printer, Search } from "lucide-react";
+import { Plus, DollarSign, Eye, FileText, Printer, Search, CheckCircle } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useAPInvoices } from "@/hooks/useAccountingData";
+import { useApproveAPInvoice } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { APInvoiceForm } from "./APInvoiceForm";
@@ -34,6 +35,7 @@ export const AccountsPayableView = () => {
   const [printDocumentType, setPrintDocumentType] = useState<string>("ap_invoice");
   const [searchQuery, setSearchQuery] = useState("");
   const { data: invoices, isLoading } = useAPInvoices(statusFilter);
+  const approveInvoice = useApproveAPInvoice();
 
   // Multi-field search filter
   const filteredInvoices = useMemo(() => {
@@ -163,6 +165,18 @@ export const AccountsPayableView = () => {
           >
             <Eye className="h-4 w-4" />
           </Button>
+          {row.original.approval_status === "pending" && (
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="text-green-600 border-green-600 hover:bg-green-50"
+              onClick={() => approveInvoice.mutate(row.original.id)}
+              disabled={approveInvoice.isPending}
+            >
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Approve
+            </Button>
+          )}
           {row.original.balance > 0 && row.original.approval_status === "approved" && (
             <Button 
               size="sm" 
