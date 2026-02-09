@@ -10,6 +10,7 @@ import { Calculator, MapPin, Plus, Trash2 } from 'lucide-react';
 import { CostBreakdown } from './CostBreakdown';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
 
 export function CostCalculator() {
   const [formData, setFormData] = useState({
@@ -132,29 +133,25 @@ export function CostCalculator() {
           const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
           exceedingDistanceChargePerBus = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
           
-          // Calculate overtime/overnight charges
+          // Calculate overtime/overnight charges using standard function
           if (formData.expectedWorkHours && formData.expectedWorkHours > 0) {
-            const availableHours = tripDistance / 10; // baseline 10 kmph
-            const extraHours = Math.max(0, formData.expectedWorkHours - availableHours);
+            const now = new Date();
+            const endTime = new Date(now.getTime() + formData.expectedWorkHours * 60 * 60 * 1000);
             
-            if (extraHours > 0) {
-              if (extraHours <= 10) {
-                overtimeChargePerBus = extraHours * (rateCard.overtime_rate_lkr_per_hour || 500);
-              } else {
-                overnightChargePerBus += (rateCard.overnight_charge_lkr_per_day || 3000);
-                let remaining = extraHours - 24;
-                
-                while (remaining > 0) {
-                  if (remaining > 10) {
-                    overnightChargePerBus += (rateCard.overnight_charge_lkr_per_day || 3000);
-                    remaining -= 24;
-                  } else {
-                    overtimeChargePerBus += remaining * (rateCard.overtime_rate_lkr_per_hour || 500);
-                    remaining = 0;
-                  }
-                }
+            const extraTimeResult = calculateExtraTimeCharge(
+              tripDistance,
+              now,
+              endTime,
+              {
+                baselineSpeedKmph: 10,
+                hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+                nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+                useStandardHours: false
               }
-            }
+            );
+            
+            overtimeChargePerBus = extraTimeResult.overtimeCharge;
+            overnightChargePerBus = extraTimeResult.overnightCharge;
           }
           
           hireChargePerBus = fixedRate + exceedingDistanceChargePerBus + overtimeChargePerBus + overnightChargePerBus;
@@ -415,32 +412,24 @@ export function CostCalculator() {
         let totalExtraTimeCharge = 0;
         
         if (formData.expectedWorkHours && formData.expectedWorkHours > 0) {
-          const estimatedActualHours = formData.expectedWorkHours;
-          // Use only quoted distance (tripDistance) for available hours calculation
-          const availableHours = tripDistance / 10; // baseline speed 10 kmph
-          const extraHours = Math.max(0, estimatedActualHours - availableHours);
+          const now = new Date();
+          const endTime = new Date(now.getTime() + formData.expectedWorkHours * 60 * 60 * 1000);
           
-          if (extraHours > 0) {
-            if (extraHours <= 10) {
-              overtimeCharge = extraHours * (rateCard.overtime_rate_lkr_per_hour || 500);
-            } else {
-              // First night block
-              overnightCharge += (rateCard.overnight_charge_lkr_per_day || 3000);
-              let remaining = extraHours - 24;
-              
-              // Additional blocks
-              while (remaining > 0) {
-                if (remaining > 10) {
-                  overnightCharge += (rateCard.overnight_charge_lkr_per_day || 3000);
-                  remaining -= 24;
-                } else {
-                  overtimeCharge += remaining * (rateCard.overtime_rate_lkr_per_hour || 500);
-                  remaining = 0;
-                }
-              }
+          const extraTimeResult = calculateExtraTimeCharge(
+            tripDistance,
+            now,
+            endTime,
+            {
+              baselineSpeedKmph: 10,
+              hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+              nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+              useStandardHours: false
             }
-            totalExtraTimeCharge = overtimeCharge + overnightCharge;
-          }
+          );
+          
+          overtimeCharge = extraTimeResult.overtimeCharge;
+          overnightCharge = extraTimeResult.overnightCharge;
+          totalExtraTimeCharge = extraTimeResult.totalExtraCharge;
         }
 
         const hireCharge = fixedRate + exceedingDistanceCharge + totalExtraTimeCharge;

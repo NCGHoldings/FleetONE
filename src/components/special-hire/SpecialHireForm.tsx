@@ -1233,7 +1233,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           {
             baselineSpeedKmph: 10,
             hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
-            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000,
+            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
             useStandardHours: false
           }
         );
@@ -1249,7 +1249,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           data.dropDateTime,
           {
             hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
-            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000,
+            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
             useStandardHours: true,
             standardHours: rateCard.standard_hours || 8
           }
@@ -2293,7 +2293,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                       {
                                         baselineSpeedKmph: 10,
                                         hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
-                                        nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000,
+                                        nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
                                         useStandardHours: false
                                       }
                                     );
@@ -2307,7 +2307,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                       formValues.dropDateTime,
                                       {
                                         hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
-                                        nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000,
+                                        nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
                                         useStandardHours: true,
                                         standardHours: rateCard.standard_hours || 8
                                       }
