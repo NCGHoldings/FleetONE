@@ -355,7 +355,7 @@ export function TripDetailsModal({
             originalOvertimeCharge={(trip.quotation as any).overtime_charge || 0}
             originalOvernightCharge={(trip.quotation as any).overnight_charge || 0}
             hourlyRate={(trip.quotation as any).overtime_rate_lkr_per_hour || 500}
-            nightBlockFee={(trip.quotation as any).overnight_charge_lkr_per_day || 3000}
+            nightBlockFee={(trip.quotation as any).overnight_charge_lkr_per_day || 10000}
           />
 
           <PaymentConfirmationModal
