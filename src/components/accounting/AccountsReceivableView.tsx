@@ -388,6 +388,7 @@ export const AccountsReceivableView = () => {
         onOpenChange={setPrintDocumentOpen}
         documentType={printDocumentType}
         documentData={printDocumentData}
+        companyId={printDocumentData?.company_id}
       />
     </div>
   );

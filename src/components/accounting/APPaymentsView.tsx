@@ -263,17 +263,9 @@ export const APPaymentsView = () => {
         <FinanceDocumentPreviewModal
           open={previewOpen}
           onOpenChange={setPreviewOpen}
-          documentType="payment_voucher"
-          documentData={{
-            payment_number: selectedPayment.payment_number,
-            payment_date: selectedPayment.payment_date,
-            vendor_name: getVendorName(selectedPayment.vendor_id),
-            amount: selectedPayment.amount,
-            payment_method: getPaymentMethodLabel(selectedPayment.payment_method || ""),
-            cheque_number: selectedPayment.cheque_number,
-            reference: selectedPayment.reference,
-            notes: selectedPayment.notes,
-          }}
+          documentType="ap_payment_voucher"
+          documentData={selectedPayment}
+          companyId={selectedPayment?.company_id}
         />
       )}
     </div>

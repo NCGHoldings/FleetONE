@@ -435,6 +435,7 @@ export const AccountsPayableView = () => {
         onOpenChange={setPrintDocumentOpen}
         documentType={printDocumentType}
         documentData={printDocumentData}
+        companyId={printDocumentData?.company_id}
       />
     </div>
   );

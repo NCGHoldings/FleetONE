@@ -52,10 +52,16 @@ export const FinanceDocumentPreviewModal = ({
     enabled: !!documentType,
   });
 
-  // Filter templates for this document type
-  const availableTemplates = allTemplates?.filter(
-    (t) => t.template_type_id === templateType?.id && t.is_active
-  );
+  // Filter templates for this document type AND company
+  const availableTemplates = allTemplates?.filter((t) => {
+    // Must match template type and be active
+    if (t.template_type_id !== templateType?.id || !t.is_active) return false;
+    // If companyId provided, filter to only that company's templates
+    if (companyId) {
+      return t.company_id === companyId;
+    }
+    return true;
+  });
 
   // Fetch line items for invoices
   const { data: lineItems } = useQuery({
@@ -115,15 +121,25 @@ export const FinanceDocumentPreviewModal = ({
     enabled: !!documentData?.id && (documentType === "ar_receipt" || documentType === "ap_payment_voucher"),
   });
 
-  // Auto-select default template
+  // Reset template selection when company or document type changes
+  useEffect(() => {
+    setSelectedTemplateId("");
+  }, [companyId, documentType]);
+
+  // Auto-select company template as default
   useEffect(() => {
     if (availableTemplates?.length && !selectedTemplateId) {
-      const defaultTemplate = availableTemplates.find((t) => t.is_default) || availableTemplates[0];
-      if (defaultTemplate) {
-        setSelectedTemplateId(defaultTemplate.id);
+      // Prefer company-specific template, then any default, then first available
+      const companyTemplate = companyId 
+        ? availableTemplates.find((t) => t.company_id === companyId)
+        : null;
+      const defaultTemplate = availableTemplates.find((t) => t.is_default);
+      const selectedTemplate = companyTemplate || defaultTemplate || availableTemplates[0];
+      if (selectedTemplate) {
+        setSelectedTemplateId(selectedTemplate.id);
       }
     }
-  }, [availableTemplates, selectedTemplateId]);
+  }, [availableTemplates, selectedTemplateId, companyId]);
 
   const selectedTemplate = availableTemplates?.find((t) => t.id === selectedTemplateId);
   const company = companies?.find((c) => c.id === (companyId || selectedTemplate?.company_id));

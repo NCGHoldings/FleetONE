@@ -199,6 +199,7 @@ export const APDebitNotesView = () => {
         onOpenChange={setPrintDocumentOpen}
         documentType="ap_debit_note"
         documentData={printDocumentData}
+        companyId={printDocumentData?.company_id}
       />
     </div>
   );
