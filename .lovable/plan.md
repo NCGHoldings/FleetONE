@@ -1,238 +1,136 @@
 
+# Special Hire Calculation Bug Fixes - Complete System Audit
 
-# Special Hire Extra-Time Charge Calculation - Bug Fixes
+## Executive Summary
 
-## Problem Summary
-
-After analyzing the codebase, I've identified **5 critical calculation bugs** in the Special Hire system that cause incorrect overtime/overnight charges.
+After comprehensive analysis of the Special Hire calculation system, I've identified **8 remaining bugs** that cause incorrect overtime/overnight calculations. The previous fix updated some files but missed several critical calculation paths.
 
 ---
 
-## Bug Analysis
+## Identified Issues
 
-### Bug 1: Core Algorithm Error in `extra-time-calculator.ts` (Lines 67-89)
+### Issue 1: Default Night Block Fee Still Wrong in Multiple Files
 
-**Current Logic (WRONG):**
+**Locations still using Rs 3,000 instead of Rs 10,000:**
+
+| File | Line | Current Value | Should Be |
+|------|------|---------------|-----------|
+| `SpecialHireForm.tsx` | 1236 | `3000` | `10000` |
+| `SpecialHireForm.tsx` | 1252 | `3000` | `10000` |
+| `SpecialHireForm.tsx` | 2296 | `3000` | `10000` |
+| `SpecialHireForm.tsx` | 2310 | `3000` | `10000` |
+| `CostCalculator.tsx` | 144 | `3000` | `10000` |
+| `CostCalculator.tsx` | 149 | `3000` | `10000` |
+| `CostCalculator.tsx` | 428 | `3000` | `10000` |
+| `CostCalculator.tsx` | 434 | `3000` | `10000` |
+| `TripDetailsModal.tsx` | 358 | `3000` | `10000` |
+
+**Impact:** When rate card doesn't have `overnight_charge_lkr_per_day` set, system defaults to Rs 3,000 instead of Rs 10,000.
+
+---
+
+### Issue 2: CostCalculator.tsx Uses Legacy Calculation Algorithm
+
+**Problem:** `CostCalculator.tsx` (lines 141-156 and 424-440) implements its own overtime/overnight logic instead of using the corrected `calculateExtraTimeCharge` function.
+
+**Current broken logic:**
 ```typescript
 if (extraHours <= 10) {
-  overtimeCharge = extraHours * hourlyRate;  // ≤10h: hourly
+  overtimeCharge = extraHours * 500;
 } else {
-  // >10h: Jump straight to night block then loop
-  overnightCharge += nightBlockFee;
-  extraHours -= 24;  // BUG: Subtracts 24h but only 10h is the threshold!
-  ...
-}
-```
-
-**Issue:** When extra hours exceed 10 (e.g., 11.5h), the code:
-1. Triggers an overnight block (correct)
-2. Then subtracts 24 hours, making `extraHours = 11.5 - 24 = -12.5` (WRONG)
-3. Loop exits with negative extraHours
-4. Returns Rs 3,000 overnight fee when it should be Rs 10,000
-
-**Correct Business Rule:**
-- 0-10 extra hours → Hourly rate (Rs 500/hr)
-- 10-24 extra hours → 1 overnight block (Rs 10,000)
-- 24-34 extra hours → 1 overnight + hourly for remainder
-- 34-48 extra hours → 2 overnight blocks
-- And so on...
-
----
-
-### Bug 2: Multi-Bus Path Missing `calculateExtraTimeCharge` (Lines 834-847)
-
-**Location:** `SpecialHireForm.tsx` lines 834-847 (multi-bus fleet mode)
-
-**Current Logic (WRONG):**
-```typescript
-// Multi-bus path uses manual calculation instead of the library function
-const expectedHours = (data.dropDateTime.getTime() - data.pickupDateTime.getTime()) / (1000 * 60 * 60);
-const availableHours = tripDistance / 10;
-if (expectedHours > availableHours) {
-  overtimeCharge = (expectedHours - availableHours) * (rateCard.overtime_rate_lkr_per_hour || 500);
-}
-// Then separately checks tripDays for overnight
-const tripDays = Math.ceil(...);
-if (tripDays > 1) {
-  overnightCharge = (tripDays - 1) * (rateCard.overnight_charge_lkr_per_day || 3000);
-}
-```
-
-**Issue:** This bypasses the `calculateExtraTimeCharge` function entirely, using a completely different (broken) algorithm:
-- Calculates overtime as simple hourly with no 10h cap
-- Calculates overnight based on calendar days, not extra hours
-- Results in double-charging when both overtime and overnight apply
-
----
-
-### Bug 3: Wrong Default Night Block Fee
-
-**Location:** Multiple files use `nightBlockFee = 3000` as default
-
-**Issue:** Rate card database shows `overnight_charge_lkr_per_day = 10000` for Leyland buses, but code defaults to Rs 3,000 when value is missing.
-
-**Affected Files:**
-- `extra-time-calculator.ts` line 33
-- `PostTripAdjustmentModal.tsx` line 83
-- `ConfirmedTripsTable.tsx` line 1686
-
----
-
-### Bug 4: Rate Card `overnight_charge_lkr_per_day` Not Always Used
-
-**Location:** `SpecialHireForm.tsx` line 1217, 1233
-
-The code correctly passes `nightBlockFee: rateCard.overnight_charge_lkr_per_day || 3000` but only in the single-bus path. Multi-bus path (Bug 2) uses hardcoded 3000.
-
----
-
-### Bug 5: Incorrect Overnight Logic in displayed quotation
-
-**Observation from Screenshot:**
-- Trip: 112.7 km trip
-- Available Hours: 11.27 hrs (112.7 km ÷ 10)
-- Actual Hours: 22.75 hrs  
-- Extra Hours: 11.48 hrs (22.75 - 11.27)
-- Displayed Charge: Rs 4,265 (implies ~8.53 hrs × Rs 500)
-
-**Expected:**
-- Extra hours = 11.48 hrs (>10h threshold)
-- Should trigger 1 overnight block = Rs 10,000
-
----
-
-## Correct Algorithm
-
-```text
-Extra Time Charge Calculation:
-┌───────────────────────────────────────────────────────┐
-│  Input: extraHours (actualHours - availableHours)     │
-│  Input: hourlyRate (e.g., Rs 500/hr)                  │
-│  Input: nightBlockFee (e.g., Rs 10,000/day)           │
-├───────────────────────────────────────────────────────┤
-│  If extraHours <= 0:                                  │
-│    Return 0                                           │
-│                                                       │
-│  If extraHours <= 10:                                 │
-│    overtimeCharge = extraHours × hourlyRate           │
-│    Return overtimeCharge                              │
-│                                                       │
-│  If extraHours > 10:                                  │
-│    overnightBlocks = ceil(extraHours / 24)            │
-│    remainingHours = extraHours - (overnightBlocks×24) │
-│                                                       │
-│    If remainingHours < 0: remainingHours = 0          │
-│    If remainingHours > 10:                            │
-│      overnightBlocks += 1                             │
-│      remainingHours = 0                               │
-│                                                       │
-│    overnightCharge = overnightBlocks × nightBlockFee  │
-│    overtimeCharge = remainingHours × hourlyRate       │
-│    Return overtimeCharge + overnightCharge            │
-└───────────────────────────────────────────────────────┘
-```
-
-**Examples:**
-| Extra Hours | Calculation | Result |
-|-------------|-------------|--------|
-| 5h | 5 × 500 | Rs 2,500 overtime |
-| 10h | 10 × 500 | Rs 5,000 overtime |
-| 11.5h | 1 overnight block | Rs 10,000 overnight |
-| 20h | 1 overnight block | Rs 10,000 overnight |
-| 25h | 1 overnight + 1h hourly | Rs 10,000 + Rs 500 = Rs 10,500 |
-| 35h | 2 overnight blocks | Rs 20,000 overnight |
-
----
-
-## Implementation Plan
-
-### Step 1: Fix Core Algorithm (`extra-time-calculator.ts`)
-
-Rewrite the calculation logic:
-
-```typescript
-export function calculateExtraTimeCharge(
-  quotedDistanceKm: number,
-  pickupDatetime: string | Date,
-  dropDatetime: string | Date,
-  config: ExtraTimeConfig = {}
-): ExtraTimeResult {
-  const {
-    baselineSpeedKmph = 10,
-    hourlyRate = 500,
-    nightBlockFee = 10000,  // Fix default to 10,000
-    useStandardHours = false,
-    standardHours = 8
-  } = config;
-
-  const availableHours = useStandardHours 
-    ? standardHours 
-    : quotedDistanceKm / baselineSpeedKmph;
-
-  const pickupTime = new Date(pickupDatetime).getTime();
-  const dropTime = new Date(dropDatetime).getTime();
-  const actualHours = Math.max(0, (dropTime - pickupTime) / (1000 * 60 * 60));
-  
-  const extraHours = Math.max(0, actualHours - availableHours);
-  
-  if (extraHours === 0) {
-    return {
-      availableHours: Math.round(availableHours * 100) / 100,
-      actualHours: Math.round(actualHours * 100) / 100,
-      extraHours: 0,
-      overtimeCharge: 0,
-      overnightCharge: 0,
-      totalExtraCharge: 0
-    };
-  }
-
-  let overtimeCharge = 0;
-  let overnightCharge = 0;
-
-  if (extraHours <= 10) {
-    // Simple hourly for up to 10 hours
-    overtimeCharge = extraHours * hourlyRate;
-  } else {
-    // Over 10 hours - use overnight blocks
-    // Calculate how many full 24-hour blocks needed
-    let remainingHours = extraHours;
-    
-    while (remainingHours > 10) {
-      // Each overnight block covers up to 24 hours
-      overnightCharge += nightBlockFee;
-      remainingHours -= 24;
-    }
-    
-    // Any remaining hours (if positive and ≤10) are charged hourly
-    if (remainingHours > 0) {
-      overtimeCharge = remainingHours * hourlyRate;
+  overnightCharge += 3000;  // Wrong default
+  let remaining = extraHours - 24;  // Wrong subtraction
+  while (remaining > 0) {
+    if (remaining > 10) {
+      overnightCharge += 3000;
+      remaining -= 24;
+    } else {
+      overtimeCharge += remaining * 500;
+      remaining = 0;
     }
   }
-
-  return {
-    availableHours: Math.round(availableHours * 100) / 100,
-    actualHours: Math.round(actualHours * 100) / 100,
-    extraHours: Math.round(extraHours * 100) / 100,
-    overtimeCharge: Math.round(overtimeCharge),
-    overnightCharge: Math.round(overnightCharge),
-    totalExtraCharge: Math.round(overtimeCharge + overnightCharge)
-  };
 }
 ```
 
-### Step 2: Fix Multi-Bus Path (`SpecialHireForm.tsx` lines 834-847)
+**Issue:** This subtracts 24 after the first block but only 10 hours triggered it - same bug we fixed in `extra-time-calculator.ts`.
 
-Replace manual calculation with `calculateExtraTimeCharge`:
+---
+
+### Issue 3: Manual Trip Distance Recalculation Uses Wrong Default
+
+**Location:** `SpecialHireForm.tsx` lines 2296 and 2310
+
+When user manually overrides trip distance and clicks "Recalculate", the overtime/overnight calculation uses `3000` as default night block fee.
+
+---
+
+### Issue 4: Single-Bus Path Uses Wrong Default
+
+**Location:** `SpecialHireForm.tsx` lines 1236 and 1252
+
+The main single-bus calculation path (inside `calculateCosts()`) uses `3000` as the fallback night block fee.
+
+---
+
+### Issue 5: TripDetailsModal Passes Wrong Default to PostTripAdjustmentModal
+
+**Location:** `TripDetailsModal.tsx` line 358
+
+When opening post-trip adjustment from trip details, it passes `nightBlockFee={3000}` if the quotation doesn't have the rate stored.
+
+---
+
+### Issue 6: Verified Files (Already Fixed)
+
+These files are already using the correct `10000` default:
+
+- `extra-time-calculator.ts` - Core algorithm (line 33)
+- `SpecialHireForm.tsx` multi-bus path (lines 842, 866)
+- `EnhancedCostCalculator.tsx` (lines 346, 361)
+- `PostTripAdjustmentModal.tsx` (line 83)
+- `ConfirmedTripsTable.tsx` (line 1686)
+- `usePostTripAdjustment.ts` (line 84)
+
+---
+
+## Complete Fix Plan
+
+### Step 1: Fix SpecialHireForm.tsx Single-Bus Path (4 locations)
+
+Update lines 1236, 1252, 2296, 2310 to use `10000` instead of `3000`:
 
 ```typescript
-if (data.hireType === 'Outside') {
-  // ... existing rate card logic ...
-  
-  // FIX: Use calculateExtraTimeCharge instead of manual calculation
+// Line 1236 - Outside hire single bus
+nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+
+// Line 1252 - Lyceum/Internal single bus  
+nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+
+// Line 2296 - Manual trip recalculation (Outside)
+nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+
+// Line 2310 - Manual trip recalculation (Lyceum/Internal)
+nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+```
+
+### Step 2: Fix CostCalculator.tsx (Replace Legacy Algorithm)
+
+Replace the manual calculation loops (lines 141-156 and 424-440) with `calculateExtraTimeCharge`:
+
+**Import at top of file:**
+```typescript
+import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
+```
+
+**Replace multi-bus loop (lines 141-156):**
+```typescript
+// Calculate overtime/overnight charges using standard function
+if (formData.expectedWorkHours && formData.expectedWorkHours > 0) {
+  const availableHours = tripDistance / 10;
   const extraTimeResult = calculateExtraTimeCharge(
     tripDistance,
-    data.pickupDateTime,
-    data.dropDateTime,
+    new Date(), // Start time (placeholder - will use expectedWorkHours)
+    new Date(Date.now() + formData.expectedWorkHours * 60 * 60 * 1000), // End time
     {
       baselineSpeedKmph: 10,
       hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
@@ -240,82 +138,93 @@ if (data.hireType === 'Outside') {
       useStandardHours: false
     }
   );
-  
-  overtimeCharge = extraTimeResult.overtimeCharge;
-  overnightCharge = extraTimeResult.overnightCharge;
-  hireChargePerBus += extraTimeResult.totalExtraCharge;
+  overtimeChargePerBus = extraTimeResult.overtimeCharge;
+  overnightChargePerBus = extraTimeResult.overnightCharge;
 }
 ```
 
-### Step 3: Update Default Night Block Fee
+**Replace single-bus loop (lines 424-440):**
+Same pattern - use `calculateExtraTimeCharge` with `10000` default.
 
-Update all hardcoded defaults from `3000` to `10000`:
+### Step 3: Fix TripDetailsModal.tsx
 
-| File | Line | Change |
-|------|------|--------|
-| `extra-time-calculator.ts` | 33 | `nightBlockFee = 10000` |
-| `PostTripAdjustmentModal.tsx` | 83 | `nightBlockFee = 10000` |
-| `ConfirmedTripsTable.tsx` | 1686 | `nightBlockFee={10000}` |
-| `usePostTripAdjustment.ts` | 84 | `nightBlockFee = 10000` |
-| `EnhancedCostCalculator.tsx` | 346, 361 | `nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 10000` |
-
-### Step 4: Add Lyceum/Internal Overtime Support to Multi-Bus Path
-
-The multi-bus fleet path (lines 848-865) lacks overtime calculation for Lyceum/Internal hires entirely. Add:
-
+Update line 358 to use correct default:
 ```typescript
-} else {
-  // Lyceum/Internal: range-based rates
-  rateCard = allRateCards.find(card => ...);
-  hireChargePerBus = rateCard?.flat_fee_lkr || 0;
-
-  // FIX: Add overtime calculation for Lyceum/Internal
-  const extraTimeResult = calculateExtraTimeCharge(
-    tripDistance,
-    data.pickupDateTime,
-    data.dropDateTime,
-    {
-      hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
-      nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
-      useStandardHours: true,
-      standardHours: rateCard.standard_hours || 8
-    }
-  );
-  
-  overtimeCharge = extraTimeResult.overtimeCharge;
-  overnightCharge = extraTimeResult.overnightCharge;
-  hireChargePerBus += extraTimeResult.totalExtraCharge;
-  
-  // Handle exceeding km...
-}
+nightBlockFee={(trip.quotation as any).overnight_charge_lkr_per_day || 10000}
 ```
 
 ---
 
 ## Files to Modify
 
-| # | File | Changes |
-|---|------|---------|
-| 1 | `src/lib/extra-time-calculator.ts` | Fix core algorithm (lines 67-89) |
-| 2 | `src/components/special-hire/SpecialHireForm.tsx` | Fix multi-bus path (lines 834-865) |
-| 3 | `src/components/special-hire/PostTripAdjustmentModal.tsx` | Update default nightBlockFee |
-| 4 | `src/components/special-hire/ConfirmedTripsTable.tsx` | Update default nightBlockFee |
-| 5 | `src/hooks/usePostTripAdjustment.ts` | Update default nightBlockFee |
-| 6 | `src/components/special-hire/EnhancedCostCalculator.tsx` | Update default nightBlockFee |
+| # | File | Changes | Priority |
+|---|------|---------|----------|
+| 1 | `src/components/special-hire/SpecialHireForm.tsx` | Fix 4 occurrences of `3000` → `10000` (lines 1236, 1252, 2296, 2310) | Critical |
+| 2 | `src/components/special-hire/CostCalculator.tsx` | Import `calculateExtraTimeCharge`, replace 2 manual loops, fix 4 occurrences of `3000` → `10000` | Critical |
+| 3 | `src/components/special-hire/TripDetailsModal.tsx` | Fix 1 occurrence of `3000` → `10000` (line 358) | High |
 
 ---
 
 ## Verification Test Cases
 
-After fixes, these scenarios should calculate correctly:
+After all fixes, these scenarios should calculate correctly:
 
-| Scenario | Trip KM | Available Hrs | Actual Hrs | Extra Hrs | Expected Charge |
-|----------|---------|---------------|------------|-----------|-----------------|
-| Under 10h extra | 100 | 10 | 15 | 5 | Rs 2,500 overtime |
-| Exactly 10h extra | 100 | 10 | 20 | 10 | Rs 5,000 overtime |
-| Just over 10h | 112.7 | 11.27 | 22.75 | 11.48 | Rs 10,000 overnight |
-| 20h extra | 50 | 5 | 25 | 20 | Rs 10,000 overnight |
-| 25h extra | 50 | 5 | 30 | 25 | Rs 10,500 (overnight + 1h) |
-| 35h extra | 50 | 5 | 40 | 35 | Rs 20,000 (2 overnight) |
-| Multi-day 50h extra | 50 | 5 | 55 | 50 | Rs 21,000 (2 overnight + 2h) |
+| Extra Hours | Expected Overtime | Expected Overnight | Total Charge |
+|-------------|-------------------|-------------------|--------------|
+| 5h | Rs 2,500 | Rs 0 | Rs 2,500 |
+| 10h | Rs 5,000 | Rs 0 | Rs 5,000 |
+| 11h | Rs 0 | Rs 10,000 | Rs 10,000 |
+| 11.48h (your example) | Rs 0 | Rs 10,000 | Rs 10,000 |
+| 20h | Rs 0 | Rs 10,000 | Rs 10,000 |
+| 25h | Rs 500 | Rs 10,000 | Rs 10,500 |
+| 35h | Rs 0 | Rs 20,000 | Rs 20,000 |
+| 50h | Rs 1,000 | Rs 20,000 | Rs 21,000 |
 
+---
+
+## Manual KM Override Flow - Complete Process
+
+When user enables "Manual Trip Distance Override":
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  1. User toggles "Manual Trip Distance Override" ON         │
+│     → System initializes manual distance with current value │
+│     → Original calculated distance stored for reset         │
+├─────────────────────────────────────────────────────────────┤
+│  2. User enters new manual trip distance (e.g., 150 km)     │
+│     → No automatic recalculation yet                        │
+├─────────────────────────────────────────────────────────────┤
+│  3. User clicks "Recalculate with Manual Trip Distance"     │
+│     → Re-fetch rate cards for bus type                      │
+│     → Re-match rate card based on NEW distance              │
+│     → Recalculate:                                          │
+│       • Fixed rate (from matched rate card)                 │
+│       • Exceeding KM charge (if > 100km threshold)          │
+│       • Overtime/Overnight charges (using correct 10,000)   │
+│       • Fuel cost (empty run only)                          │
+│       • Commission amounts                                   │
+│     → Update costData with all new values                   │
+├─────────────────────────────────────────────────────────────┤
+│  4. User submits quotation                                  │
+│     → Manual distance saved to km_trip column               │
+│     → uses_manual_trip_distance = true                      │
+│     → manual_km_trip = entered value                        │
+│     → All recalculated costs saved correctly                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Summary
+
+This fix ensures calculation consistency across ALL paths in the system:
+- Single-bus quotations
+- Multi-bus fleet quotations  
+- Manual parking distance override
+- Manual trip distance override
+- Post-trip adjustments
+- Cost calculator component
+- Trip details modal
+
+After implementing these changes, the overnight charge for 11.48 extra hours will correctly show Rs 10,000 instead of the incorrect Rs 4,265 (or Rs 3,000).
