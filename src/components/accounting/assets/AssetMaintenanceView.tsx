@@ -15,14 +15,14 @@ import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay"
 import { format } from "date-fns";
 
 export const AssetMaintenanceView = () => {
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("_all");
   const [searchTerm, setSearchTerm] = useState("");
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [completionNotes, setCompletionNotes] = useState("");
   const [completionCost, setCompletionCost] = useState("");
   
-  const { data: logs, isLoading } = useAssetMaintenanceLogs(statusFilter || undefined);
+  const { data: logs, isLoading } = useAssetMaintenanceLogs(statusFilter === "_all" ? undefined : statusFilter);
   const { data: upcomingMaintenance } = useUpcomingMaintenance();
   const startMaintenance = useStartMaintenance();
   const completeMaintenance = useCompleteMaintenance();
@@ -180,7 +180,7 @@ export const AssetMaintenanceView = () => {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="_all">All Statuses</SelectItem>
                 <SelectItem value="scheduled">Scheduled</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>

@@ -12,10 +12,10 @@ import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay"
 import { format } from "date-fns";
 
 export const LandedCostView = () => {
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("_all");
   const [searchTerm, setSearchTerm] = useState("");
   
-  const { data: vouchers, isLoading } = useLandedCostVouchers(statusFilter || undefined);
+  const { data: vouchers, isLoading } = useLandedCostVouchers(statusFilter === "_all" ? undefined : statusFilter);
 
   const filteredVouchers = vouchers?.filter(v => 
     v.voucher_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -113,7 +113,7 @@ export const LandedCostView = () => {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="_all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="posted">Posted</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
