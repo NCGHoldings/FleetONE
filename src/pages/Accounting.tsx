@@ -95,12 +95,24 @@ import { RecurringInvoicesView } from "@/components/accounting/automation/Recurr
 import { PaymentReminderRulesView } from "@/components/accounting/automation/PaymentReminderRulesView";
 import { WorkflowRulesView } from "@/components/accounting/automation/WorkflowRulesView";
 import { ScheduledTasksView } from "@/components/accounting/automation/ScheduledTasksView";
-// ERPNext Parity - New Modules
+// ERPNext Parity - Selling Module
 import { SalesOrderView } from "@/components/accounting/SalesOrderView";
 import { DeliveryNoteView } from "@/components/accounting/DeliveryNoteView";
+// ERPNext Parity - Procurement Enhancement
 import { RFQView } from "@/components/accounting/RFQView";
 import { SupplierQuotationView } from "@/components/accounting/SupplierQuotationView";
+// ERPNext Parity - Quality Module
 import { QualityInspectionView } from "@/components/accounting/quality/QualityInspectionView";
+import { InspectionTemplateView } from "@/components/accounting/quality/InspectionTemplateView";
+// ERPNext Parity - Inventory Enhancement
+import { PickListView } from "@/components/accounting/inventory/PickListView";
+import { LandedCostView } from "@/components/accounting/inventory/LandedCostView";
+import { UoMView } from "@/components/accounting/inventory/UoMView";
+// ERPNext Parity - Asset Maintenance
+import { AssetMaintenanceView } from "@/components/accounting/assets/AssetMaintenanceView";
+import { MaintenanceTeamView } from "@/components/accounting/assets/MaintenanceTeamView";
+// ERPNext Parity - Settings
+import { PaymentTermsView } from "@/components/accounting/settings/PaymentTermsView";
 
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
@@ -549,6 +561,32 @@ const Accounting = () => {
             </Tabs>
           )}
 
+          {/* Selling Module - NEW */}
+          {activeModule === "selling" && (
+            <Tabs defaultValue="sales-orders" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="sales-orders">Sales Orders</TabsTrigger>
+                  <TabsTrigger value="delivery-notes">Delivery Notes</TabsTrigger>
+                  <TabsTrigger value="pick-lists">Pick Lists</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="sales-orders">
+                <SalesOrderView />
+              </TabsContent>
+
+              <TabsContent value="delivery-notes">
+                <DeliveryNoteView />
+              </TabsContent>
+
+              <TabsContent value="pick-lists">
+                <PickListView />
+              </TabsContent>
+            </Tabs>
+          )}
+
           {/* Inventory Module */}
           {activeModule === "inventory" && (
             <Tabs defaultValue="items" className="space-y-6">
@@ -563,6 +601,8 @@ const Accounting = () => {
                   <TabsTrigger value="batch-serial">Batch/Serial Tracking</TabsTrigger>
                   <TabsTrigger value="ageing">Inventory Ageing</TabsTrigger>
                   <TabsTrigger value="reconciliation">Stock Reconciliation</TabsTrigger>
+                  <TabsTrigger value="landed-cost">Landed Cost</TabsTrigger>
+                  <TabsTrigger value="uom">Units of Measure</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -602,6 +642,14 @@ const Accounting = () => {
               <TabsContent value="reconciliation">
                 <StockReconciliationView />
               </TabsContent>
+
+              <TabsContent value="landed-cost">
+                <LandedCostView />
+              </TabsContent>
+
+              <TabsContent value="uom">
+                <UoMView />
+              </TabsContent>
             </Tabs>
           )}
 
@@ -611,6 +659,8 @@ const Accounting = () => {
               <ScrollArea className="w-full whitespace-nowrap">
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="requisitions">Purchase Requisitions</TabsTrigger>
+                  <TabsTrigger value="rfq">RFQ</TabsTrigger>
+                  <TabsTrigger value="supplier-quotes">Supplier Quotations</TabsTrigger>
                   <TabsTrigger value="orders">Purchase Orders</TabsTrigger>
                   <TabsTrigger value="grn">Goods Receipt Notes</TabsTrigger>
                   <TabsTrigger value="matching">Invoice Matching</TabsTrigger>
@@ -620,6 +670,14 @@ const Accounting = () => {
 
               <TabsContent value="requisitions">
                 <PurchaseRequisitionView />
+              </TabsContent>
+
+              <TabsContent value="rfq">
+                <RFQView />
+              </TabsContent>
+
+              <TabsContent value="supplier-quotes">
+                <SupplierQuotationView />
               </TabsContent>
 
               <TabsContent value="orders">
@@ -692,6 +750,8 @@ const Accounting = () => {
                   <TabsTrigger value="revaluations">Revaluations</TabsTrigger>
                   <TabsTrigger value="transfers">Transfers</TabsTrigger>
                   <TabsTrigger value="disposals">Disposals</TabsTrigger>
+                  <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+                  <TabsTrigger value="teams">Maintenance Teams</TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
@@ -714,6 +774,35 @@ const Accounting = () => {
 
               <TabsContent value="disposals">
                 <AssetDisposalForm />
+              </TabsContent>
+
+              <TabsContent value="maintenance">
+                <AssetMaintenanceView />
+              </TabsContent>
+
+              <TabsContent value="teams">
+                <MaintenanceTeamView />
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {/* Quality Module - NEW */}
+          {activeModule === "quality" && (
+            <Tabs defaultValue="inspections" className="space-y-6">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="inspections">Quality Inspections</TabsTrigger>
+                  <TabsTrigger value="templates">Inspection Templates</TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              <TabsContent value="inspections">
+                <QualityInspectionView />
+              </TabsContent>
+
+              <TabsContent value="templates">
+                <InspectionTemplateView />
               </TabsContent>
             </Tabs>
           )}
@@ -826,6 +915,7 @@ const Accounting = () => {
               <ScrollArea className="w-full whitespace-nowrap">
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="companies">Companies</TabsTrigger>
+                  <TabsTrigger value="payment-terms">Payment Terms</TabsTrigger>
                   <TabsTrigger value="module-integration">Module Integration</TabsTrigger>
                   <TabsTrigger value="templates">Document Templates</TabsTrigger>
                   <TabsTrigger value="costing">Costing & Budget</TabsTrigger>
@@ -841,6 +931,10 @@ const Accounting = () => {
 
               <TabsContent value="companies">
                 <CompanySettingsView />
+              </TabsContent>
+
+              <TabsContent value="payment-terms">
+                <PaymentTermsView />
               </TabsContent>
 
               <TabsContent value="module-integration">
