@@ -1,172 +1,200 @@
 
-# Yutong Document Template Integration & Cross-Check Plan
+
+# Fix Finance Document Template Preview - Root Cause Analysis & Solution
 
 ## Problem Summary
 
-Based on my analysis, there are two separate document systems that need interconnection:
+The AR Invoice Preview is showing an "old version" without the branded header image because:
 
-1. **Vehicle Sales Invoices** (Yutong, Sinotruck, Light Vehicle) - use standalone HTML generators
-2. **Finance Module Documents** (AR/AP Invoices, Receipts, etc.) - use the Document Template system
-
-The user expects:
-- Yutong documents to use professional headers like the PDF reference
-- All documents across modules to share the template system
-- Header images to display properly in previews
+1. **Templates are not filtered by company** - The modal filters templates only by document type, but shows ALL company templates
+2. **NCG Holding has no header image** - The invoice `INV-20260209-01ME` belongs to NCG Holding, which has `header_image_url: null`
+3. **Company details are empty** - NCG Holding has null values for phone, email, address, logo_url
+4. **No company_id is passed to modal** - The `FinanceDocumentPreviewModal` is called without `companyId` prop
 
 ---
 
-## Current Architecture Issues
+## Root Cause Analysis
 
-### Issue 1: Two Disconnected Document Systems
+### Issue 1: Template Filtering Not Company-Specific
 
-| System | Location | Header Source |
-|--------|----------|---------------|
-| Yutong Order Invoices | `yutong-order-invoice-generator.ts` | Hardcoded `/lovable-uploads/yutong-invoice-header.png` |
-| Finance AR/AP Invoices | `FinanceDocumentPreviewModal.tsx` | `document_templates.header_image_url` |
+**Current Code (line 56-58):**
+```typescript
+const availableTemplates = allTemplates?.filter(
+  (t) => t.template_type_id === templateType?.id && t.is_active
+);
+```
 
-### Issue 2: Template Headers Not Configured
+This shows ALL templates for ALL companies (7 companies × AR Invoice = 7 templates visible).
 
-Most Yutong templates in the database have `header_image_url: null` except for AR Invoice which was recently updated.
+### Issue 2: Company ID Not Passed
 
-### Issue 3: Missing Template-to-Document Linking
+**Current Code (AccountsReceivableView.tsx line 386-391):**
+```typescript
+<FinanceDocumentPreviewModal
+  open={printDocumentOpen}
+  onOpenChange={setPrintDocumentOpen}
+  documentType={printDocumentType}
+  documentData={printDocumentData}
+  // companyId is NOT passed!
+/>
+```
 
-Yutong order documents don't reference the Finance template system at all.
+### Issue 3: NCG Holding Template Not Configured
 
----
+Database shows:
+| Company | header_image_url | header_mode |
+|---------|------------------|-------------|
+| NCG Holding | `null` | logo_and_html |
+| Yutong Sales | `https://...` (valid) | header_image |
 
-## Solution Overview
+### Issue 4: NCG Holding Company Details Missing
 
-### Phase 1: Fix Finance Template Headers (Quick Win)
-
-**Goal:** Ensure all Yutong Finance templates have proper header images
-
-**Changes:**
-1. Create utility to bulk-update Yutong templates with professional header image
-2. Add header image URL to all 12 document types for Yutong company
-
-### Phase 2: Add Template Selection to Yutong Order Invoices
-
-**Goal:** Allow Yutong order invoices to optionally use Finance templates
-
-**New Files:**
-- `src/components/yutong/YutongInvoiceTemplateSelector.tsx` - Template dropdown for Yutong invoices
-
-**Modified Files:**
-- `src/components/yutong/YutongOrderInvoiceViewModal.tsx` - Add template selector option
-- `src/lib/yutong-order-invoice-generator.ts` - Support template-based header rendering
-
-### Phase 3: Create Unified Document Preview Component
-
-**Goal:** Single preview component that works for both vehicle sales and finance documents
-
-**New Files:**
-- `src/components/shared/UnifiedDocumentPreview.tsx` - Unified preview with template support
-
-**Features:**
-- Template selector dropdown
-- Dynamic header modes (Full Banner, Logo+Text, etc.)
-- PDF download with proper header rendering
-- Print support
-
-### Phase 4: Cross-Module Template Sync
-
-**Goal:** Ensure templates work consistently across all modules
-
-**Changes:**
-1. Add `yutong_order_invoice` template type to `document_template_types`
-2. Add `sinotruck_order_invoice` template type
-3. Add `light_vehicle_invoice` template type
-4. Create professional HTML templates for each
+| Field | Value |
+|-------|-------|
+| address | null |
+| phone | null |
+| email | null |
+| logo_url | null |
 
 ---
 
-## Technical Implementation Details
+## Solution
 
-### Database Changes
+### Fix 1: Pass Company ID to Preview Modal
+
+Update all places where `FinanceDocumentPreviewModal` is called to pass the `companyId`.
+
+**Files to Modify:**
+- `src/components/accounting/AccountsReceivableView.tsx`
+- `src/components/accounting/AccountsPayableView.tsx`
+- `src/components/accounting/ARReceiptsView.tsx`
+- `src/components/accounting/APPaymentsView.tsx`
+- `src/components/accounting/ARCreditNotesView.tsx`
+- `src/components/accounting/APDebitNotesView.tsx`
+
+**Change:**
+```typescript
+<FinanceDocumentPreviewModal
+  open={printDocumentOpen}
+  onOpenChange={setPrintDocumentOpen}
+  documentType={printDocumentType}
+  documentData={printDocumentData}
+  companyId={printDocumentData?.company_id}  // ADD THIS
+/>
+```
+
+### Fix 2: Filter Templates by Company ID
+
+Update `FinanceDocumentPreviewModal.tsx` to prioritize company-specific templates.
+
+**Change in template filtering (line 56-58):**
+```typescript
+// Filter templates for this document type AND prioritize company-specific
+const availableTemplates = allTemplates?.filter(
+  (t) => {
+    if (t.template_type_id !== templateType?.id || !t.is_active) return false;
+    // If companyId provided, filter by company; otherwise show all
+    if (companyId && t.company_id) return t.company_id === companyId;
+    return true;
+  }
+);
+```
+
+### Fix 3: Auto-Select Company Template as Default
+
+Update the auto-select logic to prefer the company's template:
+
+```typescript
+useEffect(() => {
+  if (availableTemplates?.length && !selectedTemplateId) {
+    // Prefer company-specific template, then any default, then first available
+    const companyTemplate = companyId 
+      ? availableTemplates.find((t) => t.company_id === companyId)
+      : null;
+    const defaultTemplate = availableTemplates.find((t) => t.is_default);
+    const selectedTemplate = companyTemplate || defaultTemplate || availableTemplates[0];
+    if (selectedTemplate) {
+      setSelectedTemplateId(selectedTemplate.id);
+    }
+  }
+}, [availableTemplates, selectedTemplateId, companyId]);
+```
+
+### Fix 4: Seed NCG Holding Header Image (Optional Database Update)
+
+Run SQL migration to set header images for all companies:
 
 ```sql
--- Add vehicle sales invoice template types
-INSERT INTO document_template_types (type_code, type_name, module, description, available_placeholders)
-VALUES 
-  ('yutong_order_invoice', 'Yutong Order Invoice', 'yutong', 'Invoice for Yutong bus orders', 
-   ARRAY['{{invoice_no}}', '{{customer_name}}', '{{bus_model}}', '{{total}}', '{{signatures}}']),
-  ('sinotruck_order_invoice', 'Sinotruck Order Invoice', 'sinotruck', 'Invoice for Sinotruck orders',
-   ARRAY['{{invoice_no}}', '{{customer_name}}', '{{vehicle_model}}', '{{total}}']),
-  ('light_vehicle_invoice', 'Light Vehicle Invoice', 'light_vehicle', 'Invoice for light vehicle orders',
-   ARRAY['{{invoice_no}}', '{{customer_name}}', '{{vehicle_model}}', '{{total}}']);
+-- Update NCG Holding template with header image
+UPDATE document_templates 
+SET header_image_url = '/lovable-uploads/ncg-header-banner.png',
+    header_mode = 'header_image'
+WHERE company_id = 'f40b0a9d-ae5b-41b3-9188-535ae94c9020'
+AND template_type_id = (SELECT id FROM document_template_types WHERE type_code = 'ar_invoice');
 ```
-
-### Component Architecture
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    Document Preview System                   │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────┐     ┌─────────────────────────────┐   │
-│  │ Template Selector│     │ Preview Iframe              │   │
-│  │ ┌─────────────┐ │     │ ┌─────────────────────────┐ │   │
-│  │ │ AR Invoice  │ │     │ │ ┌───────────────────┐   │ │   │
-│  │ │ AR Receipt  │ │ ──► │ │ │  HEADER IMAGE     │   │ │   │
-│  │ │ Yutong Inv  │ │     │ │ └───────────────────┘   │ │   │
-│  │ │ Sinotruck   │ │     │ │ Invoice Content...     │ │   │
-│  │ └─────────────┘ │     │ │ Signatures...          │ │   │
-│  └─────────────────┘     │ └─────────────────────────┘ │   │
-│                          └─────────────────────────────┘   │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Actions: [Download PDF] [Print] [Email]              │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### File Changes Summary
-
-| File | Change Type | Description |
-|------|-------------|-------------|
-| `src/components/yutong/YutongOrderInvoiceViewModal.tsx` | Modify | Add template selector option |
-| `src/components/yutong/YutongOrderInvoicePreview.tsx` | Modify | Support template-based rendering |
-| `src/lib/yutong-order-invoice-generator.ts` | Modify | Accept header from template |
-| `src/components/shared/UnifiedDocumentPreview.tsx` | Create | Unified preview component |
-| `src/hooks/useVehicleSalesTemplates.ts` | Create | Hook for vehicle sales templates |
-| `src/lib/vehicle-sales-template-utils.ts` | Create | Placeholder mapping for vehicle sales |
 
 ---
 
-## Expected Results
+## Files to Modify
+
+| # | File | Changes |
+|---|------|---------|
+| 1 | `src/components/accounting/shared/FinanceDocumentPreviewModal.tsx` | Filter templates by company, improve auto-select |
+| 2 | `src/components/accounting/AccountsReceivableView.tsx` | Pass companyId prop |
+| 3 | `src/components/accounting/AccountsPayableView.tsx` | Pass companyId prop |
+| 4 | `src/components/accounting/ARReceiptsView.tsx` | Pass companyId prop |
+| 5 | `src/components/accounting/APPaymentsView.tsx` | Pass companyId prop |
+| 6 | `src/components/accounting/ARCreditNotesView.tsx` | Pass companyId prop |
+| 7 | `src/components/accounting/APDebitNotesView.tsx` | Pass companyId prop |
+
+---
+
+## Technical Details
+
+### Updated Template Filtering Logic
+
+```typescript
+// Filter templates by document type AND company
+const availableTemplates = useMemo(() => {
+  if (!allTemplates || !templateType?.id) return [];
+  
+  return allTemplates.filter((t) => {
+    // Must match template type and be active
+    if (t.template_type_id !== templateType.id || !t.is_active) return false;
+    
+    // If companyId provided, filter to only that company's templates
+    if (companyId) {
+      return t.company_id === companyId;
+    }
+    
+    // Otherwise show all
+    return true;
+  });
+}, [allTemplates, templateType?.id, companyId]);
+```
+
+### Reset Template Selection on Company Change
+
+```typescript
+// Reset template selection when company or document type changes
+useEffect(() => {
+  setSelectedTemplateId("");
+}, [companyId, documentType]);
+```
+
+---
+
+## Expected Outcome
 
 After implementation:
 
-1. **Yutong Order Invoices** will show the professional branded header (matching the PDF reference)
-2. **Template Selection** will be available in the invoice preview modal
-3. **All Finance Documents** will use consistent templates with proper headers
-4. **Cross-Module Consistency** - same template system works for:
-   - Finance AR/AP documents
-   - Yutong order invoices
-   - Sinotruck order invoices
-   - Light Vehicle invoices
+1. **Company-Specific Templates** - Only the relevant company's template appears in the selector
+2. **Correct Headers** - Each company's configured header image displays properly
+3. **Auto-Selection** - The correct company template is auto-selected
+4. **Cross-Module Consistency** - All AR/AP views pass company context correctly
 
----
+The preview will show:
+- NCG Holding: Default template (until header image is configured in Settings)
+- Yutong Sales: Professional header banner with blue branding
+- Other companies: Their respective configured templates
 
-## Implementation Order
-
-1. **Step 1:** Add vehicle sales template types to database
-2. **Step 2:** Create default templates for vehicle sales with proper headers
-3. **Step 3:** Modify `YutongOrderInvoicePreview` to accept template parameter
-4. **Step 4:** Add template selector to `YutongOrderInvoiceViewModal`
-5. **Step 5:** Update `yutong-order-invoice-generator.ts` to use template headers
-6. **Step 6:** Apply same pattern to Sinotruck and Light Vehicle modules
-7. **Step 7:** Create unified document preview component for future use
-
----
-
-## Quick Fix Option (Immediate)
-
-If a full integration is too complex for now, I can implement a quick fix:
-
-1. Update `yutong-order-invoice-generator.ts` to dynamically fetch header from template
-2. Ensure Yutong templates have proper `header_image_url` set
-3. This maintains the current architecture while fixing the header issue
-
-Would you like me to proceed with the full integration or the quick fix approach?
