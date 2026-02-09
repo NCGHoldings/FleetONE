@@ -54,7 +54,7 @@ export const useFinanceApproval = () => {
       console.log('[SPH Finance] Payment ID:', paymentId);
 
       // ========================
-      // STEP 1: Update payment status FIRST (critical path)
+      // STEP 1: Update payment status FIRST (critical path - must succeed)
       // ========================
       const { data: paymentData, error: paymentError } = await supabase
         .from('special_hire_payments')
@@ -78,430 +78,361 @@ export const useFinanceApproval = () => {
 
       console.log('[SPH Finance] ✅ Payment status updated to approved');
 
-      // ========================
-      // STEP 2: AR & GL INTEGRATION (with proper error handling)
-      // ========================
-      let journalEntry: any = null;
-      let arInvoiceId: string | null = paymentData.quotation.ar_invoice_id;
-      let customerId: string | null = paymentData.quotation.finance_customer_id;
-      let arIntegrationSuccess = true;
+      // Return success immediately - AR/GL integration runs in background
+      setIsLoading(false);
 
-      // Check if document exists (validation gate)
-      const hasDocument = await checkPaymentDocument(paymentId);
-      if (!hasDocument) {
-        console.warn('[SPH Finance] ⚠️ No document found for payment. Proceeding anyway...');
-      }
+      // Fire background integration (non-blocking)
+      performBackgroundIntegration(paymentId, paymentData, signatures).catch(err => {
+        console.error('[SPH Finance] ❌ Background integration failed:', err);
+        toast.warning('Payment approved but finance integration needs retry. Use "Retry AR Integration".');
+      });
 
-      try {
-        console.log('[SPH Finance] Starting AR & GL integration...');
-        const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
-        
-        if (!settings) {
-          console.warn('[SPH Finance] ⚠️ Special Hire Finance settings not configured');
-          toast.warning('Special Hire Finance settings not configured. Go to Settings > Special Hire Finance.');
-          arIntegrationSuccess = false;
-        } else {
-          console.log('[SPH Finance] Settings loaded:', {
-            auto_post_advance: settings.auto_post_advance_payments,
-            auto_post_balance: settings.auto_post_balance_payments,
-            bank_account: settings.default_bank_account_id ? '✓' : '✗',
-            advance_account: settings.customer_advance_account_id ? '✓' : '✗',
-            receivable_account: settings.trade_receivable_account_id ? '✓' : '✗',
-            revenue_account: settings.revenue_external_account_id ? '✓' : '✗',
-          });
-
-          // Determine payment type
-          const paymentType = paymentData.payment_type || 'advance';
-          const isAdvance = paymentType === 'advance';
-          const isFullPayment = paymentType === 'full';
-          const isBalance = paymentType === 'balance';
-
-          console.log('[SPH Finance] Payment analysis:', {
-            paymentType,
-            isAdvance,
-            isFullPayment,
-            isBalance,
-            amount: paymentData.amount,
-            existingCustomerId: customerId,
-            existingArInvoiceId: arInvoiceId,
-          });
-
-          // Step 2a: Create/Get Finance Customer
-          if (!customerId) {
-            console.log('[SPH Finance] Creating/getting customer...');
-            customerId = await createOrGetSPHCustomer({
-              customerName: paymentData.quotation.customer_name,
-              customerPhone: paymentData.quotation.customer_phone,
-              customerEmail: paymentData.quotation.customer_email,
-              companyId: NCG_HOLDING_ID,
-            });
-
-            if (!customerId) {
-              console.error('[SPH Finance] ❌ CRITICAL: Failed to create customer');
-              console.error('[SPH Finance] Customer creation params:', {
-                name: paymentData.quotation.customer_name,
-                phone: paymentData.quotation.customer_phone,
-                email: paymentData.quotation.customer_email,
-                companyId: NCG_HOLDING_ID,
-              });
-              toast.error('CRITICAL: Failed to create Finance Customer. Check console for details.');
-              arIntegrationSuccess = false;
-            } else {
-              console.log('[SPH Finance] ✅ Customer ID:', customerId);
-              toast.success(`Finance Customer linked: ${paymentData.quotation.customer_name}`);
-              // Update quotation with customer ID
-              const { error: custLinkError } = await supabase
-                .from('special_hire_quotations')
-                .update({ finance_customer_id: customerId })
-                .eq('id', paymentData.quotation.id);
-              
-              if (custLinkError) {
-                console.error('[SPH Finance] ⚠️ Failed to link customer to quotation:', custLinkError);
-              }
-            }
-          }
-
-          // Step 2b: Create AR Invoice if advance/full payment and customer exists
-          if (customerId && (isAdvance || isFullPayment) && !arInvoiceId) {
-            console.log('[SPH Finance] Creating AR Invoice...');
-            
-            // Calculate total amount
-            const totalAmount = (paymentData.quotation.gross_revenue || 0) +
-              (paymentData.quotation.fuel_cost_fuel_only || 0) +
-              (paymentData.quotation.commission_pass_through_amount || 0) +
-              (paymentData.quotation.total_additional_charges || 0) -
-              (paymentData.quotation.discount_amount_lkr || 0);
-
-            const dueDate = format(
-              new Date(paymentData.quotation.pickup_datetime || new Date()),
-              'yyyy-MM-dd'
-            );
-
-            const arResult = await createSPHARInvoice({
-              quotationId: paymentData.quotation.id,
-              quotationNo: paymentData.quotation.quotation_no,
-              customerId,
-              customerName: paymentData.quotation.customer_name,
-              totalAmount,
-              advanceAmount: isFullPayment ? paymentData.amount : paymentData.amount, // For full payment, all is paid
-              dueDate,
-              companyId: NCG_HOLDING_ID,
-            });
-
-            if (!arResult) {
-              console.error('[SPH Finance] ❌ Failed to create AR Invoice');
-              toast.error('Failed to create AR Invoice. Check Finance Settings.');
-              arIntegrationSuccess = false;
-            } else {
-              arInvoiceId = arResult.invoiceId;
-              console.log('[SPH Finance] ✅ AR Invoice created:', arResult.invoiceNumber);
-              toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
-            }
-          }
-
-          // Step 2c: Post GL Entry
-          if (isAdvance && settings.auto_post_advance_payments) {
-            console.log('[SPH Finance] Posting advance payment to GL...');
-            journalEntry = await postAdvancePaymentToGLStandalone({
-              quotationNo: paymentData.quotation.quotation_no,
-              customerName: paymentData.quotation.customer_name,
-              amount: paymentData.amount,
-              settings,
-              effectiveCompanyId: NCG_HOLDING_ID,
-            });
-            
-            if (journalEntry) {
-              console.log('[SPH Finance] ✅ Advance payment posted:', journalEntry.entry_number);
-              toast.success(`GL Entry created: ${journalEntry.entry_number}`);
-            } else {
-              console.warn('[SPH Finance] ⚠️ GL posting returned null');
-            }
-          } else if (isFullPayment && settings.auto_post_advance_payments) {
-            console.log('[SPH Finance] Posting full payment to GL...');
-            journalEntry = await postFullPaymentToGLStandalone({
-              quotationNo: paymentData.quotation.quotation_no,
-              customerName: paymentData.quotation.customer_name,
-              amount: paymentData.amount,
-              settings,
-              effectiveCompanyId: NCG_HOLDING_ID,
-            });
-            
-            if (journalEntry) {
-              console.log('[SPH Finance] ✅ Full payment posted:', journalEntry.entry_number);
-              toast.success(`GL Entry created: ${journalEntry.entry_number}`);
-            }
-          } else if (isBalance && settings.auto_post_balance_payments) {
-            console.log('[SPH Finance] Posting balance payment to GL...');
-            journalEntry = await postBalancePaymentToGLStandalone({
-              quotationNo: paymentData.quotation.quotation_no,
-              customerName: paymentData.quotation.customer_name,
-              balanceAmount: paymentData.amount,
-              settings,
-              effectiveCompanyId: NCG_HOLDING_ID,
-            });
-            
-            if (journalEntry) {
-              console.log('[SPH Finance] ✅ Balance payment posted:', journalEntry.entry_number);
-              toast.success(`GL Entry created: ${journalEntry.entry_number}`);
-            }
-          }
-
-          // Step 2d: Create AR Receipt (for ALL payment types) after GL posting
-          if (arInvoiceId && customerId) {
-            // For balance payments, update the AR Invoice first
-            if (isBalance) {
-              console.log('[SPH Finance] Updating AR Invoice on balance payment...');
-              const arUpdateResult = await updateSPHARInvoiceOnPayment({
-                arInvoiceId,
-                paymentAmount: paymentData.amount,
-                paymentId,
-                journalEntryId: journalEntry?.id,
-              });
-
-              if (arUpdateResult) {
-                console.log('[SPH Finance] ✅ AR Invoice updated');
-              }
-            }
-
-            console.log('[SPH Finance] Creating AR Receipt...');
-            const receiptResult = await createSPHARReceipt({
-              customerId,
-              arInvoiceId,
-              paymentAmount: paymentData.amount,
-              paymentMethod: paymentData.payment_method || 'cash',
-              reference: paymentData.reference_no,
-              paymentId,
-              companyId: NCG_HOLDING_ID,
-              journalEntryId: journalEntry?.id,
-            });
-
-            if (receiptResult) {
-              console.log('[SPH Finance] ✅ AR Receipt created:', receiptResult.receiptNumber);
-              toast.success(`AR Receipt created: ${receiptResult.receiptNumber}`);
-            } else {
-              console.warn('[SPH Finance] ⚠️ Failed to create AR Receipt');
-            }
-          }
-
-          // Step 2e: Link journal entry and AR invoice to payment
-          if (journalEntry || arInvoiceId) {
-            const updateData: any = {};
-            if (journalEntry) updateData.journal_entry_id = journalEntry.id;
-            if (arInvoiceId) updateData.ar_invoice_id = arInvoiceId;
-            
-            const { error: linkError } = await supabase
-              .from('special_hire_payments')
-              .update(updateData)
-              .eq('id', paymentId);
-            
-            if (linkError) {
-              console.error('[SPH Finance] ⚠️ Failed to link journal/AR to payment:', linkError);
-            } else {
-              console.log('[SPH Finance] ✅ Journal/AR linked to payment');
-            }
-          }
-        }
-      } catch (glError: any) {
-        console.error('[SPH Finance] ❌ AR/GL integration failed:', glError?.message || glError);
-        toast.warning(`Payment approved but AR/GL integration failed: ${glError?.message || 'Unknown error'}`);
-        arIntegrationSuccess = false;
-      }
-
-      console.log('[SPH Finance] AR Integration Success:', arIntegrationSuccess);
-
-      // ========================
-      // STEP 3: Parallel non-critical operations
-      // ========================
-      const parallelOperations = [];
-
-      // Auto-add checked_by signature
-      parallelOperations.push((async () => {
-        try {
-          const { data: setting } = await supabase
-            .from('special_hire_signature_settings')
-            .select('default_user_id, is_enabled')
-            .eq('signature_role', 'checked_by')
-            .single();
-
-          if (setting?.is_enabled && setting.default_user_id) {
-            const { data: existingApproval } = await supabase
-              .from('document_approvals')
-              .select('id')
-              .eq('document_id', paymentData.quotation.id)
-              .eq('approval_type', 'checked_by')
-              .maybeSingle();
-
-            if (!existingApproval) {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('first_name, last_name, signature_data, user_id')
-                .eq('user_id', setting.default_user_id)
-                .single();
-
-              if (profile?.signature_data) {
-                await supabase.from('document_approvals').insert({
-                  document_id: paymentData.quotation.id,
-                  approval_type: 'checked_by',
-                  approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-                  signature_data: profile.signature_data,
-                  approval_date: new Date().toISOString().split('T')[0],
-                  user_id: profile.user_id,
-                });
-                console.log('[SPH Finance] ✅ Checked By signature added');
-              }
-            }
-          }
-        } catch (sigError) {
-          console.log('[SPH Finance] Auto-signature skipped:', sigError);
-        }
-      })());
-
-      // Update related invoices
-      parallelOperations.push(
-        supabase
-          .from('special_hire_invoices')
-          .update({
-            status: 'approved',
-            approved_by: user?.id,
-            approved_at: new Date().toISOString(),
-          })
-          .eq('quotation_id', paymentData.quotation.id)
-          .then(({ error }) => {
-            if (error) console.warn('[SPH Finance] Invoice update warning:', error);
-          })
-      );
-
-      // Create notification
-      parallelOperations.push(
-        supabase
-          .from('payment_notifications')
-          .insert({
-            payment_id: paymentId,
-            quotation_id: paymentData.quotation.id,
-            notification_type: 'payment_approved',
-            target_role: 'admin',
-            message: `Payment of LKR ${paymentData.amount.toLocaleString()} for quotation ${paymentData.quotation.quotation_no} has been approved by finance.`,
-            created_by: user?.id,
-          })
-          .then(({ error }) => {
-            if (error) console.warn('[SPH Finance] Notification warning:', error);
-          })
-      );
-
-      // Wait for parallel operations (with timeout)
-      await Promise.race([
-        Promise.allSettled(parallelOperations),
-        new Promise(resolve => setTimeout(resolve, 5000)) // 5 second timeout
-      ]);
-
-      // ========================
-      // STEP 4: Document regeneration (can be slow, handle separately)
-      // ========================
-      try {
-        const { data: draftDocuments } = await supabase
-          .from('document_storage')
-          .select('*')
-          .eq('payment_id', paymentId)
-          .eq('document_status', 'draft');
-
-        const { data: approvedPaymentsList } = await supabase
-          .from('special_hire_payments')
-          .select('amount')
-          .eq('quotation_id', paymentData.quotation.id)
-          .eq('status', 'approved');
-        
-        const totalApprovedPaid = (approvedPaymentsList || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-
-        for (const doc of draftDocuments || []) {
-          let docApprovals = await getDocumentApprovals(paymentData.quotation.id);
-          if (signatures) {
-            docApprovals = { ...docApprovals, ...signatures };
-          }
-
-          const calculateTotalAmount = (quotation: any) => {
-            return quotation.gross_revenue + 
-                   (quotation.fuel_cost_fuel_only || 0) + 
-                   (quotation.commission_pass_through_amount || 0) +
-                   (quotation.total_additional_charges || 0) - 
-                   (quotation.discount_amount_lkr || 0);
-          };
-
-          const invoiceData: InvoiceData = {
-            invoiceNo: `APPROVED-${paymentData.id}`,
-            invoiceType: doc.payment_type as 'advance' | 'balance',
-            quotationNo: paymentData.quotation.quotation_no,
-            customerName: paymentData.quotation.customer_name,
-            customerPhone: paymentData.quotation.customer_phone || '',
-            customerEmail: paymentData.quotation.customer_email,
-            companyName: paymentData.quotation.company_name,
-            pickupLocation: paymentData.quotation.pickup_location,
-            dropLocation: paymentData.quotation.drop_location,
-            pickupDate: new Date(paymentData.quotation.pickup_datetime),
-            dropDate: new Date(paymentData.quotation.drop_datetime || paymentData.quotation.pickup_datetime),
-            busType: 'Standard Bus',
-            numberOfBuses: paymentData.quotation.number_of_buses,
-            numberOfPassengers: paymentData.quotation.number_of_passengers,
-            totalAmount: calculateTotalAmount(paymentData.quotation),
-            advanceAmount: paymentData.quotation.advance_paid || 0,
-            paidAmount: (doc.document_type === 'sales_receipt' || doc.payment_type === 'advance') ? paymentData.amount : totalApprovedPaid,
-            vehicleNo: paymentData.quotation.assigned_bus_no,
-            driverName: paymentData.quotation.assigned_driver_name,
-            conductorName: paymentData.quotation.assigned_conductor_name,
-            invoice_status: 'approved',
-            document_type: doc.document_type as 'sales_receipt' | 'invoice',
-            preparedBy: docApprovals.prepared_by,
-            approvedBy: docApprovals.approved_by,
-            checkedBy: docApprovals.checked_by,
-          };
-
-          const pdfBlob = await generateInvoicePDF(invoiceData);
-          const arrayBuffer = await pdfBlob.arrayBuffer();
-          const uint8Array = new Uint8Array(arrayBuffer);
-          
-          let base64String = '';
-          const chunkSize = 1024;
-          for (let i = 0; i < uint8Array.length; i += chunkSize) {
-            const chunk = uint8Array.slice(i, i + chunkSize);
-            base64String += String.fromCharCode.apply(null, Array.from(chunk));
-          }
-          const base64Data = btoa(base64String);
-
-          await supabase
-            .from('document_storage')
-            .update({
-              document_status: 'approved',
-              document_data: base64Data,
-              file_name: doc.file_name.replace('DRAFT-', 'APPROVED-'),
-              file_size: uint8Array.length,
-              approved_by: user?.id,
-              approved_at: new Date().toISOString(),
-            })
-            .eq('id', doc.id);
-        }
-        console.log('[SPH Finance] ✅ Documents regenerated');
-      } catch (docError) {
-        console.error('[SPH Finance] Document regeneration error:', docError);
-        // Don't fail the approval for document issues
-      }
-
-      // Clean up payment proof
-      if (paymentData.payment_proof_url && paymentData.payment_proof_url.startsWith('payment-proofs/')) {
-        supabase.storage
-          .from('payment-proofs')
-          .remove([paymentData.payment_proof_url])
-          .catch(err => console.log('Payment proof cleanup:', err));
-      }
-
-      console.log('[SPH Finance] ========== APPROVAL COMPLETE ==========');
-      toast.success('Payment approved successfully!');
-      return { success: true, arIntegrationSuccess };
+      console.log('[SPH Finance] ========== APPROVAL COMPLETE (background tasks running) ==========');
+      return { success: true, arIntegrationSuccess: true };
     } catch (error) {
       console.error('[SPH Finance] ❌ APPROVAL FAILED:', error);
       toast.error('Failed to approve payment. Please try again.');
-      return { success: false, error };
-    } finally {
       setIsLoading(false);
+      return { success: false, error };
     }
+  };
+
+  // Background function for AR/GL integration + document regeneration
+  const performBackgroundIntegration = async (paymentId: string, paymentData: any, signatures?: any) => {
+    let journalEntry: any = null;
+    let arInvoiceId: string | null = paymentData.quotation.ar_invoice_id;
+    let customerId: string | null = paymentData.quotation.finance_customer_id;
+
+    // Check if document exists (validation gate)
+    const hasDocument = await checkPaymentDocument(paymentId);
+    if (!hasDocument) {
+      console.warn('[SPH Finance] ⚠️ No document found for payment. Proceeding anyway...');
+    }
+
+    const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+    
+    if (!settings) {
+      console.warn('[SPH Finance] ⚠️ Special Hire Finance settings not configured');
+      toast.warning('Special Hire Finance settings not configured. Go to Settings > Special Hire Finance.');
+      return;
+    }
+
+    console.log('[SPH Finance] Settings loaded');
+
+    const paymentType = paymentData.payment_type || 'advance';
+    const isAdvance = paymentType === 'advance';
+    const isFullPayment = paymentType === 'full';
+    const isBalance = paymentType === 'balance';
+
+    // Step 2a: Create/Get Finance Customer
+    if (!customerId) {
+      console.log('[SPH Finance] Creating/getting customer...');
+      customerId = await createOrGetSPHCustomer({
+        customerName: paymentData.quotation.customer_name,
+        customerPhone: paymentData.quotation.customer_phone,
+        customerEmail: paymentData.quotation.customer_email,
+        companyId: NCG_HOLDING_ID,
+      });
+
+      if (!customerId) {
+        console.error('[SPH Finance] ❌ CRITICAL: Failed to create customer');
+        toast.error('CRITICAL: Failed to create Finance Customer. Check console for details.');
+        return;
+      }
+      
+      console.log('[SPH Finance] ✅ Customer ID:', customerId);
+      toast.success(`Finance Customer linked: ${paymentData.quotation.customer_name}`);
+      
+      await supabase
+        .from('special_hire_quotations')
+        .update({ finance_customer_id: customerId })
+        .eq('id', paymentData.quotation.id);
+    }
+
+    // Step 2b: Create AR Invoice if advance/full payment and customer exists
+    if (customerId && (isAdvance || isFullPayment) && !arInvoiceId) {
+      console.log('[SPH Finance] Creating AR Invoice...');
+      
+      const totalAmount = (paymentData.quotation.gross_revenue || 0) +
+        (paymentData.quotation.fuel_cost_fuel_only || 0) +
+        (paymentData.quotation.commission_pass_through_amount || 0) +
+        (paymentData.quotation.total_additional_charges || 0) -
+        (paymentData.quotation.discount_amount_lkr || 0);
+
+      const dueDate = format(
+        new Date(paymentData.quotation.pickup_datetime || new Date()),
+        'yyyy-MM-dd'
+      );
+
+      const arResult = await createSPHARInvoice({
+        quotationId: paymentData.quotation.id,
+        quotationNo: paymentData.quotation.quotation_no,
+        customerId,
+        customerName: paymentData.quotation.customer_name,
+        totalAmount,
+        advanceAmount: paymentData.amount,
+        dueDate,
+        companyId: NCG_HOLDING_ID,
+      });
+
+      if (!arResult) {
+        console.error('[SPH Finance] ❌ Failed to create AR Invoice');
+        toast.error('Failed to create AR Invoice. Check Finance Settings.');
+        return;
+      }
+      
+      arInvoiceId = arResult.invoiceId;
+      console.log('[SPH Finance] ✅ AR Invoice created:', arResult.invoiceNumber);
+      toast.success(`AR Invoice created: ${arResult.invoiceNumber}`);
+    }
+
+    // Step 2c: Post GL Entry
+    if (isAdvance && settings.auto_post_advance_payments) {
+      journalEntry = await postAdvancePaymentToGLStandalone({
+        quotationNo: paymentData.quotation.quotation_no,
+        customerName: paymentData.quotation.customer_name,
+        amount: paymentData.amount,
+        settings,
+        effectiveCompanyId: NCG_HOLDING_ID,
+      });
+      if (journalEntry) {
+        console.log('[SPH Finance] ✅ Advance GL posted:', journalEntry.entry_number);
+        toast.success(`GL Entry created: ${journalEntry.entry_number}`);
+      }
+    } else if (isFullPayment && settings.auto_post_advance_payments) {
+      journalEntry = await postFullPaymentToGLStandalone({
+        quotationNo: paymentData.quotation.quotation_no,
+        customerName: paymentData.quotation.customer_name,
+        amount: paymentData.amount,
+        settings,
+        effectiveCompanyId: NCG_HOLDING_ID,
+      });
+      if (journalEntry) {
+        console.log('[SPH Finance] ✅ Full payment GL posted:', journalEntry.entry_number);
+        toast.success(`GL Entry created: ${journalEntry.entry_number}`);
+      }
+    } else if (isBalance && settings.auto_post_balance_payments) {
+      journalEntry = await postBalancePaymentToGLStandalone({
+        quotationNo: paymentData.quotation.quotation_no,
+        customerName: paymentData.quotation.customer_name,
+        balanceAmount: paymentData.amount,
+        settings,
+        effectiveCompanyId: NCG_HOLDING_ID,
+      });
+      if (journalEntry) {
+        console.log('[SPH Finance] ✅ Balance GL posted:', journalEntry.entry_number);
+        toast.success(`GL Entry created: ${journalEntry.entry_number}`);
+      }
+    }
+
+    // Step 2d: Create AR Receipt
+    if (arInvoiceId && customerId) {
+      if (isBalance) {
+        await updateSPHARInvoiceOnPayment({
+          arInvoiceId,
+          paymentAmount: paymentData.amount,
+          paymentId,
+          journalEntryId: journalEntry?.id,
+        });
+      }
+
+      const receiptResult = await createSPHARReceipt({
+        customerId,
+        arInvoiceId,
+        paymentAmount: paymentData.amount,
+        paymentMethod: paymentData.payment_method || 'cash',
+        reference: paymentData.reference_no,
+        paymentId,
+        companyId: NCG_HOLDING_ID,
+        journalEntryId: journalEntry?.id,
+      });
+
+      if (receiptResult) {
+        console.log('[SPH Finance] ✅ AR Receipt created:', receiptResult.receiptNumber);
+        toast.success(`AR Receipt created: ${receiptResult.receiptNumber}`);
+      }
+    }
+
+    // Step 2e: Link journal entry and AR invoice to payment
+    if (journalEntry || arInvoiceId) {
+      const updateData: any = {};
+      if (journalEntry) updateData.journal_entry_id = journalEntry.id;
+      if (arInvoiceId) updateData.ar_invoice_id = arInvoiceId;
+      
+      await supabase
+        .from('special_hire_payments')
+        .update(updateData)
+        .eq('id', paymentId);
+    }
+
+    // STEP 3: Parallel non-critical operations (signatures, notifications, invoice updates)
+    const parallelOperations: Promise<any>[] = [];
+
+    parallelOperations.push((async () => {
+      try {
+        const { data: setting } = await supabase
+          .from('special_hire_signature_settings')
+          .select('default_user_id, is_enabled')
+          .eq('signature_role', 'checked_by')
+          .single();
+
+        if (setting?.is_enabled && setting.default_user_id) {
+          const { data: existingApproval } = await supabase
+            .from('document_approvals')
+            .select('id')
+            .eq('document_id', paymentData.quotation.id)
+            .eq('approval_type', 'checked_by')
+            .maybeSingle();
+
+          if (!existingApproval) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, signature_data, user_id')
+              .eq('user_id', setting.default_user_id)
+              .single();
+
+            if (profile?.signature_data) {
+              await supabase.from('document_approvals').insert({
+                document_id: paymentData.quotation.id,
+                approval_type: 'checked_by',
+                approver_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+                signature_data: profile.signature_data,
+                approval_date: new Date().toISOString().split('T')[0],
+                user_id: profile.user_id,
+              });
+            }
+          }
+        }
+      } catch (sigError) {
+        console.log('[SPH Finance] Auto-signature skipped:', sigError);
+      }
+    })());
+
+    parallelOperations.push(
+      supabase
+        .from('special_hire_invoices')
+        .update({
+          status: 'approved',
+          approved_by: user?.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('quotation_id', paymentData.quotation.id)
+        .then(({ error }) => { if (error) console.warn('[SPH Finance] Invoice update warning:', error); }) as unknown as Promise<any>
+    );
+
+    parallelOperations.push(
+      supabase
+        .from('payment_notifications')
+        .insert({
+          payment_id: paymentId,
+          quotation_id: paymentData.quotation.id,
+          notification_type: 'payment_approved',
+          target_role: 'admin',
+          message: `Payment of LKR ${paymentData.amount.toLocaleString()} for quotation ${paymentData.quotation.quotation_no} has been approved by finance.`,
+          created_by: user?.id,
+        })
+        .then(({ error }) => { if (error) console.warn('[SPH Finance] Notification warning:', error); }) as unknown as Promise<any>
+    );
+
+    await Promise.allSettled(parallelOperations);
+
+    // STEP 4: Document regeneration (fire-and-forget within background)
+    try {
+      const { data: draftDocuments } = await supabase
+        .from('document_storage')
+        .select('*')
+        .eq('payment_id', paymentId)
+        .eq('document_status', 'draft');
+
+      const { data: approvedPaymentsList } = await supabase
+        .from('special_hire_payments')
+        .select('amount')
+        .eq('quotation_id', paymentData.quotation.id)
+        .eq('status', 'approved');
+      
+      const totalApprovedPaid = (approvedPaymentsList || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+      for (const doc of draftDocuments || []) {
+        let docApprovals = await getDocumentApprovals(paymentData.quotation.id);
+        if (signatures) {
+          docApprovals = { ...docApprovals, ...signatures };
+        }
+
+        const calculateTotalAmount = (quotation: any) => {
+          return quotation.gross_revenue + 
+                 (quotation.fuel_cost_fuel_only || 0) + 
+                 (quotation.commission_pass_through_amount || 0) +
+                 (quotation.total_additional_charges || 0) - 
+                 (quotation.discount_amount_lkr || 0);
+        };
+
+        const invoiceData: InvoiceData = {
+          invoiceNo: `APPROVED-${paymentData.id}`,
+          invoiceType: doc.payment_type as 'advance' | 'balance',
+          quotationNo: paymentData.quotation.quotation_no,
+          customerName: paymentData.quotation.customer_name,
+          customerPhone: paymentData.quotation.customer_phone || '',
+          customerEmail: paymentData.quotation.customer_email,
+          companyName: paymentData.quotation.company_name,
+          pickupLocation: paymentData.quotation.pickup_location,
+          dropLocation: paymentData.quotation.drop_location,
+          pickupDate: new Date(paymentData.quotation.pickup_datetime),
+          dropDate: new Date(paymentData.quotation.drop_datetime || paymentData.quotation.pickup_datetime),
+          busType: 'Standard Bus',
+          numberOfBuses: paymentData.quotation.number_of_buses,
+          numberOfPassengers: paymentData.quotation.number_of_passengers,
+          totalAmount: calculateTotalAmount(paymentData.quotation),
+          advanceAmount: paymentData.quotation.advance_paid || 0,
+          paidAmount: (doc.document_type === 'sales_receipt' || doc.payment_type === 'advance') ? paymentData.amount : totalApprovedPaid,
+          vehicleNo: paymentData.quotation.assigned_bus_no,
+          driverName: paymentData.quotation.assigned_driver_name,
+          conductorName: paymentData.quotation.assigned_conductor_name,
+          invoice_status: 'approved',
+          document_type: doc.document_type as 'sales_receipt' | 'invoice',
+          preparedBy: docApprovals.prepared_by,
+          approvedBy: docApprovals.approved_by,
+          checkedBy: docApprovals.checked_by,
+        };
+
+        const pdfBlob = await generateInvoicePDF(invoiceData);
+        const arrayBuffer = await pdfBlob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        let base64String = '';
+        const chunkSize = 1024;
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+          const chunk = uint8Array.slice(i, i + chunkSize);
+          base64String += String.fromCharCode.apply(null, Array.from(chunk));
+        }
+        const base64Data = btoa(base64String);
+
+        await supabase
+          .from('document_storage')
+          .update({
+            document_status: 'approved',
+            document_data: base64Data,
+            file_name: doc.file_name.replace('DRAFT-', 'APPROVED-'),
+            file_size: uint8Array.length,
+            approved_by: user?.id,
+            approved_at: new Date().toISOString(),
+          })
+          .eq('id', doc.id);
+      }
+      console.log('[SPH Finance] ✅ Documents regenerated');
+    } catch (docError) {
+      console.error('[SPH Finance] Document regeneration error:', docError);
+    }
+
+    // Clean up payment proof
+    if (paymentData.payment_proof_url && paymentData.payment_proof_url.startsWith('payment-proofs/')) {
+      supabase.storage
+        .from('payment-proofs')
+        .remove([paymentData.payment_proof_url])
+        .catch(err => console.log('Payment proof cleanup:', err));
+    }
+
+    console.log('[SPH Finance] ✅ Background integration complete');
+    toast.success('Finance integration completed successfully!');
   };
 
   const rejectPayment = async (paymentId: string, reason: string) => {

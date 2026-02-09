@@ -141,16 +141,17 @@ export const PaymentConfirmationModal = ({
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File is too large. Please upload a file smaller than 5MB.');
+    // Validate file size (max 10MB for high-res phone photos)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File is too large. Please upload a file smaller than 10MB.');
       setUploadStatus('error');
       return;
     }
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
-    if (!validTypes.includes(file.type)) {
+    // Validate file type - accept any image format (including HEIC/HEIF) + PDF
+    const isImage = file.type.startsWith('image/');
+    const isPDF = file.type === 'application/pdf';
+    if (!isImage && !isPDF) {
       toast.error('Invalid file type. Please upload an image or PDF.');
       setUploadStatus('error');
       return;
