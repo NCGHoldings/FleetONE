@@ -28,19 +28,19 @@ export interface YutongOrderInvoiceData {
   total: number;
   invoice_status: 'draft' | 'approved';
   // Invoice category - direct or proforma
-   invoice_category?: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice';
+  invoice_category?: 'direct_invoice' | 'proforma_invoice' | 'tax_invoice';
   proforma_amount_percentage?: number;
   proforma_amount?: number;
   finance_company_name?: string;
   finance_company_address?: string;
   proforma_purpose?: string;
-   // Tax Invoice fields
-   is_tax_invoice?: boolean;
-   company_vat_number?: string;
-   customer_vat_number?: string;
-   tax_rate?: number;
-   base_amount?: number;
-   vat_amount?: number;
+  // Tax Invoice fields
+  is_tax_invoice?: boolean;
+  company_vat_number?: string;
+  customer_vat_number?: string;
+  tax_rate?: number;
+  base_amount?: number;
+  vat_amount?: number;
   // Payment tracking
   paymentsReceived?: Array<{
     payment_date: string;
@@ -71,6 +71,8 @@ export interface YutongOrderInvoiceData {
     signature_type?: 'text' | 'drawing' | 'image';
     approval_date: string;
   };
+  // Template customization
+  customHeaderImageUrl?: string;
 }
 
 export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): string {
@@ -86,10 +88,11 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
    const vatAmount = isTaxInvoice ? (data.vat_amount || data.total - baseAmount) : 0;
    const taxAmountInWords = isTaxInvoice ? convertNumberToWords(baseAmount) : amountInWords;
    
-   // Header image based on invoice type
-   const headerImage = isTaxInvoice 
+   // Header image based on invoice type - prioritize custom header from template
+   const defaultHeaderImage = isTaxInvoice 
      ? '/lovable-uploads/yutong-tax-invoice-header.png' 
      : '/lovable-uploads/yutong-invoice-header.png';
+   const headerImage = data.customHeaderImageUrl || defaultHeaderImage;
 
   return `<!doctype html>
 <html lang="en">

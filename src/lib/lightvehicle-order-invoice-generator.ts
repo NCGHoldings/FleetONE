@@ -69,6 +69,9 @@ export interface LightVehicleOrderInvoiceData {
   // Responsible Person (footer contact)
   responsiblePersonPhone?: string;
   responsiblePersonEmail?: string;
+  
+  // Template customization
+  customHeaderImageUrl?: string;
 }
 
 export function generateLightVehicleOrderInvoiceHTML(data: LightVehicleOrderInvoiceData): string {
