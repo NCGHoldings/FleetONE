@@ -242,6 +242,7 @@ const commonStyles = `
 export const generateARInvoiceTemplate = (): string => `
 <style>${commonStyles}</style>
 <div class="document-container">
+  {{document_header}}
   <div class="document-header">
     <div class="header-row">
       <div class="logo-area">{{company_logo}}</div>

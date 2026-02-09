@@ -142,7 +142,9 @@ export const FinanceDocumentPreviewModal = ({
   }, [availableTemplates, selectedTemplateId, companyId]);
 
   const selectedTemplate = availableTemplates?.find((t) => t.id === selectedTemplateId);
-  const company = companies?.find((c) => c.id === (companyId || selectedTemplate?.company_id));
+  // Improved company lookup chain: prioritize companyId prop, then documentData.company_id, then template's company_id
+  const effectiveCompanyId = companyId || documentData?.company_id || selectedTemplate?.company_id;
+  const company = companies?.find((c) => c.id === effectiveCompanyId);
   const hasNoTemplate = !availableTemplates || availableTemplates.length === 0;
 
   // Generate fallback HTML using default template
