@@ -10,6 +10,8 @@ import { useYutongOrderInvoiceManagement } from '@/hooks/useYutongOrderInvoiceMa
 import { generateYutongOrderInvoiceHTML, generateYutongOrderInvoicePDF } from '@/lib/yutong-order-invoice-generator';
 import { YutongInvoiceSignatureManager } from './YutongInvoiceSignatureManager';
 import { YutongOrderInvoicePreview } from './YutongOrderInvoicePreview';
+import { YutongInvoiceTemplateSelector } from './YutongInvoiceTemplateSelector';
+import { VehicleSalesTemplate } from '@/hooks/useVehicleSalesTemplates';
 
 interface YutongOrderInvoiceViewModalProps {
   isOpen: boolean;
@@ -26,14 +28,19 @@ export function YutongOrderInvoiceViewModal({
 }: YutongOrderInvoiceViewModalProps) {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedTemplate, setSelectedTemplate] = useState<VehicleSalesTemplate | null>(null);
   const { isLoading, approveInvoice, regenerateInvoice } = useYutongOrderInvoiceManagement();
 
-  const invoiceHTML = generateYutongOrderInvoiceHTML(document.invoice_data);
   const isDraft = document.document_status === 'draft';
 
   const handleSignaturesUpdated = () => {
     setRefreshKey(prev => prev + 1);
     toast.success('Signatures updated. Invoice preview refreshed automatically.');
+  };
+
+  const handleTemplateChange = (template: VehicleSalesTemplate | null) => {
+    setSelectedTemplate(template);
+    setRefreshKey(prev => prev + 1);
   };
 
   const handleDownload = async () => {
@@ -52,6 +59,8 @@ export function YutongOrderInvoiceViewModal({
       
       const mergedData = {
         ...document.invoice_data,
+        // Include custom header from selected template
+        customHeaderImageUrl: selectedTemplate?.header_image_url || undefined,
         preparedBy: preparedSig ? {
           approver_name: preparedSig.signer_name,
           signature_data: preparedSig.signature_data,
@@ -131,6 +140,7 @@ export function YutongOrderInvoiceViewModal({
       
       const mergedData = {
         ...document.invoice_data,
+        customHeaderImageUrl: selectedTemplate?.header_image_url || undefined,
         preparedBy: preparedSig ? {
           approver_name: preparedSig.signer_name,
           signature_data: preparedSig.signature_data,
@@ -259,16 +269,24 @@ export function YutongOrderInvoiceViewModal({
         </DialogHeader>
 
         <Tabs defaultValue="preview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="preview" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Invoice Preview
-            </TabsTrigger>
-            <TabsTrigger value="signatures" className="flex items-center gap-2">
-              <PenTool className="h-4 w-4" />
-              Manage Signatures
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-4">
+            <TabsList className="grid w-auto grid-cols-2">
+              <TabsTrigger value="preview" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Invoice Preview
+              </TabsTrigger>
+              <TabsTrigger value="signatures" className="flex items-center gap-2">
+                <PenTool className="h-4 w-4" />
+                Manage Signatures
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* Template Selector */}
+            <YutongInvoiceTemplateSelector
+              selectedTemplateId={selectedTemplate?.id || null}
+              onTemplateChange={handleTemplateChange}
+            />
+          </div>
 
           <TabsContent value="preview" className="space-y-4">
             {isDraft && (
@@ -281,6 +299,7 @@ export function YutongOrderInvoiceViewModal({
               key={refreshKey}
               invoiceRecordId={document.invoice_record_id}
               invoiceData={document.invoice_data}
+              selectedTemplate={selectedTemplate}
             />
           </TabsContent>
 

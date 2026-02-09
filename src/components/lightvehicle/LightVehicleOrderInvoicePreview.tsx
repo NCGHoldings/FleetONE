@@ -1,26 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import { generateLightVehicleOrderInvoiceHTML, LightVehicleOrderInvoiceData } from '@/lib/lightvehicle-order-invoice-generator';
 import { Loader2 } from 'lucide-react';
+import { useVehicleSalesTemplateByType, VehicleSalesTemplate } from '@/hooks/useVehicleSalesTemplates';
 
 interface LightVehicleOrderInvoicePreviewProps {
   invoiceData: LightVehicleOrderInvoiceData;
+  selectedTemplate?: VehicleSalesTemplate | null;
 }
 
-export function LightVehicleOrderInvoicePreview({ invoiceData }: LightVehicleOrderInvoicePreviewProps) {
+export function LightVehicleOrderInvoicePreview({ invoiceData, selectedTemplate }: LightVehicleOrderInvoicePreviewProps) {
   const [html, setHtml] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  
+  // Fetch default template if no template is selected
+  const { data: defaultTemplate } = useVehicleSalesTemplateByType('light_vehicle_invoice');
+  
+  // Use selected template or fall back to default
+  const activeTemplate = selectedTemplate !== undefined ? selectedTemplate : defaultTemplate;
 
   useEffect(() => {
     setLoading(true);
     try {
-      const generatedHtml = generateLightVehicleOrderInvoiceHTML(invoiceData);
+      // Merge template header into invoice data
+      const dataWithTemplate = {
+        ...invoiceData,
+        customHeaderImageUrl: activeTemplate?.header_image_url || undefined,
+      };
+      const generatedHtml = generateLightVehicleOrderInvoiceHTML(dataWithTemplate);
       setHtml(generatedHtml);
     } catch (error) {
       console.error('Error generating invoice HTML:', error);
     } finally {
       setLoading(false);
     }
-  }, [invoiceData]);
+  }, [invoiceData, activeTemplate]);
 
   if (loading) {
     return (

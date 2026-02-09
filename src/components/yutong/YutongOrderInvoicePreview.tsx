@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useYutongInvoiceSignatures, YutongInvoiceSignature } from '@/hooks/useYutongInvoiceSignatures';
 import { generateYutongOrderInvoiceHTML } from '@/lib/yutong-order-invoice-generator';
-import { sanitizeHTML } from '@/lib/sanitize';
+import { useVehicleSalesTemplateByType, VehicleSalesTemplate } from '@/hooks/useVehicleSalesTemplates';
 
 interface YutongOrderInvoicePreviewProps {
   invoiceRecordId: string;
   invoiceData: any;
+  selectedTemplate?: VehicleSalesTemplate | null;
 }
 
-export function YutongOrderInvoicePreview({ invoiceRecordId, invoiceData }: YutongOrderInvoicePreviewProps) {
+export function YutongOrderInvoicePreview({ invoiceRecordId, invoiceData, selectedTemplate }: YutongOrderInvoicePreviewProps) {
   const [signatures, setSignatures] = useState<YutongInvoiceSignature[]>([]);
   const { fetchSignatures } = useYutongInvoiceSignatures();
+  
+  // Determine template type based on invoice category
+  const isTaxInvoice = invoiceData?.invoice_category === 'tax_invoice' || invoiceData?.is_tax_invoice;
+  const templateTypeCode = isTaxInvoice ? 'yutong_order_invoice' : 'yutong_order_invoice';
+  
+  // Fetch default template if no template is selected
+  const { data: defaultTemplate } = useVehicleSalesTemplateByType(templateTypeCode);
+  
+  // Use selected template or fall back to default
+  const activeTemplate = selectedTemplate !== undefined ? selectedTemplate : defaultTemplate;
 
   // Fetch signatures in real-time
   useEffect(() => {
@@ -30,6 +41,8 @@ export function YutongOrderInvoicePreview({ invoiceRecordId, invoiceData }: Yuto
   // Merge signatures into invoice data with correct field names for HTML generator
   const mergedInvoiceData = {
     ...invoiceData,
+    // Add custom header from template if available
+    customHeaderImageUrl: activeTemplate?.header_image_url || undefined,
     preparedBy: preparedSig ? {
       approver_name: preparedSig.signer_name,
       signature_data: preparedSig.signature_data,
@@ -50,7 +63,7 @@ export function YutongOrderInvoicePreview({ invoiceRecordId, invoiceData }: Yuto
     } : undefined
   };
 
-  // Generate HTML with merged signature data
+  // Generate HTML with merged signature data and template header
   const invoiceHTML = generateYutongOrderInvoiceHTML(mergedInvoiceData);
 
   return (
