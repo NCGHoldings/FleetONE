@@ -266,6 +266,7 @@ export const APPaymentsView = () => {
           documentType="ap_payment_voucher"
           documentData={selectedPayment}
           companyId={selectedPayment?.company_id}
+          businessUnitCode={selectedPayment?.business_unit_code}
         />
       )}
     </div>

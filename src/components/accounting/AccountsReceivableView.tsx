@@ -389,6 +389,7 @@ export const AccountsReceivableView = () => {
         documentType={printDocumentType}
         documentData={printDocumentData}
         companyId={printDocumentData?.company_id}
+        businessUnitCode={printDocumentData?.business_unit_code}
       />
     </div>
   );

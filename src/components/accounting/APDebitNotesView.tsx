@@ -200,6 +200,7 @@ export const APDebitNotesView = () => {
         documentType="ap_debit_note"
         documentData={printDocumentData}
         companyId={printDocumentData?.company_id}
+        businessUnitCode={printDocumentData?.business_unit_code}
       />
     </div>
   );
