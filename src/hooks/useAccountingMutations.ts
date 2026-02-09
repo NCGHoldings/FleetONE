@@ -665,7 +665,7 @@ export const useCreateAPPayment = () => {
       }
 
       // ========== BANK TRANSACTION ==========
-      // Create bank transaction record if bank account is selected
+      // Create bank transaction record if bank account is selected (use selectedCompanyId to match bank account)
       if (payment.bank_account_id && payment.amount > 0) {
         await supabase.from("bank_transactions").insert([{
           bank_account_id: payment.bank_account_id,
@@ -676,7 +676,7 @@ export const useCreateAPPayment = () => {
           debit_amount: 0,
           reference: payment.reference || payment.payment_number,
           cheque_number: payment.cheque_number,
-          company_id: effectiveCompanyId,
+          company_id: selectedCompanyId,
         }]);
 
         // Update bank account balance
@@ -704,8 +704,8 @@ export const useCreateAPPayment = () => {
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
       toast.success("Payment recorded successfully");
     },
     onError: (error) => {
