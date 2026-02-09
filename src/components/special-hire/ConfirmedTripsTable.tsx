@@ -1683,7 +1683,7 @@ export function ConfirmedTripsTable() {
           originalOvertimeCharge={(selectedTrip as any).overtime_charge || 0}
           originalOvernightCharge={(selectedTrip as any).overnight_charge || 0}
           hourlyRate={500}
-          nightBlockFee={3000}
+          nightBlockFee={10000}
         />
       )}
 

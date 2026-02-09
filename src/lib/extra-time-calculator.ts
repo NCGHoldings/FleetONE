@@ -30,7 +30,7 @@ export function calculateExtraTimeCharge(
   const {
     baselineSpeedKmph = 10,
     hourlyRate = 500,
-    nightBlockFee = 3000,
+    nightBlockFee = 10000,
     useStandardHours = false,
     standardHours = 8
   } = config;
@@ -64,27 +64,23 @@ export function calculateExtraTimeCharge(
   let overtimeCharge = 0;
   let overnightCharge = 0;
 
-  // Case: up to 10h – hourly only
   if (extraHours <= 10) {
+    // Simple hourly for up to 10 hours
     overtimeCharge = extraHours * hourlyRate;
   } else {
-    // Case: >10h – first night block then loop
+    // Over 10 hours - use overnight blocks
+    // Business rule: 10-24h = 1 block, 24-34h = 1 block + hourly, 34-48h = 2 blocks, etc.
+    let remainingHours = extraHours;
     
-    // First 24h block (night block)
-    overnightCharge += nightBlockFee;
-    extraHours -= 24;
-
-    // Additional blocks
-    while (extraHours > 0) {
-      if (extraHours > 10) {
-        // Another full night block
-        overnightCharge += nightBlockFee;
-        extraHours -= 24;
-      } else {
-        // ≤10h charged hourly
-        overtimeCharge += extraHours * hourlyRate;
-        extraHours = 0;
-      }
+    while (remainingHours > 10) {
+      // Each overnight block covers up to 24 hours
+      overnightCharge += nightBlockFee;
+      remainingHours -= 24;
+    }
+    
+    // Any remaining hours (if positive and ≤10) are charged hourly
+    if (remainingHours > 0) {
+      overtimeCharge = remainingHours * hourlyRate;
     }
   }
 
@@ -93,7 +89,7 @@ export function calculateExtraTimeCharge(
   return {
     availableHours: Math.round(availableHours * 100) / 100,
     actualHours: Math.round(actualHours * 100) / 100,
-    extraHours: Math.max(0, actualHours - availableHours),
+    extraHours: Math.round(extraHours * 100) / 100,
     overtimeCharge: Math.round(overtimeCharge),
     overnightCharge: Math.round(overnightCharge),
     totalExtraCharge: Math.round(totalExtraCharge)
