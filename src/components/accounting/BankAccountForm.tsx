@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useCreateBankAccount } from "@/hooks/useAccountingMutations";
-import { useChartOfAccounts } from "@/hooks/useAccountingData";
+import { useChartOfAccounts, useCurrencies } from "@/hooks/useAccountingData";
 import { Loader2 } from "lucide-react";
 
 const bankAccountSchema = z.object({
@@ -37,6 +37,7 @@ interface BankAccountFormProps {
 
 export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) => {
   const { data: accounts } = useChartOfAccounts();
+  const { data: currencies = [] } = useCurrencies();
   const createBankAccount = useCreateBankAccount();
 
   const bankAccounts = accounts?.filter(a => 
@@ -53,7 +54,7 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
       account_number: "",
       branch: "",
       account_type: "current",
-      currency: "USD",
+      currency: "LKR",
       opening_balance: 0,
       is_active: true,
       is_default: false,
@@ -70,7 +71,7 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
         account_number: data.account_number,
         branch: data.branch,
         account_type: data.account_type,
-        currency: data.currency || "USD",
+        currency: data.currency || "LKR",
         opening_balance: data.opening_balance || 0,
         current_balance: data.opening_balance || 0,
         gl_account_id: data.gl_account_id,
@@ -84,6 +85,10 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
       // Error handled in mutation
     }
   };
+
+  // Filter active currencies and ensure LKR is always available
+  const activeCurrencies = currencies.filter(c => c.is_active);
+  const hasLKR = activeCurrencies.some(c => c.currency_code === "LKR");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -142,7 +147,7 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
               <Input 
                 id="bank_name" 
                 {...form.register("bank_name")} 
-                placeholder="First National Bank"
+                placeholder="Commercial Bank"
               />
               {form.formState.errors.bank_name && (
                 <p className="text-xs text-destructive">{form.formState.errors.bank_name.message}</p>
@@ -180,10 +185,24 @@ export const BankAccountForm = ({ open, onOpenChange }: BankAccountFormProps) =>
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="ZWL">ZWL</SelectItem>
-                  <SelectItem value="ZAR">ZAR</SelectItem>
-                  <SelectItem value="BWP">BWP</SelectItem>
+                  {/* Always show LKR first if not in database */}
+                  {!hasLKR && (
+                    <SelectItem value="LKR">LKR - Sri Lankan Rupee</SelectItem>
+                  )}
+                  {/* Show currencies from database */}
+                  {activeCurrencies.map((curr) => (
+                    <SelectItem key={curr.currency_code} value={curr.currency_code}>
+                      {curr.currency_code} - {curr.currency_name}
+                    </SelectItem>
+                  ))}
+                  {/* Fallback if no currencies in database */}
+                  {activeCurrencies.length === 0 && (
+                    <>
+                      <SelectItem value="USD">USD - US Dollar</SelectItem>
+                      <SelectItem value="EUR">EUR - Euro</SelectItem>
+                      <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
