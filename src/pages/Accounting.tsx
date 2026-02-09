@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { PageAccessGuard } from "@/components/auth/PageAccessGuard";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, FileText, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building2, Users, Package, Truck, Landmark, HardDrive, Calculator, FileCheck, ClipboardCheck, BarChart3, Settings, Zap } from "lucide-react";
+import { BookOpen, FileText, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building2, Users, Package, Truck, Landmark, HardDrive, Calculator, FileCheck, ClipboardCheck, BarChart3, Settings, Zap, ShoppingCart } from "lucide-react";
 import { ChartOfAccountsView } from "@/components/accounting/ChartOfAccountsView";
 import { JournalEntriesView } from "@/components/accounting/JournalEntriesView";
 import { AccountsPayableView } from "@/components/accounting/AccountsPayableView";
@@ -95,6 +95,12 @@ import { RecurringInvoicesView } from "@/components/accounting/automation/Recurr
 import { PaymentReminderRulesView } from "@/components/accounting/automation/PaymentReminderRulesView";
 import { WorkflowRulesView } from "@/components/accounting/automation/WorkflowRulesView";
 import { ScheduledTasksView } from "@/components/accounting/automation/ScheduledTasksView";
+// ERPNext Parity - New Modules
+import { SalesOrderView } from "@/components/accounting/SalesOrderView";
+import { DeliveryNoteView } from "@/components/accounting/DeliveryNoteView";
+import { RFQView } from "@/components/accounting/RFQView";
+import { SupplierQuotationView } from "@/components/accounting/SupplierQuotationView";
+import { QualityInspectionView } from "@/components/accounting/quality/QualityInspectionView";
 
 import { useAccountingSummary, useARInvoices, useAPInvoices, useJournalEntries } from "@/hooks/useAccountingData";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
@@ -104,7 +110,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { Receipt, Wallet } from "lucide-react";
 
-type ModuleTab = "gl" | "ar" | "ap" | "expenses" | "inventory" | "procurement" | "banking" | "assets" | "automation" | "reports" | "settings";
+type ModuleTab = "gl" | "ar" | "ap" | "expenses" | "selling" | "inventory" | "procurement" | "banking" | "assets" | "quality" | "automation" | "reports" | "settings";
 
 const Accounting = () => {
   const [activeModule, setActiveModule] = useState<ModuleTab>("gl");
@@ -132,11 +138,13 @@ const Accounting = () => {
     { id: "gl" as ModuleTab, label: "General Ledger", icon: BookOpen },
     { id: "ar" as ModuleTab, label: "AR", icon: TrendingUp },
     { id: "ap" as ModuleTab, label: "AP", icon: TrendingDown },
+    { id: "selling" as ModuleTab, label: "Selling", icon: ShoppingCart },
     { id: "expenses" as ModuleTab, label: "Expenses", icon: Receipt },
     { id: "inventory" as ModuleTab, label: "Inventory", icon: Package },
     { id: "procurement" as ModuleTab, label: "Procurement", icon: Truck },
     { id: "banking" as ModuleTab, label: "Banking", icon: Landmark },
     { id: "assets" as ModuleTab, label: "Fixed Assets", icon: HardDrive },
+    { id: "quality" as ModuleTab, label: "Quality", icon: ClipboardCheck },
     { id: "automation" as ModuleTab, label: "Automation", icon: Zap },
     { id: "reports" as ModuleTab, label: "Reports", icon: BarChart3 },
     { id: "settings" as ModuleTab, label: "Settings", icon: Settings },
