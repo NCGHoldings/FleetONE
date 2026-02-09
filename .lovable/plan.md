@@ -1,233 +1,184 @@
 
-
-# Fix Bank Account Display & LKR Currency - Implementation Plan
+# Fix Bank Transactions Not Displaying - Implementation Plan
 
 ## Problem Summary
 
-When creating a bank account under School Bus Operations, the system shows "successfully created" but the account doesn't appear in the table. Additionally, the currency dropdown is missing LKR (Sri Lankan Rupee).
-
----
+When viewing the Transactions tab in the Banking module under "School Bus Operations", no transactions appear even though:
+1. Bank accounts exist with LKR 19.00 total balance
+2. Transactions were created successfully (inter-bank transfer, AP payment)
 
 ## Root Cause Analysis
 
-### Issue 1: Company ID Mismatch
+**Company ID Mismatch Between Bank Accounts and Transactions:**
 
-The bank accounts system has inconsistent company ID handling:
+| Entity | Company ID Used | Value |
+|--------|-----------------|-------|
+| Bank Account "main uresha" | `selectedCompanyId` | SBO (`0fba4a2f...`) |
+| Bank Account "sampath" | `selectedCompanyId` | SBO (`0fba4a2f...`) |
+| Bank Transactions | `effectiveCompanyId` | NCG Holding (`f40b0a9d...`) |
+
+**Query Filter:**
+- `useBankTransactions` filters by `selectedCompanyId` (SBO)
+- But transactions were stored with `effectiveCompanyId` (NCG Holding)
+- Result: No matches, empty table
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                           CURRENT BROKEN FLOW                                        │
-├─────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                      │
-│  User selects: School Bus Operations (SBO)                                           │
-│  ID: 0fba4a2f-598b-47e8-b863-283d00380b06                                           │
-│                                                                                      │
-│  1. CREATE BANK ACCOUNT                                                              │
-│     └─ Uses: selectedCompanyId = SBO (0fba4a2f...)                                  │
-│     └─ Saves to DB with company_id = SBO ✓                                          │
-│     └─ Invalidates cache: ["bank-accounts", SBO]                                    │
-│                                                                                      │
-│  2. QUERY BANK ACCOUNTS                                                              │
-│     └─ Uses: getEffectiveCompanyId() = NCG Holding (f40b0a9d...)  ← MISMATCH!       │
-│     └─ Filters: WHERE company_id = NCG Holding                                       │
-│     └─ Result: Empty (no accounts match parent company)                              │
-│                                                                                      │
-│  3. CACHE KEY                                                                        │
-│     └─ Query uses: ["bank-accounts", NCG Holding]  ← DIFFERENT KEY!                 │
-│     └─ Invalidation uses: ["bank-accounts", SBO]                                    │
-│     └─ Cache never refreshes for the query                                          │
-│                                                                                      │
-└─────────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                           DATA FLOW MISMATCH                                   │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                                │
+│  Bank Account Created                     Bank Transaction Created             │
+│  ────────────────────                     ────────────────────────             │
+│  company_id: SBO (0fba4a2f...)           company_id: NCG Holding (f40b0a9d...)│
+│          ↓                                          ↓                         │
+│  Query: WHERE company_id = SBO            Stored: company_id = NCG Holding    │
+│          ↓                                          ↓                         │
+│  Result: 2 bank accounts ✓                Result: 0 matches ✗                 │
+│                                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Database Evidence:**
-```sql
--- Bank account created with SBO company_id
-SELECT * FROM bank_accounts ORDER BY created_at DESC LIMIT 1;
+## Solution Strategy
 
-company_id: 0fba4a2f-598b-47e8-b863-283d00380b06  (SBO)
-account_name: "main uresha"
-```
+**Transactions should inherit company_id from their bank account**, not from the user's current company context. This maintains the section-specific bank account design while ensuring transactions are correctly linked.
 
-**But query filters by:**
-```
-company_id = f40b0a9d-ae5b-41b3-9188-535ae94c9020  (NCG Holding)
-```
-
-### Issue 2: Missing LKR Currency
-
-The BankAccountForm has hardcoded currencies (USD, ZWL, ZAR, BWP) instead of fetching from the `currencies` table which includes LKR.
-
----
-
-## Solution Architecture
-
-For bank accounts, the correct approach is **section-specific** (not consolidated like AR/AP), because:
-1. User wants "section by section should have to create bank accounts"
-2. Each section may have different bank accounts for operational purposes
-3. Same physical bank account can be registered under different sections if needed
-
-### Fix Strategy
-
-| Component | Change |
-|-----------|--------|
-| `useBankAccounts` | Query by `selectedCompanyId` (not `effectiveCompanyId`) |
-| `useCreateBankAccount` | Insert with `selectedCompanyId` (already correct) |
-| Cache invalidation | Use consistent `selectedCompanyId` for both |
-| `BankAccountForm` | Fetch currencies from database, add LKR |
-
----
+### Approach
+1. When creating bank transactions, fetch the bank account's `company_id` and use that
+2. Alternatively, use `selectedCompanyId` consistently (simpler approach)
+3. Fix existing data with SQL update
 
 ## Files to Modify
 
-### 1. `src/hooks/useAccountingData.ts` - Fix Query Logic
+### 1. `src/hooks/useInterBankTransfer.ts`
 
-**Current (broken):**
+**Change from:**
 ```typescript
-export const useBankAccounts = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
-  const effectiveCompanyId = getEffectiveCompanyId();  // Returns parent!
-  
-  return useQuery({
-    queryKey: ["bank-accounts", effectiveCompanyId],  // Wrong key
-    queryFn: async () => {
-      query = query.eq("company_id", effectiveCompanyId);  // Wrong filter
-    }
-  });
-};
+const { getEffectiveCompanyId } = useCompany();
+const effectiveCompanyId = getEffectiveCompanyId();
+
+// Transaction insert uses effectiveCompanyId
+company_id: effectiveCompanyId
 ```
 
-**Fixed:**
+**Change to:**
 ```typescript
-export const useBankAccounts = () => {
-  const { selectedCompanyId } = useCompany();  // Use actual company
-  
-  return useQuery({
-    queryKey: ["bank-accounts", selectedCompanyId],  // Correct key
-    queryFn: async () => {
-      query = query.eq("company_id", selectedCompanyId);  // Correct filter
-    }
-  });
-};
+const { selectedCompanyId } = useCompany();
+
+// Transaction insert uses selectedCompanyId (matches bank account)
+company_id: selectedCompanyId
 ```
 
-### 2. `src/hooks/useAccountingMutations.ts` - Fix Cache Invalidation
+Apply this change in:
+- Line 84-85: Query for transfers
+- Line 134-136: Create transfer mutation
+- Lines 241, 253: Bank transaction inserts
+- Line 269: Transfer record insert
 
-The insert uses correct `selectedCompanyId`, but verify cache invalidation matches:
+### 2. `src/hooks/useAccountingMutations.ts`
+
+**useCreateAPPayment (line 679):**
 ```typescript
-onSuccess: () => {
-  queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
-}
+// Current: uses effectiveCompanyId
+company_id: effectiveCompanyId,
+
+// Fix: use selectedCompanyId
+company_id: selectedCompanyId,
 ```
 
-### 3. `src/components/accounting/BankAccountForm.tsx` - Add LKR Currency
-
-**Current (hardcoded):**
+Also update cache invalidation to include `selectedCompanyId` in the query key:
 ```typescript
-<SelectContent>
-  <SelectItem value="USD">USD</SelectItem>
-  <SelectItem value="ZWL">ZWL</SelectItem>
-  <SelectItem value="ZAR">ZAR</SelectItem>
-  <SelectItem value="BWP">BWP</SelectItem>
-</SelectContent>
+queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
 ```
 
-**Fixed (fetch from DB + add common currencies including LKR):**
-```typescript
-// Add useCurrencies hook import
-const { data: currencies } = useCurrencies();
+### 3. `src/hooks/useFuelExpenseFinance.ts`
 
-// In the Select component
-<SelectContent>
-  {currencies?.map((curr) => (
-    <SelectItem key={curr.currency_code} value={curr.currency_code}>
-      {curr.currency_code} - {curr.currency_name}
-    </SelectItem>
-  ))}
-  {/* Fallback common currencies */}
-  {!currencies?.length && (
-    <>
-      <SelectItem value="LKR">LKR - Sri Lankan Rupee</SelectItem>
-      <SelectItem value="USD">USD - US Dollar</SelectItem>
-    </>
-  )}
-</SelectContent>
+Check and update bank transaction creation to use correct company_id matching the bank account.
+
+### 4. Database Fix - Existing Transactions
+
+Run SQL migration to fix existing transactions by matching them to their bank account's company_id:
+
+```sql
+-- Update bank_transactions to match their bank account's company_id
+UPDATE bank_transactions bt
+SET company_id = ba.company_id
+FROM bank_accounts ba
+WHERE bt.bank_account_id = ba.id
+  AND bt.company_id != ba.company_id;
 ```
 
-Also change default from "USD" to "LKR":
-```typescript
-defaultValues: {
-  currency: "LKR",  // Changed from "USD"
-}
-```
+## Complete Fix Implementation
 
----
+### File: `src/hooks/useInterBankTransfer.ts`
+
+| Location | Change |
+|----------|--------|
+| Line 83-84 | Change `getEffectiveCompanyId` to `selectedCompanyId` |
+| Line 87 | Query key: use `selectedCompanyId` |
+| Line 99 | Filter: use `selectedCompanyId` |
+| Line 134 | Remove `getEffectiveCompanyId`, use `selectedCompanyId` |
+| Line 182 | Journal entry: use `selectedCompanyId` |
+| Line 241, 253 | Bank transactions: use `selectedCompanyId` |
+| Line 269 | Transfer record: use `selectedCompanyId` |
+
+### File: `src/hooks/useAccountingMutations.ts`
+
+| Location | Change |
+|----------|--------|
+| Line 679 | Bank transaction insert: use `selectedCompanyId` |
+| Line 707 | Cache invalidation: add `selectedCompanyId` to key |
+
+### Database Migration
+
+```sql
+-- Fix existing bank transactions to match their bank account's company_id
+UPDATE bank_transactions bt
+SET company_id = ba.company_id,
+    updated_at = NOW()
+FROM bank_accounts ba
+WHERE bt.bank_account_id = ba.id
+  AND bt.company_id != ba.company_id;
+```
 
 ## Data Flow After Fix
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                           FIXED DATA FLOW                                            │
-├─────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                      │
-│  User selects: School Bus Operations (SBO)                                           │
-│                                                                                      │
-│  1. CREATE BANK ACCOUNT                                                              │
-│     └─ Uses: selectedCompanyId = SBO                                                │
-│     └─ Saves to DB with company_id = SBO ✓                                          │
-│     └─ Invalidates cache: ["bank-accounts", SBO] ✓                                  │
-│                                                                                      │
-│  2. QUERY BANK ACCOUNTS                                                              │
-│     └─ Uses: selectedCompanyId = SBO ✓ (FIXED!)                                     │
-│     └─ Filters: WHERE company_id = SBO                                              │
-│     └─ Result: Returns SBO bank accounts ✓                                          │
-│                                                                                      │
-│  3. CACHE KEY                                                                        │
-│     └─ Query uses: ["bank-accounts", SBO] ✓ (MATCHES!)                              │
-│     └─ Invalidation uses: ["bank-accounts", SBO]                                    │
-│     └─ Cache refreshes correctly ✓                                                  │
-│                                                                                      │
-└─────────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                           FIXED DATA FLOW                                      │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                                │
+│  User Context: School Bus Operations (SBO)                                     │
+│                                                                                │
+│  Bank Account Created                     Bank Transaction Created             │
+│  ────────────────────                     ────────────────────────             │
+│  company_id: SBO ✓                        company_id: SBO ✓ (FIXED!)          │
+│          ↓                                          ↓                         │
+│  Query: WHERE company_id = SBO            Stored: company_id = SBO            │
+│          ↓                                          ↓                         │
+│  Result: 2 bank accounts ✓                Result: 3 transactions ✓            │
+│                                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
-
----
-
-## Section-by-Section Bank Account Support
-
-The fix allows each sub-company to have its own bank accounts:
-
-| Section | Bank Accounts |
-|---------|--------------|
-| School Bus Operations (SBO) | SBO Main Account, SBO Fuel Account |
-| Yutong Sales (YUT) | Yutong Revenue Account |
-| Sinotruck Sales (SNT) | Sinotruck Revenue Account |
-| NCG Express (NCGE) | Express Cash Account |
-
-**Same bank can be registered in multiple sections** by creating separate records with the same account number but different company_id.
-
----
-
-## Currency Support
-
-After fix, the currency dropdown will show all active currencies from the database:
-- LKR - Sri Lankan Rupee (default)
-- USD - US Dollar
-- EUR - Euro
-- GBP - British Pound
-- AED - UAE Dirham
-- INR - Indian Rupee
-- SGD - Singapore Dollar
-- AUD - Australian Dollar
-
----
 
 ## Testing Checklist
 
 | # | Test Case | Expected Result |
 |---|-----------|-----------------|
-| 1 | Select SBO, create bank account | Account appears in table immediately |
-| 2 | Switch to YUT, create bank account | Account appears in YUT table |
-| 3 | Switch back to SBO | Only SBO accounts visible |
-| 4 | Currency dropdown | LKR and other currencies visible |
-| 5 | Default currency | LKR selected by default |
+| 1 | View Transactions tab under SBO | Previously created transactions now visible |
+| 2 | Create new inter-bank transfer | Transaction appears in table immediately |
+| 3 | Record AP payment with bank account | Bank transaction visible in Transactions tab |
+| 4 | Switch to another company | Only that company's transactions visible |
+| 5 | Cache invalidation | Table updates without page refresh |
 
+## Technical Notes
+
+### Why selectedCompanyId vs effectiveCompanyId?
+
+- **effectiveCompanyId**: Returns parent company (NCG Holding) for sub-companies, used for consolidated Chart of Accounts and GL
+- **selectedCompanyId**: Returns the actual selected company (e.g., SBO), used for section-specific data like bank accounts
+
+Since bank accounts are section-specific, their transactions must also be section-specific to maintain data integrity and correct querying.
+
+### GL Posting Consideration
+
+Journal entries still use `effectiveCompanyId` for consolidated GL, which is correct. Only bank_transactions should use `selectedCompanyId` to match bank accounts.
