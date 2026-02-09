@@ -201,7 +201,6 @@ export async function createVehicleCustomer({
         company_id: companyId,
         customer_code: customerCode,
         customer_name: customerName,
-        name: customerName, // Some queries use 'name' field
         phone: customerPhone || null,
         email: customerEmail || null,
         customer_type: 'individual',
@@ -335,6 +334,7 @@ export async function postVehiclePaymentToGL({
 
     // Build entry description
     const entryPrefix = paymentType === 'advance' ? 'ADV' : paymentType === 'balance' ? 'BAL' : 'REV';
+    const entryNumber = `${businessUnitCode}-${entryPrefix}-${orderNo}-${Date.now().toString(36).toUpperCase()}`;
     const description = `${businessUnitCode} ${paymentType.toUpperCase()} - ${orderNo} - ${customerName}`;
 
     // Create journal entry
@@ -342,6 +342,7 @@ export async function postVehiclePaymentToGL({
       .from('journal_entries')
       .insert({
         company_id: effectiveCompanyId,
+        entry_number: entryNumber,
         entry_date: new Date().toISOString().split('T')[0],
         description,
         reference: `${businessUnitCode}-${entryPrefix}-${orderNo}`,
@@ -350,6 +351,7 @@ export async function postVehiclePaymentToGL({
         total_debit: amount,
         total_credit: amount,
         business_unit_code: businessUnitCode,
+        posted_at: new Date().toISOString(),
       })
       .select('id, entry_number')
       .single();
@@ -470,6 +472,7 @@ export async function postVehicleInvoiceToGL({
       return null;
     }
 
+    const entryNumber = `${businessUnitCode}-INV-${orderNo}-${Date.now().toString(36).toUpperCase()}`;
     const description = `${businessUnitCode} INVOICE - ${orderNo} - ${customerName}`;
 
     // Create journal entry
@@ -477,6 +480,7 @@ export async function postVehicleInvoiceToGL({
       .from('journal_entries')
       .insert({
         company_id: effectiveCompanyId,
+        entry_number: entryNumber,
         entry_date: new Date().toISOString().split('T')[0],
         description,
         reference: `${businessUnitCode}-INV-${orderNo}`,
@@ -485,6 +489,7 @@ export async function postVehicleInvoiceToGL({
         total_debit: invoiceAmount,
         total_credit: invoiceAmount,
         business_unit_code: businessUnitCode,
+        posted_at: new Date().toISOString(),
       })
       .select('id, entry_number')
       .single();
@@ -558,12 +563,14 @@ export async function applyAdvanceToReceivable({
       return null;
     }
 
+    const entryNumber = `${businessUnitCode}-ADV-APPLY-${orderNo}-${Date.now().toString(36).toUpperCase()}`;
     const description = `${businessUnitCode} ADVANCE APPLIED - ${orderNo} - ${customerName}`;
 
     const { data: journalEntry, error: jeError } = await (supabase as any)
       .from('journal_entries')
       .insert({
         company_id: effectiveCompanyId,
+        entry_number: entryNumber,
         entry_date: new Date().toISOString().split('T')[0],
         description,
         reference: `${businessUnitCode}-ADV-APPLY-${orderNo}`,
@@ -572,6 +579,7 @@ export async function applyAdvanceToReceivable({
         total_debit: advanceAmount,
         total_credit: advanceAmount,
         business_unit_code: businessUnitCode,
+        posted_at: new Date().toISOString(),
       })
       .select('id, entry_number')
       .single();
