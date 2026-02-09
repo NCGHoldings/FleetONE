@@ -80,11 +80,10 @@ async function updateAccountBalancesFromJournalEntry(journalEntryId: string) {
 
 // Fetch inter-bank transfers
 export function useInterBankTransfers() {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
-  const effectiveCompanyId = getEffectiveCompanyId();
+  const { selectedCompanyId } = useCompany();
 
   return useQuery({
-    queryKey: ["inter-bank-transfers", effectiveCompanyId],
+    queryKey: ["inter-bank-transfers", selectedCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("inter_bank_transfers")
@@ -96,13 +95,13 @@ export function useInterBankTransfers() {
           to_gl:chart_of_accounts!inter_bank_transfers_to_gl_account_id_fkey(id, account_code, account_name),
           journal_entry:journal_entries(id, entry_number, status)
         `)
-        .eq("company_id", effectiveCompanyId)
+        .eq("company_id", selectedCompanyId)
         .order("transfer_date", { ascending: false });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveCompanyId,
+    enabled: !!selectedCompanyId,
   });
 }
 
@@ -131,7 +130,7 @@ async function generateTransferNumber(): Promise<string> {
 // Create inter-bank transfer with GL posting
 export function useCreateInterBankTransfer() {
   const queryClient = useQueryClient();
-  const { getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const businessUnitCode = getBusinessUnitCode();
 
@@ -232,13 +231,13 @@ export function useCreateInterBankTransfer() {
         })
         .eq("id", input.toBankAccountId);
 
-      // 8. Create bank transactions for both accounts
+      // 8. Create bank transactions for both accounts (use selectedCompanyId to match bank account)
       await supabase
         .from("bank_transactions")
         .insert([
           {
             bank_account_id: input.fromBankAccountId,
-            company_id: effectiveCompanyId,
+            company_id: selectedCompanyId,
             transaction_date: input.transferDate,
             transaction_type: "transfer_out",
             description: `Transfer to ${toBank.account_name}`,
@@ -250,7 +249,7 @@ export function useCreateInterBankTransfer() {
           },
           {
             bank_account_id: input.toBankAccountId,
-            company_id: effectiveCompanyId,
+            company_id: selectedCompanyId,
             transaction_date: input.transferDate,
             transaction_type: "transfer_in",
             description: `Transfer from ${fromBank.account_name}`,
@@ -262,11 +261,11 @@ export function useCreateInterBankTransfer() {
           },
         ]);
 
-      // 9. Create transfer record
+      // 9. Create transfer record (use selectedCompanyId to match bank account)
       const { data: transfer, error: transferError } = await supabase
         .from("inter_bank_transfers")
         .insert({
-          company_id: effectiveCompanyId,
+          company_id: selectedCompanyId,
           transfer_number: transferNumber,
           transfer_date: input.transferDate,
           from_bank_account_id: input.fromBankAccountId,
@@ -288,9 +287,9 @@ export function useCreateInterBankTransfer() {
       return transfer;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inter-bank-transfers"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["inter-bank-transfers", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
       queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Inter-bank transfer completed successfully with GL posting");
