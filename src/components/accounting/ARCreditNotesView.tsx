@@ -200,6 +200,7 @@ export const ARCreditNotesView = () => {
         documentType="ar_credit_note"
         documentData={printDocumentData}
         companyId={printDocumentData?.company_id}
+        businessUnitCode={printDocumentData?.business_unit_code}
       />
     </div>
   );

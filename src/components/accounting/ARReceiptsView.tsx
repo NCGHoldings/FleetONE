@@ -262,6 +262,7 @@ export const ARReceiptsView = () => {
           documentType="ar_receipt"
           documentData={selectedReceipt}
           companyId={selectedReceipt?.company_id}
+          businessUnitCode={selectedReceipt?.business_unit_code}
         />
       )}
     </div>

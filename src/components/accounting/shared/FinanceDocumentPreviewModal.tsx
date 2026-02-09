@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,7 @@ interface FinanceDocumentPreviewModalProps {
   documentType: string; // All 12 document types supported
   documentData: any;
   companyId?: string;
+  businessUnitCode?: string; // For consolidated GL - resolves sub-company by short_code
 }
 
 export const FinanceDocumentPreviewModal = ({
@@ -28,6 +29,7 @@ export const FinanceDocumentPreviewModal = ({
   documentType,
   documentData,
   companyId,
+  businessUnitCode,
 }: FinanceDocumentPreviewModalProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
@@ -35,6 +37,17 @@ export const FinanceDocumentPreviewModal = ({
 
   const { data: companies } = useCompanies();
   const { data: allTemplates } = useDocumentTemplates();
+
+  // Resolve actual company: If businessUnitCode provided, find sub-company by short_code
+  const resolvedCompanyId = useMemo(() => {
+    if (businessUnitCode && companies?.length) {
+      // Find sub-company by short_code (YUT, SBO, SNT, LTV, SPH, etc.)
+      const subCompany = companies.find(c => c.short_code === businessUnitCode);
+      if (subCompany) return subCompany.id;
+    }
+    // Fallback to companyId prop or documentData.company_id
+    return companyId || documentData?.company_id;
+  }, [businessUnitCode, companyId, documentData?.company_id, companies]);
 
   // Fetch template type to filter templates
   const { data: templateType } = useQuery({
@@ -52,13 +65,13 @@ export const FinanceDocumentPreviewModal = ({
     enabled: !!documentType,
   });
 
-  // Filter templates for this document type AND company
+  // Filter templates for this document type AND resolved company
   const availableTemplates = allTemplates?.filter((t) => {
     // Must match template type and be active
     if (t.template_type_id !== templateType?.id || !t.is_active) return false;
-    // If companyId provided, filter to only that company's templates
-    if (companyId) {
-      return t.company_id === companyId;
+    // Filter to resolved company's templates
+    if (resolvedCompanyId) {
+      return t.company_id === resolvedCompanyId;
     }
     return true;
   });
@@ -121,17 +134,17 @@ export const FinanceDocumentPreviewModal = ({
     enabled: !!documentData?.id && (documentType === "ar_receipt" || documentType === "ap_payment_voucher"),
   });
 
-  // Reset template selection when company or document type changes
+  // Reset template selection when resolved company or document type changes
   useEffect(() => {
     setSelectedTemplateId("");
-  }, [companyId, documentType]);
+  }, [resolvedCompanyId, documentType]);
 
   // Auto-select company template as default
   useEffect(() => {
     if (availableTemplates?.length && !selectedTemplateId) {
-      // Prefer company-specific template, then any default, then first available
-      const companyTemplate = companyId 
-        ? availableTemplates.find((t) => t.company_id === companyId)
+      // Prefer resolved company-specific template, then any default, then first available
+      const companyTemplate = resolvedCompanyId 
+        ? availableTemplates.find((t) => t.company_id === resolvedCompanyId)
         : null;
       const defaultTemplate = availableTemplates.find((t) => t.is_default);
       const selectedTemplate = companyTemplate || defaultTemplate || availableTemplates[0];
@@ -139,12 +152,11 @@ export const FinanceDocumentPreviewModal = ({
         setSelectedTemplateId(selectedTemplate.id);
       }
     }
-  }, [availableTemplates, selectedTemplateId, companyId]);
+  }, [availableTemplates, selectedTemplateId, resolvedCompanyId]);
 
   const selectedTemplate = availableTemplates?.find((t) => t.id === selectedTemplateId);
-  // Improved company lookup chain: prioritize companyId prop, then documentData.company_id, then template's company_id
-  const effectiveCompanyId = companyId || documentData?.company_id || selectedTemplate?.company_id;
-  const company = companies?.find((c) => c.id === effectiveCompanyId);
+  // Use resolved company for all lookups (sub-company details: phone, email, address, logo)
+  const company = companies?.find((c) => c.id === resolvedCompanyId);
   const hasNoTemplate = !availableTemplates || availableTemplates.length === 0;
 
   // Generate fallback HTML using default template
