@@ -312,7 +312,10 @@ export const useARInvoices = (status?: string) => {
           *,
           customers (
             customer_code,
-            customer_name
+            customer_name,
+            billing_address,
+            phone,
+            email
           )
         `)
         .order("invoice_date", { ascending: false });
@@ -396,7 +399,10 @@ export const useARReceipts = () => {
           *,
           customers (
             customer_code,
-            customer_name
+            customer_name,
+            billing_address,
+            phone,
+            email
           )
         `)
         .order("receipt_date", { ascending: false });

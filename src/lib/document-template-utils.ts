@@ -202,7 +202,7 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{invoice_date}}'] = formatDate(documentData?.invoice_date);
       placeholders['{{due_date}}'] = formatDate(documentData?.due_date);
       placeholders['{{customer_name}}'] = documentData?.customers?.customer_name || '';
-      placeholders['{{customer_address}}'] = documentData?.customers?.address || '';
+      placeholders['{{customer_address}}'] = documentData?.customers?.billing_address || '';
       placeholders['{{customer_email}}'] = documentData?.customers?.email || '';
       placeholders['{{customer_phone}}'] = documentData?.customers?.phone || '';
       placeholders['{{customer_code}}'] = documentData?.customers?.customer_code || '';
@@ -223,7 +223,7 @@ export const mapDocumentToPlaceholders = (
       placeholders['{{receipt_number}}'] = documentData?.receipt_number || '';
       placeholders['{{receipt_date}}'] = formatDate(documentData?.receipt_date);
       placeholders['{{customer_name}}'] = documentData?.customers?.customer_name || '';
-      placeholders['{{customer_address}}'] = documentData?.customers?.address || '';
+      placeholders['{{customer_address}}'] = documentData?.customers?.billing_address || '';
       placeholders['{{customer_code}}'] = documentData?.customers?.customer_code || '';
       placeholders['{{amount}}'] = formatCurrency(documentData?.amount);
       placeholders['{{total_amount}}'] = formatCurrency(documentData?.amount);
@@ -313,6 +313,9 @@ export const replacePlaceholders = (
     const escapedKey = key.replace(/[{}]/g, '\\$&');
     result = result.replace(new RegExp(escapedKey, 'g'), value);
   });
+  
+  // Remove any remaining unreplaced placeholders to keep document professional
+  result = result.replace(/\{\{[^}]+\}\}/g, '');
   
   return result;
 };
