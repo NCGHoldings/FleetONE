@@ -144,13 +144,16 @@ export const mapDocumentToPlaceholders = (
 ): Record<string, string> => {
   const placeholders: Record<string, string> = {};
 
-  // Company placeholders (always available)
+  // Company placeholders (always available) - with fallback guidance for empty fields
   placeholders['{{company_name}}'] = companyData?.name || '';
   placeholders['{{company_address}}'] = companyData?.address || '';
   placeholders['{{company_phone}}'] = companyData?.phone || '';
   placeholders['{{company_email}}'] = companyData?.email || '';
   placeholders['{{company_tax_id}}'] = companyData?.tax_number || companyData?.registration_number || '';
   placeholders['{{company_registration}}'] = companyData?.registration_number || '';
+  
+  // Use company logo_url for logo_and_html mode when no header image is set
+  const companyLogoUrl = companyData?.logo_url;
   
   // Generate header and logo placeholders based on header mode
   switch (headerMode) {
@@ -179,8 +182,10 @@ export const mapDocumentToPlaceholders = (
     case 'logo_and_html':
     default:
       // Standard mode: logo on left + company details (default)
-      placeholders['{{company_logo}}'] = headerImageUrl 
-        ? `<img src="${headerImageUrl}" style="max-height: 80px; max-width: 200px; object-fit: contain;" alt="Company Logo" />`
+      // Try headerImageUrl first, then fall back to company logo_url
+      const logoToUse = headerImageUrl || companyLogoUrl;
+      placeholders['{{company_logo}}'] = logoToUse 
+        ? `<img src="${logoToUse}" style="max-height: 80px; max-width: 200px; object-fit: contain;" alt="Company Logo" />`
         : '';
       placeholders['{{document_header}}'] = ''; // No full header banner in this mode
       break;
