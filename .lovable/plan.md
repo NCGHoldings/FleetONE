@@ -1,261 +1,172 @@
 
-# Complete ERPNext Feature Parity - Full System Integration
+# Yutong Document Template Integration & Cross-Check Plan
 
-## Overview
+## Problem Summary
 
-Based on the codebase analysis, the database schema, hooks, and main view components are already created. The remaining work is to:
+Based on my analysis, there are two separate document systems that need interconnection:
 
-1. **Add Selling module tabs** - Wire up sales orders and delivery notes in Accounting.tsx
-2. **Add RFQ/Supplier Quotes tabs** - Add to Procurement module
-3. **Add Quality module tabs** - Wire up quality inspections and templates
-4. **Add Inventory enhancements** - Pick lists, Landed Cost, UoM tabs
-5. **Create Asset Maintenance views** - New components for fixed asset maintenance
-6. **Add Payment Terms settings** - New settings tab
-7. **Create Inspection Templates view** - Missing Quality component
+1. **Vehicle Sales Invoices** (Yutong, Sinotruck, Light Vehicle) - use standalone HTML generators
+2. **Finance Module Documents** (AR/AP Invoices, Receipts, etc.) - use the Document Template system
 
----
-
-## Implementation Summary
-
-### Files to Create (7 new components)
-
-| # | File | Purpose |
-|---|------|---------|
-| 1 | `src/components/accounting/inventory/PickListView.tsx` | Pick lists management |
-| 2 | `src/components/accounting/inventory/LandedCostView.tsx` | Landed cost vouchers |
-| 3 | `src/components/accounting/inventory/UoMView.tsx` | Unit of measure management |
-| 4 | `src/components/accounting/assets/AssetMaintenanceView.tsx` | Asset maintenance scheduling |
-| 5 | `src/components/accounting/assets/MaintenanceTeamView.tsx` | Maintenance teams |
-| 6 | `src/components/accounting/settings/PaymentTermsView.tsx` | Payment terms templates |
-| 7 | `src/components/accounting/quality/InspectionTemplateView.tsx` | Quality inspection templates |
-
-### Files to Modify (1 file)
-
-| # | File | Changes |
-|---|------|---------|
-| 1 | `src/pages/Accounting.tsx` | Add all new tabs and module content |
+The user expects:
+- Yutong documents to use professional headers like the PDF reference
+- All documents across modules to share the template system
+- Header images to display properly in previews
 
 ---
 
-## Detailed Implementation
+## Current Architecture Issues
 
-### 1. PickListView Component
+### Issue 1: Two Disconnected Document Systems
 
-Create warehouse picking workflow UI with:
-- Summary cards (Total, Pending, In Progress, Completed)
-- Filterable/searchable pick list table
-- Status badges and action menu
-- Pick completion dialog
+| System | Location | Header Source |
+|--------|----------|---------------|
+| Yutong Order Invoices | `yutong-order-invoice-generator.ts` | Hardcoded `/lovable-uploads/yutong-invoice-header.png` |
+| Finance AR/AP Invoices | `FinanceDocumentPreviewModal.tsx` | `document_templates.header_image_url` |
 
-### 2. LandedCostView Component
+### Issue 2: Template Headers Not Configured
 
-Create landed cost voucher management with:
-- Voucher list with GRN reference
-- Status tracking (Draft, Posted, Cancelled)
-- Total additional cost display
-- Allocation method indicator
+Most Yutong templates in the database have `header_image_url: null` except for AR Invoice which was recently updated.
 
-### 3. UoMView Component
+### Issue 3: Missing Template-to-Document Linking
 
-Create unit of measure management with:
-- UoM master list
-- UoM conversion rules
-- Conversion factor calculator
-- Item-specific conversion support
-
-### 4. AssetMaintenanceView Component
-
-Create fixed asset maintenance scheduling with:
-- Upcoming maintenance dashboard
-- Maintenance log table with filters
-- Status tracking (Scheduled, In Progress, Completed)
-- Complete/Cancel actions with notes
-
-### 5. MaintenanceTeamView Component
-
-Create maintenance team management with:
-- Team list with member count
-- Team lead assignment
-- Team code generation
-
-### 6. PaymentTermsView Component
-
-Create payment terms template management with:
-- Terms list with due days and discount info
-- Default term indicator
-- Create/Edit dialog
-
-### 7. InspectionTemplateView Component
-
-Create quality inspection template management with:
-- Template list by inspection type
-- Criteria management
-- Template activation/deactivation
+Yutong order documents don't reference the Finance template system at all.
 
 ---
 
-## Accounting.tsx Tab Integration
+## Solution Overview
 
-### Add to Selling Module (NEW)
+### Phase 1: Fix Finance Template Headers (Quick Win)
 
-```typescript
-{activeModule === "selling" && (
-  <Tabs defaultValue="sales-orders" className="space-y-6">
-    <TabsList>
-      <TabsTrigger value="sales-orders">Sales Orders</TabsTrigger>
-      <TabsTrigger value="delivery-notes">Delivery Notes</TabsTrigger>
-      <TabsTrigger value="pick-lists">Pick Lists</TabsTrigger>
-    </TabsList>
-    
-    <TabsContent value="sales-orders">
-      <SalesOrderView />
-    </TabsContent>
-    <TabsContent value="delivery-notes">
-      <DeliveryNoteView />
-    </TabsContent>
-    <TabsContent value="pick-lists">
-      <PickListView />
-    </TabsContent>
-  </Tabs>
-)}
+**Goal:** Ensure all Yutong Finance templates have proper header images
+
+**Changes:**
+1. Create utility to bulk-update Yutong templates with professional header image
+2. Add header image URL to all 12 document types for Yutong company
+
+### Phase 2: Add Template Selection to Yutong Order Invoices
+
+**Goal:** Allow Yutong order invoices to optionally use Finance templates
+
+**New Files:**
+- `src/components/yutong/YutongInvoiceTemplateSelector.tsx` - Template dropdown for Yutong invoices
+
+**Modified Files:**
+- `src/components/yutong/YutongOrderInvoiceViewModal.tsx` - Add template selector option
+- `src/lib/yutong-order-invoice-generator.ts` - Support template-based header rendering
+
+### Phase 3: Create Unified Document Preview Component
+
+**Goal:** Single preview component that works for both vehicle sales and finance documents
+
+**New Files:**
+- `src/components/shared/UnifiedDocumentPreview.tsx` - Unified preview with template support
+
+**Features:**
+- Template selector dropdown
+- Dynamic header modes (Full Banner, Logo+Text, etc.)
+- PDF download with proper header rendering
+- Print support
+
+### Phase 4: Cross-Module Template Sync
+
+**Goal:** Ensure templates work consistently across all modules
+
+**Changes:**
+1. Add `yutong_order_invoice` template type to `document_template_types`
+2. Add `sinotruck_order_invoice` template type
+3. Add `light_vehicle_invoice` template type
+4. Create professional HTML templates for each
+
+---
+
+## Technical Implementation Details
+
+### Database Changes
+
+```sql
+-- Add vehicle sales invoice template types
+INSERT INTO document_template_types (type_code, type_name, module, description, available_placeholders)
+VALUES 
+  ('yutong_order_invoice', 'Yutong Order Invoice', 'yutong', 'Invoice for Yutong bus orders', 
+   ARRAY['{{invoice_no}}', '{{customer_name}}', '{{bus_model}}', '{{total}}', '{{signatures}}']),
+  ('sinotruck_order_invoice', 'Sinotruck Order Invoice', 'sinotruck', 'Invoice for Sinotruck orders',
+   ARRAY['{{invoice_no}}', '{{customer_name}}', '{{vehicle_model}}', '{{total}}']),
+  ('light_vehicle_invoice', 'Light Vehicle Invoice', 'light_vehicle', 'Invoice for light vehicle orders',
+   ARRAY['{{invoice_no}}', '{{customer_name}}', '{{vehicle_model}}', '{{total}}']);
 ```
 
-### Update Procurement Module
+### Component Architecture
 
-Add RFQ and Supplier Quotations tabs:
-- `<TabsTrigger value="rfq">RFQ</TabsTrigger>`
-- `<TabsTrigger value="supplier-quotes">Supplier Quotations</TabsTrigger>`
-
-### Add Quality Module (NEW)
-
-```typescript
-{activeModule === "quality" && (
-  <Tabs defaultValue="inspections" className="space-y-6">
-    <TabsList>
-      <TabsTrigger value="inspections">Quality Inspections</TabsTrigger>
-      <TabsTrigger value="templates">Inspection Templates</TabsTrigger>
-    </TabsList>
-    
-    <TabsContent value="inspections">
-      <QualityInspectionView />
-    </TabsContent>
-    <TabsContent value="templates">
-      <InspectionTemplateView />
-    </TabsContent>
-  </Tabs>
-)}
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    Document Preview System                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────┐     ┌─────────────────────────────┐   │
+│  │ Template Selector│     │ Preview Iframe              │   │
+│  │ ┌─────────────┐ │     │ ┌─────────────────────────┐ │   │
+│  │ │ AR Invoice  │ │     │ │ ┌───────────────────┐   │ │   │
+│  │ │ AR Receipt  │ │ ──► │ │ │  HEADER IMAGE     │   │ │   │
+│  │ │ Yutong Inv  │ │     │ │ └───────────────────┘   │ │   │
+│  │ │ Sinotruck   │ │     │ │ Invoice Content...     │ │   │
+│  │ └─────────────┘ │     │ │ Signatures...          │ │   │
+│  └─────────────────┘     │ └─────────────────────────┘ │   │
+│                          └─────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Actions: [Download PDF] [Print] [Email]              │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Update Inventory Module
+### File Changes Summary
 
-Add new tabs:
-- `<TabsTrigger value="pick-lists">Pick Lists</TabsTrigger>`
-- `<TabsTrigger value="landed-cost">Landed Cost</TabsTrigger>`
-- `<TabsTrigger value="uom">Units of Measure</TabsTrigger>`
-
-### Update Fixed Assets Module
-
-Add maintenance tab:
-- `<TabsTrigger value="maintenance">Maintenance</TabsTrigger>`
-- `<TabsTrigger value="teams">Maintenance Teams</TabsTrigger>`
-
-### Update Settings Module
-
-Add payment terms tab:
-- `<TabsTrigger value="payment-terms">Payment Terms</TabsTrigger>`
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `src/components/yutong/YutongOrderInvoiceViewModal.tsx` | Modify | Add template selector option |
+| `src/components/yutong/YutongOrderInvoicePreview.tsx` | Modify | Support template-based rendering |
+| `src/lib/yutong-order-invoice-generator.ts` | Modify | Accept header from template |
+| `src/components/shared/UnifiedDocumentPreview.tsx` | Create | Unified preview component |
+| `src/hooks/useVehicleSalesTemplates.ts` | Create | Hook for vehicle sales templates |
+| `src/lib/vehicle-sales-template-utils.ts` | Create | Placeholder mapping for vehicle sales |
 
 ---
 
-## Component Specifications
-
-### PickListView Features
-- Display pick list number, sales order reference, customer name
-- Show warehouse, status, picked by, picked at
-- Action menu: Start Picking, Complete, View Details
-- Filter by status (All, Draft, In Progress, Completed)
-
-### LandedCostView Features
-- Display voucher number, GRN reference, posting date
-- Show allocation method, total charges, status
-- Action menu: Post, View Details, Cancel
-- Filter by status
-
-### UoMView Features  
-- Two tabs: "Units of Measure" and "Conversions"
-- UoM list with symbol
-- Conversion rules with from/to UoM and factor
-- Item-specific conversions
-
-### AssetMaintenanceView Features
-- Dashboard with upcoming maintenance alerts
-- Maintenance log with asset name, type, date, team
-- Priority badges (Low, Medium, High, Critical)
-- Status workflow: Scheduled → In Progress → Completed
-
-### MaintenanceTeamView Features
-- Team grid/list view
-- Team member count
-- Team lead display
-- Create/Edit team dialog
-
-### PaymentTermsView Features
-- Terms table with due days
-- Early payment discount configuration
-- Default term marker
-- Active/Inactive status
-
-### InspectionTemplateView Features
-- Template list by type (Incoming, Outgoing, In-Process)
-- Criteria count per template
-- Active status toggle
-- Expand to view/edit criteria
-
----
-
-## Technical Specifications
-
-### Imports to Add to Accounting.tsx
-
-```typescript
-// Inventory enhancements
-import { PickListView } from "@/components/accounting/inventory/PickListView";
-import { LandedCostView } from "@/components/accounting/inventory/LandedCostView";
-import { UoMView } from "@/components/accounting/inventory/UoMView";
-
-// Asset maintenance
-import { AssetMaintenanceView } from "@/components/accounting/assets/AssetMaintenanceView";
-import { MaintenanceTeamView } from "@/components/accounting/assets/MaintenanceTeamView";
-
-// Settings
-import { PaymentTermsView } from "@/components/accounting/settings/PaymentTermsView";
-
-// Quality
-import { InspectionTemplateView } from "@/components/accounting/quality/InspectionTemplateView";
-```
-
----
-
-## Expected Outcome
+## Expected Results
 
 After implementation:
 
-| Module | Before | After |
-|--------|--------|-------|
-| Selling | No tabs | Sales Orders, Delivery Notes, Pick Lists |
-| Procurement | 4 tabs | 6 tabs (+RFQ, +Supplier Quotes) |
-| Inventory | 9 tabs | 12 tabs (+Pick Lists, +Landed Cost, +UoM) |
-| Assets | 5 tabs | 7 tabs (+Maintenance, +Teams) |
-| Quality | Not visible | Inspections, Templates |
-| Settings | 10 tabs | 11 tabs (+Payment Terms) |
-
-**ERPNext Parity: ~45% → ~72%**
+1. **Yutong Order Invoices** will show the professional branded header (matching the PDF reference)
+2. **Template Selection** will be available in the invoice preview modal
+3. **All Finance Documents** will use consistent templates with proper headers
+4. **Cross-Module Consistency** - same template system works for:
+   - Finance AR/AP documents
+   - Yutong order invoices
+   - Sinotruck order invoices
+   - Light Vehicle invoices
 
 ---
 
-## Component Dependencies
+## Implementation Order
 
-All new components will use:
-- Existing hooks from `useInventoryEnhanced.ts`, `useAssetMaintenance.ts`, `useSalesOrders.ts`, `useQualityInspection.ts`
-- Existing UI patterns from similar components (Card, Table, Dialog, Badge)
-- React Hook Form + Zod for forms
-- Tanstack Query for data fetching
+1. **Step 1:** Add vehicle sales template types to database
+2. **Step 2:** Create default templates for vehicle sales with proper headers
+3. **Step 3:** Modify `YutongOrderInvoicePreview` to accept template parameter
+4. **Step 4:** Add template selector to `YutongOrderInvoiceViewModal`
+5. **Step 5:** Update `yutong-order-invoice-generator.ts` to use template headers
+6. **Step 6:** Apply same pattern to Sinotruck and Light Vehicle modules
+7. **Step 7:** Create unified document preview component for future use
+
+---
+
+## Quick Fix Option (Immediate)
+
+If a full integration is too complex for now, I can implement a quick fix:
+
+1. Update `yutong-order-invoice-generator.ts` to dynamically fetch header from template
+2. Ensure Yutong templates have proper `header_image_url` set
+3. This maintains the current architecture while fixing the header issue
+
+Would you like me to proceed with the full integration or the quick fix approach?
