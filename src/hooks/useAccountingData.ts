@@ -463,21 +463,20 @@ export const useAPPayments = () => {
 };
 
 // ============ Bank Accounts ============
-// Bank accounts are shared at parent company level for consolidated GL
+// Bank accounts are section-specific (each sub-company can have its own bank accounts)
 export const useBankAccounts = () => {
-  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
-  const effectiveCompanyId = getEffectiveCompanyId();
+  const { selectedCompanyId } = useCompany();
   
   return useQuery({
-    queryKey: ["bank-accounts", effectiveCompanyId],
+    queryKey: ["bank-accounts", selectedCompanyId],
     queryFn: async () => {
       let query = supabase
         .from("bank_accounts")
         .select("*")
         .order("account_name");
       
-      if (effectiveCompanyId) {
-        query = query.eq("company_id", effectiveCompanyId);
+      if (selectedCompanyId) {
+        query = query.eq("company_id", selectedCompanyId);
       }
       
       const { data, error } = await query;
