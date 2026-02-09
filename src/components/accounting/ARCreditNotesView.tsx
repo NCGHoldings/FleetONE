@@ -199,6 +199,7 @@ export const ARCreditNotesView = () => {
         onOpenChange={setPrintDocumentOpen}
         documentType="ar_credit_note"
         documentData={printDocumentData}
+        companyId={printDocumentData?.company_id}
       />
     </div>
   );

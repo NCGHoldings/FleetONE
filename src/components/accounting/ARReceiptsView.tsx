@@ -259,16 +259,9 @@ export const ARReceiptsView = () => {
         <FinanceDocumentPreviewModal
           open={previewOpen}
           onOpenChange={setPreviewOpen}
-          documentType="receipt"
-          documentData={{
-            receipt_number: selectedReceipt.receipt_number,
-            receipt_date: selectedReceipt.receipt_date,
-            customer_name: getCustomerName(selectedReceipt.customer_id),
-            amount: selectedReceipt.amount,
-            payment_method: getPaymentMethodLabel(selectedReceipt.payment_method),
-            reference: selectedReceipt.reference,
-            notes: selectedReceipt.notes,
-          }}
+          documentType="ar_receipt"
+          documentData={selectedReceipt}
+          companyId={selectedReceipt?.company_id}
         />
       )}
     </div>
