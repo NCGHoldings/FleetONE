@@ -14,12 +14,12 @@ import { usePickLists, useCompletePicking } from "@/hooks/useInventoryEnhanced";
 import { format } from "date-fns";
 
 export const PickListView = () => {
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("_all");
   const [searchTerm, setSearchTerm] = useState("");
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [selectedPickList, setSelectedPickList] = useState<any>(null);
   
-  const { data: pickLists, isLoading } = usePickLists(statusFilter || undefined);
+  const { data: pickLists, isLoading } = usePickLists(statusFilter === "_all" ? undefined : statusFilter);
   const completePicking = useCompletePicking();
 
   const filteredPickLists = pickLists?.filter(pl => 
@@ -123,7 +123,7 @@ export const PickListView = () => {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="_all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
