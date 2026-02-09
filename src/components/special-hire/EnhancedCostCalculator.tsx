@@ -343,7 +343,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
             {
               baselineSpeedKmph: 10,
               hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
-              nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000,
+              nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 10000,
               useStandardHours: false
             }
           );
@@ -358,7 +358,7 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
             quotation.drop_datetime,
             {
               hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
-              nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 3000,
+              nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 10000,
               useStandardHours: true,
               standardHours: rateCard?.standard_hours || 8
             }

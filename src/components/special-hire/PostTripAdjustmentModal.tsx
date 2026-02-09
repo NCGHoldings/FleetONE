@@ -80,7 +80,7 @@ export const PostTripAdjustmentModal = ({
   originalOvertimeCharge = 0,
   originalOvernightCharge = 0,
   hourlyRate = 500,
-  nightBlockFee = 3000,
+  nightBlockFee = 10000,
 }: PostTripAdjustmentModalProps) => {
   const {
     loading,

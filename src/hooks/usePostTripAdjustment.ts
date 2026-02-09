@@ -81,7 +81,7 @@ export const usePostTripAdjustment = () => {
     const {
       baselineSpeedKmph = 10,
       hourlyRate = 500,
-      nightBlockFee = 3000,
+      nightBlockFee = 10000,
       useStandardHours = false,
       standardHours = 8,
     } = config;

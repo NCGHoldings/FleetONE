@@ -831,20 +831,22 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           const exceedingCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
           hireChargePerBus = fixedRate + exceedingCharge;
 
-          // Calculate overtime/overnight for Outside hire
-          const expectedHours = (data.dropDateTime.getTime() - data.pickupDateTime.getTime()) / (1000 * 60 * 60);
-          const availableHours = tripDistance / 10; // 10 km/h baseline
-          if (expectedHours > availableHours) {
-            overtimeCharge = (expectedHours - availableHours) * (rateCard.overtime_rate_lkr_per_hour || 500);
-            hireChargePerBus += overtimeCharge;
-          }
+          // FIX: Use calculateExtraTimeCharge for correct overtime/overnight calculation
+          const extraTimeResult = calculateExtraTimeCharge(
+            tripDistance,
+            data.pickupDateTime,
+            data.dropDateTime,
+            {
+              baselineSpeedKmph: 10,
+              hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+              nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+              useStandardHours: false
+            }
+          );
           
-          // Check for overnight charges
-          const tripDays = Math.ceil((data.dropDateTime.getTime() - data.pickupDateTime.getTime()) / (1000 * 60 * 60 * 24));
-          if (tripDays > 1) {
-            overnightCharge = (tripDays - 1) * (rateCard.overnight_charge_lkr_per_day || 3000);
-            hireChargePerBus += overnightCharge;
-          }
+          overtimeCharge = extraTimeResult.overtimeCharge;
+          overnightCharge = extraTimeResult.overnightCharge;
+          hireChargePerBus += extraTimeResult.totalExtraCharge;
         } else {
           // Lyceum/Internal: range-based rates
           rateCard = allRateCards.find(card => 
@@ -853,6 +855,23 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           ) || allRateCards[0];
           
           hireChargePerBus = rateCard?.flat_fee_lkr || 0;
+
+          // FIX: Add overtime calculation for Lyceum/Internal using standard hours
+          const extraTimeResult = calculateExtraTimeCharge(
+            tripDistance,
+            data.pickupDateTime,
+            data.dropDateTime,
+            {
+              hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
+              nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 10000,
+              useStandardHours: true,
+              standardHours: rateCard?.standard_hours || 8
+            }
+          );
+          
+          overtimeCharge = extraTimeResult.overtimeCharge;
+          overnightCharge = extraTimeResult.overnightCharge;
+          hireChargePerBus += extraTimeResult.totalExtraCharge;
 
           // Handle exceeding km for distances > 100km
           if (tripDistance > 100) {
