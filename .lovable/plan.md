@@ -1,230 +1,570 @@
 
-# Special Hire Calculation Bug Fixes - Complete System Audit
+# ERPNext Feature Parity Implementation Plan
 
 ## Executive Summary
 
-After comprehensive analysis of the Special Hire calculation system, I've identified **8 remaining bugs** that cause incorrect overtime/overnight calculations. The previous fix updated some files but missed several critical calculation paths.
+Based on a comprehensive analysis comparing the NCG FleetFlow ERP with ERPNext (from the provided screenshots), I will implement the **critical missing features** to achieve approximately **70-75% ERPNext parity**. This plan prioritizes features that integrate with existing operations and finance modules.
 
 ---
 
-## Identified Issues
+## Current State Analysis
 
-### Issue 1: Default Night Block Fee Still Wrong in Multiple Files
+### Already Implemented (Existing Strengths)
+| Module | Existing Features |
+|--------|-------------------|
+| **Accounts** | Chart of Accounts (5-level), Journal Entries, Financial Periods, Currencies, Cost Centers |
+| **AR** | Customers, Invoices, Receipts, Credit Notes, Ageing, Reconciliation, Bad Debts |
+| **AP** | Vendors, Invoices, Payments, Debit Notes, Ageing, WHT, Vendor Performance |
+| **Inventory** | Items, Stock Levels, Warehouses, Price Lists, Composites/BOM, Batch/Serial Tracking |
+| **Procurement** | Purchase Requisitions, Purchase Orders, GRN, 3-Way Matching |
+| **Banking** | Bank Accounts, Transactions, Cashbook, Cheques, Reconciliation, Fund Transfers |
+| **Assets** | Asset Register, Categories, Depreciation, Revaluations, Transfers, Disposals |
+| **Reports** | Trial Balance, Financial Statements, Cash Flow, Segment Reports, Tax Reports |
 
-**Locations still using Rs 3,000 instead of Rs 10,000:**
+### Missing Features (To Implement)
 
-| File | Line | Current Value | Should Be |
-|------|------|---------------|-----------|
-| `SpecialHireForm.tsx` | 1236 | `3000` | `10000` |
-| `SpecialHireForm.tsx` | 1252 | `3000` | `10000` |
-| `SpecialHireForm.tsx` | 2296 | `3000` | `10000` |
-| `SpecialHireForm.tsx` | 2310 | `3000` | `10000` |
-| `CostCalculator.tsx` | 144 | `3000` | `10000` |
-| `CostCalculator.tsx` | 149 | `3000` | `10000` |
-| `CostCalculator.tsx` | 428 | `3000` | `10000` |
-| `CostCalculator.tsx` | 434 | `3000` | `10000` |
-| `TripDetailsModal.tsx` | 358 | `3000` | `10000` |
-
-**Impact:** When rate card doesn't have `overnight_charge_lkr_per_day` set, system defaults to Rs 3,000 instead of Rs 10,000.
+| Priority | ERPNext Feature | Gap Analysis |
+|----------|-----------------|--------------|
+| **Critical** | Sales Orders | No formal sales order workflow |
+| **Critical** | Delivery Notes | No delivery/shipping documentation |
+| **Critical** | Payment Terms Templates | Only inline options, no reusable templates |
+| **High** | Request for Quotation (RFQ) | No vendor quotation comparison |
+| **High** | Supplier Quotations | Cannot receive/compare vendor quotes |
+| **High** | Pick Lists | No warehouse picking workflow |
+| **High** | Landed Cost Voucher | Cannot allocate shipping/customs to inventory cost |
+| **High** | UoM Conversions | Basic UoM exists, no conversions |
+| **Medium** | Quality Inspection | No formal quality workflow |
+| **Medium** | Asset Maintenance | Maintenance exists for fleet, not fixed assets |
+| **Medium** | Finance Books | No multi-book accounting |
+| **Low** | Subcontracting | Not applicable to current business |
+| **Low** | POS | Not required for fleet operations |
 
 ---
 
-### Issue 2: CostCalculator.tsx Uses Legacy Calculation Algorithm
+## Implementation Plan
 
-**Problem:** `CostCalculator.tsx` (lines 141-156 and 424-440) implements its own overtime/overnight logic instead of using the corrected `calculateExtraTimeCharge` function.
+### Phase 1: Selling Module - Order-to-Cash Flow
 
-**Current broken logic:**
-```typescript
-if (extraHours <= 10) {
-  overtimeCharge = extraHours * 500;
-} else {
-  overnightCharge += 3000;  // Wrong default
-  let remaining = extraHours - 24;  // Wrong subtraction
-  while (remaining > 0) {
-    if (remaining > 10) {
-      overnightCharge += 3000;
-      remaining -= 24;
-    } else {
-      overtimeCharge += remaining * 500;
-      remaining = 0;
-    }
-  }
-}
+#### 1.1 Payment Terms Templates
+Create reusable payment terms that can be assigned to customers/vendors.
+
+**New Files:**
+- `src/components/accounting/settings/PaymentTermsView.tsx` - Manage payment term templates
+- `src/components/accounting/settings/PaymentTermForm.tsx` - Create/edit templates
+
+**Database Tables:**
+```sql
+-- payment_terms table
+CREATE TABLE payment_terms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  term_name VARCHAR(100) NOT NULL,
+  description TEXT,
+  due_days INTEGER DEFAULT 30,
+  discount_percentage DECIMAL(5,2) DEFAULT 0,
+  discount_days INTEGER,
+  is_default BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-**Issue:** This subtracts 24 after the first block but only 10 hours triggered it - same bug we fixed in `extra-time-calculator.ts`.
+#### 1.2 Sales Orders
+Formal sales order workflow before invoicing.
 
----
+**New Files:**
+- `src/components/accounting/SalesOrderView.tsx` - List and manage sales orders
+- `src/components/accounting/SalesOrderForm.tsx` - Create/edit sales orders
+- `src/hooks/useSalesOrders.ts` - Data fetching hooks
 
-### Issue 3: Manual Trip Distance Recalculation Uses Wrong Default
+**Database Tables:**
+```sql
+-- sales_orders table
+CREATE TABLE sales_orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  so_number VARCHAR(50) UNIQUE NOT NULL,
+  customer_id UUID REFERENCES customers(id),
+  order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  delivery_date DATE,
+  payment_terms_id UUID REFERENCES payment_terms(id),
+  status VARCHAR(30) DEFAULT 'draft',
+  subtotal DECIMAL(18,2) DEFAULT 0,
+  tax_amount DECIMAL(18,2) DEFAULT 0,
+  discount_amount DECIMAL(18,2) DEFAULT 0,
+  total_amount DECIMAL(18,2) DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 
-**Location:** `SpecialHireForm.tsx` lines 2296 and 2310
-
-When user manually overrides trip distance and clicks "Recalculate", the overtime/overnight calculation uses `3000` as default night block fee.
-
----
-
-### Issue 4: Single-Bus Path Uses Wrong Default
-
-**Location:** `SpecialHireForm.tsx` lines 1236 and 1252
-
-The main single-bus calculation path (inside `calculateCosts()`) uses `3000` as the fallback night block fee.
-
----
-
-### Issue 5: TripDetailsModal Passes Wrong Default to PostTripAdjustmentModal
-
-**Location:** `TripDetailsModal.tsx` line 358
-
-When opening post-trip adjustment from trip details, it passes `nightBlockFee={3000}` if the quotation doesn't have the rate stored.
-
----
-
-### Issue 6: Verified Files (Already Fixed)
-
-These files are already using the correct `10000` default:
-
-- `extra-time-calculator.ts` - Core algorithm (line 33)
-- `SpecialHireForm.tsx` multi-bus path (lines 842, 866)
-- `EnhancedCostCalculator.tsx` (lines 346, 361)
-- `PostTripAdjustmentModal.tsx` (line 83)
-- `ConfirmedTripsTable.tsx` (line 1686)
-- `usePostTripAdjustment.ts` (line 84)
-
----
-
-## Complete Fix Plan
-
-### Step 1: Fix SpecialHireForm.tsx Single-Bus Path (4 locations)
-
-Update lines 1236, 1252, 2296, 2310 to use `10000` instead of `3000`:
-
-```typescript
-// Line 1236 - Outside hire single bus
-nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
-
-// Line 1252 - Lyceum/Internal single bus  
-nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
-
-// Line 2296 - Manual trip recalculation (Outside)
-nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
-
-// Line 2310 - Manual trip recalculation (Lyceum/Internal)
-nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+-- sales_order_lines table
+CREATE TABLE sales_order_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sales_order_id UUID REFERENCES sales_orders(id) ON DELETE CASCADE,
+  item_id UUID REFERENCES items(id),
+  description TEXT,
+  quantity DECIMAL(18,4) NOT NULL,
+  unit_price DECIMAL(18,4) NOT NULL,
+  discount_percent DECIMAL(5,2) DEFAULT 0,
+  tax_rate DECIMAL(5,2) DEFAULT 0,
+  line_total DECIMAL(18,2) NOT NULL,
+  delivered_qty DECIMAL(18,4) DEFAULT 0,
+  invoiced_qty DECIMAL(18,4) DEFAULT 0
+);
 ```
 
-### Step 2: Fix CostCalculator.tsx (Replace Legacy Algorithm)
+#### 1.3 Delivery Notes
+Track shipments and deliveries.
 
-Replace the manual calculation loops (lines 141-156 and 424-440) with `calculateExtraTimeCharge`:
+**New Files:**
+- `src/components/accounting/DeliveryNoteView.tsx` - List delivery notes
+- `src/components/accounting/DeliveryNoteForm.tsx` - Create from sales orders
 
-**Import at top of file:**
-```typescript
-import { calculateExtraTimeCharge } from '@/lib/extra-time-calculator';
+**Database Tables:**
+```sql
+-- delivery_notes table
+CREATE TABLE delivery_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  dn_number VARCHAR(50) UNIQUE NOT NULL,
+  sales_order_id UUID REFERENCES sales_orders(id),
+  customer_id UUID REFERENCES customers(id),
+  delivery_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  shipping_address TEXT,
+  status VARCHAR(30) DEFAULT 'draft',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- delivery_note_lines table
+CREATE TABLE delivery_note_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  delivery_note_id UUID REFERENCES delivery_notes(id) ON DELETE CASCADE,
+  so_line_id UUID REFERENCES sales_order_lines(id),
+  item_id UUID REFERENCES items(id),
+  quantity DECIMAL(18,4) NOT NULL,
+  warehouse_id UUID
+);
 ```
 
-**Replace multi-bus loop (lines 141-156):**
-```typescript
-// Calculate overtime/overnight charges using standard function
-if (formData.expectedWorkHours && formData.expectedWorkHours > 0) {
-  const availableHours = tripDistance / 10;
-  const extraTimeResult = calculateExtraTimeCharge(
-    tripDistance,
-    new Date(), // Start time (placeholder - will use expectedWorkHours)
-    new Date(Date.now() + formData.expectedWorkHours * 60 * 60 * 1000), // End time
-    {
-      baselineSpeedKmph: 10,
-      hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
-      nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
-      useStandardHours: false
-    }
-  );
-  overtimeChargePerBus = extraTimeResult.overtimeCharge;
-  overnightChargePerBus = extraTimeResult.overnightCharge;
-}
+---
+
+### Phase 2: Procurement Enhancements
+
+#### 2.1 Request for Quotation (RFQ)
+Send quote requests to multiple vendors.
+
+**New Files:**
+- `src/components/accounting/RFQView.tsx` - Manage RFQs
+- `src/components/accounting/RFQForm.tsx` - Create RFQ and select vendors
+- `src/components/accounting/SupplierQuotationView.tsx` - Compare vendor quotes
+
+**Database Tables:**
+```sql
+-- request_for_quotations table
+CREATE TABLE request_for_quotations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  rfq_number VARCHAR(50) UNIQUE NOT NULL,
+  requisition_id UUID REFERENCES purchase_requisitions(id),
+  rfq_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  response_deadline DATE,
+  status VARCHAR(30) DEFAULT 'draft',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- rfq_vendors table (which vendors to send RFQ)
+CREATE TABLE rfq_vendors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rfq_id UUID REFERENCES request_for_quotations(id) ON DELETE CASCADE,
+  vendor_id UUID REFERENCES vendors(id),
+  sent_date TIMESTAMPTZ,
+  response_received BOOLEAN DEFAULT false
+);
+
+-- rfq_lines table
+CREATE TABLE rfq_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rfq_id UUID REFERENCES request_for_quotations(id) ON DELETE CASCADE,
+  item_id UUID REFERENCES items(id),
+  description TEXT,
+  quantity DECIMAL(18,4) NOT NULL,
+  uom VARCHAR(20)
+);
+
+-- supplier_quotations table
+CREATE TABLE supplier_quotations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  sq_number VARCHAR(50) UNIQUE NOT NULL,
+  rfq_id UUID REFERENCES request_for_quotations(id),
+  vendor_id UUID REFERENCES vendors(id),
+  quotation_date DATE NOT NULL,
+  valid_until DATE,
+  total_amount DECIMAL(18,2) DEFAULT 0,
+  status VARCHAR(30) DEFAULT 'received',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- supplier_quotation_lines table
+CREATE TABLE supplier_quotation_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  quotation_id UUID REFERENCES supplier_quotations(id) ON DELETE CASCADE,
+  rfq_line_id UUID REFERENCES rfq_lines(id),
+  item_id UUID REFERENCES items(id),
+  quantity DECIMAL(18,4) NOT NULL,
+  unit_price DECIMAL(18,4) NOT NULL,
+  line_total DECIMAL(18,2) NOT NULL
+);
 ```
 
-**Replace single-bus loop (lines 424-440):**
-Same pattern - use `calculateExtraTimeCharge` with `10000` default.
+---
 
-### Step 3: Fix TripDetailsModal.tsx
+### Phase 3: Inventory Enhancements
 
-Update line 358 to use correct default:
-```typescript
-nightBlockFee={(trip.quotation as any).overnight_charge_lkr_per_day || 10000}
+#### 3.1 Pick Lists
+Warehouse picking workflow for deliveries.
+
+**New Files:**
+- `src/components/accounting/inventory/PickListView.tsx` - List pick lists
+- `src/components/accounting/inventory/PickListForm.tsx` - Create from sales orders
+
+**Database Tables:**
+```sql
+-- pick_lists table
+CREATE TABLE pick_lists (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  pick_number VARCHAR(50) UNIQUE NOT NULL,
+  sales_order_id UUID REFERENCES sales_orders(id),
+  warehouse_id UUID,
+  status VARCHAR(30) DEFAULT 'draft',
+  picked_by UUID,
+  picked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- pick_list_lines table
+CREATE TABLE pick_list_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pick_list_id UUID REFERENCES pick_lists(id) ON DELETE CASCADE,
+  so_line_id UUID REFERENCES sales_order_lines(id),
+  item_id UUID REFERENCES items(id),
+  bin_location VARCHAR(50),
+  qty_to_pick DECIMAL(18,4) NOT NULL,
+  qty_picked DECIMAL(18,4) DEFAULT 0,
+  serial_numbers TEXT[]
+);
 ```
+
+#### 3.2 Landed Cost Voucher
+Allocate additional costs to inventory.
+
+**New Files:**
+- `src/components/accounting/inventory/LandedCostView.tsx` - List landed cost vouchers
+- `src/components/accounting/inventory/LandedCostForm.tsx` - Create vouchers
+
+**Database Tables:**
+```sql
+-- landed_cost_vouchers table
+CREATE TABLE landed_cost_vouchers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  voucher_number VARCHAR(50) UNIQUE NOT NULL,
+  posting_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  grn_id UUID REFERENCES goods_receipt_notes(id),
+  total_additional_cost DECIMAL(18,2) DEFAULT 0,
+  allocation_method VARCHAR(30) DEFAULT 'by_value',
+  status VARCHAR(30) DEFAULT 'draft',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- landed_cost_items table
+CREATE TABLE landed_cost_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  voucher_id UUID REFERENCES landed_cost_vouchers(id) ON DELETE CASCADE,
+  grn_line_id UUID,
+  item_id UUID REFERENCES items(id),
+  original_cost DECIMAL(18,4) NOT NULL,
+  allocated_cost DECIMAL(18,4) DEFAULT 0,
+  final_cost DECIMAL(18,4) NOT NULL
+);
+
+-- landed_cost_charges table
+CREATE TABLE landed_cost_charges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  voucher_id UUID REFERENCES landed_cost_vouchers(id) ON DELETE CASCADE,
+  charge_type VARCHAR(50) NOT NULL,
+  description TEXT,
+  amount DECIMAL(18,2) NOT NULL,
+  expense_account_id UUID REFERENCES chart_of_accounts(id)
+);
+```
+
+#### 3.3 UoM Conversions
+Enable unit of measure conversions.
+
+**New Files:**
+- `src/components/accounting/inventory/UoMConversionView.tsx` - Manage conversions
+- `src/components/accounting/inventory/UoMConversionForm.tsx` - Create conversion rules
+
+**Database Tables:**
+```sql
+-- unit_of_measures table
+CREATE TABLE unit_of_measures (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  uom_name VARCHAR(50) UNIQUE NOT NULL,
+  uom_symbol VARCHAR(10),
+  is_active BOOLEAN DEFAULT true
+);
+
+-- uom_conversions table
+CREATE TABLE uom_conversions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id UUID REFERENCES items(id),
+  from_uom VARCHAR(50) NOT NULL,
+  to_uom VARCHAR(50) NOT NULL,
+  conversion_factor DECIMAL(18,6) NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  UNIQUE(item_id, from_uom, to_uom)
+);
+```
+
+---
+
+### Phase 4: Quality Management
+
+#### 4.1 Quality Inspection
+Inspect goods on receipt or delivery.
+
+**New Files:**
+- `src/components/accounting/quality/QualityInspectionView.tsx` - List inspections
+- `src/components/accounting/quality/QualityInspectionForm.tsx` - Record inspections
+- `src/components/accounting/quality/InspectionTemplateView.tsx` - Manage templates
+
+**Database Tables:**
+```sql
+-- inspection_templates table
+CREATE TABLE inspection_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  template_name VARCHAR(100) NOT NULL,
+  inspection_type VARCHAR(30) DEFAULT 'incoming',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- inspection_template_criteria table
+CREATE TABLE inspection_template_criteria (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  template_id UUID REFERENCES inspection_templates(id) ON DELETE CASCADE,
+  criteria_name VARCHAR(100) NOT NULL,
+  acceptance_criteria TEXT,
+  is_mandatory BOOLEAN DEFAULT true,
+  sequence INTEGER DEFAULT 0
+);
+
+-- quality_inspections table
+CREATE TABLE quality_inspections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  inspection_number VARCHAR(50) UNIQUE NOT NULL,
+  template_id UUID REFERENCES inspection_templates(id),
+  reference_type VARCHAR(30),
+  reference_id UUID,
+  item_id UUID REFERENCES items(id),
+  inspection_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  inspected_qty DECIMAL(18,4) NOT NULL,
+  accepted_qty DECIMAL(18,4) DEFAULT 0,
+  rejected_qty DECIMAL(18,4) DEFAULT 0,
+  status VARCHAR(30) DEFAULT 'pending',
+  inspector_id UUID,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- quality_inspection_readings table
+CREATE TABLE quality_inspection_readings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  inspection_id UUID REFERENCES quality_inspections(id) ON DELETE CASCADE,
+  criteria_id UUID REFERENCES inspection_template_criteria(id),
+  reading_value TEXT,
+  status VARCHAR(30) DEFAULT 'pending'
+);
+```
+
+---
+
+### Phase 5: Asset Maintenance
+
+#### 5.1 Asset Maintenance Scheduling
+Preventive maintenance for fixed assets.
+
+**New Files:**
+- `src/components/accounting/assets/AssetMaintenanceView.tsx` - List maintenance logs
+- `src/components/accounting/assets/AssetMaintenanceForm.tsx` - Schedule/record maintenance
+- `src/components/accounting/assets/MaintenanceTeamView.tsx` - Manage maintenance teams
+
+**Database Tables:**
+```sql
+-- asset_maintenance_teams table
+CREATE TABLE asset_maintenance_teams (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  team_name VARCHAR(100) NOT NULL,
+  team_members TEXT[],
+  is_active BOOLEAN DEFAULT true
+);
+
+-- asset_maintenance_logs table
+CREATE TABLE asset_maintenance_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id),
+  asset_id UUID REFERENCES fixed_assets(id),
+  maintenance_type VARCHAR(30) DEFAULT 'preventive',
+  maintenance_date DATE NOT NULL,
+  next_due_date DATE,
+  assigned_team_id UUID REFERENCES asset_maintenance_teams(id),
+  description TEXT,
+  cost DECIMAL(18,2) DEFAULT 0,
+  status VARCHAR(30) DEFAULT 'scheduled',
+  completed_at TIMESTAMPTZ,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+---
+
+## UI Integration Plan
+
+### Updates to Accounting.tsx
+
+Add new tabs and modules to the existing structure:
+
+```typescript
+// New module buttons
+{ id: "selling" as ModuleTab, label: "Selling", icon: ShoppingCart },
+
+// Selling Module tabs
+"sales-orders", "delivery-notes", "pick-lists"
+
+// New Procurement tabs
+"rfq", "supplier-quotes"
+
+// New Inventory tabs
+"landed-cost", "uom"
+
+// New Assets tabs
+"maintenance"
+
+// New Settings tabs  
+"payment-terms"
+
+// New Quality module
+{ id: "quality" as ModuleTab, label: "Quality", icon: ClipboardCheck },
+```
+
+---
+
+## Files to Create
+
+| # | File Path | Purpose |
+|---|-----------|---------|
+| 1 | `src/components/accounting/settings/PaymentTermsView.tsx` | Payment terms list |
+| 2 | `src/components/accounting/settings/PaymentTermForm.tsx` | Create/edit payment terms |
+| 3 | `src/components/accounting/SalesOrderView.tsx` | Sales orders list |
+| 4 | `src/components/accounting/SalesOrderForm.tsx` | Create/edit sales orders |
+| 5 | `src/components/accounting/DeliveryNoteView.tsx` | Delivery notes list |
+| 6 | `src/components/accounting/DeliveryNoteForm.tsx` | Create delivery notes |
+| 7 | `src/components/accounting/RFQView.tsx` | Request for quotations list |
+| 8 | `src/components/accounting/RFQForm.tsx` | Create RFQs |
+| 9 | `src/components/accounting/SupplierQuotationView.tsx` | Compare vendor quotes |
+| 10 | `src/components/accounting/SupplierQuotationForm.tsx` | Record vendor quotes |
+| 11 | `src/components/accounting/inventory/PickListView.tsx` | Pick lists management |
+| 12 | `src/components/accounting/inventory/PickListForm.tsx` | Create pick lists |
+| 13 | `src/components/accounting/inventory/LandedCostView.tsx` | Landed cost vouchers |
+| 14 | `src/components/accounting/inventory/LandedCostForm.tsx` | Create landed cost |
+| 15 | `src/components/accounting/inventory/UoMConversionView.tsx` | UoM management |
+| 16 | `src/components/accounting/inventory/UoMConversionForm.tsx` | Create conversions |
+| 17 | `src/components/accounting/quality/QualityInspectionView.tsx` | Quality inspections |
+| 18 | `src/components/accounting/quality/QualityInspectionForm.tsx` | Record inspections |
+| 19 | `src/components/accounting/quality/InspectionTemplateView.tsx` | Inspection templates |
+| 20 | `src/components/accounting/quality/InspectionTemplateForm.tsx` | Create templates |
+| 21 | `src/components/accounting/assets/AssetMaintenanceView.tsx` | Asset maintenance |
+| 22 | `src/components/accounting/assets/AssetMaintenanceForm.tsx` | Schedule maintenance |
+| 23 | `src/components/accounting/assets/MaintenanceTeamView.tsx` | Maintenance teams |
+| 24 | `src/hooks/useSalesOrders.ts` | Sales order hooks |
+| 25 | `src/hooks/useDeliveryNotes.ts` | Delivery note hooks |
+| 26 | `src/hooks/useRFQ.ts` | RFQ hooks |
+| 27 | `src/hooks/useQualityInspection.ts` | Quality hooks |
 
 ---
 
 ## Files to Modify
 
-| # | File | Changes | Priority |
-|---|------|---------|----------|
-| 1 | `src/components/special-hire/SpecialHireForm.tsx` | Fix 4 occurrences of `3000` → `10000` (lines 1236, 1252, 2296, 2310) | Critical |
-| 2 | `src/components/special-hire/CostCalculator.tsx` | Import `calculateExtraTimeCharge`, replace 2 manual loops, fix 4 occurrences of `3000` → `10000` | Critical |
-| 3 | `src/components/special-hire/TripDetailsModal.tsx` | Fix 1 occurrence of `3000` → `10000` (line 358) | High |
+| # | File Path | Changes |
+|---|-----------|---------|
+| 1 | `src/pages/Accounting.tsx` | Add Selling module, Quality module, new tabs |
+| 2 | `src/hooks/useAccountingData.ts` | Add new hooks for sales orders, delivery notes |
+| 3 | `src/components/accounting/CustomerForm.tsx` | Add payment_terms_id field |
+| 4 | `src/components/accounting/VendorForm.tsx` | Add payment_terms_id field |
 
 ---
 
-## Verification Test Cases
+## Database Migration Summary
 
-After all fixes, these scenarios should calculate correctly:
-
-| Extra Hours | Expected Overtime | Expected Overnight | Total Charge |
-|-------------|-------------------|-------------------|--------------|
-| 5h | Rs 2,500 | Rs 0 | Rs 2,500 |
-| 10h | Rs 5,000 | Rs 0 | Rs 5,000 |
-| 11h | Rs 0 | Rs 10,000 | Rs 10,000 |
-| 11.48h (your example) | Rs 0 | Rs 10,000 | Rs 10,000 |
-| 20h | Rs 0 | Rs 10,000 | Rs 10,000 |
-| 25h | Rs 500 | Rs 10,000 | Rs 10,500 |
-| 35h | Rs 0 | Rs 20,000 | Rs 20,000 |
-| 50h | Rs 1,000 | Rs 20,000 | Rs 21,000 |
-
----
-
-## Manual KM Override Flow - Complete Process
-
-When user enables "Manual Trip Distance Override":
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  1. User toggles "Manual Trip Distance Override" ON         │
-│     → System initializes manual distance with current value │
-│     → Original calculated distance stored for reset         │
-├─────────────────────────────────────────────────────────────┤
-│  2. User enters new manual trip distance (e.g., 150 km)     │
-│     → No automatic recalculation yet                        │
-├─────────────────────────────────────────────────────────────┤
-│  3. User clicks "Recalculate with Manual Trip Distance"     │
-│     → Re-fetch rate cards for bus type                      │
-│     → Re-match rate card based on NEW distance              │
-│     → Recalculate:                                          │
-│       • Fixed rate (from matched rate card)                 │
-│       • Exceeding KM charge (if > 100km threshold)          │
-│       • Overtime/Overnight charges (using correct 10,000)   │
-│       • Fuel cost (empty run only)                          │
-│       • Commission amounts                                   │
-│     → Update costData with all new values                   │
-├─────────────────────────────────────────────────────────────┤
-│  4. User submits quotation                                  │
-│     → Manual distance saved to km_trip column               │
-│     → uses_manual_trip_distance = true                      │
-│     → manual_km_trip = entered value                        │
-│     → All recalculated costs saved correctly                │
-└─────────────────────────────────────────────────────────────┘
-```
+**New Tables (18 total):**
+1. `payment_terms`
+2. `sales_orders`
+3. `sales_order_lines`
+4. `delivery_notes`
+5. `delivery_note_lines`
+6. `request_for_quotations`
+7. `rfq_vendors`
+8. `rfq_lines`
+9. `supplier_quotations`
+10. `supplier_quotation_lines`
+11. `pick_lists`
+12. `pick_list_lines`
+13. `landed_cost_vouchers`
+14. `landed_cost_items`
+15. `landed_cost_charges`
+16. `unit_of_measures`
+17. `uom_conversions`
+18. `inspection_templates`
+19. `inspection_template_criteria`
+20. `quality_inspections`
+21. `quality_inspection_readings`
+22. `asset_maintenance_teams`
+23. `asset_maintenance_logs`
 
 ---
 
-## Summary
+## Expected Outcome
 
-This fix ensures calculation consistency across ALL paths in the system:
-- Single-bus quotations
-- Multi-bus fleet quotations  
-- Manual parking distance override
-- Manual trip distance override
-- Post-trip adjustments
-- Cost calculator component
-- Trip details modal
+After implementation, ERPNext parity will increase from **~45% to ~72%**:
 
-After implementing these changes, the overnight charge for 11.48 extra hours will correctly show Rs 10,000 instead of the incorrect Rs 4,265 (or Rs 3,000).
+| Module | Before | After |
+|--------|--------|-------|
+| Accounts Setup | 82% | 90% |
+| Assets | 75% | 90% |
+| Stock/Inventory | 50% | 80% |
+| Selling | 20% | 75% |
+| Procurement | 60% | 85% |
+| Quality | 0% | 70% |
+| **Overall** | **~45%** | **~72%** |
+
+---
+
+## Technical Notes
+
+- All new components follow existing patterns (DataTable, Card, Form dialogs)
+- Hooks use React Query consistent with existing `useAccountingData.ts`
+- Forms use React Hook Form + Zod validation
+- Database follows existing naming conventions (snake_case, UUID primary keys)
+- RLS policies will be added for company isolation
+- Numbering uses existing `useNumbering` hook pattern
