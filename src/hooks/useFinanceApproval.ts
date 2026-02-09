@@ -244,9 +244,12 @@ export const useFinanceApproval = () => {
               console.log('[SPH Finance] ✅ Balance payment posted:', journalEntry.entry_number);
               toast.success(`GL Entry created: ${journalEntry.entry_number}`);
             }
+          }
 
-            // Step 2d: Update AR Invoice and create Receipt for balance payment
-            if (arInvoiceId && customerId) {
+          // Step 2d: Create AR Receipt (for ALL payment types) after GL posting
+          if (arInvoiceId && customerId) {
+            // For balance payments, update the AR Invoice first
+            if (isBalance) {
               console.log('[SPH Finance] Updating AR Invoice on balance payment...');
               const arUpdateResult = await updateSPHARInvoiceOnPayment({
                 arInvoiceId,
@@ -258,22 +261,25 @@ export const useFinanceApproval = () => {
               if (arUpdateResult) {
                 console.log('[SPH Finance] ✅ AR Invoice updated');
               }
+            }
 
-              console.log('[SPH Finance] Creating AR Receipt...');
-              const receiptResult = await createSPHARReceipt({
-                customerId,
-                arInvoiceId,
-                paymentAmount: paymentData.amount,
-                paymentMethod: paymentData.payment_method || 'cash',
-                reference: paymentData.reference_no,
-                paymentId,
-                companyId: NCG_HOLDING_ID,
-                journalEntryId: journalEntry?.id,
-              });
+            console.log('[SPH Finance] Creating AR Receipt...');
+            const receiptResult = await createSPHARReceipt({
+              customerId,
+              arInvoiceId,
+              paymentAmount: paymentData.amount,
+              paymentMethod: paymentData.payment_method || 'cash',
+              reference: paymentData.reference_no,
+              paymentId,
+              companyId: NCG_HOLDING_ID,
+              journalEntryId: journalEntry?.id,
+            });
 
-              if (receiptResult) {
-                console.log('[SPH Finance] ✅ AR Receipt created:', receiptResult.receiptNumber);
-              }
+            if (receiptResult) {
+              console.log('[SPH Finance] ✅ AR Receipt created:', receiptResult.receiptNumber);
+              toast.success(`AR Receipt created: ${receiptResult.receiptNumber}`);
+            } else {
+              console.warn('[SPH Finance] ⚠️ Failed to create AR Receipt');
             }
           }
 
