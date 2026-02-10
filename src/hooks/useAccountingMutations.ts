@@ -436,6 +436,27 @@ export const useCreateARReceipt = () => {
           }
         }
       }
+
+      // Auto-create cheque register entry for cheque receipts
+      if (receipt.payment_method === "cheque") {
+        const customerName = (() => {
+          // We don't have customer name here easily, use receipt number
+          return `Customer Receipt ${receipt.receipt_number}`;
+        })();
+        
+        await supabase.from("cheque_register").insert([{
+          cheque_number: receipt.reference || `CHQ-${data.id.slice(0, 8)}`,
+          bank_account_id: receipt.bank_account_id,
+          cheque_date: receipt.receipt_date,
+          amount: receipt.amount,
+          status: "draft",
+          payee: customerName,
+          company_id: selectedCompanyId,
+          cheque_type: "incoming",
+          ar_receipt_id: data.id,
+          reference: receipt.reference || receipt.receipt_number,
+        } as any]);
+      }
       
       return data;
     },
@@ -693,6 +714,22 @@ export const useCreateAPPayment = () => {
             .update({ current_balance: newBalance })
             .eq("id", payment.bank_account_id);
         }
+      }
+
+      // Auto-create cheque register entry for cheque payments
+      if (payment.payment_method === "cheque" && payment.cheque_number) {
+        await supabase.from("cheque_register").insert([{
+          cheque_number: payment.cheque_number,
+          bank_account_id: payment.bank_account_id,
+          cheque_date: payment.cheque_date || payment.payment_date,
+          amount: payment.amount,
+          status: "draft",
+          payee: vendorName,
+          company_id: selectedCompanyId,
+          cheque_type: "outgoing",
+          payment_id: data.id,
+          reference: payment.reference || payment.payment_number,
+        } as any]);
       }
       
       return data;
@@ -2455,6 +2492,9 @@ export const useCreateCheque = () => {
       amount: number;
       status: string;
       reference?: string;
+      cheque_type?: string;
+      payment_id?: string;
+      ar_receipt_id?: string;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
@@ -2468,7 +2508,11 @@ export const useCreateCheque = () => {
           status: cheque.status,
           payee: cheque.payee_name,
           company_id: selectedCompanyId,
-        }])
+          cheque_type: cheque.cheque_type || "outgoing",
+          reference: cheque.reference,
+          payment_id: cheque.payment_id,
+          ar_receipt_id: cheque.ar_receipt_id,
+        } as any])
         .select()
         .single();
       
@@ -2477,9 +2521,9 @@ export const useCreateCheque = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cheque-register", selectedCompanyId] });
-      toast.success("Cheque issued successfully");
+      toast.success("Cheque recorded successfully");
     },
-    onError: (error) => toast.error(`Failed to issue cheque: ${error.message}`),
+    onError: (error) => toast.error(`Failed to record cheque: ${error.message}`),
   });
 };
 

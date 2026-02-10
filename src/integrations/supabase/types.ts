@@ -2398,6 +2398,103 @@ export type Database = {
           },
         ]
       }
+      bank_fee_charges: {
+        Row: {
+          amount: number
+          ap_payment_id: string | null
+          ar_receipt_id: string | null
+          bank_account_id: string | null
+          bank_transaction_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          fee_date: string
+          fee_type: string
+          id: string
+          journal_entry_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          ap_payment_id?: string | null
+          ar_receipt_id?: string | null
+          bank_account_id?: string | null
+          bank_transaction_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          fee_date?: string
+          fee_type?: string
+          id?: string
+          journal_entry_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          ap_payment_id?: string | null
+          ar_receipt_id?: string | null
+          bank_account_id?: string | null
+          bank_transaction_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          fee_date?: string
+          fee_type?: string
+          id?: string
+          journal_entry_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_fee_charges_ap_payment_id_fkey"
+            columns: ["ap_payment_id"]
+            isOneToOne: false
+            referencedRelation: "ap_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_fee_charges_ar_receipt_id_fkey"
+            columns: ["ar_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_fee_charges_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_fee_charges_bank_transaction_id_fkey"
+            columns: ["bank_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "bank_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_fee_charges_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_fee_charges_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_reconciliation_items: {
         Row: {
           bank_transaction_id: string | null
@@ -4333,6 +4430,7 @@ export type Database = {
       cheque_register: {
         Row: {
           amount: number
+          ar_receipt_id: string | null
           bank_account_id: string | null
           bounce_reason: string | null
           bounced_date: string | null
@@ -4340,19 +4438,23 @@ export type Database = {
           cancelled_date: string | null
           cheque_date: string
           cheque_number: string
+          cheque_type: string | null
           cleared_date: string | null
           company_id: string | null
           created_at: string | null
           created_by: string | null
           id: string
+          memo: string | null
           notes: string | null
           payee: string
           payment_id: string | null
+          reference: string | null
           status: string | null
           updated_at: string | null
         }
         Insert: {
           amount: number
+          ar_receipt_id?: string | null
           bank_account_id?: string | null
           bounce_reason?: string | null
           bounced_date?: string | null
@@ -4360,19 +4462,23 @@ export type Database = {
           cancelled_date?: string | null
           cheque_date: string
           cheque_number: string
+          cheque_type?: string | null
           cleared_date?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
+          memo?: string | null
           notes?: string | null
           payee: string
           payment_id?: string | null
+          reference?: string | null
           status?: string | null
           updated_at?: string | null
         }
         Update: {
           amount?: number
+          ar_receipt_id?: string | null
           bank_account_id?: string | null
           bounce_reason?: string | null
           bounced_date?: string | null
@@ -4380,18 +4486,28 @@ export type Database = {
           cancelled_date?: string | null
           cheque_date?: string
           cheque_number?: string
+          cheque_type?: string | null
           cleared_date?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
+          memo?: string | null
           notes?: string | null
           payee?: string
           payment_id?: string | null
+          reference?: string | null
           status?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cheque_register_ar_receipt_id_fkey"
+            columns: ["ar_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cheque_register_bank_account_id_fkey"
             columns: ["bank_account_id"]

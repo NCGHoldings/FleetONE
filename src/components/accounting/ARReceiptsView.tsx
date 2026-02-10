@@ -5,16 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, DollarSign, TrendingUp, Wallet, Eye, Printer, ArrowRightLeft } from "lucide-react";
+import { Plus, Search, DollarSign, TrendingUp, Wallet, Eye, Printer, ArrowRightLeft, Landmark } from "lucide-react";
 import { format, startOfMonth, endOfMonth, isToday, isWithinInterval } from "date-fns";
 import { useARReceipts, useCustomers } from "@/hooks/useAccountingData";
+import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ARReceiptForm } from "./ARReceiptForm";
 import { FinanceDocumentPreviewModal } from "./shared/FinanceDocumentPreviewModal";
+import { BankFeeForm } from "./BankFeeForm";
 
 export const ARReceiptsView = () => {
   const { data: receipts, isLoading } = useARReceipts();
   const { data: customers } = useCustomers();
+  const { data: bankFees } = useBankFees();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<string>("_all");
@@ -24,14 +27,19 @@ export const ARReceiptsView = () => {
   const [isAdvanceMode, setIsAdvanceMode] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const [bankFeeOpen, setBankFeeOpen] = useState(false);
+  const [feeReceiptId, setFeeReceiptId] = useState<string | undefined>();
+  const [feeBankAccountId, setFeeBankAccountId] = useState<string | undefined>();
 
-  // Get customer name helper
   const getCustomerName = (customerId: string) => {
     const customer = customers?.find(c => c.id === customerId);
     return customer?.customer_name || "Unknown";
   };
 
-  // Calculate summary metrics
+  const hasLinkedFees = (receiptId: string) => {
+    return bankFees?.some(f => f.ar_receipt_id === receiptId);
+  };
+
   const today = new Date();
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
@@ -46,7 +54,6 @@ export const ARReceiptsView = () => {
   const totalMonth = monthReceipts.reduce((sum, r) => sum + (r.amount || 0), 0);
   const totalAdvances = advanceReceipts.reduce((sum, r) => sum + (r.amount || 0), 0);
 
-  // Filter receipts
   const filteredReceipts = receipts?.filter(receipt => {
     const matchesSearch = 
       receipt.receipt_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -67,6 +74,12 @@ export const ARReceiptsView = () => {
   const handleViewReceipt = (receipt: any) => {
     setSelectedReceipt(receipt);
     setPreviewOpen(true);
+  };
+
+  const handleAddBankFee = (receipt: any) => {
+    setFeeReceiptId(receipt.id);
+    setFeeBankAccountId(receipt.bank_account_id);
+    setBankFeeOpen(true);
   };
 
   const getStatusBadge = (receipt: any) => {
@@ -216,7 +229,14 @@ export const ARReceiptsView = () => {
             ) : (
               filteredReceipts.map((receipt) => (
                 <TableRow key={receipt.id}>
-                  <TableCell className="font-mono font-medium">{receipt.receipt_number}</TableCell>
+                  <TableCell className="font-mono font-medium">
+                    <div className="flex items-center gap-1">
+                      {receipt.receipt_number}
+                      {hasLinkedFees(receipt.id) && (
+                        <Badge variant="outline" className="text-xs ml-1">Fees</Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{format(new Date(receipt.receipt_date), "MMM dd, yyyy")}</TableCell>
                   <TableCell>{getCustomerName(receipt.customer_id)}</TableCell>
                   <TableCell>{getPaymentMethodLabel(receipt.payment_method)}</TableCell>
@@ -229,6 +249,9 @@ export const ARReceiptsView = () => {
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" onClick={() => handleViewReceipt(receipt)}>
                         <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleAddBankFee(receipt)} title="Add Bank Fee">
+                        <Landmark className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon">
                         <Printer className="h-4 w-4" />
@@ -252,6 +275,14 @@ export const ARReceiptsView = () => {
         open={receiptFormOpen} 
         onOpenChange={setReceiptFormOpen}
         isAdvanceMode={isAdvanceMode}
+      />
+
+      {/* Bank Fee Form */}
+      <BankFeeForm
+        open={bankFeeOpen}
+        onOpenChange={setBankFeeOpen}
+        arReceiptId={feeReceiptId}
+        defaultBankAccountId={feeBankAccountId}
       />
 
       {/* Preview Modal */}
