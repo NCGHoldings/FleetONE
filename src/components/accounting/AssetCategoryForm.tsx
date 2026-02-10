@@ -20,6 +20,9 @@ const categorySchema = z.object({
   asset_account_id: z.string().optional(),
   accumulated_dep_account_id: z.string().optional(),
   depreciation_expense_account_id: z.string().optional(),
+  bank_account_id: z.string().optional(),
+  gain_loss_disposal_account_id: z.string().optional(),
+  revaluation_surplus_account_id: z.string().optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -36,6 +39,8 @@ export const AssetCategoryForm = ({ open, onOpenChange }: AssetCategoryFormProps
 
   const assetAccounts = accounts?.filter(a => a.account_type === "asset");
   const expenseAccounts = accounts?.filter(a => a.account_type === "expense");
+  const equityAccounts = accounts?.filter(a => a.account_type === "equity");
+  const revenueExpenseAccounts = accounts?.filter(a => a.account_type === "revenue" || a.account_type === "expense");
 
   const form = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
@@ -60,6 +65,9 @@ export const AssetCategoryForm = ({ open, onOpenChange }: AssetCategoryFormProps
         asset_account_id: data.asset_account_id,
         accumulated_dep_account_id: data.accumulated_dep_account_id,
         depreciation_expense_account_id: data.depreciation_expense_account_id,
+        bank_account_id: data.bank_account_id,
+        gain_loss_disposal_account_id: data.gain_loss_disposal_account_id,
+        revaluation_surplus_account_id: data.revaluation_surplus_account_id,
         is_active: data.is_active ?? true,
       });
       form.reset();
@@ -71,7 +79,7 @@ export const AssetCategoryForm = ({ open, onOpenChange }: AssetCategoryFormProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Asset Category</DialogTitle>
         </DialogHeader>
@@ -79,7 +87,7 @@ export const AssetCategoryForm = ({ open, onOpenChange }: AssetCategoryFormProps
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="category_code">Category Code *</Label>
+              <Label htmlFor="category_code">Category Code <span className="text-destructive">*</span></Label>
               <Input 
                 id="category_code" 
                 {...form.register("category_code")} 
@@ -108,7 +116,7 @@ export const AssetCategoryForm = ({ open, onOpenChange }: AssetCategoryFormProps
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category_name">Category Name *</Label>
+            <Label htmlFor="category_name">Category Name <span className="text-destructive">*</span></Label>
             <Input 
               id="category_name" 
               {...form.register("category_name")} 
@@ -139,61 +147,129 @@ export const AssetCategoryForm = ({ open, onOpenChange }: AssetCategoryFormProps
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="asset_account_id">Asset Account</Label>
-            <Select 
-              value={form.watch("asset_account_id")} 
-              onValueChange={(v) => form.setValue("asset_account_id", v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select asset account" />
-              </SelectTrigger>
-              <SelectContent>
-                {assetAccounts?.map((acc) => (
-                  <SelectItem key={acc.id} value={acc.id}>
-                    {acc.account_code} - {acc.account_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* GL Account Mappings */}
+          <div className="border-t pt-4 mt-4">
+            <h4 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">GL Account Mappings</h4>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="accumulated_dep_account_id">Accumulated Depreciation Account</Label>
-            <Select 
-              value={form.watch("accumulated_dep_account_id")} 
-              onValueChange={(v) => form.setValue("accumulated_dep_account_id", v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select contra-asset account" />
-              </SelectTrigger>
-              <SelectContent>
-                {assetAccounts?.map((acc) => (
-                  <SelectItem key={acc.id} value={acc.id}>
-                    {acc.account_code} - {acc.account_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Asset Account <span className="text-destructive">*</span></Label>
+              <Select 
+                value={form.watch("asset_account_id")} 
+                onValueChange={(v) => form.setValue("asset_account_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select asset account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assetAccounts?.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.account_code} - {acc.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Accumulated Depreciation Account <span className="text-destructive">*</span></Label>
+              <Select 
+                value={form.watch("accumulated_dep_account_id")} 
+                onValueChange={(v) => form.setValue("accumulated_dep_account_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select contra-asset account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assetAccounts?.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.account_code} - {acc.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="depreciation_expense_account_id">Depreciation Expense Account</Label>
-            <Select 
-              value={form.watch("depreciation_expense_account_id")} 
-              onValueChange={(v) => form.setValue("depreciation_expense_account_id", v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select expense account" />
-              </SelectTrigger>
-              <SelectContent>
-                {expenseAccounts?.map((acc) => (
-                  <SelectItem key={acc.id} value={acc.id}>
-                    {acc.account_code} - {acc.account_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Depreciation Expense Account <span className="text-destructive">*</span></Label>
+              <Select 
+                value={form.watch("depreciation_expense_account_id")} 
+                onValueChange={(v) => form.setValue("depreciation_expense_account_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select expense account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {expenseAccounts?.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.account_code} - {acc.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Bank/Cash Account (Acquisition) <span className="text-destructive">*</span></Label>
+              <Select 
+                value={form.watch("bank_account_id")} 
+                onValueChange={(v) => form.setValue("bank_account_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select bank/cash account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assetAccounts?.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.account_code} - {acc.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Gain/Loss on Disposal Account <span className="text-destructive">*</span></Label>
+              <Select 
+                value={form.watch("gain_loss_disposal_account_id")} 
+                onValueChange={(v) => form.setValue("gain_loss_disposal_account_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gain/loss account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {revenueExpenseAccounts?.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.account_code} - {acc.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Revaluation Surplus Account <span className="text-destructive">*</span></Label>
+              <Select 
+                value={form.watch("revaluation_surplus_account_id")} 
+                onValueChange={(v) => form.setValue("revaluation_surplus_account_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select equity account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {equityAccounts?.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.account_code} - {acc.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

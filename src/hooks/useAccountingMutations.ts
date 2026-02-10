@@ -831,10 +831,53 @@ export const useCreateFixedAsset = () => {
         .single();
       
       if (error) throw error;
+
+      // ========== ACQUISITION GL POSTING ==========
+      // Fetch category GL accounts
+      const { data: category } = await supabase
+        .from("asset_categories")
+        .select("asset_account_id, bank_account_id")
+        .eq("id", asset.category_id)
+        .single();
+
+      if (category?.asset_account_id && category?.bank_account_id) {
+        const { createAndPostJournalEntry, generateEntryNumber } = await import("@/lib/gl-posting-utils");
+        
+        const glResult = await createAndPostJournalEntry({
+          entry_date: asset.purchase_date,
+          description: `Asset Acquisition: ${asset.asset_name} (${asset.asset_code})`,
+          reference: `ACQ-${asset.asset_code}`,
+          company_id: selectedCompanyId,
+          lines: [
+            {
+              account_id: category.asset_account_id,
+              description: `Fixed Asset - ${asset.asset_name}`,
+              debit: asset.purchase_cost,
+              credit: 0,
+            },
+            {
+              account_id: category.bank_account_id,
+              description: `Cash/Bank Payment - ${asset.asset_name}`,
+              debit: 0,
+              credit: asset.purchase_cost,
+            },
+          ],
+        });
+
+        if (!glResult.success) {
+          console.warn("Acquisition GL posting failed:", glResult.error);
+          toast.warning("Asset registered but GL posting failed: " + glResult.error);
+        }
+      } else {
+        toast.warning("Asset registered — GL accounts not configured on category, no journal entry created.");
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fixed-assets", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Asset registered successfully");
     },
     onError: (error) => {
@@ -1596,16 +1639,18 @@ export const useCreateAssetDisposal = () => {
     mutationFn: async (data: { asset_id: string; disposal_date: string; disposal_type: string; disposal_value?: number; reason?: string }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
-      const { data: asset, error: assetError } = await supabase.from("fixed_assets").select("*").eq("id", data.asset_id).single();
+      const { data: asset, error: assetError } = await supabase.from("fixed_assets").select("*, asset_categories(asset_account_id, accumulated_dep_account_id, bank_account_id, gain_loss_disposal_account_id)").eq("id", data.asset_id).single();
       if (assetError) throw assetError;
       
       const nbv = asset.current_value || 0;
       const gainLoss = (data.disposal_value || 0) - nbv;
+      const accumulatedDep = asset.accumulated_depreciation || 0;
+      const purchaseCost = asset.purchase_cost || 0;
       
       const { data: result, error } = await supabase.from("asset_disposals").insert([{
         ...data,
         net_book_value: nbv,
-        accumulated_depreciation: asset.accumulated_depreciation || 0,
+        accumulated_depreciation: accumulatedDep,
         gain_loss: gainLoss,
         approval_status: "pending",
         company_id: selectedCompanyId,
@@ -1613,12 +1658,86 @@ export const useCreateAssetDisposal = () => {
       if (error) throw error;
       
       await supabase.from("fixed_assets").update({ status: "disposed" }).eq("id", data.asset_id);
+
+      // ========== DISPOSAL GL POSTING ==========
+      const cat = asset.asset_categories;
+      if (cat?.asset_account_id && cat?.accumulated_dep_account_id && cat?.gain_loss_disposal_account_id) {
+        const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
+        
+        const lines: Array<{ account_id: string; description: string; debit: number; credit: number }> = [];
+        
+        // DR Accumulated Depreciation (remove contra-asset)
+        if (accumulatedDep > 0) {
+          lines.push({
+            account_id: cat.accumulated_dep_account_id,
+            description: `Remove Accum Dep - ${asset.asset_name}`,
+            debit: accumulatedDep,
+            credit: 0,
+          });
+        }
+
+        // DR Bank (sale proceeds) if sold
+        if ((data.disposal_value || 0) > 0 && cat.bank_account_id) {
+          lines.push({
+            account_id: cat.bank_account_id,
+            description: `Disposal Proceeds - ${asset.asset_name}`,
+            debit: data.disposal_value || 0,
+            credit: 0,
+          });
+        }
+
+        // Handle Gain or Loss
+        if (gainLoss > 0) {
+          // Gain on disposal (credit)
+          lines.push({
+            account_id: cat.gain_loss_disposal_account_id,
+            description: `Gain on Disposal - ${asset.asset_name}`,
+            debit: 0,
+            credit: gainLoss,
+          });
+        } else if (gainLoss < 0) {
+          // Loss on disposal (debit)
+          lines.push({
+            account_id: cat.gain_loss_disposal_account_id,
+            description: `Loss on Disposal - ${asset.asset_name}`,
+            debit: Math.abs(gainLoss),
+            credit: 0,
+          });
+        }
+
+        // CR Fixed Asset (remove at cost)
+        lines.push({
+          account_id: cat.asset_account_id,
+          description: `Remove Asset at Cost - ${asset.asset_name}`,
+          debit: 0,
+          credit: purchaseCost,
+        });
+        
+        const glResult = await createAndPostJournalEntry({
+          entry_date: data.disposal_date,
+          description: `Asset Disposal: ${asset.asset_name} (${asset.asset_code})`,
+          reference: `DSP-${asset.asset_code}`,
+          company_id: selectedCompanyId,
+          lines,
+        });
+
+        if (glResult.success && glResult.journalEntryId) {
+          await supabase.from("asset_disposals").update({ journal_entry_id: glResult.journalEntryId }).eq("id", result.id);
+        } else {
+          console.warn("Disposal GL posting failed:", glResult.error);
+          toast.warning("Disposal recorded but GL posting failed: " + glResult.error);
+        }
+      } else {
+        toast.warning("Disposal recorded — GL accounts not fully configured on category.");
+      }
       
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["asset-disposals", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["fixed-assets", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Asset disposal recorded");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
@@ -2370,6 +2489,9 @@ export const useCreateAssetCategory = () => {
       asset_account_id?: string;
       accumulated_dep_account_id?: string;
       depreciation_expense_account_id?: string;
+      bank_account_id?: string;
+      gain_loss_disposal_account_id?: string;
+      revaluation_surplus_account_id?: string;
       is_active?: boolean;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
