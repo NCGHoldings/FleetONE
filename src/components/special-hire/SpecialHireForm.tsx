@@ -1571,7 +1571,11 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           total_expenses: initialData.total_expenses,
           net_profit: initialData.net_profit,
           customerTotalWithFuel: initialData.customer_total_with_fuel,
-          bus_fleet_details: safeParseJSON(initialData.bus_fleet_details, null)
+          bus_fleet_details: safeParseJSON(initialData.bus_fleet_details, null),
+          fixed_rate: initialData.fixed_rate ?? 0,
+          overtime_charge: initialData.overtime_charge ?? 0,
+          overnight_charge: initialData.overnight_charge ?? 0,
+          exceeding_distance_charge: initialData.exceeding_distance_charge ?? 0,
         };
 
         distanceData = {
@@ -1642,7 +1646,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         km_parking_to_pickup: useManualParkingDistance ? manualParkingToPickup : costs.km_parking_to_pickup,
         km_trip: useManualTripDistance ? manualTripDistance : costs.km_trip,
         km_drop_to_parking: useManualParkingDistance ? manualDropToParking : costs.km_drop_to_parking,
-        fuel_cost_fuel_only: (useManualParkingDistance || useManualTripDistance) ? (costData?.fuelCostFuelOnly || costs.fuel_cost_fuel_only) : costs.fuel_cost_fuel_only,
+        fuel_cost_fuel_only: (useManualParkingDistance || useManualTripDistance) ? (costData?.fuelCostFuelOnly ?? costs.fuel_cost_fuel_only) : costs.fuel_cost_fuel_only,
         uses_manual_trip_distance: useManualTripDistance,
         manual_km_trip: useManualTripDistance ? manualTripDistance : 0,
         hire_charge: costs.hire_charge,
@@ -1654,7 +1658,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         exceeding_distance_charge: costs.exceeding_distance_charge || 0,
         gross_revenue: costs.gross_revenue,
         driver_charge: costs.driver_charge,
-        other_expenses: costs.other_expenses,
+        other_expenses: typeof costs.other_expenses === 'string' ? costs.other_expenses : JSON.stringify(costs.other_expenses || []),
         commission_pct: costs.commission_pct,
         commission_pass_through_pct: Math.min(costs.commission_pass_through_pct, costs.commission_pct),
         commission_pass_through_amount: costs.commission_pass_through_amount,
@@ -1666,7 +1670,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         total_additional_charges: costs.total_additional_charges,
         total_expenses: costs.total_expenses,
         net_profit: costs.net_profit,
-        customer_total_with_fuel: costs.customerTotalWithFuel || costData?.customerTotalWithFuel,
+        customer_total_with_fuel: costs.customerTotalWithFuel ?? costData?.customerTotalWithFuel,
         bus_fleet_details: isMultiBusMode && costs.bus_fleet_details
           ? JSON.stringify(
               // Ensure we're saving the full object structure with buses, total_buses, etc.
