@@ -232,7 +232,7 @@ export function FuelExpenseForm({ open, onOpenChange }: FuelExpenseFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No specific bus</SelectItem>
+                        <SelectItem value="_none">No specific bus</SelectItem>
                         {buses?.map((bus) => (
                           <SelectItem key={bus.id} value={bus.id}>
                             {bus.bus_no} {bus.model ? `- ${bus.model}` : ''}

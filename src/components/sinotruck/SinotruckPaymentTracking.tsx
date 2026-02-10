@@ -502,7 +502,7 @@ export function SinotruckPaymentTracking({ orderId, onRefresh }: SinotruckPaymen
                     <SelectValue placeholder="Select schedule milestone" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">-- No Link --</SelectItem>
+                    <SelectItem value="_none">-- No Link --</SelectItem>
                     {schedules.filter(s => !s.is_paid).map((schedule) => (
                       <SelectItem key={schedule.id} value={schedule.id}>
                         {schedule.milestone_name} - LKR {schedule.amount?.toLocaleString()}

@@ -114,14 +114,14 @@ export const CostCenterForm = ({ open, onOpenChange }: CostCenterFormProps) => {
           <div className="space-y-2">
             <Label htmlFor="parent_id">Parent Cost Center</Label>
             <Select 
-              value={form.watch("parent_id")} 
-              onValueChange={(v) => form.setValue("parent_id", v)}
+              value={form.watch("parent_id") || "_none"} 
+              onValueChange={(v) => form.setValue("parent_id", v === "_none" ? "" : v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="None (Top Level)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (Top Level)</SelectItem>
+                <SelectItem value="_none">None (Top Level)</SelectItem>
                 {costCenters?.filter(cc => cc.is_active).map((cc) => (
                   <SelectItem key={cc.id} value={cc.id}>
                     {cc.center_code} - {cc.center_name}
