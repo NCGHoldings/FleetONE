@@ -1747,6 +1747,7 @@ export type Database = {
         Row: {
           accumulated_dep_account_id: string | null
           asset_account_id: string | null
+          bank_account_id: string | null
           category_code: string
           category_name: string
           company_id: string | null
@@ -1754,14 +1755,17 @@ export type Database = {
           depreciation_expense_account_id: string | null
           depreciation_method: string | null
           depreciation_rate: number | null
+          gain_loss_disposal_account_id: string | null
           id: string
           is_active: boolean | null
+          revaluation_surplus_account_id: string | null
           updated_at: string | null
           useful_life_years: number | null
         }
         Insert: {
           accumulated_dep_account_id?: string | null
           asset_account_id?: string | null
+          bank_account_id?: string | null
           category_code: string
           category_name: string
           company_id?: string | null
@@ -1769,14 +1773,17 @@ export type Database = {
           depreciation_expense_account_id?: string | null
           depreciation_method?: string | null
           depreciation_rate?: number | null
+          gain_loss_disposal_account_id?: string | null
           id?: string
           is_active?: boolean | null
+          revaluation_surplus_account_id?: string | null
           updated_at?: string | null
           useful_life_years?: number | null
         }
         Update: {
           accumulated_dep_account_id?: string | null
           asset_account_id?: string | null
+          bank_account_id?: string | null
           category_code?: string
           category_name?: string
           company_id?: string | null
@@ -1784,8 +1791,10 @@ export type Database = {
           depreciation_expense_account_id?: string | null
           depreciation_method?: string | null
           depreciation_rate?: number | null
+          gain_loss_disposal_account_id?: string | null
           id?: string
           is_active?: boolean | null
+          revaluation_surplus_account_id?: string | null
           updated_at?: string | null
           useful_life_years?: number | null
         }
@@ -1805,6 +1814,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "asset_categories_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "asset_categories_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -1814,6 +1830,20 @@ export type Database = {
           {
             foreignKeyName: "asset_categories_depreciation_expense_account_id_fkey"
             columns: ["depreciation_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_categories_gain_loss_disposal_account_id_fkey"
+            columns: ["gain_loss_disposal_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_categories_revaluation_surplus_account_id_fkey"
+            columns: ["revaluation_surplus_account_id"]
             isOneToOne: false
             referencedRelation: "chart_of_accounts"
             referencedColumns: ["id"]

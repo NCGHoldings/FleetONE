@@ -73,6 +73,50 @@ export const AssetRevaluationForm = () => {
         .update({ current_value: newValue })
         .eq("id", selectedAssetId);
 
+      // ========== REVALUATION GL POSTING ==========
+      if (selectedAsset && revaluationSurplus !== 0) {
+        // Fetch category GL accounts
+        const { data: category } = await supabase
+          .from("asset_categories")
+          .select("asset_account_id, revaluation_surplus_account_id")
+          .eq("id", selectedAsset.category_id)
+          .single();
+
+        if (category?.asset_account_id && category?.revaluation_surplus_account_id) {
+          const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
+          
+          const absAmount = Math.abs(revaluationSurplus);
+          const lines = revaluationSurplus > 0
+            ? [
+                { account_id: category.asset_account_id, description: `Revaluation Increase - ${selectedAsset.asset_name}`, debit: absAmount, credit: 0 },
+                { account_id: category.revaluation_surplus_account_id, description: `Revaluation Surplus - ${selectedAsset.asset_name}`, debit: 0, credit: absAmount },
+              ]
+            : [
+                { account_id: category.revaluation_surplus_account_id, description: `Revaluation Deficit - ${selectedAsset.asset_name}`, debit: absAmount, credit: 0 },
+                { account_id: category.asset_account_id, description: `Revaluation Decrease - ${selectedAsset.asset_name}`, debit: 0, credit: absAmount },
+              ];
+
+          // Get company_id from the asset
+          const companyId = (selectedAsset as any).company_id;
+          if (companyId) {
+            const glResult = await createAndPostJournalEntry({
+              entry_date: formData.revaluation_date,
+              description: `Asset Revaluation: ${selectedAsset.asset_name} (${selectedAsset.asset_code})`,
+              reference: `RVL-${selectedAsset.asset_code}`,
+              company_id: companyId,
+              lines,
+            });
+
+            if (!glResult.success) {
+              console.warn("Revaluation GL posting failed:", glResult.error);
+              toast.warning("Revaluation recorded but GL posting failed: " + glResult.error);
+            }
+          }
+        } else {
+          toast.warning("Revaluation recorded — GL accounts not configured on category.");
+        }
+      }
+
       toast.success("Asset revaluation recorded successfully");
       setIsDialogOpen(false);
       setSelectedAssetId("");

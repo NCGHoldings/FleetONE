@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Play, Calendar, CheckCircle, AlertCircle } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { useFixedAssets, useDepreciationSchedule, useFinancialPeriods } from "@/hooks/useAccountingData";
-import { useRunDepreciation } from "@/hooks/useAccountingMutations";
+import { useRunDepreciationWithGL } from "@/hooks/useAccountingMutations";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,7 +16,7 @@ export const DepreciationRunView = () => {
   const { data: assets, isLoading } = useFixedAssets();
   const { data: schedule } = useDepreciationSchedule();
   const { data: periods } = useFinancialPeriods();
-  const runDepreciation = useRunDepreciation();
+  const runDepreciation = useRunDepreciationWithGL();
 
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
