@@ -190,7 +190,7 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
             <div className="space-y-2">
               <Label>Select Vendor (Optional)</Label>
               <Select 
-                value={form.watch("vendor_id")} 
+                value={form.watch("vendor_id") || undefined} 
                 onValueChange={handleVendorSelect}
               >
                 <SelectTrigger>
@@ -209,7 +209,7 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
             <div className="space-y-2">
               <Label>Select Customer (Optional)</Label>
               <Select
-                value={form.watch("customer_id")}
+                value={form.watch("customer_id") || undefined}
                 onValueChange={handleCustomerSelect}
               >
                 <SelectTrigger>
