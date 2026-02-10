@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, addDays } from "date-fns";
+import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useCreateCheque } from "@/hooks/useAccountingMutations";
-import { useBankAccounts, useVendors } from "@/hooks/useAccountingData";
+import { useBankAccounts, useVendors, useCustomers } from "@/hooks/useAccountingData";
 import { Loader2 } from "lucide-react";
 
 const chequeSchema = z.object({
@@ -20,7 +20,9 @@ const chequeSchema = z.object({
   payee_name: z.string().min(1, "Payee is required"),
   amount: z.number().min(0.01, "Amount must be greater than 0"),
   is_post_dated: z.boolean().optional(),
+  cheque_type: z.string().default("outgoing"),
   vendor_id: z.string().optional(),
+  customer_id: z.string().optional(),
   reference: z.string().optional(),
   memo: z.string().optional(),
 });
@@ -35,6 +37,7 @@ interface ChequeIssueFormProps {
 export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) => {
   const { data: bankAccounts } = useBankAccounts();
   const { data: vendors } = useVendors();
+  const { data: customers } = useCustomers();
   const createCheque = useCreateCheque();
 
   const form = useForm<ChequeFormData>({
@@ -46,12 +49,14 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
       payee_name: "",
       amount: 0,
       is_post_dated: false,
+      cheque_type: "outgoing",
       reference: "",
       memo: "",
     },
   });
 
   const isPostDated = form.watch("is_post_dated");
+  const chequeType = form.watch("cheque_type");
 
   const handleVendorSelect = (vendorId: string) => {
     form.setValue("vendor_id", vendorId);
@@ -61,12 +66,20 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
     }
   };
 
+  const handleCustomerSelect = (customerId: string) => {
+    form.setValue("customer_id", customerId);
+    const customer = customers?.find(c => c.id === customerId);
+    if (customer) {
+      form.setValue("payee_name", customer.customer_name);
+    }
+  };
+
   const onSubmit = async (data: ChequeFormData) => {
     const chequeDate = new Date(data.cheque_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const status = data.is_post_dated || chequeDate > today ? "post_dated" : "issued";
+    const status = data.is_post_dated || chequeDate > today ? "post_dated" : "draft";
 
     try {
       await createCheque.mutateAsync({
@@ -77,6 +90,7 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
         amount: data.amount,
         status,
         reference: data.reference,
+        cheque_type: data.cheque_type,
       });
       form.reset();
       onOpenChange(false);
@@ -89,10 +103,30 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Issue Cheque</DialogTitle>
+          <DialogTitle>{chequeType === "incoming" ? "Record Incoming Cheque" : "Issue Outgoing Cheque"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          {/* Cheque Type Toggle */}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={chequeType === "outgoing" ? "default" : "outline"}
+              size="sm"
+              onClick={() => form.setValue("cheque_type", "outgoing")}
+            >
+              Outgoing (AP)
+            </Button>
+            <Button
+              type="button"
+              variant={chequeType === "incoming" ? "default" : "outline"}
+              size="sm"
+              onClick={() => form.setValue("cheque_type", "incoming")}
+            >
+              Incoming (AR)
+            </Button>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cheque_number">Cheque Number *</Label>
@@ -151,31 +185,53 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="vendor_id">Select Vendor (Optional)</Label>
-            <Select 
-              value={form.watch("vendor_id")} 
-              onValueChange={handleVendorSelect}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Search vendor..." />
-              </SelectTrigger>
-              <SelectContent>
-                {vendors?.filter(v => v.is_active).map((vendor) => (
-                  <SelectItem key={vendor.id} value={vendor.id}>
-                    {vendor.vendor_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Show vendor or customer selector based on type */}
+          {chequeType === "outgoing" ? (
+            <div className="space-y-2">
+              <Label>Select Vendor (Optional)</Label>
+              <Select 
+                value={form.watch("vendor_id")} 
+                onValueChange={handleVendorSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Search vendor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendors?.filter(v => v.is_active).map((vendor) => (
+                    <SelectItem key={vendor.id} value={vendor.id}>
+                      {vendor.vendor_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Select Customer (Optional)</Label>
+              <Select
+                value={form.watch("customer_id")}
+                onValueChange={handleCustomerSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Search customer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers?.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.customer_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
-            <Label htmlFor="payee_name">Payee Name *</Label>
+            <Label htmlFor="payee_name">{chequeType === "incoming" ? "Payer Name *" : "Payee Name *"}</Label>
             <Input 
               id="payee_name" 
               {...form.register("payee_name")} 
-              placeholder="Payee or vendor name"
+              placeholder={chequeType === "incoming" ? "Customer / payer name" : "Payee or vendor name"}
             />
             {form.formState.errors.payee_name && (
               <p className="text-xs text-destructive">{form.formState.errors.payee_name.message}</p>
@@ -216,7 +272,7 @@ export const ChequeIssueForm = ({ open, onOpenChange }: ChequeIssueFormProps) =>
             </Button>
             <Button type="submit" disabled={createCheque.isPending}>
               {createCheque.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Issue Cheque
+              {chequeType === "incoming" ? "Record Cheque" : "Save as Draft"}
             </Button>
           </div>
         </form>

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Building2, ArrowUpDown, CheckCircle2, RefreshCw } from "lucide-react";
+import { Plus, Building2, ArrowUpDown, CheckCircle2, RefreshCw, Landmark } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useBankAccounts, useBankTransactions, useBankReconciliations } from "@/hooks/useAccountingData";
+import { useBankFees } from "@/hooks/useBankFees";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,6 +15,8 @@ import { BankTransactionForm } from "./BankTransactionForm";
 import { BankReconciliationWorksheet } from "./BankReconciliationWorksheet";
 import { InterBankTransferForm } from "./InterBankTransferForm";
 import { InterBankTransferList } from "./InterBankTransferList";
+import { BankFeeForm } from "./BankFeeForm";
+import { BankFeesList } from "./BankFeesList";
 
 export const BankingView = () => {
   const [selectedBankId, setSelectedBankId] = useState<string | undefined>();
@@ -21,6 +24,7 @@ export const BankingView = () => {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showReconciliation, setShowReconciliation] = useState(false);
   const [showTransferForm, setShowTransferForm] = useState(false);
+  const [showBankFeeForm, setShowBankFeeForm] = useState(false);
   
   const { data: bankAccounts, isLoading: accountsLoading } = useBankAccounts();
   const { data: transactions } = useBankTransactions(selectedBankId);
@@ -207,6 +211,7 @@ export const BankingView = () => {
           <TabsTrigger value="accounts">Bank Accounts</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="transfers">Fund Transfers</TabsTrigger>
+          <TabsTrigger value="bank_fees">Bank Fees</TabsTrigger>
           <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
         </TabsList>
 
@@ -283,6 +288,24 @@ export const BankingView = () => {
           </div>
         </TabsContent>
 
+        <TabsContent value="bank_fees">
+          <Card className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">Bank Fees & Charges</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Track bank charges linked to AP payments and AR receipts
+                </p>
+              </div>
+              <Button onClick={() => setShowBankFeeForm(true)}>
+                <Landmark className="h-4 w-4 mr-2" />
+                Add Bank Fee
+              </Button>
+            </div>
+            <BankFeesList />
+          </Card>
+        </TabsContent>
+
         <TabsContent value="reconciliation">
           <Card className="p-6">
             <div className="flex justify-between items-center mb-6">
@@ -327,6 +350,10 @@ export const BankingView = () => {
       <InterBankTransferForm
         open={showTransferForm}
         onOpenChange={setShowTransferForm}
+      />
+      <BankFeeForm
+        open={showBankFeeForm}
+        onOpenChange={setShowBankFeeForm}
       />
     </div>
   );
