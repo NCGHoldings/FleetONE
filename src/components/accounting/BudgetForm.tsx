@@ -149,14 +149,14 @@ export const BudgetForm = ({ open, onOpenChange }: BudgetFormProps) => {
           <div className="space-y-2">
             <Label htmlFor="cost_center_id">Cost Center</Label>
             <Select 
-              value={form.watch("cost_center_id")} 
-              onValueChange={(v) => form.setValue("cost_center_id", v)}
+              value={form.watch("cost_center_id") || "_all"} 
+              onValueChange={(v) => form.setValue("cost_center_id", v === "_all" ? "" : v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="All Cost Centers" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Cost Centers</SelectItem>
+                <SelectItem value="_all">All Cost Centers</SelectItem>
                 {costCenters?.filter(cc => cc.is_active).map((cc) => (
                   <SelectItem key={cc.id} value={cc.id}>
                     {cc.center_code} - {cc.center_name}

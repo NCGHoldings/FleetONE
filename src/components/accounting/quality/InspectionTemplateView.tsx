@@ -14,11 +14,11 @@ import { useForm, useFieldArray } from "react-hook-form";
 
 export const InspectionTemplateView = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("");
+  const [typeFilter, setTypeFilter] = useState<string>("_all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [expandedTemplates, setExpandedTemplates] = useState<Set<string>>(new Set());
   
-  const { data: templates, isLoading } = useInspectionTemplates(typeFilter || undefined);
+  const { data: templates, isLoading } = useInspectionTemplates(typeFilter === "_all" ? undefined : typeFilter);
   const createTemplate = useCreateInspectionTemplate();
 
   const { register, handleSubmit, reset, control, watch } = useForm({
@@ -159,7 +159,7 @@ export const InspectionTemplateView = () => {
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="_all">All Types</SelectItem>
                 <SelectItem value="incoming">Incoming</SelectItem>
                 <SelectItem value="outgoing">Outgoing</SelectItem>
                 <SelectItem value="in_process">In-Process</SelectItem>

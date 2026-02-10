@@ -302,7 +302,7 @@ export const SinotruckQuotationForm = ({ open, onClose, onSuccess, initialData }
                   <SelectValue placeholder="Select referral agent" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No Agent</SelectItem>
+                  <SelectItem value="_none">No Agent</SelectItem>
                   {referralAgents.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.agent_name} ({agent.default_commission_pct}%)
