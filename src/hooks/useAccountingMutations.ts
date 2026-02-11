@@ -2190,6 +2190,29 @@ export const useRunDepreciationWithGL = () => {
         
         await supabase.from("journal_entry_lines").insert(linesWithJE);
         
+        // Update COA balances for each journal line (matches createAndPostJournalEntry behavior)
+        for (const line of linesWithJE) {
+          const { data: account } = await supabase
+            .from("chart_of_accounts")
+            .select("current_balance, account_type")
+            .eq("id", line.account_id)
+            .single();
+
+          if (account) {
+            const isDebitNormal = ["asset", "expense"].includes(account.account_type);
+            const adjustment = isDebitNormal
+              ? (line.debit - line.credit)
+              : (line.credit - line.debit);
+
+            await supabase
+              .from("chart_of_accounts")
+              .update({
+                current_balance: (account.current_balance || 0) + adjustment
+              })
+              .eq("id", line.account_id);
+          }
+        }
+        
         for (const entry of scheduleEntries) {
           entry.journal_entry_id = journalEntry.id;
         }
