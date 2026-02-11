@@ -126,7 +126,7 @@ export function NCGExpressFinanceSettings() {
         .maybeSingle();
 
       if (settingsError) throw settingsError;
-      
+
       if (settingsData) {
         setSettings({
           ...defaultSettings,
@@ -169,14 +169,9 @@ export function NCGExpressFinanceSettings() {
     }
   };
 
-  const getAccountsByType = (types: string[]) => {
-    return accounts.filter(a => types.includes(a.account_type));
-  };
-
   const renderAccountSelect = (
     label: string,
     field: keyof NCGExpressSettings,
-    accountTypes: string[],
     placeholder: string,
     required = false
   ) => {
@@ -192,7 +187,7 @@ export function NCGExpressFinanceSettings() {
         <SearchableFinanceAccountSelector
           value={value}
           onValueChange={(v) => setSettings({ ...settings, [field]: v })}
-          accounts={getAccountsByType(accountTypes)}
+          accounts={accounts}
           placeholder={placeholder}
           required={required}
           hasError={hasError}
@@ -234,27 +229,24 @@ export function NCGExpressFinanceSettings() {
               Revenue Account Mappings
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Map trip ticket income to the appropriate GL accounts
+              Map trip ticket income to the appropriate GL accounts. All COA accounts are available — search by code or name.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {renderAccountSelect(
                 'Cash/Bank Account (DR)',
                 'cash_account_id',
-                ['asset'],
                 'Select cash/bank account',
                 true
               )}
               {renderAccountSelect(
                 'Ticket Revenue Account (CR)',
                 'ticket_revenue_account_id',
-                ['revenue', 'income'],
                 'Select ticket revenue account',
                 true
               )}
               {renderAccountSelect(
                 'Route Revenue Account (Optional)',
                 'route_revenue_account_id',
-                ['revenue', 'income'],
                 'Select route-specific revenue account'
               )}
             </div>
@@ -269,15 +261,14 @@ export function NCGExpressFinanceSettings() {
               Expense Account Mappings
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Map each daily bus expense category to the appropriate GL expense account
+              Map each daily bus expense category to the appropriate GL expense account. All COA accounts are available — search by code (e.g. 500) or name.
             </p>
-            
+
             {/* Cash/Bank for expenses */}
             <div className="mb-6">
               {renderAccountSelect(
                 'Expense Cash/Bank Account (CR)',
                 'expense_cash_account_id',
-                ['asset'],
                 'Select cash account for expense payments',
                 true
               )}
@@ -288,127 +279,106 @@ export function NCGExpressFinanceSettings() {
               {renderAccountSelect(
                 'Fuel/Diesel Expense',
                 'fuel_expense_account_id',
-                ['expense'],
                 'Select fuel expense account'
               )}
               {renderAccountSelect(
                 'Repair & Maintenance',
                 'repair_expense_account_id',
-                ['expense'],
                 'Select repair expense account'
               )}
               {renderAccountSelect(
                 'Tyre & Tube',
                 'tyre_expense_account_id',
-                ['expense'],
                 'Select tyre expense account'
               )}
               {renderAccountSelect(
                 'Salary & Wages',
                 'salary_expense_account_id',
-                ['expense'],
                 'Select salary expense account'
               )}
               {renderAccountSelect(
                 'Police Fines',
                 'police_expense_account_id',
-                ['expense'],
                 'Select police fines account'
               )}
               {renderAccountSelect(
                 'Food & Staff Welfare',
                 'food_expense_account_id',
-                ['expense'],
                 'Select food expense account'
               )}
               {renderAccountSelect(
                 'Emission & Fitness',
                 'emission_fitness_expense_account_id',
-                ['expense'],
                 'Select emission/fitness account'
               )}
               {renderAccountSelect(
                 'Permits & Renewals',
                 'permits_expense_account_id',
-                ['expense'],
                 'Select permits expense account'
               )}
               {renderAccountSelect(
                 'Staff Accommodation',
                 'staff_accommodation_expense_account_id',
-                ['expense'],
                 'Select accommodation account'
               )}
               {renderAccountSelect(
                 'Highway Charges/Tolls',
                 'highway_expense_account_id',
-                ['expense'],
                 'Select highway charges account'
               )}
               {renderAccountSelect(
                 'Accident Compensation',
                 'accident_expense_account_id',
-                ['expense'],
                 'Select accident expense account'
               )}
               {renderAccountSelect(
                 'Parking Charges',
                 'parking_expense_account_id',
-                ['expense'],
                 'Select parking expense account'
               )}
               {renderAccountSelect(
                 'Log Sheet',
                 'log_sheet_expense_account_id',
-                ['expense'],
                 'Select log sheet expense account'
               )}
               {renderAccountSelect(
                 'Vehicle Hire',
                 'vehicle_hire_expense_account_id',
-                ['expense'],
                 'Select vehicle hire account'
               )}
               {renderAccountSelect(
                 'NTC Charges',
                 'ntc_expense_account_id',
-                ['expense'],
                 'Select NTC expense account'
               )}
               {renderAccountSelect(
                 'Runner',
                 'runner_expense_account_id',
-                ['expense'],
                 'Select runner expense account'
               )}
               {renderAccountSelect(
                 'Short/Misc',
                 'short_misc_expense_account_id',
-                ['expense'],
                 'Select short/misc account'
               )}
               {renderAccountSelect(
                 'Temporary Permit',
                 'temporary_permit_expense_account_id',
-                ['expense'],
                 'Select temp permit account'
               )}
               {renderAccountSelect(
                 'Body Wash',
                 'body_wash_expense_account_id',
-                ['expense'],
                 'Select body wash account'
               )}
               {renderAccountSelect(
                 'Legal/Court',
                 'legal_court_expense_account_id',
-                ['expense'],
                 'Select legal/court account'
               )}
               {renderAccountSelect(
                 'Other Expenses',
                 'other_expense_account_id',
-                ['expense'],
                 'Select other expenses account'
               )}
             </div>
@@ -432,7 +402,7 @@ export function NCGExpressFinanceSettings() {
                 </div>
                 <Switch
                   checked={settings.auto_post_revenue}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     setSettings({ ...settings, auto_post_revenue: checked })
                   }
                 />
@@ -446,7 +416,7 @@ export function NCGExpressFinanceSettings() {
                 </div>
                 <Switch
                   checked={settings.auto_post_expenses}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     setSettings({ ...settings, auto_post_expenses: checked })
                   }
                 />
