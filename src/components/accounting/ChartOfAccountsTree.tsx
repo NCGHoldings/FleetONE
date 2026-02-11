@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { ChevronRight, ChevronDown, Folder, FileText } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FileText, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DrillDownModal } from "./DrillDownModal";
 
@@ -35,6 +36,8 @@ interface TreeNode {
 export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccountsTreeProps) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["Assets", "Liabilities", "Equity", "Revenue", "Expenses"]));
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [drillDownAccountIds, setDrillDownAccountIds] = useState<string[]>([]);
+  const [drillDownLabel, setDrillDownLabel] = useState<string>("");
   const [drillDownOpen, setDrillDownOpen] = useState(false);
 
   const filteredAccounts = useMemo(() => {
@@ -125,6 +128,27 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
   const handleAccountClick = (account: Account, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedAccount(account);
+    setDrillDownAccountIds([account.id]);
+    setDrillDownLabel(`${account.account_code} - ${account.account_name}`);
+    setDrillDownOpen(true);
+  };
+
+  // Recursively collect all account IDs under a tree node
+  const collectAccountIds = (node: TreeNode): string[] => {
+    const ids: string[] = node.accounts.map((a) => a.id);
+    node.children.forEach((childNode) => {
+      ids.push(...collectAccountIds(childNode));
+    });
+    return ids;
+  };
+
+  const handleFolderDrillDown = (node: TreeNode, label: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ids = collectAccountIds(node);
+    if (ids.length === 0) return;
+    setSelectedAccount(null);
+    setDrillDownAccountIds(ids);
+    setDrillDownLabel(label);
     setDrillDownOpen(true);
   };
 
@@ -151,7 +175,7 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
       <div key={path} className="select-none">
         <div
           className={cn(
-            "flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted cursor-pointer",
+            "flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted cursor-pointer group",
             level === 0 && "font-semibold text-primary"
           )}
           style={{ paddingLeft: `${level * 20 + 8}px` }}
@@ -168,6 +192,15 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
           )}
           <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="flex-1 truncate">{node.name}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => handleFolderDrillDown(node, path, e)}
+            title={`View all transactions under ${node.name}`}
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </Button>
           <span className="text-sm text-muted-foreground">
             {formatBalance(node.totalBalance)}
           </span>
@@ -230,7 +263,8 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
         open={drillDownOpen}
         onOpenChange={setDrillDownOpen}
         accountId={selectedAccount?.id || null}
-        accountName={selectedAccount ? `${selectedAccount.account_code} - ${selectedAccount.account_name}` : undefined}
+        accountIds={drillDownAccountIds}
+        accountName={drillDownLabel || (selectedAccount ? `${selectedAccount.account_code} - ${selectedAccount.account_name}` : undefined)}
       />
     </>
   );

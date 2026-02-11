@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,7 +36,8 @@ import { format } from "date-fns";
 interface DrillDownModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  accountId: string | null;
+  accountId?: string | null;
+  accountIds?: string[];
   accountName?: string;
   dateRange?: { from?: Date; to?: Date };
 }
@@ -44,9 +46,16 @@ export const DrillDownModal = ({
   open,
   onOpenChange,
   accountId,
+  accountIds: accountIdsProp,
   accountName,
   dateRange: initialDateRange,
 }: DrillDownModalProps) => {
+  // Support both single accountId and array of accountIds
+  const resolvedAccountIds = accountIdsProp && accountIdsProp.length > 0
+    ? accountIdsProp
+    : accountId
+      ? [accountId]
+      : [];
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>(initialDateRange || {});
   const [businessUnitFilter, setBusinessUnitFilter] = useState<string>("_all");
   const [transactionType, setTransactionType] = useState<string>("all");
@@ -84,9 +93,9 @@ export const DrillDownModal = ({
   });
 
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ["account-transactions", accountId, dateRange, businessUnitFilter, busFilter, routeFilter],
+    queryKey: ["account-transactions", resolvedAccountIds, dateRange, businessUnitFilter, busFilter, routeFilter],
     queryFn: async () => {
-      if (!accountId) return [];
+      if (resolvedAccountIds.length === 0) return [];
 
       let query = supabase
         .from("journal_entry_lines")
@@ -111,10 +120,14 @@ export const DrillDownModal = ({
             status,
             business_unit_code,
             reference
+          ),
+          chart_of_accounts:account_id(
+            account_code,
+            account_name
           )
         `
         )
-        .eq("account_id", accountId)
+        .in("account_id", resolvedAccountIds)
         .eq("journal_entries.status", "posted")
         .order("created_at", { ascending: false })
         .limit(500);
@@ -146,7 +159,7 @@ export const DrillDownModal = ({
       if (error) throw error;
       return data;
     },
-    enabled: open && !!accountId,
+    enabled: open && resolvedAccountIds.length > 0,
   });
 
   // Filter by transaction type on client side
@@ -204,7 +217,7 @@ export const DrillDownModal = ({
     setRouteFilter("_all");
   };
 
-  const hasActiveFilters = businessUnitFilter !== "_all" || transactionType !== "all" || 
+  const hasActiveFilters = businessUnitFilter !== "_all" || transactionType !== "all" ||
     busFilter !== "_all" || routeFilter !== "_all" || dateRange.from || dateRange.to;
 
   const exportToCSV = () => {
@@ -212,23 +225,33 @@ export const DrillDownModal = ({
       ? transactionsWithBalance.filter((t) => selectedRows.has(t.id))
       : transactionsWithBalance;
 
-    const headers = ["Date", "Entry #", "Business Unit", "Bus", "Route", "Reference", "Description", "Debit", "Credit", "Balance"];
+    const isMultiAccount = resolvedAccountIds.length > 1;
+    const headers = isMultiAccount
+      ? ["Date", "Entry #", "Account", "Business Unit", "Bus", "Route", "Reference", "Description", "Debit", "Credit", "Balance"]
+      : ["Date", "Entry #", "Business Unit", "Bus", "Route", "Reference", "Description", "Debit", "Credit", "Balance"];
     const rows = dataToExport.map((t) => {
       const entry = t.journal_entries as any;
       const busInfo = t.buses as any;
       const routeInfo = t.routes as any;
-      return [
+      const accountInfo = t.chart_of_accounts as any;
+      const baseRow = [
         format(new Date(entry?.entry_date || t.created_at), "yyyy-MM-dd"),
         entry?.entry_number || "",
+      ];
+      if (isMultiAccount) {
+        baseRow.push(accountInfo ? `${accountInfo.account_code} - ${accountInfo.account_name}` : "");
+      }
+      baseRow.push(
         entry?.business_unit_code || "",
         busInfo?.bus_no || "",
         routeInfo?.route_name || "",
         entry?.reference || "",
         (t.description || entry?.description || "").replace(/,/g, ";"),
-        t.debit || 0,
-        t.credit || 0,
-        t.runningBalance,
-      ];
+        String(t.debit || 0),
+        String(t.credit || 0),
+        String(t.runningBalance),
+      );
+      return baseRow;
     });
 
     const csvContent = [headers, ...rows].map((row) => row.join(",")).join("\n");
@@ -253,7 +276,7 @@ export const DrillDownModal = ({
         {/* Filters */}
         <div className="flex flex-wrap gap-3 p-3 bg-muted/30 rounded-lg items-center">
           <Filter className="h-4 w-4 text-muted-foreground" />
-          
+
           <DateRangePicker
             onDateRangeChange={(range) => setDateRange(range || {})}
             className="w-auto"
@@ -374,6 +397,7 @@ export const DrillDownModal = ({
                   </TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Entry #</TableHead>
+                  {resolvedAccountIds.length > 1 && <TableHead>Account</TableHead>}
                   <TableHead>BU</TableHead>
                   <TableHead>Bus</TableHead>
                   <TableHead>Route</TableHead>
@@ -389,6 +413,7 @@ export const DrillDownModal = ({
                   const entry = t.journal_entries as any;
                   const busInfo = t.buses as any;
                   const routeInfo = t.routes as any;
+                  const accountInfo = (t as any).chart_of_accounts as any;
                   return (
                     <TableRow
                       key={t.id}
@@ -406,6 +431,11 @@ export const DrillDownModal = ({
                       <TableCell className="font-mono text-xs">
                         {entry?.entry_number}
                       </TableCell>
+                      {resolvedAccountIds.length > 1 && (
+                        <TableCell className="text-xs font-mono">
+                          {accountInfo ? `${accountInfo.account_code} - ${accountInfo.account_name}` : "-"}
+                        </TableCell>
+                      )}
                       <TableCell>
                         {entry?.business_unit_code && (
                           <Badge variant="outline" className="text-xs">
