@@ -82,6 +82,7 @@
     "react-dropzone": "^14.3.8",
     "react-grid-layout": "^1.5.2",
     "react-hook-form": "^7.61.1",
+    "react-is": "^19.2.4",
     "react-markdown": "^9.1.0",
     "react-resizable-panels": "^2.1.9",
     "react-router-dom": "^6.30.1",

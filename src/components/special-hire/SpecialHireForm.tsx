@@ -32,28 +32,28 @@ const formSchema = z.object({
   customerPhone: z.string().min(1, 'Phone number is required'),
   customerEmail: z.string().email().optional().or(z.literal('')),
   specialRequest: z.string().optional(),
-  
+
   // Trip Details
   busTypeId: z.string().optional(), // Made optional for multi-bus mode
   hireType: z.enum(['Outside', 'Lyceum', 'Internal']),
   numberOfBuses: z.number().min(1, 'At least 1 bus is required'),
   pickupLocation: z.string().min(1, 'Pickup location is required'),
   dropLocation: z.string().min(1, 'Drop location is required'),
-  
+
   numberOfPassengers: z.number().min(1, 'Number of passengers is required'),
   pickupDateTime: z.date(),
   dropDateTime: z.date(),
   parkingLocationId: z.string().min(1, 'Parking location is required'),
-  
+
   // Commission Settings (company expenses)
   commissionPct: z.number().min(0, 'Commission percentage must be positive').max(100, 'Commission cannot exceed 100%'),
   commissionPassThroughPct: z.number().min(0, 'Pass-through percentage must be positive').max(100, 'Pass-through cannot exceed 100%'),
-  
+
   // Discount Settings (requires admin approval if > 0)
   discountType: z.enum(['percentage', 'amount']).default('percentage'),
   discountPct: z.number().min(0, 'Discount percentage must be positive').max(100, 'Discount cannot exceed 100%').default(0),
   discountAmount: z.number().min(0, 'Discount amount must be positive').default(0),
-  
+
   // Referral Agent (optional)
   referralAgentId: z.string().optional(),
   referralCommissionPct: z.number().min(0).max(100).default(3.0),
@@ -144,7 +144,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const [loading, setLoading] = useState(false);
   const [useMultiParking, setUseMultiParking] = useState(false);
   const [usePickupAsParking, setUsePickupAsParking] = useState(initialData?.uses_pickup_as_parking || false);
-  
+
   // Manual parking distance override state
   const [useManualParkingDistance, setUseManualParkingDistance] = useState(initialData?.uses_manual_parking_distance || false);
   const [manualParkingToPickup, setManualParkingToPickup] = useState<number>(initialData?.manual_km_parking_to_pickup || 0);
@@ -152,7 +152,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   // Store original calculated distances for reset capability
   const [originalCalculatedParkingToPickup, setOriginalCalculatedParkingToPickup] = useState<number>(0);
   const [originalCalculatedDropToParking, setOriginalCalculatedDropToParking] = useState<number>(0);
-  
+
   // Manual trip distance override state
   const [useManualTripDistance, setUseManualTripDistance] = useState(initialData?.uses_manual_trip_distance || false);
   const [manualTripDistance, setManualTripDistance] = useState<number>(initialData?.manual_km_trip || 0);
@@ -170,17 +170,17 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   ]);
   const [autoSaved, setAutoSaved] = useState(false);
   const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState(false);
-  
+
   // CRITICAL: Capture coordinates from LocationAutocomplete to avoid re-geocoding errors
   // Google can return wrong locations (e.g., "Isurupura, Malabe" instead of "Isurupura, Anuradhapura")
   const [pickupCoords, setPickupCoords] = useState<[number, number] | null>(null); // [lng, lat]
   const [dropCoords, setDropCoords] = useState<[number, number] | null>(null); // [lng, lat]
-  
+
   // Referral Agent state
   const [referralAgents, setReferralAgents] = useState<any[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
   const [showAddAgentModal, setShowAddAgentModal] = useState(false);
-  
+
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
@@ -199,7 +199,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       numberOfBuses: initialData.number_of_buses || 1,
       pickupLocation: initialData.pickup_location || '',
       dropLocation: initialData.drop_location || '',
-      
+
       numberOfPassengers: initialData.number_of_passengers || 1,
       pickupDateTime: initialData.pickup_datetime ? new Date(initialData.pickup_datetime) : new Date(),
       dropDateTime: initialData.drop_datetime ? new Date(initialData.drop_datetime) : new Date(),
@@ -242,7 +242,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     loadBusTypes();
     loadParkingLocations();
     loadReferralAgents();
-    
+
     // Auto-fill form from submission data
     if (submissionData) {
       form.setValue('companyName', submissionData.company_name || '');
@@ -257,7 +257,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       form.setValue('numberOfPassengers', submissionData.number_of_passengers);
       form.setValue('pickupDateTime', new Date(submissionData.pickup_datetime));
       form.setValue('dropDateTime', new Date(submissionData.drop_datetime));
-      
+
       // Parse intermediate places from special_request field
       if (submissionData.special_request) {
         const intermediateMatch = submissionData.special_request.match(/Intermediate places:\s*(.+?)(?:\n|$)/);
@@ -273,7 +273,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         }
       }
     }
-    
+
     // If editing, set intermediate stops, additional charges, and other expenses from initial data
     if (isEditing && initialData) {
       // Load intermediate stops
@@ -351,8 +351,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           // FIXED: Determine available hours based on hire type
           const isLyceumOrInternal = initialData.hire_type === 'Lyceum' || initialData.hire_type === 'Inside';
           const storedStandardHours = initialData.standard_hours || 8;
-          const availableHours = isLyceumOrInternal 
-            ? storedStandardHours 
+          const availableHours = isLyceumOrInternal
+            ? storedStandardHours
             : ((initialData.km_trip || 0) / 10);
           return {
             standardHours: storedStandardHours,
@@ -401,14 +401,14 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
               form.setValue(key as any, value);
             }
           });
-          
+
           // Set other state
           if (parsed.intermediateStops) setIntermediateStops(parsed.intermediateStops);
           if (parsed.additionalCharges) setAdditionalCharges(parsed.additionalCharges);
           if (parsed.otherExpenses) setOtherExpenses(parsed.otherExpenses);
           if (parsed.useMultiParking) setUseMultiParking(parsed.useMultiParking);
           if (parsed.busDetails) setBusDetails(parsed.busDetails);
-          
+
           toast({
             title: "Draft Restored",
             description: "Your previous form data has been restored.",
@@ -436,7 +436,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    
+
     // Don't auto-save if editing existing data or loading from submission
     if (!isEditing && !submissionData && !initialData) {
       saveTimeoutRef.current = setTimeout(() => {
@@ -447,7 +447,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         }
       }, 1000);
     }
-    
+
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -461,7 +461,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       if (name === 'commissionPct' || name === 'commissionPassThroughPct') {
         const commissionPct = values.commissionPct || 0;
         const passThroughPct = values.commissionPassThroughPct || 0;
-        
+
         if (passThroughPct > commissionPct) {
           form.setValue('commissionPassThroughPct', commissionPct, { shouldValidate: true });
           toast({
@@ -509,7 +509,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       // Initialize bus details for current number of buses
       const buses = [];
       const defaultLocation = parkingLocations.find(loc => loc.is_default) || parkingLocations[0];
-      
+
       for (let i = 0; i < watchedNumberOfBuses; i++) {
         if (defaultLocation) {
           buses.push({
@@ -531,15 +531,15 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const updateBusParking = (busNumber: number, parkingLocationId: string) => {
     const location = parkingLocations.find(loc => loc.id === parkingLocationId);
     if (location) {
-      setBusDetails(prev => prev.map(bus => 
-        bus.busNumber === busNumber 
+      setBusDetails(prev => prev.map(bus =>
+        bus.busNumber === busNumber
           ? {
-              ...bus,
-              parkingLocationId: location.id,
-              parkingLocationName: location.parking_location_name,
-              parkingLat: location.parking_lat,
-              parkingLng: location.parking_lng,
-            }
+            ...bus,
+            parkingLocationId: location.id,
+            parkingLocationName: location.parking_location_name,
+            parkingLat: location.parking_lat,
+            parkingLng: location.parking_lng,
+          }
           : bus
       ));
     }
@@ -573,7 +573,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       if (error) throw error;
       setParkingLocations(data || []);
-      
+
       // Set default parking location if not editing
       if (!isEditing && data && data.length > 0) {
         const defaultLocation = data.find(loc => loc.is_default) || data[0];
@@ -621,7 +621,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         .single();
 
       if (error) throw error;
-      
+
       setSelectedAgent(data);
       // Auto-fill commission percentage with agent's default rate
       form.setValue('referralCommissionPct', data.default_commission_pct || 3.0);
@@ -657,9 +657,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
   // CRITICAL: Accept coordinates from LocationAutocomplete to avoid re-geocoding errors
   const updateIntermediateStop = (id: string, location: string, coords?: [number, number]) => {
-    setIntermediateStops(intermediateStops.map(stop => 
-      stop.id === id 
-        ? { ...stop, location, lat: coords?.[1], lng: coords?.[0] } 
+    setIntermediateStops(intermediateStops.map(stop =>
+      stop.id === id
+        ? { ...stop, location, lat: coords?.[1], lng: coords?.[0] }
         : stop
     ));
   };
@@ -667,7 +667,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const addAdditionalCharge = () => {
     const newCharge: AdditionalCharge = {
       id: Date.now().toString(),
-      type: 'permits',   
+      type: 'permits',
       amount: 0,
       reason: '',
       applyPerBus: false,
@@ -677,23 +677,23 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   };
 
   const updateAdditionalCharge = async (id: string, field: keyof AdditionalCharge, value: any) => {
-    setAdditionalCharges(charges => 
+    setAdditionalCharges(charges =>
       charges.map(charge => {
         if (charge.id === id) {
           const updatedCharge = { ...charge, [field]: value };
-          
+
           // Set default reason to "wages" when type is changed to "internal_cost"
           if (field === 'type' && value === 'internal_cost' && !charge.reason) {
             updatedCharge.reason = 'wages';
           }
-          
+
           // Auto-calculate amount for additional_distance type
           if (updatedCharge.type === 'additional_distance' && field === 'distance' && value > 0) {
             // Get the exceeding KM rate from hire rate cards
             const calculateDistanceAmount = async () => {
               const watchedBusTypeId = form.watch('busTypeId');
               const watchedHireType = form.watch('hireType');
-              
+
               if (watchedBusTypeId && watchedHireType) {
                 // Use Lyceum rates for both Lyceum and Internal hire types
                 const rateCardHireType = watchedHireType === 'Internal' ? 'Lyceum' : watchedHireType;
@@ -705,12 +705,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                   .eq('is_active', true)
                   .limit(1)
                   .single();
-                
+
                 if (rateCards && rateCards.exceeding_km_rate_lkr) {
                   const calculatedAmount = value * rateCards.exceeding_km_rate_lkr;
-                  setAdditionalCharges(prevCharges => 
-                    prevCharges.map(prevCharge => 
-                      prevCharge.id === id 
+                  setAdditionalCharges(prevCharges =>
+                    prevCharges.map(prevCharge =>
+                      prevCharge.id === id
                         ? { ...prevCharge, amount: calculatedAmount }
                         : prevCharge
                     )
@@ -720,13 +720,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             };
             calculateDistanceAmount();
           }
-          
+
           // Reset amount when changing away from additional_distance type
           if (field === 'type' && charge.type === 'additional_distance' && value !== 'additional_distance') {
             updatedCharge.amount = 0;
             updatedCharge.distance = 0;
           }
-          
+
           return updatedCharge;
         }
         return charge;
@@ -748,9 +748,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   };
 
   const updateOtherExpense = (id: string, field: keyof OtherExpense, value: any) => {
-    setOtherExpenses(expenses => 
-      expenses.map(expense => 
-        expense.id === id 
+    setOtherExpenses(expenses =>
+      expenses.map(expense =>
+        expense.id === id
           ? { ...expense, [field]: value }
           : expense
       )
@@ -843,17 +843,17 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
               useStandardHours: false
             }
           );
-          
+
           overtimeCharge = extraTimeResult.overtimeCharge;
           overnightCharge = extraTimeResult.overnightCharge;
           hireChargePerBus += extraTimeResult.totalExtraCharge;
         } else {
           // Lyceum/Internal: range-based rates
-          rateCard = allRateCards.find(card => 
-            tripDistance >= (card.from_km || 0) && 
+          rateCard = allRateCards.find(card =>
+            tripDistance >= (card.from_km || 0) &&
             (card.to_km === null || tripDistance <= card.to_km)
           ) || allRateCards[0];
-          
+
           hireChargePerBus = rateCard?.flat_fee_lkr || 0;
 
           // FIX: Add overtime calculation for Lyceum/Internal using standard hours
@@ -868,7 +868,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
               standardHours: rateCard?.standard_hours || 8
             }
           );
-          
+
           overtimeCharge = extraTimeResult.overtimeCharge;
           overnightCharge = extraTimeResult.overnightCharge;
           hireChargePerBus += extraTimeResult.totalExtraCharge;
@@ -918,7 +918,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }
 
       // Apply additional charges BEFORE commission (exclude internal_cost from customer total)
-      const customerAdditionalCharges = additionalCharges.filter(charge => 
+      const customerAdditionalCharges = additionalCharges.filter(charge =>
         charge.type !== 'internal_cost'
       );
       const totalAdditionalCharges = customerAdditionalCharges.reduce((sum, charge) => {
@@ -930,7 +930,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       // Calculate pre-commission total (includes all charges except commission)
       const grossRevenue = combinedSubtotal;
-      
+
       let discountAmount = 0;
       if (data.discountType === 'percentage') {
         discountAmount = grossRevenue * (data.discountPct / 100);
@@ -940,7 +940,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
       // Pre-commission total = revenue + additional charges - discount
       const preCommissionTotal = grossRevenue + totalAdditionalCharges - discountAmount;
-      
+
       // Calculate commission on the FULL pre-commission total
       const commissionExpenseAmount = preCommissionTotal * (data.commissionPct / 100);
       const commissionPassThroughAmount = preCommissionTotal * (Math.min(data.commissionPassThroughPct, data.commissionPct) / 100);
@@ -954,12 +954,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           const effectiveAmount = charge.applyPerBus ? charge.amount * charge.busesCount : charge.amount;
           return sum + effectiveAmount;
         }, 0);
-      
+
       const driverChargeTotal = totalBuses * 1500; // Default driver charge per bus
       const totalOtherExpenses = otherExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-      const totalExpenses = driverChargeTotal + totalFuelCost + totalMaintenanceCost + 
-                            commissionExpenseAmount + totalOtherExpenses + internalExpenses;
-      
+      const totalExpenses = driverChargeTotal + totalFuelCost + totalMaintenanceCost +
+        commissionExpenseAmount + totalOtherExpenses + internalExpenses;
+
       const netProfit = finalCustomerTotal - totalExpenses;
 
       // Set cost data with bus fleet details
@@ -1027,7 +1027,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         numberOfBuses: totalBuses,
         isMultiParking: false
       });
-      
+
       toast({
         title: "Multi-Bus Fleet Cost Calculated",
         description: `${totalBuses} buses | ${totalCapacity} seats | LKR ${Math.round(finalCustomerTotal).toLocaleString()}`
@@ -1089,7 +1089,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       } else if (isEditing && initialData?.pickup_lat && initialData?.pickup_lng) {
         distanceCalculationBody.pickupCoords = [initialData.pickup_lng, initialData.pickup_lat];
       }
-      
+
       if (dropCoords) {
         distanceCalculationBody.dropCoords = dropCoords;
       } else if (isEditing && initialData?.drop_lat && initialData?.drop_lng) {
@@ -1168,8 +1168,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       // Handle different hire types with proper rate card logic
       if (data.hireType !== 'Outside') {
         // For Other hire types (Lyceum, etc.) - use range-based rates
-        rateCard = allRateCards.find(card => 
-          tripDistance >= (card.from_km || 0) && 
+        rateCard = allRateCards.find(card =>
+          tripDistance >= (card.from_km || 0) &&
           (card.to_km === null || tripDistance <= card.to_km)
         );
 
@@ -1187,7 +1187,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
         // Handle exceeding km for distances beyond 100km
         if (tripDistance > 100) {
-          const exceedingRateCard = allRateCards.find(card => 
+          const exceedingRateCard = allRateCards.find(card =>
             card.from_km >= 101 && card.exceeding_km_rate_lkr != null
           );
           if (exceedingRateCard) {
@@ -1210,7 +1210,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         exceedingKm = Math.round(Math.max(0, tripDistance - baseCoverageKm) * 10) / 10;
         exceedingDistanceCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
       }
-      
+
       // Calculate total additional distance from additional_distance charges
       const totalAdditionalDistance = additionalCharges
         .filter(charge => charge.type === 'additional_distance')
@@ -1223,7 +1223,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       let overtimeCharge = 0;
       let overnightCharge = 0;
       let totalExtraTimeCharge = 0;
-      
+
       if (data.hireType === 'Outside') {
         // Outside hire: distance-based available hours (km / 10 km/h baseline)
         const extraTimeResult = calculateExtraTimeCharge(
@@ -1237,7 +1237,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             useStandardHours: false
           }
         );
-        
+
         overtimeCharge = extraTimeResult.overtimeCharge;
         overnightCharge = extraTimeResult.overnightCharge;
         totalExtraTimeCharge = extraTimeResult.totalExtraCharge;
@@ -1254,12 +1254,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             standardHours: rateCard.standard_hours || 8
           }
         );
-        
+
         overtimeCharge = extraTimeResult.overtimeCharge;
         overnightCharge = extraTimeResult.overnightCharge;
         totalExtraTimeCharge = extraTimeResult.totalExtraCharge;
       }
-      
+
       const hireCharge = fixedRate + exceedingDistanceCharge + totalExtraTimeCharge;
 
       // Fuel cost calculation - different for single vs multi-parking
@@ -1283,32 +1283,32 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }
 
       const grossRevenue = hireCharge * data.numberOfBuses;
-      
+
       // Calculate additional charges BEFORE commission (exclude internal_cost from customer total)
-      const customerAdditionalCharges = additionalCharges.filter(charge => 
+      const customerAdditionalCharges = additionalCharges.filter(charge =>
         charge.type !== 'internal_cost'
       );
       const totalAdditionalCharges = customerAdditionalCharges.reduce((sum, charge) => {
         let chargeAmount = charge.type === 'additional_distance' ? (charge.amount || 0) : charge.amount;
         return sum + (charge.applyPerBus ? chargeAmount * charge.busesCount : chargeAmount);
       }, 0);
-      
+
       // Discount (subtracted from customer bill)
-      const discountAmount = data.discountType === 'percentage' 
+      const discountAmount = data.discountType === 'percentage'
         ? grossRevenue * (data.discountPct / 100)
         : data.discountAmount;
-      
+
       // Pre-commission total = revenue + fuel + additional charges - discount
       const preCommissionTotal = grossRevenue + totalFuelCost + totalAdditionalCharges - discountAmount;
-      
+
       // Commission calculations on FULL pre-commission total
       // Ensure pass-through percentage never exceeds commission percentage
       const safePassThroughPct = Math.min(data.commissionPassThroughPct, data.commissionPct);
       const commissionPassThroughAmount = preCommissionTotal * (safePassThroughPct / 100);
       const commissionExpense = preCommissionTotal * (data.commissionPct / 100); // Total commission company pays
-      
+
       const finalCustomerTotal = preCommissionTotal + commissionPassThroughAmount;
-      
+
       // Company expenses (include ALL charges including internal_cost in deductions)
       const internalExpenses = additionalCharges
         .filter(charge => charge.type !== 'pass_through' && charge.type !== 'additional_distance') // Exclude pass-through and additional_distance
@@ -1376,8 +1376,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           // FIXED: Always calculate actual hours from pickup/drop times for ALL hire types
           const actualHrs = (new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60);
           // FIXED: Use rate card standard_hours for Lyceum/Inside, distance/10 for Outside
-          const availableHrs = data.hireType === 'Outside' 
-            ? (tripDistance / 10) 
+          const availableHrs = data.hireType === 'Outside'
+            ? (tripDistance / 10)
             : (rateCard.standard_hours || 8);
           // FIXED: Calculate overtime for ALL hire types
           const overtimeHrs = Math.max(0, actualHrs - availableHrs);
@@ -1426,12 +1426,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         usePickupAsParking: usePickupAsParking || !!distanceData.usePickupAsParking,
       });
 
-      const discountText = data.discountType === 'percentage' && data.discountPct > 0 
-        ? `(${data.discountPct}% discount)` 
-        : data.discountType === 'amount' && data.discountAmount > 0 
-        ? `(LKR ${data.discountAmount} discount)` 
-        : '';
-      
+      const discountText = data.discountType === 'percentage' && data.discountPct > 0
+        ? `(${data.discountPct}% discount)`
+        : data.discountType === 'amount' && data.discountAmount > 0
+          ? `(LKR ${data.discountAmount} discount)`
+          : '';
+
       toast({
         title: "Cost Calculated",
         description: `Trip: ${tripDistance}km | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()} ${discountText}`
@@ -1490,14 +1490,20 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       if (currentStops[i].location !== originalStops[i]?.location) return true;
     }
 
-    // Check additional distance charges
-    const currentDistanceCharges = additionalCharges.filter(c => c.type === 'additional_distance');
+    // Check ALL additional charges (pass-through, permits, highway, fuel, driver, distance, etc.)
     const originalCharges = safeParseJSON(originalData.additional_charges, []);
-    const originalDistanceCharges = originalCharges.filter((c: any) => c.type === 'additional_distance');
-    if (currentDistanceCharges.length !== originalDistanceCharges.length) return true;
-    const currentDistanceTotal = currentDistanceCharges.reduce((sum, c) => sum + (c.distance || 0), 0);
-    const originalDistanceTotal = originalDistanceCharges.reduce((sum: number, c: any) => sum + (c.distance || 0), 0);
-    if (currentDistanceTotal !== originalDistanceTotal) return true;
+    if (additionalCharges.length !== originalCharges.length) return true;
+    for (let i = 0; i < additionalCharges.length; i++) {
+      const current = additionalCharges[i];
+      const original = originalCharges[i];
+      if (!original) return true;
+      if (current.type !== original.type) return true;
+      if (current.amount !== original.amount) return true;
+      if (current.applyPerBus !== original.applyPerBus) return true;
+      if (current.busesCount !== original.busesCount) return true;
+      if ((current.distance || 0) !== (original.distance || 0)) return true;
+      if ((current.reason || '') !== (original.reason || '')) return true;
+    }
 
     // Check commission changes (affects cost calculations)
     if (currentData.commissionPct !== (originalData.commission_pct || 0)) return true;
@@ -1513,19 +1519,19 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
   const handleSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-        // Get current user data for created_by field
-        const { data: userData } = await supabase.auth.getUser();
-        
-        // Check if discount requires admin approval
-        if ((data.discountType === 'percentage' && data.discountPct > 0) || 
-            (data.discountType === 'amount' && data.discountAmount > 0)) {
-          const { data: userRoles } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', userData.user?.id);
-        
+      // Get current user data for created_by field
+      const { data: userData } = await supabase.auth.getUser();
+
+      // Check if discount requires admin approval
+      if ((data.discountType === 'percentage' && data.discountPct > 0) ||
+        (data.discountType === 'amount' && data.discountAmount > 0)) {
+        const { data: userRoles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userData.user?.id);
+
         const isAdmin = userRoles?.some(r => r.role === 'admin' || r.role === 'super_admin');
-        
+
         if (!isAdmin) {
           toast({
             title: "Admin Approval Required",
@@ -1566,8 +1572,21 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           commission_amount: initialData.commission_amount,
           discount_percentage: initialData.discount_percentage,
           discount_amount: initialData.discount_amount_lkr,
-          additional_charges: safeParseJSON(initialData.additional_charges, []),
-          total_additional_charges: initialData.total_additional_charges,
+          // IMPORTANT: Always use CURRENT additional charges from the form state, not stale initialData
+          additional_charges: additionalCharges.map(charge => ({
+            type: charge.type,
+            amount: charge.type === 'additional_distance' ? (charge.amount || 0) : charge.amount,
+            distance: charge.type === 'additional_distance' ? charge.distance : undefined,
+            reason: charge.reason || additionalChargeTypes.find(t => t.value === charge.type)?.label,
+            applyPerBus: charge.applyPerBus,
+            busesCount: charge.busesCount
+          })),
+          total_additional_charges: additionalCharges
+            .filter(charge => charge.type !== 'internal_cost')
+            .reduce((sum, charge) => {
+              let chargeAmount = charge.type === 'additional_distance' ? (charge.amount || 0) : charge.amount;
+              return sum + (charge.applyPerBus ? chargeAmount * charge.busesCount : chargeAmount);
+            }, 0),
           total_expenses: initialData.total_expenses,
           net_profit: initialData.net_profit,
           customerTotalWithFuel: initialData.customer_total_with_fuel,
@@ -1606,7 +1625,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             customer_name: data.customerName !== initialData.customer_name ? { from: initialData.customer_name, to: data.customerName } : undefined,
             pickup_location: data.pickupLocation !== initialData.pickup_location ? { from: initialData.pickup_location, to: data.pickupLocation } : undefined,
             drop_location: data.dropLocation !== initialData.drop_location ? { from: initialData.drop_location, to: data.dropLocation } : undefined,
-            
+
             commission_pct: data.commissionPct !== (initialData.commission_pct || 5) ? { from: initialData.commission_pct || 5, to: data.commissionPct } : undefined,
             discount_type: data.discountType !== (initialData.discount_type || 'percentage') ? { from: initialData.discount_type || 'percentage', to: data.discountType } : undefined,
             discount_percentage: data.discountPct !== (initialData.discount_percentage || 0) ? { from: initialData.discount_percentage || 0, to: data.discountPct } : undefined,
@@ -1627,7 +1646,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         number_of_buses: data.numberOfBuses,
         pickup_location: data.pickupLocation,
         drop_location: data.dropLocation,
-        
+
         intermediate_stops: JSON.stringify(validIntermediateStops),
         number_of_passengers: data.numberOfPassengers,
         pickup_datetime: data.pickupDateTime.toISOString(),
@@ -1673,19 +1692,19 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         customer_total_with_fuel: costs.customerTotalWithFuel ?? costData?.customerTotalWithFuel,
         bus_fleet_details: isMultiBusMode && costs.bus_fleet_details
           ? JSON.stringify(
-              // Ensure we're saving the full object structure with buses, total_buses, etc.
-              Array.isArray(costs.bus_fleet_details) 
-                ? {
-                    buses: costs.bus_fleet_details,
-                    total_buses: costs.bus_fleet_details.reduce((sum, b) => sum + (b.quantity || 0), 0),
-                    total_capacity: costs.bus_fleet_details.reduce((sum, b) => sum + ((b.seating_capacity || 0) * (b.quantity || 1)), 0),
-                    combined_subtotal: costs.bus_fleet_details.reduce((sum, b) => sum + (b.subtotal_all_buses || 0), 0)
-                  }
-                : costs.bus_fleet_details
-            ) 
+            // Ensure we're saving the full object structure with buses, total_buses, etc.
+            Array.isArray(costs.bus_fleet_details)
+              ? {
+                buses: costs.bus_fleet_details,
+                total_buses: costs.bus_fleet_details.reduce((sum, b) => sum + (b.quantity || 0), 0),
+                total_capacity: costs.bus_fleet_details.reduce((sum, b) => sum + ((b.seating_capacity || 0) * (b.quantity || 1)), 0),
+                combined_subtotal: costs.bus_fleet_details.reduce((sum, b) => sum + (b.subtotal_all_buses || 0), 0)
+              }
+              : costs.bus_fleet_details
+          )
           : null,
-        approval_status: ((data.discountType === 'percentage' && data.discountPct > 0) || 
-                         (data.discountType === 'amount' && data.discountAmount > 0) ? 'pending' : 'approved') as 'pending' | 'approved' | 'rejected',
+        approval_status: ((data.discountType === 'percentage' && data.discountPct > 0) ||
+          (data.discountType === 'amount' && data.discountAmount > 0) ? 'pending' : 'approved') as 'pending' | 'approved' | 'rejected',
         valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
         audit_log: isEditing ? [...(initialData?.audit_log || []), auditEntry].filter(Boolean) : [],
         // Link to submission if created from one
@@ -1701,7 +1720,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           onSubmit(quotationData);
           return;
         }
-        
+
         // Regular edit - update existing quotation
         const { error } = await supabase
           .from('special_hire_quotations')
@@ -1727,7 +1746,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         if (submissionData?.id && insertedQuotation) {
           await supabase
             .from('special_hire_submissions')
-            .update({ 
+            .update({
               quotation_id: insertedQuotation.id,
               submission_status: 'processed'
             })
@@ -1762,157 +1781,222 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
   return (
     <>
-    <Dialog open={true} onOpenChange={() => onCancel()}>
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-[95vw] max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-3 sm:p-4 md:p-6 rounded-none sm:rounded-lg">
-        <DialogHeader className="pb-2 sm:pb-3">
-          <div className="flex items-center justify-between gap-2">
-            <DialogTitle className="text-base sm:text-lg md:text-xl">{isEditing ? 'Edit Quotation' : 'New Quotation'}</DialogTitle>
-            {showAutoSaveIndicator && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Save className="h-3 w-3" />
-                <span className="hidden sm:inline">Auto-saved</span>
-              </div>
-            )}
-            {autoSaved && !showAutoSaveIndicator && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Save className="h-3 w-3" />
-                <span className="hidden sm:inline">Draft saved</span>
-              </div>
-            )}
-          </div>
-        </DialogHeader>
+      <Dialog open={true} onOpenChange={() => onCancel()}>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-[95vw] max-w-4xl h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-3 sm:p-4 md:p-6 rounded-none sm:rounded-lg">
+          <DialogHeader className="pb-2 sm:pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="text-base sm:text-lg md:text-xl">{isEditing ? 'Edit Quotation' : 'New Quotation'}</DialogTitle>
+              {showAutoSaveIndicator && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Save className="h-3 w-3" />
+                  <span className="hidden sm:inline">Auto-saved</span>
+                </div>
+              )}
+              {autoSaved && !showAutoSaveIndicator && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Save className="h-3 w-3" />
+                  <span className="hidden sm:inline">Draft saved</span>
+                </div>
+              )}
+            </div>
+          </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3 sm:space-y-4 md:space-y-6">
-            {/* Customer Details */}
-            <Card className="shadow-sm">
-              <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6 pt-3 sm:pt-4">
-                <CardTitle className="text-sm sm:text-base md:text-lg">Customer Details</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 md:p-6">
-                <FormField
-                  control={form.control}
-                  name="companyName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs sm:text-sm">Company (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Company name" {...field} className="h-9 text-sm" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="customerName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs sm:text-sm">Customer Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Customer name" {...field} className="h-9 text-sm" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="customerPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs sm:text-sm">Phone *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Phone number" {...field} className="h-9 text-sm" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="customerEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs sm:text-sm">Email (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Email address" {...field} className="h-9 text-sm" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="sm:col-span-2">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3 sm:space-y-4 md:space-y-6">
+              {/* Customer Details */}
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6 pt-3 sm:pt-4">
+                  <CardTitle className="text-sm sm:text-base md:text-lg">Customer Details</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 md:p-6">
                   <FormField
                     control={form.control}
-                    name="specialRequest"
+                    name="companyName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs sm:text-sm">Special Request</FormLabel>
+                        <FormLabel className="text-xs sm:text-sm">Company (Optional)</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Any special requirements..." {...field} className="min-h-[60px] sm:min-h-[80px] resize-none text-sm" />
+                          <Input placeholder="Company name" {...field} className="h-9 text-sm" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Trip Details */}
-            <Card className="shadow-sm">
-              <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6 pt-3 sm:pt-4">
-                <CardTitle className="text-sm sm:text-base md:text-lg">Trip Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-6">
-                {/* Multi-Bus Fleet Mode Toggle */}
-                <div>
-                  <Card className="bg-muted/50">
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <Label className="text-xs sm:text-sm font-semibold">Bus Fleet Selection</Label>
-                          <p className="text-xs text-muted-foreground">Multiple bus types</p>
-                        </div>
-                        <Switch 
-                          checked={isMultiBusMode}
-                          onCheckedChange={(checked) => {
-                            setIsMultiBusMode(checked);
-                            if (!checked) {
-                              // Reset to single bus mode
-                              setSelectedBusFleet([{ id: crypto.randomUUID(), busTypeId: '', quantity: 1 }]);
-                            }
-                          }}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                  <FormField
+                    control={form.control}
+                    name="customerName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs sm:text-sm">Customer Name *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Customer name" {...field} className="h-9 text-sm" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                  {!isMultiBusMode ? (
-                    // Single Bus Type Mode
+                  <FormField
+                    control={form.control}
+                    name="customerPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs sm:text-sm">Phone *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Phone number" {...field} className="h-9 text-sm" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs sm:text-sm">Email (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Email address" {...field} className="h-9 text-sm" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="sm:col-span-2">
                     <FormField
                       control={form.control}
-                      name="busTypeId"
+                      name="specialRequest"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Bus Type *</FormLabel>
+                          <FormLabel className="text-xs sm:text-sm">Special Request</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="Any special requirements..." {...field} className="min-h-[60px] sm:min-h-[80px] resize-none text-sm" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Trip Details */}
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6 pt-3 sm:pt-4">
+                  <CardTitle className="text-sm sm:text-base md:text-lg">Trip Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-6">
+                  {/* Multi-Bus Fleet Mode Toggle */}
+                  <div>
+                    <Card className="bg-muted/50">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <Label className="text-xs sm:text-sm font-semibold">Bus Fleet Selection</Label>
+                            <p className="text-xs text-muted-foreground">Multiple bus types</p>
+                          </div>
+                          <Switch
+                            checked={isMultiBusMode}
+                            onCheckedChange={(checked) => {
+                              setIsMultiBusMode(checked);
+                              if (!checked) {
+                                // Reset to single bus mode
+                                setSelectedBusFleet([{ id: crypto.randomUUID(), busTypeId: '', quantity: 1 }]);
+                              }
+                            }}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                    {!isMultiBusMode ? (
+                      // Single Bus Type Mode
+                      <FormField
+                        control={form.control}
+                        name="busTypeId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bus Type *</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select bus type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {busTypes.map((busType) => (
+                                  <SelectItem key={busType.id} value={busType.id}>
+                                    {busType.name} (Capacity: {busType.capacity})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ) : (
+                      // Multi-Bus Fleet Mode - Show fleet summary in header
+                      <div className="lg:col-span-1">
+                        <Label>Fleet Summary</Label>
+                        <div className="text-sm mt-2 p-3 bg-primary/10 rounded-md">
+                          <div className="font-medium">Total Buses: {selectedBusFleet.reduce((sum, bus) => sum + (bus.quantity || 0), 0)}</div>
+                          <div className="text-muted-foreground">Total Capacity: {selectedBusFleet.reduce((sum, bus) => {
+                            const busType = busTypes.find(bt => bt.id === bus.busTypeId);
+                            return sum + ((busType?.capacity || 0) * (bus.quantity || 0));
+                          }, 0)} seats</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <FormField
+                      control={form.control}
+                      name="hireType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Hire Type *</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select bus type" />
+                                <SelectValue />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {busTypes.map((busType) => (
-                                <SelectItem key={busType.id} value={busType.id}>
-                                  {busType.name} (Capacity: {busType.capacity})
+                              <SelectItem value="Outside">Outside</SelectItem>
+                              <SelectItem value="Lyceum">Lyceum</SelectItem>
+                              <SelectItem value="Internal">Internal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="parkingLocationId"
+                      render={({ field }) => (
+                        <FormItem className={(useMultiParking || usePickupAsParking) ? "opacity-50 pointer-events-none" : ""}>
+                          <FormLabel>Parking Location * {useMultiParking && "(Disabled - Using multi-parking)"}{usePickupAsParking && "(Using pickup location)"}</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={useMultiParking || usePickupAsParking}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select parking location" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {parkingLocations.map((location) => (
+                                <SelectItem key={location.id} value={location.id}>
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="h-4 w-4" />
+                                    {location.parking_location_name}
+                                    {location.is_default && <Badge variant="secondary">Default</Badge>}
+                                  </div>
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1921,651 +2005,586 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                         </FormItem>
                       )}
                     />
-                  ) : (
-                    // Multi-Bus Fleet Mode - Show fleet summary in header
-                    <div className="lg:col-span-1">
-                      <Label>Fleet Summary</Label>
-                      <div className="text-sm mt-2 p-3 bg-primary/10 rounded-md">
-                        <div className="font-medium">Total Buses: {selectedBusFleet.reduce((sum, bus) => sum + (bus.quantity || 0), 0)}</div>
-                        <div className="text-muted-foreground">Total Capacity: {selectedBusFleet.reduce((sum, bus) => {
-                          const busType = busTypes.find(bt => bt.id === bus.busTypeId);
-                          return sum + ((busType?.capacity || 0) * (bus.quantity || 0));
-                        }, 0)} seats</div>
-                      </div>
-                    </div>
-                  )}
 
-                  <FormField
-                    control={form.control}
-                    name="hireType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Hire Type *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Outside">Outside</SelectItem>
-                            <SelectItem value="Lyceum">Lyceum</SelectItem>
-                            <SelectItem value="Internal">Internal</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="parkingLocationId"
-                    render={({ field }) => (
-                      <FormItem className={(useMultiParking || usePickupAsParking) ? "opacity-50 pointer-events-none" : ""}>
-                        <FormLabel>Parking Location * {useMultiParking && "(Disabled - Using multi-parking)"}{usePickupAsParking && "(Using pickup location)"}</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={useMultiParking || usePickupAsParking}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select parking location" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {parkingLocations.map((location) => (
-                              <SelectItem key={location.id} value={location.id}>
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4" />
-                                  {location.parking_location_name}
-                                  {location.is_default && <Badge variant="secondary">Default</Badge>}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Pickup as Parking toggle */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Pickup Location Same as Parking</Label>
-                    <div className="flex items-center space-x-2">
-                      <Switch 
-                        checked={usePickupAsParking} 
-                        onCheckedChange={(enabled) => {
-                          setUsePickupAsParking(enabled);
-                          // Disable multi-parking when pickup=parking
-                          if (enabled && useMultiParking) {
-                            setUseMultiParking(false);
-                          }
-                        }}
-                        disabled={useMultiParking}
-                      />
-                      <Label className="text-sm text-muted-foreground">
-                        {usePickupAsParking ? "Bus starts from customer pickup - no empty run" : "Enable if bus starts from pickup point"}
-                      </Label>
-                  </div>
-
-                  {/* Manual Parking Distance Override toggle */}
-                  {costData && !usePickupAsParking && (
-                    <div className="space-y-2 border-t pt-4">
-                      <Label className="text-sm font-medium">Manual Parking Distance Override</Label>
-                      <div className="flex items-center space-x-2">
-                        <Switch 
-                          checked={useManualParkingDistance} 
-                          onCheckedChange={(enabled) => {
-                            setUseManualParkingDistance(enabled);
-                            if (enabled) {
-                              // Initialize with current calculated distances if not already set
-                              if (manualParkingToPickup === 0 && costData?.kmParkingToPickup) {
-                                setManualParkingToPickup(costData.kmParkingToPickup);
-                              }
-                              if (manualDropToParking === 0 && costData?.kmDropToParking) {
-                                setManualDropToParking(costData.kmDropToParking);
-                              }
-                              // Store original calculated distances for reset
-                              if (costData?.kmParkingToPickup) {
-                                setOriginalCalculatedParkingToPickup(costData.kmParkingToPickup);
-                              }
-                              if (costData?.kmDropToParking) {
-                                setOriginalCalculatedDropToParking(costData.kmDropToParking);
-                              }
-                            }
-                          }}
-                          disabled={usePickupAsParking}
-                        />
-                        <Label className="text-sm text-muted-foreground">
-                          {useManualParkingDistance ? "Enter custom parking distances manually" : "Override Google Maps calculated distances"}
-                        </Label>
-                      </div>
-                      
-                      {useManualParkingDistance && (
-                        <div className="space-y-4 mt-4 p-4 bg-muted/30 rounded-lg">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label className="text-sm">Parking → Pickup (km)</Label>
-                              <Input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                value={manualParkingToPickup}
-                                onChange={(e) => setManualParkingToPickup(parseFloat(e.target.value) || 0)}
-                                className="h-10"
-                              />
-                              {originalCalculatedParkingToPickup > 0 && (
-                                <div className="text-xs text-muted-foreground">
-                                  Google calculated: {originalCalculatedParkingToPickup} km
-                                </div>
-                              )}
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm">Drop → Parking (km)</Label>
-                              <Input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                value={manualDropToParking}
-                                onChange={(e) => setManualDropToParking(parseFloat(e.target.value) || 0)}
-                                className="h-10"
-                              />
-                              {originalCalculatedDropToParking > 0 && (
-                                <div className="text-xs text-muted-foreground">
-                                  Google calculated: {originalCalculatedDropToParking} km
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            className="w-full"
-                            onClick={async () => {
-                              if (!costData) return;
-                              setLoading(true);
-                              try {
-                                // Recalculate fuel costs with manual distances
-                                const totalEmptyRun = manualParkingToPickup + manualDropToParking;
-                                const { data: fuelSettings } = await supabase
-                                  .from('fuel_settings')
-                                  .select('*')
-                                  .eq('id', form.getValues('parkingLocationId'))
-                                  .single();
-                                
-                                const { data: busTypeData } = await supabase
-                                  .from('bus_types')
-                                  .select('avg_km_per_l')
-                                  .eq('id', form.getValues('busTypeId'))
-                                  .single();
-                                
-                                const busEfficiency = busTypeData?.avg_km_per_l || 8;
-                                const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 350;
-                                const numberOfBuses = form.getValues('numberOfBuses') || 1;
-                                
-                                // Calculate new fuel cost (empty run only - for customer billing)
-                                const newFuelCost = Math.round((totalEmptyRun / busEfficiency) * fuelPrice * numberOfBuses);
-                                
-                                // Update costData with manual distances
-                                setCostData({
-                                  ...costData,
-                                  kmParkingToPickup: manualParkingToPickup,
-                                  kmDropToParking: manualDropToParking,
-                                  fuelCostFuelOnly: newFuelCost,
-                                  useManualParkingDistance: true,
-                                  // Recalculate totals
-                                  customerTotalWithFuel: (costData.hireCharge || 0) + newFuelCost + 
-                                    (costData.totalAdditionalCharges || 0) - (costData.discountAmount || 0) +
-                                    (costData.commissionPassThroughAmount || 0),
-                                });
-                                
-                                toast({
-                                  title: "Distances Updated",
-                                  description: `Manual: Parking→Pickup: ${manualParkingToPickup}km, Drop→Parking: ${manualDropToParking}km`,
-                                });
-                              } catch (error) {
-                                console.error('Error recalculating with manual distances:', error);
-                                toast({
-                                  title: "Error",
-                                  description: "Failed to recalculate with manual distances",
-                                  variant: "destructive"
-                                });
-                              } finally {
-                                setLoading(false);
-                              }
-                            }}
-                            disabled={loading}
-                          >
-                            <Calculator className="h-4 w-4 mr-2" />
-                            Recalculate with Manual Distances
-                          </Button>
-                          
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full text-muted-foreground"
-                            onClick={() => {
-                              setManualParkingToPickup(originalCalculatedParkingToPickup);
-                              setManualDropToParking(originalCalculatedDropToParking);
-                            }}
-                          >
-                            Reset to Google Calculated Values
-                          </Button>
-                        </div>
-                      )}
-                      
-                      {useManualParkingDistance && (
-                        <Badge variant="secondary" className="mt-1">
-                          Manual parking distances will be saved with quotation
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Manual Trip Distance Override */}
-                  {costData && !usePickupAsParking && (
+                    {/* Pickup as Parking toggle */}
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Manual Trip Distance Override</Label>
+                      <Label className="text-sm font-medium">Pickup Location Same as Parking</Label>
                       <div className="flex items-center space-x-2">
                         <Switch
-                          checked={useManualTripDistance}
-                          onCheckedChange={(checked) => {
-                            setUseManualTripDistance(checked);
-                            if (checked && costData?.kmTrip) {
-                              // Initialize with current calculated value
-                              setManualTripDistance(costData.kmTrip);
-                              setOriginalCalculatedTripDistance(costData.kmTrip);
+                          checked={usePickupAsParking}
+                          onCheckedChange={(enabled) => {
+                            setUsePickupAsParking(enabled);
+                            // Disable multi-parking when pickup=parking
+                            if (enabled && useMultiParking) {
+                              setUseMultiParking(false);
                             }
                           }}
+                          disabled={useMultiParking}
                         />
                         <Label className="text-sm text-muted-foreground">
-                          {useManualTripDistance ? "Enter custom trip distance manually" : "Override Google Maps trip distance"}
+                          {usePickupAsParking ? "Bus starts from customer pickup - no empty run" : "Enable if bus starts from pickup point"}
                         </Label>
                       </div>
-                      
-                      {useManualTripDistance && (
-                        <div className="space-y-4 mt-4 p-4 bg-muted/30 rounded-lg">
-                          <div className="space-y-2">
-                            <Label className="text-sm">Trip Distance: Pickup → Drop (km)</Label>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              value={manualTripDistance}
-                              onChange={(e) => setManualTripDistance(parseFloat(e.target.value) || 0)}
-                              className="h-10"
+
+                      {/* Manual Parking Distance Override toggle */}
+                      {costData && !usePickupAsParking && (
+                        <div className="space-y-2 border-t pt-4">
+                          <Label className="text-sm font-medium">Manual Parking Distance Override</Label>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={useManualParkingDistance}
+                              onCheckedChange={(enabled) => {
+                                setUseManualParkingDistance(enabled);
+                                if (enabled) {
+                                  // Initialize with current calculated distances if not already set
+                                  if (manualParkingToPickup === 0 && costData?.kmParkingToPickup) {
+                                    setManualParkingToPickup(costData.kmParkingToPickup);
+                                  }
+                                  if (manualDropToParking === 0 && costData?.kmDropToParking) {
+                                    setManualDropToParking(costData.kmDropToParking);
+                                  }
+                                  // Store original calculated distances for reset
+                                  if (costData?.kmParkingToPickup) {
+                                    setOriginalCalculatedParkingToPickup(costData.kmParkingToPickup);
+                                  }
+                                  if (costData?.kmDropToParking) {
+                                    setOriginalCalculatedDropToParking(costData.kmDropToParking);
+                                  }
+                                }
+                              }}
+                              disabled={usePickupAsParking}
                             />
-                            {originalCalculatedTripDistance > 0 && (
-                              <div className="text-xs text-muted-foreground">
-                                Google calculated: {originalCalculatedTripDistance} km
-                              </div>
-                            )}
+                            <Label className="text-sm text-muted-foreground">
+                              {useManualParkingDistance ? "Enter custom parking distances manually" : "Override Google Maps calculated distances"}
+                            </Label>
                           </div>
-                          
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            className="w-full"
-                            onClick={async () => {
-                              if (!costData) return;
-                              setLoading(true);
-                              try {
-                                // Get form values for recalculation
-                                const formValues = form.getValues();
-                                const kmParkingToPickup = useManualParkingDistance ? manualParkingToPickup : costData.kmParkingToPickup;
-                                const kmDropToParking = useManualParkingDistance ? manualDropToParking : costData.kmDropToParking;
-                                const totalDistance = kmParkingToPickup + manualTripDistance + kmDropToParking;
-                                const numberOfBuses = formValues.numberOfBuses || 1;
-                                
-                                // Get fuel settings
-                                const { data: fuelSettings } = await supabase
-                                  .from('fuel_settings')
-                                  .select('*')
-                                  .single();
-                                
-                                const { data: busTypeData } = await supabase
-                                  .from('bus_types')
-                                  .select('avg_km_per_l')
-                                  .eq('id', formValues.busTypeId)
-                                  .single();
-                                
-                                // Get rate cards for hire type
-                                const rateCardHireType = formValues.hireType === 'Internal' ? 'Lyceum' : formValues.hireType;
-                                const { data: allRateCards } = await supabase
-                                  .from('hire_rate_cards')
-                                  .select('*')
-                                  .eq('hire_type', rateCardHireType)
-                                  .eq('bus_type_id', formValues.busTypeId)
-                                  .eq('is_active', true)
-                                  .order('from_km');
-                                
-                                if (!allRateCards || allRateCards.length === 0) {
-                                  throw new Error('No rate cards found');
-                                }
-                                
-                                const busEfficiency = busTypeData?.avg_km_per_l || 8;
-                                const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 350;
-                                
-                                // FULL RECALCULATION: Rate matching, exceeding KM, and overtime
-                                let rateCard = null;
-                                let fixedRate = 0;
-                                let exceedingDistanceCharge = 0;
-                                let baseCoverageKm = 100;
-                                let exceedingKm = 0;
-                                
-                                // Match rate card based on new manual distance
-                                if (formValues.hireType !== 'Outside') {
-                                  rateCard = allRateCards.find(card => 
-                                    manualTripDistance >= (card.from_km || 0) && 
-                                    (card.to_km === null || manualTripDistance <= card.to_km)
-                                  ) || allRateCards[0];
-                                  
-                                  fixedRate = rateCard?.flat_fee_lkr || 0;
-                                  
-                                  if (manualTripDistance > 100) {
-                                    const exceedingRateCard = allRateCards.find(card => 
-                                      card.from_km >= 101 && card.exceeding_km_rate_lkr != null
-                                    );
-                                    if (exceedingRateCard) {
-                                      baseCoverageKm = exceedingRateCard.exceeding_km_threshold || 100;
-                                      exceedingKm = Math.max(0, manualTripDistance - baseCoverageKm);
-                                      exceedingDistanceCharge = exceedingKm * (exceedingRateCard.exceeding_km_rate_lkr || 0);
-                                    }
+
+                          {useManualParkingDistance && (
+                            <div className="space-y-4 mt-4 p-4 bg-muted/30 rounded-lg">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Parking → Pickup (km)</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    value={manualParkingToPickup}
+                                    onChange={(e) => setManualParkingToPickup(parseFloat(e.target.value) || 0)}
+                                    className="h-10"
+                                  />
+                                  {originalCalculatedParkingToPickup > 0 && (
+                                    <div className="text-xs text-muted-foreground">
+                                      Google calculated: {originalCalculatedParkingToPickup} km
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-sm">Drop → Parking (km)</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    value={manualDropToParking}
+                                    onChange={(e) => setManualDropToParking(parseFloat(e.target.value) || 0)}
+                                    className="h-10"
+                                  />
+                                  {originalCalculatedDropToParking > 0 && (
+                                    <div className="text-xs text-muted-foreground">
+                                      Google calculated: {originalCalculatedDropToParking} km
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="w-full"
+                                onClick={async () => {
+                                  if (!costData) return;
+                                  setLoading(true);
+                                  try {
+                                    // Recalculate fuel costs with manual distances
+                                    const totalEmptyRun = manualParkingToPickup + manualDropToParking;
+                                    const { data: fuelSettings } = await supabase
+                                      .from('fuel_settings')
+                                      .select('*')
+                                      .eq('id', form.getValues('parkingLocationId'))
+                                      .single();
+
+                                    const { data: busTypeData } = await supabase
+                                      .from('bus_types')
+                                      .select('avg_km_per_l')
+                                      .eq('id', form.getValues('busTypeId'))
+                                      .single();
+
+                                    const busEfficiency = busTypeData?.avg_km_per_l || 8;
+                                    const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 350;
+                                    const numberOfBuses = form.getValues('numberOfBuses') || 1;
+
+                                    // Calculate new fuel cost (empty run only - for customer billing)
+                                    const newFuelCost = Math.round((totalEmptyRun / busEfficiency) * fuelPrice * numberOfBuses);
+
+                                    // Update costData with manual distances
+                                    setCostData({
+                                      ...costData,
+                                      kmParkingToPickup: manualParkingToPickup,
+                                      kmDropToParking: manualDropToParking,
+                                      fuelCostFuelOnly: newFuelCost,
+                                      useManualParkingDistance: true,
+                                      // Recalculate totals
+                                      customerTotalWithFuel: (costData.hireCharge || 0) + newFuelCost +
+                                        (costData.totalAdditionalCharges || 0) - (costData.discountAmount || 0) +
+                                        (costData.commissionPassThroughAmount || 0),
+                                    });
+
+                                    toast({
+                                      title: "Distances Updated",
+                                      description: `Manual: Parking→Pickup: ${manualParkingToPickup}km, Drop→Parking: ${manualDropToParking}km`,
+                                    });
+                                  } catch (error) {
+                                    console.error('Error recalculating with manual distances:', error);
+                                    toast({
+                                      title: "Error",
+                                      description: "Failed to recalculate with manual distances",
+                                      variant: "destructive"
+                                    });
+                                  } finally {
+                                    setLoading(false);
                                   }
-                                } else {
-                                  rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
-                                  fixedRate = rateCard?.flat_fee_lkr || 0;
-                                  baseCoverageKm = rateCard?.exceeding_km_threshold || 100;
-                                  exceedingKm = Math.max(0, manualTripDistance - baseCoverageKm);
-                                  exceedingDistanceCharge = exceedingKm * (rateCard?.exceeding_km_rate_lkr || 0);
-                                }
-                                
-                                // RECALCULATE OVERTIME/OVERNIGHT with new distance
-                                let overtimeCharge = 0;
-                                let overnightCharge = 0;
-                                
-                                if (rateCard) {
-                                  if (formValues.hireType === 'Outside') {
-                                    // Outside hire: available hours = distance / 10 km/h
-                                    const extraTimeResult = calculateExtraTimeCharge(
-                                      manualTripDistance,
-                                      formValues.pickupDateTime,
-                                      formValues.dropDateTime,
-                                      {
-                                        baselineSpeedKmph: 10,
-                                        hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
-                                        nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
-                                        useStandardHours: false
-                                      }
-                                    );
-                                    overtimeCharge = extraTimeResult.overtimeCharge;
-                                    overnightCharge = extraTimeResult.overnightCharge;
-                                  } else {
-                                    // Lyceum/Internal: available hours from rate card standard_hours
-                                    const extraTimeResult = calculateExtraTimeCharge(
-                                      manualTripDistance,
-                                      formValues.pickupDateTime,
-                                      formValues.dropDateTime,
-                                      {
-                                        hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
-                                        nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
-                                        useStandardHours: true,
-                                        standardHours: rateCard.standard_hours || 8
-                                      }
-                                    );
-                                    overtimeCharge = extraTimeResult.overtimeCharge;
-                                    overnightCharge = extraTimeResult.overnightCharge;
-                                  }
-                                }
-                                
-                                const totalExtraTimeCharge = overtimeCharge + overnightCharge;
-                                const hireCharge = fixedRate + exceedingDistanceCharge + totalExtraTimeCharge;
-                                const grossRevenue = hireCharge * numberOfBuses;
-                                
-                                // Calculate fuel cost (empty run only for customer billing)
-                                const emptyRunDistance = kmParkingToPickup + kmDropToParking;
-                                const newFuelCost = Math.round((emptyRunDistance / busEfficiency) * fuelPrice * numberOfBuses);
-                                
-                                // Recalculate commission on new gross revenue
-                                const preCommissionTotal = grossRevenue + newFuelCost + 
-                                  (costData.totalAdditionalCharges || 0) - (costData.discountAmount || 0);
-                                const safePassThroughPct = Math.min(formValues.commissionPassThroughPct, formValues.commissionPct);
-                                const commissionPassThroughAmount = preCommissionTotal * (safePassThroughPct / 100);
-                                const commissionExpense = preCommissionTotal * (formValues.commissionPct / 100);
-                                const finalCustomerTotal = preCommissionTotal + commissionPassThroughAmount;
-                                
-                                // Calculate available hours for display
-                                const actualHrs = (new Date(formValues.dropDateTime).getTime() - new Date(formValues.pickupDateTime).getTime()) / (1000 * 60 * 60);
-                                const availableHrs = formValues.hireType === 'Outside' 
-                                  ? (manualTripDistance / 10) 
-                                  : (rateCard?.standard_hours || 8);
-                                const overtimeHrs = Math.max(0, actualHrs - availableHrs);
-                                
-                                // Update costData with FULL recalculation
-                                setCostData({
-                                  ...costData,
-                                  kmTrip: manualTripDistance,
-                                  totalTripDistance: totalDistance,
-                                  totalDistance: totalDistance,
-                                  useManualTripDistance: true,
-                                  // Updated hire charges
-                                  hireCharge: Math.round(hireCharge),
-                                  fixedRate: Math.round(fixedRate),
-                                  exceedingDistanceCharge: Math.round(exceedingDistanceCharge),
-                                  overtimeCharge: Math.round(overtimeCharge),
-                                  overnightCharge: Math.round(overnightCharge),
-                                  grossRevenue: Math.round(grossRevenue),
-                                  fuelCostFuelOnly: newFuelCost,
-                                  // Updated commission
-                                  commissionAmount: Math.round(commissionExpense),
-                                  commissionPassThroughAmount: Math.round(commissionPassThroughAmount),
-                                  customerTotalWithFuel: Math.round(finalCustomerTotal),
-                                  // Updated rate card details
-                                  rateCardDetails: {
-                                    ...(costData.rateCardDetails || {}),
-                                    standardHours: rateCard?.standard_hours || 8,
-                                    actualHours: Math.round(actualHrs * 100) / 100,
-                                    availableHours: Math.round(availableHrs * 100) / 100,
-                                    overtimeHours: Math.round(overtimeHrs * 100) / 100,
-                                    exceedingKm: exceedingKm,
-                                    chargeableExceedingKm: exceedingKm,
-                                  }
-                                });
-                                
-                                toast({
-                                  title: "Full Recalculation Complete",
-                                  description: `Manual trip: ${manualTripDistance} km | Hire: LKR ${Math.round(hireCharge).toLocaleString()} | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()}`,
-                                });
-                              } catch (error) {
-                                console.error('Error recalculating with manual trip distance:', error);
-                                toast({
-                                  title: "Error",
-                                  description: "Failed to recalculate with manual trip distance",
-                                  variant: "destructive"
-                                });
-                              } finally {
-                                setLoading(false);
-                              }
-                            }}
-                            disabled={loading}
-                          >
-                            <Calculator className="h-4 w-4 mr-2" />
-                            Recalculate with Manual Trip Distance
-                          </Button>
-                          
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full text-muted-foreground"
-                            onClick={() => {
-                              setManualTripDistance(originalCalculatedTripDistance);
-                            }}
-                          >
-                            Reset to Google Calculated Value
-                          </Button>
+                                }}
+                                disabled={loading}
+                              >
+                                <Calculator className="h-4 w-4 mr-2" />
+                                Recalculate with Manual Distances
+                              </Button>
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="w-full text-muted-foreground"
+                                onClick={() => {
+                                  setManualParkingToPickup(originalCalculatedParkingToPickup);
+                                  setManualDropToParking(originalCalculatedDropToParking);
+                                }}
+                              >
+                                Reset to Google Calculated Values
+                              </Button>
+                            </div>
+                          )}
+
+                          {useManualParkingDistance && (
+                            <Badge variant="secondary" className="mt-1">
+                              Manual parking distances will be saved with quotation
+                            </Badge>
+                          )}
                         </div>
                       )}
-                      
-                      {useManualTripDistance && (
+
+                      {/* Manual Trip Distance Override */}
+                      {costData && !usePickupAsParking && (
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">Manual Trip Distance Override</Label>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={useManualTripDistance}
+                              onCheckedChange={(checked) => {
+                                setUseManualTripDistance(checked);
+                                if (checked && costData?.kmTrip) {
+                                  // Initialize with current calculated value
+                                  setManualTripDistance(costData.kmTrip);
+                                  setOriginalCalculatedTripDistance(costData.kmTrip);
+                                }
+                              }}
+                            />
+                            <Label className="text-sm text-muted-foreground">
+                              {useManualTripDistance ? "Enter custom trip distance manually" : "Override Google Maps trip distance"}
+                            </Label>
+                          </div>
+
+                          {useManualTripDistance && (
+                            <div className="space-y-4 mt-4 p-4 bg-muted/30 rounded-lg">
+                              <div className="space-y-2">
+                                <Label className="text-sm">Trip Distance: Pickup → Drop (km)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  value={manualTripDistance}
+                                  onChange={(e) => setManualTripDistance(parseFloat(e.target.value) || 0)}
+                                  className="h-10"
+                                />
+                                {originalCalculatedTripDistance > 0 && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Google calculated: {originalCalculatedTripDistance} km
+                                  </div>
+                                )}
+                              </div>
+
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="w-full"
+                                onClick={async () => {
+                                  if (!costData) return;
+                                  setLoading(true);
+                                  try {
+                                    // Get form values for recalculation
+                                    const formValues = form.getValues();
+                                    const kmParkingToPickup = useManualParkingDistance ? manualParkingToPickup : costData.kmParkingToPickup;
+                                    const kmDropToParking = useManualParkingDistance ? manualDropToParking : costData.kmDropToParking;
+                                    const totalDistance = kmParkingToPickup + manualTripDistance + kmDropToParking;
+                                    const numberOfBuses = formValues.numberOfBuses || 1;
+
+                                    // Get fuel settings
+                                    const { data: fuelSettings } = await supabase
+                                      .from('fuel_settings')
+                                      .select('*')
+                                      .single();
+
+                                    const { data: busTypeData } = await supabase
+                                      .from('bus_types')
+                                      .select('avg_km_per_l')
+                                      .eq('id', formValues.busTypeId)
+                                      .single();
+
+                                    // Get rate cards for hire type
+                                    const rateCardHireType = formValues.hireType === 'Internal' ? 'Lyceum' : formValues.hireType;
+                                    const { data: allRateCards } = await supabase
+                                      .from('hire_rate_cards')
+                                      .select('*')
+                                      .eq('hire_type', rateCardHireType)
+                                      .eq('bus_type_id', formValues.busTypeId)
+                                      .eq('is_active', true)
+                                      .order('from_km');
+
+                                    if (!allRateCards || allRateCards.length === 0) {
+                                      throw new Error('No rate cards found');
+                                    }
+
+                                    const busEfficiency = busTypeData?.avg_km_per_l || 8;
+                                    const fuelPrice = fuelSettings?.diesel_price_lkr_per_l || 350;
+
+                                    // FULL RECALCULATION: Rate matching, exceeding KM, and overtime
+                                    let rateCard = null;
+                                    let fixedRate = 0;
+                                    let exceedingDistanceCharge = 0;
+                                    let baseCoverageKm = 100;
+                                    let exceedingKm = 0;
+
+                                    // Match rate card based on new manual distance
+                                    if (formValues.hireType !== 'Outside') {
+                                      rateCard = allRateCards.find(card =>
+                                        manualTripDistance >= (card.from_km || 0) &&
+                                        (card.to_km === null || manualTripDistance <= card.to_km)
+                                      ) || allRateCards[0];
+
+                                      fixedRate = rateCard?.flat_fee_lkr || 0;
+
+                                      if (manualTripDistance > 100) {
+                                        const exceedingRateCard = allRateCards.find(card =>
+                                          card.from_km >= 101 && card.exceeding_km_rate_lkr != null
+                                        );
+                                        if (exceedingRateCard) {
+                                          baseCoverageKm = exceedingRateCard.exceeding_km_threshold || 100;
+                                          exceedingKm = Math.max(0, manualTripDistance - baseCoverageKm);
+                                          exceedingDistanceCharge = exceedingKm * (exceedingRateCard.exceeding_km_rate_lkr || 0);
+                                        }
+                                      }
+                                    } else {
+                                      rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
+                                      fixedRate = rateCard?.flat_fee_lkr || 0;
+                                      baseCoverageKm = rateCard?.exceeding_km_threshold || 100;
+                                      exceedingKm = Math.max(0, manualTripDistance - baseCoverageKm);
+                                      exceedingDistanceCharge = exceedingKm * (rateCard?.exceeding_km_rate_lkr || 0);
+                                    }
+
+                                    // RECALCULATE OVERTIME/OVERNIGHT with new distance
+                                    let overtimeCharge = 0;
+                                    let overnightCharge = 0;
+
+                                    if (rateCard) {
+                                      if (formValues.hireType === 'Outside') {
+                                        // Outside hire: available hours = distance / 10 km/h
+                                        const extraTimeResult = calculateExtraTimeCharge(
+                                          manualTripDistance,
+                                          formValues.pickupDateTime,
+                                          formValues.dropDateTime,
+                                          {
+                                            baselineSpeedKmph: 10,
+                                            hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+                                            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+                                            useStandardHours: false
+                                          }
+                                        );
+                                        overtimeCharge = extraTimeResult.overtimeCharge;
+                                        overnightCharge = extraTimeResult.overnightCharge;
+                                      } else {
+                                        // Lyceum/Internal: available hours from rate card standard_hours
+                                        const extraTimeResult = calculateExtraTimeCharge(
+                                          manualTripDistance,
+                                          formValues.pickupDateTime,
+                                          formValues.dropDateTime,
+                                          {
+                                            hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+                                            nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+                                            useStandardHours: true,
+                                            standardHours: rateCard.standard_hours || 8
+                                          }
+                                        );
+                                        overtimeCharge = extraTimeResult.overtimeCharge;
+                                        overnightCharge = extraTimeResult.overnightCharge;
+                                      }
+                                    }
+
+                                    const totalExtraTimeCharge = overtimeCharge + overnightCharge;
+                                    const hireCharge = fixedRate + exceedingDistanceCharge + totalExtraTimeCharge;
+                                    const grossRevenue = hireCharge * numberOfBuses;
+
+                                    // Calculate fuel cost (empty run only for customer billing)
+                                    const emptyRunDistance = kmParkingToPickup + kmDropToParking;
+                                    const newFuelCost = Math.round((emptyRunDistance / busEfficiency) * fuelPrice * numberOfBuses);
+
+                                    // Recalculate commission on new gross revenue
+                                    const preCommissionTotal = grossRevenue + newFuelCost +
+                                      (costData.totalAdditionalCharges || 0) - (costData.discountAmount || 0);
+                                    const safePassThroughPct = Math.min(formValues.commissionPassThroughPct, formValues.commissionPct);
+                                    const commissionPassThroughAmount = preCommissionTotal * (safePassThroughPct / 100);
+                                    const commissionExpense = preCommissionTotal * (formValues.commissionPct / 100);
+                                    const finalCustomerTotal = preCommissionTotal + commissionPassThroughAmount;
+
+                                    // Calculate available hours for display
+                                    const actualHrs = (new Date(formValues.dropDateTime).getTime() - new Date(formValues.pickupDateTime).getTime()) / (1000 * 60 * 60);
+                                    const availableHrs = formValues.hireType === 'Outside'
+                                      ? (manualTripDistance / 10)
+                                      : (rateCard?.standard_hours || 8);
+                                    const overtimeHrs = Math.max(0, actualHrs - availableHrs);
+
+                                    // Update costData with FULL recalculation
+                                    setCostData({
+                                      ...costData,
+                                      kmTrip: manualTripDistance,
+                                      totalTripDistance: totalDistance,
+                                      totalDistance: totalDistance,
+                                      useManualTripDistance: true,
+                                      // Updated hire charges
+                                      hireCharge: Math.round(hireCharge),
+                                      fixedRate: Math.round(fixedRate),
+                                      exceedingDistanceCharge: Math.round(exceedingDistanceCharge),
+                                      overtimeCharge: Math.round(overtimeCharge),
+                                      overnightCharge: Math.round(overnightCharge),
+                                      grossRevenue: Math.round(grossRevenue),
+                                      fuelCostFuelOnly: newFuelCost,
+                                      // Updated commission
+                                      commissionAmount: Math.round(commissionExpense),
+                                      commissionPassThroughAmount: Math.round(commissionPassThroughAmount),
+                                      customerTotalWithFuel: Math.round(finalCustomerTotal),
+                                      // Updated rate card details
+                                      rateCardDetails: {
+                                        ...(costData.rateCardDetails || {}),
+                                        standardHours: rateCard?.standard_hours || 8,
+                                        actualHours: Math.round(actualHrs * 100) / 100,
+                                        availableHours: Math.round(availableHrs * 100) / 100,
+                                        overtimeHours: Math.round(overtimeHrs * 100) / 100,
+                                        exceedingKm: exceedingKm,
+                                        chargeableExceedingKm: exceedingKm,
+                                      }
+                                    });
+
+                                    toast({
+                                      title: "Full Recalculation Complete",
+                                      description: `Manual trip: ${manualTripDistance} km | Hire: LKR ${Math.round(hireCharge).toLocaleString()} | Total: LKR ${Math.round(finalCustomerTotal).toLocaleString()}`,
+                                    });
+                                  } catch (error) {
+                                    console.error('Error recalculating with manual trip distance:', error);
+                                    toast({
+                                      title: "Error",
+                                      description: "Failed to recalculate with manual trip distance",
+                                      variant: "destructive"
+                                    });
+                                  } finally {
+                                    setLoading(false);
+                                  }
+                                }}
+                                disabled={loading}
+                              >
+                                <Calculator className="h-4 w-4 mr-2" />
+                                Recalculate with Manual Trip Distance
+                              </Button>
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="w-full text-muted-foreground"
+                                onClick={() => {
+                                  setManualTripDistance(originalCalculatedTripDistance);
+                                }}
+                              >
+                                Reset to Google Calculated Value
+                              </Button>
+                            </div>
+                          )}
+
+                          {useManualTripDistance && (
+                            <Badge variant="secondary" className="mt-1">
+                              Manual trip distance will be saved with quotation
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                      {usePickupAsParking && (
                         <Badge variant="secondary" className="mt-1">
-                          Manual trip distance will be saved with quotation
+                          No parking → pickup & drop → parking costs
                         </Badge>
                       )}
                     </div>
-                  )}
-                    {usePickupAsParking && (
-                      <Badge variant="secondary" className="mt-1">
-                        No parking → pickup & drop → parking costs
-                      </Badge>
-                    )}
-                  </div>
 
-                  {/* Multi-parking toggle */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Different parking locations per bus</Label>
-                    <div className="flex items-center space-x-2">
-                      <Switch 
-                        checked={useMultiParking} 
-                        onCheckedChange={handleMultiParkingToggle}
-                        disabled={watchedNumberOfBuses === 1 || usePickupAsParking}
-                      />
-                      <Label className="text-sm text-muted-foreground">
-                        {usePickupAsParking ? "Disabled - using pickup as parking" : 
-                         watchedNumberOfBuses === 1 ? "Single bus - multi-parking not needed" : "Enable for multiple bus locations"}
-                      </Label>
+                    {/* Multi-parking toggle */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Different parking locations per bus</Label>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={useMultiParking}
+                          onCheckedChange={handleMultiParkingToggle}
+                          disabled={watchedNumberOfBuses === 1 || usePickupAsParking}
+                        />
+                        <Label className="text-sm text-muted-foreground">
+                          {usePickupAsParking ? "Disabled - using pickup as parking" :
+                            watchedNumberOfBuses === 1 ? "Single bus - multi-parking not needed" : "Enable for multiple bus locations"}
+                        </Label>
+                      </div>
                     </div>
-                  </div>
 
-                  {!isMultiBusMode && (
-                    <FormField
-                      control={form.control}
-                      name="numberOfBuses"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Number of Buses *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="1"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : '')}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </div>
-
-                {/* Multi-Bus Fleet Selection UI */}
-                {isMultiBusMode && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold">Fleet Configuration</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedBusFleet([...selectedBusFleet, { 
-                            id: crypto.randomUUID(), 
-                            busTypeId: '', 
-                            quantity: 1 
-                          }]);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Bus Type
-                      </Button>
-                    </div>
-                    
-                    {selectedBusFleet.map((bus, index) => (
-                      <Card key={bus.id} className="bg-card">
-                        <CardContent className="pt-6">
-                          <div className="grid grid-cols-12 gap-4 items-end">
-                            <div className="col-span-6">
-                              <Label>Bus Type</Label>
-                              <Select
-                                value={bus.busTypeId}
-                                onValueChange={(value) => {
-                                  const updated = [...selectedBusFleet];
-                                  updated[index] = { ...updated[index], busTypeId: value };
-                                  setSelectedBusFleet(updated);
-                                }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select bus type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {busTypes.map((busType) => (
-                                    <SelectItem key={busType.id} value={busType.id}>
-                                      {busType.name} ({busType.capacity} seats)
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div className="col-span-3">
-                              <Label>Quantity</Label>
+                    {!isMultiBusMode && (
+                      <FormField
+                        control={form.control}
+                        name="numberOfBuses"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Number of Buses *</FormLabel>
+                            <FormControl>
                               <Input
                                 type="number"
                                 min="1"
-                                value={bus.quantity}
-                                onChange={(e) => {
-                                  const updated = [...selectedBusFleet];
-                                  updated[index] = { ...updated[index], quantity: parseInt(e.target.value) || 1 };
-                                  setSelectedBusFleet(updated);
-                                }}
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : '')}
                               />
-                            </div>
-                            
-                            <div className="col-span-3 flex items-center gap-2">
-                              {(() => {
-                                const busType = busTypes.find(bt => bt.id === bus.busTypeId);
-                                return busType ? (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {bus.quantity}x {busType.name} = {bus.quantity * busType.capacity} seats
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs text-muted-foreground">
-                                    Select bus type
-                                  </Badge>
-                                );
-                              })()}
-                              {selectedBusFleet.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    setSelectedBusFleet(selectedBusFleet.filter((_, i) => i !== index));
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
+
+                  {/* Multi-Bus Fleet Selection UI */}
+                  {isMultiBusMode && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-base font-semibold">Fleet Configuration</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBusFleet([...selectedBusFleet, {
+                              id: crypto.randomUUID(),
+                              busTypeId: '',
+                              quantity: 1
+                            }]);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Bus Type
+                        </Button>
+                      </div>
+
+                      {selectedBusFleet.map((bus, index) => (
+                        <Card key={bus.id} className="bg-card">
+                          <CardContent className="pt-6">
+                            <div className="grid grid-cols-12 gap-4 items-end">
+                              <div className="col-span-6">
+                                <Label>Bus Type</Label>
+                                <Select
+                                  value={bus.busTypeId}
+                                  onValueChange={(value) => {
+                                    const updated = [...selectedBusFleet];
+                                    updated[index] = { ...updated[index], busTypeId: value };
+                                    setSelectedBusFleet(updated);
                                   }}
                                 >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select bus type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {busTypes.map((busType) => (
+                                      <SelectItem key={busType.id} value={busType.id}>
+                                        {busType.name} ({busType.capacity} seats)
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <FormField
-                     control={form.control}
-                     name="pickupLocation"
-                     render={({ field }) => (
-                       <FormItem>
-                         <FormLabel>Pickup Location *</FormLabel>
-                           <FormControl>
+                              <div className="col-span-3">
+                                <Label>Quantity</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={bus.quantity}
+                                  onChange={(e) => {
+                                    const updated = [...selectedBusFleet];
+                                    updated[index] = { ...updated[index], quantity: parseInt(e.target.value) || 1 };
+                                    setSelectedBusFleet(updated);
+                                  }}
+                                />
+                              </div>
+
+                              <div className="col-span-3 flex items-center gap-2">
+                                {(() => {
+                                  const busType = busTypes.find(bt => bt.id === bus.busTypeId);
+                                  return busType ? (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {bus.quantity}x {busType.name} = {bus.quantity * busType.capacity} seats
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                                      Select bus type
+                                    </Badge>
+                                  );
+                                })()}
+                                {selectedBusFleet.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      setSelectedBusFleet(selectedBusFleet.filter((_, i) => i !== index));
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="pickupLocation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pickup Location *</FormLabel>
+                          <FormControl>
                             <LocationAutocomplete
                               value={field.value || ""}
                               onChange={(value, coords) => {
@@ -2583,12 +2602,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                       )}
                     />
 
-                   <FormField
-                     control={form.control}
-                     name="dropLocation"
-                     render={({ field }) => (
-                       <FormItem>
-                         <FormLabel>Drop Location *</FormLabel>
+                    <FormField
+                      control={form.control}
+                      name="dropLocation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Drop Location *</FormLabel>
                           <FormControl>
                             <LocationAutocomplete
                               value={field.value || ""}
@@ -2606,7 +2625,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                         </FormItem>
                       )}
                     />
-                 </div>
+                  </div>
 
 
                   {/* Intermediate Stops */}
@@ -2658,10 +2677,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                           <div className="flex justify-between font-medium text-foreground border-t pt-1">
                             <span>Total trip distance:</span>
                             <span>
-                              {costData 
+                              {costData
                                 ? `${costData.kmTrip + additionalCharges
-                                    .filter(charge => charge.type === 'additional_distance')
-                                    .reduce((sum, charge) => sum + (charge.distance || 0), 0)} KM`
+                                  .filter(charge => charge.type === 'additional_distance')
+                                  .reduce((sum, charge) => sum + (charge.distance || 0), 0)} KM`
                                 : 'Calculate to see'
                               }
                             </span>
@@ -2671,839 +2690,839 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                     )}
                   </div>
 
-                {/* Multi-parking bus details */}
-                {useMultiParking && busDetails.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-medium">Bus Parking Locations</h4>
-                      <Badge variant="outline">{busDetails.length} buses</Badge>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {busDetails.map((bus) => (
-                        <Card key={bus.busNumber} className="p-4">
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">Bus {bus.busNumber}</span>
+                  {/* Multi-parking bus details */}
+                  {useMultiParking && busDetails.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-medium">Bus Parking Locations</h4>
+                        <Badge variant="outline">{busDetails.length} buses</Badge>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {busDetails.map((bus) => (
+                          <Card key={bus.busNumber} className="p-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">Bus {bus.busNumber}</span>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm">Parking Location</Label>
+                                <Select
+                                  value={bus.parkingLocationId}
+                                  onValueChange={(value) => updateBusParking(bus.busNumber, value)}
+                                >
+                                  <SelectTrigger className="h-9">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {parkingLocations.map((location) => (
+                                      <SelectItem key={location.id} value={location.id}>
+                                        <div className="flex items-center gap-2">
+                                          <MapPin className="h-3 w-3" />
+                                          {location.parking_location_name}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm">Parking Location</Label>
-                              <Select 
-                                value={bus.parkingLocationId} 
-                                onValueChange={(value) => updateBusParking(bus.busNumber, value)}
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="numberOfPassengers"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Number of Passengers *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="1"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : '')}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="pickupDateTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pickup Date & Time *</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  {field.value ? (
+                                    format(field.value, "PPP HH:mm")
+                                  ) : (
+                                    <span>Pick date & time</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <div className="flex">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const newDateTime = new Date(date);
+                                      if (field.value) {
+                                        newDateTime.setHours(field.value.getHours());
+                                        newDateTime.setMinutes(field.value.getMinutes());
+                                      }
+                                      field.onChange(newDateTime);
+                                    }
+                                  }}
+                                  disabled={(date) => {
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0);
+                                    return date < today;
+                                  }}
+                                  initialFocus
+                                  className="pointer-events-auto"
+                                />
+                                <div className="border-l p-3 space-y-3">
+                                  <div className="text-sm font-medium">Time</div>
+                                  <div className="space-y-2">
+                                    <Input
+                                      type="time"
+                                      value={field.value ? format(field.value, "HH:mm") : ""}
+                                      onChange={(e) => {
+                                        if (e.target.value && field.value) {
+                                          const [hours, minutes] = e.target.value.split(':');
+                                          const newDateTime = new Date(field.value);
+                                          newDateTime.setHours(parseInt(hours));
+                                          newDateTime.setMinutes(parseInt(minutes));
+                                          field.onChange(newDateTime);
+                                        }
+                                      }}
+                                      className="w-[120px]"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="dropDateTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Drop Date & Time *</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  {field.value ? (
+                                    format(field.value, "PPP HH:mm")
+                                  ) : (
+                                    <span>Pick date & time</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <div className="flex">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const newDateTime = new Date(date);
+                                      if (field.value) {
+                                        newDateTime.setHours(field.value.getHours());
+                                        newDateTime.setMinutes(field.value.getMinutes());
+                                      }
+                                      field.onChange(newDateTime);
+                                    }
+                                  }}
+                                  disabled={(date) => {
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0);
+                                    return date < today;
+                                  }}
+                                  initialFocus
+                                  className="pointer-events-auto"
+                                />
+                                <div className="border-l p-3 space-y-3">
+                                  <div className="text-sm font-medium">Time</div>
+                                  <div className="space-y-2">
+                                    <Input
+                                      type="time"
+                                      value={field.value ? format(field.value, "HH:mm") : ""}
+                                      onChange={(e) => {
+                                        if (e.target.value && field.value) {
+                                          const [hours, minutes] = e.target.value.split(':');
+                                          const newDateTime = new Date(field.value);
+                                          newDateTime.setHours(parseInt(hours));
+                                          newDateTime.setMinutes(parseInt(minutes));
+                                          field.onChange(newDateTime);
+                                        } else if (e.target.value) {
+                                          // If no date is set, set to today with selected time
+                                          const [hours, minutes] = e.target.value.split(':');
+                                          const newDateTime = new Date();
+                                          newDateTime.setHours(parseInt(hours));
+                                          newDateTime.setMinutes(parseInt(minutes));
+                                          field.onChange(newDateTime);
+                                        }
+                                      }}
+                                      className="w-[120px]"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Additional Charges */}
+                    <div className="space-y-8">
+                      <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                        <div className="text-xl font-bold text-foreground">
+                          Additional Charges
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="lg"
+                          onClick={addAdditionalCharge}
+                          className="text-base font-medium px-6 py-3 h-12"
+                        >
+                          <Plus className="w-5 h-5 mr-2" />
+                          Add Charge
+                        </Button>
+                      </div>
+
+                      {additionalCharges.map((charge, index) => (
+                        <Card key={charge.id} className="p-8 border-2 border-muted bg-card shadow-lg">
+                          <div className="space-y-8">
+                            <div className="flex items-center justify-between mb-6">
+                              <h4 className="text-2xl font-bold text-foreground">Additional Charge #{index + 1}</h4>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="lg"
+                                onClick={() => removeAdditionalCharge(charge.id)}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 px-6 py-3 h-12"
                               >
-                                <SelectTrigger className="h-9">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {parkingLocations.map((location) => (
-                                    <SelectItem key={location.id} value={location.id}>
-                                      <div className="flex items-center gap-2">
-                                        <MapPin className="h-3 w-3" />
-                                        {location.parking_location_name}
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                                <Trash2 className="w-5 h-5 mr-2" />
+                                Remove
+                              </Button>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-8">
+                              <div className="space-y-4">
+                                <Label className="text-lg font-bold text-foreground">
+                                  Charge Type *
+                                </Label>
+                                <Select
+                                  value={charge.type}
+                                  onValueChange={(value) => updateAdditionalCharge(charge.id, 'type', value)}
+                                >
+                                  <SelectTrigger className="h-14 text-lg">
+                                    <SelectValue placeholder="Select charge type" />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-popover border border-border z-50">
+                                    {additionalChargeTypes.map((type) => (
+                                      <SelectItem
+                                        key={type.value}
+                                        value={type.value}
+                                        className="cursor-pointer hover:bg-accent text-lg py-3"
+                                      >
+                                        {type.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {charge.type === 'additional_distance' ? (
+                                <div className="space-y-4">
+                                  <Label className="text-lg font-bold text-foreground">
+                                    Additional Distance (KM) *
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    value={charge.distance || ''}
+                                    onChange={(e) => updateAdditionalCharge(charge.id, 'distance', parseFloat(e.target.value) || 0)}
+                                    placeholder="Enter additional kilometers (e.g., 50)"
+                                    className="h-14 text-lg"
+                                  />
+                                  {charge.distance && charge.distance > 0 && (
+                                    <div className="p-4 bg-muted/30 rounded-lg">
+                                      <p className="text-sm text-muted-foreground">
+                                        Auto-calculated charge: {charge.distance} KM × Exceeding Rate = LKR {(charge.amount || 0).toLocaleString()}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="space-y-4">
+                                  <Label className="text-lg font-bold text-foreground">
+                                    Amount (LKR) *
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={charge.amount}
+                                    onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
+                                    placeholder="Enter amount (negative for refunds)"
+                                    className="h-14 text-lg"
+                                  />
+                                  {charge.amount < 0 && (
+                                    <div className="p-2 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800">
+                                      💡 Negative amounts will reduce the total cost
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {charge.type === 'other' && (
+                              <div className="space-y-4">
+                                <Label className="text-lg font-bold text-foreground">
+                                  Reason / Description *
+                                </Label>
+                                <Input
+                                  value={charge.reason || ''}
+                                  onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
+                                  placeholder="Please specify the reason for this charge"
+                                  className="h-14 text-lg"
+                                />
+                              </div>
+                            )}
+
+                            {charge.type === 'internal_cost' && (
+                              <div className="space-y-4">
+                                <Label className="text-lg font-bold text-foreground">
+                                  Cost Description *
+                                </Label>
+                                <Input
+                                  value={charge.reason || ''}
+                                  onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
+                                  placeholder="e.g., wages, staff costs, operational expenses"
+                                  className="h-14 text-lg"
+                                />
+                                <p className="text-sm text-muted-foreground">
+                                  This cost will be deducted from profit but NOT charged to the customer
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Per Bus Application Settings */}
+                            <div className="border-t pt-6 space-y-6">
+                              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                                <div className="space-y-2">
+                                  <Label className="text-lg font-bold text-foreground">
+                                    Apply to Multiple Buses
+                                  </Label>
+                                  <p className="text-base text-muted-foreground">
+                                    Enable this if the charge should be applied per bus
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={charge.applyPerBus}
+                                  onCheckedChange={(checked) => updateAdditionalCharge(charge.id, 'applyPerBus', checked)}
+                                  className="scale-125"
+                                />
+                              </div>
+
+                              {charge.applyPerBus && (
+                                <div className="space-y-4">
+                                  <Label className="text-lg font-bold text-foreground">
+                                    Number of Buses *
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    max={watchedNumberOfBuses}
+                                    value={charge.busesCount}
+                                    onChange={(e) => updateAdditionalCharge(charge.id, 'busesCount', e.target.value ? parseInt(e.target.value) : 1)}
+                                    placeholder="Enter number of buses"
+                                    className="h-14 text-lg w-40"
+                                  />
+                                  <p className="text-base text-muted-foreground">
+                                    Maximum: {watchedNumberOfBuses} buses (total buses for this trip)
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </Card>
                       ))}
                     </div>
-                  </div>
-                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="numberOfPassengers"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Number of Passengers *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="1"
-                            {...field}
-                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : '')}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="pickupDateTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Pickup Date & Time *</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? (
-                                  format(field.value, "PPP HH:mm")
-                                ) : (
-                                  <span>Pick date & time</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <div className="flex">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    const newDateTime = new Date(date);
-                                    if (field.value) {
-                                      newDateTime.setHours(field.value.getHours());
-                                      newDateTime.setMinutes(field.value.getMinutes());
-                                    }
-                                    field.onChange(newDateTime);
-                                  }
-                                }}
-                                disabled={(date) => {
-                                  const today = new Date();
-                                  today.setHours(0, 0, 0, 0);
-                                  return date < today;
-                                }}
-                                initialFocus
-                                className="pointer-events-auto"
-                              />
-                              <div className="border-l p-3 space-y-3">
-                                <div className="text-sm font-medium">Time</div>
-                                <div className="space-y-2">
-                                  <Input
-                                    type="time"
-                                    value={field.value ? format(field.value, "HH:mm") : ""}
-                                    onChange={(e) => {
-                                      if (e.target.value && field.value) {
-                                        const [hours, minutes] = e.target.value.split(':');
-                                        const newDateTime = new Date(field.value);
-                                        newDateTime.setHours(parseInt(hours));
-                                        newDateTime.setMinutes(parseInt(minutes));
-                                        field.onChange(newDateTime);
-                                      }
-                                    }}
-                                    className="w-[120px]"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="dropDateTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Drop Date & Time *</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? (
-                                  format(field.value, "PPP HH:mm")
-                                ) : (
-                                  <span>Pick date & time</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <div className="flex">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    const newDateTime = new Date(date);
-                                    if (field.value) {
-                                      newDateTime.setHours(field.value.getHours());
-                                      newDateTime.setMinutes(field.value.getMinutes());
-                                    }
-                                    field.onChange(newDateTime);
-                                  }
-                                }}
-                                disabled={(date) => {
-                                  const today = new Date();
-                                  today.setHours(0, 0, 0, 0);
-                                  return date < today;
-                                }}
-                                initialFocus
-                                className="pointer-events-auto"
-                              />
-                              <div className="border-l p-3 space-y-3">
-                                <div className="text-sm font-medium">Time</div>
-                                <div className="space-y-2">
-                                  <Input
-                                    type="time"
-                                    value={field.value ? format(field.value, "HH:mm") : ""}
-                                    onChange={(e) => {
-                                      if (e.target.value && field.value) {
-                                        const [hours, minutes] = e.target.value.split(':');
-                                        const newDateTime = new Date(field.value);
-                                        newDateTime.setHours(parseInt(hours));
-                                        newDateTime.setMinutes(parseInt(minutes));
-                                        field.onChange(newDateTime);
-                                      } else if (e.target.value) {
-                                        // If no date is set, set to today with selected time
-                                        const [hours, minutes] = e.target.value.split(':');
-                                        const newDateTime = new Date();
-                                        newDateTime.setHours(parseInt(hours));
-                                        newDateTime.setMinutes(parseInt(minutes));
-                                        field.onChange(newDateTime);
-                                      }
-                                    }}
-                                    className="w-[120px]"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                {/* Additional Charges */}
-                <div className="space-y-8">
-                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                    <div className="text-xl font-bold text-foreground">
-                      Additional Charges
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="lg"
-                      onClick={addAdditionalCharge}
-                      className="text-base font-medium px-6 py-3 h-12"
-                    >
-                      <Plus className="w-5 h-5 mr-2" />
-                      Add Charge
-                    </Button>
-                  </div>
-                  
-                  {additionalCharges.map((charge, index) => (
-                     <Card key={charge.id} className="p-8 border-2 border-muted bg-card shadow-lg">
-                       <div className="space-y-8">
-                         <div className="flex items-center justify-between mb-6">
-                           <h4 className="text-2xl font-bold text-foreground">Additional Charge #{index + 1}</h4>
-                           <Button
-                             type="button"
-                             variant="outline"
-                             size="lg"
-                             onClick={() => removeAdditionalCharge(charge.id)}
-                             className="text-destructive hover:text-destructive hover:bg-destructive/10 px-6 py-3 h-12"
-                           >
-                             <Trash2 className="w-5 h-5 mr-2" />
-                             Remove
-                           </Button>
-                         </div>
-                         
-                         <div className="grid grid-cols-1 gap-8">
-                           <div className="space-y-4">
-                             <Label className="text-lg font-bold text-foreground">
-                               Charge Type *
-                             </Label>
-                             <Select
-                               value={charge.type}
-                               onValueChange={(value) => updateAdditionalCharge(charge.id, 'type', value)}
-                             >
-                               <SelectTrigger className="h-14 text-lg">
-                                 <SelectValue placeholder="Select charge type" />
-                               </SelectTrigger>
-                               <SelectContent className="bg-popover border border-border z-50">
-                                 {additionalChargeTypes.map((type) => (
-                                   <SelectItem 
-                                     key={type.value} 
-                                     value={type.value}
-                                     className="cursor-pointer hover:bg-accent text-lg py-3"
-                                   >
-                                     {type.label}
-                                   </SelectItem>
-                                 ))}
-                               </SelectContent>
-                             </Select>
-                           </div>
-                           
-                            {charge.type === 'additional_distance' ? (
-                              <div className="space-y-4">
-                                <Label className="text-lg font-bold text-foreground">
-                                  Additional Distance (KM) *
-                                </Label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.1"
-                                  value={charge.distance || ''}
-                                  onChange={(e) => updateAdditionalCharge(charge.id, 'distance', parseFloat(e.target.value) || 0)}
-                                  placeholder="Enter additional kilometers (e.g., 50)"
-                                  className="h-14 text-lg"
-                                />
-                                {charge.distance && charge.distance > 0 && (
-                                  <div className="p-4 bg-muted/30 rounded-lg">
-                                    <p className="text-sm text-muted-foreground">
-                                      Auto-calculated charge: {charge.distance} KM × Exceeding Rate = LKR {(charge.amount || 0).toLocaleString()}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                               <div className="space-y-4">
-                                 <Label className="text-lg font-bold text-foreground">
-                                   Amount (LKR) *
-                                 </Label>
-                                 <Input
-                                   type="number"
-                                   step="0.01"
-                                   value={charge.amount}
-                                   onChange={(e) => updateAdditionalCharge(charge.id, 'amount', parseFloat(e.target.value) || 0)}
-                                   placeholder="Enter amount (negative for refunds)"
-                                   className="h-14 text-lg"
-                                 />
-                                 {charge.amount < 0 && (
-                                   <div className="p-2 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800">
-                                     💡 Negative amounts will reduce the total cost
-                                   </div>
-                                 )}
-                               </div>
-                            )}
-                         </div>
-                         
-                          {charge.type === 'other' && (
-                            <div className="space-y-4">
-                              <Label className="text-lg font-bold text-foreground">
-                                Reason / Description *
-                              </Label>
-                              <Input
-                                value={charge.reason || ''}
-                                onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
-                                placeholder="Please specify the reason for this charge"
-                                className="h-14 text-lg"
-                              />
-                            </div>
-                          )}
-                          
-                          {charge.type === 'internal_cost' && (
-                            <div className="space-y-4">
-                              <Label className="text-lg font-bold text-foreground">
-                                Cost Description *
-                              </Label>
-                              <Input
-                                value={charge.reason || ''}
-                                onChange={(e) => updateAdditionalCharge(charge.id, 'reason', e.target.value)}
-                                placeholder="e.g., wages, staff costs, operational expenses"
-                                className="h-14 text-lg"
-                              />
-                              <p className="text-sm text-muted-foreground">
-                                This cost will be deducted from profit but NOT charged to the customer
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* Per Bus Application Settings */}
-                          <div className="border-t pt-6 space-y-6">
-                            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                              <div className="space-y-2">
-                                <Label className="text-lg font-bold text-foreground">
-                                  Apply to Multiple Buses
-                                </Label>
-                                <p className="text-base text-muted-foreground">
-                                  Enable this if the charge should be applied per bus
-                                </p>
-                              </div>
-                              <Switch
-                                checked={charge.applyPerBus}
-                                onCheckedChange={(checked) => updateAdditionalCharge(charge.id, 'applyPerBus', checked)}
-                                className="scale-125"
-                              />
-                            </div>
-                            
-                            {charge.applyPerBus && (
-                              <div className="space-y-4">
-                                <Label className="text-lg font-bold text-foreground">
-                                  Number of Buses *
-                                </Label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  max={watchedNumberOfBuses}
-                                  value={charge.busesCount}
-                                  onChange={(e) => updateAdditionalCharge(charge.id, 'busesCount', e.target.value ? parseInt(e.target.value) : 1)}
-                                  placeholder="Enter number of buses"
-                                  className="h-14 text-lg w-40"
-                                />
-                                <p className="text-base text-muted-foreground">
-                                  Maximum: {watchedNumberOfBuses} buses (total buses for this trip)
-                                </p>
-                              </div>
-                            )}
+                    {/* Other Expenses (Internal Costs) */}
+                    <div className="space-y-8">
+                      <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                        <div className="space-y-2">
+                          <div className="text-xl font-bold text-foreground">
+                            Other Expenses (Internal Costs)
                           </div>
-                       </div>
-                     </Card>
-                  ))}
-                 </div>
-
-                {/* Other Expenses (Internal Costs) */}
-                <div className="space-y-8">
-                  <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                    <div className="space-y-2">
-                      <div className="text-xl font-bold text-foreground">
-                        Other Expenses (Internal Costs)
-                      </div>
-                      <p className="text-base text-muted-foreground">
-                        Internal expenses that will be deducted from profit (not charged to customer)
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addOtherExpense}
-                      className="text-xs"
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add Expense
-                    </Button>
-                  </div>
-                  
-                  {otherExpenses.map((expense, index) => (
-                    <Card key={expense.id} className="p-4 border border-muted bg-muted/20">
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <Label className="text-sm font-medium text-foreground">Expense Description</Label>
-                          <Input
-                            value={expense.label}
-                            onChange={(e) => updateOtherExpense(expense.id, 'label', e.target.value)}
-                            placeholder="e.g., Office Expenses, Staff Costs, etc."
-                            className="mt-1"
-                          />
-                        </div>
-                        <div className="w-32">
-                          <Label className="text-sm font-medium text-foreground">Amount (LKR)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={expense.amount}
-                            onChange={(e) => updateOtherExpense(expense.id, 'amount', parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                            className="mt-1"
-                          />
+                          <p className="text-base text-muted-foreground">
+                            Internal expenses that will be deducted from profit (not charged to customer)
+                          </p>
                         </div>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => removeOtherExpense(expense.id)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10 mt-6"
+                          onClick={addOtherExpense}
+                          className="text-xs"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Plus className="w-3 h-3 mr-1" />
+                          Add Expense
                         </Button>
                       </div>
-                    </Card>
-                  ))}
-                 </div>
 
-
-                {/* Commission and Discount Settings */}
-                <div className="space-y-4">
-                  <div className="text-base font-semibold text-foreground">
-                    Commission & Discount Settings
-                  </div>
-                  
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="commissionPct"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium text-foreground">
-                            Total Commission (%)
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max="100"
-                              placeholder="5.0"
-                              className="h-10 text-base"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                          <div className="text-xs text-muted-foreground">
-                            Commission that company pays
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="commissionPassThroughPct"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium text-foreground">
-                            Pass to Customer (%)
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max={form.watch('commissionPct') || 100}
-                              placeholder="0.0"
-                              className="h-10 text-base"
-                              {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                          <div className="text-xs text-muted-foreground">
-                            Commission added to customer bill (max: {form.watch('commissionPct') || 0}%)
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="discountType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium text-foreground">Discount Type</FormLabel>
-                          <Select 
-                            onValueChange={(value) => {
-                              field.onChange(value);
-                              form.setValue('discountPct', 0);
-                              form.setValue('discountAmount', 0);
-                            }} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-10 text-base">
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="percentage">Percentage (%)</SelectItem>
-                              <SelectItem value="amount">Fixed Amount (LKR)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {form.watch('discountType') === 'percentage' ? (
-                      <FormField
-                        control={form.control}
-                        name="discountPct"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm font-medium text-foreground">
-                              Discount Percentage (%)
-                              {field.value > 0 && (
-                                <Badge variant="outline" className="ml-2 text-xs text-orange-600 border-orange-300">
-                                  Admin Approval Required
-                                </Badge>
-                              )}
-                            </FormLabel>
-                            <FormControl>
+                      {otherExpenses.map((expense, index) => (
+                        <Card key={expense.id} className="p-4 border border-muted bg-muted/20">
+                          <div className="flex items-center gap-4">
+                            <div className="flex-1">
+                              <Label className="text-sm font-medium text-foreground">Expense Description</Label>
                               <Input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                max="100"
-                                placeholder="0.0"
-                                className="h-10 text-base"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                value={expense.label}
+                                onChange={(e) => updateOtherExpense(expense.id, 'label', e.target.value)}
+                                placeholder="e.g., Office Expenses, Staff Costs, etc."
+                                className="mt-1"
                               />
-                            </FormControl>
-                            <FormMessage />
-                            <div className="text-xs text-muted-foreground">
-                              {field.value > 0 
-                                ? `${field.value}% discount will be applied (requires admin approval)`
-                                : 'Percentage discount to subtract from total'
-                              }
                             </div>
-                          </FormItem>
-                        )}
-                      />
-                    ) : (
-                      <FormField
-                        control={form.control}
-                        name="discountAmount"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm font-medium text-foreground">
-                              Discount Amount (LKR)
-                              {field.value > 0 && (
-                                <Badge variant="outline" className="ml-2 text-xs text-orange-600 border-orange-300">
-                                  Admin Approval Required
-                                </Badge>
-                              )}
-                            </FormLabel>
-                            <FormControl>
+                            <div className="w-32">
+                              <Label className="text-sm font-medium text-foreground">Amount (LKR)</Label>
                               <Input
                                 type="number"
+                                min="0"
                                 step="0.01"
-                                min="0"
+                                value={expense.amount}
+                                onChange={(e) => updateOtherExpense(expense.id, 'amount', parseFloat(e.target.value) || 0)}
                                 placeholder="0.00"
-                                className="h-10 text-base"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                className="mt-1"
                               />
-                            </FormControl>
-                            <FormMessage />
-                            <div className="text-xs text-muted-foreground">
-                              {field.value > 0 
-                                ? `LKR ${field.value.toLocaleString()} discount will be applied (requires admin approval)`
-                                : 'Fixed amount discount to subtract from total'
-                              }
                             </div>
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                  </div>
-
-                  {/* Referral Agent Section */}
-                  <div className="col-span-2 border-t pt-8 mt-6 bg-muted/20 -mx-6 px-6 pb-6 rounded-lg">
-                    <div className="flex items-center gap-3 mb-6">
-                      <Users className="h-6 w-6 text-primary" />
-                      <div className="text-lg font-bold">Referral Agent</div>
-                      <div className="text-sm text-muted-foreground font-medium">(Optional)</div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeOtherExpense(expense.id)}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10 mt-6"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
                     </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      {/* Agent Selector - Full width on large screens */}
-                      <div className="lg:col-span-3">
+
+
+                    {/* Commission and Discount Settings */}
+                    <div className="space-y-4">
+                      <div className="text-base font-semibold text-foreground">
+                        Commission & Discount Settings
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
-                          name="referralAgentId"
+                          name="commissionPct"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-base font-semibold">Select Agent</FormLabel>
-                              <Select 
+                              <FormLabel className="text-sm font-medium text-foreground">
+                                Total Commission (%)
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="100"
+                                  placeholder="5.0"
+                                  className="h-10 text-base"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                              <div className="text-xs text-muted-foreground">
+                                Commission that company pays
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="commissionPassThroughPct"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium text-foreground">
+                                Pass to Customer (%)
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max={form.watch('commissionPct') || 100}
+                                  placeholder="0.0"
+                                  className="h-10 text-base"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                              <div className="text-xs text-muted-foreground">
+                                Commission added to customer bill (max: {form.watch('commissionPct') || 0}%)
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="discountType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium text-foreground">Discount Type</FormLabel>
+                              <Select
                                 onValueChange={(value) => {
-                                  if (value === 'add-new') {
-                                    setShowAddAgentModal(true);
-                                  } else {
-                                    field.onChange(value);
-                                    handleAgentSelect(value);
-                                  }
+                                  field.onChange(value);
+                                  form.setValue('discountPct', 0);
+                                  form.setValue('discountAmount', 0);
                                 }}
-                                value={field.value}
+                                defaultValue={field.value}
                               >
                                 <FormControl>
-                                  <SelectTrigger className="h-12 text-base">
-                                    <SelectValue placeholder="Choose an agent or add new" />
+                                  <SelectTrigger className="h-10 text-base">
+                                    <SelectValue placeholder="Select type" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="add-new">
-                                    <div className="flex items-center gap-2 py-1 font-medium text-primary">
-                                      <Plus className="h-4 w-4" />
-                                      Add New Agent
-                                    </div>
-                                  </SelectItem>
-                                  {referralAgents.length > 0 && (
-                                    <>
-                                      <Separator className="my-1" />
-                                      {referralAgents.map((agent) => (
-                                        <SelectItem key={agent.id} value={agent.id}>
-                                          <div className="py-1">
-                                            <div className="font-semibold text-base">{agent.agent_name}</div>
-                                            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                                              <span>{agent.phone || 'No phone'}</span>
-                                              <span>•</span>
-                                              <span className="font-medium">{agent.total_referrals} referrals</span>
-                                              <span>•</span>
-                                              <span className="font-medium">LKR {agent.total_commission_earned?.toLocaleString() || '0'}</span>
-                                            </div>
-                                          </div>
-                                        </SelectItem>
-                                      ))}
-                                    </>
-                                  )}
+                                  <SelectItem value="percentage">Percentage (%)</SelectItem>
+                                  <SelectItem value="amount">Fixed Amount (LKR)</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </div>
 
-                      {/* Commission Percentage */}
-                      <FormField
-                        control={form.control}
-                        name="referralCommissionPct"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-base font-semibold">Commission %</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                max="100"
-                                placeholder="3.0"
-                                className="h-12 text-base font-medium"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                disabled={!form.watch('referralAgentId')}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
+                        {form.watch('discountType') === 'percentage' ? (
+                          <FormField
+                            control={form.control}
+                            name="discountPct"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-sm font-medium text-foreground">
+                                  Discount Percentage (%)
+                                  {field.value > 0 && (
+                                    <Badge variant="outline" className="ml-2 text-xs text-orange-600 border-orange-300">
+                                      Admin Approval Required
+                                    </Badge>
+                                  )}
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="100"
+                                    placeholder="0.0"
+                                    className="h-10 text-base"
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                                <div className="text-xs text-muted-foreground">
+                                  {field.value > 0
+                                    ? `${field.value}% discount will be applied (requires admin approval)`
+                                    : 'Percentage discount to subtract from total'
+                                  }
+                                </div>
+                              </FormItem>
+                            )}
+                          />
+                        ) : (
+                          <FormField
+                            control={form.control}
+                            name="discountAmount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-sm font-medium text-foreground">
+                                  Discount Amount (LKR)
+                                  {field.value > 0 && (
+                                    <Badge variant="outline" className="ml-2 text-xs text-orange-600 border-orange-300">
+                                      Admin Approval Required
+                                    </Badge>
+                                  )}
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    className="h-10 text-base"
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                                <div className="text-xs text-muted-foreground">
+                                  {field.value > 0
+                                    ? `LKR ${field.value.toLocaleString()} discount will be applied (requires admin approval)`
+                                    : 'Fixed amount discount to subtract from total'
+                                  }
+                                </div>
+                              </FormItem>
+                            )}
+                          />
                         )}
-                      />
-
-                      {/* Calculated Commission Amount (Read-only) */}
-                      <FormItem className="lg:col-span-2">
-                        <FormLabel className="text-base font-semibold">Commission Amount</FormLabel>
-                        <Input
-                          type="text"
-                          value={
-                            form.watch('referralAgentId') && costData?.customerTotalWithFuel
-                              ? `LKR ${Math.round((costData.customerTotalWithFuel * form.watch('referralCommissionPct')) / 100).toLocaleString()}`
-                              : 'LKR 0'
-                          }
-                          disabled
-                          className="h-12 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-lg font-bold text-green-700 dark:text-green-400"
-                        />
-                        <div className="text-sm text-muted-foreground mt-2 font-medium">
-                          Auto-calculated from total revenue
-                        </div>
-                      </FormItem>
-                    </div>
-
-                    {/* Show Agent Stats */}
-                    {selectedAgent && form.watch('referralAgentId') && (
-                      <div className="mt-8 p-6 bg-white dark:bg-slate-900 rounded-xl border-2 shadow-sm">
-                        <div className="text-sm font-bold text-muted-foreground uppercase tracking-wide mb-6">
-                          Agent Performance History
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          {/* Stat 1 - Total Trips */}
-                          <div className="space-y-3 p-5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border-2 border-blue-200/70 dark:border-blue-800/50">
-                            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                              <TrendingUp className="h-5 w-5" />
-                              <span className="text-xs font-bold uppercase tracking-wide">Total Trips</span>
-                            </div>
-                            <div className="text-4xl font-bold tracking-tight text-blue-900 dark:text-blue-100">
-                              {selectedAgent.total_referrals}
-                            </div>
-                            <div className="text-base font-medium text-blue-700 dark:text-blue-300">
-                              Trips Referred
-                            </div>
-                          </div>
-                          
-                          {/* Stat 2 - Commission Earned */}
-                          <div className="space-y-3 p-5 rounded-lg bg-green-50/70 dark:bg-green-950/30 border-2 border-green-200/70 dark:border-green-800/50">
-                            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                              <DollarSign className="h-5 w-5" />
-                              <span className="text-xs font-bold uppercase tracking-wide">Earned</span>
-                            </div>
-                            <div className="text-3xl font-bold tracking-tight text-green-900 dark:text-green-100">
-                              LKR {selectedAgent.total_commission_earned?.toLocaleString() || '0'}
-                            </div>
-                            <div className="text-base font-medium text-green-700 dark:text-green-300">
-                              Total Commission
-                            </div>
-                          </div>
-                          
-                          {/* Stat 3 - Contact */}
-                          {selectedAgent.phone && (
-                            <div className="space-y-3 p-5 rounded-lg bg-purple-50/70 dark:bg-purple-950/30 border-2 border-purple-200/70 dark:border-purple-800/50">
-                              <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
-                                <Phone className="h-5 w-5" />
-                                <span className="text-xs font-bold uppercase tracking-wide">Contact</span>
-                              </div>
-                              <div className="text-2xl font-bold tracking-tight text-purple-900 dark:text-purple-100">
-                                {selectedAgent.phone}
-                              </div>
-                              <div className="text-base font-medium text-purple-700 dark:text-purple-300">
-                                Phone Number
-                              </div>
-                            </div>
-                          )}
-                        </div>
                       </div>
-                    )}
+
+                      {/* Referral Agent Section */}
+                      <div className="col-span-2 border-t pt-8 mt-6 bg-muted/20 -mx-6 px-6 pb-6 rounded-lg">
+                        <div className="flex items-center gap-3 mb-6">
+                          <Users className="h-6 w-6 text-primary" />
+                          <div className="text-lg font-bold">Referral Agent</div>
+                          <div className="text-sm text-muted-foreground font-medium">(Optional)</div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                          {/* Agent Selector - Full width on large screens */}
+                          <div className="lg:col-span-3">
+                            <FormField
+                              control={form.control}
+                              name="referralAgentId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base font-semibold">Select Agent</FormLabel>
+                                  <Select
+                                    onValueChange={(value) => {
+                                      if (value === 'add-new') {
+                                        setShowAddAgentModal(true);
+                                      } else {
+                                        field.onChange(value);
+                                        handleAgentSelect(value);
+                                      }
+                                    }}
+                                    value={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger className="h-12 text-base">
+                                        <SelectValue placeholder="Choose an agent or add new" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="add-new">
+                                        <div className="flex items-center gap-2 py-1 font-medium text-primary">
+                                          <Plus className="h-4 w-4" />
+                                          Add New Agent
+                                        </div>
+                                      </SelectItem>
+                                      {referralAgents.length > 0 && (
+                                        <>
+                                          <Separator className="my-1" />
+                                          {referralAgents.map((agent) => (
+                                            <SelectItem key={agent.id} value={agent.id}>
+                                              <div className="py-1">
+                                                <div className="font-semibold text-base">{agent.agent_name}</div>
+                                                <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                                                  <span>{agent.phone || 'No phone'}</span>
+                                                  <span>•</span>
+                                                  <span className="font-medium">{agent.total_referrals} referrals</span>
+                                                  <span>•</span>
+                                                  <span className="font-medium">LKR {agent.total_commission_earned?.toLocaleString() || '0'}</span>
+                                                </div>
+                                              </div>
+                                            </SelectItem>
+                                          ))}
+                                        </>
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          {/* Commission Percentage */}
+                          <FormField
+                            control={form.control}
+                            name="referralCommissionPct"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-base font-semibold">Commission %</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="100"
+                                    placeholder="3.0"
+                                    className="h-12 text-base font-medium"
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    disabled={!form.watch('referralAgentId')}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {/* Calculated Commission Amount (Read-only) */}
+                          <FormItem className="lg:col-span-2">
+                            <FormLabel className="text-base font-semibold">Commission Amount</FormLabel>
+                            <Input
+                              type="text"
+                              value={
+                                form.watch('referralAgentId') && costData?.customerTotalWithFuel
+                                  ? `LKR ${Math.round((costData.customerTotalWithFuel * form.watch('referralCommissionPct')) / 100).toLocaleString()}`
+                                  : 'LKR 0'
+                              }
+                              disabled
+                              className="h-12 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-lg font-bold text-green-700 dark:text-green-400"
+                            />
+                            <div className="text-sm text-muted-foreground mt-2 font-medium">
+                              Auto-calculated from total revenue
+                            </div>
+                          </FormItem>
+                        </div>
+
+                        {/* Show Agent Stats */}
+                        {selectedAgent && form.watch('referralAgentId') && (
+                          <div className="mt-8 p-6 bg-white dark:bg-slate-900 rounded-xl border-2 shadow-sm">
+                            <div className="text-sm font-bold text-muted-foreground uppercase tracking-wide mb-6">
+                              Agent Performance History
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                              {/* Stat 1 - Total Trips */}
+                              <div className="space-y-3 p-5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border-2 border-blue-200/70 dark:border-blue-800/50">
+                                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                                  <TrendingUp className="h-5 w-5" />
+                                  <span className="text-xs font-bold uppercase tracking-wide">Total Trips</span>
+                                </div>
+                                <div className="text-4xl font-bold tracking-tight text-blue-900 dark:text-blue-100">
+                                  {selectedAgent.total_referrals}
+                                </div>
+                                <div className="text-base font-medium text-blue-700 dark:text-blue-300">
+                                  Trips Referred
+                                </div>
+                              </div>
+
+                              {/* Stat 2 - Commission Earned */}
+                              <div className="space-y-3 p-5 rounded-lg bg-green-50/70 dark:bg-green-950/30 border-2 border-green-200/70 dark:border-green-800/50">
+                                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                                  <DollarSign className="h-5 w-5" />
+                                  <span className="text-xs font-bold uppercase tracking-wide">Earned</span>
+                                </div>
+                                <div className="text-3xl font-bold tracking-tight text-green-900 dark:text-green-100">
+                                  LKR {selectedAgent.total_commission_earned?.toLocaleString() || '0'}
+                                </div>
+                                <div className="text-base font-medium text-green-700 dark:text-green-300">
+                                  Total Commission
+                                </div>
+                              </div>
+
+                              {/* Stat 3 - Contact */}
+                              {selectedAgent.phone && (
+                                <div className="space-y-3 p-5 rounded-lg bg-purple-50/70 dark:bg-purple-950/30 border-2 border-purple-200/70 dark:border-purple-800/50">
+                                  <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                                    <Phone className="h-5 w-5" />
+                                    <span className="text-xs font-bold uppercase tracking-wide">Contact</span>
+                                  </div>
+                                  <div className="text-2xl font-bold tracking-tight text-purple-900 dark:text-purple-100">
+                                    {selectedAgent.phone}
+                                  </div>
+                                  <div className="text-base font-medium text-purple-700 dark:text-purple-300">
+                                    Phone Number
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Cost Breakdown */}
+              {costData && (
+                <CostBreakdown data={costData} />
+              )}
+
+              {/* Mobile-friendly action buttons */}
+              <div className="flex flex-col sm:flex-row sm:justify-between items-stretch sm:items-center gap-3 pt-4 sm:pt-6 border-t sticky bottom-0 bg-background pb-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="default"
+                  className="w-full sm:w-auto order-2 sm:order-1 h-10 sm:h-9"
+                  onClick={() => form.handleSubmit(calculateCosts)()}
+                >
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Calculate Costs
+                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 order-1 sm:order-2 w-full sm:w-auto">
+                  <Button type="button" variant="outline" size="default" onClick={onCancel} className="w-full sm:w-auto h-10 sm:h-9">
+                    Cancel
+                  </Button>
+                  <Button type="submit" size="default" disabled={loading || !costData} className="w-full sm:w-auto h-10 sm:h-9">
+                    {loading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update' : 'Create Quotation')}
+                  </Button>
                 </div>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
-        {/* Cost Breakdown */}
-        {costData && (
-          <CostBreakdown data={costData} />
-        )}
-
-         {/* Mobile-friendly action buttons */}
-         <div className="flex flex-col sm:flex-row sm:justify-between items-stretch sm:items-center gap-3 pt-4 sm:pt-6 border-t sticky bottom-0 bg-background pb-2">
-           <Button 
-             type="button" 
-             variant="outline"
-             size="default"
-             className="w-full sm:w-auto order-2 sm:order-1 h-10 sm:h-9"
-             onClick={() => form.handleSubmit(calculateCosts)()}
-           >
-             <Calculator className="h-4 w-4 mr-2" />
-             Calculate Costs
-           </Button>
-           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 order-1 sm:order-2 w-full sm:w-auto">
-             <Button type="button" variant="outline" size="default" onClick={onCancel} className="w-full sm:w-auto h-10 sm:h-9">
-               Cancel
-             </Button>
-             <Button type="submit" size="default" disabled={loading || !costData} className="w-full sm:w-auto h-10 sm:h-9">
-               {loading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update' : 'Create Quotation')}
-             </Button>
-           </div>
-          </div>
-           </form>
-         </Form>
-      </DialogContent>
-    </Dialog>
-
-    {/* Add Referral Agent Modal */}
-    <AddReferralAgentModal
-      open={showAddAgentModal}
-      onOpenChange={setShowAddAgentModal}
-      onAgentAdded={handleAgentAdded}
-    />
+      {/* Add Referral Agent Modal */}
+      <AddReferralAgentModal
+        open={showAddAgentModal}
+        onOpenChange={setShowAddAgentModal}
+        onAgentAdded={handleAgentAdded}
+      />
     </>
   );
 }
