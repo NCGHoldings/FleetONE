@@ -192,7 +192,7 @@ export async function postTripRevenueToGL(
 
     // Create journal entry
     const entryNumber = `${settings.revenue_prefix}-${busNo}-${tripDate}`;
-    
+
     const { data: journalEntry, error: jeError } = await supabase
       .from('journal_entries')
       .insert({
@@ -250,9 +250,9 @@ export async function postTripRevenueToGL(
     // Link trip to journal entry
     const { error: updateError } = await supabase
       .from('daily_trips')
-      .update({ 
-        journal_entry_id: journalEntry.id, 
-        gl_posted: true 
+      .update({
+        journal_entry_id: journalEntry.id,
+        gl_posted: true
       })
       .eq('id', trip.id);
 
@@ -311,7 +311,7 @@ export async function postExpensesToGL(
     for (const mapping of expenseMapping) {
       const amount = (expense[mapping.field] as number) || 0;
       const accountId = settings[mapping.accountField] as string | null;
-      
+
       if (amount > 0 && accountId) {
         expenseLines.push({ accountId, amount, label: mapping.label });
         totalExpenses += amount;
@@ -327,7 +327,7 @@ export async function postExpensesToGL(
 
     // Create journal entry
     const entryNumber = `${settings.expense_prefix}-${busNo}-${expenseDate}`;
-    
+
     const { data: journalEntry, error: jeError } = await supabase
       .from('journal_entries')
       .insert({
@@ -385,9 +385,9 @@ export async function postExpensesToGL(
     // Link expense to journal entry
     const { error: updateError } = await supabase
       .from('daily_bus_expenses')
-      .update({ 
-        journal_entry_id: journalEntry.id, 
-        gl_posted: true 
+      .update({
+        journal_entry_id: journalEntry.id,
+        gl_posted: true
       })
       .eq('id', expense.id);
 
@@ -530,4 +530,156 @@ export async function bulkPostExpensesToGL(
   }
 
   return { success, failed, errors };
+}
+
+/**
+ * Auto-post a single trip to GL if auto_post_revenue is enabled in settings.
+ * Call this after saving/updating a trip. It fetches settings internally.
+ * Silently skips if auto-posting is disabled or settings not configured.
+ */
+export async function autoPostTripIfEnabled(tripId: string): Promise<void> {
+  try {
+    // Fetch settings
+    const { data: settingsData } = await supabase
+      .from('ncg_express_finance_settings')
+      .select('*')
+      .eq('company_id', NCG_EXPRESS_COMPANY_ID)
+      .maybeSingle();
+
+    if (!settingsData?.auto_post_revenue) return; // Auto-post disabled
+    if (!settingsData?.cash_account_id || !settingsData?.ticket_revenue_account_id) return; // Not configured
+
+    // Fetch the trip with bus and route info
+    const { data: trip } = await supabase
+      .from('daily_trips')
+      .select(`
+        id, trip_no, trip_date, bus_id, route_id, income, gl_posted,
+        buses:bus_id(bus_no),
+        routes:route_id(route_name)
+      `)
+      .eq('id', tripId)
+      .single();
+
+    if (!trip || trip.gl_posted || !trip.income || trip.income <= 0) return;
+
+    const settings: NCGExpressFinanceSettings = {
+      ticket_revenue_account_id: settingsData.ticket_revenue_account_id,
+      route_revenue_account_id: settingsData.route_revenue_account_id,
+      cash_account_id: settingsData.cash_account_id,
+      fuel_expense_account_id: settingsData.fuel_expense_account_id,
+      repair_expense_account_id: settingsData.repair_expense_account_id,
+      tyre_expense_account_id: settingsData.tyre_expense_account_id,
+      salary_expense_account_id: settingsData.salary_expense_account_id,
+      police_expense_account_id: settingsData.police_expense_account_id,
+      food_expense_account_id: settingsData.food_expense_account_id,
+      emission_fitness_expense_account_id: settingsData.emission_fitness_expense_account_id,
+      permits_expense_account_id: settingsData.permits_expense_account_id,
+      staff_accommodation_expense_account_id: settingsData.staff_accommodation_expense_account_id,
+      highway_expense_account_id: settingsData.highway_expense_account_id,
+      accident_expense_account_id: settingsData.accident_expense_account_id,
+      parking_expense_account_id: settingsData.parking_expense_account_id,
+      log_sheet_expense_account_id: settingsData.log_sheet_expense_account_id,
+      vehicle_hire_expense_account_id: settingsData.vehicle_hire_expense_account_id,
+      ntc_expense_account_id: settingsData.ntc_expense_account_id,
+      runner_expense_account_id: settingsData.runner_expense_account_id,
+      short_misc_expense_account_id: settingsData.short_misc_expense_account_id,
+      temporary_permit_expense_account_id: settingsData.temporary_permit_expense_account_id,
+      body_wash_expense_account_id: settingsData.body_wash_expense_account_id,
+      legal_court_expense_account_id: settingsData.legal_court_expense_account_id,
+      other_expense_account_id: settingsData.other_expense_account_id,
+      expense_cash_account_id: settingsData.expense_cash_account_id,
+      auto_post_revenue: settingsData.auto_post_revenue ?? false,
+      auto_post_expenses: settingsData.auto_post_expenses ?? false,
+      revenue_prefix: settingsData.revenue_prefix || 'NCGE-REV',
+      expense_prefix: settingsData.expense_prefix || 'NCGE-EXP',
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const busNo = (trip.buses as any)?.bus_no || 'Unknown';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const routeName = (trip.routes as any)?.route_name || 'Unknown';
+
+    await postTripRevenueToGL(
+      {
+        id: trip.id,
+        trip_no: trip.trip_no || '',
+        trip_date: trip.trip_date,
+        bus_id: trip.bus_id || undefined,
+        bus_no: busNo,
+        route_id: trip.route_id || undefined,
+        route_name: routeName,
+        income: trip.income || 0,
+      },
+      settings
+    );
+  } catch (error) {
+    console.error('Auto-post trip failed (non-blocking):', error);
+    // Silently fail — auto-posting should never block the user's save
+  }
+}
+
+/**
+ * Auto-post a single expense record to GL if auto_post_expenses is enabled.
+ * Call this after saving/updating an expense record.
+ * Silently skips if auto-posting is disabled or settings not configured.
+ */
+export async function autoPostExpenseIfEnabled(busId: string, expenseDate: string): Promise<void> {
+  try {
+    // Fetch settings
+    const { data: settingsData } = await supabase
+      .from('ncg_express_finance_settings')
+      .select('*')
+      .eq('company_id', NCG_EXPRESS_COMPANY_ID)
+      .maybeSingle();
+
+    if (!settingsData?.auto_post_expenses) return; // Auto-post disabled
+    if (!settingsData?.expense_cash_account_id) return; // Not configured
+
+    // Fetch the expense with bus info
+    const { data: expense } = await supabase
+      .from('daily_bus_expenses')
+      .select(`*, buses:bus_id(bus_no)`)
+      .eq('bus_id', busId)
+      .eq('expense_date', expenseDate)
+      .maybeSingle();
+
+    if (!expense || expense.gl_posted) return;
+
+    const settings: NCGExpressFinanceSettings = {
+      ticket_revenue_account_id: settingsData.ticket_revenue_account_id,
+      route_revenue_account_id: settingsData.route_revenue_account_id,
+      cash_account_id: settingsData.cash_account_id,
+      fuel_expense_account_id: settingsData.fuel_expense_account_id,
+      repair_expense_account_id: settingsData.repair_expense_account_id,
+      tyre_expense_account_id: settingsData.tyre_expense_account_id,
+      salary_expense_account_id: settingsData.salary_expense_account_id,
+      police_expense_account_id: settingsData.police_expense_account_id,
+      food_expense_account_id: settingsData.food_expense_account_id,
+      emission_fitness_expense_account_id: settingsData.emission_fitness_expense_account_id,
+      permits_expense_account_id: settingsData.permits_expense_account_id,
+      staff_accommodation_expense_account_id: settingsData.staff_accommodation_expense_account_id,
+      highway_expense_account_id: settingsData.highway_expense_account_id,
+      accident_expense_account_id: settingsData.accident_expense_account_id,
+      parking_expense_account_id: settingsData.parking_expense_account_id,
+      log_sheet_expense_account_id: settingsData.log_sheet_expense_account_id,
+      vehicle_hire_expense_account_id: settingsData.vehicle_hire_expense_account_id,
+      ntc_expense_account_id: settingsData.ntc_expense_account_id,
+      runner_expense_account_id: settingsData.runner_expense_account_id,
+      short_misc_expense_account_id: settingsData.short_misc_expense_account_id,
+      temporary_permit_expense_account_id: settingsData.temporary_permit_expense_account_id,
+      body_wash_expense_account_id: settingsData.body_wash_expense_account_id,
+      legal_court_expense_account_id: settingsData.legal_court_expense_account_id,
+      other_expense_account_id: settingsData.other_expense_account_id,
+      expense_cash_account_id: settingsData.expense_cash_account_id,
+      auto_post_revenue: settingsData.auto_post_revenue ?? false,
+      auto_post_expenses: settingsData.auto_post_expenses ?? false,
+      revenue_prefix: settingsData.revenue_prefix || 'NCGE-REV',
+      expense_prefix: settingsData.expense_prefix || 'NCGE-EXP',
+    };
+
+    await postExpensesToGL(expense as DailyExpenseForGL, settings);
+  } catch (error) {
+    console.error('Auto-post expense failed (non-blocking):', error);
+    // Silently fail — auto-posting should never block the user's save
+  }
 }

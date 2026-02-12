@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Save, X, Fuel, Utensils, Wrench, Car, FileText, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { autoPostExpenseIfEnabled } from "@/hooks/useNCGExpressFinance";
 
 interface ExpenseData {
   fuel_cost: number;
@@ -130,7 +131,7 @@ export function InlineExpenseEditor({
     setSaving(true);
     try {
       const { data: user } = await supabase.auth.getUser();
-      
+
       const expenseData = {
         bus_id: busId,
         expense_date: date,
@@ -151,6 +152,9 @@ export function InlineExpenseEditor({
         title: "Success",
         description: `Expenses saved for ${busNo}`,
       });
+
+      // Auto-post to GL if enabled in settings (non-blocking)
+      autoPostExpenseIfEnabled(busId, date);
 
       onSaved();
       onClose();

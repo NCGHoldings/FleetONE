@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Save, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { autoPostTripIfEnabled } from "@/hooks/useNCGExpressFinance";
 
 interface TripData {
   id: string;
@@ -45,7 +46,7 @@ export function InlineRevenueEditor({
 
   const handleSave = async () => {
     if (!trip) return;
-    
+
     setSaving(true);
     try {
       const { error } = await supabase
@@ -63,6 +64,9 @@ export function InlineRevenueEditor({
         title: "Success",
         description: `Revenue updated for ${trip.trip_no}`,
       });
+
+      // Auto-post to GL if enabled in settings (non-blocking)
+      autoPostTripIfEnabled(trip.id);
 
       onSaved();
       onClose();

@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { autoPostTripIfEnabled } from '@/hooks/useNCGExpressFinance';
 import { Loader2, DollarSign, TrendingDown, TrendingUp, CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -135,7 +136,7 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
         `)
         .eq('trip_date', formattedDate)
         .order('trip_no');
-      
+
       if (error) throw error;
       setAvailableTrips(data || []);
     } catch (error: any) {
@@ -152,7 +153,7 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
 
   const loadTripData = async () => {
     if (!currentTripId) return;
-    
+
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -290,6 +291,9 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
         description: 'Income and expenses updated successfully',
       });
 
+      // Auto-post to GL if enabled in settings (non-blocking)
+      autoPostTripIfEnabled(currentTripId);
+
       onSuccess();
     } catch (error: any) {
       console.error('Error saving:', error);
@@ -317,7 +321,7 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
       {allowTripSelection && !currentTripId && (
         <div className="bg-muted/50 p-6 rounded-lg space-y-4">
           <h3 className="font-semibold text-lg mb-4">Select Trip</h3>
-          
+
           <div className="space-y-4">
             <div>
               <Label>Trip Date</Label>
@@ -352,9 +356,9 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
               >
                 <SelectTrigger>
                   <SelectValue placeholder={
-                    !selectedDate 
-                      ? "Select date first" 
-                      : availableTrips.length === 0 
+                    !selectedDate
+                      ? "Select date first"
+                      : availableTrips.length === 0
                         ? "No trips found for this date"
                         : "Select bus"
                   } />
@@ -795,9 +799,8 @@ export function QuickEntryPanel({ tripId, allowTripSelection = false, onSuccess,
                 <span className="text-xl font-bold">NET PROFIT:</span>
               </div>
               <span
-                className={`text-2xl font-bold ${
-                  calculateNetProfit() >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}
+                className={`text-2xl font-bold ${calculateNetProfit() >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}
               >
                 ₨ {calculateNetProfit().toLocaleString()}
               </span>

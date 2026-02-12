@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { autoPostTripIfEnabled } from "@/hooks/useNCGExpressFinance";
 import { Textarea } from "@/components/ui/textarea";
 
 interface AddTripFormProps {
@@ -85,25 +86,25 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
 
       if (busesRes.data) setBuses(busesRes.data);
       if (routesRes.data) setRoutes(routesRes.data);
-      
+
       // Extract unique driver and conductor names from driver_allocations notes
       if (allocationsRes.data) {
         const driverSet = new Set<string>();
         const conductorSet = new Set<string>();
-        
+
         allocationsRes.data.forEach((allocation: any) => {
           try {
-            const notes = typeof allocation.notes === 'string' 
-              ? JSON.parse(allocation.notes) 
+            const notes = typeof allocation.notes === 'string'
+              ? JSON.parse(allocation.notes)
               : allocation.notes;
-            
+
             if (notes?.driver) driverSet.add(notes.driver);
             if (notes?.conductor) conductorSet.add(notes.conductor);
           } catch (e) {
             // Skip invalid JSON
           }
         });
-        
+
         setDrivers(Array.from(driverSet).sort().map(name => ({ name })));
         setConductors(Array.from(conductorSet).sort().map(name => ({ name })));
       }
@@ -125,7 +126,7 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
     const distance_km = odometerEnd > odometerStart ? odometerEnd - odometerStart : 0;
     const fuel_liters = fuelCost > 0 && dieselPrice > 0 ? fuelCost / dieselPrice : 0;
     const km_per_liter = fuel_liters > 0 && distance_km > 0 ? distance_km / fuel_liters : 0;
-    
+
     // Calculate performance score based on expected km/L
     const selectedBus = buses.find(b => b.id === formData.bus_id);
     const expectedKmL = selectedBus?.expected_km_per_liter || 8;
@@ -157,7 +158,7 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
       };
 
       const tripData = {
-        trip_no: `TRP-${format(formData.trip_date, 'yyyyMMdd')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`,
+        trip_no: `TRP-${format(formData.trip_date, 'yyyyMMdd')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
         trip_date: format(formData.trip_date, 'yyyy-MM-dd'),
         bus_id: formData.bus_id,
         route_id: formData.route_id,
@@ -181,7 +182,7 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
         status: 'scheduled' as const
       };
 
-      const { error } = await supabase.from('daily_trips').insert([tripData]);
+      const { data: insertedTrip, error } = await supabase.from('daily_trips').insert([tripData]).select('id').single();
 
       if (error) throw error;
 
@@ -189,6 +190,11 @@ export function AddTripForm({ onSuccess, onCancel, dieselPrice }: AddTripFormPro
         title: "Success",
         description: "Trip added successfully",
       });
+
+      // Auto-post to GL if enabled in settings (non-blocking)
+      if (insertedTrip?.id) {
+        autoPostTripIfEnabled(insertedTrip.id);
+      }
 
       onSuccess();
     } catch (error) {
