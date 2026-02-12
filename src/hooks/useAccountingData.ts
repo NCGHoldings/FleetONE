@@ -8,12 +8,12 @@ import { useCompany } from "@/contexts/CompanyContext";
 // Helper hook to get auto business unit filtering for sub-companies
 const useAutoBusinessUnitFilter = () => {
   const { selectedCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
-  
+
   // Auto-filter by business unit when a sub-company is selected
   const autoBusinessUnitCode = selectedCompanyId && isSubCompanyOfNCGHolding(selectedCompanyId)
     ? getBusinessUnitCode()
     : null;
-  
+
   return autoBusinessUnitCode;
 };
 // ============ Chart of Accounts ============
@@ -21,7 +21,7 @@ const useAutoBusinessUnitFilter = () => {
 export const useChartOfAccounts = () => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
-  
+
   return useQuery({
     queryKey: ["chart-of-accounts", effectiveCompanyId],
     queryFn: async () => {
@@ -29,11 +29,11 @@ export const useChartOfAccounts = () => {
         .from("chart_of_accounts")
         .select("*")
         .order("account_code");
-      
+
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -45,7 +45,7 @@ export const useChartOfAccounts = () => {
 export const useAccountsByType = (accountType: "asset" | "liability" | "equity" | "revenue" | "expense") => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
-  
+
   return useQuery({
     queryKey: ["accounts-by-type", accountType, effectiveCompanyId],
     queryFn: async () => {
@@ -55,11 +55,11 @@ export const useAccountsByType = (accountType: "asset" | "liability" | "equity" 
         .eq("account_type", accountType)
         .eq("is_active", true)
         .order("account_code");
-      
+
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -76,12 +76,12 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
-  
+
   // Use override if provided, otherwise use auto-detected from selected company
-  const businessUnitCode = businessUnitCodeOverride !== undefined 
-    ? businessUnitCodeOverride 
+  const businessUnitCode = businessUnitCodeOverride !== undefined
+    ? businessUnitCodeOverride
     : autoBusinessUnitCode;
-  
+
   return useQuery({
     queryKey: ["journal-entries", status, effectiveCompanyId, businessUnitCode],
     queryFn: async () => {
@@ -89,20 +89,20 @@ export const useJournalEntries = (status?: "draft" | "posted" | "void", business
         .from("journal_entries")
         .select("*, business_unit_code")
         .order("entry_date", { ascending: false });
-      
+
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
-      
+
       if (status) {
         query = query.eq("status", status);
       }
-      
+
       // Filter by specific business unit if provided (auto or override)
       if (businessUnitCode && businessUnitCode !== "all") {
         query = query.eq("business_unit_code", businessUnitCode);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -119,14 +119,14 @@ export const useJournalEntryLines = (entryId: string) => {
         .from("journal_entry_lines")
         .select(`
           *,
-          chart_of_accounts (
+          chart_of_accounts:account_id (
             account_code,
             account_name,
             account_type
           )
         `)
         .eq("journal_entry_id", entryId)
-        .order("line_number");
+        .order("debit", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -137,7 +137,7 @@ export const useJournalEntryLines = (entryId: string) => {
 // ============ Financial Periods ============
 export const useFinancialPeriods = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["financial-periods", selectedCompanyId],
     queryFn: async () => {
@@ -145,11 +145,11 @@ export const useFinancialPeriods = () => {
         .from("financial_periods")
         .select("*")
         .order("start_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -160,7 +160,7 @@ export const useFinancialPeriods = () => {
 
 export const useCurrentPeriod = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["current-period", selectedCompanyId],
     queryFn: async () => {
@@ -171,11 +171,11 @@ export const useCurrentPeriod = () => {
         .lte("start_date", today)
         .gte("end_date", today)
         .eq("is_closed", false);
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query.single();
       if (error && error.code !== "PGRST116") throw error;
       return data;
@@ -190,7 +190,7 @@ export const useCustomers = () => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
-  
+
   return useQuery({
     queryKey: ["customers", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
@@ -198,16 +198,16 @@ export const useCustomers = () => {
         .from("customers")
         .select("*")
         .order("customer_name");
-      
+
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
-      
+
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         (query as any) = query.eq("business_unit_code", autoBusinessUnitCode);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -218,7 +218,7 @@ export const useCustomers = () => {
 
 export const useCustomerBalance = (customerId: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["customer-balance", customerId, selectedCompanyId],
     queryFn: async () => {
@@ -227,11 +227,11 @@ export const useCustomerBalance = (customerId: string) => {
         .select("balance")
         .eq("customer_id", customerId)
         .neq("status", "paid");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data.reduce((sum, inv) => sum + (inv.balance || 0), 0);
@@ -246,7 +246,7 @@ export const useVendors = () => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
-  
+
   return useQuery({
     queryKey: ["vendors", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
@@ -254,16 +254,16 @@ export const useVendors = () => {
         .from("vendors")
         .select("*")
         .order("vendor_name");
-      
+
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
-      
+
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         (query as any) = query.eq("business_unit_code", autoBusinessUnitCode);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -274,7 +274,7 @@ export const useVendors = () => {
 
 export const useVendorBalance = (vendorId: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["vendor-balance", vendorId, selectedCompanyId],
     queryFn: async () => {
@@ -283,11 +283,11 @@ export const useVendorBalance = (vendorId: string) => {
         .select("balance")
         .eq("vendor_id", vendorId)
         .neq("status", "paid");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data.reduce((sum, inv) => sum + (inv.balance || 0), 0);
@@ -302,7 +302,7 @@ export const useARInvoices = (status?: string) => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
-  
+
   return useQuery({
     queryKey: ["ar-invoices", status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
@@ -319,20 +319,20 @@ export const useARInvoices = (status?: string) => {
           )
         `)
         .order("invoice_date", { ascending: false });
-      
+
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
-      
+
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
-      
+
       if (status) {
         query = query.eq("status", status);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -347,7 +347,7 @@ export const useAPInvoices = (status?: string) => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
-  
+
   return useQuery({
     queryKey: ["ap-invoices", status, effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
@@ -361,20 +361,20 @@ export const useAPInvoices = (status?: string) => {
           )
         `)
         .order("invoice_date", { ascending: false });
-      
+
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
-      
+
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
-      
+
       if (status) {
         query = query.eq("status", status);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -389,7 +389,7 @@ export const useARReceipts = () => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
-  
+
   return useQuery({
     queryKey: ["ar-receipts", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
@@ -406,16 +406,16 @@ export const useARReceipts = () => {
           )
         `)
         .order("receipt_date", { ascending: false });
-      
+
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
-      
+
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -430,7 +430,7 @@ export const useAPPayments = () => {
   const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
   const effectiveCompanyId = getEffectiveCompanyId();
   const autoBusinessUnitCode = useAutoBusinessUnitFilter();
-  
+
   return useQuery({
     queryKey: ["ap-payments", effectiveCompanyId, autoBusinessUnitCode],
     queryFn: async () => {
@@ -444,16 +444,16 @@ export const useAPPayments = () => {
           )
         `)
         .order("payment_date", { ascending: false });
-      
+
       if (effectiveCompanyId) {
         query = query.eq("company_id", effectiveCompanyId);
       }
-      
+
       // Filter by business unit for sub-company views
       if (autoBusinessUnitCode) {
         query = query.eq("business_unit_code", autoBusinessUnitCode);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -466,7 +466,7 @@ export const useAPPayments = () => {
 // Bank accounts are section-specific (each sub-company can have its own bank accounts)
 export const useBankAccounts = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["bank-accounts", selectedCompanyId],
     queryFn: async () => {
@@ -474,11 +474,11 @@ export const useBankAccounts = () => {
         .from("bank_accounts")
         .select("*")
         .order("account_name");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -489,7 +489,7 @@ export const useBankAccounts = () => {
 
 export const useBankTransactions = (bankAccountId?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["bank-transactions", bankAccountId, selectedCompanyId],
     queryFn: async () => {
@@ -498,15 +498,15 @@ export const useBankTransactions = (bankAccountId?: string) => {
         .select("*")
         .order("transaction_date", { ascending: false })
         .limit(100);
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (bankAccountId) {
         query = query.eq("bank_account_id", bankAccountId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -517,7 +517,7 @@ export const useBankTransactions = (bankAccountId?: string) => {
 
 export const useBankReconciliations = (bankAccountId?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["bank-reconciliations", bankAccountId, selectedCompanyId],
     queryFn: async () => {
@@ -525,15 +525,15 @@ export const useBankReconciliations = (bankAccountId?: string) => {
         .from("bank_reconciliations")
         .select("*")
         .order("reconciliation_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (bankAccountId) {
         query = query.eq("bank_account_id", bankAccountId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -545,7 +545,7 @@ export const useBankReconciliations = (bankAccountId?: string) => {
 // ============ Fixed Assets ============
 export const useFixedAssets = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["fixed-assets", selectedCompanyId],
     queryFn: async () => {
@@ -561,11 +561,11 @@ export const useFixedAssets = () => {
           )
         `)
         .order("asset_code");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -576,7 +576,7 @@ export const useFixedAssets = () => {
 
 export const useAssetCategories = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["asset-categories", selectedCompanyId],
     queryFn: async () => {
@@ -584,11 +584,11 @@ export const useAssetCategories = () => {
         .from("asset_categories")
         .select("*")
         .order("category_code");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -599,7 +599,7 @@ export const useAssetCategories = () => {
 
 export const useDepreciationSchedule = (assetId?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["depreciation-schedule", assetId, selectedCompanyId],
     queryFn: async () => {
@@ -607,15 +607,15 @@ export const useDepreciationSchedule = (assetId?: string) => {
         .from("asset_depreciation_schedule")
         .select("*")
         .order("depreciation_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (assetId) {
         query = query.eq("asset_id", assetId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -643,7 +643,7 @@ export const useTaxCodes = () => {
 // ============ Cost Centers ============
 export const useCostCenters = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["cost-centers", selectedCompanyId],
     queryFn: async () => {
@@ -652,11 +652,11 @@ export const useCostCenters = () => {
         .select("*")
         .eq("is_active", true)
         .order("cost_center_code");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -668,7 +668,7 @@ export const useCostCenters = () => {
 // ============ Budgets ============
 export const useBudgets = (fiscalYear?: number) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["budgets", fiscalYear, selectedCompanyId],
     queryFn: async () => {
@@ -676,15 +676,15 @@ export const useBudgets = (fiscalYear?: number) => {
         .from("budgets")
         .select("*")
         .order("budget_name");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (fiscalYear) {
         query = query.eq("fiscal_year", fiscalYear);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -696,7 +696,7 @@ export const useBudgets = (fiscalYear?: number) => {
 // ============ Audit Logs ============
 export const useAuditLogs = (tableName?: string, recordId?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["audit-logs", tableName, recordId, selectedCompanyId],
     queryFn: async () => {
@@ -705,18 +705,18 @@ export const useAuditLogs = (tableName?: string, recordId?: string) => {
         .select("*")
         .order("changed_at", { ascending: false })
         .limit(100);
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (tableName) {
         query = query.eq("table_name", tableName);
       }
       if (recordId) {
         query = query.eq("record_id", recordId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -728,7 +728,7 @@ export const useAuditLogs = (tableName?: string, recordId?: string) => {
 // ============ Dashboard Summaries ============
 export const useAccountingSummary = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["accounting-summary", selectedCompanyId],
     queryFn: async () => {
@@ -736,14 +736,14 @@ export const useAccountingSummary = () => {
         .from("chart_of_accounts")
         .select("account_type, current_balance")
         .eq("is_active", true);
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data: accounts, error } = await query;
       if (error) throw error;
-      
+
       const summary = {
         totalAssets: 0,
         totalLiabilities: 0,
@@ -752,7 +752,7 @@ export const useAccountingSummary = () => {
         totalExpenses: 0,
         netIncome: 0,
       };
-      
+
       accounts?.forEach(acc => {
         const balance = acc.current_balance || 0;
         switch (acc.account_type) {
@@ -773,9 +773,9 @@ export const useAccountingSummary = () => {
             break;
         }
       });
-      
+
       summary.netIncome = summary.totalRevenue - summary.totalExpenses;
-      
+
       return summary;
     },
     enabled: !!selectedCompanyId,
@@ -784,7 +784,7 @@ export const useAccountingSummary = () => {
 
 export const useARSummary = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["ar-summary", selectedCompanyId],
     queryFn: async () => {
@@ -792,19 +792,19 @@ export const useARSummary = () => {
         .from("ar_invoices")
         .select("balance, due_date, status")
         .neq("status", "paid");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
-      
+
       const today = new Date();
       let totalOutstanding = 0;
       let totalOverdue = 0;
       let countOverdue = 0;
-      
+
       data?.forEach(inv => {
         totalOutstanding += inv.balance || 0;
         if (new Date(inv.due_date) < today && inv.balance > 0) {
@@ -812,7 +812,7 @@ export const useARSummary = () => {
           countOverdue++;
         }
       });
-      
+
       return { totalOutstanding, totalOverdue, countOverdue, totalInvoices: data?.length || 0 };
     },
     enabled: !!selectedCompanyId,
@@ -821,7 +821,7 @@ export const useARSummary = () => {
 
 export const useAPSummary = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["ap-summary", selectedCompanyId],
     queryFn: async () => {
@@ -829,19 +829,19 @@ export const useAPSummary = () => {
         .from("ap_invoices")
         .select("balance, due_date, status")
         .neq("status", "paid");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
-      
+
       const today = new Date();
       let totalOutstanding = 0;
       let totalOverdue = 0;
       let countOverdue = 0;
-      
+
       data?.forEach(inv => {
         totalOutstanding += inv.balance || 0;
         if (new Date(inv.due_date) < today && inv.balance > 0) {
@@ -849,7 +849,7 @@ export const useAPSummary = () => {
           countOverdue++;
         }
       });
-      
+
       return { totalOutstanding, totalOverdue, countOverdue, totalInvoices: data?.length || 0 };
     },
     enabled: !!selectedCompanyId,
@@ -859,7 +859,7 @@ export const useAPSummary = () => {
 // ============ Items & Inventory ============
 export const useItems = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["items", selectedCompanyId],
     queryFn: async () => {
@@ -867,11 +867,11 @@ export const useItems = () => {
         .from("items")
         .select(`*, item_categories (category_name, category_code, valuation_method)`)
         .order("item_code");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -882,7 +882,7 @@ export const useItems = () => {
 
 export const useItemStock = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["item-stock", selectedCompanyId],
     queryFn: async () => {
@@ -890,11 +890,11 @@ export const useItemStock = () => {
         .from("item_stock")
         .select(`*, items (item_code, item_name)`)
         .order("location");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -905,7 +905,7 @@ export const useItemStock = () => {
 
 export const useItemCategories = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["item-categories", selectedCompanyId],
     queryFn: async () => {
@@ -913,11 +913,11 @@ export const useItemCategories = () => {
         .from("item_categories")
         .select("*")
         .order("category_name");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -929,7 +929,7 @@ export const useItemCategories = () => {
 // ============ Purchase Orders & GRN ============
 export const usePurchaseOrders = (status?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["purchase-orders", status, selectedCompanyId],
     queryFn: async () => {
@@ -937,11 +937,11 @@ export const usePurchaseOrders = (status?: string) => {
         .from("purchase_orders")
         .select(`*, vendors (vendor_code, vendor_name)`)
         .order("po_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (status) query = query.eq("status", status);
       const { data, error } = await query;
       if (error) throw error;
@@ -953,7 +953,7 @@ export const usePurchaseOrders = (status?: string) => {
 
 export const useGoodsReceiptNotes = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["goods-receipt-notes", selectedCompanyId],
     queryFn: async () => {
@@ -961,11 +961,11 @@ export const useGoodsReceiptNotes = () => {
         .from("goods_receipt_notes")
         .select(`*, vendors (vendor_name), purchase_orders (po_number)`)
         .order("receipt_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -977,7 +977,7 @@ export const useGoodsReceiptNotes = () => {
 // ============ Cheque Register ============
 export const useChequeRegister = (status?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["cheque-register", status, selectedCompanyId],
     queryFn: async () => {
@@ -985,11 +985,11 @@ export const useChequeRegister = (status?: string) => {
         .from("cheque_register")
         .select("*")
         .order("cheque_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (status) query = query.eq("status", status);
       const { data, error } = await query;
       if (error) throw error;
@@ -1002,7 +1002,7 @@ export const useChequeRegister = (status?: string) => {
 // ============ Recurring Entries ============
 export const useRecurringEntries = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["recurring-entries", selectedCompanyId],
     queryFn: async () => {
@@ -1010,11 +1010,11 @@ export const useRecurringEntries = () => {
         .from("recurring_journal_entries" as any)
         .select("*")
         .order("template_name");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
@@ -1059,7 +1059,7 @@ export const useExchangeRates = (baseCurrency?: string) => {
 // ============ Purchase Requisitions ============
 export const usePurchaseRequisitions = (status?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["purchase-requisitions", status, selectedCompanyId],
     queryFn: async () => {
@@ -1067,11 +1067,11 @@ export const usePurchaseRequisitions = (status?: string) => {
         .from("purchase_requisitions" as any)
         .select("*")
         .order("created_at", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (status) query = query.eq("status", status);
       const { data, error } = await query;
       if (error) throw error;
@@ -1084,7 +1084,7 @@ export const usePurchaseRequisitions = (status?: string) => {
 // ============ Fund Transfers ============
 export const useFundTransfers = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["fund-transfers", selectedCompanyId],
     queryFn: async () => {
@@ -1092,11 +1092,11 @@ export const useFundTransfers = () => {
         .from("fund_transfers" as any)
         .select("*")
         .order("transfer_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
@@ -1108,7 +1108,7 @@ export const useFundTransfers = () => {
 // ============ Asset Disposals ============
 export const useAssetDisposals = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["asset-disposals", selectedCompanyId],
     queryFn: async () => {
@@ -1116,11 +1116,11 @@ export const useAssetDisposals = () => {
         .from("asset_disposals")
         .select(`*, fixed_assets (asset_code, asset_name)`)
         .order("disposal_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -1132,7 +1132,7 @@ export const useAssetDisposals = () => {
 // ============ Bad Debt Provisions ============
 export const useBadDebtProvisions = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["bad-debt-provisions", selectedCompanyId],
     queryFn: async () => {
@@ -1140,11 +1140,11 @@ export const useBadDebtProvisions = () => {
         .from("ar_bad_debt_provisions")
         .select(`*, customers (customer_code, customer_name), ar_invoices (invoice_number)`)
         .order("provision_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -1156,7 +1156,7 @@ export const useBadDebtProvisions = () => {
 // ============ Batch & Serial Numbers ============
 export const useBatchNumbers = (itemId?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["batch-numbers", itemId, selectedCompanyId],
     queryFn: async () => {
@@ -1164,11 +1164,11 @@ export const useBatchNumbers = (itemId?: string) => {
         .from("batch_numbers")
         .select(`*, items (item_code, item_name)`)
         .order("batch_number");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (itemId) query = query.eq("item_id", itemId);
       const { data, error } = await query;
       if (error) throw error;
@@ -1180,7 +1180,7 @@ export const useBatchNumbers = (itemId?: string) => {
 
 export const useSerialNumbers = (itemId?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["serial-numbers", itemId, selectedCompanyId],
     queryFn: async () => {
@@ -1188,11 +1188,11 @@ export const useSerialNumbers = (itemId?: string) => {
         .from("serial_numbers" as any)
         .select(`*, items (item_code, item_name)`)
         .order("serial_number");
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (itemId) query = query.eq("item_id", itemId);
       const { data, error } = await query;
       if (error) throw error;
@@ -1205,7 +1205,7 @@ export const useSerialNumbers = (itemId?: string) => {
 // ============ WHT Certificates ============
 export const useWHTCertificates = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["wht-certificates", selectedCompanyId],
     queryFn: async () => {
@@ -1213,11 +1213,11 @@ export const useWHTCertificates = () => {
         .from("wht_certificates" as any)
         .select(`*, vendors (vendor_code, vendor_name)`)
         .order("certificate_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
@@ -1229,7 +1229,7 @@ export const useWHTCertificates = () => {
 // ============ Vendor Performance ============
 export const useVendorPerformance = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["vendor-performance", selectedCompanyId],
     queryFn: async () => {
@@ -1237,11 +1237,11 @@ export const useVendorPerformance = () => {
         .from("vendor_performance" as any)
         .select(`*, vendors (vendor_code, vendor_name)`)
         .order("period_end", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data as any[];
@@ -1253,7 +1253,7 @@ export const useVendorPerformance = () => {
 // ============ Bank Reconciliation Items ============
 export const useBankReconciliationItems = (reconciliationId?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["bank-reconciliation-items", reconciliationId, selectedCompanyId],
     queryFn: async () => {
@@ -1261,11 +1261,11 @@ export const useBankReconciliationItems = (reconciliationId?: string) => {
         .from("bank_reconciliation_items")
         .select("*")
         .order("statement_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       if (reconciliationId) query = query.eq("reconciliation_id", reconciliationId);
       const { data, error } = await query;
       if (error) throw error;
@@ -1278,19 +1278,19 @@ export const useBankReconciliationItems = (reconciliationId?: string) => {
 // ============ Period Closing Checklist ============
 export const usePeriodClosingChecklist = (periodId?: string) => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["period-closing-checklist", periodId, selectedCompanyId],
     queryFn: async () => {
       if (!periodId) return null;
-      
+
       const [journals, arInvoices, apInvoices, reconciliations] = await Promise.all([
         supabase.from("journal_entries").select("id, status").eq("period_id", periodId).neq("status", "posted"),
         supabase.from("ar_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid"),
         supabase.from("ap_invoices").select("id, status").eq("period_id", periodId).eq("status", "unpaid"),
         supabase.from("bank_reconciliations").select("id, status").neq("status", "completed"),
       ]);
-      
+
       return {
         unpostedJournals: journals.data?.length || 0,
         unpaidARInvoices: arInvoices.data?.length || 0,
@@ -1305,7 +1305,7 @@ export const usePeriodClosingChecklist = (periodId?: string) => {
 // ============ AR Credit Notes ============
 export const useARCreditNotes = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["ar-credit-notes", selectedCompanyId],
     queryFn: async () => {
@@ -1317,11 +1317,11 @@ export const useARCreditNotes = () => {
           ar_invoices (invoice_number)
         `)
         .order("credit_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -1333,7 +1333,7 @@ export const useARCreditNotes = () => {
 // ============ AP Debit Notes ============
 export const useAPDebitNotes = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["ap-debit-notes", selectedCompanyId],
     queryFn: async () => {
@@ -1345,11 +1345,11 @@ export const useAPDebitNotes = () => {
           ap_invoices (invoice_number)
         `)
         .order("debit_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -1361,7 +1361,7 @@ export const useAPDebitNotes = () => {
 // ============ Asset Revaluations ============
 export const useAssetRevaluations = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["asset-revaluations", selectedCompanyId],
     queryFn: async () => {
@@ -1372,11 +1372,11 @@ export const useAssetRevaluations = () => {
           fixed_assets (asset_code, asset_name)
         `)
         .order("revaluation_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -1388,7 +1388,7 @@ export const useAssetRevaluations = () => {
 // ============ Asset Transfers ============
 export const useAssetTransfers = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["asset-transfers", selectedCompanyId],
     queryFn: async () => {
@@ -1399,11 +1399,11 @@ export const useAssetTransfers = () => {
           fixed_assets (asset_code, asset_name)
         `)
         .order("transfer_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -1415,7 +1415,7 @@ export const useAssetTransfers = () => {
 // ============ SSCL Transactions ============
 export const useSSCLTransactions = () => {
   const { selectedCompanyId } = useCompany();
-  
+
   return useQuery({
     queryKey: ["sscl-transactions", selectedCompanyId],
     queryFn: async () => {
@@ -1423,11 +1423,11 @@ export const useSSCLTransactions = () => {
         .from("sscl_transactions")
         .select("*")
         .order("transaction_date", { ascending: false });
-      
+
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;

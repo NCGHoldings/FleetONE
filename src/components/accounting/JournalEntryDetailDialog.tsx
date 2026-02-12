@@ -30,7 +30,7 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
     switch (status) {
       case "posted": return "default";
       case "draft": return "secondary";
-      case "rejected": 
+      case "rejected":
       case "void": return "destructive";
       case "reversed": return "outline";
       default: return "secondary";
@@ -83,6 +83,8 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
             <h3 className="font-semibold mb-3">Entry Lines</h3>
             {isLoading ? (
               <p className="text-muted-foreground">Loading lines...</p>
+            ) : !lines || lines.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No entry lines found for this journal entry.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -94,16 +96,23 @@ export const JournalEntryDetailDialog = ({ entry, open, onOpenChange }: JournalE
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lines?.map((line: any) => (
+                  {lines.map((line: any) => (
                     <TableRow key={line.id}>
-                      <TableCell className="font-mono text-sm">
-                        {line.chart_of_accounts?.account_code} - {line.chart_of_accounts?.account_name}
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-mono text-sm font-medium">
+                            {line.chart_of_accounts?.account_code || "N/A"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {line.chart_of_accounts?.account_name || "Unknown Account"}
+                          </span>
+                        </div>
                       </TableCell>
-                      <TableCell>{line.description || "-"}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-sm">{line.description || "-"}</TableCell>
+                      <TableCell className="text-right font-medium text-emerald-600">
                         {line.debit > 0 ? <CurrencyDisplay amount={line.debit} /> : "-"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right font-medium text-blue-600">
                         {line.credit > 0 ? <CurrencyDisplay amount={line.credit} /> : "-"}
                       </TableCell>
                     </TableRow>
