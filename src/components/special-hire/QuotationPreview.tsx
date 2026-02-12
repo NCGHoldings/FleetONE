@@ -1001,6 +1001,9 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           From the 6th km onwards, an additional per-km charge will be applied.
           <br />
           <br />
+          <strong>Excess Mileage:</strong> A flat charge applies for the first 5 km exceeding the agreed destination.
+          From the 6th km onwards, an additional per-km charge will be applied.
+          <br />
           Any change in destination must be approved in writing by a higher official of NCG Express (Private) Limited.
           <br />
           <br />
@@ -1009,6 +1012,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           • Rs. 5,000 for Leyland and D7 models.
           <br />
           • Rs. 10,000 for Super Luxury models.
+          <br />
           <br />
           <br />
           <strong>Damage Policy:</strong> If the bus is damaged, the customer will be charged twice the actual repair
@@ -1025,7 +1029,8 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           procedure.
           <br />
           • Google Maps mileage may differ from the actual mileage, and customers must rely on the verified mileage
-          recorded at the start of the hire.
+          recorded at the start of the hire. • Alcohol consumption is strictly prohibited on the bus, and any violation
+          may result in immediate termination of service without refund.
           <br />
           <br />
         </div>
