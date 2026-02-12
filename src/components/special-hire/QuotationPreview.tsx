@@ -1029,8 +1029,10 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           procedure.
           <br />
           • Google Maps mileage may differ from the actual mileage, and customers must rely on the verified mileage
-          recorded at the start of the hire. • Alcohol consumption is strictly prohibited on the bus, and any violation
-          may result in immediate termination of service without refund.
+          recorded at the start of the hire.
+          <br />
+          • Alcohol consumption is strictly prohibited on the bus, and any violation may result in immediate termination
+          of service without refund.
           <br />
           <br />
         </div>
