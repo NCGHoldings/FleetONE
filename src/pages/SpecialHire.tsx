@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AdminApprovalInterface } from '../components/special-hire/AdminApprovalInterface';
-import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, ChevronDown, Users, Workflow } from 'lucide-react';
+import { Clock, FileText, TrendingUp, CheckCircle, Plus, Calculator, Bus, MapPin, AlertTriangle, Shield, TrendingDown, Calendar, CalendarDays, ChevronDown, Users, Workflow } from 'lucide-react';
 import { SpecialHireFlowDiagram } from "@/components/special-hire/SpecialHireFlowDiagram";
 import { CostCalculator } from "@/components/special-hire/CostCalculator";
 import { EnhancedCostCalculator } from "@/components/special-hire/EnhancedCostCalculator";
@@ -14,6 +14,7 @@ import { RateCardsAdmin } from "@/components/special-hire/RateCardsAdmin";
 import { BusTypesAdmin } from "@/components/special-hire/BusTypesAdmin";
 import { FuelSettingsAdmin } from "@/components/special-hire/FuelSettingsAdmin";
 import { QuotationsList } from "@/components/special-hire/QuotationsList";
+import { SpecialHireCalendarView } from "@/components/special-hire/SpecialHireCalendarView";
 import { SpecialHireForm } from "@/components/special-hire/SpecialHireForm";
 import { SubmissionsList } from "@/components/special-hire/SubmissionsList";
 import { SpecialHireQRGenerator } from "@/components/special-hire/SpecialHireQRGenerator";
@@ -74,7 +75,7 @@ export default function SpecialHire() {
     { label: 'Quarterly', value: 'quarterly', days: 90 },
     { label: 'Annually', value: 'annually', days: 365 },
   ];
-  
+
   // Check user roles and permissions
   const isAdmin = hasRole('admin') || hasRole('super_admin');
   const isFinanceUser = hasRole('finance') || hasRole('admin') || hasRole('super_admin');
@@ -105,11 +106,11 @@ export default function SpecialHire() {
         // 1. User has explicit page permission, OR
         // 2. User has admin/super_admin role, OR  
         // 3. User has supervisor/finance role (operations access)
-        const hasAccess = pageAccess?.has_access || 
-                         hasRole('admin') || 
-                         hasRole('super_admin') || 
-                         hasRole('supervisor') || 
-                         hasRole('finance');
+        const hasAccess = pageAccess?.has_access ||
+          hasRole('admin') ||
+          hasRole('super_admin') ||
+          hasRole('supervisor') ||
+          hasRole('finance');
 
         setHasPageAccess(hasAccess);
       } catch (error) {
@@ -125,11 +126,11 @@ export default function SpecialHire() {
 
   const renderChangeIndicator = (change?: number) => {
     if (change === undefined) return null;
-    
+
     const isPositive = change >= 0;
     const Icon = isPositive ? TrendingUp : TrendingDown;
     const colorClass = isPositive ? 'text-green-500' : 'text-red-500';
-    
+
     return (
       <div className={`flex items-center space-x-1 ${colorClass}`}>
         <Icon className="h-3 w-3" />
@@ -142,7 +143,7 @@ export default function SpecialHire() {
     try {
       const selectedPeriod = comparisonPeriods.find(p => p.value === comparisonPeriod);
       const daysBack = selectedPeriod?.days || 7;
-      
+
       const currentDate = new Date();
       const comparisonDate = new Date();
       comparisonDate.setDate(currentDate.getDate() - daysBack);
@@ -281,7 +282,7 @@ export default function SpecialHire() {
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold">Access Restricted</h3>
                 <p className="text-muted-foreground">
-                  You don't have permission to access the Special Hire module. 
+                  You don't have permission to access the Special Hire module.
                   Please contact your administrator to request access.
                 </p>
               </div>
@@ -437,17 +438,22 @@ export default function SpecialHire() {
               <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Quotes</span>
             </TabsTrigger>
-            
+
+            <TabsTrigger value="calendar" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
+              <CalendarDays className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Calendar</span>
+            </TabsTrigger>
+
             <TabsTrigger value="submissions" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
               <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Submissions</span>
             </TabsTrigger>
-            
+
             <TabsTrigger value="confirmed-trips" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
               <Bus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Trips</span>
             </TabsTrigger>
-            
+
             <TabsTrigger value="calculator" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
               <Calculator className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Calc</span>
@@ -478,17 +484,17 @@ export default function SpecialHire() {
                   <Bus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Buses</span>
                 </TabsTrigger>
-                
+
                 <TabsTrigger value="rate-cards" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
                   <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Rates</span>
                 </TabsTrigger>
-                
+
                 <TabsTrigger value="fuel-settings" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
                   <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Fuel</span>
                 </TabsTrigger>
-                
+
                 <TabsTrigger value="reports" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 text-xs sm:text-sm">
                   <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span>Reports</span>
@@ -509,11 +515,15 @@ export default function SpecialHire() {
               New Quotation
             </Button>
           </div>
-            <QuotationsList 
-              onRefresh={loadStats}
-              refreshTrigger={refreshQuotationsTrigger}
-              onViewInCalculator={handleViewInCalculator}
-            />
+          <QuotationsList
+            onRefresh={loadStats}
+            refreshTrigger={refreshQuotationsTrigger}
+            onViewInCalculator={handleViewInCalculator}
+          />
+        </TabsContent>
+
+        <TabsContent value="calendar" className="space-y-4 sm:space-y-6">
+          <SpecialHireCalendarView />
         </TabsContent>
 
         <TabsContent value="submissions" className="space-y-6">
@@ -580,7 +590,7 @@ export default function SpecialHire() {
 
       {/* Enhanced Form Modal */}
       {showForm && (
-        <SpecialHireForm 
+        <SpecialHireForm
           onCancel={() => {
             setShowForm(false);
             setSubmissionData(null);

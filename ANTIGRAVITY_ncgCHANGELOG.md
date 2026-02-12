@@ -9,6 +9,22 @@
 
 ## 2026-02-12
 
+### ✨ Per-Bus-Type Breakdowns in CostBreakdown (Multi-Bus Fleet)
+**Files Modified:**
+- `src/components/special-hire/SpecialHireForm.tsx` — `busFleetDetails` entries now include per-bus-type fields: `fixed_rate_per_bus`, `overtime_charge_per_bus`, `overnight_charge_per_bus`, `exceeding_charge_per_bus`, `bus_type_efficiency`, `fuel_liters_per_bus`.
+- `src/components/special-hire/CostBreakdown.tsx` — When a quotation has **different** bus types, the Hire Charges Breakdown, Extra Time Charges, and Deductions (Fuel & Maintenance) sections now render **separate per-bus-type cards** instead of merged/averaged values. Same-type fleets still display merged. Working Hours Analysis remains shared.
+
+**Trigger:** `hasMultipleBusTypes = new Set(buses.map(b => b.bus_type_name)).size > 1`
+
+---
+
+### 🐛 Fix Multi-Bus Category Totals — Fuel Double-Counting & Display
+**Files Modified:**
+- `src/components/special-hire/SpecialHireForm.tsx` — `calculateMultiBusFleetCosts`: `grossRevenue` now stores hire charges only (was `combinedSubtotal` which included fuel+maintenance). Fuel added explicitly to `preCommissionTotal`. `setCostData` now includes all missing display fields (hireCharge, fixedRate, overtime, overnight, pickupDateTime, dropDateTime, busTypeEfficiency, fuelPricePerLiter, maintenanceRatePerKm, etc.).
+- `src/components/special-hire/QuotationPreview.tsx` — Per-bus "Total Cost" column now shows `hire_charge_per_bus × quantity` (was `subtotal_all_buses` which bundled internal fuel+maintenance costs).
+- `src/components/special-hire/CostBreakdown.tsx` — Multi-bus fuel/maintenance calculations now use stored per-bus-type values instead of recalculating with single busTypeEfficiency. Fixes 1-rupee rounding errors and incorrect totals for mixed bus types.
+**Root Cause:** Multi-bus `grossRevenue` included fuel+maintenance, but `QuotationPreview.calculateFinalCustomerTotal()` added `fuel_cost_fuel_only` again → fuel double-counted. CostBreakdown recalculated fuel using one bus type's efficiency for all types → wrong amounts.
+
 ### 🔍 Finance & Operations Full Audit (commit: `9f7bee7`)
 **Audit Result:** All 13 finance modules (92 sub-tabs) have components present and working. No missing features found in the local codebase.
 **Critical Finding:** The staging deployment has a Lovable-generated page at `/accounting/advances/receipts` referencing a non-existent `advance_receipts` table. **This table does NOT exist in Supabase.** The correct implementation uses `ar_receipts` with `is_advance: true` flag. Re-deploying from `main` fixes this.

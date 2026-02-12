@@ -51,9 +51,9 @@ interface CostData {
   totalExpenses: number;
   netProfit: number;
   // Additional charges with per-bus support
-  additionalCharges?: Array<{ 
-    type: string; 
-    amount: number; 
+  additionalCharges?: Array<{
+    type: string;
+    amount: number;
     distance?: number; // For additional_distance type
     reason?: string;
     applyPerBus?: boolean;
@@ -67,7 +67,7 @@ interface CostData {
     extraKm: number;
     extraKmChargePerKm: number;
     extraKmTotalCharge: number;
-    additionalExpenses: Array<{description: string; amount: number; category: string}>;
+    additionalExpenses: Array<{ description: string; amount: number; category: string }>;
     totalAdditionalExpenses: number;
     originalQuotationAmount: number;
     adjustmentAmount: number;
@@ -98,6 +98,13 @@ interface CostData {
       maintenance_cost_per_bus: number;
       subtotal_per_bus: number;
       subtotal_all_buses: number;
+      // Per-bus-type hire charge breakdown
+      fixed_rate_per_bus?: number;
+      overtime_charge_per_bus?: number;
+      overnight_charge_per_bus?: number;
+      exceeding_charge_per_bus?: number;
+      bus_type_efficiency?: number;
+      fuel_liters_per_bus?: number;
     }>;
     total_buses: number;
     total_capacity: number;
@@ -117,14 +124,14 @@ export function CostBreakdown({ data }: Props) {
   // Provide default values to prevent undefined errors
   // Calculate base trip distance (parking + trip + drop - without additional km from charges)
   const baseTripDistance = (data.kmParkingToPickup || 0) + (data.kmTrip || 0) + (data.kmDropToParking || 0);
-  
+
   // Calculate additional distance from charges if not already provided
-  const additionalDistanceFromChargesCalc = Array.isArray(data.additionalCharges) 
+  const additionalDistanceFromChargesCalc = Array.isArray(data.additionalCharges)
     ? data.additionalCharges
-        .filter(charge => charge.type === 'additional_distance')
-        .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+      .filter(charge => charge.type === 'additional_distance')
+      .reduce((sum, charge) => sum + (charge.distance || 0), 0)
     : 0;
-  
+
   const safeData = {
     kmParkingToPickup: data.kmParkingToPickup || 0,
     kmTrip: data.kmTrip || 0,
@@ -163,67 +170,86 @@ export function CostBreakdown({ data }: Props) {
   // Calculate customer fuel cost (only parking to pickup + drop to parking - for customer billing)
   const customerFuelDistance = safeData.kmParkingToPickup + safeData.kmDropToParking;
   const isMultiParking = data.isMultiParking || (data.busCalculations && data.busCalculations.length > 0);
-  const customerFuelCost = isMultiParking 
-    ? (customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter
-    : ((customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
-  
+  const isMultiBusFleet = data.busFleetDetails?.buses && data.busFleetDetails.buses.length > 0;
+  // Detect if fleet has multiple DIFFERENT bus types (vs same type × multiple)
+  const hasMultipleBusTypes = isMultiBusFleet
+    ? new Set(data.busFleetDetails!.buses.map(b => b.bus_type_name)).size > 1
+    : false;
+
+  // FIXED: For multi-bus fleet, use the stored fuelCostFuelOnly which was calculated 
+  // per-bus-type with correct individual efficiencies. Recalculating here with a single
+  // busTypeEfficiency would give wrong results for mixed bus types.
+  const customerFuelCost = isMultiBusFleet
+    ? safeData.fuelCostFuelOnly
+    : isMultiParking
+      ? (customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter
+      : ((customerFuelDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
+
   // Calculate additional distance from charges
-  const additionalDistanceFromCharges = Array.isArray(data.additionalCharges) 
+  const additionalDistanceFromCharges = Array.isArray(data.additionalCharges)
     ? data.additionalCharges
-        .filter(charge => charge.type === 'additional_distance')
-        .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+      .filter(charge => charge.type === 'additional_distance')
+      .reduce((sum, charge) => sum + (charge.distance || 0), 0)
     : 0;
 
   // Use actual km if post-trip adjustment exists
   // For regular quotations, use passed totalDistance (already includes additional distance)
   // For calculator tab, calculate totalTripDistance + additionalDistanceFromCharges
-  const actualTripDistance = data.postTripAdjustment 
+  const actualTripDistance = data.postTripAdjustment
     ? data.postTripAdjustment.actualKmTraveled + safeData.kmParkingToPickup + safeData.kmDropToParking + additionalDistanceFromCharges
     : (data.totalDistance !== undefined ? data.totalDistance : safeData.totalTripDistance + additionalDistanceFromCharges);
-  
+
   // Calculate total fuel cost for internal tracking (all distances)
-  const calculatedFuelCost = isMultiParking
-    ? ((actualTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter)
-    : ((actualTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
-  
+  // FIXED: For multi-bus fleet, use stored values to avoid single-efficiency recalculation errors
+  const calculatedFuelCost = isMultiBusFleet
+    ? safeData.fuelCostFuelOnly
+    : isMultiParking
+      ? ((actualTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter)
+      : ((actualTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
+
   // Calculate deductions fuel cost - ALWAYS multiply by number of buses for expense tracking
-  const deductionsFuelCost = ((actualTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
-  
+  const deductionsFuelCost = isMultiBusFleet
+    ? safeData.fuelCostFuelOnly
+    : ((actualTripDistance / safeData.busTypeEfficiency) * safeData.fuelPricePerLiter) * safeData.numberOfBuses;
+
   // Calculate maintenance cost (for all buses)  
+  // For multi-bus fleet, use stored maintenanceCost which was calculated per-bus-type
   // For multi-parking, divide parking distances by number of buses, then add trip distance
-  const distancePerBus = isMultiParking 
-    ? ((safeData.kmParkingToPickup + safeData.kmDropToParking) / safeData.numberOfBuses) + 
-      (data.postTripAdjustment ? data.postTripAdjustment.actualKmTraveled : safeData.kmTrip) + 
-      additionalDistanceFromCharges
+  const distancePerBus = isMultiParking
+    ? ((safeData.kmParkingToPickup + safeData.kmDropToParking) / safeData.numberOfBuses) +
+    (data.postTripAdjustment ? data.postTripAdjustment.actualKmTraveled : safeData.kmTrip) +
+    additionalDistanceFromCharges
     : actualTripDistance;
-  const calculatedMaintenanceCost = (distancePerBus * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
-  
+  const calculatedMaintenanceCost = isMultiBusFleet
+    ? safeData.maintenanceCost
+    : (distancePerBus * safeData.maintenanceRatePerKm) * safeData.numberOfBuses;
+
   // Calculate additional charges total with per-bus support (exclude pass-through and additional_distance charges from expenses)
-  const additionalChargesTotal = Array.isArray(data.additionalCharges) 
+  const additionalChargesTotal = Array.isArray(data.additionalCharges)
     ? data.additionalCharges.reduce((sum, charge) => {
-        // Skip pass-through and additional_distance charges in expense calculations
-        if (charge.type === 'pass_through' || charge.type === 'additional_distance') return sum;
-        
-        const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
-          ? charge.amount * charge.busesCount 
-          : charge.amount;
-        return sum + effectiveAmount;
-      }, 0)
+      // Skip pass-through and additional_distance charges in expense calculations
+      if (charge.type === 'pass_through' || charge.type === 'additional_distance') return sum;
+
+      const effectiveAmount = (charge.applyPerBus && charge.busesCount)
+        ? charge.amount * charge.busesCount
+        : charge.amount;
+      return sum + effectiveAmount;
+    }, 0)
     : 0;
-  
+
   // Calculate other expenses total
   const otherExpensesTotal = safeData.otherExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-  
+
   // Add post-trip additional expenses to total expenses
   const postTripExpensesTotal = data.postTripAdjustment?.totalAdditionalExpenses || 0;
-  
+
   // Calculate correct total expenses (align with deductions section - use deductions fuel cost)
   const correctTotalExpenses = deductionsFuelCost + calculatedMaintenanceCost + additionalChargesTotal + otherExpensesTotal + safeData.commissionAmount + postTripExpensesTotal;
-  
+
   // Calculate correct net profit - use final trip amount if adjustment exists
   const finalCustomerAmount = data.postTripAdjustment?.finalTripAmount || safeData.customerTotalWithFuel;
   const correctNetProfit = finalCustomerAmount - correctTotalExpenses;
-  
+
   // Calculate net profit per bus
   const netProfitPerBus = correctNetProfit / safeData.numberOfBuses;
 
@@ -299,17 +325,17 @@ export function CostBreakdown({ data }: Props) {
           <h4 className="font-medium mb-2">Distance Analysis</h4>
           {(() => {
             // Calculate additional distance from charges
-            const additionalDistance = Array.isArray(data.additionalCharges) 
+            const additionalDistance = Array.isArray(data.additionalCharges)
               ? data.additionalCharges
-                  .filter(charge => charge.type === 'additional_distance')
-                  .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+                .filter(charge => charge.type === 'additional_distance')
+                .reduce((sum, charge) => sum + (charge.distance || 0), 0)
               : 0;
-            
+
             const hasAdditionalDistance = additionalDistance > 0;
             const finalTotalDistance = safeData.totalTripDistance + additionalDistance;
             const isPickupAsParking = data.usePickupAsParking || (safeData.kmParkingToPickup === 0 && safeData.kmDropToParking === 0 && safeData.kmTrip > 0);
             const isManualParkingDistance = data.useManualParkingDistance || false;
-            
+
             return (
               <>
                 <div className={`grid ${hasAdditionalDistance ? 'grid-cols-5' : 'grid-cols-4'} gap-4 text-sm`}>
@@ -394,7 +420,7 @@ export function CostBreakdown({ data }: Props) {
                 </svg>
                 Post-Trip Adjustments
               </h4>
-              
+
               {/* KM Comparison */}
               <div className="grid grid-cols-3 gap-4 text-sm mb-3">
                 <div className="text-center">
@@ -410,7 +436,7 @@ export function CostBreakdown({ data }: Props) {
                   <div className="text-orange-600">{data.postTripAdjustment.extraKm} km</div>
                 </div>
               </div>
-              
+
               {/* Extra KM Charges */}
               {data.postTripAdjustment.extraKm > 0 && (
                 <div className="flex justify-between mb-2">
@@ -418,7 +444,7 @@ export function CostBreakdown({ data }: Props) {
                   <span className="text-orange-600 font-medium">LKR {data.postTripAdjustment.extraKmTotalCharge.toLocaleString()}</span>
                 </div>
               )}
-              
+
               {/* Additional Trip Expenses */}
               {data.postTripAdjustment.additionalExpenses && data.postTripAdjustment.additionalExpenses.length > 0 && (
                 <div className="space-y-1 mb-2">
@@ -431,7 +457,7 @@ export function CostBreakdown({ data }: Props) {
                   ))}
                 </div>
               )}
-              
+
               <Separator className="my-2" />
               <div className="flex justify-between font-bold text-orange-600">
                 <span>Total Adjustment</span>
@@ -445,138 +471,200 @@ export function CostBreakdown({ data }: Props) {
         {/* Revenue Section */}
         <div>
           <h4 className="font-medium mb-2">Hire Charges Breakdown</h4>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>
-                {safeData.rateCardDetails?.rateCardRange ? 
-                  `Base Rate (${safeData.rateCardDetails.rateCardRange} range)` :
-                  'Base Rate (First 100 km)'
-                }
-              </span>
-              <span>LKR {safeData.fixedRate.toLocaleString()}</span>
-            </div>
-            {safeData.overtimeCharge > 0 && (
-              <div className="flex justify-between">
-                <span>Overtime ({safeData.rateCardDetails?.overtimeHours || 0} hrs)</span>
-                <span>LKR {safeData.overtimeCharge.toLocaleString()}</span>
+          {/* Per-bus-type hire breakdown when different bus types exist */}
+          {hasMultipleBusTypes ? (
+            <div className="space-y-4">
+              {data.busFleetDetails!.buses.map((bus, idx) => {
+                const totalHireAllBuses = bus.hire_charge_per_bus * bus.quantity;
+                return (
+                  <div key={idx} className="border rounded-lg p-3 bg-muted/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="text-xs">{bus.bus_type_name}</Badge>
+                      <span className="text-xs text-muted-foreground">× {bus.quantity}</span>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Base Rate</span>
+                        <span>LKR {(bus.fixed_rate_per_bus || 0).toLocaleString()}</span>
+                      </div>
+                      {(bus.overtime_charge_per_bus || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span>Overtime</span>
+                          <span>LKR {bus.overtime_charge_per_bus!.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {(bus.overnight_charge_per_bus || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span>Overnight Charges</span>
+                          <span>LKR {bus.overnight_charge_per_bus!.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {(bus.exceeding_charge_per_bus || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span>Exceeding Distance</span>
+                          <span>LKR {bus.exceeding_charge_per_bus!.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <Separator />
+                      <div className="flex justify-between font-medium text-blue-600">
+                        <span>Hire/Bus</span>
+                        <span>LKR {bus.hire_charge_per_bus.toLocaleString()}</span>
+                      </div>
+                      {bus.quantity > 1 && (
+                        <div className="flex justify-between font-medium text-blue-700">
+                          <span>Total ({bus.quantity} buses)</span>
+                          <span>LKR {totalHireAllBuses.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <Separator />
+              <div className="flex justify-between font-medium text-blue-600">
+                <span>Total Hire Charge (All Types)</span>
+                <span>LKR {safeData.grossRevenue.toLocaleString()}</span>
               </div>
-            )}
-            {safeData.overnightCharge > 0 && (
-              <div className="flex justify-between">
-                <span>Overnight Charges</span>
-                <span>LKR {safeData.overnightCharge.toLocaleString()}</span>
+              <Separator />
+              <div className="flex justify-between font-medium text-blue-600">
+                <span>Gross Revenue</span>
+                <span>LKR {safeData.grossRevenue.toLocaleString()}</span>
               </div>
-            )}
-            {safeData.exceedingDistanceCharge > 0 && (
+            </div>
+          ) : (
+            <div className="space-y-2">
               <div className="flex justify-between">
-                <span>Exceeding Distance ({safeData.rateCardDetails?.chargeableExceedingKm || 0} km)</span>
-                <span>LKR {safeData.exceedingDistanceCharge.toLocaleString()}</span>
-              </div>
-            )}
-            <Separator />
-            <div className="flex justify-between font-medium text-blue-600">
-              <span>Total Hire Charge</span>
-              <span>LKR {safeData.hireCharge.toLocaleString()}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between font-medium text-blue-600">
-              <span>Gross Revenue</span>
-              <span>LKR {safeData.grossRevenue.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Fuel Cost (Parking to Pickup + Drop to Parking - {customerFuelDistance.toFixed(1)} km{isMultiParking ? ' (calculated per bus)' : ` × ${safeData.numberOfBuses} bus${safeData.numberOfBuses > 1 ? 'es' : ''}`})</span>
-              <span>LKR {customerFuelCost.toLocaleString()}</span>
-            </div>
-            {safeData.commissionPassThroughAmount > 0 && (
-              <div className="flex justify-between">
-                <span>Commission passed to customer ({safeData.commissionPassThroughPct}%)</span>
-                <span>LKR {safeData.commissionPassThroughAmount.toLocaleString()}</span>
-              </div>
-            )}
-            {safeData.discountAmount > 0 && (
-              <div className="flex justify-between text-green-600">
                 <span>
-                  Discount {safeData.discountType === 'percentage' 
-                    ? `(${safeData.discountPct}%)` 
-                    : '(Fixed Amount)'}
+                  {safeData.rateCardDetails?.rateCardRange ?
+                    `Base Rate (${safeData.rateCardDetails.rateCardRange} range)` :
+                    'Base Rate (First 100 km)'
+                  }
                 </span>
-                <span>-LKR {safeData.discountAmount.toLocaleString()}</span>
+                <span>LKR {safeData.fixedRate.toLocaleString()}</span>
               </div>
-            )}
-            {(Array.isArray(data.additionalCharges) && data.additionalCharges.length > 0) && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-orange-600">Additional Charges:</div>
-                   {data.additionalCharges.map((charge, index) => {
-                     const chargeTypeLabels = {
-                       permits: 'Permits Cost',
-                       highway: 'Highway Charges',
-                       additional_fuel: 'Additional Fuel Costs',
-                       driver_charges: 'Driver Charges',
-                       pass_through: 'Pass-Through Charge',
-                       internal_cost: charge.reason || 'Internal Cost',
-                       other: charge.reason || 'Other'
-                     };
-                     
-                     const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
-                       ? charge.amount * charge.busesCount 
-                       : charge.amount;
-                     
-                     const displayLabel = chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type;
-                     const busInfo = (charge.applyPerBus && charge.busesCount) 
-                       ? ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`
-                       : '';
-                     
-                     // Add indicator for pass-through charges
-                     const isPassThrough = charge.type === 'pass_through';
-                     
-                     return (
-                       <div key={index} className="flex justify-between pl-4">
-                         <span className={isPassThrough ? 'font-medium text-green-600' : ''}>
-                           {displayLabel}{busInfo}
-                           {isPassThrough && <span className="ml-2 text-xs">(Revenue Only)</span>}
-                         </span>
-                         <span className={isPassThrough ? 'text-green-600' : ''}>
-                           LKR {effectiveAmount.toLocaleString()}
-                         </span>
-                       </div>
-                     );
-                   })}
+              {safeData.overtimeCharge > 0 && (
+                <div className="flex justify-between">
+                  <span>Overtime ({safeData.rateCardDetails?.overtimeHours || 0} hrs)</span>
+                  <span>LKR {safeData.overtimeCharge.toLocaleString()}</span>
                 </div>
-              </>
-            )}
-            <Separator />
-            <div className="flex justify-between font-bold text-lg text-green-600 bg-green-50 p-3 rounded-md border-2 border-green-200">
-              <span>ORIGINAL QUOTE - Customer Pays</span>
-              <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
+              )}
+              {safeData.overnightCharge > 0 && (
+                <div className="flex justify-between">
+                  <span>Overnight Charges</span>
+                  <span>LKR {safeData.overnightCharge.toLocaleString()}</span>
+                </div>
+              )}
+              {safeData.exceedingDistanceCharge > 0 && (
+                <div className="flex justify-between">
+                  <span>Exceeding Distance ({safeData.rateCardDetails?.chargeableExceedingKm || 0} km)</span>
+                  <span>LKR {safeData.exceedingDistanceCharge.toLocaleString()}</span>
+                </div>
+              )}
+              <Separator />
+              <div className="flex justify-between font-medium text-blue-600">
+                <span>Total Hire Charge</span>
+                <span>LKR {safeData.hireCharge.toLocaleString()}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between font-medium text-blue-600">
+                <span>Gross Revenue</span>
+                <span>LKR {safeData.grossRevenue.toLocaleString()}</span>
+              </div>
             </div>
-
-            {/* Post-Trip Adjustments to Customer Total */}
-            {data.postTripAdjustment && data.postTripAdjustment.adjustmentStatus === 'finalized' && (
-              <>
-                <div className="flex justify-between text-orange-600 mt-2">
-                  <span>Post-Trip Adjustment</span>
-                  <span>+LKR {data.postTripAdjustment.adjustmentAmount.toLocaleString()}</span>
-                </div>
-                
-                <div className="flex justify-between font-bold text-lg text-blue-600 bg-blue-50 p-3 rounded-md border-2 border-blue-200 mt-2">
-                  <span>FINAL TRIP AMOUNT</span>
-                  <span>LKR {data.postTripAdjustment.finalTripAmount.toLocaleString()}</span>
-                </div>
-                
-                <div className="flex justify-between text-muted-foreground mt-2">
-                  <span>Advance Already Paid</span>
-                  <span>-LKR {data.postTripAdjustment.advanceAlreadyPaid.toLocaleString()}</span>
-                </div>
-                
-                <div className="flex justify-between font-bold text-lg text-purple-600 bg-purple-50 p-3 rounded-md border-2 border-purple-200 mt-2">
-                  <span>BALANCE DUE</span>
-                  <span>LKR {data.postTripAdjustment.balanceDue.toLocaleString()}</span>
-                </div>
-              </>
-            )}
+          )}
+          <div className="flex justify-between">
+            <span>Fuel Cost (Parking to Pickup + Drop to Parking - {customerFuelDistance.toFixed(1)} km{isMultiParking ? ' (calculated per bus)' : ` × ${safeData.numberOfBuses} bus${safeData.numberOfBuses > 1 ? 'es' : ''}`})</span>
+            <span>LKR {customerFuelCost.toLocaleString()}</span>
           </div>
+          {safeData.commissionPassThroughAmount > 0 && (
+            <div className="flex justify-between">
+              <span>Commission passed to customer ({safeData.commissionPassThroughPct}%)</span>
+              <span>LKR {safeData.commissionPassThroughAmount.toLocaleString()}</span>
+            </div>
+          )}
+          {safeData.discountAmount > 0 && (
+            <div className="flex justify-between text-green-600">
+              <span>
+                Discount {safeData.discountType === 'percentage'
+                  ? `(${safeData.discountPct}%)`
+                  : '(Fixed Amount)'}
+              </span>
+              <span>-LKR {safeData.discountAmount.toLocaleString()}</span>
+            </div>
+          )}
+          {(Array.isArray(data.additionalCharges) && data.additionalCharges.length > 0) && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-orange-600">Additional Charges:</div>
+                {data.additionalCharges.map((charge, index) => {
+                  const chargeTypeLabels = {
+                    permits: 'Permits Cost',
+                    highway: 'Highway Charges',
+                    additional_fuel: 'Additional Fuel Costs',
+                    driver_charges: 'Driver Charges',
+                    pass_through: 'Pass-Through Charge',
+                    internal_cost: charge.reason || 'Internal Cost',
+                    other: charge.reason || 'Other'
+                  };
+
+                  const effectiveAmount = (charge.applyPerBus && charge.busesCount)
+                    ? charge.amount * charge.busesCount
+                    : charge.amount;
+
+                  const displayLabel = chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type;
+                  const busInfo = (charge.applyPerBus && charge.busesCount)
+                    ? ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`
+                    : '';
+
+                  // Add indicator for pass-through charges
+                  const isPassThrough = charge.type === 'pass_through';
+
+                  return (
+                    <div key={index} className="flex justify-between pl-4">
+                      <span className={isPassThrough ? 'font-medium text-green-600' : ''}>
+                        {displayLabel}{busInfo}
+                        {isPassThrough && <span className="ml-2 text-xs">(Revenue Only)</span>}
+                      </span>
+                      <span className={isPassThrough ? 'text-green-600' : ''}>
+                        LKR {effectiveAmount.toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          <Separator />
+          <div className="flex justify-between font-bold text-lg text-green-600 bg-green-50 p-3 rounded-md border-2 border-green-200">
+            <span>ORIGINAL QUOTE - Customer Pays</span>
+            <span>LKR {safeData.customerTotalWithFuel.toLocaleString()}</span>
+          </div>
+
+          {/* Post-Trip Adjustments to Customer Total */}
+          {data.postTripAdjustment && data.postTripAdjustment.adjustmentStatus === 'finalized' && (
+            <>
+              <div className="flex justify-between text-orange-600 mt-2">
+                <span>Post-Trip Adjustment</span>
+                <span>+LKR {data.postTripAdjustment.adjustmentAmount.toLocaleString()}</span>
+              </div>
+
+              <div className="flex justify-between font-bold text-lg text-blue-600 bg-blue-50 p-3 rounded-md border-2 border-blue-200 mt-2">
+                <span>FINAL TRIP AMOUNT</span>
+                <span>LKR {data.postTripAdjustment.finalTripAmount.toLocaleString()}</span>
+              </div>
+
+              <div className="flex justify-between text-muted-foreground mt-2">
+                <span>Advance Already Paid</span>
+                <span>-LKR {data.postTripAdjustment.advanceAlreadyPaid.toLocaleString()}</span>
+              </div>
+
+              <div className="flex justify-between font-bold text-lg text-purple-600 bg-purple-50 p-3 rounded-md border-2 border-purple-200 mt-2">
+                <span>BALANCE DUE</span>
+                <span>LKR {data.postTripAdjustment.balanceDue.toLocaleString()}</span>
+              </div>
+            </>
+          )}
         </div>
 
         <Separator />
@@ -587,42 +675,42 @@ export function CostBreakdown({ data }: Props) {
           <div className="grid grid-cols-4 gap-4 text-sm">
             <div className="text-center">
               <div className="font-medium text-blue-600">
-                {safeData.rateCardDetails?.standardHours || 
-                 (data.pickupDateTime && data.dropDateTime ? 
-                   (() => {
-                     const pickup = new Date(data.pickupDateTime);
-                     const drop = new Date(data.dropDateTime);
-                     const diffHours = (drop.getTime() - pickup.getTime()) / (1000 * 60 * 60);
-                     return Math.min(diffHours, 8);
-                   })() : 8)} hrs
+                {safeData.rateCardDetails?.standardHours ||
+                  (data.pickupDateTime && data.dropDateTime ?
+                    (() => {
+                      const pickup = new Date(data.pickupDateTime);
+                      const drop = new Date(data.dropDateTime);
+                      const diffHours = (drop.getTime() - pickup.getTime()) / (1000 * 60 * 60);
+                      return Math.min(diffHours, 8);
+                    })() : 8)} hrs
               </div>
               <div className="text-muted-foreground">Standard</div>
             </div>
             <div className="text-center">
               <div className="font-medium text-orange-600">
                 {(() => {
-                  const additionalDistance = Array.isArray(data.additionalCharges) 
+                  const additionalDistance = Array.isArray(data.additionalCharges)
                     ? data.additionalCharges
-                        .filter(charge => charge.type === 'additional_distance')
-                        .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+                      .filter(charge => charge.type === 'additional_distance')
+                      .reduce((sum, charge) => sum + (charge.distance || 0), 0)
                     : 0;
-                  
+
                   const totalDistanceForHours = safeData.kmTrip + additionalDistance;
-                  return safeData.rateCardDetails?.availableHours?.toFixed(1) || 
-                         (totalDistanceForHours > 0 ? (totalDistanceForHours / 10).toFixed(1) : '0.0');
+                  return safeData.rateCardDetails?.availableHours?.toFixed(1) ||
+                    (totalDistanceForHours > 0 ? (totalDistanceForHours / 10).toFixed(1) : '0.0');
                 })()} hrs
               </div>
               <div className="text-muted-foreground">Available</div>
             </div>
             <div className="text-center">
               <div className="font-medium text-green-600">
-                {safeData.rateCardDetails?.actualHours?.toFixed(1) || 
-                 (data.pickupDateTime && data.dropDateTime ? 
-                   (() => {
-                     const pickup = new Date(data.pickupDateTime);
-                     const drop = new Date(data.dropDateTime);
-                     return ((drop.getTime() - pickup.getTime()) / (1000 * 60 * 60)).toFixed(1);
-                   })() : '0.0')} hrs
+                {safeData.rateCardDetails?.actualHours?.toFixed(1) ||
+                  (data.pickupDateTime && data.dropDateTime ?
+                    (() => {
+                      const pickup = new Date(data.pickupDateTime);
+                      const drop = new Date(data.dropDateTime);
+                      return ((drop.getTime() - pickup.getTime()) / (1000 * 60 * 60)).toFixed(1);
+                    })() : '0.0')} hrs
               </div>
               <div className="text-muted-foreground">Actual</div>
             </div>
@@ -630,27 +718,27 @@ export function CostBreakdown({ data }: Props) {
               <div className={`font-medium ${(safeData.rateCardDetails?.overtimeHours || 0) > 0 ? 'text-red-600' : 'text-gray-500'}`}>
                 {(() => {
                   // Calculate overtime hours: max(0, actual - available)
-                  const actualHours = safeData.rateCardDetails?.actualHours || 
-                    (data.pickupDateTime && data.dropDateTime ? 
+                  const actualHours = safeData.rateCardDetails?.actualHours ||
+                    (data.pickupDateTime && data.dropDateTime ?
                       (() => {
                         const pickup = new Date(data.pickupDateTime);
                         const drop = new Date(data.dropDateTime);
                         return (drop.getTime() - pickup.getTime()) / (1000 * 60 * 60);
                       })() : 0);
-                  
-                  const additionalDistance = Array.isArray(data.additionalCharges) 
+
+                  const additionalDistance = Array.isArray(data.additionalCharges)
                     ? data.additionalCharges
-                        .filter(charge => charge.type === 'additional_distance')
-                        .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+                      .filter(charge => charge.type === 'additional_distance')
+                      .reduce((sum, charge) => sum + (charge.distance || 0), 0)
                     : 0;
                   const totalDistanceForHours = safeData.kmTrip + additionalDistance;
-                  
-                  const availableHours = safeData.rateCardDetails?.availableHours || 
+
+                  const availableHours = safeData.rateCardDetails?.availableHours ||
                     (totalDistanceForHours > 0 ? totalDistanceForHours / 10 : 0);
-                  
-                  const overtimeHours = safeData.rateCardDetails?.overtimeHours ?? 
+
+                  const overtimeHours = safeData.rateCardDetails?.overtimeHours ??
                     Math.max(0, actualHours - availableHours);
-                  
+
                   return overtimeHours.toFixed(1);
                 })()} hrs
               </div>
@@ -659,18 +747,18 @@ export function CostBreakdown({ data }: Props) {
           </div>
           <div className="text-xs text-muted-foreground mt-1 text-center">
             {(() => {
-              const additionalDistance = Array.isArray(data.additionalCharges) 
+              const additionalDistance = Array.isArray(data.additionalCharges)
                 ? data.additionalCharges
-                    .filter(charge => charge.type === 'additional_distance')
-                    .reduce((sum, charge) => sum + (charge.distance || 0), 0)
+                  .filter(charge => charge.type === 'additional_distance')
+                  .reduce((sum, charge) => sum + (charge.distance || 0), 0)
                 : 0;
-              
+
               const availableHours = safeData.rateCardDetails?.availableHours || (safeData.kmTrip / 10);
-              
+
               // Check if this is Lyceum/Internal hire (standard hours based) or Outside (distance based)
-              const isStandardHoursBased = safeData.rateCardDetails?.standardHours && 
+              const isStandardHoursBased = safeData.rateCardDetails?.standardHours &&
                 safeData.rateCardDetails.availableHours === safeData.rateCardDetails.standardHours;
-              
+
               if (isStandardHoursBased) {
                 return `Available hours from rate card: ${availableHours.toFixed(1)} hrs (Lyceum/Internal hire)`;
               } else if (additionalDistance > 0) {
@@ -680,30 +768,82 @@ export function CostBreakdown({ data }: Props) {
               }
             })()}
           </div>
-          
-          {/* Extra Time Charges Info - Display when overtime or overnight charges exist */}
-          {(safeData.overtimeCharge > 0 || safeData.overnightCharge > 0) && (
-            <div className="mt-3 p-3 bg-orange-50 rounded-md border border-orange-200">
-              <div className="text-sm font-medium text-orange-700 mb-2">Extra Time Charges</div>
-              <div className="space-y-1">
-                {safeData.overtimeCharge > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-orange-600">Overtime Charge ({safeData.rateCardDetails?.overtimeHours?.toFixed(1) || '0'} hrs)</span>
-                    <span className="font-medium text-orange-700">LKR {safeData.overtimeCharge.toLocaleString()}</span>
+
+          {/* Extra Time Charges Info */}
+          {hasMultipleBusTypes ? (
+            /* Per-bus-type extra time charges */
+            (() => {
+              const busesWithExtra = data.busFleetDetails!.buses.filter(
+                b => (b.overtime_charge_per_bus || 0) > 0 || (b.overnight_charge_per_bus || 0) > 0
+              );
+              if (busesWithExtra.length === 0) return null;
+              return (
+                <div className="mt-3 space-y-2">
+                  <div className="text-sm font-medium text-orange-700">Extra Time Charges (per bus type)</div>
+                  {busesWithExtra.map((bus, idx) => (
+                    <div key={idx} className="p-3 bg-orange-50 rounded-md border border-orange-200">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant="outline" className="text-xs">{bus.bus_type_name}</Badge>
+                        <span className="text-xs text-muted-foreground">× {bus.quantity}</span>
+                      </div>
+                      <div className="space-y-1">
+                        {(bus.overtime_charge_per_bus || 0) > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-orange-600">Overtime Charge</span>
+                            <span className="font-medium text-orange-700">
+                              LKR {bus.overtime_charge_per_bus!.toLocaleString()}
+                              {bus.quantity > 1 && <span className="text-xs ml-1">(× {bus.quantity} = LKR {(bus.overtime_charge_per_bus! * bus.quantity).toLocaleString()})</span>}
+                            </span>
+                          </div>
+                        )}
+                        {(bus.overnight_charge_per_bus || 0) > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-orange-600">Overnight Charge</span>
+                            <span className="font-medium text-orange-700">
+                              LKR {bus.overnight_charge_per_bus!.toLocaleString()}
+                              {bus.quantity > 1 && <span className="text-xs ml-1">(× {bus.quantity} = LKR {(bus.overnight_charge_per_bus! * bus.quantity).toLocaleString()})</span>}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-sm pt-1 font-medium text-orange-700">
+                    <span>Total Extra Time (All Types)</span>
+                    <span className="font-bold">
+                      LKR {busesWithExtra.reduce((sum, b) =>
+                        sum + ((b.overtime_charge_per_bus || 0) + (b.overnight_charge_per_bus || 0)) * b.quantity
+                        , 0).toLocaleString()}
+                    </span>
                   </div>
-                )}
-                {safeData.overnightCharge > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-orange-600">Overnight Charge</span>
-                    <span className="font-medium text-orange-700">LKR {safeData.overnightCharge.toLocaleString()}</span>
+                </div>
+              );
+            })()
+          ) : (
+            /* Original single-type extra time charges */
+            (safeData.overtimeCharge > 0 || safeData.overnightCharge > 0) && (
+              <div className="mt-3 p-3 bg-orange-50 rounded-md border border-orange-200">
+                <div className="text-sm font-medium text-orange-700 mb-2">Extra Time Charges</div>
+                <div className="space-y-1">
+                  {safeData.overtimeCharge > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-orange-600">Overtime Charge ({safeData.rateCardDetails?.overtimeHours?.toFixed(1) || '0'} hrs)</span>
+                      <span className="font-medium text-orange-700">LKR {safeData.overtimeCharge.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {safeData.overnightCharge > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-orange-600">Overnight Charge</span>
+                      <span className="font-medium text-orange-700">LKR {safeData.overnightCharge.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm pt-1 border-t border-orange-200">
+                    <span className="font-medium text-orange-700">Total Extra Time</span>
+                    <span className="font-bold text-orange-700">LKR {(safeData.overtimeCharge + safeData.overnightCharge).toLocaleString()}</span>
                   </div>
-                )}
-                <div className="flex justify-between text-sm pt-1 border-t border-orange-200">
-                  <span className="font-medium text-orange-700">Total Extra Time</span>
-                  <span className="font-bold text-orange-700">LKR {(safeData.overtimeCharge + safeData.overnightCharge).toLocaleString()}</span>
                 </div>
               </div>
-            </div>
+            )
           )}
         </div>
 
@@ -713,28 +853,76 @@ export function CostBreakdown({ data }: Props) {
         <div>
           <h4 className="font-medium mb-2">Deductions</h4>
           <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>
-                Fuel Cost (Total Trip - {actualTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})
-                {data.postTripAdjustment && (
-                  <span className="ml-2 text-xs text-orange-600">
-                    (Recalculated: quoted {safeData.totalTripDistance.toFixed(1)} km → actual {actualTripDistance.toFixed(1)} km)
+            {/* Per-bus-type fuel & maintenance when different bus types */}
+            {hasMultipleBusTypes ? (
+              <>
+                <div className="text-sm font-medium text-muted-foreground mb-1">Fuel & Maintenance (per bus type)</div>
+                {data.busFleetDetails!.buses.map((bus, idx) => {
+                  const totalFuelForType = bus.fuel_cost_per_bus * bus.quantity;
+                  const totalMaintenanceForType = bus.maintenance_cost_per_bus * bus.quantity;
+                  return (
+                    <div key={idx} className="border rounded-lg p-3 bg-muted/20 space-y-1 text-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant="outline" className="text-xs">{bus.bus_type_name}</Badge>
+                        <span className="text-xs text-muted-foreground">× {bus.quantity} | {bus.bus_type_efficiency || 8} km/L</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>
+                          Fuel ({bus.fuel_liters_per_bus || 0} L/bus × LKR {safeData.fuelPricePerLiter})
+                        </span>
+                        <span>
+                          LKR {bus.fuel_cost_per_bus.toLocaleString()}
+                          {bus.quantity > 1 && <span className="text-xs text-muted-foreground ml-1"> × {bus.quantity} = LKR {totalFuelForType.toLocaleString()}</span>}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>
+                          Maintenance ({actualTripDistance.toFixed(1)} km × LKR {safeData.maintenanceRatePerKm})
+                        </span>
+                        <span>
+                          LKR {bus.maintenance_cost_per_bus.toLocaleString()}
+                          {bus.quantity > 1 && <span className="text-xs text-muted-foreground ml-1"> × {bus.quantity} = LKR {totalMaintenanceForType.toLocaleString()}</span>}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <Separator />
+                <div className="flex justify-between text-sm">
+                  <span>Total Fuel (All Types)</span>
+                  <span>LKR {safeData.fuelCostFuelOnly.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Total Maintenance (All Types)</span>
+                  <span>LKR {safeData.maintenanceCost.toLocaleString()}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span>
+                    Fuel Cost (Total Trip - {actualTripDistance.toFixed(1)} km ÷ {safeData.busTypeEfficiency} km/L × LKR {safeData.fuelPricePerLiter} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})
+                    {data.postTripAdjustment && (
+                      <span className="ml-2 text-xs text-orange-600">
+                        (Recalculated: quoted {safeData.totalTripDistance.toFixed(1)} km → actual {actualTripDistance.toFixed(1)} km)
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              <span>LKR {deductionsFuelCost.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>
-                Maintenance Cost (Internal - {distancePerBus.toFixed(1)} km per bus × LKR {safeData.maintenanceRatePerKm} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})
-                {data.postTripAdjustment && (
-                  <span className="ml-2 text-xs text-orange-600">
-                    (Recalculated on actual km)
+                  <span>LKR {deductionsFuelCost.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>
+                    Maintenance Cost (Internal - {distancePerBus.toFixed(1)} km per bus × LKR {safeData.maintenanceRatePerKm} × {safeData.numberOfBuses} bus{safeData.numberOfBuses > 1 ? 'es' : ''})
+                    {data.postTripAdjustment && (
+                      <span className="ml-2 text-xs text-orange-600">
+                        (Recalculated on actual km)
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              <span>LKR {calculatedMaintenanceCost.toLocaleString()}</span>
-            </div>
+                  <span>LKR {calculatedMaintenanceCost.toLocaleString()}</span>
+                </div>
+              </>
+            )}
             {(Array.isArray(data.additionalCharges) && data.additionalCharges.length > 0) && (
               <>
                 {data.additionalCharges
@@ -749,24 +937,24 @@ export function CostBreakdown({ data }: Props) {
                       internal_cost: charge.reason || 'Internal Cost',
                       other: charge.reason || 'Other'
                     };
-                    
-                    const effectiveAmount = (charge.applyPerBus && charge.busesCount) 
-                      ? charge.amount * charge.busesCount 
+
+                    const effectiveAmount = (charge.applyPerBus && charge.busesCount)
+                      ? charge.amount * charge.busesCount
                       : charge.amount;
-                      
+
                     const displayLabel = chargeTypeLabels[charge.type as keyof typeof chargeTypeLabels] || charge.type;
                     const isInternalCost = charge.type === 'internal_cost';
-                    
+
                     let busInfo = '';
                     if (charge.applyPerBus && charge.busesCount) {
                       busInfo = ` (${charge.amount.toLocaleString()} × ${charge.busesCount} bus${charge.busesCount > 1 ? 'es' : ''})`;
                     }
-                    
+
                     // Special display for distance-based charges
                     if (charge.type === 'additional_distance' && charge.distance) {
                       busInfo = ` (${charge.distance} KM × Rate)${busInfo}`;
                     }
-                    
+
                     return (
                       <div key={index} className="flex justify-between">
                         <span>
@@ -835,17 +1023,17 @@ export function CostBreakdown({ data }: Props) {
         {/* Net Profit per Day - show only if trip is more than 1 day */}
         {(() => {
           if (!data.pickupDateTime || !data.dropDateTime) return null;
-          
+
           const pickupDate = new Date(data.pickupDateTime);
           const dropDate = new Date(data.dropDateTime);
           const tripDurationMs = dropDate.getTime() - pickupDate.getTime();
           const tripDurationDays = Math.ceil(tripDurationMs / (1000 * 60 * 60 * 24));
-          
+
           if (tripDurationDays <= 1) return null;
-          
+
           const netProfitPerDay = correctNetProfit / tripDurationDays;
           const netProfitPerBusPerDay = netProfitPerBus / tripDurationDays;
-          
+
           return (
             <div className="flex justify-between items-center text-sm text-muted-foreground mt-2">
               <span>Net Profit per Day ({tripDurationDays} days)</span>
@@ -856,6 +1044,6 @@ export function CostBreakdown({ data }: Props) {
           );
         })()}
       </CardContent>
-    </Card>
+    </Card >
   );
 }

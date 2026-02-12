@@ -567,7 +567,7 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
           </thead>
           <tbody>
             {Array.isArray(parsedQuotation.bus_fleet_details?.buses) &&
-            parsedQuotation.bus_fleet_details.buses.length > 0 ? (
+              parsedQuotation.bus_fleet_details.buses.length > 0 ? (
               <>
                 {/* Individual bus rows */}
                 {parsedQuotation.bus_fleet_details.buses.map((bus, index) => (
@@ -660,11 +660,94 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       }}
                     >
                       <div style={{ fontSize: "11px", color: "#374151" }}>
-                        LKR {(bus?.subtotal_all_buses || 0).toLocaleString()}
+                        LKR {((bus?.hire_charge_per_bus || 0) * (bus?.quantity || 1)).toLocaleString()}
                       </div>
                     </td>
                   </tr>
                 ))}
+
+                {/* Shared cost rows: Fuel, Additional Charges, Commission Pass-Through */}
+                {(Number(parsedQuotation.fuel_cost_fuel_only) || 0) > 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "8px",
+                        verticalAlign: "middle",
+                        color: "#374151",
+                        textAlign: "right",
+                      }}
+                    >
+                      Fuel Cost (Parking ↔ Pickup/Drop)
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "8px",
+                        verticalAlign: "middle",
+                        textAlign: "right",
+                        color: "#374151",
+                      }}
+                    >
+                      LKR {(Number(parsedQuotation.fuel_cost_fuel_only) || 0).toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+                {(Number(parsedQuotation.total_additional_charges) || 0) > 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "8px",
+                        verticalAlign: "middle",
+                        color: "#374151",
+                        textAlign: "right",
+                      }}
+                    >
+                      Additional Charges
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "8px",
+                        verticalAlign: "middle",
+                        textAlign: "right",
+                        color: "#374151",
+                      }}
+                    >
+                      LKR {(Number(parsedQuotation.total_additional_charges) || 0).toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+                {(Number(parsedQuotation.commission_pass_through_amount) || 0) > 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "8px",
+                        verticalAlign: "middle",
+                        color: "#374151",
+                        textAlign: "right",
+                      }}
+                    >
+                      Commission ({parsedQuotation.commission_pass_through_amount ? 'Pass-through' : ''})
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #d1d5db",
+                        padding: "8px",
+                        verticalAlign: "middle",
+                        textAlign: "right",
+                        color: "#374151",
+                      }}
+                    >
+                      LKR {(Number(parsedQuotation.commission_pass_through_amount) || 0).toLocaleString()}
+                    </td>
+                  </tr>
+                )}
 
                 {/* Total Fleet Row */}
                 <tr style={{ backgroundColor: "#f9fafb", fontWeight: "600" }}>

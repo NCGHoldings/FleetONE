@@ -791,10 +791,17 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       const tripDistance = distanceData.kmTrip || 0;
       const busFleetDetails = [];
       let combinedSubtotal = 0;
+      let totalHireCharge = 0;
       let totalBuses = 0;
       let totalCapacity = 0;
       let totalFuelCost = 0;
       let totalMaintenanceCost = 0;
+      let totalOvertimeCharge = 0;
+      let totalOvernightCharge = 0;
+      let totalFuelLiters = 0;
+      let totalFixedRate = 0;
+      let totalExceedingCharge = 0;
+      let firstBusEfficiency = 8; // Default, updated from first bus type
 
       // Loop through each bus type in the fleet
       for (const bus of selectedBusFleet) {
@@ -825,15 +832,20 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         let rateCard = null;
         let overtimeCharge = 0;
         let overnightCharge = 0;
+        let exceedingChargePerBus = 0;
+        let fixedRatePerBus = 0;
 
         if (data.hireType === 'Outside') {
           // Outside hire: flat rate + exceeding km
           rateCard = allRateCards.find(c => c.flat_fee_lkr != null) || allRateCards[0];
-          const fixedRate = rateCard.flat_fee_lkr || 0;
+          fixedRatePerBus = rateCard.flat_fee_lkr || 0;
           const baseCoverageKm = rateCard.exceeding_km_threshold || 100;
           const exceedingKm = Math.max(0, tripDistance - baseCoverageKm);
-          const exceedingCharge = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
-          hireChargePerBus = fixedRate + exceedingCharge;
+          exceedingChargePerBus = exceedingKm * (rateCard.exceeding_km_rate_lkr || 0);
+          hireChargePerBus = fixedRatePerBus + exceedingChargePerBus;
+
+          totalFixedRate += fixedRatePerBus * bus.quantity;
+          totalExceedingCharge += exceedingChargePerBus * bus.quantity;
 
           // FIX: Use calculateExtraTimeCharge for correct overtime/overnight calculation
           const extraTimeResult = calculateExtraTimeCharge(
@@ -858,7 +870,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             (card.to_km === null || tripDistance <= card.to_km)
           ) || allRateCards[0];
 
-          hireChargePerBus = rateCard?.flat_fee_lkr || 0;
+          fixedRatePerBus = rateCard?.flat_fee_lkr || 0;
+          hireChargePerBus = fixedRatePerBus;
+          totalFixedRate += fixedRatePerBus * bus.quantity;
 
           // FIX: Add overtime calculation for Lyceum/Internal using standard hours
           const extraTimeResult = calculateExtraTimeCharge(
@@ -882,7 +896,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
             const exceedingCard = allRateCards.find(c => c.from_km >= 101 && c.exceeding_km_rate_lkr);
             if (exceedingCard) {
               const exceedingKm = tripDistance - 100;
-              hireChargePerBus += exceedingKm * (exceedingCard.exceeding_km_rate_lkr || 0);
+              exceedingChargePerBus = exceedingKm * (exceedingCard.exceeding_km_rate_lkr || 0);
+              hireChargePerBus += exceedingChargePerBus;
+              totalExceedingCharge += exceedingChargePerBus * bus.quantity;
             }
           }
         }
@@ -900,7 +916,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         const subtotalPerBus = hireChargePerBus + fuelCostPerBus + maintenanceCostPerBus;
         const subtotalAllBuses = subtotalPerBus * bus.quantity;
 
-        // Add to fleet details
+        // Add to fleet details — include per-bus-type breakdown for CostBreakdown display
         busFleetDetails.push({
           bus_type_id: busTypeData.id,
           bus_type_name: busTypeData.name,
@@ -910,15 +926,30 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           fuel_cost_per_bus: Math.round(fuelCostPerBus),
           maintenance_cost_per_bus: Math.round(maintenanceCostPerBus),
           subtotal_per_bus: Math.round(subtotalPerBus),
-          subtotal_all_buses: Math.round(subtotalAllBuses)
+          subtotal_all_buses: Math.round(subtotalAllBuses),
+          // Per-bus-type hire charge breakdown
+          fixed_rate_per_bus: Math.round(fixedRatePerBus),
+          overtime_charge_per_bus: Math.round(overtimeCharge),
+          overnight_charge_per_bus: Math.round(overnightCharge),
+          exceeding_charge_per_bus: Math.round(exceedingChargePerBus),
+          bus_type_efficiency: busTypeData.avg_km_per_l || 8,
+          fuel_liters_per_bus: Math.round(fuelLitersPerBus * 10) / 10,
         });
 
         // Aggregate totals
         combinedSubtotal += subtotalAllBuses;
+        totalHireCharge += hireChargePerBus * bus.quantity;
         totalBuses += bus.quantity;
         totalCapacity += busTypeData.capacity * bus.quantity;
         totalFuelCost += fuelCostPerBus * bus.quantity;
         totalMaintenanceCost += maintenanceCostPerBus * bus.quantity;
+        totalOvertimeCharge += overtimeCharge * bus.quantity;
+        totalOvernightCharge += overnightCharge * bus.quantity;
+        totalFuelLiters += fuelLitersPerBus * bus.quantity;
+        // Use first bus type's efficiency for CostBreakdown display
+        if (busFleetDetails.length === 1) {
+          firstBusEfficiency = busTypeData.avg_km_per_l || 8;
+        }
       }
 
       // Apply additional charges BEFORE commission (exclude internal_cost from customer total)
@@ -933,7 +964,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
       }, 0);
 
       // Calculate pre-commission total (includes all charges except commission)
-      const grossRevenue = combinedSubtotal;
+      // FIXED: grossRevenue = hire charges only (not fuel+maintenance), matching single-bus behavior
+      // This prevents QuotationPreview.calculateFinalCustomerTotal from double-counting fuel
+      const grossRevenue = totalHireCharge;
 
       let discountAmount = 0;
       if (data.discountType === 'percentage') {
@@ -942,8 +975,9 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         discountAmount = data.discountAmount;
       }
 
-      // Pre-commission total = revenue + additional charges - discount
-      const preCommissionTotal = grossRevenue + totalAdditionalCharges - discountAmount;
+      // Pre-commission total = hire revenue + fuel + additional charges - discount
+      // FIXED: fuel added here explicitly (was previously hidden inside grossRevenue=combinedSubtotal)
+      const preCommissionTotal = grossRevenue + totalFuelCost + totalAdditionalCharges - discountAmount;
 
       // Calculate commission on the FULL pre-commission total
       const commissionExpenseAmount = preCommissionTotal * (data.commissionPct / 100);
@@ -973,8 +1007,13 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         km_drop_to_parking: Math.round((distanceData.kmDropToParking || 0) * 10) / 10,
         bus_fleet_details: busFleetDetails,
         fuel_cost_fuel_only: Math.round(totalFuelCost),
-        hire_charge: Math.round(grossRevenue),
+        hire_charge: Math.round(totalHireCharge),
         extra_charges: 0, // Multi-bus doesn't have separate extra charges
+        // FIXED: Add fields that were missing for multi-bus (saved to DB)
+        fixed_rate: Math.round(totalFixedRate / totalBuses), // Average per bus for DB
+        overtime_charge: Math.round(totalOvertimeCharge / totalBuses),
+        overnight_charge: Math.round(totalOvernightCharge / totalBuses),
+        exceeding_distance_charge: Math.round(totalExceedingCharge / totalBuses),
         gross_revenue: Math.round(grossRevenue),
         commission_pct: data.commissionPct,
         commission_pass_through_pct: Math.min(data.commissionPassThroughPct, data.commissionPct),
@@ -1001,6 +1040,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         customerTotalWithFuel: Math.round(finalCustomerTotal)
       };
 
+      // Calculate total trip distance for display
+      const totalTripKm = (distanceData.kmParkingToPickup || 0) + tripDistance + (distanceData.kmDropToParking || 0);
+      const totalAdditionalDistance = additionalCharges
+        .filter(charge => charge.type === 'additional_distance')
+        .reduce((sum, charge) => sum + (charge.distance || 0), 0);
+
       setCostData({
         kmParkingToPickup: costs.km_parking_to_pickup,
         kmTrip: costs.km_trip,
@@ -1011,6 +1056,15 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           total_capacity: totalCapacity,
           combined_subtotal: Math.round(combinedSubtotal)
         },
+        // FIXED: Populate hire charge fields for CostBreakdown display
+        hireCharge: Math.round(totalHireCharge / totalBuses), // Average total hire per bus (includes base + overtime + overnight + exceeding)
+        fixedRate: Math.round(totalFixedRate / totalBuses), // Average base rate only (flat fee without extras)
+        exceedingDistanceCharge: Math.round(totalExceedingCharge / totalBuses),
+        overtimeCharge: Math.round(totalOvertimeCharge / totalBuses),
+        overnightCharge: Math.round(totalOvernightCharge / totalBuses),
+        // Time data for Working Hours Analysis
+        pickupDateTime: data.pickupDateTime.toISOString(),
+        dropDateTime: data.dropDateTime.toISOString(),
         grossRevenue: Math.round(grossRevenue),
         customerTotalWithFuel: Math.round(finalCustomerTotal),
         fuelCostFuelOnly: Math.round(totalFuelCost),
@@ -1029,7 +1083,15 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         totalExpenses: costs.total_expenses,
         netProfit: costs.net_profit,
         numberOfBuses: totalBuses,
-        isMultiParking: false
+        isMultiParking: false,
+        // FIXED: Add missing fields for CostBreakdown calculations
+        totalTripDistance: totalTripKm,
+        totalDistance: totalTripKm + totalAdditionalDistance,
+        fuelLiters: Math.round(totalFuelLiters * 10) / 10,
+        busTypeEfficiency: firstBusEfficiency,
+        fuelPricePerLiter: fuelSettings.diesel_price_lkr_per_l,
+        maintenanceRatePerKm: fuelSettings.maintenance_rate_lkr_per_km || 20,
+        fuelPrice: fuelSettings.diesel_price_lkr_per_l,
       });
 
       toast({
