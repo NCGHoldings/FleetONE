@@ -9,6 +9,10 @@
 
 ## 2026-02-12
 
+### 🔍 Finance & Operations Full Audit (commit: `9f7bee7`)
+**Audit Result:** All 13 finance modules (92 sub-tabs) have components present and working. No missing features found in the local codebase.
+**Critical Finding:** The staging deployment has a Lovable-generated page at `/accounting/advances/receipts` referencing a non-existent `advance_receipts` table. **This table does NOT exist in Supabase.** The correct implementation uses `ar_receipts` with `is_advance: true` flag. Re-deploying from `main` fixes this.
+
 ### ✅ GL Journal Entry Line Details (commit: `9e28926`)
 **Files Modified:**
 - `src/hooks/useAccountingData.ts` — Fixed `useJournalEntryLines` hook: changed `.order('line_number')` to `.order('debit', { ascending: false })` since `line_number` column doesn't exist. Used explicit FK alias `chart_of_accounts:account_id`.
@@ -59,3 +63,11 @@
 ### Important Constants
 - `NCG_EXPRESS_COMPANY_ID`: `'7ece7595-8b7b-46de-8bfc-c1e8e0da7513'`
 - `BUSINESS_UNIT_CODE`: `'NCGE'`
+
+### ⚠️ AR Receipts & Advances (CRITICAL)
+- **DO NOT** create or reference an `advance_receipts` table — it does NOT exist
+- Advances are stored in `ar_receipts` table with `is_advance: true`
+- Mutation: `useCreateARReceipt` in `useAccountingMutations.ts`
+- UI: `ARReceiptForm.tsx` with `isAdvanceMode` prop
+- Allocations: `ar_receipt_allocations` table links receipts to invoices
+
