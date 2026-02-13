@@ -660,40 +660,13 @@ export function QuotationPreview({ quotation, className = "" }: Props) {
                       }}
                     >
                       <div style={{ fontSize: "11px", color: "#374151" }}>
-                        LKR {((bus?.hire_charge_per_bus || 0) * (bus?.quantity || 1)).toLocaleString()}
+                        LKR {(((bus?.hire_charge_per_bus || 0) + (bus?.fuel_cost_per_bus || 0)) * (bus?.quantity || 1)).toLocaleString()}
                       </div>
                     </td>
                   </tr>
                 ))}
 
-                {/* Shared cost rows: Fuel, Additional Charges, Commission Pass-Through */}
-                {(Number(parsedQuotation.fuel_cost_fuel_only) || 0) > 0 && (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      style={{
-                        border: "1px solid #d1d5db",
-                        padding: "8px",
-                        verticalAlign: "middle",
-                        color: "#374151",
-                        textAlign: "right",
-                      }}
-                    >
-                      Fuel Cost (Parking ↔ Pickup/Drop)
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #d1d5db",
-                        padding: "8px",
-                        verticalAlign: "middle",
-                        textAlign: "right",
-                        color: "#374151",
-                      }}
-                    >
-                      LKR {(Number(parsedQuotation.fuel_cost_fuel_only) || 0).toLocaleString()}
-                    </td>
-                  </tr>
-                )}
+                {/* Additional Charges and Commission rows (fuel is now included per-bus) */}
                 {(Number(parsedQuotation.total_additional_charges) || 0) > 0 && (
                   <tr>
                     <td
