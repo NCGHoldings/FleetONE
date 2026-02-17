@@ -11,6 +11,8 @@ import { Plus, Trash2, Calculator } from "lucide-react";
 import { useCreateJournalEntry } from "@/hooks/useAccountingMutations";
 import { formatLKR } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
+import { useGenerateNumber } from "@/hooks/useNumbering";
+import { Loader2 } from "lucide-react";
 
 const lineSchema = z.object({
   account_id: z.string().min(1, "Account is required"),
@@ -20,6 +22,7 @@ const lineSchema = z.object({
 });
 
 const formSchema = z.object({
+  entry_number: z.string().min(1, "Entry number is required"),
   entry_date: z.string().min(1, "Date is required"),
   description: z.string().min(1, "Description is required"),
   reference: z.string().optional(),
@@ -34,10 +37,13 @@ interface JournalEntryFormProps {
 
 export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
   const createEntry = useCreateJournalEntry();
+  const generateNumber = useGenerateNumber();
+  const [isGenerating, setIsGenerating] = useState(true);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      entry_number: "",
       entry_date: new Date().toISOString().split("T")[0],
       description: "",
       reference: "",
@@ -47,6 +53,14 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
       ],
     },
   });
+
+  // Auto-generate entry number on mount
+  useEffect(() => {
+    generateNumber("journal").then((num) => {
+      form.setValue("entry_number", num);
+      setIsGenerating(false);
+    });
+  }, [generateNumber, form]);
 
   const lines = form.watch("lines");
   const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
@@ -81,7 +95,7 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
       }));
 
     await createEntry.mutateAsync({
-      entry_number: `JE-${Date.now()}`,
+      entry_number: data.entry_number,
       entry_date: data.entry_date,
       description: data.description,
       reference: data.reference,
@@ -97,6 +111,29 @@ export const JournalEntryForm = ({ onSuccess }: JournalEntryFormProps) => {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-3 gap-4">
+          <FormField
+            control={form.control}
+            name="entry_number"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Entry #</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input 
+                      {...field} 
+                      readOnly 
+                      className="font-mono bg-muted" 
+                      placeholder="Auto-generated"
+                    />
+                    {isGenerating && (
+                      <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           <FormField
             control={form.control}
             name="entry_date"

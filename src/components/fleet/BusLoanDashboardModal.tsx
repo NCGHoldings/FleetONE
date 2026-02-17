@@ -13,7 +13,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { 
   fetchLeasingFinanceSettings, 
   processLeasingPaymentWithFinance,
-  LeasingFinanceSettings
+  createLeasingAPInvoice,
+  createLenderVendor,
+  LeasingFinanceSettings,
+  LoanPaymentData,
 } from "@/hooks/useLeasingFinance";
 
 interface BusLoanDashboardModalProps {
@@ -60,6 +63,76 @@ export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: 
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
   const [financeSettings, setFinanceSettings] = useState<LeasingFinanceSettings | null>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [creatingAP, setCreatingAP] = useState(false);
+
+  // Count payments that already have AP invoices linked
+  const paymentsWithAP = payments.filter(p => p.ap_invoice_id);
+  const paymentsWithoutAP = payments.filter(p => !p.ap_invoice_id && p.payment_status === "pending");
+
+  const handleBulkCreateAP = async () => {
+    if (!loan || !financeSettings) return;
+
+    setCreatingAP(true);
+    try {
+      // Ensure vendor exists
+      let vendorId = loan.vendor_id || null;
+      if (!vendorId && financeSettings.auto_create_vendor) {
+        vendorId = await createLenderVendor({
+          lenderName: loan.lender_name,
+        });
+        if (vendorId) {
+          await supabase
+            .from("bus_loans")
+            .update({ vendor_id: vendorId })
+            .eq("id", loan.id);
+        }
+      }
+
+      if (!vendorId) {
+        toast.error("No vendor available. Configure auto-vendor in Leasing Finance Settings.");
+        return;
+      }
+
+      let created = 0;
+      for (const payment of paymentsWithoutAP) {
+        const paymentData: LoanPaymentData = {
+          id: payment.id,
+          payment_number: payment.payment_number,
+          payment_date: payment.payment_date,
+          principal_amount: payment.principal_amount,
+          interest_amount: payment.interest_amount,
+          total_installment: payment.total_installment,
+          balance_remaining: payment.balance_remaining,
+          payment_status: payment.payment_status,
+        };
+
+        const apResult = await createLeasingAPInvoice({
+          loanId: loan.id,
+          paymentData,
+          vendorId,
+          busNumber,
+          lenderName: loan.lender_name,
+          settings: financeSettings,
+        });
+
+        if (apResult) {
+          await supabase
+            .from("bus_loan_payments")
+            .update({ ap_invoice_id: apResult.invoiceId })
+            .eq("id", payment.id);
+          created++;
+        }
+      }
+
+      toast.success(`Created ${created} AP invoices for pending installments`);
+      await fetchLoanData();
+    } catch (error) {
+      console.error("Error creating bulk AP invoices:", error);
+      toast.error("Failed to create AP invoices");
+    } finally {
+      setCreatingAP(false);
+    }
+  };
 
   const fetchLoanData = async () => {
     try {
@@ -340,10 +413,28 @@ export function BusLoanDashboardModal({ open, onOpenChange, busId, busNumber }: 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Payment Schedule ({paidPayments.length}/{payments.length} completed)</CardTitle>
-              <Button variant="outline" size="sm">
-                <FileDown className="h-4 w-4 mr-2" />
-                Export
-              </Button>
+              <div className="flex gap-2">
+                {financeSettings && paymentsWithoutAP.length > 0 && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleBulkCreateAP}
+                    disabled={creatingAP}
+                  >
+                    <Receipt className="h-4 w-4 mr-2" />
+                    {creatingAP ? "Creating..." : `Create ${paymentsWithoutAP.length} AP Invoices`}
+                  </Button>
+                )}
+                {paymentsWithAP.length > 0 && (
+                  <Badge variant="outline" className="text-xs py-1">
+                    {paymentsWithAP.length} AP linked
+                  </Badge>
+                )}
+                <Button variant="outline" size="sm">
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="border rounded-lg overflow-hidden">

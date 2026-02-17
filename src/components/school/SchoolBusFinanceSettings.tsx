@@ -55,6 +55,7 @@ export function SchoolBusFinanceSettings() {
     trade_receivable_account_id: "",
     sbs_collection_account_id: "",
     cash_account_id: "",
+    advance_payments_liability_account_id: "",
     auto_post_invoices: false,
     auto_post_payments: false,
     auto_post_expenses: false,
@@ -76,10 +77,37 @@ export function SchoolBusFinanceSettings() {
     if (existingSettings) {
       const defaultSetting = existingSettings.find((s: any) => !s.branch_id);
       if (defaultSetting) {
+        // Fetch liability account via RPC (PostgREST might not return this column)
+        const loadLiabilityAccount = async () => {
+          console.log('[loadLiabilityAccount] START - settingId:', defaultSetting.id);
+          try {
+            const { data: rpcResult, error: rpcError } = await supabase.rpc('get_liability_account_setting' as any, {
+              p_setting_id: defaultSetting.id,
+            });
+            console.log('[loadLiabilityAccount] RPC response - data:', rpcResult, 'error:', rpcError);
+            if (rpcError) {
+              console.error('[loadLiabilityAccount] RPC FAILED:', rpcError.message, rpcError.details, rpcError.hint);
+              return;
+            }
+            if (rpcResult) {
+              console.log('[loadLiabilityAccount] Setting liability account to:', rpcResult);
+              setDefaultSettings(prev => ({
+                ...prev,
+                advance_payments_liability_account_id: (rpcResult as string) || "",
+              }));
+            } else {
+              console.log('[loadLiabilityAccount] No liability account value returned (null)');
+            }
+          } catch (e) {
+            console.error('[loadLiabilityAccount] EXCEPTION:', e);
+          }
+        };
+
         setDefaultSettings({
           trade_receivable_account_id: defaultSetting.trade_receivable_account_id || "",
           sbs_collection_account_id: defaultSetting.sbs_collection_account_id || "",
           cash_account_id: defaultSetting.cash_account_id || "",
+          advance_payments_liability_account_id: defaultSetting.advance_payments_liability_account_id || "",
           auto_post_invoices: defaultSetting.auto_post_invoices || false,
           auto_post_payments: defaultSetting.auto_post_payments || false,
           auto_post_expenses: defaultSetting.auto_post_expenses || false,
@@ -92,6 +120,9 @@ export function SchoolBusFinanceSettings() {
           salary_expense_account_id: defaultSetting.salary_expense_account_id || "",
           expense_cash_account_id: defaultSetting.expense_cash_account_id || "",
         });
+
+        // Also load via RPC to get the liability account reliably
+        loadLiabilityAccount();
       }
 
       const branchMap: Record<string, { branch_gl_account_id: string }> = {};
@@ -182,6 +213,9 @@ export function SchoolBusFinanceSettings() {
   ) || [];
   const expenseAccounts = chartOfAccounts?.filter(
     (a) => a.account_type === "expense"
+  ) || [];
+  const liabilityAccounts = chartOfAccounts?.filter(
+    (a) => a.account_type === "liability"
   ) || [];
 
   if (settingsLoading) {
@@ -326,6 +360,22 @@ export function SchoolBusFinanceSettings() {
                 accounts={cashAccounts}
                 placeholder="Select account"
               />
+            </div>
+
+            {/* Advance Payments Liability Account */}
+            <div className="space-y-2">
+              <Label>Advance Payments Liability Account (Student Overpayments)</Label>
+              <SearchableFinanceAccountSelector
+                value={defaultSettings.advance_payments_liability_account_id || null}
+                onValueChange={(value) =>
+                  setDefaultSettings({ ...defaultSettings, advance_payments_liability_account_id: value || "" })
+                }
+                accounts={liabilityAccounts}
+                placeholder="Select liability account"
+              />
+              <p className="text-xs text-muted-foreground">
+                When students pay more than fixed amount, the excess is posted here as a liability. Auto-applied when next month's invoices are generated.
+              </p>
             </div>
 
             {/* Invoice Prefix */}
@@ -653,6 +703,41 @@ export function SchoolBusFinanceSettings() {
                 </div>
               </div>
             </div>
+
+            {/* Advance Balance Posting */}
+            {defaultSettings.advance_payments_liability_account_id && (
+              <div className="p-4 border border-blue-200 rounded-lg space-y-3 md:col-span-2">
+                <h4 className="font-semibold text-sm">When Student Overpays (Credit Balance):</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 text-sm">
+                    <p className="text-xs font-medium text-muted-foreground">Payment Journal Entry:</p>
+                    <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                      <span>DR: Bank Account</span>
+                      <span className="font-mono">Full Amount</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-red-50 rounded">
+                      <span>CR: Trade Receivables</span>
+                      <span className="font-mono">Fixed Amount</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                      <span>CR: Advance Payments Liability</span>
+                      <span className="font-mono">Overpayment</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <p className="text-xs font-medium text-muted-foreground">Next Month Auto-Apply:</p>
+                    <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                      <span>DR: Advance Payments Liability</span>
+                      <span className="font-mono">Applied Amt</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-red-50 rounded">
+                      <span>CR: Trade Receivables</span>
+                      <span className="font-mono">Applied Amt</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

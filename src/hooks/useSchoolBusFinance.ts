@@ -75,6 +75,7 @@ export interface SchoolBusFinanceSettings {
   bank_account_id: string | null;
   branch_gl_account_id: string | null; // Direct COA account mapping for branch payments
   cash_account_id: string | null;
+  advance_payments_liability_account_id: string | null; // Liability COA for student overpayments
   auto_post_invoices: boolean;
   auto_post_payments: boolean;
   invoice_prefix: string;
@@ -169,6 +170,7 @@ function sanitizeSettingsForDB(settings: Record<string, any>): Record<string, an
     'bank_account_id',
     'branch_gl_account_id',
     'cash_account_id',
+    'advance_payments_liability_account_id',
     'expense_account_id',
     'fuel_expense_account_id',
     'fuel_bank_account_id',
@@ -188,6 +190,27 @@ function sanitizeSettingsForDB(settings: Record<string, any>): Record<string, an
   return sanitized;
 }
 
+// RPC-based helper to update advance_payments_liability_account_id
+// This bypasses PostgREST schema cache validation entirely because RPC calls
+// go directly to a database function, not through PostgREST's table column routing
+async function patchLiabilityAccount(settingId: string, liabilityAccountId: string | null): Promise<void> {
+  console.log('[patchLiabilityAccount] START - settingId:', settingId, 'liabilityAccountId:', liabilityAccountId);
+  try {
+    const { data, error } = await supabase.rpc('update_liability_account_setting' as any, {
+      p_setting_id: settingId,
+      p_account_id: liabilityAccountId,
+    });
+    console.log('[patchLiabilityAccount] RPC response - data:', data, 'error:', error);
+    if (error) {
+      console.error('[patchLiabilityAccount] RPC FAILED:', error.message, error.details, error.hint);
+    } else {
+      console.log('[patchLiabilityAccount] SUCCESS - liability account saved via RPC');
+    }
+  } catch (e) {
+    console.error('[patchLiabilityAccount] EXCEPTION:', e);
+  }
+}
+
 // Update or create finance settings
 export function useUpdateSchoolBusFinanceSettings() {
   const queryClient = useQueryClient();
@@ -197,38 +220,68 @@ export function useUpdateSchoolBusFinanceSettings() {
     mutationFn: async (settings: Partial<SchoolBusFinanceSettings> & { branch_id?: string | null }) => {
       // Sanitize empty strings to null for UUID fields
       const sanitizedSettings = sanitizeSettingsForDB(settings);
-      
-      const { data: existing } = await supabase
+
+      // Use .limit(1).order() instead of .maybeSingle() to avoid errors when
+      // duplicate rows exist (maybeSingle throws on multiple matches, causing 
+      // INSERT of a new row instead of UPDATE — this created 19+ duplicate rows)
+      const branchId = sanitizedSettings.branch_id ?? null;
+      let existingQuery = supabase
         .from("school_bus_finance_settings")
         .select("id")
         .eq("company_id", selectedCompanyId)
-        .is("branch_id", sanitizedSettings.branch_id ?? null)
-        .maybeSingle();
+        .order("created_at", { ascending: true })
+        .limit(1);
+      
+      if (branchId === null) {
+        existingQuery = existingQuery.is("branch_id", null);
+      } else {
+        existingQuery = existingQuery.eq("branch_id", branchId);
+      }
+      
+      const { data: existingRows } = await existingQuery;
+      const existing = existingRows && existingRows.length > 0 ? existingRows[0] : null;
+
+      // Always strip advance_payments_liability_account_id from PostgREST calls
+      // PostgREST silently drops this field if its schema cache hasn't reloaded
+      // We save it separately via RPC which bypasses PostgREST entirely
+      const { advance_payments_liability_account_id: liabilityVal, ...settingsForPostgREST } = sanitizedSettings;
 
       if (existing) {
         const { data, error } = await supabase
           .from("school_bus_finance_settings")
           .update({
-            ...sanitizedSettings,
+            ...settingsForPostgREST,
             updated_at: new Date().toISOString(),
-          })
+          } as any)
           .eq("id", existing.id)
           .select()
           .single();
 
         if (error) throw error;
+
+        // Always save liability account via RPC (bypasses PostgREST schema cache)
+        if (liabilityVal !== undefined) {
+          await patchLiabilityAccount(existing.id, liabilityVal);
+        }
+
         return data;
       } else {
         const { data, error } = await supabase
           .from("school_bus_finance_settings")
           .insert({
-            ...sanitizedSettings,
+            ...settingsForPostgREST,
             company_id: selectedCompanyId,
-          })
+          } as any)
           .select()
           .single();
 
         if (error) throw error;
+
+        // Always save liability account via RPC for new records too
+        if (liabilityVal !== undefined && data?.id) {
+          await patchLiabilityAccount(data.id, liabilityVal);
+        }
+
         return data;
       }
     },
@@ -343,7 +396,10 @@ export function useGenerateBulkARInvoices() {
         // Create basic school invoices without finance integration
         const invoicePromises = students.map(async (student, index) => {
           const invoiceNumber = `${settings.invoice_prefix}-${format(invoiceMonth, "yyyyMM")}-${String(index + 1).padStart(5, "0")}`;
-          const amount = student.current_amount_due || student.fixed_monthly_amount || 0;
+          // Net of existing credit balance
+          const rawAmount = student.current_amount_due || student.fixed_monthly_amount || 0;
+          const credit = student.payment_balance > 0 ? student.payment_balance : 0;
+          const amount = Math.max(0, rawAmount - credit);
 
           const { data, error } = await supabase
             .from("school_ar_invoices")
@@ -405,7 +461,10 @@ export function useGenerateBulkARInvoices() {
         // Process each chunk in parallel
         await Promise.all(chunk.map(async (student, indexInChunk) => {
           const globalIndex = processedCount + indexInChunk + 1;
-          const amount = student.current_amount_due || student.fixed_monthly_amount || 0;
+          // Net of existing credit balance
+          const rawAmount = student.current_amount_due || student.fixed_monthly_amount || 0;
+          const credit = student.payment_balance > 0 ? student.payment_balance : 0;
+          const amount = Math.max(0, rawAmount - credit);
           
           // Generate unique identifiers for this student
           const studentShortId = student.id.substring(0, 4).toUpperCase();
@@ -466,6 +525,56 @@ export function useGenerateBulkARInvoices() {
           // 3. Update COA balances for this entry
           await updateAccountBalancesFromJournalEntry(journalEntry.id);
 
+          // 3b. Auto-apply student advance balance if they have credit (payment_balance > 0)
+          // This creates: DR Advance Payments Liability / CR Trade Receivables
+          const liabilityAccountId = settings.advance_payments_liability_account_id;
+          if (liabilityAccountId && student.payment_balance > 0) {
+            const advanceApplyAmount = Math.min(student.payment_balance, amount);
+            const advanceEntryNumber = `SBS-ADV-${format(new Date(), "yyyyMMdd")}-${studentShortId}`;
+
+            const { data: advanceJE, error: advJEError } = await supabase
+              .from("journal_entries")
+              .insert({
+                entry_number: advanceEntryNumber,
+                entry_date: format(new Date(), "yyyy-MM-dd"),
+                description: `Advance balance applied - ${student.student_name}`,
+                reference: invoiceNumber,
+                total_debit: advanceApplyAmount,
+                total_credit: advanceApplyAmount,
+                status: "posted",
+                company_id: effectiveCompanyId,
+                business_unit_code: businessUnitCode || 'SBO',
+                business_unit_id: selectedCompanyId,
+                posted_at: new Date().toISOString(),
+              })
+              .select()
+              .single();
+
+            if (!advJEError && advanceJE) {
+              await supabase
+                .from("journal_entry_lines")
+                .insert([
+                  {
+                    journal_entry_id: advanceJE.id,
+                    account_id: liabilityAccountId,
+                    description: `Advance applied - ${student.student_name}`,
+                    debit: advanceApplyAmount,
+                    credit: 0,
+                    company_id: effectiveCompanyId,
+                  },
+                  {
+                    journal_entry_id: advanceJE.id,
+                    account_id: settings.trade_receivable_account_id,
+                    description: `Advance settled against invoice - ${student.student_name}`,
+                    debit: 0,
+                    credit: advanceApplyAmount,
+                    company_id: effectiveCompanyId,
+                  },
+                ]);
+
+              await updateAccountBalancesFromJournalEntry(advanceJE.id);
+            }
+          }
           // 4. Create individual Finance ERP AR Invoice for this student
           let arInvoiceId: string | null = null;
           if (customerId) {
@@ -564,6 +673,9 @@ export function usePostPaymentToGL() {
       studentName,
       paymentMethod,
       referenceNo,
+      fixedAmount,
+      overpaymentAmount,
+      previousBalance,
     }: {
       paymentId: string;
       amount: number;
@@ -571,6 +683,9 @@ export function usePostPaymentToGL() {
       studentName: string;
       paymentMethod: string;
       referenceNo?: string;
+      fixedAmount?: number;        // The fixed monthly amount due
+      overpaymentAmount?: number;  // Positive if student overpaid (credit balance)
+      previousBalance?: number;    // Student's credit balance from previous months (positive = credit)
     }) => {
       // Get finance settings for this branch
       const { data: settings } = await supabase
@@ -608,7 +723,53 @@ export function usePostPaymentToGL() {
         throw new Error("Bank/Cash GL account not configured for this branch. Please configure in School Bus Finance Settings.");
       }
 
+      // Determine if there's an overpayment that should go to liability
+      // OR if there's a credit to consume from previous overpayment
+      // Fetch liability account via RPC since PostgREST schema cache may not include it
+      let liabilityAccountId: string | null = null;
+      try {
+        const { data: rpcResult } = await supabase.rpc('get_liability_account_setting' as any, {
+          p_setting_id: effectiveSettings.id,
+        });
+        liabilityAccountId = rpcResult as string | null;
+      } catch {
+        // Fallback to direct field access (may be null if PostgREST cache is stale)
+        liabilityAccountId = effectiveSettings.advance_payments_liability_account_id;
+      }
+
+      // === CREDIT BALANCE LOGIC ===
+      // Scenario 1: Overpayment (paid > amountDue) → CR Advance Liability
+      // Scenario 2: Credit Consumption (has existing credit, paid < fixedAmount) → DR Advance Liability
+      // Scenario 3: Exact payment → No liability entry
+      const existingCredit = (previousBalance && previousBalance > 0) ? previousBalance : 0;
+      const amountDue = fixedAmount || amount;
+      const shortfall = amountDue - amount; // How much less than due was paid
+      const creditToConsume = Math.min(existingCredit, Math.max(0, shortfall)); // Draw from credit
+
+      const hasOverpayment = overpaymentAmount && overpaymentAmount > 0 && liabilityAccountId;
+      const hasCreditConsumption = creditToConsume > 0 && liabilityAccountId;
+
+      // Determine Trade Receivable credit amount:
+      // - Overpay: CR only the fixed amount (excess goes to liability)
+      // - Credit consume: CR the full due amount (shortfall covered by liability DR)
+      // - Exact: CR the payment amount
+      let tradeReceivableCredit: number;
+      let liabilityCredit = 0; // CR to Advance Liability (overpayment)
+      let liabilityDebit = 0;  // DR from Advance Liability (credit consumption)
+
+      if (hasOverpayment) {
+        tradeReceivableCredit = amountDue;
+        liabilityCredit = overpaymentAmount!;
+      } else if (hasCreditConsumption) {
+        tradeReceivableCredit = amount + creditToConsume; // Full due covered by cash + credit
+        liabilityDebit = creditToConsume;
+      } else {
+        tradeReceivableCredit = amount;
+      }
+
       // Create journal entry - use CONSOLIDATED GL for NCG Holding hierarchy
+      const totalDebitAmount = amount + liabilityDebit;
+      const totalCreditAmount = tradeReceivableCredit + liabilityCredit;
       const entryNumber = `SBS-PAY-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
       const { data: journalEntry, error: jeError } = await supabase
@@ -616,14 +777,14 @@ export function usePostPaymentToGL() {
         .insert({
           entry_number: entryNumber,
           entry_date: format(new Date(), "yyyy-MM-dd"),
-          description: `School Bus Payment - ${studentName}`,
+          description: `School Bus Payment - ${studentName}${hasOverpayment ? " (includes advance)" : hasCreditConsumption ? " (credit applied)" : ""}`,
           reference: referenceNo || paymentId,
-          total_debit: amount,
-          total_credit: amount,
+          total_debit: totalDebitAmount,
+          total_credit: totalCreditAmount,
           status: "posted",
-          company_id: effectiveCompanyId, // Use NCG Holding for consolidated GL
-          business_unit_code: businessUnitCode || 'SBO', // Tag with business unit
-          business_unit_id: selectedCompanyId, // Original company for reference
+          company_id: effectiveCompanyId,
+          business_unit_code: businessUnitCode || 'SBO',
+          business_unit_id: selectedCompanyId,
           posted_at: new Date().toISOString(),
         })
         .select()
@@ -631,27 +792,63 @@ export function usePostPaymentToGL() {
 
       if (jeError) throw jeError;
 
-      // Create journal entry lines - use consolidated company ID
+      // Build journal entry lines
+      // DR: Bank/Cash (full amount received)
+      // CR: Trade Receivables (fixed amount or full if no overpayment)
+      // CR: Advance Payments Liability (overpayment portion, if applicable)
+      const jeLines: Array<{
+        journal_entry_id: string;
+        account_id: string;
+        description: string;
+        debit: number;
+        credit: number;
+        company_id: string;
+      }> = [
+        {
+          journal_entry_id: journalEntry.id,
+          account_id: bankGLAccountId,
+          description: `Payment received - ${paymentMethod}`,
+          debit: amount,
+          credit: 0,
+          company_id: effectiveCompanyId,
+        },
+        {
+          journal_entry_id: journalEntry.id,
+          account_id: effectiveSettings.trade_receivable_account_id!,
+          description: `School Bus Payment - ${studentName}`,
+          debit: 0,
+          credit: tradeReceivableCredit,
+          company_id: effectiveCompanyId,
+        },
+      ];
+
+      // Add liability line for OVERPAYMENT (CR Advance Payments Liability)
+      if (hasOverpayment && liabilityAccountId) {
+        jeLines.push({
+          journal_entry_id: journalEntry.id,
+          account_id: liabilityAccountId,
+          description: `Advance payment credited - ${studentName}`,
+          debit: 0,
+          credit: liabilityCredit,
+          company_id: effectiveCompanyId,
+        });
+      }
+
+      // Add liability line for CREDIT CONSUMPTION (DR Advance Payments Liability)
+      if (hasCreditConsumption && liabilityAccountId) {
+        jeLines.push({
+          journal_entry_id: journalEntry.id,
+          account_id: liabilityAccountId,
+          description: `Credit applied from advance - ${studentName}`,
+          debit: liabilityDebit,
+          credit: 0,
+          company_id: effectiveCompanyId,
+        });
+      }
+
       const { error: linesError } = await supabase
         .from("journal_entry_lines")
-        .insert([
-          {
-            journal_entry_id: journalEntry.id,
-            account_id: bankGLAccountId,
-            description: `Payment received - ${paymentMethod}`,
-            debit: amount,
-            credit: 0,
-            company_id: effectiveCompanyId, // Use consolidated GL company
-          },
-          {
-            journal_entry_id: journalEntry.id,
-            account_id: effectiveSettings.trade_receivable_account_id,
-            description: `School Bus Payment - ${studentName}`,
-            debit: 0,
-            credit: amount,
-            company_id: effectiveCompanyId, // Use consolidated GL company
-          },
-        ]);
+        .insert(jeLines);
 
       if (linesError) throw linesError;
 

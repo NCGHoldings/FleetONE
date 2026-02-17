@@ -1,9 +1,12 @@
-import { useState, useMemo } from "react";
-import { ChevronRight, ChevronDown, Folder, FileText, Eye } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { ChevronRight, ChevronDown, Folder, FileText, Eye, Plus, Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { DrillDownModal } from "./DrillDownModal";
+import { useCompanyCreateAccount } from "@/hooks/useCompanyMutations";
 
 interface Account {
   id: string;
@@ -19,11 +22,14 @@ interface Account {
   current_balance: number;
   is_active: boolean;
   is_header: boolean | null;
+  parent_account_id: string | null;
 }
 
 interface ChartOfAccountsTreeProps {
   accounts: Account[];
+  allAccounts: Account[];
   searchTerm?: string;
+  onAccountCreated?: () => void;
 }
 
 interface TreeNode {
@@ -33,12 +39,97 @@ interface TreeNode {
   totalBalance: number;
 }
 
-export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccountsTreeProps) => {
+const ACCOUNT_TYPE_MAP: Record<string, string> = {
+  "Assets": "asset",
+  "Liabilities": "liability",
+  "Equity": "equity",
+  "Revenue": "revenue",
+  "Expenses": "expense",
+  "Income": "revenue",
+  "Expense": "expense",
+};
+
+// Auto-suggest next account code based on sibling codes
+const suggestNextCode = (siblingCodes: string[]): string => {
+  if (siblingCodes.length === 0) return "";
+  const numericCodes = siblingCodes
+    .map(c => c.replace(/[^0-9]/g, ""))
+    .filter(c => c.length > 0)
+    .map(Number)
+    .sort((a, b) => a - b);
+  if (numericCodes.length === 0) return "";
+  const highest = numericCodes[numericCodes.length - 1];
+  // Determine increment: if codes look like 2110, 2120 → step 10; if 2100, 2200 → step 100; else step 1
+  if (numericCodes.length >= 2) {
+    const diffs = numericCodes.slice(1).map((v, i) => v - numericCodes[i]);
+    const commonDiff = diffs[0];
+    if (commonDiff > 0 && diffs.every(d => d === commonDiff)) {
+      return String(highest + commonDiff);
+    }
+  }
+  // Fallback: increment by 10 if code >= 100, else by 1
+  const step = highest >= 100 ? 10 : 1;
+  return String(highest + step);
+};
+
+// Derive level fields for a new child account
+const deriveLevelsForChild = (
+  accountName: string,
+  parentPath: string[],
+  parentAccount: Account | null
+): {
+  level1: string | null;
+  level2: string | null;
+  level3: string | null;
+  level4: string | null;
+  level5: string | null;
+  account_level: number;
+} => {
+  if (parentAccount) {
+    const parentLevel = parentAccount.account_level || 1;
+    const nextLevel = Math.min(parentLevel + 1, 5);
+    const result = {
+      level1: parentAccount.level1,
+      level2: parentAccount.level2,
+      level3: parentAccount.level3,
+      level4: parentAccount.level4,
+      level5: parentAccount.level5,
+      account_level: nextLevel,
+    };
+    switch (nextLevel) {
+      case 2: result.level2 = accountName; result.level3 = null; result.level4 = null; result.level5 = null; break;
+      case 3: result.level3 = accountName; result.level4 = null; result.level5 = null; break;
+      case 4: result.level4 = accountName; result.level5 = null; break;
+      case 5: result.level5 = accountName; break;
+    }
+    return result;
+  }
+  // For folder-node parents, derive from the path
+  const level = Math.min(parentPath.length + 1, 5);
+  const result: Record<string, string | number | null> = { level1: null, level2: null, level3: null, level4: null, level5: null, account_level: level };
+  parentPath.forEach((seg, i) => {
+    if (i < 5) result[`level${i + 1}`] = seg;
+  });
+  result[`level${level}`] = accountName;
+  return result as { level1: string | null; level2: string | null; level3: string | null; level4: string | null; level5: string | null; account_level: number };
+};
+
+export const ChartOfAccountsTree = ({ accounts, allAccounts, searchTerm = "", onAccountCreated }: ChartOfAccountsTreeProps) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(["Assets", "Liabilities", "Equity", "Revenue", "Expenses"]));
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [drillDownAccountIds, setDrillDownAccountIds] = useState<string[]>([]);
   const [drillDownLabel, setDrillDownLabel] = useState<string>("");
   const [drillDownOpen, setDrillDownOpen] = useState(false);
+
+  // Inline add state
+  const [addingUnderPath, setAddingUnderPath] = useState<string | null>(null);
+  const [addingUnderAccountId, setAddingUnderAccountId] = useState<string | null>(null);
+  const [newCode, setNewCode] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState<string>("asset");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const createAccount = useCompanyCreateAccount();
 
   const filteredAccounts = useMemo(() => {
     if (!searchTerm) return accounts;
@@ -125,6 +216,165 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
     });
   };
 
+  // Open inline add form under a folder node
+  const handleAddUnderFolder = useCallback((path: string, level: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Expand the node so the inline form is visible
+    setExpandedNodes(prev => new Set(prev).add(path));
+    
+    const pathSegments = path.split("/");
+    // Find sibling account codes under this folder path
+    const siblingCodes = allAccounts
+      .filter(acc => {
+        // Match accounts that share the same path prefix
+        for (let i = 0; i < pathSegments.length; i++) {
+          const levelKey = `level${i + 1}` as keyof Account;
+          if (acc[levelKey] !== pathSegments[i]) return false;
+        }
+        // Must be exactly one level deeper
+        return (acc.account_level || 0) === pathSegments.length + 1;
+      })
+      .map(acc => acc.account_code);
+    
+    const suggested = suggestNextCode(siblingCodes);
+    
+    // Infer account type from path
+    const rootName = pathSegments[0];
+    const inferredType = ACCOUNT_TYPE_MAP[rootName] || "asset";
+    
+    setAddingUnderPath(path);
+    setAddingUnderAccountId(null);
+    setNewCode(suggested);
+    setNewName("");
+    setNewType(inferredType);
+  }, [allAccounts]);
+
+  // Open inline add form under a leaf account
+  const handleAddUnderAccount = useCallback((account: Account, path: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Find sibling accounts (children of this account)
+    const childCodes = allAccounts
+      .filter(acc => acc.parent_account_id === account.id)
+      .map(acc => acc.account_code);
+    
+    const suggested = childCodes.length > 0
+      ? suggestNextCode(childCodes)
+      : account.account_code + "0";
+    
+    setAddingUnderPath(path);
+    setAddingUnderAccountId(account.id);
+    setNewCode(suggested);
+    setNewName("");
+    setNewType(account.account_type);
+  }, [allAccounts]);
+
+  const handleCancelAdd = useCallback(() => {
+    setAddingUnderPath(null);
+    setAddingUnderAccountId(null);
+    setNewCode("");
+    setNewName("");
+  }, []);
+
+  const handleSaveNewAccount = useCallback(async () => {
+    if (!newCode.trim() || !newName.trim()) return;
+    setIsSaving(true);
+    try {
+      const pathSegments = (addingUnderPath || "").split("/");
+      const parentAccount = addingUnderAccountId
+        ? allAccounts.find(a => a.id === addingUnderAccountId) || null
+        : null;
+      
+      const levels = deriveLevelsForChild(newName, pathSegments, parentAccount);
+      
+      await createAccount.mutateAsync({
+        account_code: newCode,
+        account_name: newName,
+        account_type: newType as "asset" | "liability" | "equity" | "revenue" | "expense",
+        parent_account_id: addingUnderAccountId || undefined,
+        is_header: false,
+        level1: levels.level1,
+        level2: levels.level2,
+        level3: levels.level3,
+        level4: levels.level4,
+        level5: levels.level5,
+        account_level: levels.account_level,
+        gl_code: newCode,
+      });
+      handleCancelAdd();
+      onAccountCreated?.();
+    } finally {
+      setIsSaving(false);
+    }
+  }, [newCode, newName, newType, addingUnderPath, addingUnderAccountId, allAccounts, createAccount, handleCancelAdd, onAccountCreated]);
+
+  // Render the inline add form row
+  const renderInlineAddForm = (level: number, parentPath: string) => {
+    if (addingUnderPath !== parentPath) return null;
+    return (
+      <div
+        className="flex items-center gap-2 py-1.5 px-2 bg-primary/5 border border-dashed border-primary/30 rounded my-1 animate-in fade-in-0 slide-in-from-top-1 duration-200"
+        style={{ paddingLeft: `${(level + 1) * 20 + 8}px` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Plus className="h-4 w-4 text-primary shrink-0" />
+        <Input
+          value={newCode}
+          onChange={(e) => setNewCode(e.target.value)}
+          placeholder="Code"
+          className="h-7 w-24 text-xs font-mono"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSaveNewAccount();
+            if (e.key === "Escape") handleCancelAdd();
+          }}
+        />
+        <Input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="Account name"
+          className="h-7 flex-1 text-xs"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSaveNewAccount();
+            if (e.key === "Escape") handleCancelAdd();
+          }}
+        />
+        <Select value={newType} onValueChange={setNewType}>
+          <SelectTrigger className="h-7 w-28 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="asset">Asset</SelectItem>
+            <SelectItem value="liability">Liability</SelectItem>
+            <SelectItem value="equity">Equity</SelectItem>
+            <SelectItem value="revenue">Revenue</SelectItem>
+            <SelectItem value="expense">Expense</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+          onClick={handleSaveNewAccount}
+          disabled={isSaving || !newCode.trim() || !newName.trim()}
+          title="Save"
+        >
+          <Check className="h-4 w-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+          onClick={handleCancelAdd}
+          disabled={isSaving}
+          title="Cancel"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  };
+
   const handleAccountClick = (account: Account, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedAccount(account);
@@ -196,6 +446,15 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
             variant="ghost"
             size="sm"
             className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => handleAddUnderFolder(path, level, e)}
+            title={`Add child account under ${node.name}`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => handleFolderDrillDown(node, path, e)}
             title={`View all transactions under ${node.name}`}
           >
@@ -237,8 +496,18 @@ export const ChartOfAccountsTree = ({ accounts, searchTerm = "" }: ChartOfAccoun
                 <Badge variant={account.is_active ? "default" : "secondary"} className="text-xs">
                   {account.is_active ? "Active" : "Inactive"}
                 </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => handleAddUnderAccount(account, path + "/" + account.account_code, e)}
+                  title={`Add child under ${account.account_code}`}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
               </div>
             ))}
+            {renderInlineAddForm(level, path)}
           </>
         )}
       </div>

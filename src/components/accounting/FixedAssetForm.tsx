@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -10,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateFixedAsset } from "@/hooks/useAccountingMutations";
 import { useAssetCategories } from "@/hooks/useAccountingData";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 import { Loader2 } from "lucide-react";
 
 const assetSchema = z.object({
@@ -35,11 +37,13 @@ interface FixedAssetFormProps {
 export const FixedAssetForm = ({ open, onOpenChange }: FixedAssetFormProps) => {
   const { data: categories } = useAssetCategories();
   const createAsset = useCreateFixedAsset();
+  const generateNumber = useGenerateNumber();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const form = useForm<AssetFormData>({
     resolver: zodResolver(assetSchema),
     defaultValues: {
-      asset_code: `FA-${Date.now().toString().slice(-6)}`,
+      asset_code: "",
       asset_name: "",
       category_id: "",
       purchase_date: format(new Date(), "yyyy-MM-dd"),
@@ -51,6 +55,17 @@ export const FixedAssetForm = ({ open, onOpenChange }: FixedAssetFormProps) => {
       description: "",
     },
   });
+
+  // Auto-generate asset code when dialog opens
+  useEffect(() => {
+    if (open && !form.getValues("asset_code")) {
+      setIsGenerating(true);
+      generateNumber("fixed_asset").then((code) => {
+        form.setValue("asset_code", code);
+        setIsGenerating(false);
+      });
+    }
+  }, [open, generateNumber, form]);
 
   const onSubmit = async (data: AssetFormData) => {
     try {
@@ -82,10 +97,18 @@ export const FixedAssetForm = ({ open, onOpenChange }: FixedAssetFormProps) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="asset_code">Asset Code *</Label>
-              <Input 
-                id="asset_code" 
-                {...form.register("asset_code")} 
-              />
+              <div className="relative">
+                <Input 
+                  id="asset_code" 
+                  {...form.register("asset_code")} 
+                  readOnly
+                  placeholder="Auto-generated"
+                  className="bg-muted"
+                />
+                {isGenerating && (
+                  <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
               {form.formState.errors.asset_code && (
                 <p className="text-xs text-destructive">{form.formState.errors.asset_code.message}</p>
               )}

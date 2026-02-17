@@ -542,6 +542,28 @@ export const useBankReconciliations = (bankAccountId?: string) => {
   });
 };
 
+// Fetch the last completed reconciliation for a bank account (for "Last Statement Balance")
+export const useLastReconciliation = (bankAccountId: string | null) => {
+  const { selectedCompanyId } = useCompany();
+
+  return useQuery({
+    queryKey: ["last-reconciliation", bankAccountId, selectedCompanyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bank_reconciliations")
+        .select("*")
+        .eq("bank_account_id", bankAccountId!)
+        .eq("status", "completed")
+        .order("statement_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!bankAccountId && !!selectedCompanyId,
+  });
+};
+
 // ============ Fixed Assets ============
 export const useFixedAssets = () => {
   const { selectedCompanyId } = useCompany();

@@ -10,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCustomers, useTaxCodes } from "@/hooks/useAccountingData";
 import { useCreateARInvoice } from "@/hooks/useAccountingMutations";
-import { format, addDays } from "date-fns";
-import { Plus, Trash2 } from "lucide-react";
+import { useGenerateNumber } from "@/hooks/useNumbering";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 
 const invoiceSchema = z.object({
@@ -43,6 +43,8 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
   const { data: customers } = useCustomers();
   const { data: taxCodes } = useTaxCodes();
   const createInvoice = useCreateARInvoice();
+  const generateNumber = useGenerateNumber();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
@@ -51,12 +53,23 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
-      invoice_number: `INV-${format(new Date(), "yyyyMMdd")}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      invoice_number: "",
       invoice_date: format(new Date(), "yyyy-MM-dd"),
       due_date: format(addDays(new Date(), 30), "yyyy-MM-dd"),
       notes: "",
     },
   });
+
+  // Auto-generate invoice number when dialog opens
+  useEffect(() => {
+    if (open && !form.getValues("invoice_number")) {
+      setIsGenerating(true);
+      generateNumber("ar_invoice").then((num) => {
+        form.setValue("invoice_number", num);
+        setIsGenerating(false);
+      });
+    }
+  }, [open, generateNumber, form]);
 
   const addLine = () => {
     setLines([
@@ -145,8 +158,19 @@ export const ARInvoiceForm = ({ open, onOpenChange }: ARInvoiceFormProps) => {
                   <FormItem>
                     <FormLabel>Invoice #</FormLabel>
                     <FormControl>
-                      <Input {...field} className="font-mono" />
+                      <div className="relative">
+                        <Input 
+                          {...field} 
+                          className="font-mono" 
+                          readOnly
+                          placeholder="Auto-generated"
+                        />
+                         {isGenerating && (
+                          <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
                     </FormControl>
+                    <FormDescription className="text-xs">Auto-generated</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

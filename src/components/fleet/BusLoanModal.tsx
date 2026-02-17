@@ -8,8 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Calculator, Building2, Calendar, DollarSign } from "lucide-react";
+import { Calculator, Building2, Calendar, DollarSign, Zap } from "lucide-react";
 import { calculateLoanDetails, formatCurrency, generateAmortizationSchedule } from "@/lib/loan-calculator";
+import {
+  fetchLeasingFinanceSettings,
+  createLenderVendor,
+  createLeasingAPInvoice,
+  postInitialLoanToGL,
+  LeasingFinanceSettings,
+  LoanPaymentData,
+} from "@/hooks/useLeasingFinance";
 
 interface BusLoanModalProps {
   open: boolean;
@@ -118,7 +126,98 @@ export function BusLoanModal({ open, onOpenChange, busId, busNumber, onSuccess }
 
       if (paymentsError) throw paymentsError;
 
-      toast.success("Loan added successfully with payment schedule");
+      // ========== AUTO FINANCE INTEGRATION ==========
+      // Fetch leasing finance settings to determine what to automate
+      const settings = await fetchLeasingFinanceSettings();
+      const financeSteps: string[] = [];
+
+      if (settings) {
+        // 1) Auto-create vendor from lender
+        let vendorId: string | null = null;
+        if (settings.auto_create_vendor && formData.lenderName) {
+          vendorId = await createLenderVendor({
+            lenderName: formData.lenderName,
+            lenderContact: formData.lenderContact || undefined,
+          });
+          if (vendorId) {
+            // Link vendor to loan record
+            await supabase
+              .from("bus_loans")
+              .update({ vendor_id: vendorId })
+              .eq("id", loanData.id);
+            financeSteps.push("Vendor created/linked");
+          }
+        }
+
+        // 2) Auto-create AP invoices for each installment
+        if (settings.auto_create_ap_invoice && vendorId) {
+          // Fetch the saved payment records (need their IDs for linking)
+          const { data: savedPayments } = await supabase
+            .from("bus_loan_payments")
+            .select("id, payment_number, payment_date, principal_amount, interest_amount, total_installment, balance_remaining, payment_status")
+            .eq("loan_id", loanData.id)
+            .order("payment_number", { ascending: true });
+
+          if (savedPayments) {
+            let apCreated = 0;
+            for (const payment of savedPayments) {
+              const paymentData: LoanPaymentData = {
+                id: payment.id,
+                payment_number: payment.payment_number,
+                payment_date: payment.payment_date,
+                principal_amount: payment.principal_amount,
+                interest_amount: payment.interest_amount,
+                total_installment: payment.total_installment,
+                balance_remaining: payment.balance_remaining,
+                payment_status: payment.payment_status,
+              };
+
+              const apResult = await createLeasingAPInvoice({
+                loanId: loanData.id,
+                paymentData,
+                vendorId,
+                busNumber,
+                lenderName: formData.lenderName,
+                settings,
+              });
+
+              if (apResult) {
+                // Link AP invoice to bus_loan_payments
+                await supabase
+                  .from("bus_loan_payments")
+                  .update({ ap_invoice_id: apResult.invoiceId })
+                  .eq("id", payment.id);
+                apCreated++;
+              }
+            }
+            if (apCreated > 0) {
+              financeSteps.push(`${apCreated} AP invoices created`);
+            }
+          }
+        }
+
+        // 3) Post initial GL recognition (DR Lease Asset / CR Lease Liability)
+        if (settings.lease_asset_account_id && settings.leasing_liability_account_id) {
+          const glResult = await postInitialLoanToGL({
+            loanAmount: amount,
+            busNumber,
+            lenderName: formData.lenderName,
+            settings,
+            busId,
+          });
+          if (glResult) {
+            financeSteps.push("Initial GL entry posted");
+          }
+        }
+      }
+
+      // Success toast with finance summary
+      if (financeSteps.length > 0) {
+        toast.success(`Loan added with finance integration: ${financeSteps.join(", ")}`);
+      } else {
+        toast.success("Loan added successfully with payment schedule");
+      }
+
       onSuccess();
       onOpenChange(false);
       

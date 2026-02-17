@@ -437,12 +437,140 @@ export const useCreateARReceipt = () => {
         }
       }
 
+      // ========== GL POSTING ==========
+      // Get the bank account's linked GL account if a bank account is selected
+      let bankGLAccountId: string | null = null;
+      if (receipt.bank_account_id) {
+        const { data: bankAccount } = await supabase
+          .from("bank_accounts")
+          .select("gl_account_id")
+          .eq("id", receipt.bank_account_id)
+          .single();
+        bankGLAccountId = bankAccount?.gl_account_id || null;
+      }
+
+      // Find Trade Receivable account from COA
+      const { data: receivableAccounts } = await supabase
+        .from("chart_of_accounts")
+        .select("id, account_name")
+        .eq("company_id", effectiveCompanyId)
+        .eq("account_type", "asset")
+        .eq("is_active", true)
+        .ilike("account_name", "%trade receivable%")
+        .limit(1);
+
+      const tradeReceivableId = receivableAccounts?.[0]?.id || null;
+
+      // Get customer name for GL posting description
+      let customerName = "";
+      try {
+        const { data: customerData } = await supabase
+          .from("customers")
+          .select("customer_name")
+          .eq("id", receipt.customer_id)
+          .single();
+        customerName = customerData?.customer_name || "";
+      } catch {
+        // Non-blocking
+      }
+
+      // Only post to GL if we have the required accounts
+      if (bankGLAccountId && receipt.amount > 0) {
+        const { postARReceiptToGL, postAdvanceReceiptToGL } = await import("@/lib/gl-posting-utils");
+
+        let glResult: { success: boolean; journalEntryId?: string; error?: string };
+
+        if (receipt.is_advance) {
+          // Find Customer Advance (Liability) account
+          const { data: advanceAccounts } = await supabase
+            .from("chart_of_accounts")
+            .select("id")
+            .eq("company_id", effectiveCompanyId)
+            .eq("account_type", "liability")
+            .eq("is_active", true)
+            .ilike("account_name", "%customer advance%")
+            .limit(1);
+
+          const customerAdvanceId = advanceAccounts?.[0]?.id;
+
+          if (customerAdvanceId) {
+            glResult = await postAdvanceReceiptToGL({
+              receiptNumber: receipt.receipt_number,
+              receiptDate: receipt.receipt_date,
+              amount: receipt.amount,
+              bankAccountId: bankGLAccountId,
+              customerAdvanceId: customerAdvanceId,
+              companyId: effectiveCompanyId,
+              businessUnitCode: businessUnitCode || undefined,
+              customerName: customerName,
+            });
+          } else {
+            glResult = { success: false, error: "Customer Advance account not found in COA" };
+            console.warn("[AR Receipt GL] Customer Advance account not found, skipping advance GL posting");
+            toast.warning("GL posting skipped: 'Customer Advance' account not found in Chart of Accounts.");
+          }
+        } else if (tradeReceivableId) {
+          glResult = await postARReceiptToGL({
+            receiptNumber: receipt.receipt_number,
+            receiptDate: receipt.receipt_date,
+            amount: receipt.amount,
+            bankAccountId: bankGLAccountId,
+            tradeReceivableId: tradeReceivableId,
+            companyId: effectiveCompanyId,
+            businessUnitCode: businessUnitCode || undefined,
+            customerName: customerName,
+          });
+        } else {
+          glResult = { success: false, error: "Trade Receivable account not found in COA" };
+          console.warn("[AR Receipt GL] Trade Receivable account not found, skipping GL posting");
+          toast.warning("GL posting skipped: 'Trade Receivable' account not found in Chart of Accounts.");
+        }
+
+        // Link journal entry to receipt if GL posting succeeded
+        if (glResult.success && glResult.journalEntryId) {
+          await supabase
+            .from("ar_receipts")
+            .update({ journal_entry_id: glResult.journalEntryId })
+            .eq("id", data.id);
+        }
+      } else if (receipt.amount > 0 && !bankGLAccountId) {
+        console.warn("[AR Receipt GL] Bank account has no linked GL account, skipping GL posting");
+        toast.warning("GL posting skipped: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
+      }
+
+      // ========== BANK TRANSACTION ==========
+      // Create bank transaction record if bank account is selected
+      if (receipt.bank_account_id && receipt.amount > 0) {
+        await supabase.from("bank_transactions").insert([{
+          bank_account_id: receipt.bank_account_id,
+          transaction_date: receipt.receipt_date,
+          transaction_type: "receipt",
+          description: `AR Receipt from ${customerName || "Customer"} - ${receipt.receipt_number}`,
+          debit_amount: receipt.amount,
+          credit_amount: 0,
+          reference: receipt.reference || receipt.receipt_number,
+          company_id: selectedCompanyId,
+        }]);
+
+        // Update bank account balance (increase on receipt)
+        const { data: bankAccount } = await supabase
+          .from("bank_accounts")
+          .select("current_balance")
+          .eq("id", receipt.bank_account_id)
+          .single();
+
+        if (bankAccount) {
+          const newBalance = (bankAccount.current_balance || 0) + receipt.amount;
+          await supabase
+            .from("bank_accounts")
+            .update({ current_balance: newBalance })
+            .eq("id", receipt.bank_account_id);
+        }
+      }
+
       // Auto-create cheque register entry for cheque receipts
       if (receipt.payment_method === "cheque") {
-        const customerName = (() => {
-          // We don't have customer name here easily, use receipt number
-          return `Customer Receipt ${receipt.receipt_number}`;
-        })();
+        const chequePayee = customerName || `Customer Receipt ${receipt.receipt_number}`;
         
         await supabase.from("cheque_register").insert([{
           cheque_number: receipt.reference || `CHQ-${data.id.slice(0, 8)}`,
@@ -450,7 +578,7 @@ export const useCreateARReceipt = () => {
           cheque_date: receipt.receipt_date,
           amount: receipt.amount,
           status: "draft",
-          payee: customerName,
+          payee: chequePayee,
           company_id: selectedCompanyId,
           cheque_type: "incoming",
           ar_receipt_id: data.id,
@@ -465,6 +593,10 @@ export const useCreateARReceipt = () => {
       queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["ar-summary"] });
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
       toast.success("Receipt recorded successfully");
     },
     onError: (error) => {
@@ -683,6 +815,16 @@ export const useCreateAPPayment = () => {
             .update({ journal_entry_id: glResult.journalEntryId })
             .eq("id", data.id);
         }
+      } else if (payment.amount > 0) {
+        // Warn user when GL posting is skipped
+        if (!bankGLAccountId) {
+          console.warn("[AP Payment GL] Bank account has no linked GL account, skipping GL posting");
+          toast.warning("GL posting skipped: Bank account has no linked GL account. Configure it in Banking → Edit Account → GL Account.");
+        }
+        if (!tradePayableId) {
+          console.warn("[AP Payment GL] Trade Payable account not found in COA");
+          toast.warning("GL posting skipped: 'Trade Payable' account not found in Chart of Accounts.");
+        }
       }
 
       // ========== BANK TRANSACTION ==========
@@ -730,6 +872,41 @@ export const useCreateAPPayment = () => {
           payment_id: data.id,
           reference: payment.reference || payment.payment_number,
         } as any]);
+      }
+
+      // ========== FLEET LOAN REVERSE-SYNC ==========
+      // If any allocated AP invoice is linked to a bus_loan_payment,
+      // auto-update the loan payment status to "paid"
+      if (!payment.is_advance && payment.allocations?.length) {
+        for (const alloc of payment.allocations) {
+          try {
+            // Check if this invoice is linked to a bus_loan_payment
+            const { data: linkedPayments } = await supabase
+              .from("bus_loan_payments")
+              .select("id, loan_id")
+              .eq("ap_invoice_id", alloc.invoice_id);
+
+            if (linkedPayments && linkedPayments.length > 0) {
+              for (const loanPayment of linkedPayments) {
+                // Auto-mark loan payment as paid
+                await supabase
+                  .from("bus_loan_payments")
+                  .update({
+                    payment_status: "paid",
+                    actual_payment_date: payment.payment_date,
+                    gl_posted: true,
+                    journal_entry_id: data.journal_entry_id || null,
+                  })
+                  .eq("id", loanPayment.id);
+
+                console.log(`[Fleet Loan Sync] Auto-marked loan payment ${loanPayment.id} as paid via AP payment`);
+              }
+            }
+          } catch (syncError) {
+            // Non-blocking: don't fail the AP payment if sync fails
+            console.error("[Fleet Loan Sync] Error syncing loan payment:", syncError);
+          }
+        }
       }
       
       return data;
@@ -1579,6 +1756,87 @@ export const useCreateBankReconciliation = () => {
       toast.success("Reconciliation started");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
+  });
+};
+
+// Full save: create reconciliation record + items + mark transactions reconciled
+export const useSaveBankReconciliation = () => {
+  const queryClient = useQueryClient();
+  const { selectedCompanyId } = useCompany();
+  
+  return useMutation({
+    mutationFn: async (data: {
+      bank_account_id: string;
+      statement_date: string;
+      statement_no: string;
+      statement_balance: number;
+      book_balance: number;
+      adjusted_book_balance: number;
+      difference: number;
+      cleared_transaction_ids: string[];
+      cleared_amounts: Record<string, number>;
+    }) => {
+      if (!selectedCompanyId) throw new Error("No company selected");
+      
+      // 1. Create the reconciliation header
+      const { data: recon, error: reconError } = await supabase
+        .from("bank_reconciliations")
+        .insert([{
+          bank_account_id: data.bank_account_id,
+          statement_date: data.statement_date,
+          statement_balance: data.statement_balance,
+          book_balance: data.book_balance,
+          adjusted_book_balance: data.adjusted_book_balance,
+          difference: data.difference,
+          reconciliation_date: new Date().toISOString().split('T')[0],
+          status: "completed",
+          notes: data.statement_no ? `Statement No: ${data.statement_no}` : null,
+          company_id: selectedCompanyId,
+          reconciled_at: new Date().toISOString(),
+        }])
+        .select()
+        .single();
+      if (reconError) throw reconError;
+
+      // 2. Create reconciliation items for each cleared transaction
+      if (data.cleared_transaction_ids.length > 0) {
+        const items = data.cleared_transaction_ids.map((txnId) => ({
+          reconciliation_id: recon.id,
+          bank_transaction_id: txnId,
+          statement_amount: data.cleared_amounts[txnId] || 0,
+          statement_date: data.statement_date,
+          match_status: "matched",
+          matched_at: new Date().toISOString(),
+          company_id: selectedCompanyId,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from("bank_reconciliation_items")
+          .insert(items);
+        if (itemsError) throw itemsError;
+
+        // 3. Mark transactions as reconciled
+        const { error: updateError } = await supabase
+          .from("bank_transactions")
+          .update({
+            is_reconciled: true,
+            reconciled_at: new Date().toISOString(),
+            reconciliation_id: recon.id,
+          })
+          .in("id", data.cleared_transaction_ids);
+        if (updateError) throw updateError;
+      }
+
+      return recon;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bank-reconciliations"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["last-reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      toast.success("Reconciliation completed and saved");
+    },
+    onError: (error) => toast.error(`Failed to save reconciliation: ${error.message}`),
   });
 };
 

@@ -108,6 +108,9 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
             studentName: student.student_name,
             paymentMethod: paymentMethod,
             referenceNo: referenceNo,
+            fixedAmount: fixedAmount,
+            overpaymentAmount: receivedAmount > amountDue ? (receivedAmount - amountDue) : undefined,
+            previousBalance: previousBalance,
           });
         } catch (glError) {
           console.error("GL posting failed:", glError);
@@ -355,7 +358,7 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
             </div>
           </div>
 
-          {/* Calculation Display */}
+           {/* Calculation Display */}
           {receivedAmount > 0 && (
             <div className="space-y-2 p-4 bg-muted/30 rounded-lg border-2">
               <h3 className="font-semibold text-sm">After This Payment:</h3>
@@ -364,6 +367,12 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
                   <span>Amount Received:</span>
                   <span className="font-medium">LKR {receivedAmount.toLocaleString()}</span>
                 </div>
+                {previousBalance > 0 && (
+                  <div className="flex justify-between text-blue-600">
+                    <span>Existing Credit Balance:</span>
+                    <span className="font-medium">LKR {previousBalance.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Difference from Fixed Amount:</span>
                   <span className={cn(
@@ -379,7 +388,7 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
                     "font-bold text-base",
                     newBalance < 0 ? "text-destructive" : "text-green-600"
                   )}>
-                    LKR {newBalance.toLocaleString()} {newBalance < 0 ? "(owed)" : "(credit)"}
+                    LKR {newBalance.toLocaleString()} {newBalance < 0 ? "(owed)" : newBalance > 0 ? "(credit)" : ""}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -388,6 +397,20 @@ export function RecordPaymentModal({ isOpen, onClose, student, onSuccess }: Reco
                     LKR {nextMonthDue.toLocaleString()}
                   </span>
                 </div>
+                {/* Credit CONSUMPTION info — when student has existing credit and it's being used */}
+                {previousBalance > 0 && receivedAmount < amountDue && (financeSettings as Record<string, unknown>)?.advance_payments_liability_account_id && (
+                  <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded text-xs text-amber-700 dark:text-amber-300">
+                    🔄 <strong>LKR {Math.min(previousBalance, amountDue - receivedAmount).toLocaleString()}</strong> credit 
+                    from previous month will be applied from <em>Advance Payments Liability</em>
+                  </div>
+                )}
+                {/* Credit ADDITION info — when student overpays */}
+                {receivedAmount > amountDue && (financeSettings as Record<string, unknown>)?.advance_payments_liability_account_id && (
+                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300">
+                    💡 Credit balance of <strong>LKR {(receivedAmount - amountDue).toLocaleString()}</strong> will be posted 
+                    to <em>Advance Payments Liability</em> in COA
+                  </div>
+                )}
               </div>
             </div>
           )}

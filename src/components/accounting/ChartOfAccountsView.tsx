@@ -210,7 +210,7 @@ export const ChartOfAccountsView = () => {
       </div>
 
       {viewMode === "tree" ? (
-        <ChartOfAccountsTree accounts={accounts || []} searchTerm={searchTerm} />
+        <ChartOfAccountsTree accounts={accounts || []} allAccounts={accounts || []} searchTerm={searchTerm} onAccountCreated={refetch} />
       ) : (
         <DataTable
           columns={columns}

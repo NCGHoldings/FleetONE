@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Download, Calendar } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { CashFlowView } from "./CashFlowView";
 
 export const FinancialStatementsView = () => {
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
@@ -192,14 +193,7 @@ export const FinancialStatementsView = () => {
           </TabsContent>
 
           <TabsContent value="cf">
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">
-                Cash Flow Statement - Coming Soon
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                This feature will show operating, investing, and financing activities
-              </p>
-            </div>
+            <CashFlowView />
           </TabsContent>
         </Tabs>
       </Card>

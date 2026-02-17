@@ -16349,6 +16349,7 @@ export type Database = {
       }
       school_bus_finance_settings: {
         Row: {
+          advance_payments_liability_account_id: string | null
           auto_post_expenses: boolean | null
           auto_post_invoices: boolean | null
           auto_post_payments: boolean | null
@@ -16372,6 +16373,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          advance_payments_liability_account_id?: string | null
           auto_post_expenses?: boolean | null
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null
@@ -16395,6 +16397,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          advance_payments_liability_account_id?: string | null
           auto_post_expenses?: boolean | null
           auto_post_invoices?: boolean | null
           auto_post_payments?: boolean | null

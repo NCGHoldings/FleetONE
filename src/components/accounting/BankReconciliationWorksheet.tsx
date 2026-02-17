@@ -1,605 +1,553 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Upload,
-  CheckCircle,
-  XCircle,
-  Link,
-  RefreshCw,
-  FileSpreadsheet,
-  AlertCircle,
-  Save,
-} from "lucide-react";
-import {
-  useBankAccounts,
-  useBankTransactions,
-  useBankReconciliations,
-} from "@/hooks/useAccountingData";
-import { useCreateBankReconciliation } from "@/hooks/useAccountingMutations";
+import { Textarea } from "@/components/ui/textarea";
+import { useBankAccounts, useBankTransactions, useLastReconciliation } from "@/hooks/useAccountingData";
+import { useSaveBankReconciliation } from "@/hooks/useAccountingMutations";
+import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import "./BankReconciliationWorksheet.css";
 
-interface StatementLine {
-  id: string;
-  date: string;
-  description: string;
-  reference: string;
-  debit: number;
-  credit: number;
-  matched: boolean;
-  matchedTransactionId?: string;
+// ---------- Types ----------
+type DisplayFilter = "all" | "not_cleared" | "cleared";
+
+interface ClearedState {
+  [transactionId: string]: {
+    cleared: boolean;
+    clearedAmount: number;
+  };
 }
 
-export const BankReconciliationWorksheet = () => {
-  const { data: bankAccounts = [] } = useBankAccounts();
-  const { data: bankTransactions = [] } = useBankTransactions();
-  const { data: reconciliations = [] } = useBankReconciliations();
-  const createReconciliation = useCreateBankReconciliation();
+// ---------- Helpers ----------
+const fmt = (n: number) =>
+  n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const [selectedAccountId, setSelectedAccountId] = useState("");
+const typeLabel = (t: string): string => {
+  switch (t?.toLowerCase()) {
+    case "deposit": case "dp": case "receipt": return "DP";
+    case "payment": case "ps": case "withdrawal": return "PS";
+    case "transfer": case "ft": return "FT";
+    case "fee": case "charge": return "FC";
+    case "interest": return "IN";
+    case "adjustment": return "AJ";
+    default: return t?.substring(0, 3)?.toUpperCase() || "—";
+  }
+};
+
+const typeVariant = (t: string): string => {
+  switch (t?.toLowerCase()) {
+    case "deposit": case "dp": case "receipt": case "interest": return "deposit";
+    case "payment": case "ps": case "withdrawal": case "fee": case "charge": return "payment";
+    default: return "other";
+  }
+};
+
+// ================ COMPONENT ================
+const BankReconciliationWorksheet = () => {
+  // --- Data hooks ---
+  const { data: bankAccounts = [], isLoading: acctLoading } = useBankAccounts();
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const { data: transactions = [], isLoading: txnLoading } = useBankTransactions(selectedAccountId || undefined);
+  const { data: lastRecon } = useLastReconciliation(selectedAccountId);
+  const saveReconciliation = useSaveBankReconciliation();
+
+  // --- UI State ---
+  const [statementNo, setStatementNo] = useState("");
   const [statementDate, setStatementDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [statementBalance, setStatementBalance] = useState("");
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [statementBalance, setStatementBalance] = useState<string>("");
+  const [displayFilter, setDisplayFilter] = useState<DisplayFilter>("all");
+  const [clearedState, setClearedState] = useState<ClearedState>({});
+  const [showAdjustments, setShowAdjustments] = useState(false);
 
-  // Simulated statement lines - in production, these would come from imported bank statement
-  const [statementLines, setStatementLines] = useState<StatementLine[]>([]);
-  const [selectedBookItems, setSelectedBookItems] = useState<string[]>([]);
-  const [selectedStatementItems, setSelectedStatementItems] = useState<string[]>([]);
+  // --- Adjustment form state ---
+  const [adjType, setAdjType] = useState("bank_charge");
+  const [adjAmount, setAdjAmount] = useState("");
+  const [adjDescription, setAdjDescription] = useState("");
 
-  const selectedAccount = bankAccounts.find((a: any) => a.id === selectedAccountId);
-  const accountTransactions = bankTransactions.filter(
-    (t: any) => t.bank_account_id === selectedAccountId && !t.is_reconciled
+  // --- Derived ---
+  const selectedAccount = useMemo(
+    () => bankAccounts.find((a) => a.id === selectedAccountId) || null,
+    [bankAccounts, selectedAccountId]
   );
 
-  const bookBalance = selectedAccount?.current_balance || 0;
-  const parsedStatementBalance = parseFloat(statementBalance) || 0;
+  const lastStatementBalance = lastRecon?.statement_balance ?? selectedAccount?.opening_balance ?? 0;
 
-  // Calculate reconciling items
-  const unmatchedDeposits = accountTransactions.filter(
-    (t: any) => t.credit_amount > 0 && !statementLines.some((s) => s.matchedTransactionId === t.id)
-  );
-  const unmatchedWithdrawals = accountTransactions.filter(
-    (t: any) => t.debit_amount > 0 && !statementLines.some((s) => s.matchedTransactionId === t.id)
-  );
-  const unmatchedStatementItems = statementLines.filter((s) => !s.matched);
+  // Only show unreconciled transactions (or all if user wants to see previously cleared)
+  const filteredTransactions = useMemo(() => {
+    const base = transactions.filter((t) => {
+      // Always include previously unreconciled
+      if (!t.is_reconciled) return true;
+      // If filter is "all" or "cleared", also show already-reconciled
+      return displayFilter === "all" || displayFilter === "cleared";
+    });
 
-  const depositsInTransit = unmatchedDeposits.reduce(
-    (sum: number, t: any) => sum + (t.credit_amount || 0),
-    0
-  );
-  const outstandingCheques = unmatchedWithdrawals.reduce(
-    (sum: number, t: any) => sum + (t.debit_amount || 0),
-    0
-  );
+    if (displayFilter === "cleared") {
+      return base.filter((t) => clearedState[t.id]?.cleared || t.is_reconciled);
+    }
+    if (displayFilter === "not_cleared") {
+      return base.filter((t) => !clearedState[t.id]?.cleared && !t.is_reconciled);
+    }
+    return base;
+  }, [transactions, displayFilter, clearedState]);
 
-  const adjustedBookBalance = bookBalance - outstandingCheques + depositsInTransit;
-  const difference = adjustedBookBalance - parsedStatementBalance;
+  // Compute summaries
+  const summary = useMemo(() => {
+    let paymentCount = 0, paymentTotal = 0;
+    let depositCount = 0, depositTotal = 0;
+    let clearedPaymentTotal = 0, clearedDepositTotal = 0;
 
-  const handleMatch = () => {
-    if (selectedBookItems.length !== 1 || selectedStatementItems.length !== 1) {
-      toast.error("Select exactly one item from each side to match");
-      return;
+    transactions.forEach((t) => {
+      const payment = t.debit_amount || 0;
+      const deposit = t.credit_amount || 0;
+
+      if (payment > 0) { paymentCount++; paymentTotal += payment; }
+      if (deposit > 0) { depositCount++; depositTotal += deposit; }
+
+      const cs = clearedState[t.id];
+      if (cs?.cleared) {
+        // Use cleared amount (payment = outflow, deposit = inflow)
+        if (payment > 0) clearedPaymentTotal += cs.clearedAmount;
+        if (deposit > 0) clearedDepositTotal += cs.clearedAmount;
+      }
+    });
+
+    const bookBalance = lastStatementBalance + depositTotal - paymentTotal;
+    const clearedBookBalance = lastStatementBalance + clearedDepositTotal - clearedPaymentTotal;
+    const stmtEndBal = parseFloat(statementBalance) || 0;
+    const difference = clearedBookBalance - stmtEndBal;
+
+    return {
+      paymentCount, paymentTotal,
+      depositCount, depositTotal,
+      clearedPaymentTotal, clearedDepositTotal,
+      bookBalance,
+      clearedBookBalance,
+      stmtEndBal,
+      difference,
+    };
+  }, [transactions, clearedState, lastStatementBalance, statementBalance]);
+
+  // --- Handlers ---
+  const handleAccountChange = useCallback((accountId: string) => {
+    setSelectedAccountId(accountId);
+    setClearedState({});
+    setStatementNo("");
+    setStatementBalance("");
+  }, []);
+
+  const toggleCleared = useCallback((txnId: string, payment: number, deposit: number) => {
+    setClearedState((prev) => {
+      const current = prev[txnId];
+      const fullAmount = payment > 0 ? payment : deposit;
+      if (current?.cleared) {
+        const next = { ...prev };
+        delete next[txnId];
+        return next;
+      }
+      return { ...prev, [txnId]: { cleared: true, clearedAmount: fullAmount } };
+    });
+  }, []);
+
+  const updateClearedAmount = useCallback((txnId: string, amount: number) => {
+    setClearedState((prev) => ({
+      ...prev,
+      [txnId]: { ...prev[txnId], cleared: true, clearedAmount: amount },
+    }));
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    const allCleared = filteredTransactions.every((t) => clearedState[t.id]?.cleared || t.is_reconciled);
+    if (allCleared) {
+      // Uncheck all
+      const next: ClearedState = {};
+      Object.keys(clearedState).forEach((id) => {
+        if (!filteredTransactions.find((t) => t.id === id)) {
+          next[id] = clearedState[id];
+        }
+      });
+      setClearedState(next);
+    } else {
+      // Check all unreconciled
+      const next = { ...clearedState };
+      filteredTransactions.forEach((t) => {
+        if (!t.is_reconciled && !next[t.id]) {
+          const fullAmount = (t.debit_amount || 0) > 0 ? (t.debit_amount || 0) : (t.credit_amount || 0);
+          next[t.id] = { cleared: true, clearedAmount: fullAmount };
+        }
+      });
+      setClearedState(next);
+    }
+  }, [filteredTransactions, clearedState]);
+
+  const handleSave = useCallback(async () => {
+    if (!selectedAccountId) return toast.error("Select a bank account");
+    if (!statementBalance) return toast.error("Enter statement ending balance");
+    if (!statementDate) return toast.error("Enter statement date");
+
+    const clearedIds = Object.entries(clearedState)
+      .filter(([, v]) => v.cleared)
+      .map(([id]) => id);
+    const clearedAmounts: Record<string, number> = {};
+    clearedIds.forEach((id) => { clearedAmounts[id] = clearedState[id].clearedAmount; });
+
+    if (clearedIds.length === 0) {
+      return toast.error("No transactions are cleared for this reconciliation");
     }
 
-    const bookItem = accountTransactions.find((t: any) => t.id === selectedBookItems[0]);
-    const statementItem = statementLines.find((s) => s.id === selectedStatementItems[0]);
+    await saveReconciliation.mutateAsync({
+      bank_account_id: selectedAccountId,
+      statement_date: statementDate,
+      statement_no: statementNo,
+      statement_balance: summary.stmtEndBal,
+      book_balance: summary.bookBalance,
+      adjusted_book_balance: summary.clearedBookBalance,
+      difference: summary.difference,
+      cleared_transaction_ids: clearedIds,
+      cleared_amounts: clearedAmounts,
+    });
 
-    if (!bookItem || !statementItem) return;
+    setClearedState({});
+    setStatementNo("");
+    setStatementBalance("");
+  }, [selectedAccountId, statementDate, statementNo, statementBalance, clearedState, summary, saveReconciliation]);
 
-    setStatementLines((prev) =>
-      prev.map((s) =>
-        s.id === statementItem.id
-          ? { ...s, matched: true, matchedTransactionId: bookItem.id }
-          : s
-      )
+  const handleCancel = useCallback(() => {
+    setClearedState({});
+    toast.info("Cleared selections reset");
+  }, []);
+
+  const handleAddAdjustment = useCallback(() => {
+    const amount = parseFloat(adjAmount);
+    if (!amount || !adjDescription) {
+      return toast.error("Enter amount and description");
+    }
+    toast.info(`Adjustment "${adjDescription}" for LKR ${fmt(amount)} noted. (Full JE posting coming soon)`);
+    setShowAdjustments(false);
+    setAdjAmount("");
+    setAdjDescription("");
+    setAdjType("bank_charge");
+  }, [adjAmount, adjDescription]);
+
+  // --- Loading ---
+  if (acctLoading) {
+    return (
+      <Card className="bank-recon-root">
+        <CardContent className="bank-recon-empty">
+          <Landmark />
+          <p>Loading bank accounts…</p>
+        </CardContent>
+      </Card>
     );
-
-    setSelectedBookItems([]);
-    setSelectedStatementItems([]);
-    toast.success("Items matched successfully");
-  };
-
-  const handleUnmatch = (statementLineId: string) => {
-    setStatementLines((prev) =>
-      prev.map((s) =>
-        s.id === statementLineId
-          ? { ...s, matched: false, matchedTransactionId: undefined }
-          : s
-      )
-    );
-  };
-
-  const handleImportStatement = () => {
-    // Simulate importing a bank statement
-    const mockLines: StatementLine[] = [
-      {
-        id: "stmt-1",
-        date: format(new Date(), "yyyy-MM-dd"),
-        description: "Customer Payment - ABC Corp",
-        reference: "TRF123456",
-        debit: 0,
-        credit: 50000,
-        matched: false,
-      },
-      {
-        id: "stmt-2",
-        date: format(new Date(), "yyyy-MM-dd"),
-        description: "Supplier Payment - XYZ Ltd",
-        reference: "CHQ001234",
-        debit: 25000,
-        credit: 0,
-        matched: false,
-      },
-      {
-        id: "stmt-3",
-        date: format(new Date(), "yyyy-MM-dd"),
-        description: "Bank Charges",
-        reference: "BC-001",
-        debit: 500,
-        credit: 0,
-        matched: false,
-      },
-    ];
-    setStatementLines(mockLines);
-    setImportDialogOpen(false);
-    toast.success("Bank statement imported successfully");
-  };
-
-  const handleSaveReconciliation = async () => {
-    if (!selectedAccountId) {
-      toast.error("Please select a bank account");
-      return;
-    }
-
-    if (Math.abs(difference) > 0.01) {
-      toast.error("Reconciliation difference must be zero");
-      return;
-    }
-
-    try {
-      await createReconciliation.mutateAsync({
-        bank_account_id: selectedAccountId,
-        statement_date: statementDate,
-        statement_balance: parsedStatementBalance,
-        book_balance: bookBalance,
-        adjusted_book_balance: adjustedBookBalance,
-        difference: difference,
-        reconciliation_date: format(new Date(), "yyyy-MM-dd"),
-        status: "completed",
-      } as any);
-      toast.success("Reconciliation saved successfully");
-    } catch (error) {
-      toast.error("Failed to save reconciliation");
-    }
-  };
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Bank Reconciliation Worksheet</h2>
-          <p className="text-muted-foreground">
-            Match bank statement with book transactions
-          </p>
-        </div>
-      </div>
+    <Card className="bank-recon-root">
+      {/* ========================= HEADER ========================= */}
+      <CardHeader className="p-0">
+        <div className="bank-recon-header">
+          {/* Account Code */}
+          <div className="bank-recon-header-field" >
+            <label>Account Code</label>
+            <Select value={selectedAccountId || ""} onValueChange={handleAccountChange}>
+              <SelectTrigger className="w-[260px]">
+                <SelectValue placeholder="Select Bank Account" />
+              </SelectTrigger>
+              <SelectContent>
+                {bankAccounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.account_code} — {a.account_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      {/* Account Selection and Balance Entry */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Reconciliation Setup</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label>Bank Account</Label>
-              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+          {/* Statement No. */}
+          <div className="bank-recon-header-field">
+            <label>Statement No.</label>
+            <Input
+              value={statementNo}
+              onChange={(e) => setStatementNo(e.target.value)}
+              placeholder="e.g. 202602"
+              className="w-[140px]"
+            />
+          </div>
+
+          {/* Statement Date */}
+          <div className="bank-recon-header-field">
+            <label>Statement Date</label>
+            <Input
+              type="date"
+              value={statementDate}
+              onChange={(e) => setStatementDate(e.target.value)}
+              className="w-[160px]"
+            />
+          </div>
+
+          {/* Statement Ending Balance */}
+          <div className="bank-recon-header-field">
+            <label>Statement Ending Balance</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={statementBalance}
+              onChange={(e) => setStatementBalance(e.target.value)}
+              placeholder="0.00"
+              className="w-[160px]"
+            />
+          </div>
+
+          {/* Last Statement Balance */}
+          <div className="bank-recon-header-field">
+            <label>Last Statement Bal.</label>
+            <span className="value">LKR {fmt(lastStatementBalance)}</span>
+          </div>
+
+          {/* Display Filter */}
+          <div className="bank-recon-header-field">
+            <label>Display</label>
+            <Select value={displayFilter} onValueChange={(v) => setDisplayFilter(v as DisplayFilter)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="not_cleared">Not Cleared</SelectItem>
+                <SelectItem value="cleared">Cleared</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </CardHeader>
+
+      {/* ========================= TABLE ========================= */}
+      <CardContent className="p-0 bank-recon-table-wrap">
+        {!selectedAccountId ? (
+          <div className="bank-recon-empty">
+            <Landmark />
+            <p className="text-lg font-medium">Select a Bank Account</p>
+            <p className="text-sm">Choose an account above to begin reconciliation</p>
+          </div>
+        ) : txnLoading ? (
+          <div className="bank-recon-empty">
+            <FileText />
+            <p>Loading transactions…</p>
+          </div>
+        ) : filteredTransactions.length === 0 ? (
+          <div className="bank-recon-empty">
+            <FileText />
+            <p className="text-lg font-medium">No Transactions Found</p>
+            <p className="text-sm">
+              {displayFilter === "cleared"
+                ? "No cleared transactions"
+                : displayFilter === "not_cleared"
+                  ? "All transactions are cleared"
+                  : "No transactions for this account"}
+            </p>
+          </div>
+        ) : (
+          <table className="bank-recon-table">
+            <thead>
+              <tr>
+                <th className="w-[40px]">#</th>
+                <th className="w-[50px]">
+                  <input
+                    type="checkbox"
+                    className="cleared-checkbox"
+                    checked={filteredTransactions.length > 0 && filteredTransactions.every((t) => clearedState[t.id]?.cleared || t.is_reconciled)}
+                    onChange={handleSelectAll}
+                    title="Select / Deselect All"
+                  />
+                </th>
+                <th className="w-[60px]">Type</th>
+                <th className="w-[100px]">Date</th>
+                <th>Trans. No.</th>
+                <th>Ref. 1</th>
+                <th>Ref. 2</th>
+                <th className="num-col">Payment</th>
+                <th className="num-col">Deposit</th>
+                <th className="num-col w-[120px]">Cleared Amt</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTransactions.map((t, idx) => {
+                const payment = t.debit_amount || 0;
+                const deposit = t.credit_amount || 0;
+                const cs = clearedState[t.id];
+                const isCleared = cs?.cleared || t.is_reconciled;
+                const isAlreadyReconciled = !!t.is_reconciled;
+
+                return (
+                  <tr key={t.id} className={isCleared ? "row-cleared" : ""}>
+                    <td>{idx + 1}</td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        className="cleared-checkbox"
+                        checked={isCleared}
+                        disabled={isAlreadyReconciled}
+                        onChange={() => toggleCleared(t.id, payment, deposit)}
+                        title="Toggle cleared"
+                      />
+                    </td>
+                    <td>
+                      <span className={`type-badge ${typeVariant(t.transaction_type)}`}>
+                        {typeLabel(t.transaction_type)}
+                      </span>
+                    </td>
+                    <td>{t.transaction_date ? format(new Date(t.transaction_date), "dd/MM/yyyy") : "—"}</td>
+                    <td className="font-mono text-xs">{t.reference || t.id.substring(0, 8)}</td>
+                    <td>{t.cheque_number || "—"}</td>
+                    <td>{t.source_type || "—"}</td>
+                    <td className="num-col">{payment > 0 ? fmt(payment) : "—"}</td>
+                    <td className="num-col">{deposit > 0 ? fmt(deposit) : "—"}</td>
+                    <td className="num-col">
+                      {isCleared ? (
+                        isAlreadyReconciled ? (
+                          <span className="text-green-600 font-semibold">
+                            {fmt(payment > 0 ? payment : deposit)}
+                          </span>
+                        ) : (
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="cleared-amount-input"
+                            value={cs?.clearedAmount ?? ""}
+                            onChange={(e) => updateClearedAmount(t.id, parseFloat(e.target.value) || 0)}
+                            title="Cleared amount"
+                          />
+                        )
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="text-sm text-muted-foreground">{t.description || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+
+      {/* ========================= SUMMARY FOOTER ========================= */}
+      {selectedAccountId && (
+        <div className="bank-recon-summary">
+          <div className="bank-recon-summary-card">
+            <span className="summary-label">Payments</span>
+            <span className="summary-value negative">{fmt(summary.paymentTotal)}</span>
+            <span className="summary-count">{summary.paymentCount} transaction{summary.paymentCount !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="bank-recon-summary-card">
+            <span className="summary-label">Deposits</span>
+            <span className="summary-value positive">{fmt(summary.depositTotal)}</span>
+            <span className="summary-count">{summary.depositCount} transaction{summary.depositCount !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="bank-recon-summary-card">
+            <span className="summary-label">Cleared Book Balance</span>
+            <span className={`summary-value ${summary.clearedBookBalance >= 0 ? "positive" : "negative"}`}>
+              LKR {fmt(summary.clearedBookBalance)}
+            </span>
+          </div>
+          <div className="bank-recon-summary-card">
+            <span className="summary-label">Statement Ending Bal.</span>
+            <span className="summary-value neutral">
+              LKR {fmt(summary.stmtEndBal)}
+            </span>
+          </div>
+          <div className="bank-recon-summary-card">
+            <span className="summary-label">Difference</span>
+            <span className={`summary-value ${summary.difference === 0 ? "positive" : "negative"}`}>
+              {summary.difference === 0 ? (
+                <>✓ LKR 0.00</>
+              ) : (
+                <>
+                  <AlertTriangle className="inline w-4 h-4 mr-1" />
+                  LKR {fmt(Math.abs(summary.difference))}
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ========================= ACTION BUTTONS ========================= */}
+      {selectedAccountId && (
+        <div className="bank-recon-actions">
+          <Button variant="outline" onClick={() => setShowAdjustments(true)}>
+            <SlidersHorizontal className="w-4 h-4 mr-2" />
+            Adjustments
+          </Button>
+          <Button variant="outline" onClick={handleCancel}>
+            <X className="w-4 h-4 mr-2" />
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saveReconciliation.isPending || !statementBalance || Object.keys(clearedState).length === 0}
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {saveReconciliation.isPending ? "Saving…" : "Save Reconciliation"}
+          </Button>
+        </div>
+      )}
+
+      {/* ========================= ADJUSTMENTS DIALOG ========================= */}
+      <Dialog open={showAdjustments} onOpenChange={setShowAdjustments}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Adjustment</DialogTitle>
+          </DialogHeader>
+          <div className="adjustments-form">
+            <div className="field-row">
+              <Label>Adjustment Type</Label>
+              <Select value={adjType} onValueChange={setAdjType}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {bankAccounts.map((account: any) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_name} - {account.account_number}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="bank_charge">Bank Charge / Fee</SelectItem>
+                  <SelectItem value="interest_earned">Interest Earned</SelectItem>
+                  <SelectItem value="interest_paid">Interest Paid</SelectItem>
+                  <SelectItem value="other">Other Adjustment</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Statement Date</Label>
-              <Input
-                type="date"
-                value={statementDate}
-                onChange={(e) => setStatementDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Statement Closing Balance</Label>
+            <div className="field-row">
+              <Label>Amount</Label>
               <Input
                 type="number"
                 step="0.01"
+                value={adjAmount}
+                onChange={(e) => setAdjAmount(e.target.value)}
                 placeholder="0.00"
-                value={statementBalance}
-                onChange={(e) => setStatementBalance(e.target.value)}
               />
             </div>
-            <div className="flex items-end">
-              <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import Statement
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Import Bank Statement</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                      <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Upload CSV or Excel file with bank statement
-                      </p>
-                      <Button variant="outline" onClick={handleImportStatement}>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Select File
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Supported formats: CSV, XLS, XLSX
-                    </p>
-                  </div>
-                </DialogContent>
-              </Dialog>
+            <div className="field-row">
+              <Label>Description</Label>
+              <Textarea
+                value={adjDescription}
+                onChange={(e) => setAdjDescription(e.target.value)}
+                placeholder="Bank charges for Feb 2026"
+              />
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Reconciliation Summary */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Book Balance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              Rs. {bookBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Statement Balance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              Rs.{" "}
-              {parsedStatementBalance.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Adjusted Book Balance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              Rs.{" "}
-              {adjustedBookBalance.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Difference</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${
-                Math.abs(difference) < 0.01 ? "text-green-600" : "text-destructive"
-              }`}
-            >
-              Rs. {difference.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Matching Interface */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Book Transactions */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Book Transactions</CardTitle>
-            <Badge variant="outline">{accountTransactions.length} unreconciled</Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-[400px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px]"></TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {accountTransactions.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-4">
-                        No unreconciled transactions
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    accountTransactions.map((txn: any) => (
-                      <TableRow
-                        key={txn.id}
-                        className={
-                          selectedBookItems.includes(txn.id)
-                            ? "bg-primary/10"
-                            : ""
-                        }
-                      >
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedBookItems.includes(txn.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedBookItems([...selectedBookItems, txn.id]);
-                              } else {
-                                setSelectedBookItems(
-                                  selectedBookItems.filter((id) => id !== txn.id)
-                                );
-                              }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(txn.transaction_date), "MMM dd")}
-                        </TableCell>
-                        <TableCell className="truncate max-w-[200px]">
-                          {txn.description}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {txn.debit_amount?.toFixed(2) || "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {txn.credit_amount?.toFixed(2) || "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Statement Lines */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Bank Statement</CardTitle>
-            <Badge variant="outline">{statementLines.length} lines</Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-[400px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px]"></TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead className="w-[60px]">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {statementLines.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4">
-                        Import a bank statement to begin
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    statementLines.map((line) => (
-                      <TableRow
-                        key={line.id}
-                        className={
-                          line.matched
-                            ? "bg-green-50 dark:bg-green-950"
-                            : selectedStatementItems.includes(line.id)
-                            ? "bg-primary/10"
-                            : ""
-                        }
-                      >
-                        <TableCell>
-                          {!line.matched && (
-                            <Checkbox
-                              checked={selectedStatementItems.includes(line.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedStatementItems([
-                                    ...selectedStatementItems,
-                                    line.id,
-                                  ]);
-                                } else {
-                                  setSelectedStatementItems(
-                                    selectedStatementItems.filter(
-                                      (id) => id !== line.id
-                                    )
-                                  );
-                                }
-                              }}
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(line.date), "MMM dd")}
-                        </TableCell>
-                        <TableCell className="truncate max-w-[200px]">
-                          {line.description}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {line.debit > 0 ? line.debit.toFixed(2) : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {line.credit > 0 ? line.credit.toFixed(2) : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {line.matched ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleUnmatch(line.id)}
-                            >
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            </Button>
-                          ) : (
-                            <XCircle className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex justify-center gap-4">
-        <Button
-          onClick={handleMatch}
-          disabled={
-            selectedBookItems.length !== 1 || selectedStatementItems.length !== 1
-          }
-        >
-          <Link className="h-4 w-4 mr-2" />
-          Match Selected
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setSelectedBookItems([]);
-            setSelectedStatementItems([]);
-          }}
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Clear Selection
-        </Button>
-        <Button
-          onClick={handleSaveReconciliation}
-          disabled={Math.abs(difference) > 0.01}
-          className="bg-green-600 hover:bg-green-700"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          Complete Reconciliation
-        </Button>
-      </div>
-
-      {/* Reconciling Items */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Reconciling Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-8">
-            <div>
-              <h4 className="font-medium mb-2">Deposits in Transit</h4>
-              <p className="text-sm text-muted-foreground mb-2">
-                Recorded in books but not yet in bank statement
-              </p>
-              <Table>
-                <TableBody>
-                  {unmatchedDeposits.map((d: any) => (
-                    <TableRow key={d.id}>
-                      <TableCell>{format(new Date(d.transaction_date), "MMM dd")}</TableCell>
-                      <TableCell>{d.description}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {d.credit_amount?.toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow className="font-bold">
-                    <TableCell colSpan={2}>Total</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {depositsInTransit.toFixed(2)}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">Outstanding Cheques</h4>
-              <p className="text-sm text-muted-foreground mb-2">
-                Issued but not yet cleared by bank
-              </p>
-              <Table>
-                <TableBody>
-                  {unmatchedWithdrawals.map((w: any) => (
-                    <TableRow key={w.id}>
-                      <TableCell>{format(new Date(w.transaction_date), "MMM dd")}</TableCell>
-                      <TableCell>{w.cheque_number || w.description}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {w.debit_amount?.toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow className="font-bold">
-                    <TableCell colSpan={2}>Total</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {outstandingCheques.toFixed(2)}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleAddAdjustment}>Add Adjustment</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 };
+
+export { BankReconciliationWorksheet };
