@@ -195,7 +195,7 @@ export const PurchaseRequisitionForm = ({
             <SelectContent>
               {costCenters.map((cc: any) => (
                 <SelectItem key={cc.id} value={cc.id}>
-                  {cc.cost_center_code} - {cc.cost_center_name}
+                  {cc.center_code} - {cc.center_name}
                 </SelectItem>
               ))}
             </SelectContent>

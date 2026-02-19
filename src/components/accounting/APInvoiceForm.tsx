@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVendors, useTaxCodes } from "@/hooks/useAccountingData";
 import { useCreateAPInvoice } from "@/hooks/useAccountingMutations";
+import { useCompany } from "@/contexts/CompanyContext";
+import { supabase } from "@/integrations/supabase/client";
 import { format, addDays } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
@@ -46,6 +48,7 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
   const { data: vendors } = useVendors();
   const { data: taxCodes } = useTaxCodes();
   const createInvoice = useCreateAPInvoice();
+  const { selectedCompanyId, getEffectiveCompanyId } = useCompany();
 
   const [lines, setLines] = useState<InvoiceLine[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, tax_rate: 0, line_total: 0 },
@@ -62,6 +65,62 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
       notes: "",
     },
   });
+
+  // Auto-generate AP Invoice number when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    
+    const generateInvoiceNumber = async () => {
+      try {
+        const year = new Date().getFullYear();
+        const prefix = `AP-INV-${year}-`;
+        
+        // Build query — optionally filter by company if available
+        let query = supabase
+          .from("ap_invoices")
+          .select("invoice_number")
+          .ilike("invoice_number", `${prefix}%`)
+          .order("invoice_number", { ascending: false })
+          .limit(1);
+
+        // Only filter by company if we have one
+        const effectiveCompanyId = getEffectiveCompanyId();
+        if (effectiveCompanyId) {
+          query = query.eq("company_id", effectiveCompanyId);
+        }
+        console.log("[AP Auto-Number] Querying with prefix:", prefix, "companyId:", effectiveCompanyId);
+
+        const { data: latestInvoice, error } = await query.maybeSingle();
+        
+        if (error) {
+          console.warn("[AP Auto-Number] Query error:", error.message);
+        }
+        console.log("[AP Auto-Number] Latest invoice found:", latestInvoice);
+
+        let nextSeq = 1;
+        if (latestInvoice?.invoice_number) {
+          const match = latestInvoice.invoice_number.match(/(\d+)$/);
+          if (match) {
+            nextSeq = parseInt(match[1], 10) + 1;
+          }
+        }
+        
+        const autoNumber = `${prefix}${String(nextSeq).padStart(4, "0")}`;
+        console.log("[AP Auto-Number] Generated:", autoNumber);
+        form.setValue("invoice_number", autoNumber);
+      } catch (err) {
+        console.error("[AP Auto-Number] Failed:", err);
+        // Fallback: always generate a usable number
+        const year = new Date().getFullYear();
+        const ts = Date.now().toString().slice(-6);
+        const fallback = `AP-INV-${year}-${ts}`;
+        console.log("[AP Auto-Number] Using fallback:", fallback);
+        form.setValue("invoice_number", fallback);
+      }
+    };
+
+    generateInvoiceNumber();
+  }, [open, selectedCompanyId]);
 
   const applyWht = form.watch("apply_wht");
   const whtRate = form.watch("wht_rate") || 5;
@@ -155,9 +214,9 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
                 name="invoice_number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Vendor Invoice #</FormLabel>
+                    <FormLabel>AP Invoice #</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Vendor's invoice number" />
+                      <Input {...field} placeholder="Auto-generating..." readOnly className="bg-muted/50 font-mono" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

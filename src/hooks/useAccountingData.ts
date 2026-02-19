@@ -673,7 +673,7 @@ export const useCostCenters = () => {
         .from("cost_centers")
         .select("*")
         .eq("is_active", true)
-        .order("cost_center_code");
+        .order("center_code");
 
       if (selectedCompanyId) {
         query = query.eq("company_id", selectedCompanyId);
