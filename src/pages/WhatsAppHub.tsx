@@ -28,6 +28,9 @@ import {
   Smartphone,
   Zap,
   AlertTriangle,
+  Mail,
+  Settings,
+  CheckCircle2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -139,11 +142,27 @@ export default function WhatsAppHub() {
   const [templateSearch, setTemplateSearch] = useState('');
 
   // ── Tab State ──
-  const [activeTab, setActiveTab] = useState<'chats' | 'new' | 'templates'>('chats');
+  const [activeTab, setActiveTab] = useState<'chats' | 'new' | 'templates' | 'email'>('chats');
 
   // ── Stats ──
   const [sentToday, setSentToday] = useState(0);
   const [messageLog, setMessageLog] = useState<WAMessage[]>([]);
+
+  // ── Email State ──
+  const [emailConfigured, setEmailConfigured] = useState(false);
+  const [emailAddress, setEmailAddress] = useState('');
+  const [emailSenderName, setEmailSenderName] = useState('NCG Express');
+  const [emailSetupMode, setEmailSetupMode] = useState(false);
+  const [setupEmail, setSetupEmail] = useState('');
+  const [setupAppPassword, setSetupAppPassword] = useState('');
+  const [setupSenderName, setSetupSenderName] = useState('NCG Express');
+  const [configuringEmail, setConfiguringEmail] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailCc, setEmailCc] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailsSentToday, setEmailsSentToday] = useState(0);
 
   // ═══════════════════════════════════════════
   // WebSocket Connection
@@ -243,6 +262,7 @@ export default function WhatsAppHub() {
 
   useEffect(() => {
     connectWS();
+    fetchEmailStatus();
     return () => {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       wsRef.current?.close();
@@ -351,6 +371,111 @@ export default function WhatsAppHub() {
     } finally {
       setSendingNew(false);
     }
+  };
+
+  // ═══════════════════════════════════════════
+  // Email Functions
+  // ═══════════════════════════════════════════
+  const fetchEmailStatus = async () => {
+    try {
+      const res = await fetch(`${WA_SERVER}/api/email/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setEmailConfigured(data.configured);
+        if (data.configured) {
+          setEmailAddress(data.email);
+          setEmailSenderName(data.senderName || 'NCG Express');
+        }
+      }
+    } catch { /* server offline */ }
+  };
+
+  const handleConfigureEmail = async () => {
+    if (!setupEmail.trim() || !setupAppPassword.trim()) {
+      toast.error('Email and App Password are required');
+      return;
+    }
+    setConfiguringEmail(true);
+    try {
+      const res = await fetch(`${WA_SERVER}/api/email/configure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: setupEmail.trim(),
+          appPassword: setupAppPassword.trim(),
+          senderName: setupSenderName.trim() || 'NCG Express',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEmailConfigured(true);
+        setEmailAddress(data.email);
+        setEmailSenderName(data.senderName);
+        setEmailSetupMode(false);
+        setSetupAppPassword('');
+        toast.success('Email configured successfully!');
+      } else {
+        toast.error(data.error || 'Failed to configure email');
+      }
+    } catch {
+      toast.error('Failed to connect to server');
+    } finally {
+      setConfiguringEmail(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailTo.trim() || !emailSubject.trim() || !emailBody.trim()) {
+      toast.error('To, Subject, and Body are required');
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const res = await fetch(`${WA_SERVER}/api/email/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: emailTo.trim(),
+          cc: emailCc.trim() || undefined,
+          subject: emailSubject.trim(),
+          body: emailBody.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Email sent to ${emailTo}`);
+        setEmailTo('');
+        setEmailCc('');
+        setEmailSubject('');
+        setEmailBody('');
+        setEmailsSentToday(prev => prev + 1);
+      } else {
+        toast.error(data.error || 'Failed to send email');
+      }
+    } catch {
+      toast.error('Failed to send email. Is the server running?');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleDisconnectEmail = async () => {
+    if (!confirm('Disconnect email account?')) return;
+    try {
+      await fetch(`${WA_SERVER}/api/email/disconnect`, { method: 'POST' });
+      setEmailConfigured(false);
+      setEmailAddress('');
+      toast.success('Email disconnected');
+    } catch {
+      toast.error('Failed to disconnect email');
+    }
+  };
+
+  const handleUseEmailTemplate = (template: Template) => {
+    setEmailSubject(template.name);
+    setEmailBody(template.body);
+    setActiveTab('email');
+    toast.success(`Template "${template.name}" loaded to email`);
   };
 
   // ── Use Template ──
@@ -628,6 +753,18 @@ export default function WhatsAppHub() {
             >
               <FileText className="w-4 h-4 mr-2" />
               Templates
+            </Button>
+            <Button
+              variant={activeTab === 'email' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('email')}
+              className={activeTab === 'email' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+            >
+              <Mail className="w-4 h-4 mr-2" />
+              Email
+              {emailConfigured && (
+                <CheckCircle2 className="w-3 h-3 ml-1.5 text-green-300" />
+              )}
             </Button>
           </div>
 
@@ -917,6 +1054,224 @@ export default function WhatsAppHub() {
                   </Card>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* ═══ Email Tab ═══ */}
+          {activeTab === 'email' && (
+            <div className="space-y-4">
+              {/* Email Setup Card */}
+              {!emailConfigured || emailSetupMode ? (
+                <Card className="professional-card max-w-xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Settings className="w-5 h-5 text-blue-600" />
+                      {emailConfigured ? 'Update Email Settings' : 'Setup Email'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg text-sm space-y-1">
+                      <p className="font-medium text-blue-700 dark:text-blue-300">Gmail App Password Setup:</p>
+                      <ol className="text-blue-600 dark:text-blue-400 text-xs list-decimal pl-4 space-y-0.5">
+                        <li>Go to <strong>myaccount.google.com</strong> → Security</li>
+                        <li>Enable <strong>2-Step Verification</strong> if not already</li>
+                        <li>Search for <strong>"App passwords"</strong></li>
+                        <li>Create a new app password and paste it below</li>
+                      </ol>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Sender Name</label>
+                      <Input
+                        placeholder="NCG Express"
+                        value={setupSenderName}
+                        onChange={e => setSetupSenderName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Gmail Address</label>
+                      <Input
+                        type="email"
+                        placeholder="yourname@gmail.com"
+                        value={setupEmail}
+                        onChange={e => setSetupEmail(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">App Password</label>
+                      <Input
+                        type="password"
+                        placeholder="xxxx xxxx xxxx xxxx"
+                        value={setupAppPassword}
+                        onChange={e => setSetupAppPassword(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        This is NOT your Gmail password — it's a generated App Password
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {emailConfigured && (
+                        <Button variant="outline" size="sm" onClick={() => setEmailSetupMode(false)}>
+                          Cancel
+                        </Button>
+                      )}
+                      <Button
+                        onClick={handleConfigureEmail}
+                        disabled={configuringEmail || !setupEmail.trim() || !setupAppPassword.trim()}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {configuringEmail ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                        )}
+                        {configuringEmail ? 'Verifying...' : 'Connect Email'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Email Status Bar */}
+                  <Card className="professional-card border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                            <Mail className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{emailAddress}</p>
+                            <p className="text-xs text-muted-foreground">Sending as "{emailSenderName}" · {emailsSentToday} sent today</p>
+                          </div>
+                          <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/30">
+                            <Circle className="w-2 h-2 mr-1.5 fill-blue-500 text-blue-500 animate-pulse" />
+                            Connected
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setEmailSetupMode(true)}>
+                            <Settings className="w-4 h-4 mr-1" />
+                            Settings
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-300 hover:bg-red-50"
+                            onClick={handleDisconnectEmail}
+                          >
+                            <WifiOff className="w-4 h-4 mr-1" />
+                            Disconnect
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Compose Email */}
+                  <Card className="professional-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Mail className="w-5 h-5 text-blue-600" />
+                        Compose Email
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">To <span className="text-red-500">*</span></label>
+                          <Input
+                            type="email"
+                            placeholder="recipient@example.com"
+                            value={emailTo}
+                            onChange={e => setEmailTo(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">CC <span className="text-muted-foreground text-xs">(optional)</span></label>
+                          <Input
+                            type="email"
+                            placeholder="cc@example.com"
+                            value={emailCc}
+                            onChange={e => setEmailCc(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Subject <span className="text-red-500">*</span></label>
+                        <Input
+                          placeholder="Email subject line..."
+                          value={emailSubject}
+                          onChange={e => setEmailSubject(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Body <span className="text-red-500">*</span></label>
+                        <Textarea
+                          placeholder="Write your email content here..."
+                          value={emailBody}
+                          onChange={e => setEmailBody(e.target.value)}
+                          rows={8}
+                          className="resize-none"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1 text-right">{emailBody.length} characters</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setEmailTo(''); setEmailCc(''); setEmailSubject(''); setEmailBody(''); }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Clear
+                        </Button>
+                        <Button
+                          onClick={handleSendEmail}
+                          disabled={!emailTo.trim() || !emailSubject.trim() || !emailBody.trim() || sendingEmail}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          {sendingEmail ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4 mr-2" />
+                          )}
+                          Send Email
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Email Templates */}
+                  <Card className="professional-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <FileText className="w-4 h-4 text-blue-600" />
+                        Quick Email Templates
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {templates.map(template => (
+                          <div
+                            key={template.id}
+                            className="border rounded-lg p-3 hover:bg-accent/30 cursor-pointer transition-colors group"
+                            onClick={() => handleUseEmailTemplate(template)}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <h4 className="text-sm font-medium">{template.name}</h4>
+                              <Badge variant="outline" className="text-xs">{template.category}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground line-clamp-2">{template.body.substring(0, 80)}...</p>
+                            <Button size="sm" variant="ghost" className="mt-2 w-full text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Mail className="w-3 h-3 mr-1" />
+                              Use as Email
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
           )}
         </>

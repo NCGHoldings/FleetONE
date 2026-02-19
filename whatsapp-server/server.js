@@ -239,6 +239,135 @@ app.get('/api/messages/:chatId', async (req, res) => {
 // Get message log (in-memory)
 app.get('/api/log', (req, res) => res.json(messageLog));
 
+/* ══════════════════════════════════════════════════════════════
+   EMAIL FUNCTIONALITY
+   ══════════════════════════════════════════════════════════════ */
+const nodemailer = require('nodemailer');
+
+// Email state
+let emailTransporter = null;
+let emailConfig = null;
+const emailSettingsPath = path.join(__dirname, '.email-settings.json');
+
+// Load saved email settings on startup
+try {
+  if (fs.existsSync(emailSettingsPath)) {
+    emailConfig = JSON.parse(fs.readFileSync(emailSettingsPath, 'utf8'));
+    emailTransporter = nodemailer.createTransport({
+      service: emailConfig.service || 'gmail',
+      host: emailConfig.host,
+      port: emailConfig.port || 587,
+      secure: emailConfig.secure || false,
+      auth: { user: emailConfig.email, pass: emailConfig.appPassword },
+    });
+    console.log(`📧 Email configured: ${emailConfig.email}`);
+  }
+} catch (e) {
+  console.log('No saved email settings found');
+}
+
+// Configure email (save credentials)
+app.post('/api/email/configure', async (req, res) => {
+  try {
+    const { email, appPassword, service, host, port, secure, senderName } = req.body;
+    if (!email || !appPassword) {
+      return res.status(400).json({ error: 'Email and App Password are required' });
+    }
+
+    const config = {
+      email,
+      appPassword,
+      senderName: senderName || 'NCG Express',
+      service: service || 'gmail',
+      host: host || undefined,
+      port: port || 587,
+      secure: secure || false,
+    };
+
+    // Create transporter
+    const transporterOpts = {
+      auth: { user: email, pass: appPassword },
+    };
+    if (config.service) transporterOpts.service = config.service;
+    if (config.host) { transporterOpts.host = config.host; transporterOpts.port = config.port; transporterOpts.secure = config.secure; }
+
+    const transporter = nodemailer.createTransport(transporterOpts);
+
+    // Verify connection
+    await transporter.verify();
+
+    // Save settings
+    emailTransporter = transporter;
+    emailConfig = config;
+    fs.writeFileSync(emailSettingsPath, JSON.stringify(config, null, 2));
+
+    console.log(`📧 Email configured successfully: ${email}`);
+    res.json({ success: true, email, senderName: config.senderName });
+  } catch (error) {
+    console.error('Email config error:', error);
+    res.status(500).json({ error: error.message || 'Failed to configure email. Check credentials.' });
+  }
+});
+
+// Get email config status (without password)
+app.get('/api/email/status', (req, res) => {
+  if (emailConfig) {
+    res.json({
+      configured: true,
+      email: emailConfig.email,
+      senderName: emailConfig.senderName || 'NCG Express',
+      service: emailConfig.service || 'gmail',
+    });
+  } else {
+    res.json({ configured: false });
+  }
+});
+
+// Send email
+app.post('/api/email/send', async (req, res) => {
+  try {
+    if (!emailTransporter || !emailConfig) {
+      return res.status(503).json({ error: 'Email is not configured. Set up your email first.' });
+    }
+
+    const { to, subject, body, cc, bcc, isHtml } = req.body;
+    if (!to || !subject || !body) {
+      return res.status(400).json({ error: 'To, Subject, and Body are required' });
+    }
+
+    const mailOptions = {
+      from: `"${emailConfig.senderName || 'NCG Express'}" <${emailConfig.email}>`,
+      to: Array.isArray(to) ? to.join(', ') : to,
+      subject,
+      ...(cc && { cc: Array.isArray(cc) ? cc.join(', ') : cc }),
+      ...(bcc && { bcc: Array.isArray(bcc) ? bcc.join(', ') : bcc }),
+    };
+
+    if (isHtml) {
+      mailOptions.html = body;
+    } else {
+      mailOptions.text = body;
+    }
+
+    const info = await emailTransporter.sendMail(mailOptions);
+    console.log(`📧 Email sent to ${to}: ${subject}`);
+    res.json({ success: true, messageId: info.messageId });
+  } catch (error) {
+    console.error('Email send error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Disconnect email
+app.post('/api/email/disconnect', (req, res) => {
+  emailTransporter = null;
+  emailConfig = null;
+  try { fs.unlinkSync(emailSettingsPath); } catch {}
+  console.log('📧 Email disconnected');
+  res.json({ success: true });
+});
+
+
 // Disconnect and switch account
 app.post('/api/disconnect', async (req, res) => {
   try {

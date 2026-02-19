@@ -51,6 +51,7 @@ export const PAGES: PageCategories = {
     { id: "document_manager", title: "Document Manager", url: "/documents" },
     { id: "feedback_module", title: "Feedback Module", url: "/feedback-module" },
     { id: "vehicle_inquiries", title: "Vehicle Inquiries", url: "/vehicle-inquiries" },
+    { id: "whatsapp_hub", title: "WhatsApp Hub", url: "/whatsapp" },
   ],
   finance: [
     { id: "accounting", title: "Accounting & GL", url: "/accounting" },
