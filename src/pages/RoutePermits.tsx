@@ -12,7 +12,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { 
   FileText, Plus, AlertTriangle, CheckCircle, Calendar, 
-  MapPin, Truck, Clock, Settings, Upload, Download, Eye
+  MapPin, Truck, Clock, Settings, Upload, Download, Eye, BookOpen, Loader2
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { RoutePermitImport } from "@/components/route-permits/RoutePermitImport";
 import { RoutePermitDetailsModal } from "@/components/route-permits/RoutePermitDetailsModal";
+import { useRoutePermitFinanceSettings, usePostPermitCostToGL } from "@/hooks/useRoutePermitFinance";
 
 interface RoutePermit {
   id: string;
@@ -68,6 +69,10 @@ export default function RoutePermits() {
   const [selectedPermit, setSelectedPermit] = useState<RoutePermit | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+
+  // Finance integration
+  const { data: permitFinanceSettings } = useRoutePermitFinanceSettings();
+  const postPermitToGL = usePostPermitCostToGL();
   
   // Form states
   const [formData, setFormData] = useState({
@@ -244,6 +249,29 @@ export default function RoutePermits() {
       setIsDialogOpen(false);
       resetForm();
       fetchPermits();
+      
+      // Auto-post to GL if auto_post_on_renewal is enabled, fee is set, and settings configured
+      const fee = formData.annual_fee ? parseFloat(formData.annual_fee) : 0;
+      if (fee > 0 && permitFinanceSettings && permitFinanceSettings.auto_post_on_renewal) {
+        const isAnnual = formData.expiry_date && formData.issue_date 
+          ? differenceInDays(parseISO(formData.expiry_date), parseISO(formData.issue_date)) > 90
+          : false;
+        
+        postPermitToGL.mutate({
+          permit: {
+            permitNumber: permitNo,
+            routeName: formData.route_name,
+            vehicleNo: buses.find(b => b.id === formData.bus_id)?.bus_no,
+            permitType: isAnnual ? 'annual' : 'temporary',
+            amount: fee,
+            paymentDate: new Date().toISOString().slice(0, 10),
+            expiryDate: formData.expiry_date || undefined,
+            coverageMonths: isAnnual ? 12 : undefined,
+            description: `Route permit ${permitNo} - ${formData.route_name}`,
+          },
+          settings: permitFinanceSettings,
+        });
+      }
     } catch (error: any) {
       console.error('Error saving permit:', error);
       toast.error(error.message || 'Failed to save route permit');

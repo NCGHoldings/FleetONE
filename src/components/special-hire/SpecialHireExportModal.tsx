@@ -45,6 +45,10 @@ interface Quotation {
   discount_percentage?: number;
   gross_revenue?: number;
   net_profit?: number;
+  advance_paid?: number;
+  balance_due?: number;
+  original_quotation_amount?: number;
+  payment_status?: string;
   status: string;
   approval_status?: string;
   valid_until?: string;
@@ -106,6 +110,10 @@ export function SpecialHireExportModal({ isOpen, onClose, data }: SpecialHireExp
     { key: 'discount_amount_lkr', label: 'Discount Amount (LKR)', selected: false },
     { key: 'gross_revenue', label: 'Gross Revenue (LKR)', selected: true },
     { key: 'net_profit', label: 'Net Profit (LKR)', selected: true },
+    { key: 'original_quotation_amount', label: '💰 Total Quotation Amount (LKR)', selected: true },
+    { key: 'advance_paid', label: '💰 Advance Paid (LKR)', selected: true },
+    { key: 'balance_due', label: '💰 Balance Due (LKR)', selected: true },
+    { key: 'payment_status', label: '💰 Payment Status', selected: true },
     { key: 'status', label: 'Status', selected: true },
     { key: 'approval_status', label: 'Approval Status', selected: true },
     { key: 'valid_until', label: 'Valid Until', selected: false },
@@ -197,6 +205,9 @@ export function SpecialHireExportModal({ isOpen, onClose, data }: SpecialHireExp
       case 'discount_amount_lkr':
       case 'gross_revenue':
       case 'net_profit':
+      case 'original_quotation_amount':
+      case 'advance_paid':
+      case 'balance_due':
         return `${Number(value).toLocaleString()}`;
       case 'total_distance_km':
         return Number(value).toFixed(2);
@@ -260,28 +271,55 @@ export function SpecialHireExportModal({ isOpen, onClose, data }: SpecialHireExp
     // Create workbook and worksheet
     const wb = XLSX.utils.book_new();
     
+    // Key financial columns that should be highlighted
+    const highlightedColumns = new Set(['original_quotation_amount', 'advance_paid', 'balance_due', 'payment_status']);
+
     // Create header row with styling
-    const headers = selectedColumns.map(col => ({
-      v: col.label,
-      t: 's',
-      s: {
-        font: { bold: true },
-        alignment: { horizontal: 'center', vertical: 'center' },
-        fill: { fgColor: { rgb: 'FFFFFF' } }
-      }
-    }));
+    const headers = selectedColumns.map(col => {
+      const isHighlighted = highlightedColumns.has(col.key);
+      return {
+        v: col.label.replace(/💰 /g, ''), // Clean emoji from Excel header
+        t: 's',
+        s: {
+          font: { bold: true, color: isHighlighted ? { rgb: '7C2D12' } : undefined },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          fill: { fgColor: { rgb: isHighlighted ? 'FEF3C7' : 'FFFFFF' } },
+          border: isHighlighted ? {
+            bottom: { style: 'medium', color: { rgb: 'D97706' } }
+          } : undefined
+        }
+      };
+    });
     
-    // Create data rows with alternating colors
+    // Create data rows with alternating colors + highlight for financial columns
     const rows = processedData.map((quotation, rowIdx) => 
       selectedColumns.map(col => {
-        const value = formatValue(quotation[col.key], col.key);
+        // For 'original_quotation_amount', compute dynamically if not set
+        let rawValue = quotation[col.key];
+        if (col.key === 'original_quotation_amount' && (rawValue == null || rawValue === 0)) {
+          // Compute: hire + fuel + commission + additional - discount ± adjustment
+          const hire = quotation.gross_revenue || 0;
+          const fuel = quotation.fuel_cost_fuel_only || 0;
+          const commission = quotation.commission_pass_through_amount || 0;
+          const additional = quotation.total_additional_charges || 0;
+          const discount = quotation.discount_amount_lkr || 0;
+          const base = hire + fuel + commission + additional - discount;
+          const adjPct = quotation.percentage_adjustment || 0;
+          rawValue = Math.round(base + base * (adjPct / 100));
+        }
+        const value = formatValue(rawValue, col.key);
+        const isHighlighted = highlightedColumns.has(col.key);
+        const isEvenRow = rowIdx % 2 === 0;
+
         return {
           v: value,
           t: 's',
-          s: rowIdx % 2 === 1 ? {
-            fill: { fgColor: { rgb: 'E3F2FD' } } // Light blue for odd rows
-          } : {
-            fill: { fgColor: { rgb: 'FFFFFF' } } // White for even rows
+          s: {
+            fill: { fgColor: { rgb: isHighlighted 
+              ? (isEvenRow ? 'FFF7ED' : 'FFEDD5')  // Warm amber tones for financial cols 
+              : (isEvenRow ? 'FFFFFF' : 'E3F2FD')   // White / light blue for regular cols
+            }},
+            font: isHighlighted && col.key !== 'payment_status' ? { bold: true } : undefined,
           }
         };
       })

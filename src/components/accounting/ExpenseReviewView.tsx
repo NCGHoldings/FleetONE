@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   Receipt, Plus, Search, Filter, Eye, CheckCircle, 
-  XCircle, FileText, Building2, Bus, Loader2, RefreshCw
+  XCircle, FileText, Building2, Bus, Loader2, RefreshCw, BookOpen
 } from "lucide-react";
 import { format } from "date-fns";
 import { useExpenseRequests, useUpdateExpenseRequest, EXPENSE_CATEGORIES, BUSINESS_UNITS, ExpenseRequest } from "@/hooks/useExpenseRequests";
 import { useVendors } from "@/hooks/useAccountingData";
+import { useExpenseRequestFinanceSettings, usePostExpenseRequestToGL, useExpenseGLMappings } from "@/hooks/useExpenseRequestFinance";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ExpenseRequestForm } from "./ExpenseRequestForm";
 
@@ -51,6 +52,11 @@ export const ExpenseReviewView = () => {
   const { data: vendors } = useVendors();
   const updateExpense = useUpdateExpenseRequest();
 
+  // Finance integration
+  const { data: expenseFinanceSettings } = useExpenseRequestFinanceSettings();
+  const { data: expenseGLMappings } = useExpenseGLMappings();
+  const postExpenseToGL = usePostExpenseRequestToGL();
+
   const filteredExpenses = expenses?.filter((exp) => {
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
@@ -85,6 +91,26 @@ export const ExpenseReviewView = () => {
       vendor_id: reviewVendorId || undefined,
       status: "approved",
     });
+
+    // Auto-post to GL if auto_post_on_approve is enabled and finance settings configured
+    if (expenseFinanceSettings?.auto_post_on_approve && expenseGLMappings && selectedExpense.amount > 0) {
+      postExpenseToGL.mutate({
+        expense: {
+          id: selectedExpense.id,
+          requestNumber: selectedExpense.request_number,
+          requestDate: selectedExpense.request_date,
+          businessUnitCode: selectedExpense.business_unit_code || 'HQ',
+          expenseCategory: selectedExpense.expense_category,
+          description: selectedExpense.description || `Expense ${selectedExpense.request_number}`,
+          amount: selectedExpense.amount,
+          paymentMethod: selectedExpense.payment_method || 'bank',
+          vendorName: selectedExpense.vendor?.vendor_name || selectedExpense.vendor_name_draft || undefined,
+          vendorId: reviewVendorId || undefined,
+        },
+        settings: expenseFinanceSettings as Record<string, any>,
+        mappings: expenseGLMappings || [],
+      });
+    }
     
     setShowReviewDialog(false);
     setSelectedExpense(null);
@@ -227,6 +253,7 @@ export const ExpenseReviewView = () => {
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Vendor</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>GL</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -265,6 +292,42 @@ export const ExpenseReviewView = () => {
                     <Badge className={statusColors[expense.status]}>
                       {statusLabels[expense.status]}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {expense.gl_posted ? (
+                      <Badge variant="outline" className="text-xs text-green-600">Posted</Badge>
+                    ) : expense.status === 'approved' && !expense.gl_posted ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-blue-600 h-7 text-xs"
+                        disabled={postExpenseToGL.isPending}
+                        onClick={() => {
+                          if (expenseFinanceSettings && expenseGLMappings) {
+                            postExpenseToGL.mutate({
+                              expense: {
+                                id: expense.id,
+                                requestNumber: expense.request_number,
+                                requestDate: expense.request_date,
+                                businessUnitCode: expense.business_unit_code || 'HQ',
+                                expenseCategory: expense.expense_category,
+                                description: expense.description || `Expense ${expense.request_number}`,
+                                amount: expense.amount,
+                                paymentMethod: expense.payment_method || 'bank',
+                              },
+                              settings: expenseFinanceSettings as Record<string, any>,
+                              mappings: expenseGLMappings || [],
+                            });
+                          } else {
+                            toast.error('Configure Finance Settings first');
+                          }
+                        }}
+                      >
+                        <BookOpen className="h-3 w-3 mr-1" />Post GL
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">

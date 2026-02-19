@@ -133,6 +133,39 @@ export function EnhancedTripStatusManagementModal({
       statusData.refundStatus = refundStatus;
     }
 
+    // ========================
+    // GL POSTING FOR REFUNDS
+    // ========================
+    if (isCancellation && refundAmount > 0 && (refundStatus === 'processed' || refundStatus === 'completed')) {
+      try {
+        const { fetchSpecialHireFinanceSettings, postRefundToGLStandalone, NCG_HOLDING_ID } = await import("@/hooks/useSpecialHireFinance");
+        const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+        
+        if (settings && trip) {
+          const glResult = await postRefundToGLStandalone({
+            quotationNo: trip.quotation.quotation_no,
+            customerName: trip.quotation.customer_name,
+            refundAmount: refundAmount,
+            reason: finalReason.trim(),
+            settings,
+            effectiveCompanyId: NCG_HOLDING_ID,
+          });
+          
+          if (glResult) {
+            console.log('Refund posted to GL:', glResult.entry_number);
+            // Toast handled by caller
+          }
+        } else {
+          console.log('Special Hire Finance settings not configured - skipping GL posting');
+        }
+      } catch (glError) {
+        console.error('GL posting for refund failed (non-blocking):', glError);
+      }
+    }
+    // ========================
+    // END GL POSTING
+    // ========================
+
     await onStatusChange(statusData);
     
     // Reset form

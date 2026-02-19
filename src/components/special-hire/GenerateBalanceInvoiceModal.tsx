@@ -16,6 +16,7 @@ import {
   fetchSpecialHireFinanceSettings,
   postInvoiceToGLStandalone,
   applyAdvanceToInvoiceStandalone,
+  postDiscountToGLStandalone,
   updateSPHARInvoiceOnInvoiceSent,
 } from '@/hooks/useSpecialHireFinance';
 import { NCG_HOLDING_ID } from '@/contexts/CompanyContext';
@@ -239,8 +240,8 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
       setInvoiceStatus('draft');
       toast.success('Invoice draft saved successfully');
       
-      // Delay to ensure database write completes before refresh
-      setTimeout(() => onInvoiceGenerated?.(), 500);
+      // Database write is already awaited above, call refresh directly
+      onInvoiceGenerated?.();
     } catch (error) {
       console.error('Error saving draft:', error);
       toast.error('Failed to save invoice draft');
@@ -354,10 +355,11 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
         const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
         
         if (settings?.auto_post_invoices) {
+          // Post GROSS invoice amount (before discount) — discount is posted separately
           const fullInvoiceAmount = quotationData.original_quotation_amount + 
             (adjustmentData.extra_km_total_charge || 0) + 
-            (adjustmentData.total_additional_expenses || 0) -
-            (quotationData.discount_amount_lkr || 0);
+            (adjustmentData.total_additional_expenses || 0);
+          const discountAmount = quotationData.discount_amount_lkr || 0;
           
           const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
           const isInternal = quotationData.company_name?.toLowerCase().includes('internal') || false;
@@ -422,6 +424,27 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
               toast.success(`Advance Applied: ${advanceGLResult.entry_number}`);
             }
           }
+
+          // 3. Post discount if applicable
+          // DR Discount Expense | CR Trade Receivable
+          if (discountAmount > 0) {
+            console.log('[SPH GL] Posting discount to GL:', discountAmount);
+            const invoiceNo = `INV-${quotationData.quotation_no}-BAL`;
+
+            const discountGLResult = await postDiscountToGLStandalone({
+              invoiceNo,
+              quotationNo: quotationData.quotation_no,
+              customerName: quotationData.customer_name,
+              discountAmount,
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
+
+            if (discountGLResult) {
+              console.log('[SPH GL] ✅ Discount posted:', discountGLResult.entry_number);
+              toast.success(`Discount GL Entry: ${discountGLResult.entry_number}`);
+            }
+          }
         } else {
           console.log('[SPH GL] Auto-post invoices disabled or settings not found');
         }
@@ -435,8 +458,8 @@ export const GenerateBalanceInvoiceModal: React.FC<GenerateBalanceInvoiceModalPr
 
       toast.success(`Invoice emailed successfully to ${quotationData.customer_email}`);
       
-      // Delay to ensure database write completes before refresh
-      setTimeout(() => onInvoiceGenerated?.(), 500);
+      // Database write is already awaited above, call refresh directly
+      onInvoiceGenerated?.();
     } catch (error) {
       console.error('Error sending email:', error);
       toast.error('Failed to send invoice email');

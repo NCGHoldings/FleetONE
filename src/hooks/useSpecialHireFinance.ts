@@ -530,6 +530,179 @@ export async function applyAdvanceToInvoiceStandalone({
   return journalEntry;
 }
 
+// Standalone function to post post-trip adjustment to GL
+// When a trip has extra KM, extra time, or additional expenses, this records the additional revenue
+// DR Trade Receivable (Asset) | CR Special Hire Revenue (Revenue)
+export async function postPostTripAdjustmentToGLStandalone({
+  quotationNo,
+  customerName,
+  adjustmentAmount,
+  adjustmentDetails,
+  isInternal,
+  settings,
+  effectiveCompanyId,
+}: {
+  quotationNo: string;
+  customerName: string;
+  adjustmentAmount: number;
+  adjustmentDetails?: string;
+  isInternal?: boolean;
+  settings: any;
+  effectiveCompanyId: string;
+}) {
+  if (adjustmentAmount <= 0) {
+    console.log("[SPH GL] No positive adjustment to post");
+    return null;
+  }
+
+  const revenueAccountId = isInternal
+    ? settings?.revenue_internal_account_id
+    : settings?.revenue_external_account_id;
+
+  if (!settings?.trade_receivable_account_id || !revenueAccountId) {
+    console.warn("GL accounts not configured for Special Hire adjustments");
+    return null;
+  }
+
+  const entryNumber = `SPH-ADJ-${quotationNo}-${Date.now().toString(36).toUpperCase()}`;
+  const description = adjustmentDetails
+    ? `Post-trip adjustment - ${customerName} - ${quotationNo} (${adjustmentDetails})`
+    : `Post-trip adjustment - ${customerName} - ${quotationNo}`;
+
+  // Create journal entry
+  const { data: journalEntry, error: jeError } = await supabase
+    .from("journal_entries")
+    .insert({
+      entry_number: entryNumber,
+      entry_date: format(new Date(), "yyyy-MM-dd"),
+      description,
+      reference: quotationNo,
+      total_debit: adjustmentAmount,
+      total_credit: adjustmentAmount,
+      status: "posted",
+      company_id: effectiveCompanyId,
+      business_unit_code: "SPH",
+      posted_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (jeError) throw jeError;
+
+  // Create journal entry lines
+  // DR Trade Receivable (customer owes more)
+  // CR Revenue (additional revenue recognized)
+  const { error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .insert([
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.trade_receivable_account_id,
+        description: `Adjustment receivable - ${customerName} (${quotationNo})`,
+        debit: adjustmentAmount,
+        credit: 0,
+        company_id: effectiveCompanyId,
+      },
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: revenueAccountId,
+        description: `Adjustment revenue - ${quotationNo}`,
+        debit: 0,
+        credit: adjustmentAmount,
+        company_id: effectiveCompanyId,
+      },
+    ]);
+
+  if (linesError) throw linesError;
+
+  // Update COA balances
+  await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+  return journalEntry;
+}
+
+// Standalone function to post discount to GL
+// When a discount is applied, this reduces the receivable
+// DR Discount Expense (Expense) | CR Trade Receivable (Asset)
+export async function postDiscountToGLStandalone({
+  invoiceNo,
+  quotationNo,
+  customerName,
+  discountAmount,
+  settings,
+  effectiveCompanyId,
+}: {
+  invoiceNo: string;
+  quotationNo: string;
+  customerName: string;
+  discountAmount: number;
+  settings: any;
+  effectiveCompanyId: string;
+}) {
+  if (discountAmount <= 0) {
+    console.log("[SPH GL] No discount to post");
+    return null;
+  }
+
+  if (!settings?.discount_expense_account_id || !settings?.trade_receivable_account_id) {
+    console.warn("GL accounts not configured for Special Hire discounts");
+    return null;
+  }
+
+  const entryNumber = `SPH-DISC-${invoiceNo}-${Date.now().toString(36).toUpperCase()}`;
+
+  // Create journal entry
+  const { data: journalEntry, error: jeError } = await supabase
+    .from("journal_entries")
+    .insert({
+      entry_number: entryNumber,
+      entry_date: format(new Date(), "yyyy-MM-dd"),
+      description: `Discount given - ${customerName} - ${invoiceNo}`,
+      reference: quotationNo,
+      total_debit: discountAmount,
+      total_credit: discountAmount,
+      status: "posted",
+      company_id: effectiveCompanyId,
+      business_unit_code: "SPH",
+      posted_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (jeError) throw jeError;
+
+  // Create journal entry lines
+  // DR Discount Expense (Expense increases)
+  // CR Trade Receivable (Asset decreases — customer owes less)
+  const { error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .insert([
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.discount_expense_account_id,
+        description: `Discount expense - ${customerName} (${invoiceNo})`,
+        debit: discountAmount,
+        credit: 0,
+        company_id: effectiveCompanyId,
+      },
+      {
+        journal_entry_id: journalEntry.id,
+        account_id: settings.trade_receivable_account_id,
+        description: `Reduce receivable for discount - ${customerName}`,
+        debit: 0,
+        credit: discountAmount,
+        company_id: effectiveCompanyId,
+      },
+    ]);
+
+  if (linesError) throw linesError;
+
+  // Update COA balances
+  await updateAccountBalancesFromJournalEntry(journalEntry.id);
+
+  return journalEntry;
+}
+
 export interface SpecialHireFinanceSettings {
   id: string;
   company_id: string;

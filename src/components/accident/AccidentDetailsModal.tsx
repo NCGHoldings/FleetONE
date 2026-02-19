@@ -30,8 +30,10 @@ import {
   Trash2,
   Edit,
   Save,
-  X
+  X,
+  BookOpen
 } from "lucide-react";
+import { useInsuranceFinanceSettings, usePostInsuranceClaimToGL } from "@/hooks/useInsuranceFinance";
 
 interface AccidentRecord {
   id: string;
@@ -88,6 +90,10 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
   const [formData, setFormData] = useState<Partial<AccidentRecord>>({});
 
   const isAdmin = hasRole('super_admin') || hasRole('admin') || hasRole('supervisor');
+
+  // Finance integration
+  const { data: insuranceFinanceSettings } = useInsuranceFinanceSettings();
+  const postClaimToGL = usePostInsuranceClaimToGL();
 
   useEffect(() => {
     if (accident) {
@@ -154,6 +160,27 @@ export function AccidentDetailsModal({ accident, open, onOpenChange, onUpdate }:
       toast.success('Accident record updated successfully');
       setEditMode(false);
       onUpdate();
+
+      // Auto-post to GL when claim is approved/settled with an approved amount
+      const statusChanged = formData.status !== accident.status;
+      const hasApprovedAmount = (formData.approved_amount || 0) > 0;
+      const isClaimApproved = formData.status === 'Approved' || formData.status === 'Settlement';
+      
+      if (statusChanged && isClaimApproved && hasApprovedAmount && insuranceFinanceSettings && insuranceFinanceSettings.auto_post_premium) {
+        postClaimToGL.mutate({
+          claim: {
+            claimId: accident.id,
+            policyNumber: formData.insurer_claim_ref || formData.bl_number || `CLM-${accident.no}`,
+            vehicleNo: formData.vehicle_number,
+            claimAmount: formData.approved_amount!,
+            claimDate: formData.accident_date || new Date().toISOString().slice(0, 10),
+            claimType: 'vehicle_accident',
+            description: `Insurance claim - ${formData.vehicle_number} - ${formData.details_of_accident || 'Accident claim'}`,
+          },
+          settings: insuranceFinanceSettings,
+          received: formData.status === 'Settlement',
+        });
+      }
     } catch (error: any) {
       console.error('Error updating accident:', error);
       toast.error(error.message || 'Failed to update accident record');

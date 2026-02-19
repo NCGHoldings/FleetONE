@@ -9,10 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, MoreHorizontal, Wrench, Calendar, AlertTriangle, CheckCircle, Clock, Play } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Wrench, Calendar, AlertTriangle, CheckCircle, Clock, Play, BookOpen, Loader2 } from "lucide-react";
 import { useAssetMaintenanceLogs, useUpcomingMaintenance, useStartMaintenance, useCompleteMaintenance, useCancelMaintenance } from "@/hooks/useAssetMaintenance";
+import { useMaintenanceFinanceSettings, usePostMaintenanceCostToGL } from "@/hooks/useMaintenanceFinance";
 import { CurrencyDisplay } from "@/components/accounting/shared/CurrencyDisplay";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 export const AssetMaintenanceView = () => {
   const [statusFilter, setStatusFilter] = useState<string>("_all");
@@ -27,6 +29,10 @@ export const AssetMaintenanceView = () => {
   const startMaintenance = useStartMaintenance();
   const completeMaintenance = useCompleteMaintenance();
   const cancelMaintenance = useCancelMaintenance();
+
+  // Finance integration
+  const { data: maintenanceFinanceSettings } = useMaintenanceFinanceSettings();
+  const postMaintenanceToGL = usePostMaintenanceCostToGL();
 
   const filteredLogs = logs?.filter(log => 
     log.fixed_assets?.asset_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -89,12 +95,32 @@ export const AssetMaintenanceView = () => {
   const handleCompleteMaintenance = () => {
     if (!selectedLog) return;
     
+    const cost = completionCost ? parseFloat(completionCost) : undefined;
+    
     completeMaintenance.mutate({
       logId: selectedLog.id,
-      cost: completionCost ? parseFloat(completionCost) : undefined,
+      cost,
       completion_notes: completionNotes,
     }, {
       onSuccess: () => {
+        // Auto-post to GL if auto_post_on_complete is enabled, settings configured, and cost > 0
+        if (cost && cost > 0 && maintenanceFinanceSettings && maintenanceFinanceSettings.auto_post_on_complete) {
+          postMaintenanceToGL.mutate({
+            maintenance: {
+              maintenanceLogId: selectedLog.id,
+              assetName: selectedLog.fixed_assets?.asset_name || 'Unknown Asset',
+              assetId: selectedLog.asset_id || selectedLog.id,
+              cost: cost,
+              sparePartsCost: cost * 0.6,
+              laborCost: cost * 0.4,
+              maintenanceDate: new Date().toISOString().slice(0, 10),
+              maintenanceType: (selectedLog.maintenance_type as "preventive" | "corrective" | "predictive" | "emergency") || 'corrective',
+              paymentMethod: 'bank',
+              description: `Maintenance completed - ${selectedLog.fixed_assets?.asset_name}`,
+            },
+            settings: maintenanceFinanceSettings,
+          });
+        }
         setIsCompleteDialogOpen(false);
         setSelectedLog(null);
         setCompletionNotes("");
@@ -212,6 +238,7 @@ export const AssetMaintenanceView = () => {
                 <TableHead>Team</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>GL</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
@@ -234,6 +261,43 @@ export const AssetMaintenanceView = () => {
                     {log.cost ? <CurrencyDisplay amount={log.cost} /> : "-"}
                   </TableCell>
                   <TableCell>{getStatusBadge(log.status)}</TableCell>
+                  <TableCell>
+                    {log.status === 'completed' && log.cost && !(log as any).gl_posted ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-blue-600 h-7 text-xs"
+                        disabled={postMaintenanceToGL.isPending}
+                        onClick={() => {
+                          if (maintenanceFinanceSettings) {
+                            postMaintenanceToGL.mutate({
+                              maintenance: {
+                                maintenanceLogId: log.id,
+                                assetName: log.fixed_assets?.asset_name || 'Unknown',
+                                assetId: log.asset_id || log.id,
+                                cost: log.cost,
+                                sparePartsCost: log.cost * 0.6,
+                                laborCost: log.cost * 0.4,
+                                maintenanceDate: log.completed_at || log.maintenance_date,
+                                maintenanceType: (log.maintenance_type as "preventive" | "corrective" | "predictive" | "emergency") || 'corrective',
+                                paymentMethod: 'bank',
+                                description: `Maintenance - ${log.fixed_assets?.asset_name || 'Unknown'}`,
+                              },
+                              settings: maintenanceFinanceSettings,
+                            });
+                          } else {
+                            toast.error('Configure Finance Settings first');
+                          }
+                        }}
+                      >
+                        <BookOpen className="h-3 w-3 mr-1" />Post GL
+                      </Button>
+                    ) : (log as any).gl_posted ? (
+                      <Badge variant="outline" className="text-xs text-green-600">Posted</Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

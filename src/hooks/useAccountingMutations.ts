@@ -342,6 +342,33 @@ export const useCreateARInvoice = () => {
         
         await supabase.from("ar_invoice_lines").insert(lineData);
       }
+
+      // ========== AUTO GL POSTING: DR Trade Receivable, CR Sales Revenue ==========
+      try {
+        const { data: glSettings } = await supabase
+          .from("gl_settings")
+          .select("trade_receivable_account_id, sales_revenue_account_id")
+          .eq("company_id", effectiveCompanyId)
+          .maybeSingle();
+
+        if (glSettings?.trade_receivable_account_id && glSettings?.sales_revenue_account_id && invoice.total_amount > 0) {
+          const { postARInvoiceToGL } = await import("@/lib/gl-posting-utils");
+          const glResult = await postARInvoiceToGL({
+            invoiceNumber: invoice.invoice_number,
+            invoiceDate: invoice.invoice_date,
+            totalAmount: invoice.total_amount,
+            tradeReceivableId: glSettings.trade_receivable_account_id,
+            salesRevenueId: glSettings.sales_revenue_account_id,
+            companyId: effectiveCompanyId,
+            businessUnitCode: businessUnitCode || undefined,
+          });
+          if (!glResult.success) {
+            console.warn("AR Invoice GL posting failed:", glResult.error);
+          }
+        }
+      } catch (glError) {
+        console.warn("AR Invoice GL posting error:", glError);
+      }
       
       return data;
     },
@@ -349,6 +376,8 @@ export const useCreateARInvoice = () => {
       queryClient.invalidateQueries({ queryKey: ["ar-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["ar-summary"] });
       queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
       toast.success("Invoice created successfully");
     },
     onError: (error) => {
@@ -1370,16 +1399,62 @@ export const useCreateAPDebitNote = () => {
 // ============ AP Approvals ============
 export const useApproveAPInvoice = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   
   return useMutation({
     mutationFn: async (id: string) => {
+      // Update approval status
       const { error } = await supabase.from("ap_invoices").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
+
+      // ========== AUTO GL POSTING: DR Expense, CR Trade Payable ==========
+      try {
+        const effectiveCompanyId = getEffectiveCompanyId();
+        const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
+
+        // Fetch invoice details
+        const { data: invoice } = await supabase
+          .from("ap_invoices")
+          .select("invoice_number, invoice_date, total_amount, expense_account_id, vendors(vendor_name)")
+          .eq("id", id)
+          .single();
+
+        // Fetch GL settings
+        const { data: glSettings } = await supabase
+          .from("gl_settings")
+          .select("trade_payable_account_id, default_expense_account_id")
+          .eq("company_id", effectiveCompanyId)
+          .maybeSingle();
+
+        const expenseAccountId = invoice?.expense_account_id || glSettings?.default_expense_account_id;
+        const tradePayableId = glSettings?.trade_payable_account_id;
+
+        if (invoice && expenseAccountId && tradePayableId && invoice.total_amount > 0) {
+          const { postAPInvoiceToGL } = await import("@/lib/gl-posting-utils");
+          const vendorData = invoice.vendors as any;
+          const glResult = await postAPInvoiceToGL({
+            invoiceNumber: invoice.invoice_number,
+            invoiceDate: invoice.invoice_date,
+            totalAmount: invoice.total_amount,
+            expenseAccountId,
+            tradePayableId,
+            companyId: effectiveCompanyId,
+            businessUnitCode,
+            vendorName: vendorData?.vendor_name,
+          });
+          if (!glResult.success) {
+            console.warn("AP Invoice GL posting failed:", glResult.error);
+          }
+        }
+      } catch (glError) {
+        console.warn("AP Invoice GL posting error:", glError);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ap-invoices", selectedCompanyId] });
-      toast.success("Invoice approved");
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast.success("Invoice approved & posted to GL");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
   });
@@ -1592,13 +1667,74 @@ export const useRunRecurringEntry = () => {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("recurring_journal_entries" as any).update({ last_run_date: new Date().toISOString().split('T')[0] }).eq("id", id);
-      if (error) throw error;
+      if (!selectedCompanyId) throw new Error("No company selected");
+
+      // 1. Fetch the recurring entry details
+      const { data: entry, error: fetchError } = await (supabase as any)
+        .from("recurring_journal_entries")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (fetchError) throw fetchError;
+
+      // 2. Create actual journal entry via GL posting
+      const { createAndPostJournalEntry, generateEntryNumber } = await import("@/lib/gl-posting-utils");
+      const entryNumber = generateEntryNumber("REC");
+      const today = new Date().toISOString().split('T')[0];
+
+      const glResult = await createAndPostJournalEntry({
+        entry_date: today,
+        description: `Recurring: ${entry.entry_name} - ${entry.description}`,
+        reference: entryNumber,
+        company_id: selectedCompanyId,
+        lines: [
+          {
+            account_id: entry.debit_account_id,
+            description: entry.description || entry.entry_name,
+            debit: entry.amount,
+            credit: 0,
+          },
+          {
+            account_id: entry.credit_account_id,
+            description: entry.description || entry.entry_name,
+            debit: 0,
+            credit: entry.amount,
+          },
+        ],
+      });
+
+      if (!glResult.success) {
+        throw new Error(glResult.error || "Failed to create journal entry");
+      }
+
+      // 3. Calculate next run date based on frequency
+      const nextRunDate = new Date(today);
+      switch (entry.frequency) {
+        case 'daily': nextRunDate.setDate(nextRunDate.getDate() + 1); break;
+        case 'weekly': nextRunDate.setDate(nextRunDate.getDate() + 7); break;
+        case 'monthly': nextRunDate.setMonth(nextRunDate.getMonth() + 1); break;
+        case 'quarterly': nextRunDate.setMonth(nextRunDate.getMonth() + 3); break;
+        case 'yearly': nextRunDate.setFullYear(nextRunDate.getFullYear() + 1); break;
+      }
+
+      // 4. Update last_run_date, next_run_date, and run_count
+      const { error: updateError } = await (supabase as any)
+        .from("recurring_journal_entries")
+        .update({
+          last_run_date: today,
+          next_run_date: nextRunDate.toISOString().split('T')[0],
+          run_count: (entry.run_count || 0) + 1,
+        })
+        .eq("id", id);
+      if (updateError) throw updateError;
+
+      return glResult;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recurring-entries", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
-      toast.success("Entry executed");
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast.success("Recurring entry executed — journal entry posted to GL");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
   });
@@ -1876,13 +2012,57 @@ export const useCreateFundTransfer = () => {
         company_id: selectedCompanyId,
       }]).select().single();
       if (error) throw error;
+
+      // ========== AUTO GL POSTING: DR To Account, CR From Account ==========
+      try {
+        const { createAndPostJournalEntry, generateEntryNumber } = await import("@/lib/gl-posting-utils");
+
+        // Fetch account names for description
+        const { data: fromAccount } = await supabase.from("chart_of_accounts").select("account_name, account_code").eq("id", data.from_account_id).single();
+        const { data: toAccount } = await supabase.from("chart_of_accounts").select("account_name, account_code").eq("id", data.to_account_id).single();
+
+        const fromName = fromAccount ? `${fromAccount.account_code} - ${fromAccount.account_name}` : 'Source Account';
+        const toName = toAccount ? `${toAccount.account_code} - ${toAccount.account_name}` : 'Destination Account';
+
+        const glResult = await createAndPostJournalEntry({
+          entry_date: data.transfer_date,
+          description: `Fund Transfer: ${fromName} → ${toName}`,
+          reference: data.reference || generateEntryNumber("FT"),
+          company_id: selectedCompanyId,
+          lines: [
+            {
+              account_id: data.to_account_id,
+              description: `Transfer in from ${fromName}`,
+              debit: data.amount,
+              credit: 0,
+            },
+            {
+              account_id: data.from_account_id,
+              description: `Transfer out to ${toName}`,
+              debit: 0,
+              credit: data.amount,
+            },
+          ],
+        });
+
+        if (glResult.success && glResult.journalEntryId) {
+          await supabase.from("fund_transfers" as any).update({ journal_entry_id: glResult.journalEntryId }).eq("id", (result as any).id);
+        } else {
+          console.warn("Fund transfer GL posting failed:", glResult.error);
+        }
+      } catch (glError) {
+        console.warn("Fund transfer GL posting error:", glError);
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fund-transfers", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["bank-accounts", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["bank-transactions", selectedCompanyId] });
-      toast.success("Fund transfer completed");
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast.success("Fund transfer completed & posted to GL");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
   });

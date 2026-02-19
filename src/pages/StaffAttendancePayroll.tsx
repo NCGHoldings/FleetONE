@@ -18,6 +18,9 @@ import {
 import { useStaffRegistry } from "@/hooks/useStaffRegistry";
 import { useCommissions } from "@/hooks/useCommissions";
 import { AttendanceCalendar } from "@/components/staff/AttendanceCalendar";
+import { usePayrollFinanceSettings, usePostPayrollToGL } from "@/hooks/usePayrollFinance";
+import { useCommissionFinanceSettings, usePostCommissionPayoutToGL } from "@/hooks/useCommissionFinance";
+import { BookOpen } from "lucide-react";
 
 interface AttendanceRow {
   id: string;
@@ -65,6 +68,12 @@ export default function StaffAttendancePayroll() {
   const [generatingPayroll, setGeneratingPayroll] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('calendar');
   const [tripsWithoutStaff, setTripsWithoutStaff] = useState<string[]>([]);
+
+  // Finance integration hooks
+  const { data: payrollFinanceSettings } = usePayrollFinanceSettings();
+  const postPayrollToGL = usePostPayrollToGL();
+  const { data: commissionFinanceSettings } = useCommissionFinanceSettings();
+  const postCommissionToGL = usePostCommissionPayoutToGL();
 
   const [period, setPeriod] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10),
@@ -223,6 +232,34 @@ export default function StaffAttendancePayroll() {
       if (error) throw error;
       toast.success(`Payroll generated for ${data.summary?.totalStaff || 0} staff members`);
       await fetchPayroll();
+
+      // Auto-post to GL if auto_post_on_process is enabled
+      if (payrollFinanceSettings?.auto_post_on_process && data.summary) {
+        const batch = payroll.filter(p => p.status === 'confirmed' || p.status === 'generated');
+        if (batch.length > 0) {
+          const totalSalary = batch.reduce((s, r) => s + r.base_salary, 0);
+          const totalOvertime = batch.reduce((s, r) => s + r.overtime_pay, 0);
+          const totalDeductions = batch.reduce((s, r) => s + r.deductions, 0);
+          const totalNet = batch.reduce((s, r) => s + (r.base_salary + r.overtime_pay + r.allowances - r.deductions), 0);
+          postPayrollToGL.mutate({
+            batch: {
+              payrollIds: batch.map(r => r.id),
+              periodStart: period.start,
+              periodEnd: period.end,
+              totalBaseSalary: totalSalary,
+              totalOvertimePay: totalOvertime,
+              totalBonuses: 0,
+              totalEPFEmployee: totalDeductions * 0.3,
+              totalEPFEmployer: totalDeductions * 0.45,
+              totalETFEmployer: totalDeductions * 0.15,
+              totalPAYE: totalDeductions * 0.1,
+              totalNetPay: totalNet,
+              employeeCount: batch.length,
+            },
+            settings: payrollFinanceSettings,
+          });
+        }
+      }
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || 'Payroll generation failed');
@@ -238,6 +275,22 @@ export default function StaffAttendancePayroll() {
     }
     const ids = pendingCommissions.map(c => c.id);
     await bulkApprove(ids, user?.id || '');
+
+    // Auto-post to GL if auto_post_on_paid is enabled
+    if (commissionFinanceSettings?.auto_post_on_paid) {
+      const totalAmount = pendingCommissions.reduce((s, c) => s + c.commission_amount, 0);
+      postCommissionToGL.mutate({
+        payout: {
+          commissionIds: ids,
+          staffName: 'Bulk Payout',
+          staffId: 'bulk',
+          totalAmount,
+          payoutDate: new Date().toISOString().slice(0, 10),
+          description: `Auto-post: Bulk commission payout - ${ids.length} commissions`,
+        },
+        settings: commissionFinanceSettings,
+      });
+    }
   };
 
   const exportCSV = (rows: any[], filename: string) => {
@@ -562,6 +615,37 @@ export default function StaffAttendancePayroll() {
                     Approve All ({pendingCommissions.length})
                   </Button>
                 )}
+                {approvedCommissions.length > 0 && (
+                  <Button
+                    variant="secondary"
+                    disabled={postCommissionToGL.isPending}
+                    onClick={() => {
+                      const totalAmount = approvedCommissions.reduce((s, c) => s + c.commission_amount, 0);
+                      if (commissionFinanceSettings) {
+                        postCommissionToGL.mutate({
+                          payout: {
+                            commissionIds: approvedCommissions.map(c => c.id),
+                            staffName: 'Bulk Payout',
+                            staffId: 'bulk',
+                            totalAmount,
+                            payoutDate: new Date().toISOString().slice(0, 10),
+                            description: `Bulk commission payout - ${approvedCommissions.length} commissions`,
+                          },
+                          settings: commissionFinanceSettings,
+                        });
+                      } else {
+                        toast.error('Please configure Commission Finance Settings first');
+                      }
+                    }}
+                  >
+                    {postCommissionToGL.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <BookOpen className="h-4 w-4 mr-2" />
+                    )}
+                    Pay & Post to GL ({approvedCommissions.length})
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => exportCSV(commissions, 'commissions.csv')}>
                   <Download className="h-4 w-4 mr-2"/>Export
                 </Button>
@@ -662,6 +746,47 @@ export default function StaffAttendancePayroll() {
                   )}
                   Generate Payroll
                 </Button>
+                {payroll.filter(p => p.status === 'confirmed' || p.status === 'generated').length > 0 && (
+                  <Button
+                    variant="secondary"
+                    disabled={postPayrollToGL.isPending}
+                    onClick={() => {
+                      const batch = payroll.filter(p => p.status === 'confirmed' || p.status === 'generated');
+                      const totalSalary = batch.reduce((s, r) => s + r.base_salary, 0);
+                      const totalOvertime = batch.reduce((s, r) => s + r.overtime_pay, 0);
+                      const totalDeductions = batch.reduce((s, r) => s + r.deductions, 0);
+                      const totalNet = batch.reduce((s, r) => s + (r.base_salary + r.overtime_pay + r.allowances - r.deductions), 0);
+                      if (payrollFinanceSettings) {
+                        postPayrollToGL.mutate({
+                          batch: {
+                            payrollIds: batch.map(r => r.id),
+                            periodStart: period.start,
+                            periodEnd: period.end,
+                            totalBaseSalary: totalSalary,
+                            totalOvertimePay: totalOvertime,
+                            totalBonuses: 0,
+                            totalEPFEmployee: totalDeductions * 0.3,
+                            totalEPFEmployer: totalDeductions * 0.45,
+                            totalETFEmployer: totalDeductions * 0.15,
+                            totalPAYE: totalDeductions * 0.1,
+                            totalNetPay: totalNet,
+                            employeeCount: batch.length,
+                          },
+                          settings: payrollFinanceSettings,
+                        });
+                      } else {
+                        toast.error('Please configure Payroll Finance Settings first');
+                      }
+                    }}
+                  >
+                    {postPayrollToGL.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <BookOpen className="h-4 w-4 mr-2" />
+                    )}
+                    Post to GL
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => exportCSV(payroll, 'payroll.csv')}>
                   <Download className="h-4 w-4 mr-2"/>Export
                 </Button>

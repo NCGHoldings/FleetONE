@@ -408,7 +408,7 @@ export function useCashFlowData(
       indirectOperating, netIndirectOperating: netIndirectOp,
       investingItems, netInvesting: netInv,
       financingItems, netFinancing: netFin,
-      netCashChange: netDirectOp + netInv + netFin,
+      netCashChange: closingCash - openingCash,
       openingCash, closingCash,
       workingCapital: wcItems, netIncome, depreciation,
       periodLabel: `${fmtD(periodStart)} – ${fmtD(periodEnd)}`,

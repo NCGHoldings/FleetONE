@@ -701,17 +701,30 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
               if (watchedBusTypeId && watchedHireType) {
                 // Use Lyceum rates for both Lyceum and Internal hire types
                 const rateCardHireType = watchedHireType === 'Internal' ? 'Lyceum' : watchedHireType;
-                const { data: rateCards } = await supabase
+                // FIX: Use .not() to filter for cards that have exceeding_km_rate set,
+                // and .maybeSingle() to handle multiple range-based rate cards gracefully
+                const { data: rateCard, error: rateError } = await supabase
                   .from('hire_rate_cards')
                   .select('exceeding_km_rate_lkr')
                   .eq('hire_type', rateCardHireType)
                   .eq('bus_type_id', watchedBusTypeId)
                   .eq('is_active', true)
+                  .not('exceeding_km_rate_lkr', 'is', null)
                   .limit(1)
-                  .single();
+                  .maybeSingle();
 
-                if (rateCards && rateCards.exceeding_km_rate_lkr) {
-                  const calculatedAmount = value * rateCards.exceeding_km_rate_lkr;
+                if (rateError) {
+                  console.error('Error fetching exceeding KM rate:', rateError);
+                  toast({
+                    title: "Rate Card Error",
+                    description: "Could not fetch exceeding KM rate. Please check rate card configuration.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                if (rateCard && rateCard.exceeding_km_rate_lkr) {
+                  const calculatedAmount = value * rateCard.exceeding_km_rate_lkr;
                   setAdditionalCharges(prevCharges =>
                     prevCharges.map(prevCharge =>
                       prevCharge.id === id
@@ -719,6 +732,12 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                         : prevCharge
                     )
                   );
+                } else {
+                  toast({
+                    title: "No Exceeding KM Rate",
+                    description: `No exceeding KM rate configured for ${rateCardHireType} hire type. Please set it in Rate Cards.`,
+                    variant: "destructive",
+                  });
                 }
               }
             };

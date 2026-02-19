@@ -3,7 +3,137 @@
 > **Purpose:** This file documents all changes made by **Antigravity** (external AI development tool).
 > Lovable should read this file before any development to avoid duplicating or conflicting with these changes.
 >
-> **Last Updated:** 2026-02-16
+> **Last Updated:** 2026-02-18
+
+---
+
+## 2026-02-18
+
+### 🔍 Special Hire System Audit — 3 GL Gap Fixes
+
+**Audit Scope:** 67 components, 17 hooks across the entire Special Hire financial system.
+
+**Critical GL Gaps Fixed:**
+
+- **Post-Trip Adjustment GL:** `PostTripAdjustmentModal.handleFinalize` now posts DR Trade Receivable / CR Revenue via new `postPostTripAdjustmentToGLStandalone` (extra KM, time, expenses were previously invisible to GL)
+- **Enhanced Status Modal Refund GL:** `EnhancedTripStatusManagementModal.handleSubmit` now posts DR Customer Advance / CR Bank via `postRefundToGLStandalone` (the basic modal had this, the enhanced version didn't)
+- **Discount GL Posting:** `GenerateBalanceInvoiceModal.handleEmailToCustomer` now posts DR Discount Expense / CR Trade Receivable via new `postDiscountToGLStandalone` (discount hook existed but was never called from UI)
+
+**Accounting Fix:** Invoice GL now posts **gross** amount before discount, with a separate discount entry (previously netted before posting).
+
+**New Standalone Functions (useSpecialHireFinance.ts):**
+
+- `postPostTripAdjustmentToGLStandalone` — DR Trade Receivable / CR Revenue
+- `postDiscountToGLStandalone` — DR Discount Expense / CR Trade Receivable
+
+---
+
+### 🚀 Advanced Finance Automation — 4 GL Fixes + Automation Engine
+
+**Critical GL Integration Fixes (useAccountingMutations.ts):**
+
+- **AR Invoices:** `useCreateARInvoice` now auto-posts DR Trade Receivable / CR Sales Revenue via `postARInvoiceToGL`
+- **AP Invoice Approval:** `useApproveAPInvoice` now auto-posts DR Expense / CR Trade Payable via `postAPInvoiceToGL`
+- **Recurring Entries:** `useRunRecurringEntry` now creates real journal entries via `createAndPostJournalEntry` (was only updating `last_run_date`)
+- **Fund Transfers:** `useCreateFundTransfer` now posts DR/CR to respective bank accounts
+
+**New Files Created:**
+
+- `src/hooks/useFinanceAutomationEngine.ts` — 6 hooks: overdue entry detection, batch execution, GL balance health check, discrepancy fix, recent auto-posts, module health monitoring
+- `src/components/accounting/FinanceAutomationDashboard.tsx` — Command-center: module health status, overdue entry runner, GL balance checker, recent post log
+
+**Modified:**
+
+- `src/pages/Accounting.tsx` — Added "Automation Engine" tab as default in Automation module
+
+---
+
+### ✅ Finance Integration Hooks — 6 New GL Posting Modules
+
+**Files Created:**
+
+- `src/hooks/usePayrollFinance.ts` — **[NEW]** GL posting for payroll batches (DR Salary/Overtime/Bonus Expense, CR PAYE/EPF/ETF Payable, CR Bank). Supports salary, overtime, bonuses, statutory deductions.
+- `src/hooks/useCommissionFinance.ts` — **[NEW]** GL posting for commission payouts (DR Commission Expense / CR Bank). Handles bank balance updates and bank transaction records.
+- `src/hooks/useMaintenanceFinance.ts` — **[NEW]** GL posting for vehicle maintenance costs (DR Maintenance Expense / CR Bank or AP). Supports parts/labor cost splitting and AP invoice creation for credit purchases.
+- `src/hooks/useInsuranceFinance.ts` — **[NEW]** GL posting for insurance: premium payments (DR Prepaid Insurance / CR Bank), monthly amortization (DR Insurance Expense / CR Prepaid Insurance), and claim recoveries (DR Claims Receivable / CR Claims Income).
+- `src/hooks/useExpenseRequestFinance.ts` — **[NEW]** GL posting for approved expense requests (DR Expense / CR Bank/Cash/AP). Maps expense categories to GL accounts. Supports petty cash, bank, IOU, and AP payment methods.
+- `src/hooks/useRoutePermitFinance.ts` — **[NEW]** GL posting for route permits (DR Permit Expense or Prepaid / CR Bank). Distinguishes annual (capitalize + amortize) vs temporary (expense immediately) permits.
+- `supabase/migrations/20260218_create_module_finance_settings.sql` — **[NEW]** Creates `module_finance_settings` table for per-module GL account mappings. Adds `gl_posted` and `journal_entry_id` columns to `asset_maintenance_logs` and `expense_requests`.
+
+### ✅ Finance Hooks — UI Wiring (GL Posting Triggers)
+
+**Files Modified:**
+
+- `src/pages/StaffAttendancePayroll.tsx` — Added "Post to GL" button on payroll batches. Added "Pay & Post to GL" button for approved commissions.
+- `src/components/accounting/assets/AssetMaintenanceView.tsx` — Auto-posts maintenance cost to GL on completion. Added GL status column and manual "Post GL" button for completed entries.
+- `src/components/accounting/ExpenseReviewView.tsx` — Auto-posts to GL on expense approval. Added GL status column and manual "Post GL" button. Uses `ExpenseRequestForGL` interface with `settings` + `mappings` params.
+- `src/pages/RoutePermits.tsx` — Auto-posts permit cost to GL when `annual_fee > 0`. Distinguishes annual (>90 days, 12-month coverage) vs temporary permits.
+- `src/components/accident/AccidentDetailsModal.tsx` — Auto-posts insurance claim recovery to GL when status changes to Approved/Settlement with approved_amount > 0.
+
+**Architecture Notes:**
+
+- All 6 hooks follow the same pattern: fetch/save per-module settings from `module_finance_settings`, create journal entries with double-entry lines, update COA balances, update bank balances, create bank transactions
+- GL account mappings are configuration-driven via `module_finance_settings` (JSONB `settings` column, keyed by `company_id` + `module_name`)
+- No existing hook files were modified — zero regression risk
+
+### ✅ Module GL Mappings — Admin Settings UI
+
+**Files Created / Modified:**
+
+- `src/components/settings/ModuleFinanceSettingsView.tsx` — **[NEW]** Unified admin UI with accordion panels for all 6 finance modules (Payroll, Commissions, Maintenance, Insurance, Expense Requests, Route Permits). Each panel has searchable GL account selectors, auto-post toggles, JE prefix config, and per-module save. Expense Requests also supports dynamic category-to-GL mappings.
+- `src/pages/Settings.tsx` — Added "Module GL Mappings" tab to the Settings page.
+
+### ✅ Finance Automation Audit — Auto-Post Toggle Gate Fixes
+
+All 6 new finance modules now properly respect their auto-post toggle settings:
+
+**Files Modified:**
+
+- `src/components/accounting/assets/AssetMaintenanceView.tsx` — GL post now gated behind `auto_post_on_complete` toggle
+- `src/components/accounting/ExpenseReviewView.tsx` — GL post now gated behind `auto_post_on_approve` toggle
+- `src/pages/RoutePermits.tsx` — GL post now gated behind `auto_post_on_renewal` toggle
+- `src/components/accident/AccidentDetailsModal.tsx` — GL post now gated behind `auto_post_premium` toggle
+- `src/pages/StaffAttendancePayroll.tsx` — Added auto-post after payroll generation (`auto_post_on_process`) and after commission bulk approval (`auto_post_on_paid`)
+
+---
+
+## 2026-02-17
+
+### ✅ Budget Section — Company-Wise Filtering & GL-Linked Actuals
+
+**Files Modified:**
+
+- `src/components/budgeting/BudgetDashboard.tsx` — Added `useCompany()` context for company-wise filtering. All queries (budgets, line items, GL entries, expense accounts) now filter by `effectiveCompanyId` with proper cache key invalidation.
+- `src/components/budgeting/BudgetAnalytics.tsx` — Added `useCompany()` context for company-wise filtering on all queries. Added `glAccountSpending` map that computes actual spending from GL journal entry lines per COA account. Category analysis and top variances now use GL-derived actuals when `account_id` is linked to a budget line item, falling back to manual `actual_amount` otherwise.
+
+**Architecture Notes:**
+
+- Both components follow the same pattern as `FinancialStatementsView`: `useCompany()` → `getEffectiveCompanyId()` → `.eq("company_id", ...)` on queries
+- GL-linked actuals: `budget_line_items.account_id` → matches `journal_entry_lines.account_id` → sums `debit - credit` for expense accounts within fiscal year
+- Queries re-fetch automatically when company changes via `queryKey` including `effectiveCompanyId`
+
+### ✅ P&L and Balance Sheet — Journal-Entry-Based Rebuild
+
+**Files Modified:**
+
+- `src/components/accounting/FinancialStatementsView.tsx` — **Major rewrite:** Rebuilt Profit & Loss and Balance Sheet reports to calculate figures from `journal_entry_lines` instead of aggregating raw transaction tables. Added date-range filtering for P&L and point-in-time reporting for Balance Sheet. Implemented PDF export for both financial statements using browser print API. Added export toolbar with PDF download button.
+
+### ✅ Budget Dashboard YTD Fix & Budget Analytics Tab
+
+**Files Modified:**
+
+- `src/components/budgeting/BudgetDashboard.tsx` — Fixed YTD actual spending calculation to correctly sum from journal entries within the budget period. Rebuilt variance analysis to compare budgeted vs. actual (journal-entry-derived) amounts. Added Budget Analytics tab with visual charts for budget vs. actual comparison, category breakdowns, and trend analysis.
+- `src/pages/Budgeting.tsx` — Updated tab navigation to include new Budget Analytics tab.
+
+### 🔧 Minor Fixes (Auto-Numbering & Cash Flow)
+
+**Files Modified:**
+
+- `src/components/accounting/ARInvoiceForm.tsx` — Minor fix for auto-numbering integration
+- `src/components/accounting/JournalEntryForm.tsx` — Minor fix for auto-numbering integration
+- `src/components/accounting/CustomerMasterView.tsx` — Minor UI adjustments
+- `src/components/accounting/VendorMasterView.tsx` — Minor UI adjustments
+- `src/hooks/useCashFlowData.ts` — Minor cash flow reconciliation fix
 
 ---
 
@@ -162,3 +292,11 @@
 - Mutation: `useCreateARReceipt` in `useAccountingMutations.ts`
 - UI: `ARReceiptForm.tsx` with `isAdvanceMode` prop
 - Allocations: `ar_receipt_allocations` table links receipts to invoices
+
+### Module Finance Settings (GL Account Mappings)
+
+- Table: `module_finance_settings` — stores per-module GL account configurations
+- Key columns: `company_id`, `module_name` (unique together), `settings` (JSONB)
+- Module names: `payroll`, `commissions`, `maintenance`, `insurance`, `expense_requests`, `route_permits`
+- Each hook reads/writes settings from this table using the same pattern
+- Related columns added: `asset_maintenance_logs.gl_posted`, `asset_maintenance_logs.journal_entry_id`, `expense_requests.gl_posted`, `expense_requests.journal_entry_id`

@@ -30,6 +30,7 @@ import { SinotruckFinanceSettings } from "@/components/settings/SinotruckFinance
 import { LightVehicleFinanceSettings } from "@/components/settings/LightVehicleFinanceSettings";
 import { NCGExpressFinanceSettings } from "@/components/settings/NCGExpressFinanceSettings";
 import { LeasingFinanceSettings } from "@/components/settings/LeasingFinanceSettings";
+import { ModuleFinanceSettingsView } from "@/components/settings/ModuleFinanceSettingsView";
 import { Truck, Wallet as WalletIcon } from "lucide-react";
 
 export default function Settings() {
@@ -162,6 +163,10 @@ export default function Settings() {
           <TabsTrigger value="leasing-finance" className="flex items-center gap-1">
             <WalletIcon className="h-3 w-3" />
             Leasing Finance
+          </TabsTrigger>
+          <TabsTrigger value="module-finance" className="flex items-center gap-1">
+            <WalletIcon className="h-3 w-3" />
+            Module GL Mappings
           </TabsTrigger>
         </TabsList>
 
@@ -631,6 +636,10 @@ export default function Settings() {
 
         <TabsContent value="leasing-finance" className="space-y-6 mt-6">
           <LeasingFinanceSettings />
+        </TabsContent>
+
+        <TabsContent value="module-finance" className="space-y-6 mt-6">
+          <ModuleFinanceSettingsView />
         </TabsContent>
       </Tabs>
     </div>

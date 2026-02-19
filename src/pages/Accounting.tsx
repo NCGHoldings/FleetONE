@@ -95,6 +95,7 @@ import { RecurringInvoicesView } from "@/components/accounting/automation/Recurr
 import { PaymentReminderRulesView } from "@/components/accounting/automation/PaymentReminderRulesView";
 import { WorkflowRulesView } from "@/components/accounting/automation/WorkflowRulesView";
 import { ScheduledTasksView } from "@/components/accounting/automation/ScheduledTasksView";
+import FinanceAutomationDashboard from "@/components/accounting/FinanceAutomationDashboard";
 // ERPNext Parity - Selling Module
 import { SalesOrderView } from "@/components/accounting/SalesOrderView";
 import { DeliveryNoteView } from "@/components/accounting/DeliveryNoteView";
@@ -880,9 +881,10 @@ const Accounting = () => {
 
           {/* Automation Module */}
           {activeModule === "automation" && (
-            <Tabs defaultValue="recurring" className="space-y-6">
+            <Tabs defaultValue="engine" className="space-y-6">
               <ScrollArea className="w-full whitespace-nowrap">
                 <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="engine">Automation Engine</TabsTrigger>
                   <TabsTrigger value="recurring">Recurring Invoices</TabsTrigger>
                   <TabsTrigger value="reminders">Payment Reminders</TabsTrigger>
                   <TabsTrigger value="workflows">Workflow Rules</TabsTrigger>
@@ -890,6 +892,10 @@ const Accounting = () => {
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
+
+              <TabsContent value="engine">
+                <FinanceAutomationDashboard />
+              </TabsContent>
 
               <TabsContent value="recurring">
                 <RecurringInvoicesView />

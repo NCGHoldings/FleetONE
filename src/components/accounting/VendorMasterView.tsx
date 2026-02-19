@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -29,8 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Building2, Store } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Building2, Store, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useGenerateNumber } from "@/hooks/useNumbering";
 
 interface Vendor {
   id: string;
@@ -54,6 +55,8 @@ export function VendorMasterView() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const queryClient = useQueryClient();
   const { selectedCompanyId, selectedCompany, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
+  const generateNumber = useGenerateNumber();
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   
   // For consolidated GL: use parent company ID for storage, filter by business unit
   const effectiveCompanyId = getEffectiveCompanyId();
@@ -236,8 +239,20 @@ export function VendorMasterView() {
               </Badge>
             )}
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          <Dialog open={isDialogOpen} onOpenChange={async (open) => {
             setIsDialogOpen(open);
+            if (open && !editingVendor) {
+              // Auto-generate vendor code for new vendors
+              setIsGeneratingCode(true);
+              try {
+                const code = await generateNumber("vendor");
+                setFormData(prev => ({ ...prev, vendor_code: code }));
+              } catch (err) {
+                console.error("Failed to generate vendor code:", err);
+              } finally {
+                setIsGeneratingCode(false);
+              }
+            }
             if (!open) {
               resetForm();
               setEditingVendor(null);
@@ -259,12 +274,20 @@ export function VendorMasterView() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="vendor_code">Vendor Code *</Label>
-                    <Input
-                      id="vendor_code"
-                      value={formData.vendor_code}
-                      onChange={(e) => setFormData({ ...formData, vendor_code: e.target.value })}
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="vendor_code"
+                        value={formData.vendor_code}
+                        onChange={(e) => setFormData({ ...formData, vendor_code: e.target.value })}
+                        required
+                        readOnly={!editingVendor}
+                        placeholder="Auto-generated"
+                        className={!editingVendor ? "bg-muted pr-9" : ""}
+                      />
+                      {isGeneratingCode && (
+                        <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="vendor_name">Vendor Name *</Label>

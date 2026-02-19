@@ -271,6 +271,46 @@ export const PostTripAdjustmentModal = ({
       setAdjustmentFinalized(true);
       onAdjustmentSaved?.();
       toast.success('Adjustment finalized successfully!');
+
+      // ========================
+      // GL POSTING FOR POST-TRIP ADJUSTMENT
+      // ========================
+      if (totals.adjustment_amount > 0) {
+        try {
+          const { postPostTripAdjustmentToGLStandalone, fetchSpecialHireFinanceSettings, NCG_HOLDING_ID } = await import("@/hooks/useSpecialHireFinance");
+          const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
+
+          if (settings) {
+            // Build adjustment details string
+            const details: string[] = [];
+            if (extraKm > 0) details.push(`Extra ${extraKm} km`);
+            if (timeAdjustmentResult?.totalTimeAdjustment && timeAdjustmentResult.totalTimeAdjustment > 0) details.push(`Time adj LKR ${timeAdjustmentResult.totalTimeAdjustment.toLocaleString()}`);
+            if (totals.total_additional_expenses > 0) details.push(`Addl expenses LKR ${totals.total_additional_expenses.toLocaleString()}`);
+
+            const glResult = await postPostTripAdjustmentToGLStandalone({
+              quotationNo,
+              customerName,
+              adjustmentAmount: totals.adjustment_amount,
+              adjustmentDetails: details.join(', '),
+              settings,
+              effectiveCompanyId: NCG_HOLDING_ID,
+            });
+
+            if (glResult) {
+              console.log('Post-trip adjustment posted to GL:', glResult.entry_number);
+              toast.success('Adjustment posted to General Ledger');
+            }
+          } else {
+            console.log('Special Hire Finance settings not configured - skipping GL posting');
+          }
+        } catch (glError) {
+          console.error('GL posting for adjustment failed (non-blocking):', glError);
+          toast.warning('Adjustment finalized but GL posting failed. Check Finance Settings.');
+        }
+      }
+      // ========================
+      // END GL POSTING
+      // ========================
     }
   };
 

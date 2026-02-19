@@ -5,6 +5,7 @@ import { BudgetDashboard } from "@/components/budgeting/BudgetDashboard";
 import { BudgetListView } from "@/components/budgeting/BudgetListView";
 import { CreateBudgetWizard } from "@/components/budgeting/CreateBudgetWizard";
 import { TemplateLibrary } from "@/components/budgeting/TemplateLibrary";
+import { BudgetAnalytics } from "@/components/budgeting/BudgetAnalytics";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, AlertCircle, Lock } from "lucide-react";
@@ -85,10 +86,7 @@ const Budgeting = () => {
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-6">
-          <div className="text-center p-12 border rounded-lg">
-            <h3 className="text-lg font-semibold mb-2">Analytics Dashboard</h3>
-            <p className="text-muted-foreground">Coming soon</p>
-          </div>
+          <BudgetAnalytics />
         </TabsContent>
       </Tabs>
 
