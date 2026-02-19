@@ -219,7 +219,11 @@ export function ConfirmedTripsTable() {
     const base = hireAll + fuelAll + commission + additional - discount;
     const adjustmentPct = (quotation as any).percentage_adjustment || 0;
     const adjustmentAmount = base * (adjustmentPct / 100);
-    return Math.round(base + adjustmentAmount);
+    const baseTotal = Math.round(base + adjustmentAmount);
+    
+    // Include post-trip adjustment amounts if finalized
+    const postTripAdjustment = quotation.adjustment_amount || 0;
+    return baseTotal + postTripAdjustment;
   };
 
   const getTripStatusBadge = (status: string) => {
@@ -1105,11 +1109,21 @@ export function ConfirmedTripsTable() {
                         <TableCell>
                           <div className="space-y-1 text-xs">
                             <div className="font-medium">Total: LKR {totalAmount.toLocaleString()}</div>
+                            {(trip as any).adjustment_amount > 0 && (
+                              <div className="text-orange-600">
+                                +Adj: LKR {((trip as any).adjustment_amount || 0).toLocaleString()}
+                              </div>
+                            )}
                             {(trip.total_paid || 0) > 0 && (
                               <div className="text-green-600">Paid: LKR {(trip.total_paid || 0).toLocaleString()}</div>
                             )}
-                            {(trip.balance_due || 0) > 0 && (
-                              <div className="text-red-600">Due: LKR {(trip.balance_due || 0).toLocaleString()}</div>
+                            {trip.balance_due > 0 && (
+                              <div className="text-red-600">Due: LKR {trip.balance_due.toLocaleString()}</div>
+                            )}
+                            {trip.balance_due === 0 && (trip.total_paid || 0) > 0 && (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs mt-1">
+                                <CheckCircle className="w-3 h-3 mr-1" />Settled
+                              </Badge>
                             )}
                           </div>
                         </TableCell>
@@ -1265,6 +1279,34 @@ export function ConfirmedTripsTable() {
                   <FileCheck className="w-4 h-4 mr-2" />
                   View Documents
                 </DropdownMenuItem>
+
+                                {/* Show View Balance Invoice if adjustment exists and invoice was generated */}
+                                {adjustmentsData[trip.id]?.balance_invoice_document_id && (
+                                  <DropdownMenuItem
+                                    onClick={async () => {
+                                      try {
+                                        const { data: doc } = await supabase
+                                          .from('document_storage')
+                                          .select('*')
+                                          .eq('id', adjustmentsData[trip.id].balance_invoice_document_id)
+                                          .single();
+                                        if (doc) {
+                                          setCurrentDocument(doc);
+                                          setSelectedTrip(trip);
+                                          setDocumentViewerOpen(true);
+                                        } else {
+                                          toast.error('Balance invoice document not found');
+                                        }
+                                      } catch (error) {
+                                        console.error('Error loading balance invoice:', error);
+                                        toast.error('Failed to load balance invoice');
+                                      }
+                                    }}
+                                  >
+                                    <Receipt className="w-4 h-4 mr-2 text-orange-600" />
+                                    View Balance Invoice
+                                  </DropdownMenuItem>
+                                )}
                                 
                                 <DropdownMenuItem onClick={() => viewInvoice(trip)}>
                                   <Receipt className="w-4 h-4 mr-2" />

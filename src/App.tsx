@@ -81,6 +81,7 @@ import SystemHealthDashboard from "./pages/SystemHealthDashboard";
 import Marketing from "./pages/Marketing";
 import CustomerPortal from "./pages/CustomerPortal";
 import VendorPortal from "./pages/VendorPortal";
+import WhatsAppHub from "./pages/WhatsAppHub";
 
 const queryClient = new QueryClient();
 
@@ -785,6 +786,17 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <Marketing />
+                  </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/whatsapp" 
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <WhatsAppHub />
                   </AppLayout>
                 </ProtectedRoute>
               } 

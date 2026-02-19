@@ -1,0 +1,22 @@
+{
+  "name": "whatsapp-server",
+  "version": "1.0.0",
+  "description": "WhatsApp Web integration server for NCG FleetFlow",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "whatsapp-web.js": "^1.26.1-alpha.1",
+    "qrcode": "^1.5.4",
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "ws": "^8.18.0"
+  },
+  "overrides": {
+    "puppeteer": {
+      "puppeteer-core": "$puppeteer-core"
+    }
+  }
+}

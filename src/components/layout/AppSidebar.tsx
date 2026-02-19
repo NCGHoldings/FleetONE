@@ -144,6 +144,11 @@ const businessItems = [{
   title: "Vehicle Inquiries",
   url: "/vehicle-inquiries",
   icon: Users
+}, {
+  id: "whatsapp_hub",
+  title: "WhatsApp Hub",
+  url: "/whatsapp",
+  icon: MessageSquare
 }];
 const yutongItems = [{
   id: "yutong_quotations",

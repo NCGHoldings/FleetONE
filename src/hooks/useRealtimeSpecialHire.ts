@@ -42,6 +42,9 @@ export interface QuotationWithPayments {
   assigned_conductor_name?: string;
   assigned_bus_no?: string;
   created_at: string;
+  // Post-trip adjustment fields
+  adjustment_amount?: number;
+  has_finalized_adjustment?: boolean;
   // Finance integration fields
   ar_invoice_id?: string;
   finance_customer_id?: string;
@@ -147,20 +150,53 @@ export function useRealtimeSpecialHire() {
 
       if (invoicesError) throw invoicesError;
 
+      // Fetch all finalized post-trip adjustments for these quotations
+      const { data: adjustmentsData, error: adjustmentsError } = await supabase
+        .from('special_hire_trip_adjustments')
+        .select(`
+          quotation_id,
+          adjustment_amount,
+          extra_km_total_charge,
+          total_additional_expenses,
+          total_time_adjustment,
+          adjustment_status,
+          final_trip_amount,
+          balance_due
+        `)
+        .in('quotation_id', quotationIds)
+        .eq('adjustment_status', 'finalized');
+
+      if (adjustmentsError) {
+        console.warn('Error fetching adjustments (non-blocking):', adjustmentsError);
+      }
+
+      // Build adjustment lookup map (latest finalized adjustment per quotation)
+      const adjustmentMap: Record<string, any> = {};
+      (adjustmentsData || []).forEach(adj => {
+        adjustmentMap[adj.quotation_id] = adj;
+      });
+
       // Combine the data
       const enrichedQuotations: QuotationWithPayments[] = quotationsData?.map(quotation => {
         const quotationPayments = paymentsData?.filter(p => p.quotation_id === quotation.id) || [];
         const quotationInvoices = invoicesData?.filter(i => i.quotation_id === quotation.id) || [];
+        const adjustment = adjustmentMap[quotation.id];
 
         // Calculate total amounts from actual database records
         const approvedPayments = quotationPayments.filter(p => p.status === 'approved');
         const calculatedTotalPaid = approvedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         
-        const finalTotal = (quotation.gross_revenue || 0) + 
+        // Base quotation total (without adjustments)
+        const baseTotal = (quotation.gross_revenue || 0) + 
                           (quotation.fuel_cost_fuel_only || 0) + 
                           (quotation.commission_pass_through_amount || 0) + 
                           (quotation.total_additional_charges || 0) - 
                           (quotation.discount_amount_lkr || 0);
+        
+        // Add post-trip adjustment amounts if finalized
+        const adjustmentAmount = adjustment?.adjustment_amount || 0;
+        const finalTotal = baseTotal + adjustmentAmount;
+        
         const calculatedBalance = Math.max(finalTotal - calculatedTotalPaid, 0);
 
         return {
@@ -170,10 +206,13 @@ export function useRealtimeSpecialHire() {
           additional_charges: typeof quotation.additional_charges === 'string' 
             ? quotation.additional_charges 
             : JSON.stringify(quotation.additional_charges || []),
-          // Use database values if available, fall back to calculated values
-          total_paid: quotation.total_paid ?? calculatedTotalPaid,
-          balance_due: quotation.balance_due ?? calculatedBalance,
+          // Use calculated values that include adjustments
+          total_paid: calculatedTotalPaid,
+          balance_due: calculatedBalance,
           advance_paid: quotation.advance_paid ?? approvedPayments.filter(p => p.payment_type === 'advance').reduce((sum, p) => sum + (p.amount || 0), 0),
+          // Include adjustment data for the Financial column
+          adjustment_amount: adjustmentAmount,
+          has_finalized_adjustment: !!adjustment,
           payments: quotationPayments.map(p => ({
             id: p.id,
             payment_type: p.payment_type,

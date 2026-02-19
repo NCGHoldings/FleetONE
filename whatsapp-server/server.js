@@ -1,0 +1,301 @@
+const express = require('express');
+const cors = require('cors');
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const { WebSocketServer } = require('ws');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const QRCode = require('qrcode');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: '/ws' });
+
+app.use(cors({ origin: '*' }));
+app.use(express.json());
+
+/* ─── State ─── */
+let qrCodeDataUrl = null;
+let connectionStatus = 'disconnected'; // disconnected | qr_ready | connected
+let clientInfo = null;
+const messageLog = [];
+
+/* ─── WhatsApp Client ─── */
+const waClient = new Client({
+  authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
+  webVersionCache: {
+    type: 'remote',
+    remotePath: 'https://raw.githubusercontent.com/AdrianLC99/nicefolder/main/nicecache/',
+  },
+  puppeteer: {
+    headless: true,
+    // ⚠️ IMPORTANT: Set the correct Chrome path for your OS
+    // macOS:   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+    // Windows: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+    // Linux:   '/usr/bin/google-chrome-stable'
+    executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    timeout: 120000, // 2 minutes for Chrome to start
+    protocolTimeout: 120000,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--disable-gpu',
+    ],
+  },
+});
+
+// ─── QR Code Event ───
+waClient.on('qr', async (qr) => {
+  console.log('📱 QR Code received — scan with your phone');
+  connectionStatus = 'qr_ready';
+  qrCodeDataUrl = await QRCode.toDataURL(qr, { width: 300 });
+  broadcast({ type: 'qr', data: qrCodeDataUrl });
+});
+
+// ─── Ready Event ───
+waClient.on('ready', () => {
+  console.log('✅ WhatsApp is connected!');
+  connectionStatus = 'connected';
+  qrCodeDataUrl = null;
+  clientInfo = {
+    pushname: waClient.info?.pushname || 'Unknown',
+    phone: waClient.info?.wid?.user || 'Unknown',
+    platform: waClient.info?.platform || 'Unknown',
+  };
+  broadcast({ type: 'status', data: { status: 'connected', info: clientInfo } });
+});
+
+// ─── Authenticated Event ───
+waClient.on('authenticated', () => {
+  console.log('🔐 Authenticated successfully');
+  connectionStatus = 'connecting';
+  broadcast({ type: 'status', data: { status: 'connecting' } });
+});
+
+// ─── Auth Failure ───
+waClient.on('auth_failure', (msg) => {
+  console.error('❌ Auth failed:', msg);
+  connectionStatus = 'disconnected';
+  broadcast({ type: 'status', data: { status: 'auth_failed', error: msg } });
+});
+
+// ─── Disconnected ───
+waClient.on('disconnected', (reason) => {
+  console.log('⚠️ Disconnected:', reason);
+  connectionStatus = 'disconnected';
+  clientInfo = null;
+  broadcast({ type: 'status', data: { status: 'disconnected', reason } });
+});
+
+// ─── Incoming Message ───
+waClient.on('message', async (msg) => {
+  console.log(`📩 Message from ${msg.from}: ${msg.body.substring(0, 50)}`);
+  let contact;
+  try { contact = await msg.getContact(); } catch { contact = null; }
+
+  const messageData = {
+    id: msg.id._serialized,
+    from: msg.from,
+    to: msg.to,
+    body: msg.body,
+    timestamp: msg.timestamp * 1000,
+    fromMe: msg.fromMe,
+    hasMedia: msg.hasMedia,
+    type: msg.type,
+    contactName: contact?.pushname || contact?.name || msg.from.replace('@c.us', ''),
+    contactNumber: msg.from.replace('@c.us', ''),
+  };
+
+  messageLog.unshift(messageData);
+  if (messageLog.length > 500) messageLog.pop();
+  broadcast({ type: 'message', data: messageData });
+});
+
+// ─── Outgoing Message (sent by us) ───
+waClient.on('message_create', async (msg) => {
+  if (!msg.fromMe) return;
+  let contact;
+  try { contact = await msg.getContact(); } catch { contact = null; }
+
+  const messageData = {
+    id: msg.id._serialized,
+    from: msg.from,
+    to: msg.to,
+    body: msg.body,
+    timestamp: msg.timestamp * 1000,
+    fromMe: true,
+    hasMedia: msg.hasMedia,
+    type: msg.type,
+    contactName: contact?.pushname || contact?.name || msg.to.replace('@c.us', ''),
+    contactNumber: msg.to.replace('@c.us', ''),
+  };
+
+  messageLog.unshift(messageData);
+  if (messageLog.length > 500) messageLog.pop();
+  broadcast({ type: 'message', data: messageData });
+});
+
+/* ─── WebSocket Broadcasting ─── */
+function broadcast(data) {
+  const json = JSON.stringify(data);
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1) client.send(json);
+  });
+}
+
+wss.on('connection', (ws) => {
+  console.log('🔌 WebSocket client connected');
+  ws.send(JSON.stringify({
+    type: 'status',
+    data: { status: connectionStatus, info: clientInfo, qr: qrCodeDataUrl },
+  }));
+});
+
+/* ─── REST API Endpoints ─── */
+
+// Get connection status
+app.get('/api/status', (req, res) => {
+  res.json({ status: connectionStatus, info: clientInfo });
+});
+
+// Get QR code
+app.get('/api/qr', (req, res) => {
+  if (connectionStatus === 'connected') return res.json({ status: 'connected', qr: null });
+  res.json({ status: connectionStatus, qr: qrCodeDataUrl });
+});
+
+// Send message
+app.post('/api/send', async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+    if (!phone || !message) return res.status(400).json({ error: 'Phone and message are required' });
+    if (connectionStatus !== 'connected') return res.status(503).json({ error: 'WhatsApp is not connected' });
+
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const chatId = `${cleanPhone}@c.us`;
+    const sentMsg = await waClient.sendMessage(chatId, message);
+    res.json({ success: true, messageId: sentMsg.id._serialized, timestamp: sentMsg.timestamp * 1000 });
+  } catch (error) {
+    console.error('Send error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get recent chats
+app.get('/api/chats', async (req, res) => {
+  try {
+    if (connectionStatus !== 'connected') return res.status(503).json({ error: 'WhatsApp is not connected' });
+    const chats = await waClient.getChats();
+    const chatList = await Promise.all(
+      chats.slice(0, 30).map(async (chat) => {
+        let lastMsg = null;
+        try {
+          const msgs = await chat.fetchMessages({ limit: 1 });
+          if (msgs.length > 0) lastMsg = { body: msgs[0].body, timestamp: msgs[0].timestamp * 1000, fromMe: msgs[0].fromMe };
+        } catch { /* ignore */ }
+        return {
+          id: chat.id._serialized,
+          name: chat.name || chat.id.user,
+          isGroup: chat.isGroup,
+          unreadCount: chat.unreadCount,
+          timestamp: chat.timestamp ? chat.timestamp * 1000 : null,
+          lastMessage: lastMsg,
+          phone: chat.id.user,
+        };
+      })
+    );
+    res.json(chatList);
+  } catch (error) {
+    console.error('Chats error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get messages for a chat
+app.get('/api/messages/:chatId', async (req, res) => {
+  try {
+    if (connectionStatus !== 'connected') return res.status(503).json({ error: 'WhatsApp is not connected' });
+    const limit = parseInt(req.query.limit) || 30;
+    const chat = await waClient.getChatById(req.params.chatId);
+    const messages = await chat.fetchMessages({ limit });
+    const msgList = messages.map((msg) => ({
+      id: msg.id._serialized,
+      body: msg.body,
+      timestamp: msg.timestamp * 1000,
+      fromMe: msg.fromMe,
+      hasMedia: msg.hasMedia,
+      type: msg.type,
+    }));
+    res.json(msgList);
+  } catch (error) {
+    console.error('Messages error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get message log (in-memory)
+app.get('/api/log', (req, res) => res.json(messageLog));
+
+// Disconnect and switch account
+app.post('/api/disconnect', async (req, res) => {
+  try {
+    console.log('🔄 Disconnecting and clearing session...');
+    
+    // Step 1: Logout from WhatsApp
+    try {
+      await waClient.logout();
+    } catch (e) {
+      console.log('Logout warning (non-critical):', e.message);
+    }
+    
+    // Step 2: Destroy the client
+    try {
+      await waClient.destroy();
+    } catch (e) {
+      console.log('Destroy warning (non-critical):', e.message);
+    }
+    
+    // Step 3: Clear saved auth session
+    const authPath = path.join(__dirname, '.wwebjs_auth');
+    const cachePath = path.join(__dirname, '.wwebjs_cache');
+    try {
+      if (fs.existsSync(authPath)) fs.rmSync(authPath, { recursive: true, force: true });
+      if (fs.existsSync(cachePath)) fs.rmSync(cachePath, { recursive: true, force: true });
+      console.log('🗑️ Session data cleared');
+    } catch (e) {
+      console.log('Clear warning (non-critical):', e.message);
+    }
+    
+    // Step 4: Reset state
+    connectionStatus = 'disconnected';
+    clientInfo = null;
+    qrCodeDataUrl = null;
+    broadcast({ type: 'status', data: { status: 'disconnected', reason: 'user_switch' } });
+    
+    res.json({ success: true, message: 'Disconnected. Restarting server — reconnect in 5 seconds to scan new QR.' });
+    
+    // Step 5: Restart the process so a fresh client is created
+    console.log('♻️ Restarting server in 2 seconds...');
+    setTimeout(() => {
+      process.exit(0); // PM2 or the terminal user will restart it
+    }, 2000);
+    
+  } catch (error) {
+    console.error('Disconnect error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ─── Start Server ─── */
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+  console.log(`\n🚀 WhatsApp Server running on http://localhost:${PORT}`);
+  console.log(`   WebSocket: ws://localhost:${PORT}/ws`);
+  console.log(`   API: http://localhost:${PORT}/api/status`);
+  console.log('\n⏳ Initializing WhatsApp client...\n');
+});
+
+waClient.initialize();
