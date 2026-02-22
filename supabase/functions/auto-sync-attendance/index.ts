@@ -148,8 +148,8 @@ serve(async (req) => {
     const attendanceRecords: any[] = [];
     let matchedDrivers = 0;
     let matchedConductors = 0;
-    let unmatchedDrivers: string[] = [];
-    let unmatchedConductors: string[] = [];
+    const unmatchedDrivers: string[] = [];
+    const unmatchedConductors: string[] = [];
     const tripsWithoutStaff: string[] = [];
 
     for (const trip of trips || []) {

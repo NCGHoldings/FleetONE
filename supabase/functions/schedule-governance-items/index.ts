@@ -58,7 +58,7 @@ function rollBackToWorkingDay(
   holidayData: Holiday[]
 ): { date: Date; adjusted: boolean; reason?: string; originalDate?: Date } {
   const originalDate = new Date(date);
-  let adjustedDate = new Date(date);
+  const adjustedDate = new Date(date);
   let wasAdjusted = false;
   let reason = '';
 
@@ -92,7 +92,7 @@ function generateOccurrences(
   switch (rule_type) {
     case 'DAILY': {
       const includeWeekends = params.includeWeekends ?? false;
-      let current = new Date(startDate);
+      const current = new Date(startDate);
       while (current <= endDate) {
         if (includeWeekends || !isWeekend(current)) {
           occurrences.push(rollBackToWorkingDay(new Date(current), holidayDates, holidayData));
@@ -105,7 +105,7 @@ function generateOccurrences(
     case 'WEEKLY_BY_WEEKDAY': {
       if (!params.weekday) break;
       const targetDay = WEEKDAY_MAP[params.weekday];
-      let current = new Date(startDate);
+      const current = new Date(startDate);
       while (current.getDay() !== targetDay && current <= endDate) {
         current.setDate(current.getDate() + 1);
       }
@@ -119,7 +119,7 @@ function generateOccurrences(
     case 'BIWEEKLY_BY_WEEKDAY': {
       if (!params.weekday || !params.startAnchor) break;
       const targetDay = WEEKDAY_MAP[params.weekday];
-      let current = parse(params.startAnchor, 'yyyy-MM-dd', new Date());
+      const current = parse(params.startAnchor, 'yyyy-MM-dd', new Date());
       while (current < startDate) {
         current.setDate(current.getDate() + 14);
       }

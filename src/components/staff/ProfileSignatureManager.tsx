@@ -44,7 +44,7 @@ export const ProfileSignatureManager = () => {
 
   const handleSave = async () => {
     let signatureData = '';
-    let signatureType: 'drawing' | 'text' | 'image' = activeTab;
+    const signatureType: 'drawing' | 'text' | 'image' = activeTab;
 
     if (activeTab === 'drawing') {
       if (signatureRef.current?.isEmpty()) {

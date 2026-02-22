@@ -319,8 +319,8 @@ const extractDate = (text: string): string => {
   // If no date found in any format, try a more relaxed approach
   const relaxedDate = text.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
   if (relaxedDate) {
-    let [, a, b, c] = relaxedDate;
-    let year = c.length === 2 ? `20${c}` : c;
+    const [, a, b, c] = relaxedDate;
+    const year = c.length === 2 ? `20${c}` : c;
     let month = b.padStart(2, "0");
     let day = a.padStart(2, "0");
     if (parseInt(month) > 12) {

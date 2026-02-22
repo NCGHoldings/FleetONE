@@ -78,7 +78,7 @@ export function useCrewGroupedTrips(
       }
 
       // Fetch trips with bus and route info
-      let tripsQuery = supabase
+      const tripsQuery = supabase
         .from('daily_trips')
         .select(`
           id,

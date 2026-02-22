@@ -453,7 +453,7 @@ const FleetManagementComponent = () => {
             console.log(`🔍 Processing bus: ${bus.bus_no} (ID: ${bus.id})`);
 
             // Method 1: Direct bus_id matching (Primary)
-            let latestTrip = await supabase
+            const latestTrip = await supabase
               .from('daily_trips')
               .select('odometer_end, trip_date, created_at, trip_no')
               .eq('bus_id', bus.id)
@@ -463,7 +463,7 @@ const FleetManagementComponent = () => {
               .limit(1)
               .maybeSingle();
 
-            let allTrips = await supabase
+            const allTrips = await supabase
               .from('daily_trips')
               .select('income, trip_date, route_id, routes(route_name)')
               .eq('bus_id', bus.id)

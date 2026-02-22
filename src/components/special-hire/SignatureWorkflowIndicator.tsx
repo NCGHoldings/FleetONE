@@ -46,7 +46,7 @@ export function SignatureWorkflowIndicator({
       if (settings) {
         const userIds = settings.filter(s => s.default_user_id).map(s => s.default_user_id);
         
-        let profilesMap: Record<string, string> = {};
+        const profilesMap: Record<string, string> = {};
         if (userIds.length > 0) {
           const { data: profiles } = await supabase
             .from('profiles')

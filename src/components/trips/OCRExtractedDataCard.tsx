@@ -495,7 +495,7 @@ export const OCRExtractedDataCard = ({ data, actualSaveDate, onApply, onDiscard,
                         const ocrDateParts = data.date.split(/[/-]/);
                         if (ocrDateParts.length === 3) {
                           const [first, second, third] = ocrDateParts.map(p => parseInt(p, 10));
-                          let ocrYear = third > 99 ? third : 2000 + third;
+                          const ocrYear = third > 99 ? third : 2000 + third;
                           const daysDiff = Math.abs(differenceInDays(
                             parseISO(actualSaveDate),
                             new Date(ocrYear, second - 1, first)

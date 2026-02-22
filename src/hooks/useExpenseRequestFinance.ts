@@ -432,7 +432,7 @@ export async function bulkPostExpenseRequestsToGL(
         continue;
       }
 
-      let creditAccountId = settings.default_bank_account_id || settings.default_cash_account_id;
+      const creditAccountId = settings.default_bank_account_id || settings.default_cash_account_id;
       if (!creditAccountId) {
         errors.push(`${expense.requestNumber}: No payment account configured`);
         failed++;

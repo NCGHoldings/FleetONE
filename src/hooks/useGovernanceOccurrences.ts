@@ -60,7 +60,7 @@ export const useGovernanceOccurrences = ({
   return useQuery({
     queryKey: ['governance-occurrences', startDate, endDate, companyIds, sbuIds, types, categories, statuses],
     queryFn: async () => {
-      let query = supabase
+      const query = supabase
         .from('governance_occurrences')
         .select(`
           *,

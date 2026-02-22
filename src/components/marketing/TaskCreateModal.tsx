@@ -94,7 +94,7 @@ export const TaskCreateModal = ({ open, onOpenChange, onSuccess, preFillData }: 
       if (formData.assigned_hours) {
         const hours = parseFloat(formData.assigned_hours);
         const daysNeeded = Math.ceil(hours / 8);
-        let currentDate = new Date();
+        const currentDate = new Date();
         let daysAdded = 0;
         
         while (daysAdded < daysNeeded) {

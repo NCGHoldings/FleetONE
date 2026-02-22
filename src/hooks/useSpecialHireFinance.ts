@@ -1426,7 +1426,7 @@ export async function createOrGetSPHCustomer({
 
     // First, try to find existing customer by phone or email
     if (customerPhone || customerEmail) {
-      let query = supabase
+      const query = supabase
         .from('customers')
         .select('id')
         .eq('company_id', companyId);

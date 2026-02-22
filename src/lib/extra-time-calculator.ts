@@ -48,7 +48,7 @@ export function calculateExtraTimeCharge(
   const actualHours = Math.max(0, (dropTime - pickupTime) / (1000 * 60 * 60));
 
   // Calculate extra hours
-  let extraHours = Math.max(0, actualHours - availableHours);
+  const extraHours = Math.max(0, actualHours - availableHours);
   
   if (extraHours === 0) {
     return {

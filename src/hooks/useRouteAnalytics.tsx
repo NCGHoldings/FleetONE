@@ -89,7 +89,7 @@ export function useRouteAnalytics(branchId?: string) {
 
         // Get or create route record (use first bus for route creation)
         const firstBusRegNo = busRegNos.length > 0 ? busRegNos[0] : 'No Bus';
-        let routeRecord = await getOrCreateRoute(branchId, routeName, firstBusRegNo, routeStudents);
+        const routeRecord = await getOrCreateRoute(branchId, routeName, firstBusRegNo, routeStudents);
         
         // Calculate financial metrics for all students on this route
         const totalStudents = routeStudents.length;

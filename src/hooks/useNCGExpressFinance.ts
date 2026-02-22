@@ -594,9 +594,9 @@ export async function autoPostTripIfEnabled(tripId: string): Promise<void> {
       expense_prefix: settingsData.expense_prefix || 'NCGE-EXP',
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const busNo = (trip.buses as any)?.bus_no || 'Unknown';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const routeName = (trip.routes as any)?.route_name || 'Unknown';
 
     await postTripRevenueToGL(

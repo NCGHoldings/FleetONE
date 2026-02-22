@@ -169,7 +169,7 @@ export const ChartOfAccountsUpload = ({ onUploadComplete, companyId }: ChartOfAc
         const records = batchData.map((row) => {
           // Determine account level based on which level has value
           let accountLevel = 5;
-          let accountName = row.level5 || row.level4 || row.level3 || row.level2 || row.level1;
+          const accountName = row.level5 || row.level4 || row.level3 || row.level2 || row.level1;
           
           if (row.level5) accountLevel = 5;
           else if (row.level4) accountLevel = 4;

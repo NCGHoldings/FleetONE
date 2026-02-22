@@ -110,7 +110,7 @@ serve(async (req) => {
         }
 
         // PHASE 2: Find or create route - use proper filter and maybeSingle()
-        let { data: routes, error: routeSearchError } = await supabase
+        const { data: routes, error: routeSearchError } = await supabase
           .from('routes')
           .select('id, route_no, route_name')
           .or(`route_no.eq.${routeNo},route_name.ilike.%${routeName}%`)

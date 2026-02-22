@@ -542,7 +542,7 @@ export const generateInvoicePDF = async (data: InvoiceData): Promise<Blob> => {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const imgWidth = 210; // A4 width in mm
     const pageHeight = 297; // A4 height in mm
-    let imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
     
   // Convert canvas to JPEG data URL only (avoid PNG signature errors)
   let imgData: string;

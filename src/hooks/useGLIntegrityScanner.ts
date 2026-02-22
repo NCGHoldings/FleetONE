@@ -608,8 +608,8 @@ export function useGLIntegrityScanner() {
 
           let debitAccountId: string | null = null;
           let creditAccountId: string | null = null;
-          let debitLabel = target.suggestedDebit;
-          let creditLabel = target.suggestedCredit;
+          const debitLabel = target.suggestedDebit;
+          const creditLabel = target.suggestedCredit;
 
           if (target.glSettingsKey && glSettings) {
             debitAccountId = (glSettings as any)[target.glSettingsKey] || null;

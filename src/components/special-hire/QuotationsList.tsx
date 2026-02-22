@@ -530,7 +530,7 @@ export function QuotationsList({ onRefresh, onViewInCalculator, refreshTrigger }
       console.error('❌ === EMAIL SEND FAILED ===');
       console.error('Error:', error);
       
-      let errorMessage = 'Failed to send email';
+      const errorMessage = 'Failed to send email';
       let errorDescription = error.message || 'Unknown error occurred';
       
       if (error.message?.includes('PDF generation')) {

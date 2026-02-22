@@ -155,7 +155,7 @@ export function OCRImageUpload({ selectedDate, onDataExtracted }: OCRImageUpload
       console.log(`🔄 Processing OCR data - Sheet date: ${data.date} | Saving to: ${tripDate}`);
 
       // 2. FLEXIBLE BUS NUMBER MATCHING - try exact match first, then alternative formats
-      let busQuery = supabase
+      const busQuery = supabase
         .from('buses')
         .select('id, bus_no, route')
         .eq('bus_no', data.busNumber);
