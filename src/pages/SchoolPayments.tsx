@@ -13,6 +13,7 @@ import { RecordPaymentModal } from "@/components/school/RecordPaymentModal";
 import { PaymentHistoryModal } from "@/components/school/PaymentHistoryModal";
 import { OutstandingStudentsView } from "@/components/school/OutstandingStudentsView";
 import { BulkARInvoiceDialog } from "@/components/school/BulkARInvoiceDialog";
+import { SchoolBusBranchPLReport } from "@/components/school/SchoolBusBranchPLReport";
 
 interface Student {
   id: string;
@@ -379,6 +380,7 @@ export default function SchoolPayments() {
         <TabsList>
           <TabsTrigger value="all">All Students</TabsTrigger>
           <TabsTrigger value="outstanding">Outstanding</TabsTrigger>
+          <TabsTrigger value="pl-report">P&L Report</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-0">
@@ -404,6 +406,17 @@ export default function SchoolPayments() {
             onViewHistory={handleViewHistory}
           />
         </TabsContent>
+
+        {branchId && branch && (
+          <TabsContent value="pl-report" className="space-y-0">
+            <SchoolBusBranchPLReport
+              branchId={branchId}
+              branchName={branch.branch_name}
+              branchCode={branch.branch_code}
+              onBack={() => navigate(`/school-bus/branch/${branchId}`)}
+            />
+          </TabsContent>
+        )}
       </Tabs>
 
       <RecordPaymentModal

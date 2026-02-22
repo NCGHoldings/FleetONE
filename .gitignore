@@ -27,3 +27,12 @@ dist-ssr
 # Env files
 .env
 .env.
+
+# WhatsApp session data (large Chrome binary cache)
+.wwebjs_auth/
+whatsapp-server/.wwebjs_auth/
+
+# Playwright
+playwright-report/
+test-results/
+e2e/.auth/

@@ -3,6 +3,7 @@ import { AppSidebar } from "./AppSidebar";
 import { Header } from "./Header";
 import { ThemeDecorations } from "../seasonal/ThemeDecorations";
 import { ThemeStyleInjector } from "../seasonal/ThemeStyleInjector";
+import { SystemIssueReportButton } from "../issues/SystemIssueReportButton";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -22,6 +23,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           </main>
         </div>
       </div>
+      <SystemIssueReportButton />
     </SidebarProvider>
   );
 }

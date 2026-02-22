@@ -8,13 +8,15 @@
  * - Recent auto-posted journal entries
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Zap,
   ShieldCheck,
+  Shield,
   AlertTriangle,
   XCircle,
   RefreshCw,
@@ -26,6 +28,7 @@ import {
   Loader2,
   ArrowRight,
   Ban,
+  Calendar,
 } from "lucide-react";
 import {
   Table,
@@ -43,8 +46,10 @@ import {
   useFixBalanceDiscrepancies,
   useRecentAutoPostEntries,
   useModuleAutomationHealth,
+  usePendingAmortizations,
   type GLBalanceCheck,
 } from "@/hooks/useFinanceAutomationEngine";
+import { useGLIntegrityScanner, type ScanResult } from "@/hooks/useGLIntegrityScanner";
 
 const FinanceAutomationDashboard = () => {
   const { data: overdueEntries = [], isLoading: loadingOverdue } = useOverdueRecurringEntries();
@@ -53,7 +58,20 @@ const FinanceAutomationDashboard = () => {
   const fixDiscrepancies = useFixBalanceDiscrepancies();
   const { data: recentPosts = [], isLoading: loadingRecent } = useRecentAutoPostEntries(15);
   const { data: moduleHealth = [], isLoading: loadingHealth } = useModuleAutomationHealth();
+  const { data: pendingAmortizations = [] } = usePendingAmortizations();
+  const glScanner = useGLIntegrityScanner();
   const [balanceCheck, setBalanceCheck] = useState<GLBalanceCheck | null>(null);
+  const [glScanResult, setGlScanResult] = useState<ScanResult | null>(null);
+  const hasScannedGL = useRef(false);
+
+  // Auto-run GL health scan on mount
+  useEffect(() => {
+    if (!hasScannedGL.current) {
+      hasScannedGL.current = true;
+      glScanner.mutateAsync().then(setGlScanResult).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const healthyCount = moduleHealth.filter((m) => m.status === "healthy").length;
   const warningCount = moduleHealth.filter((m) => m.status === "warning").length;
@@ -100,6 +118,12 @@ const FinanceAutomationDashboard = () => {
       Insurance: "bg-rose-100 text-rose-800",
       Expense: "bg-amber-100 text-amber-800",
       "Route Permit": "bg-lime-100 text-lime-800",
+      Fuel: "bg-yellow-100 text-yellow-800",
+      "School Bus": "bg-violet-100 text-violet-800",
+      Leasing: "bg-fuchsia-100 text-fuchsia-800",
+      "Vehicle Sales": "bg-pink-100 text-pink-800",
+      "Special Hire": "bg-sky-100 text-sky-800",
+      "NCG Express": "bg-emerald-100 text-emerald-800",
       "Asset Disposal": "bg-red-100 text-red-800",
       "AR/AP": "bg-green-100 text-green-800",
       Receipt: "bg-emerald-100 text-emerald-800",
@@ -416,6 +440,128 @@ const FinanceAutomationDashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* GL Guardian Health Score */}
+      <Card className="border-blue-200 bg-gradient-to-r from-blue-50/50 to-transparent">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Shield className="h-5 w-5 text-blue-600" />
+            GL Integrity Guardian
+          </CardTitle>
+          <CardDescription>
+            Auto-audit health score from GL Guardian scanner
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {glScanResult ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full border-4 ${
+                  glScanResult.auditScore.overallScore >= 90
+                    ? "border-emerald-500 text-emerald-700"
+                    : glScanResult.auditScore.overallScore >= 75
+                    ? "border-blue-500 text-blue-700"
+                    : glScanResult.auditScore.overallScore >= 60
+                    ? "border-amber-500 text-amber-700"
+                    : "border-red-500 text-red-700"
+                }`}>
+                  <div>
+                    <div className="text-xl font-bold">{glScanResult.auditScore.overallScore}</div>
+                    <div className="text-[10px] opacity-60">/ 100</div>
+                  </div>
+                </div>
+                <Badge className={`mt-2 ${
+                  glScanResult.auditScore.grade === "A" ? "bg-emerald-100 text-emerald-800"
+                  : glScanResult.auditScore.grade === "B" ? "bg-blue-100 text-blue-800"
+                  : glScanResult.auditScore.grade === "C" ? "bg-amber-100 text-amber-800"
+                  : "bg-red-100 text-red-800"
+                }`}>
+                  Grade {glScanResult.auditScore.grade}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {Object.entries(glScanResult.auditScore.categoryScores).slice(0, 4).map(([key, cat]) => (
+                  <div key={key}>
+                    <div className="flex justify-between text-xs">
+                      <span>{cat.label}</span>
+                      <span className="font-semibold">{cat.score}%</span>
+                    </div>
+                    <Progress value={cat.score} className="h-1.5" />
+                  </div>
+                ))}
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-red-600">{glScanResult.totalGaps}</p>
+                <p className="text-xs text-muted-foreground">Unposted Gaps</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold">{glScanResult.modulesAffected}</p>
+                <p className="text-xs text-muted-foreground">Modules Affected</p>
+              </div>
+            </div>
+          ) : glScanner.isPending ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-500 mr-2" />
+              <span className="text-sm text-muted-foreground">Running GL audit scan...</span>
+            </div>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground">
+              <p className="text-sm">GL scan will auto-run on the Guardian tab</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pending Amortizations */}
+      {pendingAmortizations.length > 0 && (
+        <Card className="border-purple-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Calendar className="h-5 w-5 text-purple-600" />
+              Pending Amortizations
+            </CardTitle>
+            <CardDescription>
+              Insurance premiums and route permits needing monthly amortization entries
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead className="text-right">Monthly Amount</TableHead>
+                  <TableHead>Last Posted</TableHead>
+                  <TableHead className="text-right">Pending Months</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingAmortizations.map((amort) => (
+                  <TableRow key={amort.id}>
+                    <TableCell>
+                      <Badge className={amort.type === "insurance" ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"}>
+                        {amort.type === "insurance" ? "Insurance" : "Route Permit"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{amort.policyOrPermit}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      LKR {amort.monthlyAmount.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {amort.lastPostedMonth || <span className="text-red-500">Never</span>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="destructive" className="text-xs">
+                        {amort.pendingMonths} month{amort.pendingMonths > 1 ? "s" : ""}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent Auto-Posted Entries */}
       <Card>

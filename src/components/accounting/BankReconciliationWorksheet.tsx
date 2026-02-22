@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useBankAccounts, useBankTransactions, useLastReconciliation } from "@/hooks/useAccountingData";
 import { useSaveBankReconciliation } from "@/hooks/useAccountingMutations";
-import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle } from "lucide-react";
+import { Landmark, Save, X, SlidersHorizontal, FileText, AlertTriangle, Upload, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import "./BankReconciliationWorksheet.css";
+import { BankStatementImportModal } from "./BankStatementImportModal";
 
 // ---------- Types ----------
 type DisplayFilter = "all" | "not_cleared" | "cleared";
@@ -63,6 +64,7 @@ const BankReconciliationWorksheet = () => {
   const [displayFilter, setDisplayFilter] = useState<DisplayFilter>("all");
   const [clearedState, setClearedState] = useState<ClearedState>({});
   const [showAdjustments, setShowAdjustments] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // --- Adjustment form state ---
   const [adjType, setAdjType] = useState("bank_charge");
@@ -383,8 +385,13 @@ const BankReconciliationWorksheet = () => {
                 const isCleared = cs?.cleared || t.is_reconciled;
                 const isAlreadyReconciled = !!t.is_reconciled;
 
+                const rowClass = [
+                  isCleared ? "row-cleared" : "",
+                  deposit > 0 ? "row-deposit" : payment > 0 ? "row-payment" : "",
+                ].filter(Boolean).join(" ");
+
                 return (
-                  <tr key={t.id} className={isCleared ? "row-cleared" : ""}>
+                  <tr key={t.id} className={rowClass}>
                     <td>{idx + 1}</td>
                     <td>
                       <input
@@ -405,13 +412,13 @@ const BankReconciliationWorksheet = () => {
                     <td className="font-mono text-xs">{t.reference || t.id.substring(0, 8)}</td>
                     <td>{t.cheque_number || "—"}</td>
                     <td>{t.source_type || "—"}</td>
-                    <td className="num-col">{payment > 0 ? fmt(payment) : "—"}</td>
-                    <td className="num-col">{deposit > 0 ? fmt(deposit) : "—"}</td>
+                    <td className="num-col">{payment > 0 ? `LKR ${fmt(payment)}` : "—"}</td>
+                    <td className="num-col">{deposit > 0 ? `LKR ${fmt(deposit)}` : "—"}</td>
                     <td className="num-col">
                       {isCleared ? (
                         isAlreadyReconciled ? (
                           <span className="text-green-600 font-semibold">
-                            {fmt(payment > 0 ? payment : deposit)}
+                            LKR {fmt(payment > 0 ? payment : deposit)}
                           </span>
                         ) : (
                           <input
@@ -439,40 +446,44 @@ const BankReconciliationWorksheet = () => {
       {/* ========================= SUMMARY FOOTER ========================= */}
       {selectedAccountId && (
         <div className="bank-recon-summary">
-          <div className="bank-recon-summary-card">
-            <span className="summary-label">Payments</span>
-            <span className="summary-value negative">{fmt(summary.paymentTotal)}</span>
-            <span className="summary-count">{summary.paymentCount} transaction{summary.paymentCount !== 1 ? "s" : ""}</span>
+          {/* LEFT: Payment & Deposit totals (SAP-style) */}
+          <div className="bank-recon-summary-left">
+            <div className="bank-recon-summary-row">
+              <span className="summary-label">Payment</span>
+              <span className="summary-count">{summary.paymentCount}</span>
+              <span className="summary-amount negative">LKR {fmt(summary.paymentTotal)}</span>
+            </div>
+            <div className="bank-recon-summary-row">
+              <span className="summary-label">Deposit</span>
+              <span className="summary-count">{summary.depositCount}</span>
+              <span className="summary-amount positive">LKR {fmt(summary.depositTotal)}</span>
+            </div>
           </div>
-          <div className="bank-recon-summary-card">
-            <span className="summary-label">Deposits</span>
-            <span className="summary-value positive">{fmt(summary.depositTotal)}</span>
-            <span className="summary-count">{summary.depositCount} transaction{summary.depositCount !== 1 ? "s" : ""}</span>
-          </div>
-          <div className="bank-recon-summary-card">
-            <span className="summary-label">Cleared Book Balance</span>
-            <span className={`summary-value ${summary.clearedBookBalance >= 0 ? "positive" : "negative"}`}>
-              LKR {fmt(summary.clearedBookBalance)}
-            </span>
-          </div>
-          <div className="bank-recon-summary-card">
-            <span className="summary-label">Statement Ending Bal.</span>
-            <span className="summary-value neutral">
-              LKR {fmt(summary.stmtEndBal)}
-            </span>
-          </div>
-          <div className="bank-recon-summary-card">
-            <span className="summary-label">Difference</span>
-            <span className={`summary-value ${summary.difference === 0 ? "positive" : "negative"}`}>
-              {summary.difference === 0 ? (
-                <>✓ LKR 0.00</>
-              ) : (
-                <>
-                  <AlertTriangle className="inline w-4 h-4 mr-1" />
-                  LKR {fmt(Math.abs(summary.difference))}
-                </>
-              )}
-            </span>
+
+          {/* RIGHT: Cleared Book Balance / Statement Ending / Difference */}
+          <div className="bank-recon-summary-right">
+            <div className="bank-recon-balance-row">
+              <span className="balance-label">Cleared Book Balance</span>
+              <span className={`balance-value ${summary.clearedBookBalance >= 0 ? "positive" : "negative"}`}>
+                LKR {fmt(summary.clearedBookBalance)}
+              </span>
+            </div>
+            <div className="bank-recon-balance-row">
+              <span className="balance-label">Statement Ending Balance</span>
+              <span className="balance-value neutral">
+                LKR {fmt(summary.stmtEndBal)}
+              </span>
+            </div>
+            <div className="bank-recon-balance-row difference-row">
+              <span className="balance-label">Difference</span>
+              <span className={`balance-value ${summary.difference === 0 ? "match" : "negative"}`}>
+                {summary.difference === 0 ? (
+                  <><CheckCircle className="inline w-4 h-4 mr-1" />LKR 0.00</>
+                ) : (
+                  <><AlertTriangle className="inline w-4 h-4 mr-1" />LKR {fmt(Math.abs(summary.difference))}</>
+                )}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -480,6 +491,10 @@ const BankReconciliationWorksheet = () => {
       {/* ========================= ACTION BUTTONS ========================= */}
       {selectedAccountId && (
         <div className="bank-recon-actions">
+          <Button variant="outline" onClick={() => setShowImportModal(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import Statement
+          </Button>
           <Button variant="outline" onClick={() => setShowAdjustments(true)}>
             <SlidersHorizontal className="w-4 h-4 mr-2" />
             Adjustments
@@ -493,7 +508,7 @@ const BankReconciliationWorksheet = () => {
             disabled={saveReconciliation.isPending || !statementBalance || Object.keys(clearedState).length === 0}
           >
             <Save className="w-4 h-4 mr-2" />
-            {saveReconciliation.isPending ? "Saving…" : "Save Reconciliation"}
+            {saveReconciliation.isPending ? "Saving…" : "Save"}
           </Button>
         </div>
       )}
@@ -546,6 +561,17 @@ const BankReconciliationWorksheet = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ========================= IMPORT MODAL ========================= */}
+      <BankStatementImportModal
+        open={showImportModal}
+        onOpenChange={setShowImportModal}
+        bankAccountId={selectedAccountId}
+        onImportComplete={() => {
+          // Refresh transactions after import
+          setClearedState({});
+        }}
+      />
     </Card>
   );
 };

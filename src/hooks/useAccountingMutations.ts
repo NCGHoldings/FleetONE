@@ -161,19 +161,58 @@ export const useApproveJournalEntry = () => {
         2: "posted",
       };
       
+      const newStatus = statusMap[level] || "posted";
+      
       const { error } = await supabase
         .from("journal_entries")
         .update({ 
-          status: statusMap[level] || ("posted" as const),
+          status: newStatus,
           approved_at: new Date().toISOString(),
+          posted_at: newStatus === "posted" ? new Date().toISOString() : undefined,
         })
         .eq("id", entryId);
       
       if (error) throw error;
+
+      // ========== UPDATE COA BALANCES when posting ==========
+      if (newStatus === "posted") {
+        try {
+          // Fetch all lines for this journal entry
+          const { data: lines } = await supabase
+            .from("journal_entry_lines")
+            .select("account_id, debit, credit")
+            .eq("journal_entry_id", entryId);
+
+          if (lines && lines.length > 0) {
+            for (const line of lines) {
+              if (!line.account_id) continue;
+              const { data: account } = await supabase
+                .from("chart_of_accounts")
+                .select("current_balance, account_type")
+                .eq("id", line.account_id)
+                .single();
+
+              if (account) {
+                const netAmount = (line.debit || 0) - (line.credit || 0);
+                const isDebitNormal = ["asset", "expense"].includes(account.account_type);
+                const adjustment = isDebitNormal ? netAmount : -netAmount;
+
+                await supabase
+                  .from("chart_of_accounts")
+                  .update({ current_balance: (account.current_balance || 0) + adjustment })
+                  .eq("id", line.account_id);
+              }
+            }
+          }
+        } catch (balanceError) {
+          console.warn("COA balance update after JE approval failed:", balanceError);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journal-entries", selectedCompanyId] });
-      toast.success("Journal entry approved");
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast.success("Journal entry approved & COA balances updated");
     },
     onError: (error) => {
       toast.error(`Failed to approve: ${error.message}`);
@@ -646,9 +685,18 @@ export const useCreateAPInvoice = () => {
       invoice_date: string;
       due_date: string;
       total_amount: number;
+      subtotal?: number;
       tax_amount?: number;
       wht_amount?: number;
       notes?: string;
+      lines?: Array<{
+        description: string;
+        quantity: number;
+        unit_price: number;
+        tax_amount?: number;
+        tax_code?: string;
+        line_total: number;
+      }>;
     }) => {
       if (!selectedCompanyId) throw new Error("No company selected");
       
@@ -656,10 +704,12 @@ export const useCreateAPInvoice = () => {
       const effectiveCompanyId = getEffectiveCompanyId();
       const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId) ? getBusinessUnitCode() : null;
       
+      const { lines, ...headerData } = invoice;
+      
       const { data, error } = await supabase
         .from("ap_invoices")
         .insert([{
-          ...invoice,
+          ...headerData,
           balance: invoice.total_amount - (invoice.wht_amount || 0),
           status: "unpaid",
           company_id: effectiveCompanyId,
@@ -669,6 +719,26 @@ export const useCreateAPInvoice = () => {
         .single();
       
       if (error) throw error;
+      
+      // Insert line items into ap_invoice_lines
+      if (lines?.length) {
+        const lineData = lines.map(line => ({
+          invoice_id: data.id,
+          description: line.description,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          tax_amount: line.tax_amount || 0,
+          tax_code: line.tax_code,
+          line_total: line.line_total,
+          company_id: effectiveCompanyId,
+        }));
+        
+        const { error: lineError } = await supabase.from("ap_invoice_lines").insert(lineData);
+        if (lineError) {
+          console.warn("Failed to insert AP invoice lines:", lineError.message);
+        }
+      }
+      
       return data;
     },
     onSuccess: () => {
@@ -1462,16 +1532,81 @@ export const useApproveAPInvoice = () => {
 
 export const useApproveAPPayment = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode, isSubCompanyOfNCGHolding } = useCompany();
   
   return useMutation({
     mutationFn: async (id: string) => {
+      // Update approval status
       const { error } = await supabase.from("ap_payments").update({ approval_status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
+
+      // ========== AUTO GL POSTING: DR Trade Payable, CR Bank ==========
+      try {
+        const effectiveCompanyId = getEffectiveCompanyId();
+        const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
+
+        // Fetch payment details
+        const { data: payment } = await supabase
+          .from("ap_payments")
+          .select("payment_number, payment_date, amount, vendors(vendor_name)")
+          .eq("id", id)
+          .single();
+
+        // Fetch GL settings
+        const { data: glSettings } = await supabase
+          .from("gl_settings")
+          .select("trade_payable_account_id, bank_account_id")
+          .eq("company_id", effectiveCompanyId)
+          .maybeSingle();
+
+        const tradePayableId = glSettings?.trade_payable_account_id;
+        const bankAccountId = glSettings?.bank_account_id;
+
+        if (payment && tradePayableId && bankAccountId && payment.amount > 0) {
+          const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
+          const vendorData = payment.vendors as Record<string, string> | null;
+          const vendorName = vendorData?.vendor_name || "Vendor";
+          
+          const glResult = await createAndPostJournalEntry({
+            entry_date: payment.payment_date,
+            description: `AP Payment: ${payment.payment_number} - ${vendorName}`,
+            reference: payment.payment_number,
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode || "HQ",
+            lines: [
+              {
+                account_id: tradePayableId,
+                description: `Trade Payable - ${vendorName}`,
+                debit: payment.amount,
+                credit: 0,
+              },
+              {
+                account_id: bankAccountId,
+                description: `Bank Payment - ${payment.payment_number}`,
+                debit: 0,
+                credit: payment.amount,
+              },
+            ],
+          });
+
+          if (glResult.success && glResult.journalEntryId) {
+            // Link journal entry back to payment
+            await supabase.from("ap_payments")
+              .update({ journal_entry_id: glResult.journalEntryId })
+              .eq("id", id);
+          } else {
+            console.warn("AP Payment GL posting failed:", glResult.error);
+          }
+        }
+      } catch (glError) {
+        console.warn("AP Payment GL posting error:", glError);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ap-payments", selectedCompanyId] });
-      toast.success("Payment approved");
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast.success("Payment approved & posted to GL");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
   });
@@ -2353,7 +2488,7 @@ export const useRejectPurchaseOrder = () => {
 // ============ Stock Adjustment Approval ============
 export const useApproveStockAdjustment = () => {
   const queryClient = useQueryClient();
-  const { selectedCompanyId } = useCompany();
+  const { selectedCompanyId, getEffectiveCompanyId, getBusinessUnitCode } = useCompany();
   
   return useMutation({
     mutationFn: async (id: string) => {
@@ -2365,11 +2500,66 @@ export const useApproveStockAdjustment = () => {
         })
         .eq("id", id);
       if (error) throw error;
+
+      // ========== AUTO GL POSTING for Stock Adjustment ==========
+      try {
+        const effectiveCompanyId = getEffectiveCompanyId();
+        const businessUnitCode = getBusinessUnitCode();
+
+        // Fetch adjustment details
+        const { data: adjustment } = await (supabase as any)
+          .from("stock_adjustments")
+          .select("adjustment_number, adjustment_date, adjustment_type, adjustment_value, reason, items(item_name)")
+          .eq("id", id)
+          .single();
+
+        // Fetch GL settings for inventory
+        const { data: glSettings } = await supabase
+          .from("gl_settings")
+          .select("*")
+          .eq("company_id", effectiveCompanyId)
+          .maybeSingle();
+
+        const inventoryAccountId = (glSettings as Record<string, string> | null)?.inventory_account_id;
+        const adjustmentExpenseId = (glSettings as Record<string, string> | null)?.stock_adjustment_account_id ||
+          (glSettings as Record<string, string> | null)?.default_expense_account_id;
+
+        if (adjustment && inventoryAccountId && adjustmentExpenseId && adjustment.adjustment_value > 0) {
+          const { createAndPostJournalEntry } = await import("@/lib/gl-posting-utils");
+          const itemName = adjustment.items?.item_name || "Stock";
+          const isIncrease = adjustment.adjustment_type === "increase" || adjustment.adjustment_type === "addition";
+
+          const glResult = await createAndPostJournalEntry({
+            entry_date: adjustment.adjustment_date || new Date().toISOString().split("T")[0],
+            description: `Stock Adjustment: ${adjustment.adjustment_number || id.substring(0, 8)} - ${itemName} (${adjustment.adjustment_type})`,
+            reference: adjustment.adjustment_number || id.substring(0, 8),
+            company_id: effectiveCompanyId,
+            business_unit_code: businessUnitCode || "HQ",
+            lines: isIncrease
+              ? [
+                  { account_id: inventoryAccountId, description: `Inventory Increase - ${itemName}`, debit: adjustment.adjustment_value, credit: 0 },
+                  { account_id: adjustmentExpenseId, description: `Stock Adjustment - ${itemName}`, debit: 0, credit: adjustment.adjustment_value },
+                ]
+              : [
+                  { account_id: adjustmentExpenseId, description: `Stock Adjustment Write-off - ${itemName}`, debit: adjustment.adjustment_value, credit: 0 },
+                  { account_id: inventoryAccountId, description: `Inventory Decrease - ${itemName}`, debit: 0, credit: adjustment.adjustment_value },
+                ],
+          });
+
+          if (!glResult.success) {
+            console.warn("Stock Adjustment GL posting failed:", glResult.error);
+          }
+        }
+      } catch (glError) {
+        console.warn("Stock Adjustment GL posting error:", glError);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stock-adjustments", selectedCompanyId] });
       queryClient.invalidateQueries({ queryKey: ["items", selectedCompanyId] });
-      toast.success("Stock adjustment approved");
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["chart-of-accounts"] });
+      toast.success("Stock adjustment approved & posted to GL");
     },
     onError: (error) => toast.error(`Failed: ${error.message}`),
   });

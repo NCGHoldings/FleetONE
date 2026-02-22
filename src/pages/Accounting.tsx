@@ -96,6 +96,7 @@ import { PaymentReminderRulesView } from "@/components/accounting/automation/Pay
 import { WorkflowRulesView } from "@/components/accounting/automation/WorkflowRulesView";
 import { ScheduledTasksView } from "@/components/accounting/automation/ScheduledTasksView";
 import FinanceAutomationDashboard from "@/components/accounting/FinanceAutomationDashboard";
+import GLIntegrityGuardian from "@/components/accounting/GLIntegrityGuardian";
 // ERPNext Parity - Selling Module
 import { SalesOrderView } from "@/components/accounting/SalesOrderView";
 import { DeliveryNoteView } from "@/components/accounting/DeliveryNoteView";
@@ -885,6 +886,7 @@ const Accounting = () => {
               <ScrollArea className="w-full whitespace-nowrap">
                 <TabsList className="inline-flex w-max">
                   <TabsTrigger value="engine">Automation Engine</TabsTrigger>
+                  <TabsTrigger value="gl-guardian">GL Guardian</TabsTrigger>
                   <TabsTrigger value="recurring">Recurring Invoices</TabsTrigger>
                   <TabsTrigger value="reminders">Payment Reminders</TabsTrigger>
                   <TabsTrigger value="workflows">Workflow Rules</TabsTrigger>
@@ -895,6 +897,10 @@ const Accounting = () => {
 
               <TabsContent value="engine">
                 <FinanceAutomationDashboard />
+              </TabsContent>
+
+              <TabsContent value="gl-guardian">
+                <GLIntegrityGuardian />
               </TabsContent>
 
               <TabsContent value="recurring">

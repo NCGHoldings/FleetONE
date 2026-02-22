@@ -40,8 +40,8 @@ const commonStyles = `
     flex-shrink: 0;
   }
   .logo-area img {
-    max-height: 70px;
-    max-width: 180px;
+    max-height: 200px;
+    max-width: 400px;
     object-fit: contain;
   }
   .company-details {
@@ -467,6 +467,7 @@ table.items-table th { background: #ea580c; }
       <div class="total-row"><span>Tax:</span><span>{{tax_amount}}</span></div>
       <div class="total-row"><span>WHT:</span><span>{{wht_amount}}</span></div>
       <div class="total-row grand"><span>Total Payable:</span><span>{{total_amount}}</span></div>
+      <div class="total-row"><span>Balance Due:</span><span>{{balance_due}}</span></div>
     </div>
 
     <div class="amount-words">
@@ -480,9 +481,21 @@ table.items-table th { background: #ea580c; }
 
   <div class="document-footer">
     <div class="signature-grid">
-      <div class="sig-box"><div class="sig-line">Received By</div></div>
-      <div class="sig-box"><div class="sig-line">Verified By</div></div>
-      <div class="sig-box"><div class="sig-line">Approved By</div></div>
+      <div class="sig-box">
+        <div style="min-height: 60px; display: flex; align-items: center; justify-content: center;">{{received_by_signature}}</div>
+        <div class="sig-line">{{received_by}}</div>
+        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Received By</div>
+      </div>
+      <div class="sig-box">
+        <div style="min-height: 60px; display: flex; align-items: center; justify-content: center;">{{verified_by_signature}}</div>
+        <div class="sig-line">{{verified_by}}</div>
+        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Verified By</div>
+      </div>
+      <div class="sig-box">
+        <div style="min-height: 60px; display: flex; align-items: center; justify-content: center;">{{approved_by_signature}}</div>
+        <div class="sig-line">{{approved_by}}</div>
+        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Approved By</div>
+      </div>
     </div>
   </div>
 </div>

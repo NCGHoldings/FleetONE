@@ -185,10 +185,21 @@ export const APInvoiceForm = ({ open, onOpenChange }: APInvoiceFormProps) => {
         vendor_id: data.vendor_id,
         invoice_date: data.invoice_date,
         due_date: data.due_date,
+        subtotal: subtotal,
         total_amount: grossTotal,
         tax_amount: totalTax,
         wht_amount: whtAmount,
         notes: data.notes,
+        lines: lines
+          .filter(l => l.description.trim() || l.unit_price > 0)
+          .map(l => ({
+            description: l.description,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            tax_amount: (l.quantity * l.unit_price * l.tax_rate) / 100,
+            tax_code: l.tax_code,
+            line_total: l.line_total,
+          })),
       });
       onOpenChange(false);
       form.reset();

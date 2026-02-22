@@ -266,6 +266,12 @@ export const useRecentAutoPostEntries = (limit: number = 20) => {
         else if (desc.includes("insurance")) source = "Insurance";
         else if (desc.includes("expense")) source = "Expense";
         else if (desc.includes("permit")) source = "Route Permit";
+        else if (desc.includes("fuel")) source = "Fuel";
+        else if (desc.includes("school") || desc.includes("sch-")) source = "School Bus";
+        else if (desc.includes("leasing") || desc.includes("loan") || desc.includes("emi")) source = "Leasing";
+        else if (desc.includes("yutong") || desc.includes("sinotruck") || desc.includes("vehicle sale")) source = "Vehicle Sales";
+        else if (desc.includes("sph") || desc.includes("special hire")) source = "Special Hire";
+        else if (desc.includes("ncg express") || desc.includes("ncge")) source = "NCG Express";
         else if (desc.includes("disposal")) source = "Asset Disposal";
         else if (desc.includes("inv-") || desc.includes("invoice")) source = "AR/AP";
         else if (desc.includes("rct-") || desc.includes("receipt")) source = "Receipt";
@@ -398,9 +404,294 @@ export const useModuleAutomationHealth = () => {
           : "Not configured",
       });
 
+      // Fuel Expenses
+      const fuelSettings = moduleMap.get("fuel_expenses");
+      statuses.push({
+        module: "fuel",
+        label: "Fuel Expenses",
+        status: fuelSettings?.auto_post_on_entry ? "healthy" : fuelSettings ? "warning" : "disabled",
+        message: fuelSettings?.auto_post_on_entry
+          ? "Auto-post on entry: ON"
+          : fuelSettings
+          ? "Auto-post disabled"
+          : "Not configured",
+      });
+
+      // School Bus
+      const schoolSettings = moduleMap.get("school_bus");
+      statuses.push({
+        module: "school_bus",
+        label: "School Bus",
+        status: schoolSettings?.auto_post_on_payment ? "healthy" : schoolSettings ? "warning" : "disabled",
+        message: schoolSettings?.auto_post_on_payment
+          ? "Auto-post on payment: ON"
+          : schoolSettings
+          ? "Auto-post disabled"
+          : "Not configured",
+      });
+
+      // Special Hire (check special_hire_finance_settings directly)
+      let sphStatus: AutomationHealthStatus = {
+        module: "special_hire",
+        label: "Special Hire",
+        status: "disabled",
+        message: "Not configured",
+      };
+      try {
+        const { data: sphSettings } = await (supabase as any)
+          .from("special_hire_finance_settings")
+          .select("auto_post_advance_payments, auto_post_invoices, auto_post_balance_payments")
+          .eq("company_id", selectedCompanyId)
+          .maybeSingle();
+        if (sphSettings) {
+          const allOn = sphSettings.auto_post_advance_payments && sphSettings.auto_post_invoices && sphSettings.auto_post_balance_payments;
+          const anyOn = sphSettings.auto_post_advance_payments || sphSettings.auto_post_invoices || sphSettings.auto_post_balance_payments;
+          sphStatus = {
+            module: "special_hire",
+            label: "Special Hire",
+            status: allOn ? "healthy" : anyOn ? "warning" : "disabled",
+            message: allOn
+              ? "All auto-posting: ON"
+              : anyOn
+              ? "Partial auto-posting — some options disabled"
+              : "Auto-posting disabled",
+          };
+        }
+      } catch { /* table may not exist */ }
+      statuses.push(sphStatus);
+
+      // Leasing
+      let leasingStatus: AutomationHealthStatus = {
+        module: "leasing",
+        label: "Fleet Leasing",
+        status: "disabled",
+        message: "Not configured",
+      };
+      try {
+        const { data: leasSettings } = await (supabase as any)
+          .from("leasing_finance_settings")
+          .select("auto_post_gl_on_payment, auto_create_ap_invoice")
+          .eq("company_id", selectedCompanyId)
+          .maybeSingle();
+        if (leasSettings) {
+          const allOn = leasSettings.auto_post_gl_on_payment && leasSettings.auto_create_ap_invoice;
+          leasingStatus = {
+            module: "leasing",
+            label: "Fleet Leasing",
+            status: allOn ? "healthy" : leasSettings.auto_post_gl_on_payment ? "warning" : "disabled",
+            message: allOn
+              ? "Auto GL + AP Invoice: ON"
+              : leasSettings.auto_post_gl_on_payment
+              ? "GL posting ON, AP Invoice OFF"
+              : "Auto-posting disabled",
+          };
+        }
+      } catch { /* table may not exist */ }
+      statuses.push(leasingStatus);
+
+      // Vehicle Sales (Yutong / Sinotruck / Light Vehicle)
+      const vehicleModules = [
+        { key: "yutong", label: "Yutong Sales", table: "yutong_finance_settings" },
+        { key: "sinotruck", label: "Sinotruck Sales", table: "sinotruck_finance_settings" },
+        { key: "lightvehicle", label: "Light Vehicle Sales", table: "light_vehicle_finance_settings" },
+      ];
+      for (const vm of vehicleModules) {
+        let vStatus: AutomationHealthStatus = {
+          module: vm.key,
+          label: vm.label,
+          status: "disabled",
+          message: "Not configured",
+        };
+        try {
+          const { data: vSettings } = await (supabase as any)
+            .from(vm.table)
+            .select("auto_post_on_verify, auto_create_customer")
+            .eq("company_id", selectedCompanyId)
+            .maybeSingle();
+          if (vSettings) {
+            vStatus = {
+              module: vm.key,
+              label: vm.label,
+              status: vSettings.auto_post_on_verify ? "healthy" : "warning",
+              message: vSettings.auto_post_on_verify
+                ? "Auto-post on verify: ON"
+                : "Auto-post disabled",
+            };
+          }
+        } catch { /* table may not exist */ }
+        statuses.push(vStatus);
+      }
+
+      // NCG Express
+      let ncgeStatus: AutomationHealthStatus = {
+        module: "ncg_express",
+        label: "NCG Express",
+        status: "disabled",
+        message: "Not configured",
+      };
+      try {
+        const NCG_EXPRESS_ID = "7ece7595-8b7b-46de-8bfc-c1e8e0da7513";
+        const { data: ncgeSettings } = await (supabase as any)
+          .from("module_finance_settings")
+          .select("settings")
+          .eq("company_id", NCG_EXPRESS_ID)
+          .eq("module_name", "ncg_express")
+          .maybeSingle();
+        if (ncgeSettings) {
+          const s = typeof ncgeSettings.settings === "string"
+            ? JSON.parse(ncgeSettings.settings)
+            : ncgeSettings.settings;
+          const allOn = s?.auto_post_revenue && s?.auto_post_expenses;
+          ncgeStatus = {
+            module: "ncg_express",
+            label: "NCG Express",
+            status: allOn ? "healthy" : s?.auto_post_revenue || s?.auto_post_expenses ? "warning" : "disabled",
+            message: allOn
+              ? "Auto-post revenue + expenses: ON"
+              : s?.auto_post_revenue
+              ? "Revenue ON, Expenses OFF"
+              : s?.auto_post_expenses
+              ? "Revenue OFF, Expenses ON"
+              : "Auto-posting disabled",
+          };
+        }
+      } catch { /* ignore */ }
+      statuses.push(ncgeStatus);
+
       return statuses;
     },
     enabled: !!selectedCompanyId,
     refetchInterval: 10 * 60 * 1000, // 10 mins
+  });
+};
+
+// ============ Pending Amortizations ============
+
+export interface PendingAmortization {
+  id: string;
+  type: "insurance" | "route_permit";
+  label: string;
+  policyOrPermit: string;
+  monthlyAmount: number;
+  lastPostedMonth: string | null;
+  pendingMonths: number;
+}
+
+export const usePendingAmortizations = () => {
+  const { selectedCompanyId } = useCompany();
+
+  return useQuery({
+    queryKey: ["pending-amortizations", selectedCompanyId],
+    queryFn: async (): Promise<PendingAmortization[]> => {
+      if (!selectedCompanyId) return [];
+
+      const pending: PendingAmortization[] = [];
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+      // Check insurance records for monthly amortization
+      try {
+        const { data: policies } = await (supabase as any)
+          .from("insurance_records")
+          .select("id, policy_number, premium_amount, issue_date, expiry_date, last_amortization_month")
+          .eq("company_id", selectedCompanyId)
+          .eq("status", "active");
+
+        for (const policy of policies || []) {
+          if (!policy.premium_amount || policy.premium_amount <= 0) continue;
+          const issueDate = new Date(policy.issue_date);
+          const expiryDate = new Date(policy.expiry_date);
+          const totalMonths = Math.max(
+            1,
+            (expiryDate.getFullYear() - issueDate.getFullYear()) * 12 +
+              (expiryDate.getMonth() - issueDate.getMonth())
+          );
+          const monthlyAmount = Math.round(policy.premium_amount / totalMonths);
+          const lastPosted = policy.last_amortization_month || null;
+
+          // Count pending months
+          let pendingMonths = 0;
+          if (!lastPosted) {
+            // Never posted — calculate months from issue to now
+            const monthsSinceIssue = Math.max(0,
+              (now.getFullYear() - issueDate.getFullYear()) * 12 +
+              (now.getMonth() - issueDate.getMonth())
+            );
+            pendingMonths = Math.min(monthsSinceIssue, totalMonths);
+          } else if (lastPosted < currentMonth) {
+            const lp = new Date(lastPosted + "-01");
+            pendingMonths = Math.max(0,
+              (now.getFullYear() - lp.getFullYear()) * 12 +
+              (now.getMonth() - lp.getMonth())
+            );
+          }
+
+          if (pendingMonths > 0) {
+            pending.push({
+              id: policy.id,
+              type: "insurance",
+              label: "Insurance Premium Amortization",
+              policyOrPermit: policy.policy_number || policy.id.substring(0, 8),
+              monthlyAmount,
+              lastPostedMonth: lastPosted,
+              pendingMonths,
+            });
+          }
+        }
+      } catch { /* table may not exist */ }
+
+      // Check route permits for monthly amortization
+      try {
+        const { data: permits } = await (supabase as any)
+          .from("route_permits")
+          .select("id, permit_number, renewal_cost, issue_date, expiry_date, last_amortization_month")
+          .eq("company_id", selectedCompanyId)
+          .eq("status", "active");
+
+        for (const permit of permits || []) {
+          if (!permit.renewal_cost || permit.renewal_cost <= 0) continue;
+          const issueDate = new Date(permit.issue_date);
+          const expiryDate = new Date(permit.expiry_date);
+          const totalMonths = Math.max(
+            1,
+            (expiryDate.getFullYear() - issueDate.getFullYear()) * 12 +
+              (expiryDate.getMonth() - issueDate.getMonth())
+          );
+          const monthlyAmount = Math.round(permit.renewal_cost / totalMonths);
+          const lastPosted = permit.last_amortization_month || null;
+
+          let pendingMonths = 0;
+          if (!lastPosted) {
+            const monthsSinceIssue = Math.max(0,
+              (now.getFullYear() - issueDate.getFullYear()) * 12 +
+              (now.getMonth() - issueDate.getMonth())
+            );
+            pendingMonths = Math.min(monthsSinceIssue, totalMonths);
+          } else if (lastPosted < currentMonth) {
+            const lp = new Date(lastPosted + "-01");
+            pendingMonths = Math.max(0,
+              (now.getFullYear() - lp.getFullYear()) * 12 +
+              (now.getMonth() - lp.getMonth())
+            );
+          }
+
+          if (pendingMonths > 0) {
+            pending.push({
+              id: permit.id,
+              type: "route_permit",
+              label: "Route Permit Amortization",
+              policyOrPermit: permit.permit_number || permit.id.substring(0, 8),
+              monthlyAmount,
+              lastPostedMonth: lastPosted,
+              pendingMonths,
+            });
+          }
+        }
+      } catch { /* table may not exist */ }
+
+      return pending;
+    },
+    enabled: !!selectedCompanyId,
+    refetchInterval: 10 * 60 * 1000,
   });
 };

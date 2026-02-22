@@ -33,6 +33,7 @@ export const PAGES: PageCategories = {
     { id: "insurance", title: "Insurance", url: "/insurance" },
     { id: "staff_management", title: "Staff Management", url: "/staff" },
     { id: "staff_performance", title: "Staff Performance", url: "/staff-performance" },
+    { id: "system_issues", title: "System Issues", url: "/system-issues" },
   ],
   operations: [
     { id: "route_permits", title: "Route Permits", url: "/permits" },

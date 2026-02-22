@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target, Users, Wallet, Hash, Bus, Car } from "lucide-react";
+import { Lock, Bell, Palette, Globe, Shield, Clock, QrCode, Upload, MapPin, Wrench, PenTool, Tag, Target, Users, Wallet, Hash, Bus, Car, Truck, Settings2 } from "lucide-react";
 import { GrantAccessButton } from "@/components/accounting/GrantAccessButton";
 import { DataEntrySettings } from "@/components/trips/DataEntrySettings";
 import { ConductorSubmissionQRGenerator } from "@/components/trips/ConductorSubmissionQRGenerator";
@@ -31,7 +31,7 @@ import { LightVehicleFinanceSettings } from "@/components/settings/LightVehicleF
 import { NCGExpressFinanceSettings } from "@/components/settings/NCGExpressFinanceSettings";
 import { LeasingFinanceSettings } from "@/components/settings/LeasingFinanceSettings";
 import { ModuleFinanceSettingsView } from "@/components/settings/ModuleFinanceSettingsView";
-import { Truck, Wallet as WalletIcon } from "lucide-react";
+import { CoreGLSettings } from "@/components/settings/CoreGLSettings";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -161,11 +161,15 @@ export default function Settings() {
             NCG Express Finance
           </TabsTrigger>
           <TabsTrigger value="leasing-finance" className="flex items-center gap-1">
-            <WalletIcon className="h-3 w-3" />
+            <Wallet className="h-3 w-3" />
             Leasing Finance
           </TabsTrigger>
+          <TabsTrigger value="core-gl-settings" className="flex items-center gap-1">
+            <Settings2 className="h-3 w-3" />
+            Core GL Settings
+          </TabsTrigger>
           <TabsTrigger value="module-finance" className="flex items-center gap-1">
-            <WalletIcon className="h-3 w-3" />
+            <Wallet className="h-3 w-3" />
             Module GL Mappings
           </TabsTrigger>
         </TabsList>
@@ -636,6 +640,10 @@ export default function Settings() {
 
         <TabsContent value="leasing-finance" className="space-y-6 mt-6">
           <LeasingFinanceSettings />
+        </TabsContent>
+
+        <TabsContent value="core-gl-settings" className="space-y-6 mt-6">
+          <CoreGLSettings />
         </TabsContent>
 
         <TabsContent value="module-finance" className="space-y-6 mt-6">

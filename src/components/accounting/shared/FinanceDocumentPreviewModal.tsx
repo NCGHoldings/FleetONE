@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Printer, Download, FileText, AlertTriangle, Wand2 } from "lucide-react";
+import { Printer, Download, FileText, AlertTriangle, Wand2, Pen } from "lucide-react";
+import { DocumentSignaturePad, injectSignaturesIntoHtml } from "./DocumentSignaturePad";
 import { useDocumentTemplates } from "@/hooks/useDocumentTemplates";
 import { useCompanies } from "@/hooks/useAccountingData";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +35,54 @@ export const FinanceDocumentPreviewModal = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Signature persistence helpers
+  const getSignatureStorageKey = () => {
+    const docId = documentData?.id || documentData?.invoice_number || documentData?.receipt_number || documentData?.payment_number || '';
+    return `doc_signatures_${documentType}_${docId}`;
+  };
+
+  const loadSavedSignatures = (): Record<string, { dataUrl: string; name: string }> => {
+    const defaultSigs = {
+      verified_by: { dataUrl: "", name: "" },
+      approved_by: { dataUrl: "", name: "" },
+      received_by: { dataUrl: "", name: "" },
+      finance_controller: { dataUrl: "", name: "" },
+    };
+    try {
+      const key = getSignatureStorageKey();
+      if (!key || key === `doc_signatures_${documentType}_`) return defaultSigs;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        return { ...defaultSigs, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.warn("Failed to load saved signatures:", e);
+    }
+    return defaultSigs;
+  };
+
+  const saveSignaturesToStorage = (sigs: Record<string, { dataUrl: string; name: string }>) => {
+    try {
+      const key = getSignatureStorageKey();
+      if (!key || key === `doc_signatures_${documentType}_`) return;
+      localStorage.setItem(key, JSON.stringify(sigs));
+    } catch (e) {
+      console.warn("Failed to save signatures:", e);
+    }
+  };
+
+  // Signature state — initialized from localStorage
+  const [signatures, setSignatures] = useState<Record<string, { dataUrl: string; name: string }>>(() => loadSavedSignatures());
+  const [signaturePadOpen, setSignaturePadOpen] = useState(false);
+  const [activeSignatureRole, setActiveSignatureRole] = useState("");
+
+  // Reload saved signatures when modal opens or document changes
+  useEffect(() => {
+    if (open && documentData?.id) {
+      setSignatures(loadSavedSignatures());
+    }
+  }, [open, documentData?.id]);
 
   const { data: companies } = useCompanies();
   const { data: allTemplates } = useDocumentTemplates();
@@ -201,9 +250,22 @@ export const FinanceDocumentPreviewModal = ({
 
     // Use selected template if available, otherwise use fallback
     if (selectedTemplate) {
+      const enrichedDocData = {
+        ...documentData,
+        verified_by: signatures.verified_by.name || documentData?.verified_by || '',
+        verified_by_signature: signatures.verified_by.dataUrl || documentData?.verified_by_signature || '',
+        approved_by: signatures.approved_by.name || documentData?.approved_by || '',
+        approved_by_signature: signatures.approved_by.dataUrl || documentData?.approved_by_signature || '',
+        received_by: signatures.received_by.name || documentData?.received_by || '',
+        received_by_signature: signatures.received_by.dataUrl || documentData?.received_by_signature || '',
+        finance_controller: signatures.finance_controller.name || documentData?.finance_controller || '',
+        finance_controller_signature: signatures.finance_controller.dataUrl || documentData?.finance_controller_signature || '',
+        prepared_by: signatures.verified_by.name || documentData?.prepared_by || '', // Alias
+      };
+
     const placeholders = mapDocumentToPlaceholders(
       documentType,
-      documentData,
+      enrichedDocData,
       company,
       lineItems || [],
       allocations || [],
@@ -213,16 +275,21 @@ export const FinanceDocumentPreviewModal = ({
 
       const renderedHtml = replacePlaceholders(selectedTemplate.html_content || "", placeholders);
       
+      // Post-process: inject signatures into rendered HTML (works with ANY template)
+      const withSignatures = injectSignaturesIntoHtml(renderedHtml, signatures);
+      
       return generatePrintableDocument(
-        renderedHtml,
+        withSignatures,
         selectedTemplate.css_styles || undefined,
         selectedTemplate.paper_size || "A4",
         selectedTemplate.orientation || "portrait"
       );
     }
 
-    // Fallback to default template
-    return generatePrintableDocument(generateFallbackHtml());
+    // Fallback to default template  
+    const fallbackHtml = generateFallbackHtml();
+    const fallbackWithSigs = injectSignaturesIntoHtml(fallbackHtml, signatures);
+    return generatePrintableDocument(fallbackWithSigs);
   };
 
   const handlePrint = () => {
@@ -378,7 +445,54 @@ export const FinanceDocumentPreviewModal = ({
             sandbox="allow-same-origin"
           />
         </div>
+        {/* Signature Buttons */}
+        <div className="flex items-center gap-2 pt-3 border-t">
+          <span className="text-sm font-medium text-muted-foreground mr-2">
+            <Pen className="h-4 w-4 inline mr-1" />
+            Sign:
+          </span>
+          {[
+            { key: "verified_by", label: "Verified By" },
+            { key: "approved_by", label: "Dept. Head" },
+            { key: "finance_controller", label: "Finance Controller" },
+            { key: "received_by", label: "Received By" },
+          ].map((role) => (
+            <Button
+              key={role.key}
+              variant={signatures[role.key]?.dataUrl ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setActiveSignatureRole(role.key);
+                setSignaturePadOpen(true);
+              }}
+              className={signatures[role.key]?.dataUrl ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+            >
+              <Pen className="h-3.5 w-3.5 mr-1" />
+              {signatures[role.key]?.dataUrl ? `✓ ${role.label}` : role.label}
+            </Button>
+          ))}
+        </div>
       </DialogContent>
+
+      {/* Signature Pad Dialog */}
+      <DocumentSignaturePad
+        open={signaturePadOpen}
+        onOpenChange={setSignaturePadOpen}
+        signerLabel={
+          activeSignatureRole === "verified_by" ? "Verified By" :
+          activeSignatureRole === "approved_by" ? "Dept. Head Approval" :
+          activeSignatureRole === "finance_controller" ? "Finance Controller" :
+          "Received By"
+        }
+        onSave={(dataUrl, name) => {
+          const newSigs = {
+            ...signatures,
+            [activeSignatureRole]: { dataUrl, name },
+          };
+          setSignatures(newSigs);
+          saveSignaturesToStorage(newSigs);
+        }}
+      />
     </Dialog>
   );
 };

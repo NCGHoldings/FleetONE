@@ -16,6 +16,7 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { DocumentUpload } from "@/components/documents/DocumentUpload";
 import { AccidentInsurance } from "@/components/accident/AccidentInsurance";
+import { useInsuranceFinanceSettings, usePostInsurancePremiumToGL } from "@/hooks/useInsuranceFinance";
 
 interface InsuranceRecord {
   id: string;
@@ -49,6 +50,9 @@ export default function Insurance() {
   const [drivers, setDrivers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  const { data: financeSettings } = useInsuranceFinanceSettings();
+  const postInsuranceToGL = usePostInsurancePremiumToGL();
   
   // Form states
   const [formData, setFormData] = useState({
@@ -132,15 +136,50 @@ export default function Insurance() {
     }
 
     try {
-      const { error } = await supabase
+      const { data: newRecord, error } = await supabase
         .from('insurance_records')
         .insert({
           ...formData,
           premium_amount: parseFloat(formData.premium_amount) || null,
           coverage_amount: parseFloat(formData.coverage_amount) || null
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Auto-post to GL if setting is enabled
+      if (financeSettings?.auto_post_premium && newRecord?.premium_amount > 0) {
+        try {
+          const selectedBus = buses.find(b => b.id === newRecord.bus_id);
+          
+          let coverageMonths = 12;
+          if (newRecord.issue_date && newRecord.expiry_date) {
+            const start = new Date(newRecord.issue_date);
+            const end = new Date(newRecord.expiry_date);
+            coverageMonths = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44)));
+          }
+
+          await postInsuranceToGL.mutateAsync({
+            premium: {
+              policyId: newRecord.id,
+              policyNumber: newRecord.policy_number,
+              vehicleNo: selectedBus?.bus_no,
+              insuranceProvider: newRecord.insurance_company,
+              premiumAmount: newRecord.premium_amount,
+              premiumDate: newRecord.issue_date || new Date().toISOString().split('T')[0],
+              coverageStartDate: newRecord.issue_date || new Date().toISOString().split('T')[0],
+              coverageEndDate: newRecord.expiry_date || new Date().toISOString().split('T')[0],
+              coverageMonths,
+              insuranceType: newRecord.policy_type,
+            },
+            settings: financeSettings,
+          });
+        } catch (glError) {
+          console.error('Error posting premium to GL:', glError);
+          // Non-blocking error
+        }
+      }
 
       toast.success('Insurance record created successfully');
       setIsDialogOpen(false);

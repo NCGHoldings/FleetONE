@@ -70,6 +70,12 @@ export interface ExpenseRequest {
   ap_payment_id: string | null;
   gl_posted: boolean;
   journal_entry_id: string | null;
+  // NEW — OCR + Bank fields
+  bank_account_id: string | null;
+  fuel_liters: number | null;
+  fuel_price_per_liter: number | null;
+  receipt_ocr_data: any;
+  ocr_fields_modified: string[] | null;
   created_at: string;
   updated_at: string;
   // Joined data
@@ -131,7 +137,7 @@ export const useCreateExpenseRequest = () => {
 
   return useMutation({
     mutationFn: async (data: Partial<ExpenseRequest>) => {
-      const { data: result, error } = await supabase
+      const { data: result, error } = await (supabase as any)
         .from("expense_requests")
         .insert([{
           request_number: "", // Trigger will auto-generate
@@ -150,6 +156,13 @@ export const useCreateExpenseRequest = () => {
           iou_id: data.iou_id,
           notes: data.notes,
           status: data.status || "draft",
+          // OCR + Bank fields
+          bank_account_id: data.bank_account_id || null,
+          fuel_liters: data.fuel_liters || null,
+          fuel_price_per_liter: data.fuel_price_per_liter || null,
+          receipt_attachment_url: data.receipt_attachment_url || null,
+          receipt_ocr_data: data.receipt_ocr_data || null,
+          ocr_fields_modified: data.ocr_fields_modified || null,
         }])
         .select()
         .single();

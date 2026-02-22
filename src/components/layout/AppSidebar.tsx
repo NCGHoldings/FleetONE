@@ -61,6 +61,11 @@ const mainItems = [{
   title: "Staff Performance",
   url: "/staff-performance",
   icon: TrendingUp
+}, {
+  id: "system_issues",
+  title: "System Issues",
+  url: "/system-issues",
+  icon: AlertTriangle
 }];
 const governanceItems = [{
   id: "governance_calendar",

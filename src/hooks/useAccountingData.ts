@@ -357,7 +357,17 @@ export const useAPInvoices = (status?: string) => {
           *,
           vendors (
             vendor_code,
-            vendor_name
+            vendor_name,
+            address,
+            bank_account,
+            bank_name,
+            bank_branch,
+            tax_id,
+            currency,
+            email,
+            phone,
+            contact_person,
+            payment_terms
           )
         `)
         .order("invoice_date", { ascending: false });
@@ -440,7 +450,16 @@ export const useAPPayments = () => {
           *,
           vendors (
             vendor_code,
-            vendor_name
+            vendor_name,
+            address,
+            bank_account,
+            bank_name,
+            bank_branch,
+            tax_id,
+            currency,
+            email,
+            phone,
+            contact_person
           )
         `)
         .order("payment_date", { ascending: false });

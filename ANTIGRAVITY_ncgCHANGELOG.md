@@ -3,7 +3,24 @@
 > **Purpose:** This file documents all changes made by **Antigravity** (external AI development tool).
 > Lovable should read this file before any development to avoid duplicating or conflicting with these changes.
 >
-> **Last Updated:** 2026-02-18
+> **Last Updated:** 2026-02-22
+
+---
+
+## 2026-02-22
+
+### ✅ CI/CD Pipeline Setup — GitHub Actions
+
+**Files Created:**
+
+- `.github/workflows/ci.yml` — **[NEW]** Continuous Integration workflow: runs Lint, Type Check, Build, and Unit Tests as 4 parallel jobs on every push/PR. Uses Node 20, npm caching, and uploads build artifacts. Includes `workflow_call` trigger for reuse by deploy workflow.
+- `.github/workflows/deploy.yml` — **[NEW]** Continuous Deployment workflow: triggers on push to `main` only. Calls CI workflow first, then deploys to VPS via SSH (`appleboy/ssh-action@v1`). Runs `git pull → npm install → npm run build → nginx reload`. Requires GitHub Secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_APP_DIR`.
+
+**Architecture Notes:**
+
+- CI is reusable via `workflow_call` — deploy.yml calls it with `uses: ./.github/workflows/ci.yml`
+- Deploy only runs after all 4 CI jobs pass (`needs: ci`)
+- Uses `environment: production` for deployment protection rules (optional)
 
 ---
 

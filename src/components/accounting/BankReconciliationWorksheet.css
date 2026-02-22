@@ -95,6 +95,24 @@
   background: hsl(142 76% 36% / 0.12);
 }
 
+/* SAP-style deposit row highlight (light blue) */
+.bank-recon-table tbody tr.row-deposit {
+  background: hsl(217 91% 60% / 0.05);
+}
+
+.bank-recon-table tbody tr.row-deposit:hover {
+  background: hsl(217 91% 60% / 0.10);
+}
+
+.bank-recon-table tbody tr.row-deposit.row-cleared {
+  background: hsl(142 76% 36% / 0.07);
+}
+
+/* SAP-style payment row (subtle warm tint) */
+.bank-recon-table tbody tr.row-payment {
+  background: transparent;
+}
+
 .bank-recon-table tbody td {
   padding: 8px 12px;
   border-bottom: 1px solid hsl(var(--border) / 0.5);
@@ -155,52 +173,113 @@
   color: hsl(var(--muted-foreground));
 }
 
-/* -------- Summary Footer ---------- */
+/* -------- SAP-Style Summary Footer ---------- */
 .bank-recon-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   padding: 16px 24px;
   background: hsl(var(--muted));
   border-top: 2px solid hsl(var(--border));
+  gap: 24px;
 }
 
-.bank-recon-summary-card {
+/* Left side: Payment & Deposit totals */
+.bank-recon-summary-left {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
 }
 
-.bank-recon-summary-card .summary-label {
-  font-size: 11px;
+.bank-recon-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.bank-recon-summary-row .summary-label {
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   color: hsl(var(--muted-foreground));
+  min-width: 80px;
 }
 
-.bank-recon-summary-card .summary-value {
-  font-size: 16px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+.bank-recon-summary-row .summary-count {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
   color: hsl(var(--foreground));
 }
 
-.bank-recon-summary-card .summary-value.positive {
-  color: hsl(142 76% 30%);
+.bank-recon-summary-row .summary-amount {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 140px;
+  text-align: right;
 }
 
-.bank-recon-summary-card .summary-value.negative {
+.bank-recon-summary-row .summary-amount.negative {
   color: hsl(0 72% 50%);
 }
 
-.bank-recon-summary-card .summary-value.neutral {
+.bank-recon-summary-row .summary-amount.positive {
+  color: hsl(142 76% 30%);
+}
+
+/* Right side: Cleared Book Balance, Statement Balance, Difference */
+.bank-recon-summary-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  min-width: 300px;
+}
+
+.bank-recon-balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.bank-recon-balance-row.difference-row {
+  border-top: 2px solid hsl(var(--border));
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.bank-recon-balance-row .balance-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.bank-recon-balance-row .balance-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bank-recon-balance-row .balance-value.positive {
+  color: hsl(142 76% 30%);
+}
+
+.bank-recon-balance-row .balance-value.negative {
+  color: hsl(0 72% 50%);
+}
+
+.bank-recon-balance-row .balance-value.neutral {
   color: hsl(var(--foreground));
 }
 
-.bank-recon-summary-card .summary-count {
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
+.bank-recon-balance-row .balance-value.match {
+  color: hsl(142 76% 30%);
+  font-size: 16px;
 }
 
 /* -------- Actions ---------- */

@@ -20,21 +20,31 @@ export const AssetMaintenanceView = () => {
   const [statusFilter, setStatusFilter] = useState<string>("_all");
   const [searchTerm, setSearchTerm] = useState("");
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
-  const [selectedLog, setSelectedLog] = useState<any>(null);
-  const [completionNotes, setCompletionNotes] = useState("");
-  const [completionCost, setCompletionCost] = useState("");
-  
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    asset_id: "",
+    maintenance_type: "preventive" as "preventive" | "corrective" | "predictive" | "emergency",
+    maintenance_date: new Date().toISOString().slice(0, 10),
+    description: "",
+    priority: "medium" as "low" | "medium" | "high" | "critical",
+    estimated_cost: "",
+  });
+
   const { data: logs, isLoading } = useAssetMaintenanceLogs(statusFilter === "_all" ? undefined : statusFilter);
   const { data: upcomingMaintenance } = useUpcomingMaintenance();
   const startMaintenance = useStartMaintenance();
   const completeMaintenance = useCompleteMaintenance();
   const cancelMaintenance = useCancelMaintenance();
+  const scheduleMaintenance = useCreateMaintenanceLog();
+  
+  // Need fixed assets to populate the schedule dropdown
+  const { data: fixedAssets } = useFixedAssets();
 
   // Finance integration
   const { data: maintenanceFinanceSettings } = useMaintenanceFinanceSettings();
   const postMaintenanceToGL = usePostMaintenanceCostToGL();
 
-  const filteredLogs = logs?.filter(log => 
+  const filteredLogs = logs?.filter((log: any) => 
     log.fixed_assets?.asset_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     log.fixed_assets?.asset_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     log.maintenance_number?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -42,9 +52,9 @@ export const AssetMaintenanceView = () => {
 
   const statusCounts = {
     total: logs?.length || 0,
-    scheduled: logs?.filter(l => l.status === "scheduled").length || 0,
-    in_progress: logs?.filter(l => l.status === "in_progress").length || 0,
-    completed: logs?.filter(l => l.status === "completed").length || 0,
+    scheduled: logs?.filter((l: any) => l.status === "scheduled").length || 0,
+    in_progress: logs?.filter((l: any) => l.status === "in_progress").length || 0,
+    completed: logs?.filter((l: any) => l.status === "completed").length || 0,
   };
 
   const getStatusBadge = (status: string) => {
@@ -90,6 +100,34 @@ export const AssetMaintenanceView = () => {
       default:
         return type;
     }
+  };
+
+  const handleScheduleSubmit = () => {
+    if (!scheduleForm.asset_id || !scheduleForm.description) {
+      toast.error("Please select an asset and provide a description");
+      return;
+    }
+
+    scheduleMaintenance.mutate({
+      asset_id: scheduleForm.asset_id,
+      maintenance_type: scheduleForm.maintenance_type,
+      maintenance_date: scheduleForm.maintenance_date,
+      description: scheduleForm.description,
+      priority: scheduleForm.priority,
+      cost: scheduleForm.estimated_cost ? parseFloat(scheduleForm.estimated_cost) : undefined
+    }, {
+      onSuccess: () => {
+        setIsScheduleDialogOpen(false);
+        setScheduleForm({
+          asset_id: "",
+          maintenance_type: "preventive",
+          maintenance_date: new Date().toISOString().slice(0, 10),
+          description: "",
+          priority: "medium",
+          estimated_cost: "",
+        });
+      }
+    });
   };
 
   const handleCompleteMaintenance = () => {
@@ -141,7 +179,7 @@ export const AssetMaintenanceView = () => {
                 {upcomingMaintenance.length} maintenance tasks due in the next 30 days
               </p>
               <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                {upcomingMaintenance.slice(0, 3).map(m => m.fixed_assets?.asset_name).join(", ")}
+                {upcomingMaintenance.slice(0, 3).map((m: any) => m.fixed_assets?.asset_name).join(", ")}
                 {upcomingMaintenance.length > 3 && ` and ${upcomingMaintenance.length - 3} more`}
               </p>
             </div>
@@ -214,11 +252,116 @@ export const AssetMaintenanceView = () => {
               </SelectContent>
             </Select>
           </div>
-          <Button>
+          <Button onClick={() => setIsScheduleDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Schedule Maintenance
           </Button>
         </div>
+
+        {/* Schedule Maintenance Dialog */}
+        <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Schedule Asset Maintenance</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="asset_id">Fixed Asset *</Label>
+                <Select 
+                  value={scheduleForm.asset_id} 
+                  onValueChange={(val) => setScheduleForm(prev => ({ ...prev, asset_id: val }))}
+                >
+                  <SelectTrigger id="asset_id">
+                    <SelectValue placeholder="Select asset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fixedAssets?.map(asset => (
+                      <SelectItem key={asset.id} value={asset.id}>
+                        {asset.asset_code} - {asset.asset_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="maintenance_type">Type *</Label>
+                  <Select 
+                    value={scheduleForm.maintenance_type} 
+                    onValueChange={(val: any) => setScheduleForm(prev => ({ ...prev, maintenance_type: val }))}
+                  >
+                    <SelectTrigger id="maintenance_type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="preventive">Preventive</SelectItem>
+                      <SelectItem value="corrective">Corrective</SelectItem>
+                      <SelectItem value="predictive">Predictive</SelectItem>
+                      <SelectItem value="emergency">Emergency</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select 
+                    value={scheduleForm.priority} 
+                    onValueChange={(val: any) => setScheduleForm(prev => ({ ...prev, priority: val }))}
+                  >
+                    <SelectTrigger id="priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="maintenance_date">Scheduled Date *</Label>
+                <Input
+                  id="maintenance_date"
+                  type="date"
+                  value={scheduleForm.maintenance_date}
+                  onChange={(e) => setScheduleForm(prev => ({ ...prev, maintenance_date: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estimated_cost">Estimated Cost (₨)</Label>
+                <Input
+                  id="estimated_cost"
+                  type="number"
+                  placeholder="e.g. 5000"
+                  value={scheduleForm.estimated_cost}
+                  onChange={(e) => setScheduleForm(prev => ({ ...prev, estimated_cost: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description *</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe the maintenance required..."
+                  value={scheduleForm.description}
+                  onChange={(e) => setScheduleForm(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsScheduleDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleScheduleSubmit} disabled={scheduleMaintenance.isPending}>
+                {scheduleMaintenance.isPending ? "Scheduling..." : "Schedule"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {isLoading ? (
           <div className="text-center py-8 text-muted-foreground">Loading maintenance logs...</div>

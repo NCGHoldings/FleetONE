@@ -82,6 +82,7 @@ import Marketing from "./pages/Marketing";
 import CustomerPortal from "./pages/CustomerPortal";
 import VendorPortal from "./pages/VendorPortal";
 import WhatsAppHub from "./pages/WhatsAppHub";
+import SystemIssueTracker from "./pages/SystemIssueTracker";
 
 const queryClient = new QueryClient();
 
@@ -798,6 +799,19 @@ const App = () => (
                   <AppLayout>
                     <WhatsAppHub />
                   </AppLayout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/system-issues" 
+              element={
+                <ProtectedRoute requiredRoles={['super_admin', 'admin']}>
+                  <PageAccessGuard pageId="system_issues">
+                    <AppLayout>
+                      <SystemIssueTracker />
+                    </AppLayout>
+                  </PageAccessGuard>
                 </ProtectedRoute>
               } 
             />
