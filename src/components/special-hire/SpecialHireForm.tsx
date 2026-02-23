@@ -350,14 +350,10 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         numberOfBuses: initialData.number_of_buses || 1,
         // Rate card details for display
         rateCardDetails: (() => {
-          // FIXED: Determine available hours based on hire type
-          const isLyceumOrInternal = initialData.hire_type === 'Lyceum' || initialData.hire_type === 'Inside';
-          const storedStandardHours = initialData.standard_hours || 8;
-          const availableHours = isLyceumOrInternal
-            ? storedStandardHours
-            : ((initialData.km_trip || 0) / 10);
+          // ALL hire types: available hours = trip distance / 10 km/h baseline speed
+          const availableHours = (initialData.km_trip || 0) / 10;
           return {
-            standardHours: storedStandardHours,
+            standardHours: initialData.standard_hours || 8,
             actualHours: actualHours,
             availableHours: Math.round(availableHours * 100) / 100,
             overtimeHours: Math.round(Math.max(0, actualHours - availableHours) * 100) / 100,
@@ -893,16 +889,16 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
           hireChargePerBus = fixedRatePerBus;
           totalFixedRate += fixedRatePerBus * bus.quantity;
 
-          // FIX: Add overtime calculation for Lyceum/Internal using standard hours
+          // Lyceum/Internal hire: use km/10 distance-based available hours (same as Outside)
           const extraTimeResult = calculateExtraTimeCharge(
             tripDistance,
             data.pickupDateTime,
             data.dropDateTime,
             {
+              baselineSpeedKmph: 10,
               hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
               nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 10000,
-              useStandardHours: true,
-              standardHours: rateCard?.standard_hours || 8
+              useStandardHours: false  // Use km/10 same as Outside
             }
           );
 
@@ -1327,16 +1323,16 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         overnightCharge = extraTimeResult.overnightCharge;
         totalExtraTimeCharge = extraTimeResult.totalExtraCharge;
       } else {
-        // Lyceum/Internal hire: rate card standard_hours based available hours
+        // Lyceum/Internal hire: use km/10 distance-based available hours (same as Outside)
         const extraTimeResult = calculateExtraTimeCharge(
-          tripDistance, // Not used when useStandardHours=true
+          tripDistance,
           data.pickupDateTime,
           data.dropDateTime,
           {
+            baselineSpeedKmph: 10,
             hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
             nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
-            useStandardHours: true,
-            standardHours: rateCard.standard_hours || 8
+            useStandardHours: false  // Use km/10 same as Outside
           }
         );
 
@@ -1460,10 +1456,8 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
         rateCardDetails: (() => {
           // FIXED: Always calculate actual hours from pickup/drop times for ALL hire types
           const actualHrs = (new Date(data.dropDateTime).getTime() - new Date(data.pickupDateTime).getTime()) / (1000 * 60 * 60);
-          // FIXED: Use rate card standard_hours for Lyceum/Inside, distance/10 for Outside
-          const availableHrs = data.hireType === 'Outside'
-            ? (tripDistance / 10)
-            : (rateCard.standard_hours || 8);
+          // ALL hire types: available hours = trip distance / 10 km/h baseline speed
+          const availableHrs = tripDistance / 10;
           // FIXED: Calculate overtime for ALL hire types
           const overtimeHrs = Math.max(0, actualHrs - availableHrs);
           return {
@@ -2408,16 +2402,16 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
                                         overtimeCharge = extraTimeResult.overtimeCharge;
                                         overnightCharge = extraTimeResult.overnightCharge;
                                       } else {
-                                        // Lyceum/Internal: available hours from rate card standard_hours
+                                        // Lyceum/Internal: use km/10 same as Outside
                                         const extraTimeResult = calculateExtraTimeCharge(
                                           manualTripDistance,
                                           formValues.pickupDateTime,
                                           formValues.dropDateTime,
                                           {
+                                            baselineSpeedKmph: 10,
                                             hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
                                             nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
-                                            useStandardHours: true,
-                                            standardHours: rateCard.standard_hours || 8
+                                            useStandardHours: false  // Use km/10 same as Outside
                                           }
                                         );
                                         overtimeCharge = extraTimeResult.overtimeCharge;
@@ -2443,9 +2437,7 @@ export function SpecialHireForm({ onSubmit, onCancel, initialData, isEditing = f
 
                                     // Calculate available hours for display
                                     const actualHrs = (new Date(formValues.dropDateTime).getTime() - new Date(formValues.pickupDateTime).getTime()) / (1000 * 60 * 60);
-                                    const availableHrs = formValues.hireType === 'Outside'
-                                      ? (manualTripDistance / 10)
-                                      : (rateCard?.standard_hours || 8);
+                                    const availableHrs = manualTripDistance / 10; // km/10 for ALL hire types
                                     const overtimeHrs = Math.max(0, actualHrs - availableHrs);
 
                                     // Update costData with FULL recalculation

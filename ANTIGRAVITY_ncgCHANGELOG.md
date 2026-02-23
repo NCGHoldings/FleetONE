@@ -3,7 +3,21 @@
 > **Purpose:** This file documents all changes made by **Antigravity** (external AI development tool).
 > Lovable should read this file before any development to avoid duplicating or conflicting with these changes.
 >
-> **Last Updated:** 2026-02-22
+> **Last Updated:** 2026-02-23
+
+---
+
+## 2026-02-23
+
+### 🔧 Lyceum Hire Overtime — Unified km/10 Available Hours
+
+**Business Logic Change:** Lyceum hire overtime calculation now uses the same **km ÷ 10** distance-based available hours as Outside hire. Previously Lyceum used fixed rate card `standard_hours` blocks (4h/8h).
+
+**Files Modified:**
+
+- `src/components/special-hire/CostCalculator.tsx` — Replaced simple `standardHours` subtraction with `calculateExtraTimeCharge()` using `useStandardHours: false`. Added `availableHours` to `rateCardDetails`.
+- `src/components/special-hire/SpecialHireForm.tsx` — Updated 5 locations (multi-bus, single-bus, initial data load, rateCardDetails, live preview) to use `km/10` for Lyceum instead of `standard_hours`.
+- `src/components/special-hire/EnhancedCostCalculator.tsx` — Updated recalculation fallback and `rateCardDetails.availableHours` to use `km/10` for all hire types.
 
 ---
 

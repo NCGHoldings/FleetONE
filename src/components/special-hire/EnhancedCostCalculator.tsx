@@ -351,16 +351,16 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
           storedOvertimeCharge = extraTimeResult.overtimeCharge;
           storedOvernightCharge = extraTimeResult.overnightCharge;
         } else {
-          // Lyceum/Internal hire: rate card standard_hours based
+          // Lyceum/Internal hire: use km/10 distance-based (same as Outside)
           const extraTimeResult = calculateExtraTimeCharge(
-            tripDistance, // Not used when useStandardHours=true
+            tripDistance,
             quotation.pickup_datetime,
             quotation.drop_datetime,
             {
+              baselineSpeedKmph: 10,
               hourlyRate: rateCard?.overtime_rate_lkr_per_hour || 500,
               nightBlockFee: rateCard?.overnight_charge_lkr_per_day || 10000,
-              useStandardHours: true,
-              standardHours: rateCard?.standard_hours || 8
+              useStandardHours: false  // Use km/10 same as Outside
             }
           );
           
@@ -419,19 +419,9 @@ export function EnhancedCostCalculator({ preselectedQuotationId }: { preselected
             actualHours = Math.max(0, (dropTime.getTime() - pickupTime.getTime()) / (1000 * 60 * 60));
           }
           
-          // FIXED: Calculate available hours based on hire type
-          // - Outside hire: distance-based (km / 10 km/h baseline speed)
-          // - Lyceum/Internal hire: use rate card standard_hours
-          const isLyceumOrInternal = quotation.hire_type === 'Lyceum' || quotation.hire_type === 'Internal';
-          
-          if (isLyceumOrInternal) {
-            // Lyceum/Internal: available hours = rate card standard hours (typically 4h or 8h blocks)
-            availableHours = standardHours;
-          } else {
-            // Outside hire: available hours = trip distance / 10 km/h baseline speed
-            const baselineSpeed = 10; // km/h
-            availableHours = tripDistance / baselineSpeed;
-          }
+          // ALL hire types: available hours = trip distance / 10 km/h baseline speed
+          const baselineSpeed = 10; // km/h
+          availableHours = tripDistance / baselineSpeed;
           
           // Calculate overtime hours
           const overtimeHours = Math.max(0, actualHours - availableHours);

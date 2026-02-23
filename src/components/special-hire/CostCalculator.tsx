@@ -590,11 +590,24 @@ export function CostCalculator() {
 
         setSelectedRateCard(rateCard);
         
-        // Calculate overtime based on standard hours from rate card
-        const standardHours = rateCard.standard_hours || 8;
-        const overtimeHours = Math.max(0, formData.expectedWorkHours - standardHours);
-        overtimeCharge = overtimeHours * (rateCard.overtime_rate_lkr_per_hour || 0);
-        overnightCharge = formData.overnightDays * (rateCard.overnight_charge_lkr_per_day || 0);
+        // Lyceum hire: use same km/10 distance-based available hours as Outside hire
+        if (formData.expectedWorkHours && formData.expectedWorkHours > 0) {
+          const now = new Date();
+          const endTime = new Date(now.getTime() + formData.expectedWorkHours * 60 * 60 * 1000);
+          const extraTimeResult = calculateExtraTimeCharge(
+            tripDistance,
+            now,
+            endTime,
+            {
+              baselineSpeedKmph: 10,
+              hourlyRate: rateCard.overtime_rate_lkr_per_hour || 500,
+              nightBlockFee: rateCard.overnight_charge_lkr_per_day || 10000,
+              useStandardHours: false  // Use km/10 same as Outside
+            }
+          );
+          overtimeCharge = extraTimeResult.overtimeCharge;
+          overnightCharge = extraTimeResult.overnightCharge;
+        }
       } else {
         // Outside hire logic - unified flat fee + exceeding rate
         rateCard = allRateCards.find(c => c.flat_fee_lkr != null && c.exceeding_km_rate_lkr != null) || allRateCards[0];
@@ -667,7 +680,8 @@ export function CostCalculator() {
         rateCardDetails: {
           standardHours: rateCard.standard_hours || 8,
           actualHours: formData.expectedWorkHours,
-          overtimeHours: Math.max(0, formData.expectedWorkHours - (rateCard.standard_hours || 8)),
+          availableHours: tripDistance / 10,
+          overtimeHours: Math.max(0, formData.expectedWorkHours - (tripDistance / 10)),
           agreedDistance: baseCoverageKm,
           actualDistance: tripDistance,
           exceedingKm,
