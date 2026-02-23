@@ -1,8 +1,8 @@
 name: Deploy to VPS
 
 on:
-  push:
-    branches: [main]
+  # Manual trigger only — click "Run workflow" in GitHub Actions
+  workflow_dispatch:
 
 env:
   NODE_VERSION: "20"
