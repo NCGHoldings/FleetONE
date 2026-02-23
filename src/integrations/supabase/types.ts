@@ -2021,7 +2021,9 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
+          gl_posted: boolean | null
           id: string
+          journal_entry_id: string | null
           maintenance_date: string
           maintenance_number: string | null
           maintenance_type: string | null
@@ -2042,7 +2044,9 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          gl_posted?: boolean | null
           id?: string
+          journal_entry_id?: string | null
           maintenance_date: string
           maintenance_number?: string | null
           maintenance_type?: string | null
@@ -2063,7 +2067,9 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          gl_posted?: boolean | null
           id?: string
+          journal_entry_id?: string | null
           maintenance_date?: string
           maintenance_number?: string | null
           maintenance_type?: string | null
@@ -2093,6 +2099,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_maintenance_logs_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -6575,6 +6588,7 @@ export type Database = {
           ap_invoice_id: string | null
           ap_payment_id: string | null
           approved_by: string | null
+          bank_account_id: string | null
           bus_id: string | null
           business_unit_code: string
           company_id: string | null
@@ -6583,14 +6597,18 @@ export type Database = {
           description: string | null
           expense_category: string
           expense_subcategory: string | null
+          fuel_liters: number | null
+          fuel_price_per_liter: number | null
           gl_posted: boolean | null
           id: string
           iou_id: string | null
           journal_entry_id: string | null
           notes: string | null
+          ocr_fields_modified: string[] | null
           payment_method: string | null
           petty_cash_fund_id: string | null
           receipt_attachment_url: string | null
+          receipt_ocr_data: Json | null
           request_date: string
           request_number: string
           reviewed_by: string | null
@@ -6605,6 +6623,7 @@ export type Database = {
           ap_invoice_id?: string | null
           ap_payment_id?: string | null
           approved_by?: string | null
+          bank_account_id?: string | null
           bus_id?: string | null
           business_unit_code: string
           company_id?: string | null
@@ -6613,14 +6632,18 @@ export type Database = {
           description?: string | null
           expense_category: string
           expense_subcategory?: string | null
+          fuel_liters?: number | null
+          fuel_price_per_liter?: number | null
           gl_posted?: boolean | null
           id?: string
           iou_id?: string | null
           journal_entry_id?: string | null
           notes?: string | null
+          ocr_fields_modified?: string[] | null
           payment_method?: string | null
           petty_cash_fund_id?: string | null
           receipt_attachment_url?: string | null
+          receipt_ocr_data?: Json | null
           request_date?: string
           request_number: string
           reviewed_by?: string | null
@@ -6635,6 +6658,7 @@ export type Database = {
           ap_invoice_id?: string | null
           ap_payment_id?: string | null
           approved_by?: string | null
+          bank_account_id?: string | null
           bus_id?: string | null
           business_unit_code?: string
           company_id?: string | null
@@ -6643,14 +6667,18 @@ export type Database = {
           description?: string | null
           expense_category?: string
           expense_subcategory?: string | null
+          fuel_liters?: number | null
+          fuel_price_per_liter?: number | null
           gl_posted?: boolean | null
           id?: string
           iou_id?: string | null
           journal_entry_id?: string | null
           notes?: string | null
+          ocr_fields_modified?: string[] | null
           payment_method?: string | null
           petty_cash_fund_id?: string | null
           receipt_attachment_url?: string | null
+          receipt_ocr_data?: Json | null
           request_date?: string
           request_number?: string
           reviewed_by?: string | null
@@ -12149,6 +12177,33 @@ export type Database = {
           },
         ]
       }
+      module_finance_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          module_name: string
+          settings: Json
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          module_name: string
+          settings?: Json
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          module_name?: string
+          settings?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       module_gl_mappings: {
         Row: {
           amount_field: string
@@ -16421,6 +16476,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "school_bus_finance_settings_advance_payments_liability_acc_fkey"
+            columns: ["advance_payments_liability_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "school_bus_finance_settings_bank_account_id_fkey"
             columns: ["bank_account_id"]
@@ -20719,6 +20781,93 @@ export type Database = {
           metadata?: Json | null
           response_time_ms?: number | null
           status?: string
+        }
+        Relationships: []
+      }
+      system_issues: {
+        Row: {
+          assigned_to: string | null
+          auto_diagnosis: string | null
+          browser_info: string | null
+          category: string
+          created_at: string | null
+          description: string | null
+          error_message: string | null
+          id: string
+          is_auto_diagnosed: boolean | null
+          issue_number: number
+          notification_sent: boolean | null
+          notify_reporter: boolean | null
+          page_name: string | null
+          page_url: string | null
+          priority: string
+          reported_by: string | null
+          reporter_email: string | null
+          reporter_name: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          screenshot_url: string | null
+          status: string
+          suggested_fix: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          auto_diagnosis?: string | null
+          browser_info?: string | null
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          error_message?: string | null
+          id?: string
+          is_auto_diagnosed?: boolean | null
+          issue_number?: number
+          notification_sent?: boolean | null
+          notify_reporter?: boolean | null
+          page_name?: string | null
+          page_url?: string | null
+          priority?: string
+          reported_by?: string | null
+          reporter_email?: string | null
+          reporter_name?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          screenshot_url?: string | null
+          status?: string
+          suggested_fix?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          auto_diagnosis?: string | null
+          browser_info?: string | null
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          error_message?: string | null
+          id?: string
+          is_auto_diagnosed?: boolean | null
+          issue_number?: number
+          notification_sent?: boolean | null
+          notify_reporter?: boolean | null
+          page_name?: string | null
+          page_url?: string | null
+          priority?: string
+          reported_by?: string | null
+          reporter_email?: string | null
+          reporter_name?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          screenshot_url?: string | null
+          status?: string
+          suggested_fix?: string | null
+          title?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -26425,6 +26574,10 @@ export type Database = {
           schedule: string
         }[]
       }
+      get_liability_account_setting: {
+        Args: { p_setting_id: string }
+        Returns: string
+      }
       get_user_page_permissions: {
         Args: { _user_id: string }
         Returns: {
@@ -26474,6 +26627,10 @@ export type Database = {
       sync_all_tyre_conditions: { Args: never; Returns: undefined }
       update_active_seasonal_themes: { Args: never; Returns: undefined }
       update_all_tyre_conditions: { Args: never; Returns: undefined }
+      update_liability_account_setting: {
+        Args: { p_account_id: string; p_setting_id: string }
+        Returns: undefined
+      }
       update_trip_status_with_adjustments: {
         Args: {
           p_changed_by?: string
