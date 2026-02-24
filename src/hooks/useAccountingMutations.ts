@@ -384,7 +384,7 @@ export const useCreateARInvoice = () => {
 
       // ========== AUTO GL POSTING: DR Trade Receivable, CR Sales Revenue ==========
       try {
-        const { data: glSettings } = await supabase
+        const { data: glSettings } = await (supabase as any)
           .from("gl_settings")
           .select("trade_receivable_account_id, sales_revenue_account_id")
           .eq("company_id", effectiveCompanyId)
@@ -1483,20 +1483,20 @@ export const useApproveAPInvoice = () => {
         const businessUnitCode = isSubCompanyOfNCGHolding(selectedCompanyId || '') ? getBusinessUnitCode() : undefined;
 
         // Fetch invoice details
-        const { data: invoice } = await supabase
+        const { data: invoice } = await (supabase as any)
           .from("ap_invoices")
-          .select("invoice_number, invoice_date, total_amount, expense_account_id, vendors(vendor_name)")
+          .select("invoice_number, invoice_date, total_amount, vendors(vendor_name)")
           .eq("id", id)
           .single();
 
         // Fetch GL settings
-        const { data: glSettings } = await supabase
+        const { data: glSettings } = await (supabase as any)
           .from("gl_settings")
           .select("trade_payable_account_id, default_expense_account_id")
           .eq("company_id", effectiveCompanyId)
           .maybeSingle();
 
-        const expenseAccountId = invoice?.expense_account_id || glSettings?.default_expense_account_id;
+        const expenseAccountId = glSettings?.default_expense_account_id;
         const tradePayableId = glSettings?.trade_payable_account_id;
 
         if (invoice && expenseAccountId && tradePayableId && invoice.total_amount > 0) {
@@ -1553,7 +1553,7 @@ export const useApproveAPPayment = () => {
           .single();
 
         // Fetch GL settings
-        const { data: glSettings } = await supabase
+        const { data: glSettings } = await (supabase as any)
           .from("gl_settings")
           .select("trade_payable_account_id, bank_account_id")
           .eq("company_id", effectiveCompanyId)
@@ -2514,7 +2514,7 @@ export const useApproveStockAdjustment = () => {
           .single();
 
         // Fetch GL settings for inventory
-        const { data: glSettings } = await supabase
+        const { data: glSettings } = await (supabase as any)
           .from("gl_settings")
           .select("*")
           .eq("company_id", effectiveCompanyId)

@@ -277,7 +277,8 @@ export const PostTripAdjustmentModal = ({
       // ========================
       if (totals.adjustment_amount > 0) {
         try {
-          const { postPostTripAdjustmentToGLStandalone, fetchSpecialHireFinanceSettings, NCG_HOLDING_ID } = await import("@/hooks/useSpecialHireFinance");
+          const { postPostTripAdjustmentToGLStandalone, fetchSpecialHireFinanceSettings } = await import("@/hooks/useSpecialHireFinance");
+          const { NCG_HOLDING_ID } = await import("@/contexts/CompanyContext");
           const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
 
           if (settings) {

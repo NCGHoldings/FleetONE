@@ -93,7 +93,7 @@ export function useRoutePermitFinanceSettings() {
       }
 
       if (data?.settings) {
-        return data.settings as RoutePermitFinanceSettings;
+        return data.settings as unknown as RoutePermitFinanceSettings;
       }
 
       return {
@@ -115,12 +115,12 @@ export function useSaveRoutePermitFinanceSettings() {
 
   return useMutation({
     mutationFn: async (settings: RoutePermitFinanceSettings) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("module_finance_settings")
         .upsert({
           company_id: effectiveCompanyId,
           module_name: "route_permits",
-          settings: settings,
+          settings: settings as any,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: "company_id,module_name",

@@ -17,6 +17,7 @@ import { useVendors } from "@/hooks/useAccountingData";
 import { useExpenseRequestFinanceSettings, usePostExpenseRequestToGL, useExpenseGLMappings } from "@/hooks/useExpenseRequestFinance";
 import { CurrencyDisplay } from "./shared/CurrencyDisplay";
 import { ExpenseRequestForm } from "./ExpenseRequestForm";
+import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
   draft: "bg-gray-500",
@@ -93,7 +94,7 @@ export const ExpenseReviewView = () => {
     });
 
     // Auto-post to GL if auto_post_on_approve is enabled and finance settings configured
-    if (expenseFinanceSettings?.auto_post_on_approve && expenseGLMappings && selectedExpense.amount > 0) {
+    if ((expenseFinanceSettings as Record<string, any>)?.auto_post_on_approve && expenseGLMappings && selectedExpense.amount > 0) {
       postExpenseToGL.mutate({
         expense: {
           id: selectedExpense.id,

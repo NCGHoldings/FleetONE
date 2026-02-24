@@ -85,7 +85,7 @@ export function useCommissionFinanceSettings() {
       }
 
       if (data?.settings) {
-        return data.settings as CommissionFinanceSettings;
+        return data.settings as unknown as CommissionFinanceSettings;
       }
 
       return {
@@ -106,12 +106,12 @@ export function useSaveCommissionFinanceSettings() {
 
   return useMutation({
     mutationFn: async (settings: CommissionFinanceSettings) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("module_finance_settings")
         .upsert({
           company_id: effectiveCompanyId,
           module_name: "commissions",
-          settings: settings,
+          settings: settings as any,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: "company_id,module_name",

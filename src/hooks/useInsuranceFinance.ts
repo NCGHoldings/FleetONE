@@ -107,7 +107,7 @@ export function useInsuranceFinanceSettings() {
       }
 
       if (data?.settings) {
-        return data.settings as InsuranceFinanceSettings;
+        return data.settings as unknown as InsuranceFinanceSettings;
       }
 
       return {
@@ -132,12 +132,12 @@ export function useSaveInsuranceFinanceSettings() {
 
   return useMutation({
     mutationFn: async (settings: InsuranceFinanceSettings) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("module_finance_settings")
         .upsert({
           company_id: effectiveCompanyId,
           module_name: "insurance",
-          settings: settings,
+          settings: settings as any,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: "company_id,module_name",

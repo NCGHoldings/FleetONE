@@ -138,7 +138,8 @@ export function EnhancedTripStatusManagementModal({
     // ========================
     if (isCancellation && refundAmount > 0 && (refundStatus === 'processed' || refundStatus === 'completed')) {
       try {
-        const { fetchSpecialHireFinanceSettings, postRefundToGLStandalone, NCG_HOLDING_ID } = await import("@/hooks/useSpecialHireFinance");
+        const { fetchSpecialHireFinanceSettings, postRefundToGLStandalone } = await import("@/hooks/useSpecialHireFinance");
+        const { NCG_HOLDING_ID } = await import("@/contexts/CompanyContext");
         const settings = await fetchSpecialHireFinanceSettings(NCG_HOLDING_ID);
         
         if (settings && trip) {
