@@ -1,107 +1,145 @@
 
 
-# Fix: Yutong Quotation PDF Signature Rendering and Multi-Page Preview
+# Fix: Special Hire KPIs Not Updating Beyond 2000 Records
 
-## Problems Identified
+## Problem
 
-### 1. Signatures Not Rendering in Downloaded PDF
-The `generatePDFBase64` function in `YutongQuotationViewModal.tsx` only pre-loads images matching `img[src*="lovable-uploads"]` as base64 for html2canvas. Signature images (which use data URLs from canvas drawings or Supabase storage URLs) are **not included** in this pre-loading step. This causes html2canvas to either skip or fail to render signature images in the PDF.
+The Special Hire Management KPI cards are stuck showing **2000 Total Quotations** when the database actually has **2033**. This happens because:
 
-### 2. Both Pages Must Always Show Signatures
-Both Page 1 and Page 2 have identical signature blocks that fetch from the same `signatures` state. The signatures load correctly on screen preview but fail in PDF due to the image pre-loading issue above.
+1. **Supabase row limit**: The `loadStats()` function fetches all rows using `.select('status, gross_revenue, approval_status, created_at')` which is capped by Supabase's default PostgREST row limit (~2000). It then counts rows client-side with `.length`, so the count is never accurate beyond the limit.
 
-## Fix Details
+2. **Missing `is_active_version` filter**: The KPI query counts ALL quotations (including old versions), while the quotation list correctly filters by `is_active_version = true` (showing 1743). The KPIs should match the list.
 
-### File: `src/components/yutong/YutongQuotationViewModal.tsx`
+3. **Comparison period logic is flawed**: The "comparison" query uses `.lte('created_at', comparisonDate)` which fetches all records *before* the comparison date -- this gives the cumulative total at that point, not just the records in the comparison window. Change percentages are therefore meaningless for older data.
 
-**Change 1: Pre-load ALL images, not just lovable-uploads (lines 119-148)**
+## Actual vs Displayed Numbers
 
-Replace the selector `img[src*="lovable-uploads"]` with `img` to capture all images including signature images. Also add handling for signature data URLs that may need special treatment with html2canvas.
+| Metric | Database (Real) | KPI Shows | Issue |
+|--------|-----------------|-----------|-------|
+| Total Quotations | 2033 (all) / 1743 (active) | 2000 | Row limit cap |
+| Confirmed Trips | 97 | 97 | Happens to be under limit |
+| Revenue | LKR 7,250,960.50 | LKR 7,250,960.5 | Correct (payments table is small) |
+| Pending Approval | 163 | ~152 | Row limit excludes some |
+
+## Solution
+
+### File: `src/pages/SpecialHire.tsx` -- Rewrite `loadStats()` function (lines 142-225)
+
+Replace the client-side counting approach with **server-side counting using Supabase `count` and `head` options**, and add the `is_active_version` filter.
+
+**New approach for each metric:**
 
 ```typescript
-// Before: Only lovable-uploads images
-const allImages = printRef.current.querySelectorAll('img[src*="lovable-uploads"]');
+const loadStats = async () => {
+  try {
+    const selectedPeriod = comparisonPeriods.find(p => p.value === comparisonPeriod);
+    const daysBack = selectedPeriod?.days || 7;
+    const currentDate = new Date();
+    const comparisonStartDate = new Date();
+    comparisonStartDate.setDate(currentDate.getDate() - daysBack);
+    const previousStartDate = new Date();
+    previousStartDate.setDate(currentDate.getDate() - (daysBack * 2));
 
-// After: ALL images including signatures
-const allImages = printRef.current.querySelectorAll('img');
-```
+    // Use count queries instead of fetching all rows
+    const [
+      { count: totalQuotations },
+      { count: pendingQuotations },
+      { count: confirmedTrips },
+      { count: pendingApprovals },
+      { data: revenueData },
+      { count: pendingFinanceApprovals },
+      // Comparison period counts (records created in previous period)
+      { count: compTotalQuotations },
+      { count: compConfirmedTrips },
+    ] = await Promise.all([
+      // Total active quotations
+      supabase.from('special_hire_quotations')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active_version', true),
+      // Pending
+      supabase.from('special_hire_quotations')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active_version', true)
+        .eq('status', 'pending'),
+      // Confirmed
+      supabase.from('special_hire_quotations')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active_version', true)
+        .eq('status', 'confirmed'),
+      // Pending approval
+      supabase.from('special_hire_quotations')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active_version', true)
+        .eq('approval_status', 'pending'),
+      // Revenue (small table, safe to fetch)
+      supabase.from('special_hire_payments')
+        .select('status, amount'),
+      // Finance pending
+      supabase.from('special_hire_payments')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending_finance'),
+      // Comparison: quotations created in previous period
+      supabase.from('special_hire_quotations')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active_version', true)
+        .gte('created_at', previousStartDate.toISOString())
+        .lt('created_at', comparisonStartDate.toISOString()),
+      // Comparison: confirmed in previous period
+      supabase.from('special_hire_quotations')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active_version', true)
+        .eq('status', 'confirmed')
+        .gte('created_at', previousStartDate.toISOString())
+        .lt('created_at', comparisonStartDate.toISOString()),
+    ]);
 
-Also skip base64 data URLs from the fetch-and-convert step (they are already base64), and only convert external/relative URLs:
+    // Current period new quotations for comparison
+    const { count: currentPeriodNew } = await supabase
+      .from('special_hire_quotations')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active_version', true)
+      .gte('created_at', comparisonStartDate.toISOString());
 
-```typescript
-allImages.forEach(img => {
-  const imgEl = img as HTMLImageElement;
-  // Skip data URLs - already base64
-  if (!imgEl.src.startsWith('data:')) {
-    uniqueUrls.add(imgEl.src);
+    const totalRevenue = revenueData
+      ?.filter(p => p.status === 'approved')
+      .reduce((sum, p) => sum + p.amount, 0) || 0;
+
+    const calculateChange = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    setStats({
+      totalQuotations: totalQuotations || 0,
+      pendingQuotations: pendingQuotations || 0,
+      confirmedTrips: confirmedTrips || 0,
+      totalRevenue,
+      pendingApprovals: pendingApprovals || 0,
+      pendingFinanceApprovals: pendingFinanceApprovals || 0,
+      totalQuotationsChange: calculateChange(currentPeriodNew || 0, compTotalQuotations || 0),
+      confirmedTripsChange: calculateChange(confirmedTrips || 0, compConfirmedTrips || 0),
+      // ... other change calculations
+    });
+  } catch (error) {
+    console.error('Error loading stats:', error);
   }
-});
+};
 ```
 
-**Change 2: Improve html2canvas options for signature rendering (line 174-186)**
+### Key Changes Summary
 
-Add `allowTaint: true` option and ensure data URL images are handled. Also set a fixed height matching A4 proportions (1123px at 96dpi) instead of using `page.scrollHeight`:
+1. **Use `{ count: 'exact', head: true }`** -- asks Supabase to count server-side without returning row data. Works for any table size.
+2. **Add `.eq('is_active_version', true)`** -- KPI totals now match the quotation list count (1743 active, not 2033 total).
+3. **Fix comparison logic** -- compare records created in the current period vs. the previous period of equal length, not cumulative totals.
+4. **Use `Promise.all()`** -- run all count queries in parallel for faster loading.
+5. **No row limit issues** -- `head: true` means no rows are fetched, only the count header.
 
-```typescript
-const canvas = await html2canvas(page, {
-  scale: 2.5,          // Higher quality (matching memory standard)
-  useCORS: true,
-  allowTaint: true,    // Allow tainted canvas for data URLs
-  backgroundColor: '#ffffff',
-  width: 794,
-  height: 1123,        // Fixed A4 height at 96dpi
-  scrollX: 0,
-  scrollY: 0,
-  foreignObjectRendering: false,
-  removeContainer: true,
-  logging: false
-});
-```
+## Also Fix: Build Errors (Pre-existing)
 
-**Change 3: Use JPEG output for smaller file size (line 193)**
+The build has many pre-existing TypeScript errors in other files. These are unrelated to this KPI fix but block deployment. The most critical ones will be addressed:
 
-```typescript
-const imgData = canvas.toDataURL('image/jpeg', 0.95);
-```
-
-### File: `src/components/yutong/YutongQuotationPreview.tsx`
-
-**Change 4: Ensure signature images have crossOrigin attribute (lines 817-819, 993-995)**
-
-Add `crossOrigin="anonymous"` to signature `<img>` tags on both pages so html2canvas can access them:
-
-```typescript
-<img
-  src={sig.signature_data}
-  alt={`${sig.signer_name} signature`}
-  style={{ maxHeight: "60px", maxWidth: "100%" }}
-  crossOrigin="anonymous"
-/>
-```
-
-This change applies to both Page 1 (line ~817) and Page 2 (line ~994) signature blocks.
-
-## Also Fixing: Edge Function Build Errors
-
-Multiple edge functions have `'error' is of type 'unknown'` TypeScript errors. These will be fixed by adding proper type assertions (`(error as Error).message`) across all affected files:
-
-- `aggregate-fleet-analytics/index.ts`
-- `analyze-trips/index.ts`
-- `auto-sync-attendance/index.ts`
-- `calculate-commissions/index.ts`
-- `check-fuel-alerts/index.ts`
-- `create-temporary-account/index.ts`
-- `discover-bus-api/index.ts`
-- `execute-workflow-rules/index.ts`
-- `fetch-driver-events/index.ts`
-- `fetch-fios-mileage/index.ts`
-- `fetch-fios-tracking/index.ts` (also fix `bus` possibly undefined and missing `gsm`/`hdop` properties)
-- `get-maps-api-key/index.ts`
-
-## Expected Result
-
-- Signatures (drawn, typed, or uploaded) render correctly in the downloaded PDF on both pages
-- Both pages display properly in the preview and in the generated PDF
-- PDF quality matches the A4 professional standard
-- All edge function build errors resolved
+- **`AssetMaintenanceView.tsx`**: Missing state variables (`selectedLog`, `completionCost`, `completionNotes`) -- add the missing `useState` declarations
+- **`ExpenseReviewView.tsx`**: Missing `toast` import and incorrect type access -- fix imports and type cast
+- **`BudgetAnalytics.tsx`**: `account_id` doesn't exist on `BudgetLineItem` -- use correct property name
+- **Other files**: Type casting fixes for `gl_settings` queries and `NCG_HOLDING_ID` exports
 
