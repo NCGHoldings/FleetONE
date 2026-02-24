@@ -272,13 +272,19 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   }
 
   .meta-left .row, .meta-right .row {
-    margin: 6px 0;
+    margin: 4px 0;
     display: flex;
-    justify-content: space-between;
+    align-items: baseline;
   }
 
   .meta-left .label, .meta-right .label {
     font-weight: 700;
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  .meta-right .label {
+    min-width: 160px;
   }
 
   .attn {
