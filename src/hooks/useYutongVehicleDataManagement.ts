@@ -260,9 +260,11 @@ export function useYutongVehicleDataManagement() {
   const matchVehicleToOrder = useCallback(async (
     vehicleId: string,
     orderId: string,
-    isAutoMatch: boolean = false
+    isAutoMatch: boolean = false,
+    vehicleData?: VehicleRecord
   ): Promise<boolean> => {
     try {
+      // Update vehicle record match status
       const { error } = await supabase
         .from('yutong_vehicle_records')
         .update({
@@ -273,6 +275,33 @@ export function useYutongVehicleDataManagement() {
         .eq('id', vehicleId);
 
       if (error) throw error;
+
+      // Auto-populate vehicle details into the order
+      if (vehicleData) {
+        const orderUpdate: Record<string, any> = {};
+        if (vehicleData.engine_no) orderUpdate.engine_number = vehicleData.engine_no;
+        if (vehicleData.chassis_no) orderUpdate.chassis_number = vehicleData.chassis_no;
+        if (vehicleData.year_of_manufacture) orderUpdate.year_of_manufacture = vehicleData.year_of_manufacture;
+        if (vehicleData.country_of_origin) orderUpdate.country_of_origin = vehicleData.country_of_origin;
+        if (vehicleData.fuel_type) orderUpdate.fuel_type = vehicleData.fuel_type;
+        if (vehicleData.engine_capacity) orderUpdate.engine_capacity = vehicleData.engine_capacity;
+        if (vehicleData.color) orderUpdate.color_scheme = vehicleData.color;
+
+        if (Object.keys(orderUpdate).length > 0) {
+          const { error: orderError } = await supabase
+            .from('yutong_orders')
+            .update(orderUpdate)
+            .eq('id', orderId);
+
+          if (orderError) {
+            console.error('Error syncing vehicle details to order:', orderError);
+            toast.warning('Vehicle matched but some details could not be synced to order');
+          } else {
+            console.log('✅ Vehicle details synced to order:', orderUpdate);
+          }
+        }
+      }
+
       toast.success('Vehicle matched to order successfully');
       return true;
     } catch (error: any) {

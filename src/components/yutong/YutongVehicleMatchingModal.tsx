@@ -50,7 +50,7 @@ export function YutongVehicleMatchingModal({ vehicle, isOpen, onClose, onSuccess
           order_no,
           bus_model,
           status,
-          quotation:yutong_quotations(customer_name, model_name)
+          quotation:yutong_quotations(customer_name, bus_model)
         `)
         .in('status', ['confirmed', 'in_progress', 'production'])
         .order('created_at', { ascending: false });
@@ -62,7 +62,7 @@ export function YutongVehicleMatchingModal({ vehicle, isOpen, onClose, onSuccess
         let score = 0;
         const orderCustomer = (order.quotation?.customer_name || '').toLowerCase();
         const vehicleCustomer = vehicle.customer_name?.toLowerCase() || '';
-        const orderModel = (order.quotation?.model_name || order.bus_model || '').toLowerCase();
+        const orderModel = (order.quotation?.bus_model || order.bus_model || '').toLowerCase();
         const vehicleModel = vehicle.model?.toLowerCase() || '';
 
         // Customer name match (40 points max)
@@ -85,7 +85,7 @@ export function YutongVehicleMatchingModal({ vehicle, isOpen, onClose, onSuccess
           id: order.id,
           order_no: order.order_no,
           customer_name: order.quotation?.customer_name || 'Unknown',
-          model_name: order.quotation?.model_name || order.bus_model || 'Unknown',
+          model_name: order.quotation?.bus_model || order.bus_model || 'Unknown',
           status: order.status,
           matchScore: score
         };
@@ -118,7 +118,7 @@ export function YutongVehicleMatchingModal({ vehicle, isOpen, onClose, onSuccess
     setIsMatching(true);
     try {
       const isAutoMatch = selectedOrder.matchScore >= 80;
-      const success = await matchVehicleToOrder(vehicle.id, selectedOrder.id, isAutoMatch);
+      const success = await matchVehicleToOrder(vehicle.id, selectedOrder.id, isAutoMatch, vehicle);
       if (success) {
         onSuccess();
       }
