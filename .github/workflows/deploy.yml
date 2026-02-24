@@ -1,7 +1,8 @@
 name: Deploy to VPS
 
 on:
-  # Manual trigger only — click "Run workflow" in GitHub Actions
+  push:
+    branches: [main]
   workflow_dispatch:
 
 env:
