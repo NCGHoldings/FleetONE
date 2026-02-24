@@ -15,20 +15,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Mirror via API
+      - name: Sync to FleetONE via API
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          # Get source commit SHA
           SOURCE_SHA=$(git rev-parse HEAD)
-          echo "Source SHA: $SOURCE_SHA"
+          echo "Mirroring commit: $SOURCE_SHA"
 
-          # Push all objects to FleetONE using git
-          git remote add fleetone https://x-access-token:${GH_TOKEN}@github.com/NCGHoldings/FleetONE.git
+          # Use GitHub API to create a repository dispatch on FleetONE
+          # This triggers FleetONE's deploy workflow
+          curl -X POST \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/NCGHoldings/FleetONE/dispatches \
+            -d '{"event_type":"mirror_sync","client_payload":{"sha":"'"${SOURCE_SHA}"'"}}'
 
-          # Push only the source code (exclude .github/workflows to avoid workflow scope issue)
-          git filter-branch --force --index-filter \
-            'git rm -r --cached --ignore-unmatch .github/workflows/' \
-            --prune-empty HEAD
-
-          git push fleetone main --force
+          echo "✅ Triggered FleetONE deploy via repository dispatch"
