@@ -157,7 +157,8 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
     console.log('📦 Order data:', order);
     console.log('📋 Quotation data:', quotation);
     
-    if (!vehicleDetailsComplete) {
+    // For non-proforma invoices, require complete vehicle details
+    if (invoiceType !== 'proforma_invoice' && !vehicleDetailsComplete) {
       console.warn('⚠️ Vehicle details incomplete');
       toast.error('Please complete all vehicle details first');
       setShowVehicleDataModal(true);
@@ -217,14 +218,14 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
       make: 'YUTONG',
       bus_model: order.bus_model,
       seating_capacity: quotation.seating_capacity || 'N/A',
-      year_of_manufacture: order.year_of_manufacture!,
+      year_of_manufacture: order.year_of_manufacture || new Date().getFullYear(),
       country_of_origin: order.country_of_origin || 'China',
       vehicle_condition: order.vehicle_condition || 'New',
-      fuel_type: order.fuel_type!,
-      engine_capacity: order.engine_capacity!,
-      color_scheme: order.color_scheme!,
-      engine_number: order.engine_number!,
-      chassis_number: order.chassis_number!,
+      fuel_type: order.fuel_type || 'TBA',
+      engine_capacity: order.engine_capacity || 0,
+      color_scheme: order.color_scheme || 'TBA',
+      engine_number: order.engine_number || 'TBA',
+      chassis_number: order.chassis_number || 'TBA',
       
       unit_price: order.total_amount / order.quantity,
       quantity: order.quantity,
@@ -358,7 +359,7 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
                 )}
               </div>
               
-              {vehicleDetailsComplete ? (
+              <div className="flex gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button disabled={isLoading}>
@@ -368,34 +369,47 @@ export function YutongOrderInvoiceGenerator({ order, onRefresh }: YutongOrderInv
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem onClick={() => handleGenerateInvoice('direct_invoice')}>
-                      <User className="h-4 w-4 mr-2" />
-                      <div>
-                        <div className="font-medium">Customer Invoice</div>
-                        <div className="text-xs text-muted-foreground">Direct invoice to customer</div>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleGenerateInvoice('proforma_invoice')}>
+                    <DropdownMenuItem 
+                      onClick={() => handleGenerateInvoice('proforma_invoice')}
+                    >
                       <Building className="h-4 w-4 mr-2" />
                       <div>
                         <div className="font-medium">Proforma Invoice</div>
                         <div className="text-xs text-muted-foreground">For bank/finance company</div>
                       </div>
                     </DropdownMenuItem>
-                     <DropdownMenuItem onClick={() => handleGenerateInvoice('tax_invoice')}>
-                       <Receipt className="h-4 w-4 mr-2" />
-                       <div>
-                         <div className="font-medium">Tax Invoice</div>
-                         <div className="text-xs text-muted-foreground">With VAT breakdown</div>
-                       </div>
-                     </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleGenerateInvoice('direct_invoice')}
+                      disabled={!vehicleDetailsComplete}
+                    >
+                      <User className="h-4 w-4 mr-2" />
+                      <div>
+                        <div className="font-medium">Customer Invoice</div>
+                        <div className="text-xs text-muted-foreground">
+                          {vehicleDetailsComplete ? 'Direct invoice to customer' : 'Complete vehicle details first'}
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleGenerateInvoice('tax_invoice')}
+                      disabled={!vehicleDetailsComplete}
+                    >
+                      <Receipt className="h-4 w-4 mr-2" />
+                      <div>
+                        <div className="font-medium">Tax Invoice</div>
+                        <div className="text-xs text-muted-foreground">
+                          {vehicleDetailsComplete ? 'With VAT breakdown' : 'Complete vehicle details first'}
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              ) : (
-                <Button onClick={() => setShowVehicleDataModal(true)}>
-                  Complete Vehicle Details
-                </Button>
-              )}
+                {!vehicleDetailsComplete && (
+                  <Button variant="outline" onClick={() => setShowVehicleDataModal(true)}>
+                    Complete Vehicle Details
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
