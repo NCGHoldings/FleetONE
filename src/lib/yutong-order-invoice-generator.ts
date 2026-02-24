@@ -195,10 +195,26 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
      border-right-color: rgba(255,255,255,0.3);
    }
    
-   .merged-cell {
-     vertical-align: middle !important;
-     text-align: center;
-   }
+    .merged-cell {
+      vertical-align: middle !important;
+      text-align: center;
+      position: relative;
+    }
+    .merged-cell-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 8px;
+      box-sizing: border-box;
+      font-weight: 700;
+    }
 
   .invoice-container {
     width: 900px;
@@ -700,9 +716,9 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
           <tr class="invoice-body">
              <td style="font-weight: 700; width: 25%;">MAKE</td>
              <td style="width: 30%;">${data.make}</td>
-              <td rowspan="8" class="qty merged-cell">${data.quantity}.00</td>
-              <td rowspan="8" class="price merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 }))}</td>
-              <td rowspan="8" class="total merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+               <td rowspan="8" class="qty merged-cell"><div class="merged-cell-content">${data.quantity}.00</div></td>
+               <td rowspan="8" class="price merged-cell"><div class="merged-cell-content">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 }))}</div></td>
+               <td rowspan="8" class="total merged-cell"><div class="merged-cell-content">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div></td>
            </tr>
            <tr class="invoice-body">
              <td style="font-weight: 700;">BUS MODEL</td>
