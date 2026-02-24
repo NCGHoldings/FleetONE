@@ -3,6 +3,8 @@ name: Deploy to VPS
 on:
   push:
     branches: [main]
+  repository_dispatch:
+    types: [mirror_sync]
   workflow_dispatch:
 
 env:
@@ -39,8 +41,8 @@ jobs:
             # Fix git ownership check
             git config --global --add safe.directory "$APP_DIR"
 
-            # Set up authenticated remote
-            REPO_URL="https://${GH_TOKEN}@github.com/NCGHoldings/FleetONE.git"
+            # Pull from source repo (ncg-fleetflow)
+            REPO_URL="https://${GH_TOKEN}@github.com/NCGHoldings/ncg-fleetflow.git"
 
             if [ ! -d ".git" ]; then
               echo "🔧 Initializing git repo..."
