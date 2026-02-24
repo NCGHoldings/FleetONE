@@ -129,41 +129,23 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   ` : ''}
 
   ${isProforma ? `
-  .proforma-badge {
-    position: absolute;
-    top: 120px;
-    right: 40px;
-    background: linear-gradient(135deg, #f97316, #ea580c);
-    color: white;
-    padding: 10px 25px;
-    font-size: 16px;
-    font-weight: bold;
-    border-radius: 6px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
-  }
   .proforma-info {
-    background: #fff7ed;
-    border: 2px solid #f97316;
+    background: #e8f6ff;
+    border: 2px solid #0b2f66;
     border-radius: 8px;
     padding: 16px;
     margin: 20px 40px 0;
   }
   .proforma-info h4 {
-    color: #ea580c;
+    color: #0b2f66;
     margin: 0 0 10px 0;
     font-size: 16px;
+    font-weight: bold;
   }
   .proforma-info p {
     margin: 4px 0;
     font-size: 14px;
-    color: #9a3412;
-  }
-  .proforma-amount-display {
-    background: #fff7ed;
-    border: 2px solid #f97316;
-    color: #ea580c;
+    color: #0b2f66;
   }
   ` : ''}
    
@@ -675,7 +657,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
   <!-- PAGE 1: Product & Pricing Information -->
   <div class="page">
     ${isDraft ? '<div class="draft-watermark">DRAFT</div>' : ''}
-    ${isProforma ? '<div class="proforma-badge">Proforma Invoice</div>' : ''}
+    
     <div class="page-content">
       <div class="header-section">
          <img src="${headerImage}" alt="Invoice Header" class="header-image">
@@ -716,8 +698,8 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
         </thead>
         <tbody>
           <tr class="invoice-body">
-             <td style="font-weight: 700; width: 45%;">MAKE</td>
-             <td>${data.make}</td>
+             <td style="font-weight: 700; width: 25%;">MAKE</td>
+             <td style="width: 30%;">${data.make}</td>
               <td rowspan="8" class="qty merged-cell">${data.quantity}.00</td>
               <td rowspan="8" class="price merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : (isProforma && data.proforma_amount ? (data.proforma_amount / data.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 }) : data.unit_price.toLocaleString('en-US', { minimumFractionDigits: 2 }))}</td>
               <td rowspan="8" class="total merged-cell">${isTaxInvoice ? baseAmount.toLocaleString('en-US', { minimumFractionDigits: 2 }) : displayAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
@@ -785,7 +767,7 @@ export function generateYutongOrderInvoiceHTML(data: YutongOrderInvoiceData): st
 
       ${isProforma ? `
         <div class="proforma-info">
-          <h4>⚠️ PROFORMA INVOICE NOTICE</h4>
+          <h4>PROFORMA INVOICE NOTICE</h4>
           <p>This is a proforma invoice issued for ${(data.proforma_purpose || 'financing').replace('_', ' ')} purposes only.</p>
           <p>The amount shown represents ${data.proforma_amount_percentage || 0}% of the total vehicle price.</p>
           <p>This document is not a demand for payment and should not be used for tax purposes.</p>
