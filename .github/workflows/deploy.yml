@@ -56,6 +56,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
+            # Create an empty .env file if it doesn't exist so Docker COPY doesn't fail
+            touch .env
+
             echo "🐳 Rebuilding Docker container..."
             docker build -t fleetflow .
             docker rm -f fleetflow || true
