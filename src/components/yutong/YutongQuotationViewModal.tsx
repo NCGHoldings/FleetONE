@@ -115,15 +115,17 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
       throw new Error('No pages found in quotation preview');
     }
 
-    // Pre-load all images from lovable-uploads as base64
-    const allImages = printRef.current.querySelectorAll('img[src*="lovable-uploads"]');
+    // Pre-load ALL images (including signatures) as base64
+    const allImages = printRef.current.querySelectorAll('img');
     const originalSrcs: Map<HTMLImageElement, string> = new Map();
     
-    // Load unique image URLs
+    // Load unique image URLs (skip data URLs - already base64)
     const uniqueUrls = new Set<string>();
     allImages.forEach(img => {
       const imgEl = img as HTMLImageElement;
-      uniqueUrls.add(imgEl.src);
+      if (!imgEl.src.startsWith('data:')) {
+        uniqueUrls.add(imgEl.src);
+      }
     });
     
     // Pre-load all unique images
@@ -172,12 +174,12 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
         
         // Create canvas for each page individually
         const canvas = await html2canvas(page, {
-          scale: 2,
+          scale: 2.5,
           useCORS: true,
-          allowTaint: false,
+          allowTaint: true,
           backgroundColor: '#ffffff',
-          width: 794, // A4 width in pixels at 96dpi
-          height: page.scrollHeight,
+          width: 794,
+          height: 1123, // Fixed A4 height at 96dpi
           scrollX: 0,
           scrollY: 0,
           foreignObjectRendering: false,
@@ -190,7 +192,7 @@ export function YutongQuotationViewModal({ quotation, open, onClose }: YutongQuo
         page.style.minHeight = originalMinHeight;
         page.style.maxWidth = originalMaxWidth;
 
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
         
         // Add new page if not the first page
         if (i > 0) {

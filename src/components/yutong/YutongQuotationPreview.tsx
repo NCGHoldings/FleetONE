@@ -817,6 +817,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                           src={sig.signature_data}
                           alt={`${sig.signer_name} signature`}
                           style={{ maxHeight: "60px", maxWidth: "100%" }}
+                          crossOrigin="anonymous"
                         />
                       ) : (
                         <div style={{ fontFamily: "cursive", fontSize: "18px" }}>
@@ -994,6 +995,7 @@ export const YutongQuotationPreview = forwardRef<HTMLDivElement, YutongQuotation
                           src={sig.signature_data}
                           alt={`${sig.signer_name} signature`}
                           style={{ maxHeight: "60px", maxWidth: "100%" }}
+                          crossOrigin="anonymous"
                         />
                       ) : (
                         <div style={{ fontFamily: "cursive", fontSize: "18px" }}>
