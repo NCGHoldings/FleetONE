@@ -1,66 +1,107 @@
 
 
-# Fix: Depreciation GL Posting to Update COA Balances
+# Fix: Yutong Quotation PDF Signature Rendering and Multi-Page Preview
 
-## Problem
+## Problems Identified
 
-The `useRunDepreciationWithGL` hook creates journal entries and lines correctly, but **bypasses the COA balance update step**. It directly inserts into `journal_entries` and `journal_entry_lines` tables instead of using the centralized `createAndPostJournalEntry()` utility. This means:
+### 1. Signatures Not Rendering in Downloaded PDF
+The `generatePDFBase64` function in `YutongQuotationViewModal.tsx` only pre-loads images matching `img[src*="lovable-uploads"]` as base64 for html2canvas. Signature images (which use data URLs from canvas drawings or Supabase storage URLs) are **not included** in this pre-loading step. This causes html2canvas to either skip or fail to render signature images in the PDF.
 
-- Trial Balance does not reflect depreciation expense
-- P&L Statement is missing depreciation costs
-- Balance Sheet accumulated depreciation is understated
-- Manual reconciliation is required to fix balances
+### 2. Both Pages Must Always Show Signatures
+Both Page 1 and Page 2 have identical signature blocks that fetch from the same `signatures` state. The signatures load correctly on screen preview but fail in PDF due to the image pre-loading issue above.
 
-## Fix
+## Fix Details
 
-### File: `src/hooks/useAccountingMutations.ts` (lines ~2191)
+### File: `src/components/yutong/YutongQuotationViewModal.tsx`
 
-After the journal entry lines are inserted (line 2191), add a loop to update each affected COA account balance -- matching exactly what `createAndPostJournalEntry()` does internally.
+**Change 1: Pre-load ALL images, not just lovable-uploads (lines 119-148)**
 
-**Add after line 2191** (`await supabase.from("journal_entry_lines").insert(linesWithJE);`):
+Replace the selector `img[src*="lovable-uploads"]` with `img` to capture all images including signature images. Also add handling for signature data URLs that may need special treatment with html2canvas.
 
 ```typescript
-// Update COA balances for each journal line
-for (const line of linesWithJE) {
-  const { data: account } = await supabase
-    .from("chart_of_accounts")
-    .select("current_balance, account_type")
-    .eq("id", line.account_id)
-    .single();
+// Before: Only lovable-uploads images
+const allImages = printRef.current.querySelectorAll('img[src*="lovable-uploads"]');
 
-  if (account) {
-    const isDebitNormal = ["asset", "expense"].includes(account.account_type);
-    const adjustment = isDebitNormal
-      ? (line.debit - line.credit)
-      : (line.credit - line.debit);
-
-    await supabase
-      .from("chart_of_accounts")
-      .update({
-        current_balance: (account.current_balance || 0) + adjustment
-      })
-      .eq("id", line.account_id);
-  }
-}
+// After: ALL images including signatures
+const allImages = printRef.current.querySelectorAll('img');
 ```
 
-This ensures:
-- **Depreciation Expense account** (expense type, debit-normal) increases by the depreciation amount
-- **Accumulated Depreciation account** (contra-asset, credit-normal) increases by the same amount
-- Balances update in real-time, no manual reconciliation needed
+Also skip base64 data URLs from the fetch-and-convert step (they are already base64), and only convert external/relative URLs:
 
-### Why not switch to `createAndPostJournalEntry()`?
+```typescript
+allImages.forEach(img => {
+  const imgEl = img as HTMLImageElement;
+  // Skip data URLs - already base64
+  if (!imgEl.src.startsWith('data:')) {
+    uniqueUrls.add(imgEl.src);
+  }
+});
+```
 
-The depreciation hook has a unique batching pattern -- it processes multiple assets, aggregates all lines into one journal entry, and links each schedule entry back to the JE. Refactoring to use the utility would require significant restructuring. Adding the balance update loop after the existing insert is the minimal, safe fix that aligns the behavior.
+**Change 2: Improve html2canvas options for signature rendering (line 174-186)**
 
-## Result
+Add `allowTaint: true` option and ensure data URL images are handled. Also set a fixed height matching A4 proportions (1123px at 96dpi) instead of using `page.scrollHeight`:
 
-After this fix, all 4 fixed asset operations will fully update COA balances automatically:
+```typescript
+const canvas = await html2canvas(page, {
+  scale: 2.5,          // Higher quality (matching memory standard)
+  useCORS: true,
+  allowTaint: true,    // Allow tainted canvas for data URLs
+  backgroundColor: '#ffffff',
+  width: 794,
+  height: 1123,        // Fixed A4 height at 96dpi
+  scrollX: 0,
+  scrollY: 0,
+  foreignObjectRendering: false,
+  removeContainer: true,
+  logging: false
+});
+```
 
-| Operation | JE Created | COA Updated | Status |
-|-----------|-----------|-------------|--------|
-| Acquisition | Yes | Yes | Working |
-| Depreciation | Yes | **Yes (this fix)** | **Fixed** |
-| Disposal | Yes | Yes | Working |
-| Revaluation | Yes | Yes | Working |
+**Change 3: Use JPEG output for smaller file size (line 193)**
+
+```typescript
+const imgData = canvas.toDataURL('image/jpeg', 0.95);
+```
+
+### File: `src/components/yutong/YutongQuotationPreview.tsx`
+
+**Change 4: Ensure signature images have crossOrigin attribute (lines 817-819, 993-995)**
+
+Add `crossOrigin="anonymous"` to signature `<img>` tags on both pages so html2canvas can access them:
+
+```typescript
+<img
+  src={sig.signature_data}
+  alt={`${sig.signer_name} signature`}
+  style={{ maxHeight: "60px", maxWidth: "100%" }}
+  crossOrigin="anonymous"
+/>
+```
+
+This change applies to both Page 1 (line ~817) and Page 2 (line ~994) signature blocks.
+
+## Also Fixing: Edge Function Build Errors
+
+Multiple edge functions have `'error' is of type 'unknown'` TypeScript errors. These will be fixed by adding proper type assertions (`(error as Error).message`) across all affected files:
+
+- `aggregate-fleet-analytics/index.ts`
+- `analyze-trips/index.ts`
+- `auto-sync-attendance/index.ts`
+- `calculate-commissions/index.ts`
+- `check-fuel-alerts/index.ts`
+- `create-temporary-account/index.ts`
+- `discover-bus-api/index.ts`
+- `execute-workflow-rules/index.ts`
+- `fetch-driver-events/index.ts`
+- `fetch-fios-mileage/index.ts`
+- `fetch-fios-tracking/index.ts` (also fix `bus` possibly undefined and missing `gsm`/`hdop` properties)
+- `get-maps-api-key/index.ts`
+
+## Expected Result
+
+- Signatures (drawn, typed, or uploaded) render correctly in the downloaded PDF on both pages
+- Both pages display properly in the preview and in the generated PDF
+- PDF quality matches the A4 professional standard
+- All edge function build errors resolved
 
